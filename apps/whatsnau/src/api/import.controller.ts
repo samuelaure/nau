@@ -111,16 +111,33 @@ router.post('/batches/:id/execute', async (req: Request, res: Response) => {
             include: { opportunities: true }
         });
 
+        const firstStage = await db.campaignStage.findFirst({
+            where: { campaignId: batch.campaignId },
+            orderBy: { order: 'asc' }
+        });
+
         for (const s of stagingLeads) {
             // Check if already exists in Lead
             const existing = await db.lead.findFirst({ where: { phoneNumber: s.phoneNumber } });
-            if (existing) continue;
+            if (existing) {
+                await db.lead.update({
+                    where: { id: existing.id },
+                    data: {
+                        campaignId: batch.campaignId,
+                        currentStageId: firstStage?.id,
+                        state: 'OUTREACH'
+                    }
+                });
+                continue;
+            }
 
             const lead = await db.lead.create({
                 data: {
                     phoneNumber: s.phoneNumber,
                     name: s.name,
                     campaignId: batch.campaignId,
+                    currentStageId: firstStage?.id,
+                    state: 'OUTREACH',
                     metadata: s.rawData
                 }
             });
@@ -148,6 +165,39 @@ router.post('/batches/:id/execute', async (req: Request, res: Response) => {
     } catch (error) {
         logger.error({ err: error }, 'Batch execution failed');
         res.status(500).json({ error: 'Execution failed' });
+    }
+});
+
+/**
+ * REACH: Start sending M1 to leads in this batch
+ */
+router.post('/batches/:id/reach', async (req: Request, res: Response) => {
+    const batchId = req.params.id;
+    try {
+        const batch = await (db as any).leadImportBatch.findUnique({ where: { id: batchId } });
+        const leads = await db.lead.findMany({
+            where: {
+                campaignId: batch.campaignId,
+                messages: { none: {} }, // No messages yet
+                state: 'OUTREACH'
+            }
+        });
+
+        const firstStage = await db.campaignStage.findFirst({
+            where: { campaignId: batch.campaignId },
+            orderBy: { order: 'asc' }
+        });
+
+        const { SequenceService } = await import('../services/sequence.service.js');
+
+        for (const lead of leads) {
+            await SequenceService.triggerInitialContact(lead, firstStage);
+        }
+
+        res.json({ success: true, count: leads.length });
+    } catch (error) {
+        logger.error({ err: error }, 'Batch reach failed');
+        res.status(500).json({ error: 'Reach failed' });
     }
 });
 

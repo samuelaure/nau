@@ -49,19 +49,22 @@ export class NotificationService {
 
     static async notifyHandover(lead: any, reasoning?: string) {
         const dashboardUrl = `http://localhost:5173/`; // Should be configurable
+        const leadLink = `${dashboardUrl}?leadId=${lead.id}`;
         const text = `🚨 <b>Intelligent Handover Triggered</b>\n\n` +
             `👤 <b>Lead:</b> ${lead.name || 'Unknown'} (${lead.phoneNumber})\n` +
             `📝 <b>Reasoning:</b> ${reasoning || 'Lead requested human intervention.'}\n\n` +
-            `🔗 <a href="${dashboardUrl}">Open Dashboard</a>`;
+            `🔗 <a href="${leadLink}">Open Chat</a>`;
 
         await this.sendTelegramAlert(text);
     }
 
     static async notifyHighIntent(lead: any, message: string) {
+        const dashboardUrl = `http://localhost:5173/`;
+        const leadLink = `${dashboardUrl}?leadId=${lead.id}`;
         const text = `🔥 <b>High Intent Detected</b>\n\n` +
             `👤 <b>Lead:</b> ${lead.name || 'Unknown'} (${lead.phoneNumber})\n` +
             `💬 <b>Message:</b> "${message}"\n\n` +
-            `Check the dashboard to intervene!`;
+            `🔗 <a href="${leadLink}">Open Chat and Intervene</a>`;
 
         await this.sendTelegramAlert(text);
     }

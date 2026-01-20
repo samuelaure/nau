@@ -1,22 +1,25 @@
 import { useEffect, useState } from 'react';
 import {
-  Users,
   Target,
-  CheckCircle2,
-  AlertCircle,
   Search,
   RefreshCw,
   MessageSquare,
   X,
-  ShieldAlert,
+  Shield,
   Clock,
   Upload,
   Send,
-  Zap
+  Zap,
+  BarChart3,
+  Mail,
+  UserCheck
 } from 'lucide-react';
 
 interface Metric {
   totalContacts: number;
+  delivered: number;
+  read: number;
+  replied: number;
   interested: number;
   conversions: number;
   blocked: number;
@@ -255,6 +258,7 @@ function App() {
   };
 
   const executeBatch = async (batchId: string) => {
+    if (!confirm('Are you sure you want to move these leads to the live campaign?')) return;
     try {
       await fetch(`http://localhost:3000/api/dashboard/import/batches/${batchId}/execute`, {
         method: 'POST',
@@ -262,10 +266,23 @@ function App() {
         body: JSON.stringify({ leadIds: null })
       });
       fetchBatches();
-      setSelectedBatch(null);
+      // Don't close so they can trigger reach
+      fetchBatchDetails(batchId);
       fetchData();
     } catch (error) {
       console.error('Execution failed:', error);
+    }
+  };
+
+  const runReach = async (batchId: string) => {
+    if (!confirm('This will send the first WhatsApp message to all leads in this batch. Proceed?')) return;
+    try {
+      await fetch(`http://localhost:3000/api/dashboard/import/batches/${batchId}/reach`, { method: 'POST' });
+      alert('Outreach triggered successfully');
+      setSelectedBatch(null);
+      fetchBatches();
+    } catch (error) {
+      console.error('Reach failed:', error);
     }
   };
 
@@ -389,8 +406,32 @@ function App() {
     });
     eventSource.addEventListener('status', () => fetchData());
     eventSource.addEventListener('handover', () => fetchData());
+
+    // Deep Linking Support
+    const params = new URLSearchParams(window.location.search);
+    const leadId = params.get('leadId');
+    if (leadId) {
+      // We need to wait for leads to be loaded or just fetch specifically
+      // For now, let's just trigger a search when leads are updated in another useEffect
+    }
+
     return () => eventSource.close();
   }, [selectedLead]);
+
+  useEffect(() => {
+    if (leads.length > 0 && !selectedLead) {
+      const params = new URLSearchParams(window.location.search);
+      const leadId = params.get('leadId');
+      if (leadId) {
+        const lead = leads.find(l => l.id === leadId);
+        if (lead) {
+          setSelectedLead(lead);
+          // Clean up URL
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+      }
+    }
+  }, [leads]);
 
   useEffect(() => {
     if (activeTab === 'import') {
@@ -405,11 +446,14 @@ function App() {
   }, [selectedLead]);
 
   const totalMetrics = stats.reduce((acc, curr) => ({
-    totalContacts: acc.totalContacts + curr.metrics.totalContacts,
-    interested: acc.interested + curr.metrics.interested,
-    conversions: acc.conversions + curr.metrics.conversions,
-    blocked: acc.blocked + curr.metrics.blocked,
-  }), { totalContacts: 0, interested: 0, conversions: 0, blocked: 0 });
+    totalContacts: acc.totalContacts + (curr.metrics.totalContacts || 0),
+    delivered: acc.delivered + (curr.metrics.delivered || 0),
+    read: acc.read + (curr.metrics.read || 0),
+    replied: acc.replied + (curr.metrics.replied || 0),
+    interested: acc.interested + (curr.metrics.interested || 0),
+    conversions: acc.conversions + (curr.metrics.conversions || 0),
+    blocked: acc.blocked + (curr.metrics.blocked || 0),
+  }), { totalContacts: 0, delivered: 0, read: 0, replied: 0, interested: 0, conversions: 0, blocked: 0 });
 
   return (
     <div className="dashboard-container">
@@ -437,36 +481,56 @@ function App() {
 
       {activeTab === 'overview' && (
         <>
-          <div className="stats-grid">
+          <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
             <div className="stat-card">
               <div className="stat-label flex items-center gap-2">
-                <Users size={16} color="var(--primary)" /> Total Contacts
+                <BarChart3 size={16} color="var(--primary)" /> Total Outbound
               </div>
               <div className="stat-value">{totalMetrics.totalContacts}</div>
-              <div className="stat-trend" style={{ color: 'var(--primary)' }}>Active outreach</div>
+              <div className="stat-trend">Leads imported</div>
             </div>
             <div className="stat-card">
-              <div className="stat-label">
-                <Target size={16} color="var(--accent)" /> Interested Leads
+              <div className="stat-label flex items-center gap-2">
+                <Mail size={16} color="var(--success)" /> Delivered
+              </div>
+              <div className="stat-value">{totalMetrics.delivered}</div>
+              <div className="stat-trend" style={{ color: 'var(--success)' }}>
+                {((totalMetrics.delivered / (totalMetrics.totalContacts || 1)) * 100).toFixed(1)}% reach
+              </div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label flex items-center gap-2">
+                <Send size={16} color="var(--primary)" /> Read (Opens)
+              </div>
+              <div className="stat-value">{totalMetrics.read}</div>
+              <div className="stat-trend" style={{ color: 'var(--primary)' }}>
+                {((totalMetrics.read / (totalMetrics.delivered || 1)) * 100).toFixed(1)}% open rate
+              </div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label flex items-center gap-2">
+                <MessageSquare size={16} color="var(--accent)" /> Replied
+              </div>
+              <div className="stat-value">{totalMetrics.replied}</div>
+              <div className="stat-trend" style={{ color: 'var(--accent)' }}>
+                {((totalMetrics.replied / (totalMetrics.read || 1)) * 100).toFixed(1)}% reply rate
+              </div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label flex items-center gap-2">
+                <Target size={16} color="var(--accent)" /> Interested
               </div>
               <div className="stat-value">{totalMetrics.interested}</div>
-              <div className="stat-trend" style={{ color: 'var(--accent)' }}>Ready for demo</div>
+              <div className="stat-trend" style={{ color: 'var(--accent)' }}>High potential</div>
             </div>
             <div className="stat-card">
-              <div className="stat-label">
-                <CheckCircle2 size={16} color="var(--success)" /> Converted
+              <div className="stat-label flex items-center gap-2">
+                <UserCheck size={16} color="var(--success)" /> Converted
               </div>
-              <div className="stat-value">{totalMetrics.conversions}</div>
-              <div className="stat-trend" style={{ color: 'var(--success)' }}>Success rate: {((totalMetrics.conversions / (totalMetrics.totalContacts || 1)) * 100).toFixed(1)}%</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">
-                <AlertCircle size={16} color="var(--danger)" /> Handover Required
+              <div className="stat-value" style={{ color: 'var(--success)' }}>{totalMetrics.conversions}</div>
+              <div className="stat-trend" style={{ color: 'var(--success)' }}>
+                {((totalMetrics.conversions / (totalMetrics.totalContacts || 1)) * 100).toFixed(1)}% success
               </div>
-              <div className="stat-value" style={{ color: leads.filter(l => l.status === 'HANDOVER').length > 0 ? 'var(--danger)' : 'inherit' }}>
-                {leads.filter(l => l.status === 'HANDOVER').length}
-              </div>
-              <div className="stat-trend">Manual intervention needed</div>
             </div>
           </div>
 
@@ -570,7 +634,7 @@ function App() {
             </div>
             <div className="settings-section">
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
-                <ShieldAlert size={20} color="var(--primary)" />
+                <Shield size={20} color="var(--primary)" />
                 <h3 style={{ margin: 0 }}>Handover</h3>
               </div>
               <form onSubmit={addKeyword} className="keyword-form" style={{ flexDirection: 'column', gap: '0.5rem' }}>
@@ -691,7 +755,12 @@ function App() {
                   <button className="secondary" onClick={() => runAction(selectedBatch.id, 'cleanse')}>Cleanse</button>
                   <button className="secondary" onClick={() => runAction(selectedBatch.id, 'verify-wa')}>Verify WA</button>
                   <button className="secondary" onClick={() => runAction(selectedBatch.id, 'analyze-ai')}><Zap size={14} /> AI Analysis</button>
-                  <button onClick={() => executeBatch(selectedBatch.id)}>🚀 Execute</button>
+                  {selectedBatch.status !== 'COMPLETED' && (
+                    <button onClick={() => executeBatch(selectedBatch.id)}>🚀 Execute</button>
+                  )}
+                  {selectedBatch.status === 'COMPLETED' && (
+                    <button onClick={() => runReach(selectedBatch.id)} style={{ background: 'var(--success)' }}>📣 Start Outreach</button>
+                  )}
                 </div>
               </div>
               <table>

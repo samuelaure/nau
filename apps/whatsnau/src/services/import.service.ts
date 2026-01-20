@@ -21,27 +21,52 @@ export class ImportService {
         });
 
         const stagingLeads = records.map((record: any) => {
-            // Flexible detection of common headers
-            const phoneKey = Object.keys(record).find(k => k.toLowerCase().includes('phone') || k.toLowerCase().includes('tel') || k.toLowerCase().includes('número')) || '';
-            const nameKey = Object.keys(record).find(k => k.toLowerCase() === 'name' || k.toLowerCase().includes('nombre') || k.toLowerCase().includes('business')) || '';
-            const websiteKey = Object.keys(record).find(k => k.toLowerCase().includes('web') || k.toLowerCase().includes('sitio') || k.toLowerCase().includes('url')) || '';
-            const emailKey = Object.keys(record).find(k => k.toLowerCase().includes('email') || k.toLowerCase().includes('correo')) || '';
+            // Flexible detection of common headers (including common scraping tool outputs)
+            const phoneKey = Object.keys(record).find(k => {
+                const lower = k.toLowerCase();
+                return lower.includes('phone') || lower.includes('tel') || lower.includes('nmero') || lower.includes('whatsapp') || lower.includes('mobile');
+            }) || '';
 
-            let phone = record[phoneKey] || '';
-            // Basic phone cleaning (remove spaces, dashes)
+            const nameKey = Object.keys(record).find(k => {
+                const lower = k.toLowerCase();
+                return lower === 'name' || lower.includes('nombre') || lower.includes('business') || lower.includes('company') || lower.includes('title');
+            }) || '';
+
+            const websiteKey = Object.keys(record).find(k => {
+                const lower = k.toLowerCase();
+                return lower.includes('web') || lower.includes('sitio') || lower.includes('url') || lower.includes('link') || lower.includes('domain');
+            }) || '';
+
+            const emailKey = Object.keys(record).find(k => {
+                const lower = k.toLowerCase();
+                return lower.includes('email') || lower.includes('correo') || lower.includes('mail');
+            }) || '';
+
+            const ratingKey = Object.keys(record).find(k => k.toLowerCase().includes('rating') || k.toLowerCase().includes('nota') || k.toLowerCase().includes('puntuacion')) || '';
+            const reviewsKey = Object.keys(record).find(k => k.toLowerCase().includes('reviews') || k.toLowerCase().includes('reseñas') || k.toLowerCase().includes('count')) || '';
+
+            let phone = (record[phoneKey] || '').toString().trim();
+            // Basic phone cleaning (remove spaces, dashes, parentheses)
             phone = phone.replace(/[^0-9+]/g, '');
             if (phone && !phone.startsWith('+')) {
-                // Default to +34 if missing (Spain first principle) or just keep as is if too short
-                if (phone.length === 9) phone = `+34${phone}`;
+                // If it looks like a Spain number without prefix
+                if (phone.length === 9 && (phone.startsWith('6') || phone.startsWith('7') || phone.startsWith('9'))) {
+                    phone = `+34${phone}`;
+                }
+            }
+
+            let website = (record[websiteKey] || '').toString().trim();
+            if (website && !website.startsWith('http')) {
+                website = `https://${website}`;
             }
 
             return {
                 batchId: batch.id,
                 rawData: JSON.stringify(record),
                 phoneNumber: phone,
-                name: record[nameKey] || null,
-                website: record[websiteKey] || null,
-                email: record[emailKey] || null,
+                name: (record[nameKey] || null)?.toString().trim(),
+                website: website || null,
+                email: (record[emailKey] || null)?.toString().trim(),
                 cleanseStatus: 'PENDING'
             };
         });

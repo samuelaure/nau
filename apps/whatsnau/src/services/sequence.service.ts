@@ -94,6 +94,36 @@ export class SequenceService {
         }
     }
 
+    static async triggerInitialContact(lead: any, stage: any) {
+        logger.info({ leadId: lead.id, stage: stage.name }, 'Triggering initial contact (M1)');
+
+        const message = `¡Hola ${lead.name || ''}! Soy Samuel de whatsnaŭ. He visto tu negocio y me ha parecido muy interesante. ¿Te gustaría automatizar tus captaciones por WhatsApp?`;
+
+        const res = await WhatsAppService.sendText(lead.phoneNumber, message);
+        const whatsappId = res?.messages?.[0]?.id;
+
+        await db.lead.update({
+            where: { id: lead.id },
+            data: {
+                currentStageId: stage.id,
+                lastInteraction: new Date()
+            }
+        });
+
+        if (whatsappId) {
+            await db.message.create({
+                data: {
+                    leadId: lead.id,
+                    direction: 'OUTBOUND',
+                    content: message,
+                    whatsappId,
+                    campaignStage: stage.name,
+                    status: 'sent'
+                }
+            });
+        }
+    }
+
     private static async triggerFollowUp(lead: any, stage: any) {
         logger.info({ leadId: lead.id, stage: stage.name }, 'Triggering follow-up');
 

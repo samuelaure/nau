@@ -13,20 +13,52 @@ export class AnalysisService {
         for (const lead of stagingLeads) {
             let cleanseStatus = 'CLEANED';
             const opportunities = [];
+            const raw = JSON.parse(lead.rawData);
 
-            // Example opportunistic logic: Missing website for Google Maps info
+            // 1. Basic phone validation
+            if (!lead.phoneNumber || lead.phoneNumber.length < 9) {
+                cleanseStatus = 'INVALID';
+            }
+
+            // 2. Duplicate Check (Industry Standard)
+            const existingLead = await db.lead.findFirst({ where: { phoneNumber: lead.phoneNumber } });
+            if (existingLead) {
+                cleanseStatus = 'DUPLICATE';
+            }
+
+            // 3. Opportunity Detection (Deterministic/Non-AI)
+            // No Website
             if (!lead.website || lead.website.trim() === '') {
                 opportunities.push({
                     type: 'NO_WEBSITE',
-                    description: 'Business has no website listed. High potential for web development services.',
+                    description: 'Business has no website listed. Potential for web development services.',
                     severity: 'HIGH'
                 });
             }
 
-            // Basic phone validation
-            if (!lead.phoneNumber || lead.phoneNumber.length < 9) {
-                cleanseStatus = 'INVALID';
+            // Low Reviews or Rating (Common in Gmaps data)
+            const rating = parseFloat(raw.rating || raw.puntuacion || 0);
+            const reviews = parseInt(raw.reviews || raw.reviews_count || raw.reseñas || 0);
+
+            if (reviews > 0 && reviews < 10) {
+                opportunities.push({
+                    type: 'FEW_REVIEWS',
+                    description: `Only ${reviews} reviews. Needs reputation management.`,
+                    severity: 'MEDIUM'
+                });
             }
+
+            if (rating > 0 && rating < 3.5) {
+                opportunities.push({
+                    type: 'LOW_RATING',
+                    description: `Critical rating of ${rating}. Urgent reputation fix needed.`,
+                    severity: 'HIGH'
+                });
+            }
+
+            // 4. Update Staging Lead
+            // Delete old opportunities first to avoid duplicates on re-run
+            await (db as any).opportunity.deleteMany({ where: { stagingLeadId: lead.id, aiGenerated: false } });
 
             await (db as any).stagingLead.update({
                 where: { id: lead.id },
@@ -87,10 +119,15 @@ export class AnalysisService {
         });
 
         for (const lead of stagingLeads) {
-            const prompt = `Analiza los datos de este lead y detecta oportunidades de negocio.\n` +
-                `Datos: ${lead.rawData}\n` +
-                `Oportunidades actuales: ${lead.opportunities.map((o: any) => o.type).join(', ')}\n\n` +
-                `Responde solo con un JSON array de objetos con {type, description, severity}.`;
+            const prompt = `Actúa como un experto en análisis comercial B2B. Analiza los siguientes datos de un cliente potencial y detecta oportunidades específicas de venta o mejora.\n\n` +
+                `DATOS DEL NEGOCIO:\n${lead.rawData}\n\n` +
+                `OPORTUNIDADES YA DETECTADAS: ${lead.opportunities.map((o: any) => o.type).join(', ')}\n\n` +
+                `INSTRUCCIONES:\n` +
+                `1. Identifica problemas que podamos resolver (falta de presencia online, mala reputación, procesos manuales, etc).\n` +
+                `2. Sé muy específico en la descripción.\n` +
+                `3. Asigna una severidad (LOW, MEDIUM, HIGH).\n` +
+                `4. No repitas oportunidades que ya han sido detectadas.\n\n` +
+                `RESPONDE ÚNICAMENTE CON UN ARRAY JSON de objetos con el formato: [{"type": "BREVE_CODIGO", "description": "explicación detallada", "severity": "HIGH/MEDIUM/LOW"}]`;
 
             try {
                 const aiResponse = await AIService.getChatResponse(

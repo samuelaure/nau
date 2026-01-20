@@ -141,6 +141,12 @@ export class Orchestrator {
             return this.handleHumanRequest(lead, aiClassification?.reasoning);
         }
 
+        // Notification for High Intent (Industry Standard: Immediate Alert)
+        if (aiClassification?.intent === 'buy_interest' || aiClassification?.intent === 'demo_request') {
+            await NotificationService.notifyHighIntent(lead, content);
+            await LeadService.addTag(lead.id, 'high_intent');
+        }
+
         // Standard flow processing
         switch (lead.state as LeadState) {
             case LeadState.OUTREACH:
