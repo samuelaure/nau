@@ -90,6 +90,12 @@ model Tag {
   leads       Lead[]
 }
 
+model TakeoverKeyword {
+  id        String   @id @default(uuid())
+  word      String   @unique
+  createdAt DateTime @default(now())
+}
+
 model ConversationSummary {
   id        String   @id @default(uuid())
   leadId    String

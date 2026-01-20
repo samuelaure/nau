@@ -54,13 +54,15 @@ export class Orchestrator {
         });
 
         // 2.5 Human Takeover Check
-        const takeoverKeywords = ['HUMAN', 'AYUDA', 'AGENT', 'HUMANO', 'STOP'];
+        const dynamicKeywords = await db.takeoverKeyword.findMany();
+        const takeoverKeywords = dynamicKeywords.map(k => k.word.toUpperCase());
+
         if (takeoverKeywords.includes(content.toUpperCase().trim())) {
             await db.lead.update({
                 where: { id: lead.id },
                 data: { status: 'HANDOVER' }
             });
-            await WhatsAppService.sendText(lead.phoneNumber, 'He avisado a un compañero humano. En breve se pondrán en contacto contigo.');
+            logger.info({ leadId: lead.id, matchedWord: content }, 'Handover triggered by custom keyword');
             return;
         }
 

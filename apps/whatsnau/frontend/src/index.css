@@ -25,7 +25,7 @@ body {
   color: var(--text-main);
   min-height: 100vh;
   overflow-x: hidden;
-  background-image: 
+  background-image:
     radial-gradient(circle at 10% 20%, rgba(59, 7, 100, 0.15) 0%, transparent 40%),
     radial-gradient(circle at 90% 80%, rgba(124, 124, 255, 0.1) 0%, transparent 40%);
 }
@@ -145,11 +145,33 @@ tr:hover td {
   letter-spacing: 0.02em;
 }
 
-.badge-outreach { background: rgba(124, 124, 255, 0.15); color: #a5a5ff; border: 1px solid rgba(124, 124, 255, 0.2); }
-.badge-pre_sale { background: rgba(217, 70, 239, 0.15); color: #f0abfc; border: 1px solid rgba(217, 70, 239, 0.2); }
-.badge-demo { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.2); }
-.badge-active { color: var(--success); }
-.badge-handover { background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.2); }
+.badge-outreach {
+  background: rgba(124, 124, 255, 0.15);
+  color: #a5a5ff;
+  border: 1px solid rgba(124, 124, 255, 0.2);
+}
+
+.badge-pre_sale {
+  background: rgba(217, 70, 239, 0.15);
+  color: #f0abfc;
+  border: 1px solid rgba(217, 70, 239, 0.2);
+}
+
+.badge-demo {
+  background: rgba(16, 185, 129, 0.15);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.badge-active {
+  color: var(--success);
+}
+
+.badge-handover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
 
 .tag {
   display: inline-block;
@@ -183,4 +205,63 @@ button.secondary {
 
 button.secondary:hover {
   background: rgba(255, 255, 255, 0.05);
+}
+
+.settings-section {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 1.5rem;
+  padding: 1.5rem;
+  margin-bottom: 3rem;
+  backdrop-filter: blur(20px);
+}
+
+.keyword-form {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.keyword-form input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--card-border);
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  color: #fff;
+  outline: none;
+}
+
+.keyword-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+}
+
+.keyword-pill {
+  background: rgba(124, 124, 255, 0.1);
+  border: 1px solid rgba(124, 124, 255, 0.2);
+  color: var(--primary);
+  padding: 0.4rem 0.8rem;
+  border-radius: 2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.keyword-pill button {
+  background: transparent;
+  padding: 0;
+  color: var(--primary);
+  height: auto;
+  min-width: unset;
+  opacity: 0.6;
+}
+
+.keyword-pill button:hover {
+  background: transparent;
+  opacity: 1;
 }

@@ -61,4 +61,45 @@ router.post('/leads/:id/resolve', async (req: Request, res: Response) => {
     }
 });
 
+/**
+ * Keywords for Human Takeover
+ */
+router.get('/config/keywords', async (req: Request, res: Response) => {
+    try {
+        const keywords = await db.takeoverKeyword.findMany({
+            orderBy: { createdAt: 'desc' }
+        });
+        res.json(keywords);
+    } catch (error) {
+        logger.error({ err: error }, 'Failed to fetch keywords');
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+router.post('/config/keywords', async (req: Request, res: Response) => {
+    const { word } = req.body;
+    try {
+        const keyword = await db.takeoverKeyword.create({
+            data: { word: word.toUpperCase().trim() }
+        });
+        res.json(keyword);
+    } catch (error) {
+        logger.error({ err: error }, 'Failed to create keyword');
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+router.delete('/config/keywords/:id', async (req: Request, res: Response) => {
+    const { id } = req.params;
+    try {
+        await db.takeoverKeyword.delete({
+            where: { id }
+        });
+        res.json({ success: true });
+    } catch (error) {
+        logger.error({ err: error }, 'Failed to delete keyword');
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
 export default router;

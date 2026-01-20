@@ -6,7 +6,9 @@ import {
   AlertCircle,
   Search,
   RefreshCw,
-  MessageSquare
+  MessageSquare,
+  X,
+  ShieldAlert
 } from 'lucide-react';
 
 interface Metric {
@@ -37,26 +39,58 @@ interface Lead {
 function App() {
   const [stats, setStats] = useState<CampaignStats[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [keywords, setKeywords] = useState<{ id: string; word: string }[]>([]);
+  const [newKeyword, setNewKeyword] = useState('');
   const [loading, setLoading] = useState(true);
 
   const fetchData = async () => {
     setLoading(true);
     try {
       const baseUrl = 'http://localhost:3000/api/dashboard';
-      const [statsRes, leadsRes] = await Promise.all([
+      const [statsRes, leadsRes, keywordsRes] = await Promise.all([
         fetch(`${baseUrl}/stats`),
-        fetch(`${baseUrl}/leads`)
+        fetch(`${baseUrl}/leads`),
+        fetch(`${baseUrl}/config/keywords`)
       ]);
 
       const statsData = await statsRes.json();
       const leadsData = await leadsRes.json();
+      const keywordsData = await keywordsRes.json();
 
       setStats(statsData);
       setLeads(leadsData);
+      setKeywords(keywordsData);
     } catch (error) {
       console.error('Failed to fetch data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const addKeyword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newKeyword.trim()) return;
+    try {
+      const res = await fetch('http://localhost:3000/api/dashboard/config/keywords', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ word: newKeyword })
+      });
+      if (res.ok) {
+        setNewKeyword('');
+        fetchData();
+      }
+    } catch (error) {
+      console.error('Failed to add keyword:', error);
+    }
+  };
+
+  const removeKeyword = async (id: string) => {
+    try {
+      await fetch(`http://localhost:3000/api/dashboard/config/keywords/${id}`, { method: 'DELETE' });
+      fetchData();
+    } catch (error) {
+      console.error('Failed to remove keyword:', error);
     }
   };
 
@@ -125,6 +159,41 @@ function App() {
             {leads.filter(l => l.status === 'HANDOVER').length}
           </div>
           <div className="stat-trend">Manual intervention needed</div>
+        </div>
+      </div>
+
+      <div className="settings-section">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
+          <ShieldAlert size={20} color="var(--primary)" />
+          <h3 style={{ margin: 0 }}>Human Takeover Triggers</h3>
+        </div>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
+          Messages matching these patterns will immediately stop the AI and flag the lead for manual intervention.
+          Use this to trigger handover from your mobile WhatsApp Business App.
+        </p>
+
+        <form onSubmit={addKeyword} className="keyword-form">
+          <input
+            type="text"
+            placeholder="e.g. 'un momento', 'human help', 'stop ai'..."
+            value={newKeyword}
+            onChange={(e) => setNewKeyword(e.target.value)}
+          />
+          <button type="submit">Add Trigger</button>
+        </form>
+
+        <div className="keyword-list">
+          {keywords.map((k) => (
+            <div key={k.id} className="keyword-pill">
+              {k.word}
+              <button onClick={() => removeKeyword(k.id)}>
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+          {keywords.length === 0 && (
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontStyle: 'italic' }}>No custom triggers active.</p>
+          )}
         </div>
       </div>
 
