@@ -12,7 +12,7 @@ import {
   Zap,
   BarChart3,
   Mail,
-  UserCheck
+  UserCheck,
 } from 'lucide-react';
 
 interface Metric {
@@ -102,10 +102,14 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   const [isSendingMsg, setIsSendingMsg] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'settings' | 'campaign' | 'templates' | 'import'>('overview');
+  const [activeTab, setActiveTab] = useState<
+    'overview' | 'settings' | 'campaign' | 'templates' | 'import'
+  >('overview');
   const [business, setBusiness] = useState({ name: '', knowledgeBase: '' });
   const [prompts, setPrompts] = useState<{ role: string; basePrompt: string }[]>([]);
-  const [sequences, setSequences] = useState<{ id: string; name: string; waitHours: number; order: number }[]>([]);
+  const [sequences, setSequences] = useState<
+    { id: string; name: string; waitHours: number; order: number }[]
+  >([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [telegram, setTelegram] = useState({ botToken: '', chatId: '', isEnabled: false });
   const [batches, setBatches] = useState<ImportBatch[]>([]);
@@ -121,7 +125,7 @@ function App() {
         fetch(`${baseUrl}/prompts`),
         fetch(`${baseUrl}/sequences`),
         fetch(`${baseUrl}/whatsapp-templates`),
-        fetch(`${baseUrl}/telegram`)
+        fetch(`${baseUrl}/telegram`),
       ]);
       setBusiness(await bizRes.json());
       setPrompts(await promptRes.json());
@@ -142,7 +146,7 @@ function App() {
         fetch(`${baseUrl}/stats`),
         fetch(`${baseUrl}/leads`),
         fetch(`${baseUrl}/config/keywords`),
-        fetch(`${baseUrl}/config/global`)
+        fetch(`${baseUrl}/config/global`),
       ]);
 
       const statsData = await statsRes.json();
@@ -170,7 +174,7 @@ function App() {
       await fetch('http://localhost:3000/api/dashboard/config/global', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ availabilityStatus: availability })
+        body: JSON.stringify({ availabilityStatus: availability }),
       });
     } catch (error) {
       console.error('Failed to update status:', error);
@@ -186,7 +190,7 @@ function App() {
       const res = await fetch('http://localhost:3000/api/dashboard/config/keywords', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ word: newKeyword, type: kwType })
+        body: JSON.stringify({ word: newKeyword, type: kwType }),
       });
       if (res.ok) {
         setNewKeyword('');
@@ -199,7 +203,9 @@ function App() {
 
   const removeKeyword = async (id: string) => {
     try {
-      await fetch(`http://localhost:3000/api/dashboard/config/keywords/${id}`, { method: 'DELETE' });
+      await fetch(`http://localhost:3000/api/dashboard/config/keywords/${id}`, {
+        method: 'DELETE',
+      });
       fetchData();
     } catch (error) {
       console.error('Failed to remove keyword:', error);
@@ -236,7 +242,7 @@ function App() {
         await fetch('http://localhost:3000/api/dashboard/import/csv', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ campaignId: selectedCampaignId, name, csvContent })
+          body: JSON.stringify({ campaignId: selectedCampaignId, name, csvContent }),
         });
         fetchBatches();
       } catch (error) {
@@ -250,7 +256,9 @@ function App() {
 
   const runAction = async (batchId: string, action: string) => {
     try {
-      await fetch(`http://localhost:3000/api/dashboard/import/batches/${batchId}/${action}`, { method: 'POST' });
+      await fetch(`http://localhost:3000/api/dashboard/import/batches/${batchId}/${action}`, {
+        method: 'POST',
+      });
       fetchBatchDetails(batchId);
     } catch (error) {
       console.error(`Action ${action} failed:`, error);
@@ -263,7 +271,7 @@ function App() {
       await fetch(`http://localhost:3000/api/dashboard/import/batches/${batchId}/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ leadIds: null })
+        body: JSON.stringify({ leadIds: null }),
       });
       fetchBatches();
       // Don't close so they can trigger reach
@@ -275,9 +283,12 @@ function App() {
   };
 
   const runReach = async (batchId: string) => {
-    if (!confirm('This will send the first WhatsApp message to all leads in this batch. Proceed?')) return;
+    if (!confirm('This will send the first WhatsApp message to all leads in this batch. Proceed?'))
+      return;
     try {
-      await fetch(`http://localhost:3000/api/dashboard/import/batches/${batchId}/reach`, { method: 'POST' });
+      await fetch(`http://localhost:3000/api/dashboard/import/batches/${batchId}/reach`, {
+        method: 'POST',
+      });
       alert('Outreach triggered successfully');
       setSelectedBatch(null);
       fetchBatches();
@@ -301,7 +312,7 @@ function App() {
       await fetch(`http://localhost:3000/api/dashboard/leads/${leadId}/ai-toggle`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ aiEnabled: enabled })
+        body: JSON.stringify({ aiEnabled: enabled }),
       });
       fetchData();
       if (selectedLead && selectedLead.id === leadId) {
@@ -320,7 +331,7 @@ function App() {
       await fetch(`http://localhost:3000/api/dashboard/leads/${selectedLead.id}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: newMessage })
+        body: JSON.stringify({ content: newMessage }),
       });
       setNewMessage('');
       fetchMessages(selectedLead.id);
@@ -336,7 +347,7 @@ function App() {
       await fetch('http://localhost:3000/api/dashboard/config/business', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(business)
+        body: JSON.stringify(business),
       });
       alert('Business profile updated');
     } catch (error) {
@@ -349,7 +360,7 @@ function App() {
       await fetch('http://localhost:3000/api/dashboard/config/telegram', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(telegram)
+        body: JSON.stringify(telegram),
       });
       alert('Telegram settings updated');
     } catch (error) {
@@ -362,7 +373,7 @@ function App() {
       await fetch('http://localhost:3000/api/dashboard/config/prompts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role, basePrompt })
+        body: JSON.stringify({ role, basePrompt }),
       });
       alert(`${role} prompt updated`);
     } catch (error) {
@@ -375,7 +386,7 @@ function App() {
       await fetch(`http://localhost:3000/api/dashboard/config/sequences/${id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, waitHours })
+        body: JSON.stringify({ name, waitHours }),
       });
       fetchConfig();
       alert('Sequence updated');
@@ -423,7 +434,7 @@ function App() {
       const params = new URLSearchParams(window.location.search);
       const leadId = params.get('leadId');
       if (leadId) {
-        const lead = leads.find(l => l.id === leadId);
+        const lead = leads.find((l) => l.id === leadId);
         if (lead) {
           setSelectedLead(lead);
           // Clean up URL
@@ -445,35 +456,78 @@ function App() {
     }
   }, [selectedLead]);
 
-  const totalMetrics = stats.reduce((acc, curr) => ({
-    totalContacts: acc.totalContacts + (curr.metrics.totalContacts || 0),
-    delivered: acc.delivered + (curr.metrics.delivered || 0),
-    read: acc.read + (curr.metrics.read || 0),
-    replied: acc.replied + (curr.metrics.replied || 0),
-    interested: acc.interested + (curr.metrics.interested || 0),
-    conversions: acc.conversions + (curr.metrics.conversions || 0),
-    blocked: acc.blocked + (curr.metrics.blocked || 0),
-  }), { totalContacts: 0, delivered: 0, read: 0, replied: 0, interested: 0, conversions: 0, blocked: 0 });
+  const totalMetrics = stats.reduce(
+    (acc, curr) => ({
+      totalContacts: acc.totalContacts + (curr.metrics.totalContacts || 0),
+      delivered: acc.delivered + (curr.metrics.delivered || 0),
+      read: acc.read + (curr.metrics.read || 0),
+      replied: acc.replied + (curr.metrics.replied || 0),
+      interested: acc.interested + (curr.metrics.interested || 0),
+      conversions: acc.conversions + (curr.metrics.conversions || 0),
+      blocked: acc.blocked + (curr.metrics.blocked || 0),
+    }),
+    {
+      totalContacts: 0,
+      delivered: 0,
+      read: 0,
+      replied: 0,
+      interested: 0,
+      conversions: 0,
+      blocked: 0,
+    }
+  );
 
   return (
     <div className="dashboard-container">
       <header>
         <div>
           <h1 className="logo">whatsnaŭ</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Campaign Orchestration Dashboard</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+            Campaign Orchestration Dashboard
+          </p>
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
           <nav className="tabs">
-            <button className={activeTab === 'overview' ? 'active' : ''} onClick={() => setActiveTab('overview')}>Overview</button>
-            <button className={activeTab === 'settings' ? 'active' : ''} onClick={() => setActiveTab('settings')}>AI Agents</button>
-            <button className={activeTab === 'campaign' ? 'active' : ''} onClick={() => setActiveTab('campaign')}>Campaign</button>
-            <button className={activeTab === 'templates' ? 'active' : ''} onClick={() => setActiveTab('templates')}>Templates</button>
-            <button className={activeTab === 'import' ? 'active' : ''} onClick={() => setActiveTab('import')}>
+            <button
+              className={activeTab === 'overview' ? 'active' : ''}
+              onClick={() => setActiveTab('overview')}
+            >
+              Overview
+            </button>
+            <button
+              className={activeTab === 'settings' ? 'active' : ''}
+              onClick={() => setActiveTab('settings')}
+            >
+              AI Agents
+            </button>
+            <button
+              className={activeTab === 'campaign' ? 'active' : ''}
+              onClick={() => setActiveTab('campaign')}
+            >
+              Campaign
+            </button>
+            <button
+              className={activeTab === 'templates' ? 'active' : ''}
+              onClick={() => setActiveTab('templates')}
+            >
+              Templates
+            </button>
+            <button
+              className={activeTab === 'import' ? 'active' : ''}
+              onClick={() => setActiveTab('import')}
+            >
               <Upload size={14} style={{ marginRight: '6px' }} /> Import
             </button>
           </nav>
           <button className="secondary" onClick={fetchData} disabled={loading}>
-            <RefreshCw size={16} style={{ marginRight: '8px', verticalAlign: 'middle', animation: loading ? 'spin 2s linear infinite' : 'none' }} />
+            <RefreshCw
+              size={16}
+              style={{
+                marginRight: '8px',
+                verticalAlign: 'middle',
+                animation: loading ? 'spin 2s linear infinite' : 'none',
+              }}
+            />
             Refresh
           </button>
         </div>
@@ -481,7 +535,10 @@ function App() {
 
       {activeTab === 'overview' && (
         <>
-          <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+          <div
+            className="stats-grid"
+            style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}
+          >
             <div className="stat-card">
               <div className="stat-label flex items-center gap-2">
                 <BarChart3 size={16} color="var(--primary)" /> Total Outbound
@@ -495,7 +552,8 @@ function App() {
               </div>
               <div className="stat-value">{totalMetrics.delivered}</div>
               <div className="stat-trend" style={{ color: 'var(--success)' }}>
-                {((totalMetrics.delivered / (totalMetrics.totalContacts || 1)) * 100).toFixed(1)}% reach
+                {((totalMetrics.delivered / (totalMetrics.totalContacts || 1)) * 100).toFixed(1)}%
+                reach
               </div>
             </div>
             <div className="stat-card">
@@ -521,15 +579,20 @@ function App() {
                 <Target size={16} color="var(--accent)" /> Interested
               </div>
               <div className="stat-value">{totalMetrics.interested}</div>
-              <div className="stat-trend" style={{ color: 'var(--accent)' }}>High potential</div>
+              <div className="stat-trend" style={{ color: 'var(--accent)' }}>
+                High potential
+              </div>
             </div>
             <div className="stat-card">
               <div className="stat-label flex items-center gap-2">
                 <UserCheck size={16} color="var(--success)" /> Converted
               </div>
-              <div className="stat-value" style={{ color: 'var(--success)' }}>{totalMetrics.conversions}</div>
+              <div className="stat-value" style={{ color: 'var(--success)' }}>
+                {totalMetrics.conversions}
+              </div>
               <div className="stat-trend" style={{ color: 'var(--success)' }}>
-                {((totalMetrics.conversions / (totalMetrics.totalContacts || 1)) * 100).toFixed(1)}% success
+                {((totalMetrics.conversions / (totalMetrics.totalContacts || 1)) * 100).toFixed(1)}%
+                success
               </div>
             </div>
           </div>
@@ -539,7 +602,16 @@ function App() {
               <h2>Recent Interactions</h2>
               <div className="search-box">
                 <Search size={16} color="var(--text-muted)" style={{ marginRight: '8px' }} />
-                <input type="text" placeholder="Search leads..." style={{ background: 'transparent', border: 'none', color: '#fff', outline: 'none' }} />
+                <input
+                  type="text"
+                  placeholder="Search leads..."
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#fff',
+                    outline: 'none',
+                  }}
+                />
               </div>
             </div>
             <table>
@@ -558,16 +630,42 @@ function App() {
                   <tr key={lead.id}>
                     <td>
                       <div style={{ fontWeight: 600 }}>{lead.name || 'Unknown Lead'}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{lead.phoneNumber}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        {lead.phoneNumber}
+                      </div>
                     </td>
-                    <td><span className={`badge badge-${lead.status.toLowerCase()}`}>{lead.status}</span></td>
-                    <td><span className={`badge badge-${lead.state.toLowerCase()}`}>{lead.currentStage?.name || lead.state.replace('_', ' ')}</span></td>
-                    <td>{lead.tags.map(tag => <span key={tag.name} className="tag">{tag.name}</span>)}</td>
-                    <td style={{ color: 'var(--text-muted)', fontSize: '0.8125rem' }}>{new Date(lead.lastInteraction).toLocaleTimeString()}</td>
+                    <td>
+                      <span className={`badge badge-${lead.status.toLowerCase()}`}>
+                        {lead.status}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`badge badge-${lead.state.toLowerCase()}`}>
+                        {lead.currentStage?.name || lead.state.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td>
+                      {lead.tags.map((tag) => (
+                        <span key={tag.name} className="tag">
+                          {tag.name}
+                        </span>
+                      ))}
+                    </td>
+                    <td style={{ color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
+                      {new Date(lead.lastInteraction).toLocaleTimeString()}
+                    </td>
                     <td>
                       <div style={{ display: 'flex', gap: '8px' }}>
-                        <button className="secondary" title="View Chat" onClick={() => setSelectedLead(lead)}><MessageSquare size={14} /></button>
-                        {lead.status === 'HANDOVER' && <button onClick={() => resolveHandover(lead.id)}>Resolve</button>}
+                        <button
+                          className="secondary"
+                          title="View Chat"
+                          onClick={() => setSelectedLead(lead)}
+                        >
+                          <MessageSquare size={14} />
+                        </button>
+                        {lead.status === 'HANDOVER' && (
+                          <button onClick={() => resolveHandover(lead.id)}>Resolve</button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -583,22 +681,53 @@ function App() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             <div className="settings-section">
               <h3>Agent Prompts</h3>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.5rem' }}>Configure the personality and primary objective of each AI agent.</p>
+              <p
+                style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.5rem' }}
+              >
+                Configure the personality and primary objective of each AI agent.
+              </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                {['CLOSER', 'RECEPTIONIST'].map(role => {
-                  const p = prompts.find(pr => pr.role === role) || { basePrompt: '' };
+                {['CLOSER', 'RECEPTIONIST'].map((role) => {
+                  const p = prompts.find((pr) => pr.role === role) || { basePrompt: '' };
                   return (
                     <div key={role}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: '0.5rem',
+                        }}
+                      >
                         <h4 style={{ color: 'var(--primary)' }}>{role}</h4>
-                        <button className="secondary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.75rem' }} onClick={() => savePrompt(role, p.basePrompt)}>Update</button>
+                        <button
+                          className="secondary"
+                          style={{ padding: '0.25rem 0.75rem', fontSize: '0.75rem' }}
+                          onClick={() => savePrompt(role, p.basePrompt)}
+                        >
+                          Update
+                        </button>
                       </div>
                       <textarea
                         value={p.basePrompt}
-                        onChange={(e) => setPrompts(prompts.map(pr => pr.role === role ? { ...pr, basePrompt: e.target.value } : pr))}
+                        onChange={(e) =>
+                          setPrompts(
+                            prompts.map((pr) =>
+                              pr.role === role ? { ...pr, basePrompt: e.target.value } : pr
+                            )
+                          )
+                        }
                         placeholder={`System prompt for ${role}...`}
                         rows={6}
-                        style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--card-border)', borderRadius: '0.75rem', color: '#fff', padding: '1rem', fontFamily: 'monospace' }}
+                        style={{
+                          width: '100%',
+                          background: 'rgba(255,255,255,0.03)',
+                          border: '1px solid var(--card-border)',
+                          borderRadius: '0.75rem',
+                          color: '#fff',
+                          padding: '1rem',
+                          fontFamily: 'monospace',
+                        }}
                       />
                     </div>
                   );
@@ -607,13 +736,24 @@ function App() {
             </div>
             <div className="settings-section">
               <h3>Business Knowledge Base</h3>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.5rem' }}>This information is injected into all agents to ensure accurate responses.</p>
+              <p
+                style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.5rem' }}
+              >
+                This information is injected into all agents to ensure accurate responses.
+              </p>
               <textarea
                 value={business.knowledgeBase || ''}
                 onChange={(e) => setBusiness({ ...business, knowledgeBase: e.target.value })}
                 placeholder="Describe your business..."
                 rows={12}
-                style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--card-border)', borderRadius: '0.75rem', color: '#fff', padding: '1rem' }}
+                style={{
+                  width: '100%',
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid var(--card-border)',
+                  borderRadius: '0.75rem',
+                  color: '#fff',
+                  padding: '1rem',
+                }}
               />
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
                 <button onClick={saveBusiness}>Save Knowledge Base</button>
@@ -623,48 +763,106 @@ function App() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             <div className="settings-section">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
+              <div
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}
+              >
                 <Clock size={20} color="var(--accent)" />
                 <h3 style={{ margin: 0 }}>Availability</h3>
               </div>
               <div className="keyword-form" style={{ flexDirection: 'column', gap: '0.5rem' }}>
-                <input type="text" placeholder="e.g. 'en una reunión'..." value={availability} onChange={(e) => setAvailability(e.target.value)} />
-                <button onClick={updateAvailability} disabled={isSavingStatus}>{isSavingStatus ? 'Saving...' : 'Save'}</button>
+                <input
+                  type="text"
+                  placeholder="e.g. 'en una reunión'..."
+                  value={availability}
+                  onChange={(e) => setAvailability(e.target.value)}
+                />
+                <button onClick={updateAvailability} disabled={isSavingStatus}>
+                  {isSavingStatus ? 'Saving...' : 'Save'}
+                </button>
               </div>
             </div>
             <div className="settings-section">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
+              <div
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}
+              >
                 <Shield size={20} color="var(--primary)" />
                 <h3 style={{ margin: 0 }}>Handover</h3>
               </div>
-              <form onSubmit={addKeyword} className="keyword-form" style={{ flexDirection: 'column', gap: '0.5rem' }}>
-                <select value={kwType} onChange={(e) => setKwType(e.target.value)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--card-border)', color: '#fff', borderRadius: '0.75rem', padding: '0.5rem' }}>
+              <form
+                onSubmit={addKeyword}
+                className="keyword-form"
+                style={{ flexDirection: 'column', gap: '0.5rem' }}
+              >
+                <select
+                  value={kwType}
+                  onChange={(e) => setKwType(e.target.value)}
+                  style={{
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid var(--card-border)',
+                    color: '#fff',
+                    borderRadius: '0.75rem',
+                    padding: '0.5rem',
+                  }}
+                >
                   <option value="INTERNAL">Owner Trigger</option>
                   <option value="LEAD">Lead Request</option>
                 </select>
-                <input type="text" placeholder="Phrase..." value={newKeyword} onChange={(e) => setNewKeyword(e.target.value)} />
+                <input
+                  type="text"
+                  placeholder="Phrase..."
+                  value={newKeyword}
+                  onChange={(e) => setNewKeyword(e.target.value)}
+                />
                 <button type="submit">Add</button>
               </form>
               <div className="keyword-list">
                 {keywords.map((k) => (
-                  <div key={k.id} className="keyword-pill" style={{ borderColor: k.type === 'INTERNAL' ? 'var(--primary-glow)' : 'var(--accent)' }}>
-                    {k.word} <button onClick={() => removeKeyword(k.id)}><X size={14} /></button>
+                  <div
+                    key={k.id}
+                    className="keyword-pill"
+                    style={{
+                      borderColor: k.type === 'INTERNAL' ? 'var(--primary-glow)' : 'var(--accent)',
+                    }}
+                  >
+                    {k.word}{' '}
+                    <button onClick={() => removeKeyword(k.id)}>
+                      <X size={14} />
+                    </button>
                   </div>
                 ))}
               </div>
             </div>
             <div className="settings-section">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
+              <div
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}
+              >
                 <Send size={20} color="#229ED9" />
                 <h3 style={{ margin: 0 }}>Telegram Alerts</h3>
               </div>
               <div className="keyword-form" style={{ flexDirection: 'column', gap: '0.8rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <input type="checkbox" checked={telegram.isEnabled} onChange={(e) => setTelegram({ ...telegram, isEnabled: e.target.checked })} style={{ width: 'auto' }} />
+                  <input
+                    type="checkbox"
+                    checked={telegram.isEnabled}
+                    onChange={(e) => setTelegram({ ...telegram, isEnabled: e.target.checked })}
+                    style={{ width: 'auto' }}
+                  />
                   <span style={{ fontSize: '0.875rem' }}>Enable Telegram Notifications</span>
                 </div>
-                <input type="text" placeholder="Bot Token" value={telegram.botToken} onChange={(e) => setTelegram({ ...telegram, botToken: e.target.value })} style={{ width: '100%' }} />
-                <input type="text" placeholder="Chat ID" value={telegram.chatId} onChange={(e) => setTelegram({ ...telegram, chatId: e.target.value })} style={{ width: '100%' }} />
+                <input
+                  type="text"
+                  placeholder="Bot Token"
+                  value={telegram.botToken}
+                  onChange={(e) => setTelegram({ ...telegram, botToken: e.target.value })}
+                  style={{ width: '100%' }}
+                />
+                <input
+                  type="text"
+                  placeholder="Chat ID"
+                  value={telegram.chatId}
+                  onChange={(e) => setTelegram({ ...telegram, chatId: e.target.value })}
+                  style={{ width: '100%' }}
+                />
                 <button onClick={saveTelegram}>Save Telegram Config</button>
               </div>
             </div>
@@ -675,20 +873,90 @@ function App() {
       {activeTab === 'campaign' && (
         <div className="settings-section">
           <h3>Campaign Flow (Sequences)</h3>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '2rem' }}>Define follow-ups.</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '2rem' }}>
+            Define follow-ups.
+          </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {sequences.map(s => (
-              <div key={s.id} className="stat-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            {sequences.map((s) => (
+              <div
+                key={s.id}
+                className="stat-card"
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              >
                 <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
-                  <div style={{ width: '40px', height: '40px', background: 'var(--primary)', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold' }}>{s.order}</div>
+                  <div
+                    style={{
+                      width: '40px',
+                      height: '40px',
+                      background: 'var(--primary)',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    {s.order}
+                  </div>
                   <div>
-                    <input type="text" value={s.name} onChange={(e) => setSequences(sequences.map(sq => sq.id === s.id ? { ...sq, name: e.target.value } : sq))} style={{ background: 'transparent', border: 'none', color: '#fff', fontWeight: 600, fontSize: '1rem', outline: 'none' }} />
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                      Wait: <input type="number" value={s.waitHours} onChange={(e) => setSequences(sequences.map(sq => sq.id === s.id ? { ...sq, waitHours: Number(e.target.value) } : sq))} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: '#fff', width: '40px', textAlign: 'center' }} /> hours
+                    <input
+                      type="text"
+                      value={s.name}
+                      onChange={(e) =>
+                        setSequences(
+                          sequences.map((sq) =>
+                            sq.id === s.id ? { ...sq, name: e.target.value } : sq
+                          )
+                        )
+                      }
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#fff',
+                        fontWeight: 600,
+                        fontSize: '1rem',
+                        outline: 'none',
+                      }}
+                    />
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: '0.5rem',
+                        alignItems: 'center',
+                        fontSize: '0.75rem',
+                        color: 'var(--text-muted)',
+                        marginTop: '0.25rem',
+                      }}
+                    >
+                      Wait:{' '}
+                      <input
+                        type="number"
+                        value={s.waitHours}
+                        onChange={(e) =>
+                          setSequences(
+                            sequences.map((sq) =>
+                              sq.id === s.id ? { ...sq, waitHours: Number(e.target.value) } : sq
+                            )
+                          )
+                        }
+                        style={{
+                          background: 'rgba(255,255,255,0.05)',
+                          border: 'none',
+                          color: '#fff',
+                          width: '40px',
+                          textAlign: 'center',
+                        }}
+                      />{' '}
+                      hours
                     </div>
                   </div>
                 </div>
-                <button className="secondary" onClick={() => saveSequence(s.id, s.name, s.waitHours)}>Save</button>
+                <button
+                  className="secondary"
+                  onClick={() => saveSequence(s.id, s.name, s.waitHours)}
+                >
+                  Save
+                </button>
               </div>
             ))}
           </div>
@@ -699,13 +967,17 @@ function App() {
         <div className="settings-section">
           <h3>WhatsApp Marketing Templates</h3>
           <div className="stats-grid">
-            {templates.map(t => (
+            {templates.map((t) => (
               <div key={t.name} className="stat-card">
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                <div
+                  style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}
+                >
                   <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{t.name}</span>
                   <span className="badge badge-active">{t.status}</span>
                 </div>
-                <div style={{ fontSize: '0.875rem', fontStyle: 'italic' }}>"{t.components?.find(c => c.type === 'BODY')?.text}"</div>
+                <div style={{ fontSize: '0.875rem', fontStyle: 'italic' }}>
+                  "{t.components?.find((c) => c.type === 'BODY')?.text}"
+                </div>
               </div>
             ))}
           </div>
@@ -716,64 +988,152 @@ function App() {
         <div className="settings-section">
           {!selectedBatch ? (
             <>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '2rem',
+                }}
+              >
                 <div>
                   <h3>Mass Outreach (Import)</h3>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Upload CSV to prepare new leads.</p>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+                    Upload CSV to prepare new leads.
+                  </p>
                 </div>
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                   <select
                     value={selectedCampaignId}
                     onChange={(e) => setSelectedCampaignId(e.target.value)}
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--card-border)', color: '#fff', borderRadius: '0.5rem', padding: '0.5rem' }}
+                    style={{
+                      background: 'rgba(255,255,255,0.05)',
+                      border: '1px solid var(--card-border)',
+                      color: '#fff',
+                      borderRadius: '0.5rem',
+                      padding: '0.5rem',
+                    }}
                   >
-                    {stats.map(s => <option key={s.campaignId} value={s.campaignId}>{s.name}</option>)}
+                    {stats.map((s) => (
+                      <option key={s.campaignId} value={s.campaignId}>
+                        {s.name}
+                      </option>
+                    ))}
                   </select>
                   <div style={{ position: 'relative' }}>
-                    <input type="file" accept=".csv" onChange={handleFileUpload} style={{ position: 'absolute', opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }} disabled={isImporting || !selectedCampaignId} />
-                    <button className="secondary" disabled={isImporting || !selectedCampaignId}>{isImporting ? 'Importing...' : 'Upload CSV'}</button>
+                    <input
+                      type="file"
+                      accept=".csv"
+                      onChange={handleFileUpload}
+                      style={{
+                        position: 'absolute',
+                        opacity: 0,
+                        width: '100%',
+                        height: '100%',
+                        cursor: 'pointer',
+                      }}
+                      disabled={isImporting || !selectedCampaignId}
+                    />
+                    <button className="secondary" disabled={isImporting || !selectedCampaignId}>
+                      {isImporting ? 'Importing...' : 'Upload CSV'}
+                    </button>
                   </div>
                 </div>
               </div>
               <div className="stats-grid">
-                {batches.map(b => (
-                  <div key={b.id} className="stat-card" style={{ cursor: 'pointer' }} onClick={() => fetchBatchDetails(b.id)}>
+                {batches.map((b) => (
+                  <div
+                    key={b.id}
+                    className="stat-card"
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => fetchBatchDetails(b.id)}
+                  >
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ fontWeight: 600 }}>{b.name}</span>
                       <span className="badge badge-active">{b.status}</span>
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Leads: {b._count?.stagingLeads || 0} | {new Date(b.createdAt).toLocaleDateString()}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      Leads: {b._count?.stagingLeads || 0} |{' '}
+                      {new Date(b.createdAt).toLocaleDateString()}
+                    </div>
                   </div>
                 ))}
               </div>
             </>
           ) : (
             <div className="staging-view">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-                <button className="secondary" onClick={() => setSelectedBatch(null)}>← Back</button>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '2rem',
+                }}
+              >
+                <button className="secondary" onClick={() => setSelectedBatch(null)}>
+                  ← Back
+                </button>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button className="secondary" onClick={() => runAction(selectedBatch.id, 'cleanse')}>Cleanse</button>
-                  <button className="secondary" onClick={() => runAction(selectedBatch.id, 'verify-wa')}>Verify WA</button>
-                  <button className="secondary" onClick={() => runAction(selectedBatch.id, 'analyze-ai')}><Zap size={14} /> AI Analysis</button>
+                  <button
+                    className="secondary"
+                    onClick={() => runAction(selectedBatch.id, 'cleanse')}
+                  >
+                    Cleanse
+                  </button>
+                  <button
+                    className="secondary"
+                    onClick={() => runAction(selectedBatch.id, 'verify-wa')}
+                  >
+                    Verify WA
+                  </button>
+                  <button
+                    className="secondary"
+                    onClick={() => runAction(selectedBatch.id, 'analyze-ai')}
+                  >
+                    <Zap size={14} /> AI Analysis
+                  </button>
                   {selectedBatch.status !== 'COMPLETED' && (
                     <button onClick={() => executeBatch(selectedBatch.id)}>🚀 Execute</button>
                   )}
                   {selectedBatch.status === 'COMPLETED' && (
-                    <button onClick={() => runReach(selectedBatch.id)} style={{ background: 'var(--success)' }}>📣 Start Outreach</button>
+                    <button
+                      onClick={() => runReach(selectedBatch.id)}
+                      style={{ background: 'var(--success)' }}
+                    >
+                      📣 Start Outreach
+                    </button>
                   )}
                 </div>
               </div>
               <table>
                 <thead>
-                  <tr><th>Lead</th><th>WA</th><th>Status</th><th>Opportunities</th></tr>
+                  <tr>
+                    <th>Lead</th>
+                    <th>WA</th>
+                    <th>Status</th>
+                    <th>Opportunities</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {selectedBatch.stagingLeads.map((s) => (
                     <tr key={s.id}>
-                      <td><div style={{ fontWeight: 600 }}>{s.name || 'Unknown'}</div><div style={{ fontSize: '0.75rem' }}>{s.phoneNumber}</div></td>
+                      <td>
+                        <div style={{ fontWeight: 600 }}>{s.name || 'Unknown'}</div>
+                        <div style={{ fontSize: '0.75rem' }}>{s.phoneNumber}</div>
+                      </td>
                       <td>{s.isVerified ? (s.isValidWhatsApp ? '✅' : '❌') : '⏳'}</td>
-                      <td><span className={`badge badge-${s.cleanseStatus.toLowerCase()}`}>{s.cleanseStatus}</span></td>
-                      <td>{s.opportunities.map((o) => <span key={o.id} className="tag">{o.type}</span>)}</td>
+                      <td>
+                        <span className={`badge badge-${s.cleanseStatus.toLowerCase()}`}>
+                          {s.cleanseStatus}
+                        </span>
+                      </td>
+                      <td>
+                        {s.opportunities.map((o) => (
+                          <span key={o.id} className="tag">
+                            {o.type}
+                          </span>
+                        ))}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -789,14 +1149,40 @@ function App() {
             <div className="chat-header">
               <div>
                 <h3>{selectedLead.name || 'Chat'}</h3>
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{selectedLead.phoneNumber}</p>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  {selectedLead.phoneNumber}
+                </p>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.05)', padding: '0.25rem 0.75rem', borderRadius: '2rem' }}>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 600, color: selectedLead.aiEnabled ? 'var(--primary)' : 'var(--text-muted)' }}>AI {selectedLead.aiEnabled ? 'ENABLED' : 'DISABLED'}</span>
-                  <button className={`switch-mini ${selectedLead.aiEnabled ? 'active' : ''}`} onClick={() => toggleAI(selectedLead.id, !selectedLead.aiEnabled)}><div className="thumb"></div></button>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    background: 'rgba(255,255,255,0.05)',
+                    padding: '0.25rem 0.75rem',
+                    borderRadius: '2rem',
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: '0.7rem',
+                      fontWeight: 600,
+                      color: selectedLead.aiEnabled ? 'var(--primary)' : 'var(--text-muted)',
+                    }}
+                  >
+                    AI {selectedLead.aiEnabled ? 'ENABLED' : 'DISABLED'}
+                  </span>
+                  <button
+                    className={`switch-mini ${selectedLead.aiEnabled ? 'active' : ''}`}
+                    onClick={() => toggleAI(selectedLead.id, !selectedLead.aiEnabled)}
+                  >
+                    <div className="thumb"></div>
+                  </button>
                 </div>
-                <button className="secondary" onClick={() => setSelectedLead(null)}><X size={18} /></button>
+                <button className="secondary" onClick={() => setSelectedLead(null)}>
+                  <X size={18} />
+                </button>
               </div>
             </div>
             <div className="chat-messages">
@@ -810,8 +1196,15 @@ function App() {
               ))}
             </div>
             <form onSubmit={sendMessage} className="chat-input">
-              <input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Type a message..." disabled={isSendingMsg} />
-              <button type="submit" disabled={isSendingMsg || !newMessage.trim()}>{isSendingMsg ? '...' : 'Send'}</button>
+              <input
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Type a message..."
+                disabled={isSendingMsg}
+              />
+              <button type="submit" disabled={isSendingMsg || !newMessage.trim()}>
+                {isSendingMsg ? '...' : 'Send'}
+              </button>
             </form>
           </div>
         </div>

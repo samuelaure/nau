@@ -20,7 +20,11 @@
 }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family:
+    'Inter',
+    system-ui,
+    -apple-system,
+    sans-serif;
   background-color: var(--bg-color);
   color: var(--text-main);
   min-height: 100vh;
@@ -66,7 +70,9 @@ header {
   border-radius: 1.25rem;
   padding: 1.5rem;
   backdrop-filter: blur(20px);
-  transition: transform 0.2s, border-color 0.2s;
+  transition:
+    transform 0.2s,
+    border-color 0.2s;
 }
 
 .stat-card:hover {
@@ -421,4 +427,34 @@ button.secondary:hover {
   to {
     transform: rotate(360deg);
   }
-}.switch-mini { width: 32px; height: 18px; background: rgba(255,255,255,0.1); border-radius: 12px; border: none; position: relative; cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); padding: 0; display: flex; align-items: center; } .switch-mini.active { background: var(--primary); box-shadow: 0 0 10px var(--primary-glow); } .switch-mini .thumb { width: 14px; height: 14px; background: #fff; border-radius: 50%; position: absolute; top: 2px; left: 2px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); } .switch-mini.active .thumb { left: calc(100% - 16px); } 
+}
+.switch-mini {
+  width: 32px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  border: none;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+.switch-mini.active {
+  background: var(--primary);
+  box-shadow: 0 0 10px var(--primary-glow);
+}
+.switch-mini .thumb {
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.switch-mini.active .thumb {
+  left: calc(100% - 16px);
+}

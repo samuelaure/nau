@@ -10,195 +10,195 @@ const router = Router();
  * RAW CSV IMPORT
  */
 router.post('/csv', async (req: Request, res: Response) => {
-    const { campaignId, name, csvContent } = req.body;
-    try {
-        const batch = await ImportService.processCSV(campaignId, name, csvContent);
-        res.json(batch);
-    } catch (error) {
-        logger.error({ err: error }, 'CSV Import failed');
-        res.status(500).json({ error: 'Failed to process CSV' });
-    }
+  const { campaignId, name, csvContent } = req.body;
+  try {
+    const batch = await ImportService.processCSV(campaignId, name, csvContent);
+    res.json(batch);
+  } catch (error) {
+    logger.error({ err: error }, 'CSV Import failed');
+    res.status(500).json({ error: 'Failed to process CSV' });
+  }
 });
 
 /**
  * BATCH LIST
  */
 router.get('/batches', async (req: Request, res: Response) => {
-    try {
-        const batches = await (db as any).leadImportBatch.findMany({
-            include: { _count: { select: { stagingLeads: true } } },
-            orderBy: { createdAt: 'desc' }
-        });
-        res.json(batches);
-    } catch (error) {
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
+  try {
+    const batches = await (db as any).leadImportBatch.findMany({
+      include: { _count: { select: { stagingLeads: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json(batches);
+  } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
 });
 
 /**
  * BATCH DETAILS
  */
 router.get('/batches/:id', async (req: Request, res: Response) => {
-    try {
-        const batch = await ImportService.getBatchDetails(req.params.id as string);
-        res.json(batch);
-    } catch (error) {
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
+  try {
+    const batch = await ImportService.getBatchDetails(req.params.id as string);
+    res.json(batch);
+  } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
 });
 
 /**
  * TRIGGER CLEANSE
  */
 router.post('/batches/:id/cleanse', async (req: Request, res: Response) => {
-    try {
-        await AnalysisService.cleanseBatch(req.params.id as string);
-        res.json({ success: true });
-    } catch (error) {
-        res.status(500).json({ error: 'Cleanse failed' });
-    }
+  try {
+    await AnalysisService.cleanseBatch(req.params.id as string);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Cleanse failed' });
+  }
 });
 
 /**
  * TRIGGER WHATSAPP VERIFICATION
  */
 router.post('/batches/:id/verify-wa', async (req: Request, res: Response) => {
-    try {
-        await AnalysisService.verifyBatchWhatsApp(req.params.id as string);
-        res.json({ success: true });
-    } catch (error) {
-        res.status(500).json({ error: 'WhatsApp verification failed' });
-    }
+  try {
+    await AnalysisService.verifyBatchWhatsApp(req.params.id as string);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'WhatsApp verification failed' });
+  }
 });
 
 /**
  * TRIGGER AI ANALYSIS
  */
 router.post('/batches/:id/analyze-ai', async (req: Request, res: Response) => {
-    try {
-        await AnalysisService.performDeepAIAnalysis(req.params.id as string);
-        res.json({ success: true });
-    } catch (error) {
-        res.status(500).json({ error: 'AI Analysis failed' });
-    }
+  try {
+    await AnalysisService.performDeepAIAnalysis(req.params.id as string);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'AI Analysis failed' });
+  }
 });
 
 /**
  * EXECUTE: PUSH TO ACTUAL CAMPAIGN
  */
 router.post('/batches/:id/execute', async (req: Request, res: Response) => {
-    const { leadIds } = req.body; // Array of staging lead IDs or all if empty
-    const batchId = req.params.id;
+  const { leadIds } = req.body; // Array of staging lead IDs or all if empty
+  const batchId = req.params.id;
 
-    try {
-        const batch = await (db as any).leadImportBatch.findUnique({
-            where: { id: batchId },
-            include: { campaign: true }
+  try {
+    const batch = await (db as any).leadImportBatch.findUnique({
+      where: { id: batchId },
+      include: { campaign: true },
+    });
+
+    await (db as any).leadImportBatch.update({
+      where: { id: batchId },
+      data: { status: 'EXECUTING' },
+    });
+
+    const stagingLeads = await (db as any).stagingLead.findMany({
+      where: {
+        batchId,
+        id: leadIds ? { in: leadIds } : undefined,
+        cleanseStatus: 'CLEANED',
+        isValidWhatsApp: true,
+      },
+      include: { opportunities: true },
+    });
+
+    const firstStage = await db.campaignStage.findFirst({
+      where: { campaignId: batch.campaignId },
+      orderBy: { order: 'asc' },
+    });
+
+    for (const s of stagingLeads) {
+      // Check if already exists in Lead
+      const existing = await db.lead.findFirst({ where: { phoneNumber: s.phoneNumber } });
+      if (existing) {
+        await db.lead.update({
+          where: { id: existing.id },
+          data: {
+            campaignId: batch.campaignId,
+            currentStageId: firstStage?.id,
+            state: 'OUTREACH',
+          },
         });
+        continue;
+      }
 
-        await (db as any).leadImportBatch.update({
-            where: { id: batchId },
-            data: { status: 'EXECUTING' }
+      const lead = await db.lead.create({
+        data: {
+          phoneNumber: s.phoneNumber,
+          name: s.name,
+          campaignId: batch.campaignId,
+          currentStageId: firstStage?.id,
+          state: 'OUTREACH',
+          metadata: s.rawData,
+        },
+      });
+
+      // Transfer opportunities
+      for (const opt of s.opportunities) {
+        await (db as any).opportunity.create({
+          data: {
+            leadId: lead.id,
+            type: opt.type,
+            description: opt.description,
+            severity: opt.severity,
+            aiGenerated: opt.aiGenerated,
+          },
         });
-
-        const stagingLeads = await (db as any).stagingLead.findMany({
-            where: {
-                batchId,
-                id: leadIds ? { in: leadIds } : undefined,
-                cleanseStatus: 'CLEANED',
-                isValidWhatsApp: true
-            },
-            include: { opportunities: true }
-        });
-
-        const firstStage = await db.campaignStage.findFirst({
-            where: { campaignId: batch.campaignId },
-            orderBy: { order: 'asc' }
-        });
-
-        for (const s of stagingLeads) {
-            // Check if already exists in Lead
-            const existing = await db.lead.findFirst({ where: { phoneNumber: s.phoneNumber } });
-            if (existing) {
-                await db.lead.update({
-                    where: { id: existing.id },
-                    data: {
-                        campaignId: batch.campaignId,
-                        currentStageId: firstStage?.id,
-                        state: 'OUTREACH'
-                    }
-                });
-                continue;
-            }
-
-            const lead = await db.lead.create({
-                data: {
-                    phoneNumber: s.phoneNumber,
-                    name: s.name,
-                    campaignId: batch.campaignId,
-                    currentStageId: firstStage?.id,
-                    state: 'OUTREACH',
-                    metadata: s.rawData
-                }
-            });
-
-            // Transfer opportunities
-            for (const opt of s.opportunities) {
-                await (db as any).opportunity.create({
-                    data: {
-                        leadId: lead.id,
-                        type: opt.type,
-                        description: opt.description,
-                        severity: opt.severity,
-                        aiGenerated: opt.aiGenerated
-                    }
-                });
-            }
-        }
-
-        await (db as any).leadImportBatch.update({
-            where: { id: batchId },
-            data: { status: 'COMPLETED' }
-        });
-
-        res.json({ success: true, count: stagingLeads.length });
-    } catch (error) {
-        logger.error({ err: error }, 'Batch execution failed');
-        res.status(500).json({ error: 'Execution failed' });
+      }
     }
+
+    await (db as any).leadImportBatch.update({
+      where: { id: batchId },
+      data: { status: 'COMPLETED' },
+    });
+
+    res.json({ success: true, count: stagingLeads.length });
+  } catch (error) {
+    logger.error({ err: error }, 'Batch execution failed');
+    res.status(500).json({ error: 'Execution failed' });
+  }
 });
 
 /**
  * REACH: Start sending M1 to leads in this batch
  */
 router.post('/batches/:id/reach', async (req: Request, res: Response) => {
-    const batchId = req.params.id;
-    try {
-        const batch = await (db as any).leadImportBatch.findUnique({ where: { id: batchId } });
-        const leads = await db.lead.findMany({
-            where: {
-                campaignId: batch.campaignId,
-                messages: { none: {} }, // No messages yet
-                state: 'OUTREACH'
-            }
-        });
+  const batchId = req.params.id;
+  try {
+    const batch = await (db as any).leadImportBatch.findUnique({ where: { id: batchId } });
+    const leads = await db.lead.findMany({
+      where: {
+        campaignId: batch.campaignId,
+        messages: { none: {} }, // No messages yet
+        state: 'OUTREACH',
+      },
+    });
 
-        const firstStage = await db.campaignStage.findFirst({
-            where: { campaignId: batch.campaignId },
-            orderBy: { order: 'asc' }
-        });
+    const firstStage = await db.campaignStage.findFirst({
+      where: { campaignId: batch.campaignId },
+      orderBy: { order: 'asc' },
+    });
 
-        const { SequenceService } = await import('../services/sequence.service.js');
+    const { SequenceService } = await import('../services/sequence.service.js');
 
-        for (const lead of leads) {
-            await SequenceService.triggerInitialContact(lead, firstStage);
-        }
-
-        res.json({ success: true, count: leads.length });
-    } catch (error) {
-        logger.error({ err: error }, 'Batch reach failed');
-        res.status(500).json({ error: 'Reach failed' });
+    for (const lead of leads) {
+      await SequenceService.triggerInitialContact(lead, firstStage);
     }
+
+    res.json({ success: true, count: leads.length });
+  } catch (error) {
+    logger.error({ err: error }, 'Batch reach failed');
+    res.status(500).json({ error: 'Reach failed' });
+  }
 });
 
 export default router;

@@ -1,0 +1,12 @@
+node_modules
+dist
+build
+package-lock.json
+frontend/package-lock.json
+*.db
+*.db-journal
+.env
+commit_msg.txt
+prisma/dev.db
+frontend/dist
+frontend/build
