@@ -288,4 +288,70 @@ router.delete(
   })
 );
 
+/**
+ * CAMPAIGN MANAGEMENT
+ */
+router.get(
+  '/campaigns',
+  asyncHandler(async (req: Request, res: Response) => {
+    const campaigns = await db.campaign.findMany({
+      include: {
+        stages: {
+          orderBy: { order: 'asc' },
+          include: {
+            messageTemplates: {
+              orderBy: { order: 'asc' },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json(campaigns);
+  })
+);
+
+router.post(
+  '/campaigns',
+  asyncHandler(async (req: Request, res: Response) => {
+    const { name, description, isActive } = req.body;
+    const campaign = await db.campaign.create({
+      data: {
+        name,
+        description: description || '',
+        isActive: isActive !== undefined ? isActive : true,
+      },
+    });
+    res.json(campaign);
+  })
+);
+
+router.patch(
+  '/campaigns/:id',
+  asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { name, description, isActive } = req.body;
+    const campaign = await db.campaign.update({
+      where: { id: id as string },
+      data: {
+        ...(name && { name }),
+        ...(description !== undefined && { description }),
+        ...(isActive !== undefined && { isActive }),
+      },
+    });
+    res.json(campaign);
+  })
+);
+
+router.delete(
+  '/campaigns/:id',
+  asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    await db.campaign.delete({
+      where: { id: id as string },
+    });
+    res.json({ success: true });
+  })
+);
+
 export default router;

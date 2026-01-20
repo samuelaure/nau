@@ -2,8 +2,10 @@ import React from 'react';
 import { RefreshCw, Upload } from 'lucide-react';
 
 interface HeaderProps {
-  activeTab: 'overview' | 'settings' | 'campaign' | 'templates' | 'import';
-  setActiveTab: (tab: 'overview' | 'settings' | 'campaign' | 'templates' | 'import') => void;
+  activeTab: 'overview' | 'settings' | 'campaign' | 'campaigns' | 'templates' | 'import';
+  setActiveTab: (
+    tab: 'overview' | 'settings' | 'campaign' | 'campaigns' | 'templates' | 'import'
+  ) => void;
   loading: boolean;
   onRefresh: () => void;
 }
@@ -36,6 +38,12 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, loading
             onClick={() => setActiveTab('campaign')}
           >
             Campaign
+          </button>
+          <button
+            className={activeTab === 'campaigns' ? 'active' : ''}
+            onClick={() => setActiveTab('campaigns')}
+          >
+            Campaigns
           </button>
           <button
             className={activeTab === 'templates' ? 'active' : ''}

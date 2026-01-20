@@ -4,6 +4,7 @@ import { Overview } from './components/features/Overview';
 import { AIAgents } from './components/features/AIAgents';
 import { ImportManager } from './components/features/ImportManager';
 import { CampaignFlow } from './components/features/CampaignFlow';
+import { CampaignManager } from './components/features/CampaignManager';
 import { TemplatesView } from './components/features/TemplatesView';
 import { ChatModal } from './components/features/ChatModal';
 import { useDashboard } from './hooks/useDashboard';
@@ -59,7 +60,7 @@ function App() {
   } = useConfig();
 
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'settings' | 'campaign' | 'templates' | 'import'
+    'overview' | 'settings' | 'campaign' | 'campaigns' | 'templates' | 'import'
   >('overview');
   const [selectedCampaignId, setSelectedCampaignId] = useState('');
   const [newMessage, setNewMessage] = useState('');
@@ -130,6 +131,8 @@ function App() {
           onUpdateSequences={setSequences}
         />
       )}
+
+      {activeTab === 'campaigns' && <CampaignManager />}
 
       {activeTab === 'templates' && <TemplatesView templates={templates} />}
 
