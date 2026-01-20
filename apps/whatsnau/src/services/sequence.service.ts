@@ -91,16 +91,58 @@ export class SequenceService {
     const template = await TemplateService.getTemplate(stage.id);
     const buttons = template?.hasButtons && template.buttons ? JSON.parse(template.buttons) : null;
 
-    // Send message with buttons if available
+    // --- SMART COMPLIANCE ROUTING ---
+    const canSendFreeform = await WhatsAppService.canSendFreeform(lead.id);
     let res;
-    if (buttons && buttons.length > 0) {
-      res = await WhatsAppService.sendInteractiveButtons(
-        lead.phoneNumber,
-        renderedMessage,
-        buttons
-      );
+
+    if (canSendFreeform) {
+      // Within 24-hour window: send freeform text or interactive buttons
+      if (buttons && buttons.length > 0) {
+        res = await WhatsAppService.sendInteractiveButtons(
+          lead.phoneNumber,
+          renderedMessage,
+          buttons
+        );
+      } else {
+        res = await WhatsAppService.sendText(lead.phoneNumber, renderedMessage);
+      }
     } else {
-      res = await WhatsAppService.sendText(lead.phoneNumber, renderedMessage);
+      // Outside 24-hour window: MUST use Meta-approved template
+      const { TemplateSyncService } = await import('./template-sync.service.js');
+      const waTemplate = await TemplateSyncService.getWhatsAppTemplateForMessage(stage.id);
+
+      if (waTemplate && waTemplate.status === 'APPROVED') {
+        const variableMapping = waTemplate.variableMapping
+          ? JSON.parse(waTemplate.variableMapping)
+          : {};
+
+        // Build context for rendering (name, business name, etc.)
+        const context = {
+          name: lead.name || 'amigo',
+          business: 'whatsnaŭ', // Fallback or fetch from lead context
+          ...(lead.metadata ? JSON.parse(lead.metadata) : {}),
+        };
+
+        const components = TemplateSyncService.renderTemplateForMeta(
+          renderedMessage,
+          context,
+          variableMapping
+        );
+
+        res = await WhatsAppService.sendTemplateWithVariables(
+          lead.phoneNumber,
+          waTemplate.name,
+          components,
+          waTemplate.language
+        );
+      } else {
+        logger.error(
+          { leadId: lead.id, stage: stage.name },
+          'Compliance Error: No approved WhatsApp Template linked for business-initiated message'
+        );
+        // Fallback: Try to send as text but expect Meta rejection (error code 131030)
+        res = await WhatsAppService.sendText(lead.phoneNumber, renderedMessage);
+      }
     }
 
     const whatsappId = res?.messages?.[0]?.id;

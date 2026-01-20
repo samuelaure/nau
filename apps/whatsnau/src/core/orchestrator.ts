@@ -332,11 +332,49 @@ export class Orchestrator {
     const template = await TemplateService.getTemplate(m3Stage.id);
     const buttons = template?.hasButtons && template.buttons ? JSON.parse(template.buttons) : null;
 
+    // --- SMART COMPLIANCE ROUTING ---
+    const canSendFreeform = await WhatsAppService.canSendFreeform(lead.id);
     let res;
-    if (buttons && buttons.length > 0) {
-      res = await WhatsAppService.sendInteractiveButtons(lead.phoneNumber, message, buttons);
+
+    if (canSendFreeform) {
+      if (buttons && buttons.length > 0) {
+        res = await WhatsAppService.sendInteractiveButtons(lead.phoneNumber, message, buttons);
+      } else {
+        res = await WhatsAppService.sendText(lead.phoneNumber, message);
+      }
     } else {
-      res = await WhatsAppService.sendText(lead.phoneNumber, message);
+      const { TemplateSyncService } = await import('../services/template-sync.service.js');
+      const waTemplate = await TemplateSyncService.getWhatsAppTemplateForMessage(m3Stage.id);
+
+      if (waTemplate && waTemplate.status === 'APPROVED') {
+        const variableMapping = waTemplate.variableMapping
+          ? JSON.parse(waTemplate.variableMapping)
+          : {};
+        const context = {
+          name: lead.name || 'amigo',
+          business: 'whatsnaŭ',
+          ...(lead.metadata ? JSON.parse(lead.metadata) : {}),
+        };
+
+        const components = TemplateSyncService.renderTemplateForMeta(
+          message,
+          context,
+          variableMapping
+        );
+
+        res = await WhatsAppService.sendTemplateWithVariables(
+          lead.phoneNumber,
+          waTemplate.name,
+          components,
+          waTemplate.language
+        );
+      } else {
+        logger.error(
+          { leadId: lead.id, stage: m3Stage.name },
+          'Compliance Error: No approved WhatsApp Template linked for M3 business-initiated message'
+        );
+        res = await WhatsAppService.sendText(lead.phoneNumber, message);
+      }
     }
 
     await db.lead.update({
