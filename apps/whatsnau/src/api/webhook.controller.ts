@@ -1,6 +1,7 @@
 import { Request, Response, Router } from 'express';
 import { config } from '../core/config.js';
 import { logger } from '../core/logger.js';
+import { Orchestrator } from '../core/orchestrator.js';
 
 const router = Router();
 
@@ -30,9 +31,6 @@ router.get('/whatsapp', (req: Request, res: Response) => {
 router.post('/whatsapp', async (req: Request, res: Response) => {
     const body = req.body;
 
-    // Log full body in development to understand Meta payloads
-    logger.debug({ body }, 'Incoming WhatsApp Webhook');
-
     if (body.object) {
         if (
             body.entry &&
@@ -42,16 +40,19 @@ router.post('/whatsapp', async (req: Request, res: Response) => {
             body.entry[0].changes[0].value.messages[0]
         ) {
             const message = body.entry[0].changes[0].value.messages[0];
-            const from = message.from; // Phone number
+            const from = message.from;
             const text = message.text?.body;
-            const buttonResponse = message.interactive?.button_reply?.id;
+            const buttonId = message.interactive?.button_reply?.id;
 
-            logger.info({ from, text, buttonResponse }, 'Received message from WhatsApp');
+            logger.info({ from, text, buttonId }, 'Received message from WhatsApp');
 
-            // TODO: Call Orchestrator to process the logic
-            // await Orchestrator.handleIncoming(from, text || buttonResponse);
+            try {
+                await Orchestrator.handleIncoming(from, text, buttonId);
+            } catch (error) {
+                logger.error({ err: error, from }, 'Error in Orchestrator');
+            }
         }
-        return res.sendStatus(200);
+        return res.status(200).send('OK');
     } else {
         return res.sendStatus(404);
     }
