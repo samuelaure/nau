@@ -6,6 +6,7 @@ import { WhatsAppService } from '../services/whatsapp.service.js';
 import { EventsService } from '../services/events.service.js';
 import { NotificationService } from '../services/notification.service.js';
 import { MessageBufferService } from '../services/buffer.service.js';
+import { TemplateService } from '../services/template.service.js';
 
 export class Orchestrator {
   /**
@@ -204,11 +205,11 @@ export class Orchestrator {
     }
 
     switch (lead.state as LeadState) {
-      case LeadState.OUTREACH:
-        await this.handleOutreachPhase(lead, content, buttonId);
+      case LeadState.COLD:
+        await this.handleColdPhase(lead, content, buttonId);
         break;
-      case LeadState.PRE_SALE:
-        await this.handlePreSalePhase(lead, content, buttonId);
+      case LeadState.INTERESTED:
+        await this.handleInterestedPhase(lead, content, buttonId);
         break;
       case LeadState.DEMO:
         await this.handleDemoPhase(lead, content, buttonId);
@@ -267,35 +268,107 @@ export class Orchestrator {
     });
   }
 
-  private static async handleOutreachPhase(lead: any, content: string, buttonId?: string) {
+  /**
+   * Handle COLD phase (M1, M2, M3 sequence responses)
+   */
+  private static async handleColdPhase(lead: any, content: string, buttonId?: string) {
+    // Check for YES response
     if (
-      buttonId === 'sí_me_interesa' ||
+      buttonId === 'yes_interested' ||
       content.toLowerCase().includes('si') ||
       content.toLowerCase().includes('interesa')
     ) {
-      await LeadService.transition(lead.id, LeadState.PRE_SALE);
+      await LeadService.transition(lead.id, LeadState.INTERESTED);
       await LeadService.addTag(lead.id, 'interested');
       await this.triggerAgent(lead, 'CLOSER');
-    } else if (buttonId === 'no_me_interesa' || content.toLowerCase().includes('no')) {
-      await LeadService.addTag(lead.id, 'not_interested');
-      const msg =
-        'Entiendo perfectamente. ¿Te interesaría recibir consejos semanales gratuitos sobre automatización para tu negocio? (Responde con Sí o No)';
-      const res = await WhatsAppService.sendText(lead.phoneNumber, msg);
-      await this.trackOutboundMessage(lead, msg, res?.messages?.[0]?.id);
-    } else {
-      await this.triggerAgent(lead, 'CLOSER', content);
+      return;
+    }
+
+    // Check for NO response
+    if (buttonId === 'no_thanks' || content.toLowerCase().includes('no')) {
+      // Send M3 immediately (skip M2)
+      await this.sendWeeklyTipsInvite(lead);
+      return;
+    }
+
+    // Check for nurturing opt-in (response to M3)
+    if (
+      buttonId === 'yes_nurturing' ||
+      (content.toLowerCase().includes('si') && content.toLowerCase().includes('envía'))
+    ) {
+      await LeadService.optIntoNurturing(lead.id);
+      await this.triggerAgent(lead, 'NURTURING');
+      return;
+    }
+
+    if (buttonId === 'no_nurturing') {
+      const isInterested = await LeadService.hasTag(lead.id, 'interested');
+      if (!isInterested) {
+        await LeadService.addTag(lead.id, 'colder');
+      }
+      return;
+    }
+
+    // Ambiguous response - let Closer handle it
+    await LeadService.transition(lead.id, LeadState.INTERESTED);
+    await this.triggerAgent(lead, 'CLOSER', content);
+  }
+
+  /**
+   * Send M3 (Weekly Tips Invitation)
+   */
+  private static async sendWeeklyTipsInvite(lead: any) {
+    const campaign = await db.campaign.findFirst({
+      where: { name: 'Main Outreach Campaign' },
+      include: { stages: true },
+    });
+
+    const m3Stage = campaign?.stages.find((s) => s.name === 'M3-WeeklyTipsInvite');
+    if (!m3Stage) return;
+
+    const message = await TemplateService.getRenderedMessage(lead.id, m3Stage.id);
+    if (!message) return;
+
+    const template = await TemplateService.getTemplate(m3Stage.id);
+    const buttons = template?.hasButtons && template.buttons ? JSON.parse(template.buttons) : null;
+
+    // TODO: Add button support to WhatsAppService
+    const res = await WhatsAppService.sendText(lead.phoneNumber, message);
+
+    await db.lead.update({
+      where: { id: lead.id },
+      data: { currentStageId: m3Stage.id, lastInteraction: new Date() },
+    });
+
+    if (res?.messages?.[0]?.id) {
+      await db.message.create({
+        data: {
+          leadId: lead.id,
+          direction: 'OUTBOUND',
+          content: message,
+          whatsappId: res.messages[0].id,
+          campaignStage: m3Stage.name,
+          status: 'sent',
+        },
+      });
     }
   }
 
-  private static async handlePreSalePhase(lead: any, content: string, buttonId?: string) {
+  /**
+   * Handle INTERESTED phase (pre-sale conversations)
+   */
+  private static async handleInterestedPhase(lead: any, content: string, buttonId?: string) {
     if (buttonId === 'ver_demo' || content.toLowerCase().includes('demo'))
       return this.startDemo(lead);
     await this.triggerAgent(lead, 'CLOSER', content);
   }
 
+  /**
+   * Handle DEMO phase
+   */
   private static async handleDemoPhase(lead: any, content: string, buttonId?: string) {
     if (lead.demoExpiresAt && new Date() > new Date(lead.demoExpiresAt)) {
-      await LeadService.transition(lead.id, LeadState.PRE_SALE);
+      await LeadService.endDemo(lead.id);
       const msg = 'La demo ha finalizado. Regresamos a nuestra charla. ¿Qué te ha parecido?';
       const res = await WhatsAppService.sendText(lead.phoneNumber, msg);
       await this.trackOutboundMessage(lead, msg, res?.messages?.[0]?.id);
@@ -304,13 +377,11 @@ export class Orchestrator {
     await this.triggerAgent(lead, 'RECEPTIONIST', content);
   }
 
+  /**
+   * Start demo session
+   */
   private static async startDemo(lead: any) {
-    const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + 10);
-    await db.lead.update({
-      where: { id: lead.id },
-      data: { state: LeadState.DEMO, demoStartedAt: new Date(), demoExpiresAt: expiresAt },
-    });
+    await LeadService.startDemo(lead.id, 10);
     const msg =
       '¡Genial! A partir de ahora hablas con mi **Recepcionista IA**. Prueba a preguntarme sobre el negocio.';
     const res = await WhatsAppService.sendText(lead.phoneNumber, msg);
@@ -326,20 +397,26 @@ export class Orchestrator {
     );
   }
 
+  /**
+   * Enhanced triggerAgent with new context injection
+   */
   private static async triggerAgent(
     lead: any,
-    role: 'CLOSER' | 'RECEPTIONIST',
+    role: 'CLOSER' | 'RECEPTIONIST' | 'NURTURING',
     userMessage?: string
   ) {
+    // Get conversation history
     const history = await db.message.findMany({
       where: { leadId: lead.id },
       orderBy: { timestamp: 'desc' },
       take: 10,
     });
+
     const aiMessages = history.reverse().map((m) => ({
       role: (m.direction === 'INBOUND' ? 'user' : 'assistant') as 'user' | 'assistant',
       content: m.content,
     }));
+
     if (
       userMessage &&
       (!aiMessages.length || aiMessages[aiMessages.length - 1].content !== userMessage)
@@ -347,21 +424,9 @@ export class Orchestrator {
       aiMessages.push({ role: 'user', content: userMessage });
     }
 
-    const [business, config] = await Promise.all([
-      (db as any).businessProfile.findUnique({ where: { id: 'singleton' } }),
-      (db as any).promptConfig.findUnique({ where: { role } }),
-    ]);
+    // Use enhanced AI service with context
+    const response = await AIService.getChatResponseWithContext(lead.id, role, aiMessages);
 
-    const knowledgeBase = business?.knowledgeBase || 'No hay información adicional del negocio.';
-    const baseSystemPrompt =
-      config?.basePrompt ||
-      (role === 'CLOSER'
-        ? `Eres el "Conversational Closer" de whatsnaŭ. Tono profesional y humano. Objetivo: Validar interés y ofrecer DEMO.`
-        : `Eres una **Recepcionista IA** amable y eficiente. Respondiendo siempre en español.`);
-
-    const systemPrompt = `${baseSystemPrompt}\n\n### CONTEXTO DEL NEGOCIO:\n${knowledgeBase}`;
-
-    const response = await AIService.getChatResponse(systemPrompt, aiMessages, true);
     if (response) {
       const res = await WhatsAppService.sendText(lead.phoneNumber, response);
       await this.trackOutboundMessage(
@@ -374,7 +439,17 @@ export class Orchestrator {
     }
   }
 
+  /**
+   * Handle nurturing phase
+   */
   private static async handleNurturingPhase(lead: any, content: string, buttonId?: string) {
-    /* ... */
+    // Update last broadcast interaction
+    await db.lead.update({
+      where: { id: lead.id },
+      data: { lastBroadcastInteraction: new Date() },
+    });
+
+    // Trigger Nurturing Buddy agent
+    await this.triggerAgent(lead, 'NURTURING', content);
   }
 }
