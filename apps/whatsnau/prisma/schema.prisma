@@ -29,22 +29,24 @@ model CampaignStage {
   campaignId   String
   campaign     Campaign @relation(fields: [campaignId], references: [id])
   
-  name         String   // e.g., "M1-Initial-Hook", "M2-Follow-Up", "Demo"
+  name         String   // e.g., "M1-Pitch", "M2-FollowUp", "M3-WeeklyTipsInvite"
   order        Int      // To sequence them
   waitHours    Int      @default(0) // Time to wait before triggering if no response
   
+  messageTemplates MessageTemplate[]
   leads        Lead[]   @relation("CurrentStage")
+  createdAt    DateTime @default(now())
 }
 
 model Lead {
   id             String   @id @default(uuid())
   phoneNumber    String   @unique
   name           String?
-  status         String   @default("ACTIVE") // ACTIVE, BLOCKED, CONVERTED
+  status         String   @default("ACTIVE") // ACTIVE, HANDOVER, BLOCKED
   aiEnabled      Boolean  @default(true)
   
-  // State Machine Logic
-  state          String   @default("OUTREACH") // OUTREACH, PRE_SALE, DEMO, NURTURING
+  // State Machine Logic (Primary State)
+  state          String   @default("COLD") // COLD, INTERESTED, DEMO, NURTURING, CLIENTS
   currentStageId String?
   currentStage   CampaignStage? @relation("CurrentStage", fields: [currentStageId], references: [id])
   
@@ -55,13 +57,22 @@ model Lead {
   lastInboundAt   DateTime?
   isProcessingAI  Boolean   @default(false)
 
-  // Meta Details
+  // Timestamps
   lastInteraction DateTime @default(now())
-  metadata        String?   // JSON string or long text for flexible business data
+  createdAt       DateTime @default(now())
+  
+  // Flexible metadata (JSON)
+  metadata        String?   // JSON string for business info, research data, etc.
   
   // Demo Specifics
   demoStartedAt   DateTime?
   demoExpiresAt   DateTime?
+  demoMinutes     Int?      @default(10) // Configurable demo duration
+  
+  // Nurturing Specifics
+  nurturingOptInAt            DateTime?
+  nurturingOnboardingComplete Boolean  @default(false)
+  lastBroadcastInteraction    DateTime?
   
   messages        Message[]
   tags            Tag[]
@@ -92,11 +103,13 @@ model Message {
 model Tag {
   id          String   @id @default(uuid())
   name        String   @unique
-  category    String   @default("SYSTEM") // SYSTEM, INTENT, CAMPAIGN
+  category    String   @default("SYSTEM") // SYSTEM, INTENT, CAMPAIGN, CUSTOM
+  description String?  // What this tag means
   campaignId  String?
   campaign    Campaign? @relation(fields: [campaignId], references: [id])
   
   leads       Lead[]
+  createdAt   DateTime @default(now())
 }
 
 model TakeoverKeyword {
@@ -133,7 +146,20 @@ model PromptConfig {
   id            String   @id @default(uuid())
   role          String   @unique // CLOSER, RECEPTIONIST, NURTURING
   basePrompt    String
-  updatedAt     DateTime @updatedAt
+  
+  // Context injection rules
+  includeLeadName             Boolean @default(true)
+  includeLeadMetadata         Boolean @default(true)
+  includeLeadTags             Boolean @default(true)
+  includeConversationHistory  Boolean @default(true)
+  historyMessageCount         Int     @default(10)
+  
+  // Behavior settings
+  temperature     Float   @default(0.7)
+  usePremiumModel Boolean @default(true)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 // MASS OUTREACH MODELS
@@ -187,4 +213,20 @@ model TelegramConfig {
   chatId      String?
   isEnabled   Boolean  @default(false)
   updatedAt   DateTime @updatedAt
+}
+
+model MessageTemplate {
+  id              String   @id @default(uuid())
+  stageId         String
+  stage           CampaignStage @relation(fields: [stageId], references: [id])
+  
+  content         String   // Template with variables: "Hola {{name}}, ..."
+  order           Int      @default(1) // For multi-message stages
+  
+  // Button support (for interactive messages)
+  hasButtons      Boolean  @default(false)
+  buttons         String?  // JSON array of button configs
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
