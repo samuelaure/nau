@@ -37,15 +37,27 @@ interface Lead {
   currentStage: { name: string } | null;
 }
 
+interface Message {
+  id: string;
+  direction: 'INBOUND' | 'OUTBOUND';
+  content: string;
+  timestamp: string;
+  status: string;
+}
+
 function App() {
   const [stats, setStats] = useState<CampaignStats[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [keywords, setKeywords] = useState<{ id: string; word: string; type: string }[]>([]);
   const [availability, setAvailability] = useState('');
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [newMessage, setNewMessage] = useState('');
   const [newKeyword, setNewKeyword] = useState('');
   const [kwType, setKwType] = useState('INTERNAL');
   const [loading, setLoading] = useState(true);
   const [isSavingStatus, setIsSavingStatus] = useState(false);
+  const [isSendingMsg, setIsSendingMsg] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -121,6 +133,44 @@ function App() {
     const interval = setInterval(fetchData, 30000); // Auto refresh every 30s
     return () => clearInterval(interval);
   }, []);
+
+  const fetchMessages = async (leadId: string) => {
+    try {
+      const res = await fetch(`http://localhost:3000/api/dashboard/leads/${leadId}/messages`);
+      const data = await res.json();
+      setMessages(data);
+    } catch (error) {
+      console.error('Failed to fetch messages:', error);
+    }
+  };
+
+  useEffect(() => {
+    let interval: any;
+    if (selectedLead) {
+      fetchMessages(selectedLead.id);
+      interval = setInterval(() => fetchMessages(selectedLead.id), 5000);
+    }
+    return () => clearInterval(interval);
+  }, [selectedLead]);
+
+  const sendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedLead || !newMessage.trim()) return;
+    setIsSendingMsg(true);
+    try {
+      await fetch(`http://localhost:3000/api/dashboard/leads/${selectedLead.id}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: newMessage })
+      });
+      setNewMessage('');
+      fetchMessages(selectedLead.id);
+    } catch (error) {
+      console.error('Failed to send message:', error);
+    } finally {
+      setIsSendingMsg(false);
+    }
+  };
 
   const totalMetrics = stats.reduce((acc, curr) => ({
     totalContacts: acc.totalContacts + curr.metrics.totalContacts,
@@ -246,10 +296,49 @@ function App() {
         </div>
       </div>
 
+      {selectedLead && (
+        <div className="modal-overlay">
+          <div className="chat-modal">
+            <div className="chat-header">
+              <div>
+                <h3>{selectedLead.name || 'Chat with Lead'}</h3>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{selectedLead.phoneNumber}</p>
+              </div>
+              <button className="secondary" onClick={() => setSelectedLead(null)}><X size={18} /></button>
+            </div>
+            <div className="chat-messages">
+              {messages.map((m) => (
+                <div key={m.id} className={`message ${m.direction.toLowerCase()}`}>
+                  <div className="message-content">
+                    {m.content}
+                    <div className="message-meta">
+                      {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {m.direction === 'OUTBOUND' && <span className={`status-${m.status || 'sent'}`}> • {m.status || 'sent'}</span>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <form onSubmit={sendMessage} className="chat-input">
+              <input
+                type="text"
+                placeholder="Type a message..."
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                disabled={isSendingMsg}
+              />
+              <button type="submit" disabled={isSendingMsg || !newMessage.trim()}>
+                {isSendingMsg ? '...' : 'Send'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       <div className="leads-container">
         <div className="leads-header">
           <h2>Recent Interactions</h2>
-          <div className="search-box" style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '0.5rem 1rem', borderRadius: '0.5rem', border: '1px solid var(--card-border)' }}>
+          <div className="search-box">
             <Search size={16} color="var(--text-muted)" style={{ marginRight: '8px' }} />
             <input
               type="text"
@@ -296,13 +385,14 @@ function App() {
                   {new Date(lead.lastInteraction).toLocaleTimeString()}
                 </td>
                 <td>
-                  {lead.status === 'HANDOVER' ? (
-                    <button onClick={() => resolveHandover(lead.id)}>Resolve</button>
-                  ) : (
-                    <button className="secondary" title="View Chat">
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button className="secondary" title="View Chat" onClick={() => setSelectedLead(lead)}>
                       <MessageSquare size={14} />
                     </button>
-                  )}
+                    {lead.status === 'HANDOVER' && (
+                      <button onClick={() => resolveHandover(lead.id)}>Resolve</button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

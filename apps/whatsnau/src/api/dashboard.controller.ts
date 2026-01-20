@@ -1,6 +1,8 @@
 import { Request, Response, Router } from 'express';
 import { db } from '../core/db.js';
 import { MetricsService } from '../services/metrics.service.js';
+import { WhatsAppService } from '../services/whatsapp.service.js';
+import { Orchestrator } from '../core/orchestrator.js';
 import { logger } from '../core/logger.js';
 
 const router = Router();
@@ -119,6 +121,44 @@ router.post('/config/keywords', async (req: Request, res: Response) => {
         res.json(keyword);
     } catch (error) {
         logger.error({ err: error }, 'Failed to create keyword');
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+/**
+ * LIVE CHAT ENDPOINTS
+ */
+router.get('/leads/:id/messages', async (req: Request, res: Response) => {
+    const { id } = req.params;
+    try {
+        const messages = await db.message.findMany({
+            where: { leadId: id as string },
+            orderBy: { timestamp: 'asc' }
+        });
+        res.json(messages);
+    } catch (error) {
+        logger.error({ err: error, leadId: id }, 'Failed to fetch messages');
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+router.post('/leads/:id/messages', async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { content } = req.body;
+    try {
+        const lead = await db.lead.findUnique({ where: { id: id as string } });
+        if (!lead) return res.status(404).json({ error: 'Lead not found' });
+
+        // Send via WhatsApp
+        const waRes = await WhatsAppService.sendText(lead.phoneNumber, content);
+        const whatsappId = waRes?.messages?.[0]?.id;
+
+        // Process as OUTBOUND via Orchestrator to ensure consistency (Silent takeover, logic, etc)
+        await Orchestrator.handleIncoming(lead.phoneNumber, content, undefined, 'OUTBOUND', whatsappId);
+
+        res.json({ success: true, whatsappId });
+    } catch (error) {
+        logger.error({ err: error, leadId: id }, 'Failed to send message');
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
