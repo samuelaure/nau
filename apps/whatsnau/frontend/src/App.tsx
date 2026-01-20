@@ -58,6 +58,26 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   const [isSendingMsg, setIsSendingMsg] = useState(false);
+  const [activeTab, setActiveTab] = useState<'overview' | 'settings' | 'campaign'>('overview');
+  const [business, setBusiness] = useState({ name: '', knowledgeBase: '' });
+  const [prompts, setPrompts] = useState<{ role: string; basePrompt: string }[]>([]);
+  const [sequences, setSequences] = useState<{ id: string; name: string; waitHours: number; order: number }[]>([]);
+
+  const fetchConfig = async () => {
+    try {
+      const baseUrl = 'http://localhost:3000/api/dashboard/config';
+      const [bizRes, promptRes, seqRes] = await Promise.all([
+        fetch(`${baseUrl}/business`),
+        fetch(`${baseUrl}/prompts`),
+        fetch(`${baseUrl}/sequences`)
+      ]);
+      setBusiness(await bizRes.json());
+      setPrompts(await promptRes.json());
+      setSequences(await seqRes.json());
+    } catch (error) {
+      console.error('Failed to fetch config:', error);
+    }
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -130,9 +150,51 @@ function App() {
 
   useEffect(() => {
     fetchData();
+    fetchConfig();
     const interval = setInterval(fetchData, 30000); // Auto refresh every 30s
     return () => clearInterval(interval);
   }, []);
+
+  const saveBusiness = async () => {
+    try {
+      await fetch('http://localhost:3000/api/dashboard/config/business', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(business)
+      });
+      alert('Business profile updated');
+    } catch (error) {
+      console.error('Failed to save business:', error);
+    }
+  };
+
+  const savePrompt = async (role: string, basePrompt: string) => {
+    try {
+      await fetch('http://localhost:3000/api/dashboard/config/prompts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role, basePrompt })
+      });
+      alert(`${role} prompt updated`);
+    } catch (error) {
+      console.error('Failed to save prompt:', error);
+    }
+  };
+
+  const saveSequence = async (id: string, name: string, waitHours: number) => {
+    try {
+      await fetch(`http://localhost:3000/api/dashboard/config/sequences/${id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, waitHours })
+      });
+      fetchConfig();
+      alert('Sequence updated');
+    } catch (error) {
+      console.error('Failed to save sequence:', error);
+    }
+  };
+
 
   const fetchMessages = async (leadId: string) => {
     try {
@@ -195,106 +257,249 @@ function App() {
           <h1 className="logo">whatsnaŭ</h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Campaign Orchestration Dashboard</p>
         </div>
-        <button className="secondary" onClick={fetchData} disabled={loading}>
-          <RefreshCw size={16} style={{ marginRight: '8px', verticalAlign: 'middle', animation: loading ? 'spin 2s linear infinite' : 'none' }} />
-          Refresh
-        </button>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <nav className="tabs">
+            <button className={activeTab === 'overview' ? 'active' : ''} onClick={() => setActiveTab('overview')}>Overview</button>
+            <button className={activeTab === 'settings' ? 'active' : ''} onClick={() => setActiveTab('settings')}>AI Agents</button>
+            <button className={activeTab === 'campaign' ? 'active' : ''} onClick={() => setActiveTab('campaign')}>Campaign</button>
+          </nav>
+          <button className="secondary" onClick={fetchData} disabled={loading}>
+            <RefreshCw size={16} style={{ marginRight: '8px', verticalAlign: 'middle', animation: loading ? 'spin 2s linear infinite' : 'none' }} />
+            Refresh
+          </button>
+        </div>
       </header>
 
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-label flex items-center gap-2">
-            <Users size={16} color="var(--primary)" /> Total Contacts
+      {activeTab === 'overview' && (
+        <>
+          <div className="stats-grid">
+            <div className="stat-card">
+              <div className="stat-label flex items-center gap-2">
+                <Users size={16} color="var(--primary)" /> Total Contacts
+              </div>
+              <div className="stat-value">{totalMetrics.totalContacts}</div>
+              <div className="stat-trend" style={{ color: 'var(--primary)' }}>Active outreach</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">
+                <Target size={16} color="var(--accent)" /> Interested Leads
+              </div>
+              <div className="stat-value">{totalMetrics.interested}</div>
+              <div className="stat-trend" style={{ color: 'var(--accent)' }}>Ready for demo</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">
+                <CheckCircle2 size={16} color="var(--success)" /> Converted
+              </div>
+              <div className="stat-value">{totalMetrics.conversions}</div>
+              <div className="stat-trend" style={{ color: 'var(--success)' }}>Success rate: {((totalMetrics.conversions / (totalMetrics.totalContacts || 1)) * 100).toFixed(1)}%</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">
+                <AlertCircle size={16} color="var(--danger)" /> Handover Required
+              </div>
+              <div className="stat-value" style={{ color: leads.filter(l => l.status === 'HANDOVER').length > 0 ? 'var(--danger)' : 'inherit' }}>
+                {leads.filter(l => l.status === 'HANDOVER').length}
+              </div>
+              <div className="stat-trend">Manual intervention needed</div>
+            </div>
           </div>
-          <div className="stat-value">{totalMetrics.totalContacts}</div>
-          <div className="stat-trend" style={{ color: 'var(--primary)' }}>Active outreach</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">
-            <Target size={16} color="var(--accent)" /> Interested Leads
-          </div>
-          <div className="stat-value">{totalMetrics.interested}</div>
-          <div className="stat-trend" style={{ color: 'var(--accent)' }}>Ready for demo</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">
-            <CheckCircle2 size={16} color="var(--success)" /> Converted
-          </div>
-          <div className="stat-value">{totalMetrics.conversions}</div>
-          <div className="stat-trend" style={{ color: 'var(--success)' }}>Success rate: {((totalMetrics.conversions / (totalMetrics.totalContacts || 1)) * 100).toFixed(1)}%</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">
-            <AlertCircle size={16} color="var(--danger)" /> Handover Required
-          </div>
-          <div className="stat-value" style={{ color: leads.filter(l => l.status === 'HANDOVER').length > 0 ? 'var(--danger)' : 'inherit' }}>
-            {leads.filter(l => l.status === 'HANDOVER').length}
-          </div>
-          <div className="stat-trend">Manual intervention needed</div>
-        </div>
-      </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '3rem' }}>
-        <div className="settings-section">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
-            <Clock size={20} color="var(--accent)" />
-            <h3 style={{ margin: 0 }}>Availability Status</h3>
-          </div>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
-            Personalize AI responses while leads wait for you. Describe what you're doing.
-          </p>
-          <div className="keyword-form">
-            <input
-              type="text"
-              placeholder="e.g. 'en una reunión hasta las 16:00'..."
-              value={availability}
-              onChange={(e) => setAvailability(e.target.value)}
-            />
-            <button onClick={updateAvailability} disabled={isSavingStatus}>
-              {isSavingStatus ? 'Saving...' : 'Save Status'}
-            </button>
-          </div>
-        </div>
+          <div className="leads-container">
+            <div className="leads-header">
+              <h2>Recent Interactions</h2>
+              <div className="search-box">
+                <Search size={16} color="var(--text-muted)" style={{ marginRight: '8px' }} />
+                <input type="text" placeholder="Search leads..." style={{ background: 'transparent', border: 'none', color: '#fff', outline: 'none' }} />
+              </div>
+            </div>
 
-        <div className="settings-section">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
-            <ShieldAlert size={20} color="var(--primary)" />
-            <h3 style={{ margin: 0 }}>Handover Triggers</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Contact</th>
+                  <th>Status</th>
+                  <th>Campaign Stage</th>
+                  <th>Tokens/Tags</th>
+                  <th>Last Seen</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {leads.map((lead) => (
+                  <tr key={lead.id}>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{lead.name || 'Unknown Lead'}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{lead.phoneNumber}</div>
+                    </td>
+                    <td>
+                      <span className={`badge badge-${lead.status.toLowerCase()}`}>
+                        {lead.status}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`badge badge-${lead.state.toLowerCase()}`}>
+                        {lead.currentStage?.name || lead.state.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td>
+                      {lead.tags.map(tag => (
+                        <span key={tag.name} className="tag">{tag.name}</span>
+                      ))}
+                    </td>
+                    <td style={{ color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
+                      {new Date(lead.lastInteraction).toLocaleTimeString()}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button className="secondary" title="View Chat" onClick={() => setSelectedLead(lead)}>
+                          <MessageSquare size={14} />
+                        </button>
+                        {lead.status === 'HANDOVER' && (
+                          <button onClick={() => resolveHandover(lead.id)}>Resolve</button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
-            Define logic-based triggers for human intervention.
-          </p>
+        </>
+      )}
 
-          <form onSubmit={addKeyword} className="keyword-form">
-            <select
-              value={kwType}
-              onChange={(e) => setKwType(e.target.value)}
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--card-border)', color: '#fff', borderRadius: '0.75rem', padding: '0 0.5rem' }}
-            >
-              <option value="INTERNAL">Owner Trigger</option>
-              <option value="LEAD">Lead Request</option>
-            </select>
-            <input
-              type="text"
-              placeholder="Phrase..."
-              value={newKeyword}
-              onChange={(e) => setNewKeyword(e.target.value)}
-            />
-            <button type="submit">Add</button>
-          </form>
+      {activeTab === 'settings' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '2rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            <div className="settings-section">
+              <h3>Agent Prompts</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.5rem' }}>Configure the personality and primary objective of each AI agent.</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                {['CLOSER', 'RECEPTIONIST'].map(role => {
+                  const p = prompts.find(pr => pr.role === role) || { basePrompt: '' };
+                  return (
+                    <div key={role}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                        <h4 style={{ color: 'var(--primary)' }}>{role}</h4>
+                        <button className="secondary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.75rem' }} onClick={() => savePrompt(role, p.basePrompt)}>Update</button>
+                      </div>
+                      <textarea
+                        value={p.basePrompt}
+                        onChange={(e) => setPrompts(prompts.map(pr => pr.role === role ? { ...pr, basePrompt: e.target.value } : pr))}
+                        placeholder={`System prompt for ${role}...`}
+                        rows={6}
+                        style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--card-border)', borderRadius: '0.75rem', color: '#fff', padding: '1rem', fontFamily: 'monospace' }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
 
-          <div className="keyword-list">
-            {keywords.map((k) => (
-              <div key={k.id} className="keyword-pill" style={{ borderColor: k.type === 'INTERNAL' ? 'var(--primary-glow)' : 'var(--accent)' }}>
-                <span style={{ fontSize: '0.65rem', opacity: 0.5, marginRight: '4px' }}>{k.type}:</span> {k.word}
-                <button onClick={() => removeKeyword(k.id)}>
-                  <X size={14} />
+            <div className="settings-section">
+              <h3>Business Knowledge Base</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.5rem' }}>This information is injected into all agents to ensure accurate responses.</p>
+              <textarea
+                value={business.knowledgeBase || ''}
+                onChange={(e) => setBusiness({ ...business, knowledgeBase: e.target.value })}
+                placeholder="Describe your business, products, services, pricing, FAQs..."
+                rows={12}
+                style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--card-border)', borderRadius: '0.75rem', color: '#fff', padding: '1rem' }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                <button onClick={saveBusiness}>Save Knowledge Base</button>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            <div className="settings-section">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
+                <Clock size={20} color="var(--accent)" />
+                <h3 style={{ margin: 0 }}>Availability</h3>
+              </div>
+              <div className="keyword-form" style={{ flexDirection: 'column', gap: '0.5rem' }}>
+                <input
+                  type="text"
+                  placeholder="e.g. 'en una reunión'..."
+                  value={availability}
+                  onChange={(e) => setAvailability(e.target.value)}
+                />
+                <button onClick={updateAvailability} disabled={isSavingStatus}>
+                  {isSavingStatus ? 'Saving...' : 'Save'}
                 </button>
+              </div>
+            </div>
+
+            <div className="settings-section">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
+                <ShieldAlert size={20} color="var(--primary)" />
+                <h3 style={{ margin: 0 }}>Handover</h3>
+              </div>
+              <form onSubmit={addKeyword} className="keyword-form" style={{ flexDirection: 'column', gap: '0.5rem' }}>
+                <select
+                  value={kwType}
+                  onChange={(e) => setKwType(e.target.value)}
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--card-border)', color: '#fff', borderRadius: '0.75rem', padding: '0.5rem' }}
+                >
+                  <option value="INTERNAL">Owner Trigger</option>
+                  <option value="LEAD">Lead Request</option>
+                </select>
+                <input
+                  type="text"
+                  placeholder="Phrase..."
+                  value={newKeyword}
+                  onChange={(e) => setNewKeyword(e.target.value)}
+                />
+                <button type="submit">Add</button>
+              </form>
+              <div className="keyword-list">
+                {keywords.map((k) => (
+                  <div key={k.id} className="keyword-pill" style={{ borderColor: k.type === 'INTERNAL' ? 'var(--primary-glow)' : 'var(--accent)' }}>
+                    {k.word}
+                    <button onClick={() => removeKeyword(k.id)}><X size={14} /></button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'campaign' && (
+        <div className="settings-section">
+          <h3>Campaign Flow (Sequences)</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '2rem' }}>Define the outreach timeline and automated follow-ups.</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {sequences.map(s => (
+              <div key={s.id} className="stat-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
+                  <div style={{ width: '40px', height: '40px', background: 'var(--primary)', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold' }}>{s.order}</div>
+                  <div>
+                    <input
+                      type="text"
+                      value={s.name}
+                      onChange={(e) => setSequences(sequences.map(sq => sq.id === s.id ? { ...sq, name: e.target.value } : sq))}
+                      style={{ background: 'transparent', border: 'none', color: '#fff', fontWeight: 600, fontSize: '1rem', outline: 'none' }}
+                    />
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                      Wait:
+                      <input
+                        type="number"
+                        value={s.waitHours}
+                        onChange={(e) => setSequences(sequences.map(sq => sq.id === s.id ? { ...sq, waitHours: Number(e.target.value) } : sq))}
+                        style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: '#fff', width: '40px', textAlign: 'center', borderRadius: '4px' }}
+                      />
+                      hours
+                    </div>
+                  </div>
+                </div>
+                <button className="secondary" onClick={() => saveSequence(s.id, s.name, s.waitHours)}>Save</button>
               </div>
             ))}
           </div>
         </div>
-      </div>
+      )}
 
       {selectedLead && (
         <div className="modal-overlay">
@@ -334,71 +539,6 @@ function App() {
           </div>
         </div>
       )}
-
-      <div className="leads-container">
-        <div className="leads-header">
-          <h2>Recent Interactions</h2>
-          <div className="search-box">
-            <Search size={16} color="var(--text-muted)" style={{ marginRight: '8px' }} />
-            <input
-              type="text"
-              placeholder="Search leads..."
-              style={{ background: 'transparent', border: 'none', color: '#fff', outline: 'none', fontSize: '0.875rem' }}
-            />
-          </div>
-        </div>
-
-        <table>
-          <thead>
-            <tr>
-              <th>Contact</th>
-              <th>Status</th>
-              <th>Campaign Stage</th>
-              <th>Tokens/Tags</th>
-              <th>Last Seen</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {leads.map((lead) => (
-              <tr key={lead.id}>
-                <td>
-                  <div style={{ fontWeight: 600 }}>{lead.name || 'Unknown Lead'}</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{lead.phoneNumber}</div>
-                </td>
-                <td>
-                  <span className={`badge badge-${lead.status.toLowerCase()}`}>
-                    {lead.status}
-                  </span>
-                </td>
-                <td>
-                  <span className={`badge badge-${lead.state.toLowerCase()}`}>
-                    {lead.currentStage?.name || lead.state.replace('_', ' ')}
-                  </span>
-                </td>
-                <td>
-                  {lead.tags.map(tag => (
-                    <span key={tag.name} className="tag">{tag.name}</span>
-                  ))}
-                </td>
-                <td style={{ color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
-                  {new Date(lead.lastInteraction).toLocaleTimeString()}
-                </td>
-                <td>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button className="secondary" title="View Chat" onClick={() => setSelectedLead(lead)}>
-                      <MessageSquare size={14} />
-                    </button>
-                    {lead.status === 'HANDOVER' && (
-                      <button onClick={() => resolveHandover(lead.id)}>Resolve</button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
     </div>
   );
 }

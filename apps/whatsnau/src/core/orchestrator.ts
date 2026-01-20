@@ -233,9 +233,19 @@ export class Orchestrator {
             aiMessages.push({ role: 'user', content: userMessage });
         }
 
-        const systemPrompt = role === 'CLOSER'
-            ? `Eres el "Conversational Closer" de whatsnaŭ. Tono profesional y humano. Objetivo: Validar interés y ofrecer DEMO.`
-            : `Eres una **Recepcionista IA** amable y eficiente. Responde siempre en español.`;
+        const [business, config] = await Promise.all([
+            db.businessProfile.findUnique({ where: { id: 'singleton' } }),
+            db.promptConfig.findUnique({ where: { role } })
+        ]);
+
+        const knowledgeBase = business?.knowledgeBase || 'No hay información adicional del negocio.';
+        const baseSystemPrompt = config?.basePrompt || (
+            role === 'CLOSER'
+                ? `Eres el "Conversational Closer" de whatsnaŭ. Tono profesional y humano. Objetivo: Validar interés y ofrecer DEMO.`
+                : `Eres una **Recepcionista IA** amable y eficiente. Responde siempre en español.`
+        );
+
+        const systemPrompt = `${baseSystemPrompt}\n\n### CONTEXTO DEL NEGOCIO:\n${knowledgeBase}`;
 
         const response = await AIService.getChatResponse(systemPrompt, aiMessages, true);
         if (response) {

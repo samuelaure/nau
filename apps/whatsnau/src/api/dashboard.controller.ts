@@ -163,6 +163,80 @@ router.post('/leads/:id/messages', async (req: Request, res: Response) => {
     }
 });
 
+/**
+ * BUSINESS & AGENT CONFIG
+ */
+router.get('/config/business', async (req: Request, res: Response) => {
+    try {
+        const business = await db.businessProfile.findUnique({ where: { id: 'singleton' } });
+        res.json(business || { name: 'whatsnaŭ', knowledgeBase: '' });
+    } catch (error) {
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+router.post('/config/business', async (req: Request, res: Response) => {
+    const { name, knowledgeBase } = req.body;
+    try {
+        const business = await db.businessProfile.upsert({
+            where: { id: 'singleton' },
+            create: { id: 'singleton', name, knowledgeBase },
+            update: { name, knowledgeBase }
+        });
+        res.json(business);
+    } catch (error) {
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+router.get('/config/prompts', async (req: Request, res: Response) => {
+    try {
+        const prompts = await db.promptConfig.findMany();
+        res.json(prompts);
+    } catch (error) {
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+router.post('/config/prompts', async (req: Request, res: Response) => {
+    const { role, basePrompt } = req.body;
+    try {
+        const prompt = await db.promptConfig.upsert({
+            where: { role },
+            create: { role, basePrompt },
+            update: { basePrompt }
+        });
+        res.json(prompt);
+    } catch (error) {
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+router.get('/config/sequences', async (req: Request, res: Response) => {
+    try {
+        const stages = await db.campaignStage.findMany({
+            orderBy: { order: 'asc' }
+        });
+        res.json(stages);
+    } catch (error) {
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+router.post('/config/sequences/:id', async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { name, waitHours } = req.body;
+    try {
+        const stage = await db.campaignStage.update({
+            where: { id: id as string },
+            data: { name, waitHours: Number(waitHours) }
+        });
+        res.json(stage);
+    } catch (error) {
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
 router.delete('/config/keywords/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
     try {

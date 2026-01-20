@@ -113,3 +113,17 @@ model ConversationSummary {
   content   String
   createdAt DateTime @default(now())
 }
+
+model BusinessProfile {
+  id            String   @id @default("singleton")
+  name          String   @default("whatsnaŭ")
+  knowledgeBase String?  // Extensive context about the business
+  updatedAt     DateTime @updatedAt
+}
+
+model PromptConfig {
+  id            String   @id @default(uuid())
+  role          String   @unique // CLOSER, RECEPTIONIST, NURTURING
+  basePrompt    String
+  updatedAt     DateTime @updatedAt
+}
