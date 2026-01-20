@@ -25,6 +25,11 @@ async function bootstrap() {
     app.use(cors()); // Enable CORS for Dashboard
     app.use(bodyParser.json());
 
+    // Observability: Health Check
+    app.get('/health', (req, res) => {
+      res.json({ status: 'ok', timestamp: new Date().toISOString(), version: process.env.npm_package_version });
+    });
+
     // Routes
     app.use('/api', webhookRouter);
     app.use('/api/dashboard', dashboardRouter);
