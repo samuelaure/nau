@@ -1,0 +1,39 @@
+# Node.js
+node_modules/
+dist/
+build/
+.npm
+scripts/
+
+# Environment
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDEs & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+
+# Project specific
+.cursorrules
+.agent/
+
+# Database
+/prisma/migrations/
+*.db
+*.db-journal
+
+# Testing
+coverage/
+.nyc_output
+
+# Misc
+.cache/
+.parcel-cache/
+.next/
+out/
