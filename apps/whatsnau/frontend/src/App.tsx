@@ -134,7 +134,7 @@ function App() {
 
       {activeTab === 'campaigns' && <CampaignManager />}
 
-      {activeTab === 'templates' && <TemplatesView templates={templates} />}
+      {activeTab === 'templates' && <TemplatesView initialTemplates={templates} />}
 
       {activeTab === 'import' && (
         <ImportManager

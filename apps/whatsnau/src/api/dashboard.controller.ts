@@ -256,6 +256,42 @@ router.post(
   })
 );
 
+router.post(
+  '/config/whatsapp-templates/sync',
+  asyncHandler(async (req: Request, res: Response) => {
+    const { TemplateSyncService } = await import('../services/template-sync.service.js');
+    const result = await TemplateSyncService.syncTemplatesFromMeta();
+    res.json(result);
+  })
+);
+
+router.post(
+  '/config/whatsapp-templates/link',
+  asyncHandler(async (req: Request, res: Response) => {
+    const { TemplateSyncService } = await import('../services/template-sync.service.js');
+    const { metaTemplateName, messageTemplateId, variableMapping } = req.body;
+
+    // First find the local WhatsAppTemplate by Meta name
+    const waTemplate = await (db as any).whatsAppTemplate.findUnique({
+      where: { name: metaTemplateName },
+    });
+
+    if (!waTemplate) {
+      return res
+        .status(404)
+        .json({ error: 'WhatsApp Template not found in local db. Sync first.' });
+    }
+
+    await TemplateSyncService.linkTemplateToMessage(
+      waTemplate.id,
+      messageTemplateId,
+      variableMapping
+    );
+
+    res.json({ success: true });
+  })
+);
+
 router.get(
   '/config/telegram',
   asyncHandler(async (req: Request, res: Response) => {
