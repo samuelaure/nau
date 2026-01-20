@@ -1,6 +1,6 @@
 {
   "name": "whatsnau",
-  "version": "0.2.4",
+  "version": "0.3.0",
   "description": "Campaign-driven WhatsApp CRM & Automation platform",
   "type": "module",
   "main": "dist/index.js",
@@ -34,6 +34,7 @@
     "@types/pino": "^7.0.4",
     "body-parser": "^2.2.2",
     "cors": "^2.8.5",
+    "csv-parse": "^6.1.0",
     "dotenv": "^16.3.1",
     "express": "^5.2.1",
     "openai": "^6.16.0",

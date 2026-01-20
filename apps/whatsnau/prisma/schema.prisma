@@ -21,6 +21,7 @@ model Campaign {
   leads       Lead[]
   stages      CampaignStage[]
   tags        Tag[]
+  importBatches LeadImportBatch[]
 }
 
 model CampaignStage {
@@ -61,6 +62,7 @@ model Lead {
   messages        Message[]
   tags            Tag[]
   summaries       ConversationSummary[]
+  opportunities   Opportunity[]
 }
 
 model Message {
@@ -127,4 +129,57 @@ model PromptConfig {
   role          String   @unique // CLOSER, RECEPTIONIST, NURTURING
   basePrompt    String
   updatedAt     DateTime @updatedAt
+}
+
+// MASS OUTREACH MODELS
+model LeadImportBatch {
+  id          String   @id @default(uuid())
+  campaignId  String
+  campaign    Campaign @relation(fields: [campaignId], references: [id])
+  name        String   // e.g., "Google Maps Scraping - Jan 20"
+  status      String   @default("STAGING") // STAGING, ANALYZING, READY, EXECUTING, COMPLETED
+  createdAt   DateTime @default(now())
+  
+  stagingLeads StagingLead[]
+}
+
+model StagingLead {
+  id              String   @id @default(uuid())
+  batchId         String
+  batch           LeadImportBatch @relation(fields: [batchId], references: [id])
+  
+  rawData         String   // JSON blob of original CSV row
+  phoneNumber     String
+  name            String?
+  email           String?
+  website         String?
+  
+  // Cleanse/Analysis Status
+  isValidWhatsApp Boolean  @default(false)
+  isVerified      Boolean  @default(false) // Checked against WA API
+  cleanseStatus   String   @default("PENDING") // PENDING, CLEANED, INVALID
+  
+  opportunities   Opportunity[]
+}
+
+model Opportunity {
+  id              String   @id @default(uuid())
+  stagingLeadId   String?
+  stagingLead     StagingLead? @relation(fields: [stagingLeadId], references: [id])
+  leadId          String?
+  lead            Lead? @relation(fields: [leadId], references: [id])
+  
+  type            String   // NO_WEBSITE, FEW_REVIEWS, LOW_RATING, CUSTOM
+  description     String
+  severity        String   @default("MEDIUM") // LOW, MEDIUM, HIGH (Priority)
+  aiGenerated     Boolean  @default(false)
+  createdAt       DateTime @default(now())
+}
+
+model TelegramConfig {
+  id          String   @id @default("singleton")
+  botToken    String?
+  chatId      String?
+  isEnabled   Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
 }

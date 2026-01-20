@@ -279,6 +279,29 @@ router.post('/config/whatsapp-templates', async (req: Request, res: Response) =>
     }
 });
 
+router.get('/config/telegram', async (req: Request, res: Response) => {
+    try {
+        const config = await (db as any).telegramConfig.findUnique({ where: { id: 'singleton' } });
+        res.json(config || { botToken: '', chatId: '', isEnabled: false });
+    } catch (error) {
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+router.post('/config/telegram', async (req: Request, res: Response) => {
+    const { botToken, chatId, isEnabled } = req.body;
+    try {
+        const config = await (db as any).telegramConfig.upsert({
+            where: { id: 'singleton' },
+            create: { id: 'singleton', botToken, chatId, isEnabled },
+            update: { botToken, chatId, isEnabled }
+        });
+        res.json(config);
+    } catch (error) {
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
 router.delete('/config/keywords/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
     try {

@@ -96,4 +96,21 @@ export class WhatsAppService {
         });
         return res.json();
     }
+
+    static async verifyNumbers(phoneNumbers: string[]) {
+        const url = `https://graph.facebook.com/${config.WHATSAPP_VERSION}/${config.WHATSAPP_PHONE_NUMBER_ID}/contacts`;
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${config.WHATSAPP_ACCESS_TOKEN}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                messaging_product: 'whatsapp',
+                contacts: phoneNumbers.map(p => p.startsWith('+') ? p : `+${p}`),
+                blocking: 'wait'
+            }),
+        });
+        return res.json();
+    }
 }

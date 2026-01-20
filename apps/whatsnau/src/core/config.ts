@@ -20,6 +20,9 @@ const configSchema = z.object({
     OPENAI_API_KEY: z.string(),
     PRIMARY_AI_MODEL: z.string().default('gpt-4o'),
     CHEAP_AI_MODEL: z.string().default('gpt-4o-mini'),
+    // Telegram
+    TELEGRAM_BOT_TOKEN: z.string().optional(),
+    TELEGRAM_CHAT_ID: z.string().optional(),
 });
 
 const parsed = configSchema.safeParse(process.env);

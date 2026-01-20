@@ -4,6 +4,7 @@ import { LeadService, LeadState } from '../services/lead.service.js';
 import { AIService } from '../services/ai.service.js';
 import { WhatsAppService } from '../services/whatsapp.service.js';
 import { EventsService } from '../services/events.service.js';
+import { NotificationService } from '../services/notification.service.js';
 
 export class Orchestrator {
     /**
@@ -165,6 +166,9 @@ export class Orchestrator {
             data: { status: 'HANDOVER' }
         });
         EventsService.emit('handover', { leadId: lead.id, reasoning });
+
+        // Notify via Telegram
+        await NotificationService.notifyHandover(lead, reasoning);
 
         const config = await db.globalConfig.findUnique({ where: { id: 'singleton' } });
         const statusMsg = config?.availabilityStatus

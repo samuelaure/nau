@@ -6,6 +6,7 @@ import { db } from './core/db.js';
 import { CampaignService } from './services/campaign.service.js';
 import webhookRouter from './api/webhook.controller.js';
 import dashboardRouter from './api/dashboard.controller.js';
+import importRouter from './api/import.controller.js';
 
 async function bootstrap() {
     logger.info('🚀 whatsnaŭ is starting...');
@@ -26,6 +27,7 @@ async function bootstrap() {
         // Routes
         app.use('/api', webhookRouter);
         app.use('/api/dashboard', dashboardRouter);
+        app.use('/api/dashboard/import', importRouter);
 
         const port = process.env.PORT || 3000;
         app.listen(port, () => {
