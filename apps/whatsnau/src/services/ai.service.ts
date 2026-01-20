@@ -35,7 +35,7 @@ export class AIService {
 
     /**
      * Detects lead intent and tags from a message (Spanish).
-     * This is part of the "Deterministic logic + AI Classification" strategy.
+     * COST-EFFICIENCY: Uses GPT-4o-mini for logical classification.
      */
     static async classifyIntent(message: string, contextSummaries: string = '') {
         const prompt = `
@@ -45,15 +45,16 @@ export class AIService {
 
       Responde únicamente en formato JSON con la siguiente estructura:
       {
-        "intent": "interesado" | "no_interesado" | "duda" | "nurturing_opt_in" | "desconocido",
+        "intent": "interesado" | "no_interesado" | "duda" | "nurturing_opt_in" | "request_human" | "desconocido",
+        "confidence": 0-1,
         "reasoning": "Breve explicación en español",
         "tags": ["tag1", "tag2"]
       }
 
-      Reglas:
-      - Si el usuario dice que sí, o pregunta cómo funciona, es "interesado".
-      - Si dice que no o que no le molesten, es "no_interesado".
-      - Si pide contenido gratuito o seguir contacto sin comprar ahora, es "nurturing_opt_in".
+      Reglas para "request_human":
+      - El usuario quiere hablar con alguien real o pregunta si eres un bot.
+      - Pide ayuda técnica o personal.
+      - Expresa frustración clara.
     `;
 
         try {

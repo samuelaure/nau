@@ -44,10 +44,19 @@ router.post('/whatsapp', async (req: Request, res: Response) => {
             const text = message.text?.body;
             const buttonId = message.interactive?.button_reply?.id;
 
-            logger.info({ from, text, buttonId }, 'Received message from WhatsApp');
+            // DETECT DIRECTION
+            // If internal number sends it, it's OUTBOUND (owner talking)
+            const isOutbound = from === config.WHATSAPP_PHONE_NUMBER;
+            const direction = isOutbound ? 'OUTBOUND' : 'INBOUND';
+
+            // For OUTBOUND, the "target" is the 'to' or 'recipient_id' equivalent (usually message.to)
+            // Note: message.to might depend on exact payload structure for outbound webhooks
+            const targetPhone = isOutbound ? (message as any).to : from;
+
+            logger.info({ from, targetPhone, direction, text }, 'Processing WhatsApp webhook');
 
             try {
-                await Orchestrator.handleIncoming(from, text, buttonId);
+                await Orchestrator.handleIncoming(targetPhone, text, buttonId, direction);
             } catch (error) {
                 logger.error({ err: error, from }, 'Error in Orchestrator');
             }

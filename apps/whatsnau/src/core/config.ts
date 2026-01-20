@@ -11,6 +11,7 @@ const configSchema = z.object({
     // WhatsApp Cloud API
     WHATSAPP_VERSION: z.string().default('v18.0'),
     WHATSAPP_PHONE_NUMBER_ID: z.string(),
+    WHATSAPP_PHONE_NUMBER: z.string(), // Added for direction detection
     WHATSAPP_BUSINESS_ACCOUNT_ID: z.string(),
     WHATSAPP_ACCESS_TOKEN: z.string(),
     WHATSAPP_VERIFY_TOKEN: z.string(),

@@ -8,7 +8,8 @@ import {
   RefreshCw,
   MessageSquare,
   X,
-  ShieldAlert
+  ShieldAlert,
+  Clock
 } from 'lucide-react';
 
 interface Metric {
@@ -39,31 +40,52 @@ interface Lead {
 function App() {
   const [stats, setStats] = useState<CampaignStats[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [keywords, setKeywords] = useState<{ id: string; word: string }[]>([]);
+  const [keywords, setKeywords] = useState<{ id: string; word: string; type: string }[]>([]);
+  const [availability, setAvailability] = useState('');
   const [newKeyword, setNewKeyword] = useState('');
+  const [kwType, setKwType] = useState('INTERNAL');
   const [loading, setLoading] = useState(true);
+  const [isSavingStatus, setIsSavingStatus] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
     try {
       const baseUrl = 'http://localhost:3000/api/dashboard';
-      const [statsRes, leadsRes, keywordsRes] = await Promise.all([
+      const [statsRes, leadsRes, keywordsRes, configRes] = await Promise.all([
         fetch(`${baseUrl}/stats`),
         fetch(`${baseUrl}/leads`),
-        fetch(`${baseUrl}/config/keywords`)
+        fetch(`${baseUrl}/config/keywords`),
+        fetch(`${baseUrl}/config/global`)
       ]);
 
       const statsData = await statsRes.json();
       const leadsData = await leadsRes.json();
       const keywordsData = await keywordsRes.json();
+      const configData = await configRes.json();
 
       setStats(statsData);
       setLeads(leadsData);
       setKeywords(keywordsData);
+      setAvailability(configData.availabilityStatus || '');
     } catch (error) {
       console.error('Failed to fetch data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const updateAvailability = async () => {
+    setIsSavingStatus(true);
+    try {
+      await fetch('http://localhost:3000/api/dashboard/config/global', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ availabilityStatus: availability })
+      });
+    } catch (error) {
+      console.error('Failed to update status:', error);
+    } finally {
+      setIsSavingStatus(false);
     }
   };
 
@@ -74,7 +96,7 @@ function App() {
       const res = await fetch('http://localhost:3000/api/dashboard/config/keywords', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ word: newKeyword })
+        body: JSON.stringify({ word: newKeyword, type: kwType })
       });
       if (res.ok) {
         setNewKeyword('');
@@ -162,38 +184,65 @@ function App() {
         </div>
       </div>
 
-      <div className="settings-section">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
-          <ShieldAlert size={20} color="var(--primary)" />
-          <h3 style={{ margin: 0 }}>Human Takeover Triggers</h3>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '3rem' }}>
+        <div className="settings-section">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
+            <Clock size={20} color="var(--accent)" />
+            <h3 style={{ margin: 0 }}>Availability Status</h3>
+          </div>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
+            Personalize AI responses while leads wait for you. Describe what you're doing.
+          </p>
+          <div className="keyword-form">
+            <input
+              type="text"
+              placeholder="e.g. 'en una reunión hasta las 16:00'..."
+              value={availability}
+              onChange={(e) => setAvailability(e.target.value)}
+            />
+            <button onClick={updateAvailability} disabled={isSavingStatus}>
+              {isSavingStatus ? 'Saving...' : 'Save Status'}
+            </button>
+          </div>
         </div>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
-          Messages matching these patterns will immediately stop the AI and flag the lead for manual intervention.
-          Use this to trigger handover from your mobile WhatsApp Business App.
-        </p>
 
-        <form onSubmit={addKeyword} className="keyword-form">
-          <input
-            type="text"
-            placeholder="e.g. 'un momento', 'human help', 'stop ai'..."
-            value={newKeyword}
-            onChange={(e) => setNewKeyword(e.target.value)}
-          />
-          <button type="submit">Add Trigger</button>
-        </form>
+        <div className="settings-section">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
+            <ShieldAlert size={20} color="var(--primary)" />
+            <h3 style={{ margin: 0 }}>Handover Triggers</h3>
+          </div>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
+            Define logic-based triggers for human intervention.
+          </p>
 
-        <div className="keyword-list">
-          {keywords.map((k) => (
-            <div key={k.id} className="keyword-pill">
-              {k.word}
-              <button onClick={() => removeKeyword(k.id)}>
-                <X size={14} />
-              </button>
-            </div>
-          ))}
-          {keywords.length === 0 && (
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontStyle: 'italic' }}>No custom triggers active.</p>
-          )}
+          <form onSubmit={addKeyword} className="keyword-form">
+            <select
+              value={kwType}
+              onChange={(e) => setKwType(e.target.value)}
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--card-border)', color: '#fff', borderRadius: '0.75rem', padding: '0 0.5rem' }}
+            >
+              <option value="INTERNAL">Owner Trigger</option>
+              <option value="LEAD">Lead Request</option>
+            </select>
+            <input
+              type="text"
+              placeholder="Phrase..."
+              value={newKeyword}
+              onChange={(e) => setNewKeyword(e.target.value)}
+            />
+            <button type="submit">Add</button>
+          </form>
+
+          <div className="keyword-list">
+            {keywords.map((k) => (
+              <div key={k.id} className="keyword-pill" style={{ borderColor: k.type === 'INTERNAL' ? 'var(--primary-glow)' : 'var(--accent)' }}>
+                <span style={{ fontSize: '0.65rem', opacity: 0.5, marginRight: '4px' }}>{k.type}:</span> {k.word}
+                <button onClick={() => removeKeyword(k.id)}>
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 

@@ -62,6 +62,37 @@ router.post('/leads/:id/resolve', async (req: Request, res: Response) => {
 });
 
 /**
+ * Global Configuration (Availability Status)
+ */
+router.get('/config/global', async (req: Request, res: Response) => {
+    try {
+        let config = await db.globalConfig.findUnique({ where: { id: 'singleton' } });
+        if (!config) {
+            config = await db.globalConfig.create({ data: { id: 'singleton', availabilityStatus: 'disponible' } });
+        }
+        res.json(config);
+    } catch (error) {
+        logger.error({ err: error }, 'Failed to fetch global config');
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+router.post('/config/global', async (req: Request, res: Response) => {
+    const { availabilityStatus } = req.body;
+    try {
+        const config = await db.globalConfig.upsert({
+            where: { id: 'singleton' },
+            update: { availabilityStatus },
+            create: { id: 'singleton', availabilityStatus }
+        });
+        res.json(config);
+    } catch (error) {
+        logger.error({ err: error }, 'Failed to update global config');
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+/**
  * Keywords for Human Takeover
  */
 router.get('/config/keywords', async (req: Request, res: Response) => {
@@ -77,10 +108,13 @@ router.get('/config/keywords', async (req: Request, res: Response) => {
 });
 
 router.post('/config/keywords', async (req: Request, res: Response) => {
-    const { word } = req.body;
+    const { word, type } = req.body;
     try {
         const keyword = await db.takeoverKeyword.create({
-            data: { word: word.toUpperCase().trim() }
+            data: {
+                word: word.toUpperCase().trim(),
+                type: type || 'INTERNAL'
+            }
         });
         res.json(keyword);
     } catch (error) {

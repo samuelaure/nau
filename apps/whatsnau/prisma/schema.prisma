@@ -93,7 +93,15 @@ model Tag {
 model TakeoverKeyword {
   id        String   @id @default(uuid())
   word      String   @unique
+  type      String   @default("INTERNAL") // INTERNAL (for owner), LEAD (for leads)
   createdAt DateTime @default(now())
+}
+
+model GlobalConfig {
+  id                String   @id @default("singleton")
+  availabilityStatus String?  // e.g. "meeting_until_1600"
+  ownerName          String   @default("Samuel")
+  updatedAt          DateTime @updatedAt
 }
 
 model ConversationSummary {
