@@ -3,6 +3,7 @@ import { logger } from './logger.js';
 import { LeadService, LeadState } from '../services/lead.service.js';
 import { AIService } from '../services/ai.service.js';
 import { WhatsAppService } from '../services/whatsapp.service.js';
+import { EventsService } from '../services/events.service.js';
 
 export class Orchestrator {
     /**
@@ -55,6 +56,15 @@ export class Orchestrator {
             }
         });
 
+        // Emit real-time message event
+        EventsService.emit('message', {
+            leadId: lead.id,
+            content,
+            direction,
+            whatsappId,
+            timestamp: new Date()
+        });
+
         // 3. Source-Aware Takeover Check
         if (direction === 'OUTBOUND') {
             await this.handleOutboundTakeover(lead, content);
@@ -70,10 +80,12 @@ export class Orchestrator {
     static async handleStatusUpdate(whatsappId: string, status: string) {
         logger.info({ whatsappId, status }, 'Updating message status');
         try {
-            await db.message.updateMany({
+            await (db as any).message.updateMany({
                 where: { whatsappId },
                 data: { status }
             });
+
+            EventsService.emit('status', { whatsappId, status });
 
             if (status === 'read') {
                 await db.message.updateMany({
@@ -106,8 +118,8 @@ export class Orchestrator {
      * INTELLIGENT PROCESSING: Handle lead messages.
      */
     private static async handleInboundProcessing(lead: any, content: string, buttonId?: string) {
-        if (lead.status === 'HANDOVER') {
-            logger.info({ leadId: lead.id }, 'Lead in manual handover, skipping AI');
+        if (lead.status === 'HANDOVER' || !lead.aiEnabled) {
+            logger.info({ leadId: lead.id, aiEnabled: lead.aiEnabled }, 'Lead in manual handover or AI disabled, skipping');
             return;
         }
 
@@ -150,8 +162,9 @@ export class Orchestrator {
 
         await db.lead.update({
             where: { id: lead.id },
-            data: { status: 'HANDOVER' } // Set to handover but we will still "entertain"
+            data: { status: 'HANDOVER' }
         });
+        EventsService.emit('handover', { leadId: lead.id, reasoning });
 
         const config = await db.globalConfig.findUnique({ where: { id: 'singleton' } });
         const statusMsg = config?.availabilityStatus
@@ -166,7 +179,7 @@ export class Orchestrator {
 
     private static async trackOutboundMessage(lead: any, content: string, whatsappId: string, stage?: string, aiGenerated = false) {
         if (!whatsappId) return;
-        await db.message.create({
+        await (db as any).message.create({
             data: {
                 leadId: lead.id,
                 direction: 'OUTBOUND',
@@ -234,8 +247,8 @@ export class Orchestrator {
         }
 
         const [business, config] = await Promise.all([
-            db.businessProfile.findUnique({ where: { id: 'singleton' } }),
-            db.promptConfig.findUnique({ where: { role } })
+            (db as any).businessProfile.findUnique({ where: { id: 'singleton' } }),
+            (db as any).promptConfig.findUnique({ where: { role } })
         ]);
 
         const knowledgeBase = business?.knowledgeBase || 'No hay información adicional del negocio.';

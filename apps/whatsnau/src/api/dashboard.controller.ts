@@ -4,8 +4,17 @@ import { MetricsService } from '../services/metrics.service.js';
 import { WhatsAppService } from '../services/whatsapp.service.js';
 import { Orchestrator } from '../core/orchestrator.js';
 import { logger } from '../core/logger.js';
+import { EventsService } from '../services/events.service.js';
 
 const router = Router();
+
+/**
+ * REAL-TIME EVENTS (SSE)
+ */
+router.get('/events', (req: Request, res: Response) => {
+    const clientId = Date.now().toString();
+    EventsService.addClient(clientId, res);
+});
 
 /**
  * Get overall metrics for all campaigns
@@ -168,7 +177,7 @@ router.post('/leads/:id/messages', async (req: Request, res: Response) => {
  */
 router.get('/config/business', async (req: Request, res: Response) => {
     try {
-        const business = await db.businessProfile.findUnique({ where: { id: 'singleton' } });
+        const business = await (db as any).businessProfile.findUnique({ where: { id: 'singleton' } });
         res.json(business || { name: 'whatsnaŭ', knowledgeBase: '' });
     } catch (error) {
         res.status(500).json({ error: 'Internal Server Error' });
@@ -178,7 +187,7 @@ router.get('/config/business', async (req: Request, res: Response) => {
 router.post('/config/business', async (req: Request, res: Response) => {
     const { name, knowledgeBase } = req.body;
     try {
-        const business = await db.businessProfile.upsert({
+        const business = await (db as any).businessProfile.upsert({
             where: { id: 'singleton' },
             create: { id: 'singleton', name, knowledgeBase },
             update: { name, knowledgeBase }
@@ -191,7 +200,7 @@ router.post('/config/business', async (req: Request, res: Response) => {
 
 router.get('/config/prompts', async (req: Request, res: Response) => {
     try {
-        const prompts = await db.promptConfig.findMany();
+        const prompts = await (db as any).promptConfig.findMany();
         res.json(prompts);
     } catch (error) {
         res.status(500).json({ error: 'Internal Server Error' });
@@ -201,7 +210,7 @@ router.get('/config/prompts', async (req: Request, res: Response) => {
 router.post('/config/prompts', async (req: Request, res: Response) => {
     const { role, basePrompt } = req.body;
     try {
-        const prompt = await db.promptConfig.upsert({
+        const prompt = await (db as any).promptConfig.upsert({
             where: { role },
             create: { role, basePrompt },
             update: { basePrompt }
@@ -234,6 +243,39 @@ router.post('/config/sequences/:id', async (req: Request, res: Response) => {
         res.json(stage);
     } catch (error) {
         res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+router.post('/leads/:id/ai-toggle', async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { aiEnabled } = req.body;
+    try {
+        const lead = await (db as any).lead.update({
+            where: { id: id as string },
+            data: { aiEnabled }
+        });
+        res.json(lead);
+    } catch (error) {
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+router.get('/config/whatsapp-templates', async (req: Request, res: Response) => {
+    try {
+        const templates = await WhatsAppService.getTemplates();
+        res.json(templates);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch templates' });
+    }
+});
+
+router.post('/config/whatsapp-templates', async (req: Request, res: Response) => {
+    const { name, category, language, components } = req.body;
+    try {
+        const result = await WhatsAppService.createTemplate(name, category, language, components);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to create template' });
     }
 });
 

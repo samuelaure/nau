@@ -31,6 +31,7 @@ interface Lead {
   phoneNumber: string;
   name: string | null;
   status: string;
+  aiEnabled: boolean;
   state: string;
   lastInteraction: string;
   tags: { name: string }[];
@@ -58,22 +59,26 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   const [isSendingMsg, setIsSendingMsg] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'settings' | 'campaign'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'settings' | 'campaign' | 'templates'>('overview');
   const [business, setBusiness] = useState({ name: '', knowledgeBase: '' });
   const [prompts, setPrompts] = useState<{ role: string; basePrompt: string }[]>([]);
   const [sequences, setSequences] = useState<{ id: string; name: string; waitHours: number; order: number }[]>([]);
+  const [templates, setTemplates] = useState<any[]>([]);
 
   const fetchConfig = async () => {
     try {
       const baseUrl = 'http://localhost:3000/api/dashboard/config';
-      const [bizRes, promptRes, seqRes] = await Promise.all([
+      const [bizRes, promptRes, seqRes, tempRes] = await Promise.all([
         fetch(`${baseUrl}/business`),
         fetch(`${baseUrl}/prompts`),
-        fetch(`${baseUrl}/sequences`)
+        fetch(`${baseUrl}/sequences`),
+        fetch(`${baseUrl}/whatsapp-templates`)
       ]);
       setBusiness(await bizRes.json());
       setPrompts(await promptRes.json());
       setSequences(await seqRes.json());
+      const tempData = await tempRes.json();
+      setTemplates(tempData.data || []);
     } catch (error) {
       console.error('Failed to fetch config:', error);
     }
@@ -151,9 +156,28 @@ function App() {
   useEffect(() => {
     fetchData();
     fetchConfig();
-    const interval = setInterval(fetchData, 30000); // Auto refresh every 30s
-    return () => clearInterval(interval);
-  }, []);
+
+    const eventSource = new EventSource('http://localhost:3000/api/dashboard/events');
+
+    eventSource.addEventListener('message', (e: any) => {
+      const data = JSON.parse(e.data);
+      // If we are looking at this lead, refresh messages
+      if (selectedLead && data.leadId === selectedLead.id) {
+        fetchMessages(selectedLead.id);
+      }
+      fetchData(); // Refresh the list
+    });
+
+    eventSource.addEventListener('status', () => {
+      fetchData();
+    });
+
+    eventSource.addEventListener('handover', () => {
+      fetchData();
+    });
+
+    return () => eventSource.close();
+  }, [selectedLead]);
 
   const saveBusiness = async () => {
     try {
@@ -207,13 +231,26 @@ function App() {
   };
 
   useEffect(() => {
-    let interval: any;
     if (selectedLead) {
       fetchMessages(selectedLead.id);
-      interval = setInterval(() => fetchMessages(selectedLead.id), 5000);
     }
-    return () => clearInterval(interval);
   }, [selectedLead]);
+
+  const toggleAI = async (leadId: string, enabled: boolean) => {
+    try {
+      await fetch(`http://localhost:3000/api/dashboard/leads/${leadId}/ai-toggle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aiEnabled: enabled })
+      });
+      fetchData();
+      if (selectedLead && selectedLead.id === leadId) {
+        setSelectedLead({ ...selectedLead, aiEnabled: enabled });
+      }
+    } catch (error) {
+      console.error('Failed to toggle AI:', error);
+    }
+  };
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -262,6 +299,7 @@ function App() {
             <button className={activeTab === 'overview' ? 'active' : ''} onClick={() => setActiveTab('overview')}>Overview</button>
             <button className={activeTab === 'settings' ? 'active' : ''} onClick={() => setActiveTab('settings')}>AI Agents</button>
             <button className={activeTab === 'campaign' ? 'active' : ''} onClick={() => setActiveTab('campaign')}>Campaign</button>
+            <button className={activeTab === 'templates' ? 'active' : ''} onClick={() => setActiveTab('templates')}>Templates</button>
           </nav>
           <button className="secondary" onClick={fetchData} disabled={loading}>
             <RefreshCw size={16} style={{ marginRight: '8px', verticalAlign: 'middle', animation: loading ? 'spin 2s linear infinite' : 'none' }} />
@@ -501,6 +539,51 @@ function App() {
         </div>
       )}
 
+      {activeTab === 'templates' && (
+        <div className="settings-section">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <div>
+              <h3>WhatsApp Marketing Templates</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>View and manage templates for Meta-approved outreach.</p>
+            </div>
+            <button className="secondary" onClick={() => window.open('https://business.facebook.com/wa/manage/templates', '_blank')}>
+              Open Meta Business Suite
+            </button>
+          </div>
+
+          <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
+            {templates.length === 0 && (
+              <div className="stat-card" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3rem' }}>
+                <p style={{ color: 'var(--text-muted)' }}>No templates found or Meta API not connected.</p>
+              </div>
+            )}
+            {templates.map(t => (
+              <div key={t.name} className="stat-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                  <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{t.name}</span>
+                  <span style={{
+                    fontSize: '0.7rem',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    background: t.status === 'APPROVED' ? 'rgba(76, 175, 80, 0.1)' : 'rgba(255, 152, 0, 0.1)',
+                    color: t.status === 'APPROVED' ? '#81c784' : '#ffb74d'
+                  }}>
+                    {t.status}
+                  </span>
+                </div>
+                <div style={{ flex: 1, fontSize: '0.875rem', color: '#eee', marginBottom: '1rem', background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '0.5rem', fontFamily: 'serif', fontStyle: 'italic' }}>
+                  "{t.components?.find((c: any) => c.type === 'BODY')?.text}"
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  <span>{t.category}</span>
+                  <span>{t.language}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {selectedLead && (
         <div className="modal-overlay">
           <div className="chat-modal">
@@ -509,7 +592,21 @@ function App() {
                 <h3>{selectedLead.name || 'Chat with Lead'}</h3>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{selectedLead.phoneNumber}</p>
               </div>
-              <button className="secondary" onClick={() => setSelectedLead(null)}><X size={18} /></button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.05)', padding: '0.25rem 0.75rem', borderRadius: '2rem' }}>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 600, color: selectedLead.aiEnabled ? 'var(--primary)' : 'var(--text-muted)' }}>
+                    AI {selectedLead.aiEnabled ? 'ENABLED' : 'DISABLED'}
+                  </span>
+                  <button
+                    className={`switch-mini ${selectedLead.aiEnabled ? 'active' : ''}`}
+                    onClick={() => toggleAI(selectedLead.id, !selectedLead.aiEnabled)}
+                    title="Toggle AI Assistant for this lead"
+                  >
+                    <div className="thumb"></div>
+                  </button>
+                </div>
+                <button className="secondary" onClick={() => setSelectedLead(null)}><X size={18} /></button>
+              </div>
             </div>
             <div className="chat-messages">
               {messages.map((m) => (

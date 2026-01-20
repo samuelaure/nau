@@ -40,6 +40,7 @@ model Lead {
   phoneNumber    String   @unique
   name           String?
   status         String   @default("ACTIVE") // ACTIVE, BLOCKED, CONVERTED
+  aiEnabled      Boolean  @default(true)
   
   // State Machine Logic
   state          String   @default("OUTREACH") // OUTREACH, PRE_SALE, DEMO, NURTURING

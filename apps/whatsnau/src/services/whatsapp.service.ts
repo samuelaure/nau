@@ -66,4 +66,34 @@ export class WhatsAppService {
             text: { body: text },
         });
     }
+
+    static async getTemplates() {
+        const url = `https://graph.facebook.com/${config.WHATSAPP_VERSION}/${config.WHATSAPP_BUSINESS_ACCOUNT_ID}/message_templates`;
+        const res = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${config.WHATSAPP_ACCESS_TOKEN}` }
+        });
+        return res.json();
+    }
+
+    static async createTemplate(name: string, category: string, language: string, components: any[]) {
+        const url = `https://graph.facebook.com/${config.WHATSAPP_VERSION}/${config.WHATSAPP_BUSINESS_ACCOUNT_ID}/message_templates`;
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${config.WHATSAPP_ACCESS_TOKEN}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ name, category, language, components }),
+        });
+        return res.json();
+    }
+
+    static async deleteTemplate(name: string) {
+        const url = `https://graph.facebook.com/${config.WHATSAPP_VERSION}/${config.WHATSAPP_BUSINESS_ACCOUNT_ID}/message_templates?name=${name}`;
+        const res = await fetch(url, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${config.WHATSAPP_ACCESS_TOKEN}` }
+        });
+        return res.json();
+    }
 }
