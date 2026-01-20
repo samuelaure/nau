@@ -5,10 +5,12 @@ import { AIService } from '../services/ai.service.js';
 import { WhatsAppService } from '../services/whatsapp.service.js';
 import { EventsService } from '../services/events.service.js';
 import { NotificationService } from '../services/notification.service.js';
+import { MessageBufferService } from '../services/buffer.service.js';
 
 export class Orchestrator {
   /**
    * Main entry point for all incoming WhatsApp messages.
+   * Focuses on persistence and debouncing.
    */
   static async handleIncoming(
     from: string,
@@ -31,7 +33,7 @@ export class Orchestrator {
     });
 
     if (!lead) {
-      if (direction === 'OUTBOUND') return; // Don't create leads from outbound if they don't exist
+      if (direction === 'OUTBOUND') return;
       const campaign = await db.campaign.findFirst({ where: { isActive: true } });
       if (!campaign) return;
       const initialLead = await LeadService.initiateLead(from, campaign.id);
@@ -57,11 +59,20 @@ export class Orchestrator {
         whatsappId,
         type: buttonId ? 'BUTTON_RESPONSE' : 'TEXT',
         campaignStage: lead.currentStage?.name || lead.state,
+        isProcessed: direction === 'OUTBOUND',
       },
       update: {
-        content, // Update if it exists (idempotency)
+        content,
       },
     });
+
+    // 3. Update Activity Timestamp for Debouncing
+    if (direction === 'INBOUND') {
+      await db.lead.update({
+        where: { id: lead.id },
+        data: { lastInboundAt: new Date() },
+      });
+    }
 
     // Emit real-time message event
     EventsService.emit('message', {
@@ -72,13 +83,47 @@ export class Orchestrator {
       timestamp: new Date(),
     });
 
-    // 3. Source-Aware Takeover Check
+    // 4. Source-Aware Processing
     if (direction === 'OUTBOUND') {
       await this.handleOutboundTakeover(lead, content);
-      return;
     } else {
-      await this.handleInboundProcessing(lead, content, buttonId);
+      await MessageBufferService.scheduleProcessing(from);
     }
+  }
+
+  /**
+   * Process a burst of messages from a lead.
+   */
+  static async processBurst(from: string) {
+    const lead = await db.lead.findUnique({
+      where: { phoneNumber: from },
+      include: {
+        campaign: { include: { stages: { orderBy: { order: 'asc' } } } },
+        tags: true,
+        currentStage: true,
+      },
+    });
+
+    if (!lead || !lead.aiEnabled || lead.status === 'HANDOVER') return;
+
+    const pendingMessages = await db.message.findMany({
+      where: { leadId: lead.id, direction: 'INBOUND', isProcessed: false },
+      orderBy: { timestamp: 'asc' },
+    });
+
+    if (pendingMessages.length === 0) return;
+
+    const fullContent = pendingMessages.map((m) => m.content).join('\n');
+    const lastButtonId = [...pendingMessages].reverse().find((m) => m.type === 'BUTTON_RESPONSE')?.content;
+
+    logger.info({ leadId: lead.id, burstSize: pendingMessages.length }, 'Processing message burst');
+
+    await db.message.updateMany({
+      where: { id: { in: pendingMessages.map((m) => m.id) } },
+      data: { isProcessed: true },
+    });
+
+    await this.handleInboundProcessing(lead, fullContent, lastButtonId);
   }
 
   /**
@@ -133,7 +178,6 @@ export class Orchestrator {
       return;
     }
 
-    // Check for explicit LEAD keywords first (Deterministic)
     const leadKeywords = await db.takeoverKeyword.findMany({ where: { type: 'LEAD' } });
     const leadTriggers = leadKeywords.map((k) => k.word.toUpperCase());
 
@@ -141,7 +185,6 @@ export class Orchestrator {
     let aiClassification = null;
 
     if (!requiresHuman) {
-      // Intelligent intent detection (Cost-efficient using mini)
       aiClassification = await AIService.classifyIntent(content);
       requiresHuman = aiClassification?.intent === 'request_human';
     }
@@ -150,7 +193,6 @@ export class Orchestrator {
       return this.handleHumanRequest(lead, aiClassification?.reasoning);
     }
 
-    // Notification for High Intent (Industry Standard: Immediate Alert)
     if (
       aiClassification?.intent === 'buy_interest' ||
       aiClassification?.intent === 'demo_request'
@@ -159,7 +201,6 @@ export class Orchestrator {
       await LeadService.addTag(lead.id, 'high_intent');
     }
 
-    // Standard flow processing
     switch (lead.state as LeadState) {
       case LeadState.OUTREACH:
         await this.handleOutreachPhase(lead, content, buttonId);
@@ -184,8 +225,6 @@ export class Orchestrator {
       data: { status: 'HANDOVER' },
     });
     EventsService.emit('handover', { leadId: lead.id, reasoning });
-
-    // Notify via Telegram
     await NotificationService.notifyHandover(lead, reasoning);
 
     const config = await db.globalConfig.findUnique({ where: { id: 'singleton' } });
@@ -316,7 +355,7 @@ export class Orchestrator {
       config?.basePrompt ||
       (role === 'CLOSER'
         ? `Eres el "Conversational Closer" de whatsnaŭ. Tono profesional y humano. Objetivo: Validar interés y ofrecer DEMO.`
-        : `Eres una **Recepcionista IA** amable y eficiente. Responde siempre en español.`);
+        : `Eres una **Recepcionista IA** amable y eficiente. Respondiendo siempre en español.`);
 
     const systemPrompt = `${baseSystemPrompt}\n\n### CONTEXTO DEL NEGOCIO:\n${knowledgeBase}`;
 

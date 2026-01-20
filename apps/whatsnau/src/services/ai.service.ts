@@ -32,6 +32,13 @@ export class AIService {
     usePremium = false
   ) {
     const model = usePremium ? config.PRIMARY_AI_MODEL : config.CHEAP_AI_MODEL;
+    const globalGuidelines = `
+### DIRECTRICES DE RESPUESTA:
+1. Mantén tus respuestas lo más cortas posible sin sacrificar la "integridad" (wholeness).
+2. La calidad y la completitud del mensaje son prioritarias.
+3. Solo envía respuestas largas si es estrictamente necesario para que la respuesta sea completa y de alta calidad basado en el contexto. Una respuesta "completa" es aquella que cumple su deber comunicativo eficientemente.
+4. Tu tono debe ser extremadamente humano, evita sonar como un asistente robótico.
+`;
 
     return withRetry(
       async () => {
@@ -39,7 +46,7 @@ export class AIService {
 
         const response = await this.client.chat.completions.create({
           model,
-          messages: [{ role: 'system', content: systemPrompt }, ...messages],
+          messages: [{ role: 'system', content: `${systemPrompt}\n${globalGuidelines}` }, ...messages],
           temperature: 0.7,
         });
 

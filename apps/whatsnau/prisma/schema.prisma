@@ -51,6 +51,10 @@ model Lead {
   campaignId     String
   campaign       Campaign @relation(fields: [campaignId], references: [id])
   
+  // Debouncing & AI State
+  lastInboundAt   DateTime?
+  isProcessingAI  Boolean   @default(false)
+
   // Meta Details
   lastInteraction DateTime @default(now())
   metadata        String?   // JSON string or long text for flexible business data
@@ -82,6 +86,7 @@ model Message {
   campaignStage String?  // Reference to stage when sent
   aiGenerated   Boolean  @default(false)
   wasRead       Boolean  @default(false)
+  isProcessed   Boolean  @default(false)
 }
 
 model Tag {
