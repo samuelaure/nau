@@ -1,0 +1,96 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Campaign {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  leads       Lead[]
+  stages      CampaignStage[]
+  tags        Tag[]
+}
+
+model CampaignStage {
+  id           String   @id @default(uuid())
+  campaignId   String
+  campaign     Campaign @relation(fields: [campaignId], references: [id])
+  
+  name         String   // e.g., "M1-Initial-Hook", "M2-Follow-Up", "Demo"
+  order        Int      // To sequence them
+  waitHours    Int      @default(0) // Time to wait before triggering if no response
+  
+  leads        Lead[]   @relation("CurrentStage")
+}
+
+model Lead {
+  id             String   @id @default(uuid())
+  phoneNumber    String   @unique
+  name           String?
+  status         String   @default("ACTIVE") // ACTIVE, BLOCKED, CONVERTED
+  
+  // State Machine Logic
+  state          String   @default("OUTREACH") // OUTREACH, PRE_SALE, DEMO, NURTURING
+  currentStageId String?
+  currentStage   CampaignStage? @relation("CurrentStage", fields: [currentStageId], references: [id])
+  
+  campaignId     String
+  campaign       Campaign @relation(fields: [campaignId], references: [id])
+  
+  // Meta Details
+  lastInteraction DateTime @default(now())
+  metadata        String?   // JSON string or long text for flexible business data
+  
+  messages        Message[]
+  tags            Tag[]
+  summaries       ConversationSummary[]
+}
+
+model Message {
+  id            String   @id @default(uuid())
+  leadId        String
+  lead          Lead     @relation(fields: [leadId], references: [id])
+  
+  direction     String   // INBOUND, OUTBOUND
+  content       String
+  type          String   @default("TEXT") // TEXT, BUTTON_RESPONSE, TEMPLATE
+  
+  timestamp     DateTime @default(now())
+  
+  // Logic tracking
+  whatsappId    String?  @unique // To handle idempotency
+  campaignStage String?  // Reference to stage when sent
+  aiGenerated   Boolean  @default(false)
+  wasRead       Boolean  @default(false)
+}
+
+model Tag {
+  id          String   @id @default(uuid())
+  name        String
+  category    String   @default("SYSTEM") // SYSTEM, INTENT, CAMPAIGN
+  campaignId  String?
+  campaign    Campaign? @relation(fields: [campaignId], references: [id])
+  
+  leads       Lead[]
+}
+
+model ConversationSummary {
+  id        String   @id @default(uuid())
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id])
+  
+  content   String
+  createdAt DateTime @default(now())
+}
