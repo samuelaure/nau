@@ -34,6 +34,40 @@ export const ImportManager: React.FC<ImportManagerProps> = ({
   onExecute,
   onRunReach,
 }) => {
+  const [showCreateCampaign, setShowCreateCampaign] = React.useState(false);
+  const [newCampaignName, setNewCampaignName] = React.useState('');
+  const [isCreating, setIsCreating] = React.useState(false);
+
+  const handleCreateCampaign = async () => {
+    if (!newCampaignName.trim()) return;
+
+    setIsCreating(true);
+    try {
+      const res = await fetch('/api/campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newCampaignName,
+          description: `Created from import on ${new Date().toLocaleDateString()}`,
+          isActive: true,
+        }),
+      });
+
+      if (res.ok) {
+        const campaign = await res.json();
+        setSelectedCampaignId(campaign.id);
+        setNewCampaignName('');
+        setShowCreateCampaign(false);
+        // Refresh stats to include new campaign
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error('Failed to create campaign:', error);
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
   return (
     <div className="settings-section">
       {!selectedBatch ? (
@@ -43,23 +77,33 @@ export const ImportManager: React.FC<ImportManagerProps> = ({
             description="Upload CSV to prepare new leads."
             actions={
               <>
-                <select
-                  value={selectedCampaignId}
-                  onChange={(e) => setSelectedCampaignId(e.target.value)}
-                  style={{
-                    background: 'rgba(255,255,255,0.05)',
-                    border: '1px solid var(--card-border)',
-                    color: '#fff',
-                    borderRadius: '0.5rem',
-                    padding: '0.5rem',
-                  }}
-                >
-                  {stats.map((s) => (
-                    <option key={s.campaignId} value={s.campaignId}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <select
+                    value={selectedCampaignId}
+                    onChange={(e) => setSelectedCampaignId(e.target.value)}
+                    style={{
+                      background: 'rgba(255,255,255,0.05)',
+                      border: '1px solid var(--card-border)',
+                      color: '#fff',
+                      borderRadius: '0.5rem',
+                      padding: '0.5rem',
+                    }}
+                  >
+                    <option value="">Select Campaign...</option>
+                    {stats.map((s) => (
+                      <option key={s.campaignId} value={s.campaignId}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="secondary"
+                    onClick={() => setShowCreateCampaign(!showCreateCampaign)}
+                    style={{ whiteSpace: 'nowrap' }}
+                  >
+                    {showCreateCampaign ? '✕ Cancel' : '+ New Campaign'}
+                  </button>
+                </div>
                 <div style={{ position: 'relative' }}>
                   <input
                     type="file"
@@ -84,6 +128,56 @@ export const ImportManager: React.FC<ImportManagerProps> = ({
               </>
             }
           />
+
+          {showCreateCampaign && (
+            <div
+              style={{
+                marginBottom: '2rem',
+                padding: '1.5rem',
+                background: 'rgba(255, 255, 255, 0.05)',
+                backdropFilter: 'blur(10px)',
+                borderRadius: '12px',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+              }}
+            >
+              <h3 style={{ marginBottom: '1rem', color: 'var(--primary)' }}>Create New Campaign</h3>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input
+                  type="text"
+                  value={newCampaignName}
+                  onChange={(e) => setNewCampaignName(e.target.value)}
+                  placeholder="Campaign name..."
+                  onKeyPress={(e) => e.key === 'Enter' && handleCreateCampaign()}
+                  style={{
+                    flex: 1,
+                    padding: '0.75rem',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '8px',
+                    color: 'white',
+                    fontSize: '1rem',
+                  }}
+                />
+                <button
+                  onClick={handleCreateCampaign}
+                  disabled={!newCampaignName.trim() || isCreating}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    border: 'none',
+                    borderRadius: '8px',
+                    color: 'white',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {isCreating ? 'Creating...' : 'Create'}
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="stats-grid">
             {batches.map((b) => (
               <div
