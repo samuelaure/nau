@@ -53,7 +53,22 @@ export class Orchestrator {
             }
         });
 
+        // 2.5 Human Takeover Check
+        const takeoverKeywords = ['HUMAN', 'AYUDA', 'AGENT', 'HUMANO', 'STOP'];
+        if (takeoverKeywords.includes(content.toUpperCase().trim())) {
+            await db.lead.update({
+                where: { id: lead.id },
+                data: { status: 'HANDOVER' }
+            });
+            await WhatsAppService.sendText(lead.phoneNumber, 'He avisado a un compañero humano. En breve se pondrán en contacto contigo.');
+            return;
+        }
+
         // 3. Process based on Current State
+        if (lead.status === 'HANDOVER') {
+            logger.info({ leadId: lead.id }, 'Lead in handover status, skipping AI processing');
+            return;
+        }
         switch (lead.state as LeadState) {
             case LeadState.OUTREACH:
                 await this.handleOutreachPhase(lead, content, buttonId);
