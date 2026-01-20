@@ -1,5 +1,6 @@
 import { logger } from './core/logger.js';
 import { db } from './core/db.js';
+import { CampaignService } from './services/campaign.service.js';
 
 async function bootstrap() {
     logger.info('🚀 whatsnaŭ is starting...');
@@ -8,6 +9,9 @@ async function bootstrap() {
         // Basic connectivity check
         await db.$connect();
         logger.info('✅ Database connected successfully');
+
+        // Seed reference campaign
+        await CampaignService.seedReferenceCampaign();
 
         logger.info('🛠 Platform initialized in Campaign-First mode');
     } catch (error) {

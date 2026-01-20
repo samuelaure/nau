@@ -78,7 +78,7 @@ model Message {
 
 model Tag {
   id          String   @id @default(uuid())
-  name        String
+  name        String   @unique
   category    String   @default("SYSTEM") // SYSTEM, INTENT, CAMPAIGN
   campaignId  String?
   campaign    Campaign? @relation(fields: [campaignId], references: [id])
