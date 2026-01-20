@@ -227,6 +227,35 @@ model MessageTemplate {
   hasButtons      Boolean  @default(false)
   buttons         String?  // JSON array of button configs
   
+  // Link to Meta-approved WhatsApp template (for business-initiated messages)
+  whatsappTemplate WhatsAppTemplate?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model WhatsAppTemplate {
+  id              String   @id @default(uuid())
+  
+  // Meta template info
+  metaTemplateId  String?  @unique // Meta's template ID
+  name            String   @unique // Template name in Meta
+  status          String   // APPROVED, PENDING, REJECTED, DISABLED
+  category        String   // MARKETING, UTILITY, AUTHENTICATION
+  language        String   @default("es_ES")
+  
+  // Template structure from Meta
+  components      String   // JSON: header, body, footer, buttons
+  
+  // Variable mapping (Meta {{1}} → Our {{name}})
+  variableMapping String?  // JSON: {"1": "name", "2": "business"}
+  
+  // Link to our internal template
+  messageTemplateId String? @unique
+  messageTemplate   MessageTemplate? @relation(fields: [messageTemplateId], references: [id])
+  
+  // Metadata
+  lastSyncedAt    DateTime @default(now())
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
