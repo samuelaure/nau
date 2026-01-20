@@ -1,6 +1,8 @@
 import OpenAI from 'openai';
 import { config } from '../core/config.js';
 import { logger } from '../core/logger.js';
+import { withRetry } from '../core/errors/withRetry.js';
+import { ExternalServiceError } from '../core/errors/AppError.js';
 
 const openai = new OpenAI({
   apiKey: config.OPENAI_API_KEY,
@@ -15,22 +17,28 @@ export class AIService {
     messages: { role: 'user' | 'assistant' | 'system'; content: string }[],
     usePremium = false
   ) {
-    try {
-      const model = usePremium ? config.PRIMARY_AI_MODEL : config.CHEAP_AI_MODEL;
+    const model = usePremium ? config.PRIMARY_AI_MODEL : config.CHEAP_AI_MODEL;
 
-      logger.info({ model }, 'Requesting AI response');
+    return withRetry(
+      async () => {
+        logger.info({ model }, 'Requesting AI response');
 
-      const response = await openai.chat.completions.create({
-        model,
-        messages: [{ role: 'system', content: systemPrompt }, ...messages],
-        temperature: 0.7,
-      });
+        const response = await openai.chat.completions.create({
+          model,
+          messages: [{ role: 'system', content: systemPrompt }, ...messages],
+          temperature: 0.7,
+        });
 
-      return response.choices[0].message.content;
-    } catch (error) {
-      logger.error({ err: error }, 'AI Request failed');
-      throw error;
-    }
+        return response.choices[0].message.content;
+      },
+      {
+        retries: 2,
+        delay: 1000,
+        onRetry: (err) => logger.warn({ err }, 'Retrying OpenAI chat response'),
+      }
+    ).catch((error) => {
+      throw new ExternalServiceError('OpenAI', error.message, error);
+    });
   }
 
   /**
@@ -57,18 +65,21 @@ export class AIService {
       - Expresa frustración clara.
     `;
 
-    try {
-      const result = await openai.chat.completions.create({
-        model: config.CHEAP_AI_MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        response_format: { type: 'json_object' },
-      });
+    return withRetry(
+      async () => {
+        const result = await openai.chat.completions.create({
+          model: config.CHEAP_AI_MODEL,
+          messages: [{ role: 'user', content: prompt }],
+          response_format: { type: 'json_object' },
+        });
 
-      const content = result.choices[0].message.content;
-      return content ? JSON.parse(content) : null;
-    } catch (error) {
-      logger.error({ err: error }, 'Intent classification failed');
+        const content = result.choices[0].message.content;
+        return content ? JSON.parse(content) : null;
+      },
+      { retries: 2 }
+    ).catch((error) => {
+      logger.error({ err: error }, 'Intent classification failed after retries');
       return null;
-    }
+    });
   }
 }
