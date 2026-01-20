@@ -79,6 +79,78 @@ export class WhatsAppService {
     });
   }
 
+  /**
+   * Send interactive message with buttons (Quick Reply)
+   * @param to - Phone number
+   * @param bodyText - Message body text
+   * @param buttons - Array of buttons (max 3)
+   */
+  static async sendInteractiveButtons(
+    to: string,
+    bodyText: string,
+    buttons: Array<{ id: string; text: string }>
+  ) {
+    // WhatsApp allows max 3 buttons
+    if (buttons.length > 3) {
+      logger.warn({ buttonCount: buttons.length }, 'Too many buttons, truncating to 3');
+      buttons = buttons.slice(0, 3);
+    }
+
+    return this.sendMessage({
+      messaging_product: 'whatsapp',
+      to,
+      type: 'interactive',
+      interactive: {
+        type: 'button',
+        body: {
+          text: bodyText,
+        },
+        action: {
+          buttons: buttons.map((btn, index) => ({
+            type: 'reply',
+            reply: {
+              id: btn.id,
+              title: btn.text.substring(0, 20), // Max 20 chars for button text
+            },
+          })),
+        },
+      },
+    });
+  }
+
+  /**
+   * Send interactive message with list (up to 10 options)
+   * @param to - Phone number
+   * @param bodyText - Message body text
+   * @param buttonText - Text for the list button
+   * @param sections - Array of list sections with rows
+   */
+  static async sendInteractiveList(
+    to: string,
+    bodyText: string,
+    buttonText: string,
+    sections: Array<{
+      title?: string;
+      rows: Array<{ id: string; title: string; description?: string }>;
+    }>
+  ) {
+    return this.sendMessage({
+      messaging_product: 'whatsapp',
+      to,
+      type: 'interactive',
+      interactive: {
+        type: 'list',
+        body: {
+          text: bodyText,
+        },
+        action: {
+          button: buttonText,
+          sections,
+        },
+      },
+    });
+  }
+
   static async getTemplates() {
     return withRetry(async () => {
       const url = `https://graph.facebook.com/${config.WHATSAPP_VERSION}/${config.WHATSAPP_BUSINESS_ACCOUNT_ID}/message_templates`;

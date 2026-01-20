@@ -332,8 +332,12 @@ export class Orchestrator {
     const template = await TemplateService.getTemplate(m3Stage.id);
     const buttons = template?.hasButtons && template.buttons ? JSON.parse(template.buttons) : null;
 
-    // TODO: Add button support to WhatsAppService
-    const res = await WhatsAppService.sendText(lead.phoneNumber, message);
+    let res;
+    if (buttons && buttons.length > 0) {
+      res = await WhatsAppService.sendInteractiveButtons(lead.phoneNumber, message, buttons);
+    } else {
+      res = await WhatsAppService.sendText(lead.phoneNumber, message);
+    }
 
     await db.lead.update({
       where: { id: lead.id },

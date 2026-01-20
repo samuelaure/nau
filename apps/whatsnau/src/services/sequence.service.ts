@@ -91,8 +91,17 @@ export class SequenceService {
     const template = await TemplateService.getTemplate(stage.id);
     const buttons = template?.hasButtons && template.buttons ? JSON.parse(template.buttons) : null;
 
-    // Send message (TODO: Add button support to WhatsAppService)
-    const res = await WhatsAppService.sendText(lead.phoneNumber, renderedMessage);
+    // Send message with buttons if available
+    let res;
+    if (buttons && buttons.length > 0) {
+      res = await WhatsAppService.sendInteractiveButtons(
+        lead.phoneNumber,
+        renderedMessage,
+        buttons
+      );
+    } else {
+      res = await WhatsAppService.sendText(lead.phoneNumber, renderedMessage);
+    }
 
     const whatsappId = res?.messages?.[0]?.id;
 
