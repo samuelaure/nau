@@ -19,17 +19,21 @@ The platform empowers businesses to scale their WhatsApp outreach while maintain
 
 ---
 
-## ✨ Key Features
+## ✨ Key Features (Platform v2.0)
 
 ### 🖥️ High-End Dashboard
 
 - **Glassmorphic UI**: A premium, modern interface for managing leads and campaigns.
 - **Real-time SSE Engine**: Instant updates for new messages, delivery statuses, and handover alerts via Server-Sent Events.
 - **Unified Command Center**: Overview of campaign metrics, conversion rates, and active outreach.
+- **Lead Segmentation**: Visual breakdown of COLD, INTERESTED, NURTURING, and CLIENT leads.
 
-### 🤖 Intelligent AI Agents
+### 🤖 Intelligent AI Agents (3 Specialized Roles)
 
-- **Closer & Receptionist Roles**: Specialized AI personas for different stages of the funnel.
+- **Conversational Closer**: Pre-sale conversations with INTERESTED leads, gathering key information and warming relationships.
+- **Receptionist (Demo Agent)**: Time-limited demo sessions (5-10 min) using lead's business context to demonstrate competence.
+- **Nurturing Buddy**: Community host for weekly tips subscribers, building long-term relationships and identifying opportunities.
+- **Lead-Specific Context**: All agents receive personalized context (name, business data, tags, conversation history).
 - **Business Knowledge Base**: Inject your specific business context directly into the AI's "brain".
 - **Dynamic Prompt Management**: Fine-tune agent personality and instructions through the dashboard.
 - **Manual AI Toggle**: Granular control to enable/disable the AI assistant on a per-lead basis.
@@ -38,7 +42,12 @@ The platform empowers businesses to scale their WhatsApp outreach while maintain
 
 - **Live Chat**: Integrated chat modal with real-time feedback and delivery status tracking (Sent, Delivered, Read).
 - **Intelligent Handover**: Automatic detection of human intent with "Silent Takeover" for manual agents.
-- **Sequence Orchestration**: Manage multi-stage follow-ups (M0, M1, M2...) with configurable wait times.
+- **Template-Driven Sequences**: Configurable message templates with variable substitution ({{name}}, {{business}}, etc.).
+- **Multi-Stage Campaigns**:
+  - Main Outreach: M1 (Pitch) → M2 (Follow-up) → M3 (Weekly Tips Invite)
+  - Nurturing Onboarding: 3 welcome messages over 23 hours
+- **Smart State Machine**: Automatic lead progression through COLD → INTERESTED → DEMO → NURTURING → CLIENTS.
+- **Conditional Logic**: YES/NO response handling with immediate M3 delivery on rejection.
 
 ---
 
