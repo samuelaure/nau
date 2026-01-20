@@ -70,6 +70,7 @@ model Message {
   direction     String   // INBOUND, OUTBOUND
   content       String
   type          String   @default("TEXT") // TEXT, BUTTON_RESPONSE, TEMPLATE
+  status        String   @default("sent") // sent, delivered, read, failed
   
   timestamp     DateTime @default(now())
   

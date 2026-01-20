@@ -8,9 +8,9 @@ export class Orchestrator {
     /**
      * Main entry point for all incoming WhatsApp messages.
      */
-    static async handleIncoming(from: string, text?: string, buttonId?: string, direction: 'INBOUND' | 'OUTBOUND' = 'INBOUND') {
+    static async handleIncoming(from: string, text?: string, buttonId?: string, direction: 'INBOUND' | 'OUTBOUND' = 'INBOUND', whatsappId?: string) {
         const content = text || buttonId || '';
-        logger.info({ from, content, direction }, 'Orchestrating interaction');
+        logger.info({ from, content, direction, whatsappId }, 'Orchestrating interaction');
 
         // 1. Find or initialize Lead
         let lead = await db.lead.findUnique({
@@ -40,13 +40,18 @@ export class Orchestrator {
         if (!lead) return;
 
         // 2. Track message in DB
-        await db.message.create({
-            data: {
+        await db.message.upsert({
+            where: { whatsappId: whatsappId || 'unknown' },
+            create: {
                 leadId: lead.id,
                 direction,
                 content,
+                whatsappId,
                 type: buttonId ? 'BUTTON_RESPONSE' : 'TEXT',
-                campaignStage: lead.currentStage?.name
+                campaignStage: lead.currentStage?.name || lead.state
+            },
+            update: {
+                content // Update if it exists (idempotency)
             }
         });
 
@@ -56,6 +61,28 @@ export class Orchestrator {
             return;
         } else {
             await this.handleInboundProcessing(lead, content, buttonId);
+        }
+    }
+
+    /**
+     * Update delivery status of a message.
+     */
+    static async handleStatusUpdate(whatsappId: string, status: string) {
+        logger.info({ whatsappId, status }, 'Updating message status');
+        try {
+            await db.message.updateMany({
+                where: { whatsappId },
+                data: { status }
+            });
+
+            if (status === 'read') {
+                await db.message.updateMany({
+                    where: { whatsappId },
+                    data: { wasRead: true }
+                });
+            }
+        } catch (error) {
+            logger.error({ err: error, whatsappId }, 'Failed to update message status');
         }
     }
 
@@ -131,23 +158,26 @@ export class Orchestrator {
             ? ` Samuel está actualmente ${config.availabilityStatus}, pero ya sabe que quieres hablar con él.`
             : ` Le he notificado a Samuel, vendrá lo antes que pueda.`;
 
-        const response = `Perfecto, le avisaré a Samuel que deseas hablar con él directamente.${statusMsg} Mientras esperamos, aquí estaré si necesitas algo.`;
+        const responseMsg = `Perfecto, le avisaré a Samuel que deseas hablar con él directamente.${statusMsg} Mientras esperamos, aquí estaré si necesitas algo.`;
 
-        await WhatsAppService.sendText(lead.phoneNumber, response);
+        const res = await WhatsAppService.sendText(lead.phoneNumber, responseMsg);
+        await this.trackOutboundMessage(lead, responseMsg, res?.messages?.[0]?.id, 'HANDOVER_ENTERTAIN', true);
+    }
 
-        // Track outbound notification
+    private static async trackOutboundMessage(lead: any, content: string, whatsappId: string, stage?: string, aiGenerated = false) {
+        if (!whatsappId) return;
         await db.message.create({
             data: {
                 leadId: lead.id,
                 direction: 'OUTBOUND',
-                content: response,
-                aiGenerated: true,
-                campaignStage: 'HANDOVER_ENTERTAIN'
+                content,
+                whatsappId,
+                aiGenerated,
+                campaignStage: stage || lead.currentStage?.name || lead.state,
+                status: 'sent'
             }
         });
     }
-
-    // ... (Rest of the phase handlers remain same for now, but use triggerAgent internally)
 
     private static async handleOutreachPhase(lead: any, content: string, buttonId?: string) {
         if (buttonId === 'sí_me_interesa' || content.toLowerCase().includes('si') || content.toLowerCase().includes('interesa')) {
@@ -156,7 +186,9 @@ export class Orchestrator {
             await this.triggerAgent(lead, 'CLOSER');
         } else if (buttonId === 'no_me_interesa' || content.toLowerCase().includes('no')) {
             await LeadService.addTag(lead.id, 'not_interested');
-            await WhatsAppService.sendText(lead.phoneNumber, 'Entiendo perfectamente. ¿Te interesaría recibir consejos semanales gratuitos sobre automatización para tu negocio? (Responde con Sí o No)');
+            const msg = 'Entiendo perfectamente. ¿Te interesaría recibir consejos semanales gratuitos sobre automatización para tu negocio? (Responde con Sí o No)';
+            const res = await WhatsAppService.sendText(lead.phoneNumber, msg);
+            await this.trackOutboundMessage(lead, msg, res?.messages?.[0]?.id);
         } else {
             await this.triggerAgent(lead, 'CLOSER', content);
         }
@@ -170,7 +202,9 @@ export class Orchestrator {
     private static async handleDemoPhase(lead: any, content: string, buttonId?: string) {
         if (lead.demoExpiresAt && new Date() > new Date(lead.demoExpiresAt)) {
             await LeadService.transition(lead.id, LeadState.PRE_SALE);
-            await WhatsAppService.sendText(lead.phoneNumber, 'La demo ha finalizado. Regresamos a nuestra charla. ¿Qué te ha parecido?');
+            const msg = 'La demo ha finalizado. Regresamos a nuestra charla. ¿Qué te ha parecido?';
+            const res = await WhatsAppService.sendText(lead.phoneNumber, msg);
+            await this.trackOutboundMessage(lead, msg, res?.messages?.[0]?.id);
             return;
         }
         await this.triggerAgent(lead, 'RECEPTIONIST', content);
@@ -183,7 +217,9 @@ export class Orchestrator {
             where: { id: lead.id },
             data: { state: LeadState.DEMO, demoStartedAt: new Date(), demoExpiresAt: expiresAt }
         });
-        await WhatsAppService.sendText(lead.phoneNumber, '¡Genial! A partir de ahora hablas con mi **Recepcionista IA**. Prueba a preguntarme sobre el negocio.');
+        const msg = '¡Genial! A partir de ahora hablas con mi **Recepcionista IA**. Prueba a preguntarme sobre el negocio.';
+        const res = await WhatsAppService.sendText(lead.phoneNumber, msg);
+        await this.trackOutboundMessage({ ...lead, state: LeadState.DEMO }, msg, res?.messages?.[0]?.id);
         await this.triggerAgent({ ...lead, state: LeadState.DEMO }, 'RECEPTIONIST', 'Hola, soy tu nueva recepcionista.');
     }
 
@@ -203,10 +239,8 @@ export class Orchestrator {
 
         const response = await AIService.getChatResponse(systemPrompt, aiMessages, true);
         if (response) {
-            await WhatsAppService.sendText(lead.phoneNumber, response);
-            await db.message.create({
-                data: { leadId: lead.id, direction: 'OUTBOUND', content: response, aiGenerated: true, campaignStage: lead.currentStage?.name || lead.state }
-            });
+            const res = await WhatsAppService.sendText(lead.phoneNumber, response);
+            await this.trackOutboundMessage(lead, response, res?.messages?.[0]?.id, lead.currentStage?.name || lead.state, true);
         }
     }
 

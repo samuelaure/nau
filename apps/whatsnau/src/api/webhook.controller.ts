@@ -32,33 +32,39 @@ router.post('/whatsapp', async (req: Request, res: Response) => {
     const body = req.body;
 
     if (body.object) {
-        if (
-            body.entry &&
-            body.entry[0].changes &&
-            body.entry[0].changes[0] &&
-            body.entry[0].changes[0].value.messages &&
-            body.entry[0].changes[0].value.messages[0]
-        ) {
-            const message = body.entry[0].changes[0].value.messages[0];
+        const changes = body.entry?.[0]?.changes?.[0]?.value;
+        if (!changes) return res.status(200).send('OK');
+
+        const message = changes.messages?.[0];
+        const status = changes.statuses?.[0];
+
+        if (message) {
             const from = message.from;
             const text = message.text?.body;
             const buttonId = message.interactive?.button_reply?.id;
+            const whatsappId = message.id;
 
-            // DETECT DIRECTION
-            // If internal number sends it, it's OUTBOUND (owner talking)
             const isOutbound = from === config.WHATSAPP_PHONE_NUMBER;
             const direction = isOutbound ? 'OUTBOUND' : 'INBOUND';
-
-            // For OUTBOUND, the "target" is the 'to' or 'recipient_id' equivalent (usually message.to)
-            // Note: message.to might depend on exact payload structure for outbound webhooks
             const targetPhone = isOutbound ? (message as any).to : from;
 
-            logger.info({ from, targetPhone, direction, text }, 'Processing WhatsApp webhook');
+            logger.info({ from, targetPhone, direction, text, whatsappId }, 'Processing WhatsApp message');
 
             try {
-                await Orchestrator.handleIncoming(targetPhone, text, buttonId, direction);
+                await Orchestrator.handleIncoming(targetPhone, text, buttonId, direction, whatsappId);
             } catch (error) {
-                logger.error({ err: error, from }, 'Error in Orchestrator');
+                logger.error({ err: error, from }, 'Error in Orchestrator message handling');
+            }
+        } else if (status) {
+            const messageId = status.id;
+            const deliveryStatus = status.status; // sent, delivered, read, failed
+
+            logger.info({ messageId, deliveryStatus }, 'Processing WhatsApp status update');
+
+            try {
+                await Orchestrator.handleStatusUpdate(messageId, deliveryStatus);
+            } catch (error) {
+                logger.error({ err: error, messageId }, 'Error in Orchestrator status handling');
             }
         }
         return res.status(200).send('OK');

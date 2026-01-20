@@ -64,7 +64,8 @@ export class SequenceService {
             logger.info({ leadId: lead.id }, 'Sending handover reassurance message');
             const message = 'Hola, sigo aquí. Samuel está tardando un poco más de lo previsto en liberarse, pero no me he olvidado de ti. ¿Hay algo más en lo que pueda ayudarte mientras esperas?';
 
-            await WhatsAppService.sendText(lead.phoneNumber, message);
+            const res = await WhatsAppService.sendText(lead.phoneNumber, message);
+            const whatsappId = res?.messages?.[0]?.id;
 
             await db.lead.update({
                 where: { id: lead.id },
@@ -77,24 +78,24 @@ export class SequenceService {
                 data: { name: 'handover_reassurance_sent', category: 'SYSTEM', campaignId: lead.campaignId, leads: { connect: { id: lead.id } } }
             });
 
-            await db.message.create({
-                data: {
-                    leadId: lead.id,
-                    direction: 'OUTBOUND',
-                    content: message,
-                    aiGenerated: true,
-                    campaignStage: 'HANDOVER_REASSURANCE'
-                }
-            });
+            if (whatsappId) {
+                await db.message.create({
+                    data: {
+                        leadId: lead.id,
+                        direction: 'OUTBOUND',
+                        content: message,
+                        whatsappId,
+                        aiGenerated: true,
+                        campaignStage: 'HANDOVER_REASSURANCE',
+                        status: 'sent'
+                    }
+                });
+            }
         }
     }
 
     private static async triggerFollowUp(lead: any, stage: any) {
         logger.info({ leadId: lead.id, stage: stage.name }, 'Triggering follow-up');
-
-        // In a real scenario, we'd send a specific Template based on the stage name
-        // For M2: "M2-Same-Day-FollowUp"
-        // For M3: "M3-Final-Touch"
 
         let message = '';
         if (stage.name.includes('M2')) {
@@ -104,7 +105,8 @@ export class SequenceService {
         }
 
         if (message) {
-            await WhatsAppService.sendText(lead.phoneNumber, message);
+            const res = await WhatsAppService.sendText(lead.phoneNumber, message);
+            const whatsappId = res?.messages?.[0]?.id;
 
             await db.lead.update({
                 where: { id: lead.id },
@@ -114,14 +116,18 @@ export class SequenceService {
                 }
             });
 
-            await db.message.create({
-                data: {
-                    leadId: lead.id,
-                    direction: 'OUTBOUND',
-                    content: message,
-                    campaignStage: stage.name
-                }
-            });
+            if (whatsappId) {
+                await db.message.create({
+                    data: {
+                        leadId: lead.id,
+                        direction: 'OUTBOUND',
+                        content: message,
+                        whatsappId,
+                        campaignStage: stage.name,
+                        status: 'sent'
+                    }
+                });
+            }
         }
     }
 }
