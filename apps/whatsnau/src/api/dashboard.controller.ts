@@ -127,7 +127,7 @@ router.delete('/config/keywords/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
     try {
         await db.takeoverKeyword.delete({
-            where: { id }
+            where: { id: id as string }
         });
         res.json({ success: true });
     } catch (error) {
