@@ -96,6 +96,11 @@ router.post('/batches/:id/execute', async (req: Request, res: Response) => {
             include: { campaign: true }
         });
 
+        await (db as any).leadImportBatch.update({
+            where: { id: batchId },
+            data: { status: 'EXECUTING' }
+        });
+
         const stagingLeads = await (db as any).stagingLead.findMany({
             where: {
                 batchId,
@@ -108,7 +113,7 @@ router.post('/batches/:id/execute', async (req: Request, res: Response) => {
 
         for (const s of stagingLeads) {
             // Check if already exists in Lead
-            const existing = await db.lead.findUnique({ where: { phoneNumber: s.phoneNumber } });
+            const existing = await db.lead.findFirst({ where: { phoneNumber: s.phoneNumber } });
             if (existing) continue;
 
             const lead = await db.lead.create({
@@ -136,7 +141,7 @@ router.post('/batches/:id/execute', async (req: Request, res: Response) => {
 
         await (db as any).leadImportBatch.update({
             where: { id: batchId },
-            status: 'COMPLETED'
+            data: { status: 'COMPLETED' }
         });
 
         res.json({ success: true, count: stagingLeads.length });

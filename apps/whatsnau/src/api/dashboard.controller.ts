@@ -269,6 +269,29 @@ router.get('/config/whatsapp-templates', async (req: Request, res: Response) => 
     }
 });
 
+router.get('/config/business', async (req: Request, res: Response) => {
+    try {
+        const profile = await (db as any).businessProfile.findUnique({ where: { id: 'singleton' } });
+        res.json(profile || { name: 'whatsnaŭ', knowledgeBase: '' });
+    } catch (error) {
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+router.post('/config/business', async (req: Request, res: Response) => {
+    const { name, knowledgeBase } = req.body;
+    try {
+        const profile = await (db as any).businessProfile.upsert({
+            where: { id: 'singleton' },
+            create: { id: 'singleton', name, knowledgeBase },
+            update: { name, knowledgeBase }
+        });
+        res.json(profile);
+    } catch (error) {
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
 router.post('/config/whatsapp-templates', async (req: Request, res: Response) => {
     const { name, category, language, components } = req.body;
     try {
