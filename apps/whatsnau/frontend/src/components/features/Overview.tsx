@@ -87,6 +87,51 @@ export const Overview: React.FC<OverviewProps> = ({
         />
       </div>
 
+      {/* Lead State Segmentation */}
+      <div style={{ marginTop: '2rem', marginBottom: '2rem' }}>
+        <h2 style={{ marginBottom: '1rem', color: 'var(--primary)' }}>Lead Segmentation</h2>
+        <div
+          className="stats-grid"
+          style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}
+        >
+          <StatCard
+            label="COLD"
+            value={leads.filter((l) => l.state === 'COLD').length}
+            trend="Not yet engaged"
+            trendColor="rgba(255, 255, 255, 0.5)"
+            icon={<Target size={16} color="#94a3b8" />}
+          />
+          <StatCard
+            label="INTERESTED"
+            value={leads.filter((l) => l.state === 'INTERESTED').length}
+            trend="In conversation"
+            trendColor="var(--accent)"
+            icon={<MessageSquare size={16} color="var(--accent)" />}
+          />
+          <StatCard
+            label="DEMO"
+            value={leads.filter((l) => l.state === 'DEMO').length}
+            trend="Testing product"
+            trendColor="var(--primary)"
+            icon={<Search size={16} color="var(--primary)" />}
+          />
+          <StatCard
+            label="NURTURING"
+            value={leads.filter((l) => l.state === 'NURTURING').length}
+            trend="Weekly tips"
+            trendColor="#f59e0b"
+            icon={<Mail size={16} color="#f59e0b" />}
+          />
+          <StatCard
+            label="CLIENTS"
+            value={leads.filter((l) => l.state === 'CLIENTS').length}
+            trend="Converted!"
+            trendColor="var(--success)"
+            icon={<UserCheck size={16} color="var(--success)" />}
+          />
+        </div>
+      </div>
+
       <div className="leads-container">
         <div className="leads-header">
           <h2>Recent Interactions</h2>
