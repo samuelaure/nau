@@ -22,17 +22,20 @@ The platform empowers businesses to scale their WhatsApp outreach while maintain
 ## ✨ Key Features
 
 ### 🖥️ High-End Dashboard
+
 - **Glassmorphic UI**: A premium, modern interface for managing leads and campaigns.
 - **Real-time SSE Engine**: Instant updates for new messages, delivery statuses, and handover alerts via Server-Sent Events.
 - **Unified Command Center**: Overview of campaign metrics, conversion rates, and active outreach.
 
 ### 🤖 Intelligent AI Agents
+
 - **Closer & Receptionist Roles**: Specialized AI personas for different stages of the funnel.
 - **Business Knowledge Base**: Inject your specific business context directly into the AI's "brain".
 - **Dynamic Prompt Management**: Fine-tune agent personality and instructions through the dashboard.
 - **Manual AI Toggle**: Granular control to enable/disable the AI assistant on a per-lead basis.
 
 ### 💬 Advanced Messaging & CRM
+
 - **Live Chat**: Integrated chat modal with real-time feedback and delivery status tracking (Sent, Delivered, Read).
 - **Intelligent Handover**: Automatic detection of human intent with "Silent Takeover" for manual agents.
 - **Sequence Orchestration**: Manage multi-stage follow-ups (M0, M1, M2...) with configurable wait times.
@@ -60,6 +63,7 @@ We follow industry-standard TDD (Test-Driven Development) practices to ensure th
 - **Deterministic Mocking**: All external service dependencies are mocked to ensure tests are fast, reliable, and offline-compatible.
 
 ### Run Tests:
+
 ```bash
 # Run all tests
 npm test
@@ -104,11 +108,13 @@ npm run test:watch
 ## 🚀 Getting Started
 
 ### Prerequisites
+
 - Node.js (v20+)
 - Meta WhatsApp Cloud API credentials
 - OpenAI API Key
 
 ### Installation
+
 1.  **Clone and Install**:
     ```bash
     npm install

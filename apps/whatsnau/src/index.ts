@@ -46,14 +46,17 @@ async function bootstrap() {
       logger.info(`🌐 Server running on port ${port}`);
     });
 
-    setInterval(async () => {
-      try {
-        const { SequenceService } = await import('./services/sequence.service.js');
-        await SequenceService.processFollowUps();
-      } catch (error) {
-        logger.error({ err: error }, 'Error in sequence interval');
-      }
-    }, 5 * 60 * 1000);
+    setInterval(
+      async () => {
+        try {
+          const { SequenceService } = await import('./services/sequence.service.js');
+          await SequenceService.processFollowUps();
+        } catch (error) {
+          logger.error({ err: error }, 'Error in sequence interval');
+        }
+      },
+      5 * 60 * 1000
+    );
 
     logger.info('🛠 Platform initialized in Campaign-First mode');
   } catch (error) {

@@ -101,7 +101,8 @@ export class WhatsAppService {
         },
         body: JSON.stringify({ name, category, language, components }),
       });
-      if (!res.ok) throw new ExternalServiceError('WhatsApp', 'Failed to create template', await res.json());
+      if (!res.ok)
+        throw new ExternalServiceError('WhatsApp', 'Failed to create template', await res.json());
       return res.json();
     });
   }
