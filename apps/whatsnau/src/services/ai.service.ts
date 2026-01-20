@@ -46,7 +46,10 @@ export class AIService {
 
         const response = await this.client.chat.completions.create({
           model,
-          messages: [{ role: 'system', content: `${systemPrompt}\n${globalGuidelines}` }, ...messages],
+          messages: [
+            { role: 'system', content: `${systemPrompt}\n${globalGuidelines}` },
+            ...messages,
+          ],
           temperature: 0.7,
         });
 

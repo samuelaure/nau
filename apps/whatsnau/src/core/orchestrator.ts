@@ -114,7 +114,9 @@ export class Orchestrator {
     if (pendingMessages.length === 0) return;
 
     const fullContent = pendingMessages.map((m) => m.content).join('\n');
-    const lastButtonId = [...pendingMessages].reverse().find((m) => m.type === 'BUTTON_RESPONSE')?.content;
+    const lastButtonId = [...pendingMessages]
+      .reverse()
+      .find((m) => m.type === 'BUTTON_RESPONSE')?.content;
 
     logger.info({ leadId: lead.id, burstSize: pendingMessages.length }, 'Processing message burst');
 
