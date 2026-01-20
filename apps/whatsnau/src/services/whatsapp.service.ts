@@ -210,4 +210,53 @@ export class WhatsAppService {
       return res.json();
     });
   }
+
+  /**
+   * Send template with variable substitution
+   * @param to - Phone number
+   * @param templateName - Meta template name
+   * @param components - Template components with variables
+   * @param languageCode - Template language
+   */
+  static async sendTemplateWithVariables(
+    to: string,
+    templateName: string,
+    components: any[],
+    languageCode = 'es_ES'
+  ) {
+    logger.info({ to, templateName }, 'Sending WhatsApp template with variables');
+    return this.sendTemplate(to, templateName, languageCode, components);
+  }
+
+  /**
+   * Check if we can send freeform messages to a lead (24-hour window)
+   * @param leadId - Lead ID
+   * @returns true if lead is within 24-hour window
+   */
+  static async canSendFreeform(leadId: string): Promise<boolean> {
+    const { db } = await import('../core/db.js');
+
+    const lead = await db.lead.findUnique({
+      where: { id: leadId },
+      include: {
+        messages: {
+          where: { direction: 'INBOUND' },
+          orderBy: { timestamp: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    if (!lead || !lead.messages || lead.messages.length === 0) {
+      // No inbound messages = business-initiated = need template
+      return false;
+    }
+
+    const lastInbound = lead.messages[0];
+    const hoursSinceLastInbound =
+      (Date.now() - new Date(lastInbound.timestamp).getTime()) / (1000 * 60 * 60);
+
+    // WhatsApp allows 24 hours
+    return hoursSinceLastInbound < 24;
+  }
 }
