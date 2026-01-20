@@ -8,10 +8,19 @@ interface HeaderProps {
     | 'campaign'
     | 'campaigns'
     | 'broadcast'
+    | 'analytics'
     | 'templates'
     | 'import';
   setActiveTab: (
-    tab: 'overview' | 'settings' | 'campaign' | 'campaigns' | 'broadcast' | 'templates' | 'import'
+    tab:
+      | 'overview'
+      | 'settings'
+      | 'campaign'
+      | 'campaigns'
+      | 'broadcast'
+      | 'analytics'
+      | 'templates'
+      | 'import'
   ) => void;
   loading: boolean;
   onRefresh: () => void;
@@ -63,6 +72,12 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, loading
             onClick={() => setActiveTab('broadcast')}
           >
             Broadcast
+          </button>
+          <button
+            className={activeTab === 'analytics' ? 'active' : ''}
+            onClick={() => setActiveTab('analytics')}
+          >
+            Analytics
           </button>
           <button
             className={activeTab === 'import' ? 'active' : ''}
