@@ -7,6 +7,7 @@ import { CampaignService } from './services/campaign.service.js';
 import webhookRouter from './api/webhook.controller.js';
 import dashboardRouter from './api/dashboard.controller.js';
 import importRouter from './api/import.controller.js';
+import { errorMiddleware } from './core/errors/errorMiddleware.js';
 
 async function bootstrap() {
   logger.info('🚀 whatsnaŭ is starting...');
@@ -28,6 +29,9 @@ async function bootstrap() {
     app.use('/api', webhookRouter);
     app.use('/api/dashboard', dashboardRouter);
     app.use('/api/dashboard/import', importRouter);
+
+    // Error Handling Middleware (must be after routes)
+    app.use(errorMiddleware);
 
     const port = process.env.PORT || 3000;
     app.listen(port, () => {
