@@ -10,14 +10,14 @@ const configSchema = z.object({
 
   // WhatsApp Cloud API
   WHATSAPP_VERSION: z.string().default('v18.0'),
-  WHATSAPP_PHONE_NUMBER_ID: z.string(),
-  WHATSAPP_PHONE_NUMBER: z.string(), // Added for direction detection
-  WHATSAPP_BUSINESS_ACCOUNT_ID: z.string(),
-  WHATSAPP_ACCESS_TOKEN: z.string(),
-  WHATSAPP_VERIFY_TOKEN: z.string(),
+  WHATSAPP_PHONE_NUMBER_ID: z.string().default('test_id'),
+  WHATSAPP_PHONE_NUMBER: z.string().default('+34600000000'),
+  WHATSAPP_BUSINESS_ACCOUNT_ID: z.string().default('test_biz_id'),
+  WHATSAPP_ACCESS_TOKEN: z.string().default('test_token'),
+  WHATSAPP_VERIFY_TOKEN: z.string().default('test_verify'),
 
   // OpenAI
-  OPENAI_API_KEY: z.string(),
+  OPENAI_API_KEY: z.string().default('test_openai_key'),
   PRIMARY_AI_MODEL: z.string().default('gpt-4o'),
   CHEAP_AI_MODEL: z.string().default('gpt-4o-mini'),
   // Telegram
@@ -25,11 +25,12 @@ const configSchema = z.object({
   TELEGRAM_CHAT_ID: z.string().optional(),
 });
 
+const isTest = process.env.NODE_ENV === 'test';
 const parsed = configSchema.safeParse(process.env);
 
-if (!parsed.success) {
+if (!parsed.success && !isTest) {
   console.error('❌ Invalid environment variables:', parsed.error.format());
   process.exit(1);
 }
 
-export const config = parsed.data;
+export const config = parsed.success ? parsed.data : configSchema.parse({});

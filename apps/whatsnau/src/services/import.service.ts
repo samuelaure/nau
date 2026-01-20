@@ -79,23 +79,8 @@ export class ImportService {
             k.toLowerCase().includes('count')
         ) || '';
 
-      let phone = (record[phoneKey] || '').toString().trim();
-      // Basic phone cleaning (remove spaces, dashes, parentheses)
-      phone = phone.replace(/[^0-9+]/g, '');
-      if (phone && !phone.startsWith('+')) {
-        // If it looks like a Spain number without prefix
-        if (
-          phone.length === 9 &&
-          (phone.startsWith('6') || phone.startsWith('7') || phone.startsWith('9'))
-        ) {
-          phone = `+34${phone}`;
-        }
-      }
-
-      let website = (record[websiteKey] || '').toString().trim();
-      if (website && !website.startsWith('http')) {
-        website = `https://${website}`;
-      }
+      const phone = this.cleanPhoneNumber((record[phoneKey] || '').toString());
+      const website = this.cleanWebsite((record[websiteKey] || '').toString());
 
       return {
         batchId: batch.id,
@@ -108,13 +93,41 @@ export class ImportService {
       };
     });
 
-    // Bulk create (Prisma SQLite limitation handles this in chunks or just many creates)
-    // For simplicity and speed in SQLite, we can do multiple at once
+    // Bulk create
     await (db as any).stagingLead.createMany({
       data: stagingLeads,
     });
 
     return batch;
+  }
+
+  /**
+   * Cleans and normalizes phone numbers (Spain focus)
+   */
+  static cleanPhoneNumber(phone: string): string {
+    let cleaned = phone.trim().replace(/[^0-9+]/g, '');
+    if (cleaned && !cleaned.startsWith('+')) {
+      // 9 digits and starts with common Spanish prefixes
+      if (
+        cleaned.length === 9 &&
+        (cleaned.startsWith('6') || cleaned.startsWith('7') || cleaned.startsWith('9'))
+      ) {
+        cleaned = `+34${cleaned}`;
+      }
+    }
+    return cleaned;
+  }
+
+  /**
+   * Normalizes website URLs
+   */
+  static cleanWebsite(url: string | null): string | null {
+    if (!url) return null;
+    let website = url.trim();
+    if (website && !website.startsWith('http')) {
+      website = `https://${website}`;
+    }
+    return website || null;
   }
 
   static async getBatchDetails(batchId: string) {

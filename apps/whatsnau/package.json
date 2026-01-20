@@ -1,6 +1,6 @@
 {
   "name": "whatsnau",
-  "version": "1.3.0",
+  "version": "1.3.2",
   "description": "Campaign-driven WhatsApp CRM & Automation platform",
   "type": "module",
   "main": "dist/index.js",
@@ -12,9 +12,9 @@
     "format": "prettier --write .",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test": "SET NODE_ENV=test&& vitest run",
+    "test:watch": "SET NODE_ENV=test&& vitest",
+    "test:coverage": "SET NODE_ENV=test&& vitest run --coverage"
   },
   "keywords": [
     "whatsapp",

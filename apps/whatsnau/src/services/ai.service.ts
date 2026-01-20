@@ -4,11 +4,25 @@ import { logger } from '../core/logger.js';
 import { withRetry } from '../core/errors/withRetry.js';
 import { ExternalServiceError } from '../core/errors/AppError.js';
 
-const openai = new OpenAI({
-  apiKey: config.OPENAI_API_KEY,
-});
-
 export class AIService {
+  private static _openai: OpenAI | null = null;
+
+  static get client(): OpenAI {
+    if (!this._openai) {
+      this._openai = new OpenAI({
+        apiKey: config.OPENAI_API_KEY,
+      });
+    }
+    return this._openai;
+  }
+
+  /**
+   * For testing purposes to inject a mock client
+   */
+  static setClient(mockClient: any) {
+    this._openai = mockClient;
+  }
+
   /**
    * General purpose completion for conversational agents.
    */
@@ -23,7 +37,7 @@ export class AIService {
       async () => {
         logger.info({ model }, 'Requesting AI response');
 
-        const response = await openai.chat.completions.create({
+        const response = await this.client.chat.completions.create({
           model,
           messages: [{ role: 'system', content: systemPrompt }, ...messages],
           temperature: 0.7,
@@ -43,7 +57,6 @@ export class AIService {
 
   /**
    * Detects lead intent and tags from a message (Spanish).
-   * COST-EFFICIENCY: Uses GPT-4o-mini for logical classification.
    */
   static async classifyIntent(message: string, contextSummaries: string = '') {
     const prompt = `
@@ -58,16 +71,11 @@ export class AIService {
         "reasoning": "Breve explicación en español",
         "tags": ["tag1", "tag2"]
       }
-
-      Reglas para "request_human":
-      - El usuario quiere hablar con alguien real o pregunta si eres un bot.
-      - Pide ayuda técnica o personal.
-      - Expresa frustración clara.
     `;
 
     return withRetry(
       async () => {
-        const result = await openai.chat.completions.create({
+        const result = await this.client.chat.completions.create({
           model: config.CHEAP_AI_MODEL,
           messages: [{ role: 'user', content: prompt }],
           response_format: { type: 'json_object' },

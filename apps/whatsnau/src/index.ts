@@ -9,52 +9,51 @@ import dashboardRouter from './api/dashboard.controller.js';
 import importRouter from './api/import.controller.js';
 import { errorMiddleware } from './core/errors/errorMiddleware.js';
 
+export const app = express();
+
+// Middleware
+app.use(cors());
+app.use(bodyParser.json());
+
+// Observability: Health Check
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    version: process.env.npm_package_version,
+  });
+});
+
+// Routes
+app.use('/api', webhookRouter);
+app.use('/api/dashboard', dashboardRouter);
+app.use('/api/dashboard/import', importRouter);
+
+// Error Handling Middleware
+app.use(errorMiddleware);
+
 async function bootstrap() {
   logger.info('🚀 whatsnaŭ is starting...');
 
   try {
-    // Basic connectivity check
     await db.$connect();
     logger.info('✅ Database connected successfully');
 
-    // Seed reference campaign
     await CampaignService.seedReferenceCampaign();
-
-    // Setup Express
-    const app = express();
-    app.use(cors()); // Enable CORS for Dashboard
-    app.use(bodyParser.json());
-
-    // Observability: Health Check
-    app.get('/health', (req, res) => {
-      res.json({ status: 'ok', timestamp: new Date().toISOString(), version: process.env.npm_package_version });
-    });
-
-    // Routes
-    app.use('/api', webhookRouter);
-    app.use('/api/dashboard', dashboardRouter);
-    app.use('/api/dashboard/import', importRouter);
-
-    // Error Handling Middleware (must be after routes)
-    app.use(errorMiddleware);
 
     const port = process.env.PORT || 3000;
     app.listen(port, () => {
       logger.info(`🌐 Server running on port ${port}`);
     });
 
-    // Run follow-up check every 5 minutes
-    setInterval(
-      async () => {
-        try {
-          const { SequenceService } = await import('./services/sequence.service.js');
-          await SequenceService.processFollowUps();
-        } catch (error) {
-          logger.error({ err: error }, 'Error in sequence interval');
-        }
-      },
-      5 * 60 * 1000
-    );
+    setInterval(async () => {
+      try {
+        const { SequenceService } = await import('./services/sequence.service.js');
+        await SequenceService.processFollowUps();
+      } catch (error) {
+        logger.error({ err: error }, 'Error in sequence interval');
+      }
+    }, 5 * 60 * 1000);
 
     logger.info('🛠 Platform initialized in Campaign-First mode');
   } catch (error) {
@@ -63,4 +62,6 @@ async function bootstrap() {
   }
 }
 
-bootstrap();
+if (process.env.NODE_ENV !== 'test') {
+  bootstrap();
+}
