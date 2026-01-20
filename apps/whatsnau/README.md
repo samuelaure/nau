@@ -2,6 +2,8 @@
 
 whatsnaŭ is a premium, high-performance CRM and orchestration platform for WhatsApp-based sales campaigns. It is designed to bridge the gap between automated lead nurturing and high-conversion human intervention using strategic AI integration.
 
+Built with **enterprise-grade resilience** and **world-class development standards**, it serves as a robust backbone for modern digital sales teams.
+
 ---
 
 ## 🎯 Project Purpose
@@ -20,34 +22,64 @@ The platform empowers businesses to scale their WhatsApp outreach while maintain
 ## ✨ Key Features
 
 ### 🖥️ High-End Dashboard
-
 - **Glassmorphic UI**: A premium, modern interface for managing leads and campaigns.
 - **Real-time SSE Engine**: Instant updates for new messages, delivery statuses, and handover alerts via Server-Sent Events.
 - **Unified Command Center**: Overview of campaign metrics, conversion rates, and active outreach.
 
 ### 🤖 Intelligent AI Agents
-
 - **Closer & Receptionist Roles**: Specialized AI personas for different stages of the funnel.
 - **Business Knowledge Base**: Inject your specific business context directly into the AI's "brain".
 - **Dynamic Prompt Management**: Fine-tune agent personality and instructions through the dashboard.
 - **Manual AI Toggle**: Granular control to enable/disable the AI assistant on a per-lead basis.
 
 ### 💬 Advanced Messaging & CRM
-
 - **Live Chat**: Integrated chat modal with real-time feedback and delivery status tracking (Sent, Delivered, Read).
 - **Intelligent Handover**: Automatic detection of human intent with "Silent Takeover" for manual agents.
 - **Sequence Orchestration**: Manage multi-stage follow-ups (M0, M1, M2...) with configurable wait times.
-- **Template Management**: Direct visibility into Meta-approved marketing templates.
+
+---
+
+## 🛡️ Resilience & Reliability (Standard)
+
+whatsnaŭ is engineered for production environments where reliability is non-negotiable:
+
+- **Unified Error Architecture**: Centralized error handling using custom `AppError` classes and global middleware to ensure no crash goes silent.
+- **Self-Healing Integrations**: All external API calls (WhatsApp, OpenAI) are wrapped in a **Retry Utility with Exponential Backoff**.
+- **Data Atomicity**: Critical multi-step operations (like Mass Import) are protected by **Prisma Transactions** to prevent partial data state.
+- **Observability**: Standardized structured logging and a `/health` endpoint for external monitoring and uptime validation.
+- **Defensive UI**: Global React Error Boundaries and a real-time Notification System (Toasts) provide immediate user feedback on system status.
+
+---
+
+## 🧪 Testing & Quality Assurance
+
+We follow industry-standard TDD (Test-Driven Development) practices to ensure the platform remains stable as it evolves.
+
+- **Unit Tests**: Critical logic normalization and AI service interactions are fully unit-tested with **Vitest**.
+- **Integration Tests**: Full-flow API validation using **Supertest**, verifying everything from health checks to error propagation.
+- **Deterministic Mocking**: All external service dependencies are mocked to ensure tests are fast, reliable, and offline-compatible.
+
+### Run Tests:
+```bash
+# Run all tests
+npm test
+
+# Run tests with coverage report
+npm run test:coverage
+
+# Watch mode for development
+npm run test:watch
+```
 
 ---
 
 ## 🛠 Tech Stack
 
-- **Runtime**: [Node.js](https://nodejs.org/) (ESM) + [TypeScript](https://www.typescriptlang.org/)
+- **Runtime**: [Node.js](https://nodejs.org/) (ESM) + [TypeScript](https://www.typescriptlang.org/) (Strict Mode)
 - **Frontend**: [React](https://reactjs.org/) + [Vite](https://vitejs.dev/) + [Lucide Icons](https://lucide.dev/)
 - **ORM**: [Prisma](https://www.prisma.io/)
+- **Testing**: [Vitest](https://vitest.dev/) + [Supertest](https://github.com/ladjs/supertest)
 - **Database**: SQLite (Dev) / PostgreSQL (Prod)
-- **Messaging**: Meta WhatsApp Cloud API
 - **AI**: OpenAI API (GPT-4o & GPT-4o-mini)
 - **Styling**: Vanilla CSS (Premium Custom Design)
 
@@ -57,14 +89,14 @@ The platform empowers businesses to scale their WhatsApp outreach while maintain
 
 ```text
 ├── src/
-│   ├── core/         # Orchestrator, Database, Config, Logger
-│   ├── api/          # Webhook & Dashboard Controllers
+│   ├── core/         # Orchestrator, Database, Config, Logger, Errors (Resilience Core)
+│   ├── api/          # Webhook, Dashboard, & Import Controllers
 │   ├── services/     # AI, WhatsApp, Lead, Sequence, Metrics, Events
-│   └── index.ts      # Application entry point
-├── frontend/         # React SPA Dashboard
+│   └── index.ts      # Application entry point & Observability
+├── frontend/         # React SPA Dashboard + Resilience Components
 ├── prisma/           # Schema & Migrations (SQLite/PostgreSQL)
-├── .cursorrules      # Strategic AI coding rules
-└── .agent/           # Automation workflows
+├── .agent/           # Automation workflows & Project Rules
+└── .cursorrules      # Strategic AI coding rules
 ```
 
 ---
@@ -72,13 +104,11 @@ The platform empowers businesses to scale their WhatsApp outreach while maintain
 ## 🚀 Getting Started
 
 ### Prerequisites
-
 - Node.js (v20+)
 - Meta WhatsApp Cloud API credentials
 - OpenAI API Key
 
 ### Installation
-
 1.  **Clone and Install**:
     ```bash
     npm install
