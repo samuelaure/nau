@@ -458,3 +458,63 @@ button.secondary:hover {
 .switch-mini.active .thumb {
   left: calc(100% - 16px);
 }
+
+/* Notification System */
+.notification-container {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  z-index: 2000;
+  pointer-events: none;
+}
+
+.notification {
+  background: #1a1825;
+  border: 1px solid var(--card-border);
+  padding: 1rem 1.25rem;
+  border-radius: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+  min-width: 300px;
+  max-width: 450px;
+  animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: auto;
+}
+
+.notification.success { border-left: 4px solid var(--success); }
+.notification.error { border-left: 4px solid var(--danger); }
+.notification.info { border-left: 4px solid var(--primary); }
+
+.notification-icon { display: flex; align-items: center; }
+.notification.success .notification-icon { color: var(--success); }
+.notification.error .notification-icon { color: var(--danger); }
+.notification.info .notification-icon { color: var(--primary); }
+
+.notification-message { flex: 1; font-size: 0.875rem; font-weight: 500; }
+.notification-close { background: transparent; padding: 0; color: var(--text-muted); opacity: 0.5; cursor: pointer; }
+.notification-close:hover { opacity: 1; }
+
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* Error Boundary View */
+.error-boundary-view {
+  height: 80vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 1.5rem;
+  padding: 2rem;
+}
+
+.error-boundary-view h2 { font-size: 2rem; }
+.error-boundary-view p { color: var(--text-muted); }

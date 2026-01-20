@@ -1,7 +1,9 @@
 import { useState, useCallback } from 'react';
 import type { BusinessConfig, PromptConfig, SequenceConfig, Template, TelegramConfig } from '../types';
+import { useNotification } from '../context/NotificationContext';
 
 export const useConfig = () => {
+    const { notify } = useNotification();
     const [business, setBusiness] = useState<BusinessConfig>({ name: '', knowledgeBase: '' });
     const [prompts, setPrompts] = useState<PromptConfig[]>([]);
     const [sequences, setSequences] = useState<SequenceConfig[]>([]);
@@ -30,73 +32,85 @@ export const useConfig = () => {
             setTelegram(await teleRes.json());
         } catch (error) {
             console.error('Failed to fetch config:', error);
+            notify('error', 'Configuration sync failed.');
         }
-    }, []);
+    }, [notify]);
 
     const saveBusiness = async (data: BusinessConfig) => {
         try {
-            await fetch('http://localhost:3000/api/dashboard/config/business', {
+            const res = await fetch('http://localhost:3000/api/dashboard/config/business', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
             });
+            if (!res.ok) throw new Error('Save failed');
             setBusiness(data);
-            alert('Business profile updated');
+            notify('success', 'Business knowledge base updated.');
         } catch (error) {
             console.error('Failed to save business:', error);
+            notify('error', 'Failed to save business profile.');
         }
     };
 
     const savePrompt = async (role: string, basePrompt: string) => {
         try {
-            await fetch('http://localhost:3000/api/dashboard/config/prompts', {
+            const res = await fetch('http://localhost:3000/api/dashboard/config/prompts', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ role, basePrompt }),
             });
-            alert(`${role} prompt updated`);
+            if (!res.ok) throw new Error('Save failed');
+            notify('success', `${role} system prompt synchronized.`);
         } catch (error) {
             console.error('Failed to save prompt:', error);
+            notify('error', `Failed to update ${role} prompt.`);
         }
     };
 
     const saveSequence = async (id: string, name: string, waitHours: number) => {
         try {
-            await fetch(`http://localhost:3000/api/dashboard/config/sequences/${id}`, {
+            const res = await fetch(`http://localhost:3000/api/dashboard/config/sequences/${id}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, waitHours }),
             });
+            if (!res.ok) throw new Error('Save failed');
             fetchConfig();
-            alert('Sequence updated');
+            notify('success', 'Timeline sequence updated.');
         } catch (error) {
             console.error('Failed to save sequence:', error);
+            notify('error', 'Failed to update campaign sequence.');
         }
     };
 
     const saveTelegram = async (data: TelegramConfig) => {
         try {
-            await fetch('http://localhost:3000/api/dashboard/config/telegram', {
+            const res = await fetch('http://localhost:3000/api/dashboard/config/telegram', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
             });
+            if (!res.ok) throw new Error('Save failed');
             setTelegram(data);
-            alert('Telegram settings updated');
+            notify('success', 'Telegram alert settings updated.');
         } catch (error) {
             console.error('Failed to save telegram:', error);
+            notify('error', 'Failed to save Telegram credentials.');
         }
     };
 
     const updateGlobalConfig = async (availabilityStatus: string) => {
         try {
-            await fetch('http://localhost:3000/api/dashboard/config/global', {
+            const res = await fetch('http://localhost:3000/api/dashboard/config/global', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ availabilityStatus }),
             });
+            if (!res.ok) throw new Error('Update failed');
+            notify('info', `Availability updated: ${availabilityStatus}`);
         } catch (error) {
             console.error('Failed to update status:', error);
+            notify('error', 'Failed to update availability status.');
         }
     };
 
@@ -107,21 +121,31 @@ export const useConfig = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ word, type }),
             });
-            return res.ok;
+            if (res.ok) {
+                notify('success', `Handover keyword '${word}' added.`);
+                return true;
+            }
+            throw new Error('Add failed');
         } catch (error) {
             console.error('Failed to add keyword:', error);
+            notify('error', 'Failed to register new keyword.');
             return false;
         }
     };
 
     const removeKeyword = async (id: string) => {
         try {
-            await fetch(`http://localhost:3000/api/dashboard/config/keywords/${id}`, {
+            const res = await fetch(`http://localhost:3000/api/dashboard/config/keywords/${id}`, {
                 method: 'DELETE',
             });
-            return true;
+            if (res.ok) {
+                notify('info', 'Keyword removed.');
+                return true;
+            }
+            throw new Error('Remove failed');
         } catch (error) {
             console.error('Failed to remove keyword:', error);
+            notify('error', 'Failed to remove keyword.');
             return false;
         }
     };
