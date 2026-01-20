@@ -1,39 +1,67 @@
 # whatsnaŭ 🚀
 
-whatsnaŭ is a high-performance CRM and orchestration platform for WhatsApp-based sales campaigns. It is designed to manage cold outreach, conversational pre-sales, and long-term lead nurturing with strategic AI integration.
+whatsnaŭ is a premium, high-performance CRM and orchestration platform for WhatsApp-based sales campaigns. It is designed to bridge the gap between automated lead nurturing and high-conversion human intervention using strategic AI integration.
 
 ---
 
 ## 🎯 Project Purpose
 
-The platform enables businesses to automate their WhatsApp sales funnel while maintaining a human, high-value interaction style. It integrates directly with the **WhatsApp Business Cloud API** and **OpenAI GPT-4o** to create a seamless, conversation-aware experience.
+The platform empowers businesses to scale their WhatsApp outreach while maintaining a boutique, high-value interaction style. It integrates directly with the **WhatsApp Business Cloud API** and **OpenAI GPT-4o** to create a conversation-aware experience that knows when to automate and when to step aside for a human.
 
-### Key Logic
-- **Campaign-First Architecture**: System behavior is driven by predefined sequence structures.
-- **Strategic AI usage**: GPT-4o is reserved for critical human-like interactions, while deterministic logic handles the "heavy lifting".
-- **Spanish-First Interactions**: All client-facing content follows the Spanish (Spain) linguistic and cultural context.
+### Core Philosophy
+- **Campaign-First Logic**: System behavior is governed by structured outreach sequences.
+- **Strategic AI usage**: AI acts as a sophisticated assistant (Closer or Receptionist), while deterministic logic ensures outreach reliability.
+- **Human-in-the-Loop**: Seamless transitions between AI and manual agents to ensure no "bot-like" friction during high-stakes moments.
+- **Spanish-First**: Native support for Spanish (Spain) linguistic and cultural nuances.
+
+---
+
+## ✨ Key Features
+
+### 🖥️ High-End Dashboard
+- **Glassmorphic UI**: A premium, modern interface for managing leads and campaigns.
+- **Real-time SSE Engine**: Instant updates for new messages, delivery statuses, and handover alerts via Server-Sent Events.
+- **Unified Command Center**: Overview of campaign metrics, conversion rates, and active outreach.
+
+### 🤖 Intelligent AI Agents
+- **Closer & Receptionist Roles**: Specialized AI personas for different stages of the funnel.
+- **Business Knowledge Base**: Inject your specific business context directly into the AI's "brain".
+- **Dynamic Prompt Management**: Fine-tune agent personality and instructions through the dashboard.
+- **Manual AI Toggle**: Granular control to enable/disable the AI assistant on a per-lead basis.
+
+### 💬 Advanced Messaging & CRM
+- **Live Chat**: Integrated chat modal with real-time feedback and delivery status tracking (Sent, Delivered, Read).
+- **Intelligent Handover**: Automatic detection of human intent with "Silent Takeover" for manual agents.
+- **Sequence Orchestration**: Manage multi-stage follow-ups (M0, M1, M2...) with configurable wait times.
+- **Template Management**: Direct visibility into Meta-approved marketing templates.
 
 ---
 
 ## 🛠 Tech Stack
 
-- **Runtime**: [Node.js](https://nodejs.org/) + [TypeScript](https://www.typescriptlang.org/)
+- **Runtime**: [Node.js](https://nodejs.org/) (ESM) + [TypeScript](https://www.typescriptlang.org/)
+- **Frontend**: [React](https://reactjs.org/) + [Vite](https://vitejs.dev/) + [Lucide Icons](https://lucide.dev/)
 - **ORM**: [Prisma](https://www.prisma.io/)
-- **Database**: PostgreSQL (Production)
-- **Messaging**: Meta WhatsApp Business Cloud API
-- **AI**: OpenAI API (GPT-4o & specialized models)
+- **Database**: SQLite (Dev) / PostgreSQL (Prod)
+- **Messaging**: Meta WhatsApp Cloud API
+- **AI**: OpenAI API (GPT-4o & GPT-4o-mini)
+- **Styling**: Vanilla CSS (Premium Custom Design)
 
 ---
 
-## 🧠 Strategic Mindset
+## 📂 Project Structure
 
-whatsnaŭ follows the **Four Agreements**:
-1. Be impeccable with your word.
-2. Don’t take anything personally.
-3. Don’t make assumptions.
-4. Always do your best.
-
-The service is inherently valuable; our goal is to **expose**, not to convince.
+```text
+├── src/
+│   ├── core/         # Orchestrator, Database, Config, Logger
+│   ├── api/          # Webhook & Dashboard Controllers
+│   ├── services/     # AI, WhatsApp, Lead, Sequence, Metrics, Events
+│   └── index.ts      # Application entry point
+├── frontend/         # React SPA Dashboard
+├── prisma/           # Schema & Migrations (SQLite/PostgreSQL)
+├── .cursorrules      # Strategic AI coding rules
+└── .agent/           # Automation workflows
+```
 
 ---
 
@@ -41,40 +69,31 @@ The service is inherently valuable; our goal is to **expose**, not to convince.
 
 ### Prerequisites
 - Node.js (v20+)
-- PostgreSQL instance
-- Meta Developer App (WhatsApp Cloud API)
+- Meta WhatsApp Cloud API credentials
 - OpenAI API Key
 
 ### Installation
-```bash
-# Clone the repository
-git clone <repo-url>
-
-# Install dependencies
-npm install
-
-# Initialize Prisma
-npx prisma generate
-```
-
----
-
-## 📂 Project Structure (Planned)
-
-```text
-├── src/
-│   ├── core/         # State machine, campaign logic, context manager
-│   ├── api/          # WhatsApp webhooks, OpenAI integrations
-│   ├── services/     # CRM, Messaging, AI Agents
-│   ├── templates/    # WhatsApp and Prompt templates (Spanish)
-│   └── utils/        # Loggers, helpers
-├── prisma/           # Schema & Migrations
-├── .cursorrules      # Project-specific AI behavior rules
-└── .agent/           # Automation workflows
-```
+1.  **Clone and Install**:
+    ```bash
+    npm install
+    cd frontend && npm install && cd ..
+    ```
+2.  **Environment Setup**:
+    Copy `.env.example` to `.env` and fill in your Meta and OpenAI credentials.
+3.  **Database Migration**:
+    ```bash
+    npx prisma migrate dev
+    ```
+4.  **Run Development**:
+    ```bash
+    # Backend
+    npm run dev
+    # Frontend (Separate terminal)
+    cd frontend && npm run dev
+    ```
 
 ---
 
 ## ⚖️ License
 
-Proprietary. Developed for production use.
+Proprietary. Developed for high-performance production environments.
