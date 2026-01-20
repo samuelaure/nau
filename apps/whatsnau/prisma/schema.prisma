@@ -53,6 +53,10 @@ model Lead {
   lastInteraction DateTime @default(now())
   metadata        String?   // JSON string or long text for flexible business data
   
+  // Demo Specifics
+  demoStartedAt   DateTime?
+  demoExpiresAt   DateTime?
+  
   messages        Message[]
   tags            Tag[]
   summaries       ConversationSummary[]

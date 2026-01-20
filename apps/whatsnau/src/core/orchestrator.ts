@@ -59,13 +59,13 @@ export class Orchestrator {
                 await this.handleOutreachPhase(lead, content, buttonId);
                 break;
             case LeadState.PRE_SALE:
-                await this.handlePreSalePhase(lead, content);
+                await this.handlePreSalePhase(lead, content, buttonId);
                 break;
             case LeadState.DEMO:
-                await this.handleDemoPhase(lead, content);
+                await this.handleDemoPhase(lead, content, buttonId);
                 break;
             case LeadState.NURTURING:
-                await this.handleNurturingPhase(lead, content);
+                await this.handleNurturingPhase(lead, content, buttonId);
                 break;
             default:
                 logger.info({ state: lead.state }, 'Lead in unhandled or terminal state');
@@ -76,29 +76,94 @@ export class Orchestrator {
         if (buttonId === 'sí_me_interesa' || content.toLowerCase().includes('si') || content.toLowerCase().includes('interesa')) {
             await LeadService.transition(lead.id, LeadState.PRE_SALE);
             await LeadService.addTag(lead.id, 'interested');
-            await this.triggerCloser(lead);
+            await this.triggerAgent(lead, 'CLOSER');
         } else if (buttonId === 'no_me_interesa' || content.toLowerCase().includes('no')) {
+            // Assume refusal for now, offer nurturing
             await LeadService.addTag(lead.id, 'not_interested');
             await WhatsAppService.sendText(lead.phoneNumber, 'Entiendo perfectamente. ¿Te interesaría recibir consejos semanales gratuitos sobre automatización para tu negocio? (Responde con Sí o No)');
         } else {
             const classification = await AIService.classifyIntent(content);
             if (classification?.intent === 'interesado') {
                 await LeadService.transition(lead.id, LeadState.PRE_SALE);
-                await this.triggerCloser(lead);
+                await this.triggerAgent(lead, 'CLOSER');
             }
         }
     }
 
-    private static async triggerCloser(lead: any) {
-        const systemPrompt = `
-      Eres el "Conversational Closer" de whatsnaŭ. Tu tono es profesional, humano y sigue los "Cuatro Acuerdos".
-      Tu objetivo es validar el interés, pedir datos del negocio y ofrecer una DEMO de Recepcionista IA.
-      Responde siempre en español.
-    `;
+    private static async handlePreSalePhase(lead: any, content: string, buttonId?: string) {
+        // Check if lead wants the demo
+        if (buttonId === 'ver_demo' || content.toLowerCase().includes('demo')) {
+            return this.startDemo(lead);
+        }
 
-        const response = await AIService.getChatResponse(systemPrompt, [
-            { role: 'user', content: 'He dicho que me interesa la oferta.' }
-        ], true);
+        await this.triggerAgent(lead, 'CLOSER', content);
+    }
+
+    private static async startDemo(lead: any) {
+        const expiresAt = new Date();
+        expiresAt.setMinutes(expiresAt.getMinutes() + 10);
+
+        await db.lead.update({
+            where: { id: lead.id },
+            data: {
+                state: LeadState.DEMO,
+                demoStartedAt: new Date(),
+                demoExpiresAt: expiresAt
+            }
+        });
+
+        await WhatsAppService.sendText(lead.phoneNumber, '¡Genial! A partir de ahora, estás hablando con mi **Recepcionista IA**. \n\nHázle cualquier pregunta sobre tu negocio (ej. "¿Qué servicios ofrecéis?", "¿Cuál es el horario?") y verás cómo responde. \n\n*La demo durará 10 minutos.*');
+
+        // Optional: Trigger first response from receptionist
+        await this.triggerAgent({ ...lead, state: LeadState.DEMO }, 'RECEPTIONIST', 'Hola, soy tu nueva recepcionista.');
+    }
+
+    private static async handleDemoPhase(lead: any, content: string, buttonId?: string) {
+        // Check expiration
+        if (lead.demoExpiresAt && new Date() > new Date(lead.demoExpiresAt)) {
+            await LeadService.transition(lead.id, LeadState.PRE_SALE);
+            await LeadService.addTag(lead.id, 'demo_completed');
+            await WhatsAppService.sendText(lead.phoneNumber, 'La demo ha finalizado. ¡Espero que te haya gustado! Volvemos a nuestra conversación. ¿Qué te ha parecido la experiencia?');
+            return;
+        }
+
+        await this.triggerAgent(lead, 'RECEPTIONIST', content);
+    }
+
+    private static async triggerAgent(lead: any, role: 'CLOSER' | 'RECEPTIONIST', userMessage?: string) {
+        const history = await db.message.findMany({
+            where: { leadId: lead.id },
+            orderBy: { timestamp: 'desc' },
+            take: 10
+        });
+
+        const aiMessages = history.reverse().map(m => ({
+            role: (m.direction === 'INBOUND' ? 'user' : 'assistant') as 'user' | 'assistant',
+            content: m.content
+        }));
+
+        if (userMessage && (!aiMessages.length || aiMessages[aiMessages.length - 1].content !== userMessage)) {
+            aiMessages.push({ role: 'user', content: userMessage });
+        }
+
+        let systemPrompt = '';
+        if (role === 'CLOSER') {
+            systemPrompt = `
+        Eres el "Conversational Closer" de whatsnaŭ. Tono profesional, humano, sigue los Cuatro Acuerdos.
+        Tu objetivo: Validar interés, pedir datos, ofrecer una DEMO de Recepcionista IA.
+        Si el cliente está listo, dile que puede escribir "VER DEMO" o pulsar el botón (si existiera).
+        Responde siempre en español.
+      `;
+        } else {
+            systemPrompt = `
+        Eres una **Recepcionista IA** de última generación para el negocio de este cliente.
+        Tu tono es extremadamente amable, eficiente y resolutivo.
+        Actúas como si ya trabajaras para ellos.
+        Responde siempre en español.
+      `;
+        }
+
+        const response = await AIService.getChatResponse(systemPrompt, aiMessages, true);
 
         if (response) {
             await WhatsAppService.sendText(lead.phoneNumber, response);
@@ -108,13 +173,13 @@ export class Orchestrator {
                     direction: 'OUTBOUND',
                     content: response,
                     aiGenerated: true,
-                    campaignStage: 'CONVERSATIONAL_PRE_SALE'
+                    campaignStage: lead.currentStage?.name || lead.state
                 }
             });
         }
     }
 
-    private static async handlePreSalePhase(lead: any, content: string) { logger.info('Pre-sale logic not fully implemented yet'); }
-    private static async handleDemoPhase(lead: any, content: string) { logger.info('Demo logic not fully implemented yet'); }
-    private static async handleNurturingPhase(lead: any, content: string) { logger.info('Nurturing logic not fully implemented yet'); }
+    private static async handleNurturingPhase(lead: any, content: string, buttonId?: string) {
+        logger.info('Nurturing logic pending...');
+    }
 }
