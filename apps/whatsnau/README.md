@@ -27,6 +27,7 @@ The platform empowers businesses to scale their WhatsApp outreach while maintain
 - **Real-time SSE Engine**: Instant updates for new messages, delivery statuses, and handover alerts via Server-Sent Events.
 - **Unified Command Center**: Overview of campaign metrics, conversion rates, and active outreach.
 - **Lead Segmentation**: Visual breakdown of COLD, INTERESTED, NURTURING, and CLIENT leads.
+- **Visual DAG Builder**: A sophisticated node-based interface for designing complex message sequences, featuring a nested Boolean logic engine for advanced branching.
 
 ### 🤖 Intelligent AI Agents (3 Specialized Roles)
 
