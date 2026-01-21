@@ -67,11 +67,14 @@ export class Orchestrator {
       },
     });
 
-    // 3. Update Activity Timestamp for Debouncing
+    // 3. Update Activity Timestamp for Debouncing & Reset Unanswered Counter
     if (direction === 'INBOUND') {
-      await db.lead.update({
+      await (db as any).lead.update({
         where: { id: lead.id },
-        data: { lastInboundAt: new Date() },
+        data: {
+          lastInboundAt: new Date(),
+          unansweredCount: 0, // Reset counter: user responded!
+        },
       });
     }
 
@@ -326,6 +329,12 @@ export class Orchestrator {
     const m3Stage = campaign?.stages.find((s) => s.name === 'M3-WeeklyTipsInvite');
     if (!m3Stage) return;
 
+    // --- POINT 1: THE 2-MESSAGE LIMIT ---
+    if ((lead.unansweredCount || 0) >= 2) {
+      logger.info({ leadId: lead.id }, 'Weekly tips invite skipped: Max unanswered (2)');
+      return;
+    }
+
     const message = await TemplateService.getRenderedMessage(lead.id, m3Stage.id);
     if (!message) return;
 
@@ -377,9 +386,13 @@ export class Orchestrator {
       }
     }
 
-    await db.lead.update({
+    await (db as any).lead.update({
       where: { id: lead.id },
-      data: { currentStageId: m3Stage.id, lastInteraction: new Date() },
+      data: {
+        currentStageId: m3Stage.id,
+        unansweredCount: { increment: 1 },
+        lastInteraction: new Date(),
+      },
     });
 
     if (res?.messages?.[0]?.id) {

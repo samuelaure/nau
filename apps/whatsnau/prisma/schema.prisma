@@ -44,6 +44,7 @@ model Lead {
   name           String?
   status         String   @default("ACTIVE") // ACTIVE, HANDOVER, BLOCKED
   aiEnabled      Boolean  @default(true)
+  unansweredCount Int      @default(0) // New: track consecutive unanswered business messages
   
   // State Machine Logic (Primary State)
   state          String   @default("COLD") // COLD, INTERESTED, DEMO, NURTURING, CLIENTS

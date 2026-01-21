@@ -87,6 +87,16 @@ export class SequenceService {
       return;
     }
 
+    // --- POINT 1: THE 2-MESSAGE LIMIT ---
+    // If the user hasn't replied to the last 2 system messages, we stop sending.
+    if ((lead.unansweredCount || 0) >= 2) {
+      logger.info(
+        { leadId: lead.id, count: lead.unansweredCount },
+        'Sequence paused: Max unanswered messages reached (2)'
+      );
+      return;
+    }
+
     // Get template for button support
     const template = await TemplateService.getTemplate(stage.id);
     const buttons = template?.hasButtons && template.buttons ? JSON.parse(template.buttons) : null;
@@ -147,11 +157,12 @@ export class SequenceService {
 
     const whatsappId = res?.messages?.[0]?.id;
 
-    // Update lead stage
-    await db.lead.update({
+    // Update lead stage AND increment unanswered count
+    await (db as any).lead.update({
       where: { id: lead.id },
       data: {
         currentStageId: stage.id,
+        unansweredCount: { increment: 1 },
         lastInteraction: new Date(),
       },
     });
