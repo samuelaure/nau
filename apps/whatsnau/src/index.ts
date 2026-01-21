@@ -19,9 +19,13 @@ export const app = express();
 
 // Security Middleware
 app.use(helmet()); // Basic security headers
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',')
+  : ['https://app.9nau.com', 'https://whatsnau.com'];
+
 app.use(
   cors({
-    origin: process.env.NODE_ENV === 'production' ? ['https://whatsnau.com'] : true,
+    origin: process.env.NODE_ENV === 'production' ? allowedOrigins : true,
     credentials: true,
   })
 );
