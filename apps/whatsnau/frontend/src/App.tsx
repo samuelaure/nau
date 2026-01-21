@@ -12,14 +12,64 @@ import { ChatModal } from './components/features/ChatModal';
 import { useDashboard } from './hooks/useDashboard';
 import { useImport } from './hooks/useImport';
 import { useConfig } from './hooks/useConfig';
-
+import { Login } from './components/layout/Login';
 import { Sidebar } from './components/layout/Sidebar';
+import { Loader2 } from 'lucide-react';
+import type { User } from './types';
 
 function App() {
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedCampaignId, setSelectedCampaignId] = useState('');
   const [newMessage, setNewMessage] = useState('');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  // Check auth on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (res.ok) {
+          const data = await res.json();
+          setUser(data.user);
+        }
+      } catch (err) {
+        console.error('Auth check failed');
+      } finally {
+        setIsAuthLoading(false);
+      }
+    };
+    checkAuth();
+  }, []);
+
+  const handleLogin = async (email: string, pass: string) => {
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: pass }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setUser(data.user);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      return false;
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      setUser(null);
+    } catch (err) {
+      console.error('Logout failed');
+    }
+  };
 
   const {
     stats,
@@ -86,6 +136,18 @@ function App() {
     }
   }, [stats, selectedCampaignId]);
 
+  if (isAuthLoading) {
+    return (
+      <div className="loading-screen">
+        <Loader2 className="animate-spin" size={48} color="var(--primary)" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Login onLogin={handleLogin} />;
+  }
+
   return (
     <div className={`dashboard-container ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       <Sidebar
@@ -96,6 +158,7 @@ function App() {
         onSelectCampaign={setSelectedCampaignId}
         isCollapsed={isSidebarCollapsed}
         onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        onLogout={handleLogout}
       />
 
       <div className="main-content">

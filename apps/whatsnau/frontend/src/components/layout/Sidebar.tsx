@@ -11,6 +11,7 @@ import {
   FolderTree,
   ChevronLeft,
   ChevronRight,
+  LogOut,
 } from 'lucide-react';
 import type { CampaignStats } from '../../types';
 
@@ -22,6 +23,7 @@ interface SidebarProps {
   onSelectCampaign: (id: string) => void;
   isCollapsed: boolean;
   onToggle: () => void;
+  onLogout: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -32,6 +34,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectCampaign,
   isCollapsed,
   onToggle,
+  onLogout,
 }) => {
   const menuItems = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -133,6 +136,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <button className="nav-item" title={isCollapsed ? 'New Campaign' : ''}>
           <PlusCircle size={18} />
           {!isCollapsed && <span>New Campaign</span>}
+        </button>
+        <button
+          className="nav-item danger"
+          onClick={onLogout}
+          title={isCollapsed ? 'Cerrar Sesión' : ''}
+          style={{ marginTop: '0.5rem' }}
+        >
+          <LogOut size={18} />
+          {!isCollapsed && <span>Cerrar Sesión</span>}
         </button>
       </div>
     </aside>

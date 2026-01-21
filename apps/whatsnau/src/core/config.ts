@@ -23,6 +23,10 @@ const configSchema = z.object({
   // Telegram
   TELEGRAM_BOT_TOKEN: z.string().optional(),
   TELEGRAM_CHAT_ID: z.string().optional(),
+
+  // Auth
+  JWT_SECRET: z.string().default('super-secret-change-me-in-production'),
+  JWT_EXPIRES_IN: z.string().default('7d'),
 });
 
 const isTest = process.env.NODE_ENV === 'test';

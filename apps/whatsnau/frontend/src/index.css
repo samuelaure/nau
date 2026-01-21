@@ -155,6 +155,15 @@ body {
   opacity: 1;
 }
 
+.nav-item.danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #fca5a5;
+}
+
+.nav-item.danger:hover svg {
+  color: #fca5a5;
+}
+
 .campaign-selector {
   width: calc(100% - 1rem);
   margin-left: 0.5rem;
@@ -596,7 +605,149 @@ button.secondary:hover {
   left: calc(100% - 16px);
 }
 
-/* Notification System */
+/* Login Screen Styles */
+.login-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  overflow: hidden;
+  font-family: 'Inter', system-ui, sans-serif;
+  background: #09080e;
+}
+
+.login-bg-overlay {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 20% 30%, rgba(61, 7, 100, 0.4) 0%, transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(29, 29, 133, 0.4) 0%, transparent 40%);
+  filter: blur(60px);
+  animation: bgPulse 10s infinite alternate ease-in-out;
+}
+
+@keyframes bgPulse {
+  0% {
+    transform: scale(1) translate(0, 0);
+  }
+
+  100% {
+    transform: scale(1.1) translate(2%, 2%);
+  }
+}
+
+.login-card {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  padding: 3rem;
+  border-radius: 2rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  animation: modalScale 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.logo.large {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.login-header p {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.input-group {
+  margin-bottom: 1.5rem;
+}
+
+.input-group label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.625rem;
+  padding-left: 0.25rem;
+}
+
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-icon {
+  position: absolute;
+  left: 1rem;
+  color: var(--text-muted);
+  transition: color 0.2s;
+}
+
+.input-wrapper input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--card-border);
+  border-radius: 1rem;
+  padding: 0.875rem 1rem 0.875rem 3rem;
+  color: #fff;
+  font-size: 1rem;
+  transition: all 0.2s;
+  outline: none;
+}
+
+.input-wrapper input:focus {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(124, 124, 255, 0.1);
+}
+
+.input-wrapper input:focus + .input-icon {
+  color: var(--primary);
+}
+
+.login-error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.login-btn {
+  width: 100%;
+  height: 3.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.login-footer {
+  margin-top: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
 .notification-container {
   position: fixed;
   bottom: 2rem;
