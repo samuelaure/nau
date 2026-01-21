@@ -16,7 +16,7 @@ export const useDashboard = (campaignId?: string) => {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const baseUrl = 'http://localhost:3000/api/dashboard';
+      const baseUrl = '/api/dashboard';
       const leadsUrl = campaignId
         ? `${baseUrl}/leads?campaignId=${campaignId}`
         : `${baseUrl}/leads`;
@@ -52,7 +52,7 @@ export const useDashboard = (campaignId?: string) => {
   const fetchMessages = useCallback(
     async (leadId: string) => {
       try {
-        const res = await fetch(`http://localhost:3000/api/dashboard/leads/${leadId}/messages`);
+        const res = await fetch(`/api/dashboard/leads/${leadId}/messages`);
         const data = await res.json();
         setMessages(data);
       } catch (error) {
@@ -65,7 +65,7 @@ export const useDashboard = (campaignId?: string) => {
 
   const toggleAI = async (leadId: string, enabled: boolean) => {
     try {
-      const res = await fetch(`http://localhost:3000/api/dashboard/leads/${leadId}/ai-toggle`, {
+      const res = await fetch(`/api/dashboard/leads/${leadId}/ai-toggle`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ aiEnabled: enabled }),
@@ -85,7 +85,7 @@ export const useDashboard = (campaignId?: string) => {
 
   const resolveHandover = async (id: string) => {
     try {
-      const res = await fetch(`http://localhost:3000/api/dashboard/leads/${id}/resolve`, {
+      const res = await fetch(`/api/dashboard/leads/${id}/resolve`, {
         method: 'POST',
       });
       if (!res.ok) throw new Error('Resolve failed');
@@ -100,7 +100,7 @@ export const useDashboard = (campaignId?: string) => {
   const sendMessage = async (leadId: string, content: string) => {
     setIsSendingMsg(true);
     try {
-      const res = await fetch(`http://localhost:3000/api/dashboard/leads/${leadId}/messages`, {
+      const res = await fetch(`/api/dashboard/leads/${leadId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content }),
@@ -117,7 +117,7 @@ export const useDashboard = (campaignId?: string) => {
   };
 
   useEffect(() => {
-    const eventSource = new EventSource('http://localhost:3000/api/dashboard/events');
+    const eventSource = new EventSource('/api/dashboard/events');
     eventSource.addEventListener('message', (e) => {
       const data = JSON.parse(e.data);
       if (selectedLead && data.leadId === selectedLead.id) {

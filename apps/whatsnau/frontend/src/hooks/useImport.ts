@@ -10,7 +10,7 @@ export const useImport = (fetchData: () => void) => {
 
   const fetchBatches = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:3000/api/dashboard/import/batches');
+      const res = await fetch('/api/dashboard/import/batches');
       setBatches(await res.json());
     } catch (error) {
       console.error('Failed to fetch batches:', error);
@@ -21,7 +21,7 @@ export const useImport = (fetchData: () => void) => {
   const fetchBatchDetails = useCallback(
     async (id: string) => {
       try {
-        const res = await fetch(`http://localhost:3000/api/dashboard/import/batches/${id}`);
+        const res = await fetch(`/api/dashboard/import/batches/${id}`);
         const data = await res.json();
         setSelectedBatch(data);
       } catch (error) {
@@ -43,7 +43,7 @@ export const useImport = (fetchData: () => void) => {
       const name = file.name.replace('.csv', '');
       setIsImporting(true);
       try {
-        const res = await fetch('http://localhost:3000/api/dashboard/import/csv', {
+        const res = await fetch('/api/dashboard/import/csv', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ campaignId, name, csvContent }),
@@ -64,7 +64,7 @@ export const useImport = (fetchData: () => void) => {
   const runAction = async (batchId: string, action: string) => {
     try {
       const res = await fetch(
-        `http://localhost:3000/api/dashboard/import/batches/${batchId}/${action}`,
+        `/api/dashboard/import/batches/${batchId}/${action}`,
         {
           method: 'POST',
         }
@@ -82,7 +82,7 @@ export const useImport = (fetchData: () => void) => {
     if (!confirm('Are you sure you want to move these leads to the live campaign?')) return;
     try {
       const res = await fetch(
-        `http://localhost:3000/api/dashboard/import/batches/${batchId}/execute`,
+        `/api/dashboard/import/batches/${batchId}/execute`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -105,7 +105,7 @@ export const useImport = (fetchData: () => void) => {
       return;
     try {
       const res = await fetch(
-        `http://localhost:3000/api/dashboard/import/batches/${batchId}/reach`,
+        `/api/dashboard/import/batches/${batchId}/reach`,
         {
           method: 'POST',
         }

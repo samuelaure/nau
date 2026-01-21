@@ -22,7 +22,7 @@ export const useConfig = (campaignId?: string) => {
 
   const fetchConfig = useCallback(async () => {
     try {
-      const baseUrl = 'http://localhost:3000/api/dashboard/config';
+      const baseUrl = '/api/dashboard/config';
       const promptUrl = campaignId
         ? `${baseUrl}/prompts?campaignId=${campaignId}`
         : `${baseUrl}/prompts`;
@@ -55,7 +55,7 @@ export const useConfig = (campaignId?: string) => {
 
   const saveBusiness = async (data: BusinessConfig) => {
     try {
-      const res = await fetch('http://localhost:3000/api/dashboard/config/business', {
+      const res = await fetch('/api/dashboard/config/business', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -72,7 +72,7 @@ export const useConfig = (campaignId?: string) => {
   const savePrompt = async (role: string, basePrompt: string) => {
     if (!campaignId) return notify('error', 'Select a campaign first');
     try {
-      const res = await fetch('http://localhost:3000/api/dashboard/config/prompts', {
+      const res = await fetch('/api/dashboard/config/prompts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role, basePrompt, campaignId }),
@@ -87,7 +87,7 @@ export const useConfig = (campaignId?: string) => {
 
   const saveSequence = async (id: string, name: string, waitHours: number) => {
     try {
-      const res = await fetch(`http://localhost:3000/api/dashboard/config/sequences/${id}`, {
+      const res = await fetch(`/api/dashboard/config/sequences/${id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, waitHours }),
@@ -103,7 +103,7 @@ export const useConfig = (campaignId?: string) => {
 
   const saveTelegram = async (data: TelegramConfig) => {
     try {
-      const res = await fetch('http://localhost:3000/api/dashboard/config/telegram', {
+      const res = await fetch('/api/dashboard/config/telegram', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -119,7 +119,7 @@ export const useConfig = (campaignId?: string) => {
 
   const updateGlobalConfig = async (availabilityStatus: string) => {
     try {
-      const res = await fetch('http://localhost:3000/api/dashboard/config/global', {
+      const res = await fetch('/api/dashboard/config/global', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ availabilityStatus }),
@@ -134,7 +134,7 @@ export const useConfig = (campaignId?: string) => {
 
   const addKeyword = async (word: string, type: string) => {
     try {
-      const res = await fetch('http://localhost:3000/api/dashboard/config/keywords', {
+      const res = await fetch('/api/dashboard/config/keywords', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ word, type }),
@@ -153,7 +153,7 @@ export const useConfig = (campaignId?: string) => {
 
   const removeKeyword = async (id: string) => {
     try {
-      const res = await fetch(`http://localhost:3000/api/dashboard/config/keywords/${id}`, {
+      const res = await fetch(`/api/dashboard/config/keywords/${id}`, {
         method: 'DELETE',
       });
       if (res.ok) {
