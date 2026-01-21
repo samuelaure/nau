@@ -38,14 +38,14 @@ export class AuthService {
 
     await db.user.create({
       data: {
-        email: 'samuel@whatsnau.com',
+        email: 'samuelaure@gmail.com',
         password: hashedPassword,
         name: 'Samuel Aure',
         role: 'ADMIN',
       },
     });
 
-    logger.info('Initial admin user created: samuel@whatsnau.com / admin123');
+    logger.info('Initial admin user created: samuelaure@gmail.com / admin123');
   }
 
   /**

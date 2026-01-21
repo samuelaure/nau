@@ -2,6 +2,8 @@ import express, { Request, Response } from 'express';
 import bodyParser from 'body-parser';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
+import { rateLimit } from 'express-rate-limit';
 import { logger } from './core/logger.js';
 import { db } from './core/db.js';
 import { CampaignService } from './services/campaign.service.js';
@@ -15,10 +17,25 @@ import { errorMiddleware } from './core/errors/errorMiddleware.js';
 
 export const app = express();
 
-// Middleware
-app.use(cors());
+// Security Middleware
+app.use(helmet()); // Basic security headers
+app.use(
+  cors({
+    origin: process.env.NODE_ENV === 'production' ? ['https://whatsnau.com'] : true,
+    credentials: true,
+  })
+);
 app.use(cookieParser());
 app.use(bodyParser.json());
+
+// Rate Limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  limit: 100, // Limit each IP to 100 requests per `window`
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+});
+app.use('/api/', limiter);
 
 // Observability: Health Check
 app.get('/health', (req, res) => {
