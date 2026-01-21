@@ -1,116 +1,123 @@
 import React from 'react';
 import {
-    LayoutDashboard,
-    Users,
-    MessageSquare,
-    BarChart3,
-    Settings,
-    Layers,
-    FileText,
-    PlusCircle,
-    FolderTree
+  LayoutDashboard,
+  Users,
+  MessageSquare,
+  BarChart3,
+  Settings,
+  Layers,
+  FileText,
+  PlusCircle,
+  FolderTree,
 } from 'lucide-react';
 import type { CampaignStats } from '../../types';
 
 interface SidebarProps {
-    activeTab: string;
-    setActiveTab: (tab: any) => void;
-    campaigns: CampaignStats[];
-    selectedCampaignId: string;
-    onSelectCampaign: (id: string) => void;
+  activeTab: string;
+  setActiveTab: (tab: any) => void;
+  campaigns: CampaignStats[];
+  selectedCampaignId: string;
+  onSelectCampaign: (id: string) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
-    activeTab,
-    setActiveTab,
-    campaigns,
-    selectedCampaignId,
-    onSelectCampaign,
+  activeTab,
+  setActiveTab,
+  campaigns,
+  selectedCampaignId,
+  onSelectCampaign,
 }) => {
-    const menuItems = [
-        { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-        { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-        { id: 'broadcast', label: 'Broadcast', icon: MessageSquare },
-        { id: 'import', label: 'Import Leads', icon: Users },
-    ];
+  const menuItems = [
+    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'broadcast', label: 'Broadcast', icon: MessageSquare },
+    { id: 'import', label: 'Import Leads', icon: Users },
+  ];
 
-    const workspaceItems = [
-        { id: 'campaign', label: 'Flow & Sequence', icon: FolderTree },
-        { id: 'settings', label: 'AI Agents', icon: Settings },
-        { id: 'templates', label: 'Meta Templates', icon: FileText },
-    ];
+  const workspaceItems = [
+    { id: 'campaign', label: 'Flow & Sequence', icon: FolderTree },
+    { id: 'settings', label: 'AI Agents', icon: Settings },
+    { id: 'templates', label: 'Meta Templates', icon: FileText },
+  ];
 
-    return (
-        <aside className="sidebar">
-            <div className="sidebar-header">
-                <div className="logo">
-                    whatsna<span>ŭ</span>
-                </div>
-            </div>
+  return (
+    <aside className="sidebar">
+      <div className="sidebar-header">
+        <div className="logo">
+          whatsna<span>ŭ</span>
+        </div>
+      </div>
 
-            <div className="sidebar-section">
-                <label>Global Workspace</label>
-                <nav>
-                    {menuItems.map((item) => (
-                        <button
-                            key={item.id}
-                            className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
-                            onClick={() => setActiveTab(item.id)}
-                        >
-                            <item.icon size={18} />
-                            <span>{item.label}</span>
-                        </button>
-                    ))}
-                </nav>
-            </div>
+      <div className="sidebar-section">
+        <label>Global Workspace</label>
+        <nav>
+          {menuItems.map((item) => (
+            <button
+              key={item.id}
+              className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
+              onClick={() => setActiveTab(item.id)}
+            >
+              <item.icon size={18} />
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </nav>
+      </div>
 
-            <div className="sidebar-section">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                    <label>Campaign Workspaces</label>
-                </div>
+      <div className="sidebar-section">
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '0.75rem',
+          }}
+        >
+          <label>Campaign Workspaces</label>
+        </div>
 
-                <select
-                    className="campaign-selector"
-                    value={selectedCampaignId}
-                    onChange={(e) => onSelectCampaign(e.target.value)}
-                >
-                    <option value="">All Campaigns</option>
-                    {campaigns.map(c => (
-                        <option key={c.campaignId} value={c.campaignId}>
-                            {c.name}
-                        </option>
-                    ))}
-                </select>
+        <select
+          className="campaign-selector"
+          value={selectedCampaignId}
+          onChange={(e) => onSelectCampaign(e.target.value)}
+        >
+          <option value="">All Campaigns</option>
+          {campaigns.map((c) => (
+            <option key={c.campaignId} value={c.campaignId}>
+              {c.name}
+            </option>
+          ))}
+        </select>
 
-                <nav style={{ marginTop: '1rem' }}>
-                    {workspaceItems.map((item) => (
-                        <button
-                            key={item.id}
-                            className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
-                            onClick={() => setActiveTab(item.id)}
-                        >
-                            <item.icon size={18} />
-                            <span>{item.label}</span>
-                        </button>
-                    ))}
+        <nav style={{ marginTop: '1rem' }}>
+          {workspaceItems.map((item) => (
+            <button
+              key={item.id}
+              className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
+              onClick={() => setActiveTab(item.id)}
+            >
+              <item.icon size={18} />
+              <span>{item.label}</span>
+            </button>
+          ))}
 
-                    <button
-                        className={`nav-item ${activeTab === 'campaigns' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('campaigns')}
-                        style={{ marginTop: 'auto' }}
-                    >
-                        <Layers size={18} />
-                        <span>Manage Campaigns</span>
-                    </button>
-                </nav>
-            </div>
+          <button
+            className={`nav-item ${activeTab === 'campaigns' ? 'active' : ''}`}
+            onClick={() => setActiveTab('campaigns')}
+            style={{ marginTop: 'auto' }}
+          >
+            <Layers size={18} />
+            <span>Manage Campaigns</span>
+          </button>
+        </nav>
+      </div>
 
-            <div className="sidebar-footer">
-                <button className="nav-item">
-                    <PlusCircle size={18} />
-                    <span>New Campaign</span>
-                </button>
-            </div>
-        </aside>
-    );
+      <div className="sidebar-footer">
+        <button className="nav-item">
+          <PlusCircle size={18} />
+          <span>New Campaign</span>
+        </button>
+      </div>
+    </aside>
+  );
 };

@@ -16,7 +16,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, loading, onRefresh })
       campaign: 'Sequence Flow',
       settings: 'AI Agents',
       templates: 'Meta Templates',
-      campaigns: 'Campaign Manager'
+      campaigns: 'Campaign Manager',
     };
     return titles[activeTab] || 'Dashboard';
   };

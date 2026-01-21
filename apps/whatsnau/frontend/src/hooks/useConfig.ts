@@ -23,8 +23,12 @@ export const useConfig = (campaignId?: string) => {
   const fetchConfig = useCallback(async () => {
     try {
       const baseUrl = 'http://localhost:3000/api/dashboard/config';
-      const promptUrl = campaignId ? `${baseUrl}/prompts?campaignId=${campaignId}` : `${baseUrl}/prompts`;
-      const seqUrl = campaignId ? `${baseUrl}/sequences?campaignId=${campaignId}` : `${baseUrl}/sequences`;
+      const promptUrl = campaignId
+        ? `${baseUrl}/prompts?campaignId=${campaignId}`
+        : `${baseUrl}/prompts`;
+      const seqUrl = campaignId
+        ? `${baseUrl}/sequences?campaignId=${campaignId}`
+        : `${baseUrl}/sequences`;
 
       const [bizRes, promptRes, seqRes, tempRes, teleRes] = await Promise.all([
         fetch(`${baseUrl}/business`),

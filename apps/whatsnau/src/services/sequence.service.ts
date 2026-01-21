@@ -8,31 +8,32 @@ export class SequenceService {
   /**
    * Main entry point for sequence processing
    */
-  static async processSequences() {
+  static async processFollowUps() {
     logger.info('Running sequence processor...');
-    await this.processMainOutreachSequence();
+
+    // 1. Process all active campaigns
+    const activeCampaigns = await db.campaign.findMany({
+      where: { isActive: true },
+      include: { stages: { orderBy: { order: 'asc' } } },
+    });
+
+    for (const campaign of activeCampaigns) {
+      await this.processCampaignLeads(campaign);
+    }
+
+    // 2. Global background processes
     await this.processNurturingOnboarding();
     await this.processHandoverFollowUps();
   }
 
   /**
-   * Process Main Outreach Sequence (M1, M2, M3)
+   * Process all leads for a specific campaign
    */
-  private static async processMainOutreachSequence() {
-    const mainCampaign = await db.campaign.findFirst({
-      where: { name: 'Main Outreach Campaign', isActive: true },
-      include: { stages: { orderBy: { order: 'asc' } } },
-    });
-
-    if (!mainCampaign) {
-      logger.warn('Main Outreach Campaign not found');
-      return;
-    }
-
-    // Get COLD leads in the campaign
-    const coldLeads = await db.lead.findMany({
+  private static async processCampaignLeads(campaign: any) {
+    // Get COLD leads in this specific campaign
+    const leads = await db.lead.findMany({
       where: {
-        campaignId: mainCampaign.id,
+        campaignId: campaign.id,
         state: LeadState.COLD,
         status: 'ACTIVE',
         tags: { none: { name: 'black' } }, // Exclude blacklisted
@@ -40,8 +41,8 @@ export class SequenceService {
       include: { currentStage: true, tags: true },
     });
 
-    for (const lead of coldLeads) {
-      await this.processLeadSequence(lead, mainCampaign);
+    for (const lead of leads) {
+      await this.processLeadSequence(lead, campaign);
     }
   }
 

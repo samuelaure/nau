@@ -321,8 +321,8 @@ export class Orchestrator {
    * Send M3 (Weekly Tips Invitation)
    */
   private static async sendWeeklyTipsInvite(lead: any) {
-    const campaign = await db.campaign.findFirst({
-      where: { name: 'Main Outreach Campaign' },
+    const campaign = await db.campaign.findUnique({
+      where: { id: lead.campaignId },
       include: { stages: true },
     });
 
@@ -480,7 +480,12 @@ export class Orchestrator {
     }
 
     // Use enhanced AI service with context
-    const response = await AIService.getChatResponseWithContext(lead.id, lead.campaignId, role, aiMessages);
+    const response = await AIService.getChatResponseWithContext(
+      lead.id,
+      lead.campaignId,
+      role,
+      aiMessages
+    );
 
     if (response) {
       const res = await WhatsAppService.sendText(lead.phoneNumber, response);

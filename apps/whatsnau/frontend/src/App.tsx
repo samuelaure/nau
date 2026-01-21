@@ -96,11 +96,7 @@ function App() {
       />
 
       <div className="main-content">
-        <Header
-          activeTab={activeTab}
-          loading={loading}
-          onRefresh={fetchData}
-        />
+        <Header activeTab={activeTab} loading={loading} onRefresh={fetchData} />
 
         {activeTab === 'overview' && (
           <Overview

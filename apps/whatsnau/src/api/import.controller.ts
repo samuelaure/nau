@@ -191,7 +191,7 @@ router.post(
     const { SequenceService } = await import('../services/sequence.service.js');
 
     for (const lead of leads) {
-      await SequenceService.triggerInitialContact(lead, firstStage);
+      await SequenceService.sendStageMessage(lead, firstStage);
     }
 
     res.json({ success: true, count: leads.length });
