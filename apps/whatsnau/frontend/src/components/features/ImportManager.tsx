@@ -18,6 +18,7 @@ interface ImportManagerProps {
   onRunAction: (batchId: string, action: string) => void;
   onExecute: (batchId: string) => void;
   onRunReach: (batchId: string) => void;
+  onRefresh: () => void;
 }
 
 export const ImportManager: React.FC<ImportManagerProps> = ({
@@ -33,6 +34,7 @@ export const ImportManager: React.FC<ImportManagerProps> = ({
   onRunAction,
   onExecute,
   onRunReach,
+  onRefresh,
 }) => {
   const [showCreateCampaign, setShowCreateCampaign] = React.useState(false);
   const [newCampaignName, setNewCampaignName] = React.useState('');
@@ -55,11 +57,10 @@ export const ImportManager: React.FC<ImportManagerProps> = ({
 
       if (res.ok) {
         const campaign = await res.json();
+        onRefresh(); // Refresh stats to include new campaign
         setSelectedCampaignId(campaign.id);
         setNewCampaignName('');
         setShowCreateCampaign(false);
-        // Refresh stats to include new campaign
-        window.location.reload();
       }
     } catch (error) {
       console.error('Failed to create campaign:', error);

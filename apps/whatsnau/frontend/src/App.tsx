@@ -164,6 +164,7 @@ function App() {
             onRunAction={runAction}
             onExecute={executeBatch}
             onRunReach={runReach}
+            onRefresh={fetchData}
           />
         )}
       </div>
