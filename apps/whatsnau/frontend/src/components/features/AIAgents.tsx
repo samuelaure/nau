@@ -17,6 +17,63 @@ interface AIAgentsProps {
   onRemoveKeyword: (id: string) => void;
 }
 
+interface AgentPromptEditorProps {
+  role: string;
+  prompt: PromptConfig | undefined;
+  onSave: (role: string, prompt: string) => void;
+}
+
+const AgentPromptEditor: React.FC<AgentPromptEditorProps> = ({ role, prompt, onSave }) => {
+  const [localPrompt, setLocalPrompt] = React.useState(prompt?.basePrompt || '');
+
+  React.useEffect(() => {
+    setLocalPrompt(prompt?.basePrompt || '');
+  }, [prompt?.basePrompt]);
+
+  return (
+    <div>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '0.5rem',
+        }}
+      >
+        <h4 style={{ color: 'var(--primary)' }}>{role}</h4>
+        <button
+          className="secondary"
+          style={{ padding: '0.25rem 0.75rem', fontSize: '0.75rem' }}
+          onClick={() => onSave(role, localPrompt)}
+          disabled={localPrompt === prompt?.basePrompt}
+        >
+          Update
+        </button>
+      </div>
+      <textarea
+        value={localPrompt}
+        onChange={(e) => setLocalPrompt(e.target.value)}
+        onBlur={() => {
+          if (localPrompt !== prompt?.basePrompt) {
+            onSave(role, localPrompt);
+          }
+        }}
+        placeholder={`System prompt for ${role}...`}
+        rows={6}
+        style={{
+          width: '100%',
+          background: 'rgba(255,255,255,0.03)',
+          border: '1px solid var(--card-border)',
+          borderRadius: '0.75rem',
+          color: '#fff',
+          padding: '1rem',
+          fontFamily: 'monospace',
+        }}
+      />
+    </div>
+  );
+};
+
 export const AIAgents: React.FC<AIAgentsProps> = ({
   business,
   prompts,
@@ -45,45 +102,14 @@ export const AIAgents: React.FC<AIAgentsProps> = ({
             Configure the personality and primary objective of each AI agent.
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            {['CLOSER', 'RECEPTIONIST'].map((role) => {
-              const p = prompts.find((pr) => pr.role === role) || { basePrompt: '' };
-              return (
-                <div key={role}>
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginBottom: '0.5rem',
-                    }}
-                  >
-                    <h4 style={{ color: 'var(--primary)' }}>{role}</h4>
-                    <button
-                      className="secondary"
-                      style={{ padding: '0.25rem 0.75rem', fontSize: '0.75rem' }}
-                      onClick={() => onSavePrompt(role, p.basePrompt)}
-                    >
-                      Update
-                    </button>
-                  </div>
-                  <textarea
-                    value={p.basePrompt}
-                    readOnly
-                    placeholder={`System prompt for ${role}...`}
-                    rows={6}
-                    style={{
-                      width: '100%',
-                      background: 'rgba(255,255,255,0.03)',
-                      border: '1px solid var(--card-border)',
-                      borderRadius: '0.75rem',
-                      color: '#fff',
-                      padding: '1rem',
-                      fontFamily: 'monospace',
-                    }}
-                  />
-                </div>
-              );
-            })}
+            {['CLOSER', 'RECEPTIONIST', 'NURTURING'].map((role) => (
+              <AgentPromptEditor
+                key={role}
+                role={role}
+                prompt={prompts.find((p) => p.role === role)}
+                onSave={onSavePrompt}
+              />
+            ))}
           </div>
         </div>
         <div className="settings-section">
