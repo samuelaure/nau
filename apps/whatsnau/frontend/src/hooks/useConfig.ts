@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type {
   BusinessConfig,
   PromptConfig,
@@ -8,7 +8,7 @@ import type {
 } from '../types';
 import { useNotification } from '../context/NotificationContext';
 
-export const useConfig = () => {
+export const useConfig = (campaignId?: string) => {
   const { notify } = useNotification();
   const [business, setBusiness] = useState<BusinessConfig>({ name: '', knowledgeBase: '' });
   const [prompts, setPrompts] = useState<PromptConfig[]>([]);
@@ -23,10 +23,13 @@ export const useConfig = () => {
   const fetchConfig = useCallback(async () => {
     try {
       const baseUrl = 'http://localhost:3000/api/dashboard/config';
+      const promptUrl = campaignId ? `${baseUrl}/prompts?campaignId=${campaignId}` : `${baseUrl}/prompts`;
+      const seqUrl = campaignId ? `${baseUrl}/sequences?campaignId=${campaignId}` : `${baseUrl}/sequences`;
+
       const [bizRes, promptRes, seqRes, tempRes, teleRes] = await Promise.all([
         fetch(`${baseUrl}/business`),
-        fetch(`${baseUrl}/prompts`),
-        fetch(`${baseUrl}/sequences`),
+        fetch(promptUrl),
+        fetch(seqUrl),
         fetch(`${baseUrl}/whatsapp-templates`),
         fetch(`${baseUrl}/telegram`),
       ]);
@@ -40,7 +43,11 @@ export const useConfig = () => {
       console.error('Failed to fetch config:', error);
       notify('error', 'Configuration sync failed.');
     }
-  }, [notify]);
+  }, [notify, campaignId]);
+
+  useEffect(() => {
+    fetchConfig();
+  }, [fetchConfig]);
 
   const saveBusiness = async (data: BusinessConfig) => {
     try {
@@ -59,11 +66,12 @@ export const useConfig = () => {
   };
 
   const savePrompt = async (role: string, basePrompt: string) => {
+    if (!campaignId) return notify('error', 'Select a campaign first');
     try {
       const res = await fetch('http://localhost:3000/api/dashboard/config/prompts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role, basePrompt }),
+        body: JSON.stringify({ role, basePrompt, campaignId }),
       });
       if (!res.ok) throw new Error('Save failed');
       notify('success', `${role} system prompt synchronized.`);

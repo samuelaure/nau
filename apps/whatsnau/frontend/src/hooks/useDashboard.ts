@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { CampaignStats, Lead, KeywordConfig, Message } from '../types';
 import { useNotification } from '../context/NotificationContext';
 
-export const useDashboard = () => {
+export const useDashboard = (campaignId?: string) => {
   const { notify } = useNotification();
   const [stats, setStats] = useState<CampaignStats[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -17,9 +17,13 @@ export const useDashboard = () => {
     setLoading(true);
     try {
       const baseUrl = 'http://localhost:3000/api/dashboard';
+      const leadsUrl = campaignId
+        ? `${baseUrl}/leads?campaignId=${campaignId}`
+        : `${baseUrl}/leads`;
+
       const [statsRes, leadsRes, keywordsRes, configRes] = await Promise.all([
         fetch(`${baseUrl}/stats`),
-        fetch(`${baseUrl}/leads`),
+        fetch(leadsUrl),
         fetch(`${baseUrl}/config/keywords`),
         fetch(`${baseUrl}/config/global`),
       ]);
@@ -39,7 +43,11 @@ export const useDashboard = () => {
     } finally {
       setLoading(false);
     }
-  }, [notify]);
+  }, [notify, campaignId]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const fetchMessages = useCallback(
     async (leadId: string) => {

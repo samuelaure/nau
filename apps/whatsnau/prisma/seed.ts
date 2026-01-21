@@ -352,8 +352,9 @@ async function main() {
 
   // 4.1 Conversational Closer
   await db.promptConfig.upsert({
-    where: { role: 'CLOSER' },
+    where: { role_campaignId: { role: 'CLOSER', campaignId: mainCampaign.id } },
     update: {
+      campaignId: mainCampaign.id,
       basePrompt: `Eres el Conversational Closer de whatsnaŭ, un experto en ventas consultivas.
 
 TU MISIÓN:
@@ -386,6 +387,7 @@ INFORMACIÓN QUE DEBES RECOPILAR:
     },
     create: {
       role: 'CLOSER',
+      campaignId: mainCampaign.id,
       basePrompt: `Eres el Conversational Closer de whatsnaŭ, un experto en ventas consultivas.
 
 TU MISIÓN:
@@ -420,8 +422,9 @@ INFORMACIÓN QUE DEBES RECOPILAR:
 
   // 4.2 Receptionist (Demo Agent)
   await db.promptConfig.upsert({
-    where: { role: 'RECEPTIONIST' },
+    where: { role_campaignId: { role: 'RECEPTIONIST', campaignId: mainCampaign.id } },
     update: {
+      campaignId: mainCampaign.id,
       basePrompt: `Eres una Recepcionista IA profesional y competente en tu "entrevista de trabajo".
 
 TU MISIÓN:
@@ -451,6 +454,7 @@ CONTEXTO DE DEMO:
     },
     create: {
       role: 'RECEPTIONIST',
+      campaignId: mainCampaign.id,
       basePrompt: `Eres una Recepcionista IA profesional y competente en tu "entrevista de trabajo".
 
 TU MISIÓN:
@@ -482,8 +486,9 @@ CONTEXTO DE DEMO:
 
   // 4.3 Nurturing Buddy
   await db.promptConfig.upsert({
-    where: { role: 'NURTURING' },
+    where: { role_campaignId: { role: 'NURTURING', campaignId: mainCampaign.id } },
     update: {
+      campaignId: mainCampaign.id,
       basePrompt: `Eres el Nurturing Buddy de whatsnaŭ, el anfitrión cálido de la comunidad.
 
 TU MISIÓN:
@@ -521,6 +526,7 @@ ENGAGEMENT:
     },
     create: {
       role: 'NURTURING',
+      campaignId: mainCampaign.id,
       basePrompt: `Eres el Nurturing Buddy de whatsnaŭ, el anfitrión cálido de la comunidad.
 
 TU MISIÓN:

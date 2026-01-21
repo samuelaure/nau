@@ -480,7 +480,7 @@ export class Orchestrator {
     }
 
     // Use enhanced AI service with context
-    const response = await AIService.getChatResponseWithContext(lead.id, role, aiMessages);
+    const response = await AIService.getChatResponseWithContext(lead.id, lead.campaignId, role, aiMessages);
 
     if (response) {
       const res = await WhatsAppService.sendText(lead.phoneNumber, response);

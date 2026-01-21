@@ -22,6 +22,7 @@ model Campaign {
   stages      CampaignStage[]
   tags        Tag[]
   importBatches LeadImportBatch[]
+  prompts     PromptConfig[]
 }
 
 model CampaignStage {
@@ -145,7 +146,9 @@ model BusinessProfile {
 
 model PromptConfig {
   id            String   @id @default(uuid())
-  role          String   @unique // CLOSER, RECEPTIONIST, NURTURING
+  role          String   // CLOSER, RECEPTIONIST, NURTURING
+  campaignId    String
+  campaign      Campaign @relation(fields: [campaignId], references: [id])
   basePrompt    String
   
   // Context injection rules
@@ -161,6 +164,8 @@ model PromptConfig {
   
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  @@unique([role, campaignId])
 }
 
 // MASS OUTREACH MODELS

@@ -1,91 +1,35 @@
-import React from 'react';
-import { RefreshCw, Upload } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 
 interface HeaderProps {
-  activeTab:
-    | 'overview'
-    | 'settings'
-    | 'campaign'
-    | 'campaigns'
-    | 'broadcast'
-    | 'analytics'
-    | 'templates'
-    | 'import';
-  setActiveTab: (
-    tab:
-      | 'overview'
-      | 'settings'
-      | 'campaign'
-      | 'campaigns'
-      | 'broadcast'
-      | 'analytics'
-      | 'templates'
-      | 'import'
-  ) => void;
+  activeTab: string;
   loading: boolean;
   onRefresh: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, loading, onRefresh }) => {
+export const Header: React.FC<HeaderProps> = ({ activeTab, loading, onRefresh }) => {
+  const getTitle = () => {
+    const titles: Record<string, string> = {
+      overview: 'Overview',
+      analytics: 'Analytics',
+      broadcast: 'Broadcast',
+      import: 'Lead Import',
+      campaign: 'Sequence Flow',
+      settings: 'AI Agents',
+      templates: 'Meta Templates',
+      campaigns: 'Campaign Manager'
+    };
+    return titles[activeTab] || 'Dashboard';
+  };
+
   return (
-    <header>
+    <header style={{ marginBottom: '2rem' }}>
       <div>
-        <h1 className="logo">whatsnaŭ</h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-          Campaign Orchestration Dashboard
+        <h1 style={{ fontSize: '1.25rem', fontWeight: 700 }}>{getTitle()}</h1>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
+          {activeTab === 'overview' ? 'Real-time performance metrics' : 'Campaign Orchestration'}
         </p>
       </div>
       <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-        <nav className="tabs">
-          <button
-            className={activeTab === 'overview' ? 'active' : ''}
-            onClick={() => setActiveTab('overview')}
-          >
-            Overview
-          </button>
-          <button
-            className={activeTab === 'settings' ? 'active' : ''}
-            onClick={() => setActiveTab('settings')}
-          >
-            AI Agents
-          </button>
-          <button
-            className={activeTab === 'campaign' ? 'active' : ''}
-            onClick={() => setActiveTab('campaign')}
-          >
-            Campaign
-          </button>
-          <button
-            className={activeTab === 'campaigns' ? 'active' : ''}
-            onClick={() => setActiveTab('campaigns')}
-          >
-            Campaigns
-          </button>
-          <button
-            className={activeTab === 'templates' ? 'active' : ''}
-            onClick={() => setActiveTab('templates')}
-          >
-            Templates
-          </button>
-          <button
-            className={activeTab === 'broadcast' ? 'active' : ''}
-            onClick={() => setActiveTab('broadcast')}
-          >
-            Broadcast
-          </button>
-          <button
-            className={activeTab === 'analytics' ? 'active' : ''}
-            onClick={() => setActiveTab('analytics')}
-          >
-            Analytics
-          </button>
-          <button
-            className={activeTab === 'import' ? 'active' : ''}
-            onClick={() => setActiveTab('import')}
-          >
-            <Upload size={14} style={{ marginRight: '6px' }} /> Import
-          </button>
-        </nav>
         <button className="secondary" onClick={onRefresh} disabled={loading}>
           <RefreshCw
             size={16}
@@ -95,7 +39,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, loading
               animation: loading ? 'spin 2s linear infinite' : 'none',
             }}
           />
-          Refresh
+          Sync Data
         </button>
       </div>
     </header>

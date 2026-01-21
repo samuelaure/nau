@@ -42,7 +42,11 @@ router.get(
 router.get(
   '/leads',
   asyncHandler(async (req: Request, res: Response) => {
+    const { campaignId } = req.query;
+    const where = campaignId ? { campaignId: campaignId as string } : {};
+
     const leads = await db.lead.findMany({
+      where,
       include: {
         tags: true,
         currentStage: true,
@@ -185,7 +189,9 @@ router.post(
 router.get(
   '/config/prompts',
   asyncHandler(async (req: Request, res: Response) => {
-    const prompts = await (db as any).promptConfig.findMany();
+    const { campaignId } = req.query;
+    const where = campaignId ? { campaignId: campaignId as string } : {};
+    const prompts = await (db as any).promptConfig.findMany({ where });
     res.json(prompts);
   })
 );
@@ -193,10 +199,12 @@ router.get(
 router.post(
   '/config/prompts',
   asyncHandler(async (req: Request, res: Response) => {
-    const { role, basePrompt } = req.body;
+    const { role, basePrompt, campaignId } = req.body;
+    if (!campaignId) return res.status(400).json({ error: 'campaignId is required' });
+
     const prompt = await (db as any).promptConfig.upsert({
-      where: { role },
-      create: { role, basePrompt },
+      where: { role_campaignId: { role, campaignId } },
+      create: { role, basePrompt, campaignId },
       update: { basePrompt },
     });
     res.json(prompt);
@@ -206,7 +214,10 @@ router.post(
 router.get(
   '/config/sequences',
   asyncHandler(async (req: Request, res: Response) => {
+    const { campaignId } = req.query;
+    const where = campaignId ? { campaignId: campaignId as string } : {};
     const stages = await db.campaignStage.findMany({
+      where,
       orderBy: { order: 'asc' },
     });
     res.json(stages);

@@ -13,7 +13,13 @@ import { useDashboard } from './hooks/useDashboard';
 import { useImport } from './hooks/useImport';
 import { useConfig } from './hooks/useConfig';
 
+import { Sidebar } from './components/layout/Sidebar';
+
 function App() {
+  const [activeTab, setActiveTab] = useState('overview');
+  const [selectedCampaignId, setSelectedCampaignId] = useState('');
+  const [newMessage, setNewMessage] = useState('');
+
   const {
     stats,
     leads,
@@ -29,7 +35,7 @@ function App() {
     sendMessage,
     setSelectedLead,
     setAvailability,
-  } = useDashboard();
+  } = useDashboard(selectedCampaignId);
 
   const {
     batches,
@@ -59,20 +65,7 @@ function App() {
     addKeyword,
     removeKeyword,
     setSequences,
-  } = useConfig();
-
-  const [activeTab, setActiveTab] = useState<
-    | 'overview'
-    | 'settings'
-    | 'campaign'
-    | 'campaigns'
-    | 'broadcast'
-    | 'analytics'
-    | 'templates'
-    | 'import'
-  >('overview');
-  const [selectedCampaignId, setSelectedCampaignId] = useState('');
-  const [newMessage, setNewMessage] = useState('');
+  } = useConfig(selectedCampaignId);
 
   useEffect(() => {
     fetchData();
@@ -94,77 +87,86 @@ function App() {
 
   return (
     <div className="dashboard-container">
-      <Header
+      <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        loading={loading}
-        onRefresh={fetchData}
+        campaigns={stats}
+        selectedCampaignId={selectedCampaignId}
+        onSelectCampaign={setSelectedCampaignId}
       />
 
-      {activeTab === 'overview' && (
-        <Overview
-          stats={stats}
-          leads={leads}
-          onSelectLead={setSelectedLead}
-          resolveHandover={resolveHandover}
+      <div className="main-content">
+        <Header
+          activeTab={activeTab}
+          loading={loading}
+          onRefresh={fetchData}
         />
-      )}
 
-      {activeTab === 'settings' && (
-        <AIAgents
-          business={business}
-          prompts={prompts}
-          telegram={telegram}
-          keywords={keywords}
-          availability={availability}
-          onSaveBusiness={saveBusiness}
-          onSavePrompt={savePrompt}
-          onSaveTelegram={saveTelegram}
-          onUpdateAvailability={(status) => {
-            setAvailability(status);
-            updateGlobalConfig(status);
-          }}
-          onAddKeyword={async (word, type) => {
-            if (await addKeyword(word, type)) fetchData();
-          }}
-          onRemoveKeyword={async (id) => {
-            if (await removeKeyword(id)) fetchData();
-          }}
-        />
-      )}
+        {activeTab === 'overview' && (
+          <Overview
+            stats={stats}
+            leads={leads}
+            onSelectLead={setSelectedLead}
+            resolveHandover={resolveHandover}
+          />
+        )}
 
-      {activeTab === 'campaign' && (
-        <CampaignFlow
-          sequences={sequences}
-          onSave={saveSequence}
-          onUpdateSequences={setSequences}
-        />
-      )}
+        {activeTab === 'settings' && (
+          <AIAgents
+            business={business}
+            prompts={prompts}
+            telegram={telegram}
+            keywords={keywords}
+            availability={availability}
+            onSaveBusiness={saveBusiness}
+            onSavePrompt={savePrompt}
+            onSaveTelegram={saveTelegram}
+            onUpdateAvailability={(status) => {
+              setAvailability(status);
+              updateGlobalConfig(status);
+            }}
+            onAddKeyword={async (word, type) => {
+              if (await addKeyword(word, type)) fetchData();
+            }}
+            onRemoveKeyword={async (id) => {
+              if (await removeKeyword(id)) fetchData();
+            }}
+          />
+        )}
 
-      {activeTab === 'campaigns' && <CampaignManager />}
+        {activeTab === 'campaign' && (
+          <CampaignFlow
+            sequences={sequences}
+            onSave={saveSequence}
+            onUpdateSequences={setSequences}
+          />
+        )}
 
-      {activeTab === 'broadcast' && <BroadcastView />}
+        {activeTab === 'campaigns' && <CampaignManager />}
 
-      {activeTab === 'analytics' && <AnalyticsView />}
+        {activeTab === 'broadcast' && <BroadcastView />}
 
-      {activeTab === 'templates' && <TemplatesView initialTemplates={templates} />}
+        {activeTab === 'analytics' && <AnalyticsView />}
 
-      {activeTab === 'import' && (
-        <ImportManager
-          batches={batches}
-          selectedBatch={selectedBatch}
-          stats={stats}
-          isImporting={isImporting}
-          selectedCampaignId={selectedCampaignId}
-          setSelectedCampaignId={setSelectedCampaignId}
-          onSelectBatch={fetchBatchDetails}
-          onBack={() => setSelectedBatch(null)}
-          onFileUpload={handleFileUpload}
-          onRunAction={runAction}
-          onExecute={executeBatch}
-          onRunReach={runReach}
-        />
-      )}
+        {activeTab === 'templates' && <TemplatesView initialTemplates={templates} />}
+
+        {activeTab === 'import' && (
+          <ImportManager
+            batches={batches}
+            selectedBatch={selectedBatch}
+            stats={stats}
+            isImporting={isImporting}
+            selectedCampaignId={selectedCampaignId}
+            setSelectedCampaignId={setSelectedCampaignId}
+            onSelectBatch={fetchBatchDetails}
+            onBack={() => setSelectedBatch(null)}
+            onFileUpload={handleFileUpload}
+            onRunAction={runAction}
+            onExecute={executeBatch}
+            onRunReach={runReach}
+          />
+        )}
+      </div>
 
       {selectedLead && (
         <ChatModal

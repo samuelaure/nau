@@ -168,13 +168,16 @@ export class AIService {
    */
   static async getChatResponseWithContext(
     leadId: string,
+    campaignId: string,
     role: 'CLOSER' | 'RECEPTIONIST' | 'NURTURING',
     messages: { role: 'user' | 'assistant' | 'system'; content: string }[]
   ) {
-    // Get prompt config for role
-    const promptConfig = await db.promptConfig.findUnique({ where: { role } });
+    // Get prompt config for role and campaign
+    const promptConfig = await (db as any).promptConfig.findUnique({
+      where: { role_campaignId: { role, campaignId } },
+    });
     if (!promptConfig) {
-      throw new Error(`Prompt config not found for role: ${role}`);
+      throw new Error(`Prompt config not found for role: ${role} in campaign: ${campaignId}`);
     }
 
     // Get business knowledge base
