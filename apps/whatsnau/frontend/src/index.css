@@ -60,11 +60,46 @@ body {
   position: sticky;
   top: 0;
   z-index: 100;
+  transition:
+    width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    padding 0.3s ease;
+}
+
+.sidebar.collapsed {
+  width: 80px;
+  padding: 2rem 0.5rem;
 }
 
 .sidebar-header {
   margin-bottom: 2.5rem;
   padding-left: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sidebar.collapsed .sidebar-header {
+  padding-left: 0;
+  justify-content: center;
+}
+
+.toggle-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--card-border);
+  color: var(--text-muted);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
 }
 
 .sidebar-section {
@@ -80,6 +115,9 @@ body {
   font-weight: 700;
   margin-bottom: 1rem;
   padding-left: 1rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .nav-item {
@@ -97,6 +135,12 @@ body {
   cursor: pointer;
   transition: all 0.2s;
   text-align: left;
+}
+
+.sidebar.collapsed .nav-item {
+  justify-content: center;
+  padding: 0.75rem;
+  gap: 0;
 }
 
 .nav-item:hover {
@@ -517,6 +561,7 @@ button.secondary:hover {
     transform: rotate(360deg);
   }
 }
+
 .switch-mini {
   width: 32px;
   height: 18px;
@@ -530,10 +575,12 @@ button.secondary:hover {
   display: flex;
   align-items: center;
 }
+
 .switch-mini.active {
   background: var(--primary);
   box-shadow: 0 0 10px var(--primary-glow);
 }
+
 .switch-mini .thumb {
   width: 14px;
   height: 14px;
@@ -544,6 +591,7 @@ button.secondary:hover {
   left: 2px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
 .switch-mini.active .thumb {
   left: calc(100% - 16px);
 }
@@ -578,9 +626,11 @@ button.secondary:hover {
 .notification.success {
   border-left: 4px solid var(--success);
 }
+
 .notification.error {
   border-left: 4px solid var(--danger);
 }
+
 .notification.info {
   border-left: 4px solid var(--primary);
 }
@@ -589,12 +639,15 @@ button.secondary:hover {
   display: flex;
   align-items: center;
 }
+
 .notification.success .notification-icon {
   color: var(--success);
 }
+
 .notification.error .notification-icon {
   color: var(--danger);
 }
+
 .notification.info .notification-icon {
   color: var(--primary);
 }
@@ -604,6 +657,7 @@ button.secondary:hover {
   font-size: 0.875rem;
   font-weight: 500;
 }
+
 .notification-close {
   background: transparent;
   padding: 0;
@@ -611,6 +665,7 @@ button.secondary:hover {
   opacity: 0.5;
   cursor: pointer;
 }
+
 .notification-close:hover {
   opacity: 1;
 }
@@ -620,6 +675,7 @@ button.secondary:hover {
     transform: translateX(100%);
     opacity: 0;
   }
+
   to {
     transform: translateX(0);
     opacity: 1;
@@ -641,6 +697,7 @@ button.secondary:hover {
 .error-boundary-view h2 {
   font-size: 2rem;
 }
+
 .error-boundary-view p {
   color: var(--text-muted);
 }

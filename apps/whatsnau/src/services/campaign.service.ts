@@ -9,48 +9,75 @@ export class CampaignService {
   static async seedReferenceCampaign() {
     const campaignName = 'Spain Local Businesses - AI Receptionist Demo';
 
-    const existing = await db.campaign.findFirst({
+    // Check for existing by name first to avoid unique constraint issues
+    const byName = await db.campaign.findFirst({
       where: { name: campaignName },
     });
 
-    if (existing) {
-      logger.info('Reference campaign already exists');
-      return existing;
+    if (byName) {
+      return byName;
     }
 
-    logger.info('Seeding reference campaign...');
-
-    const campaign = await db.campaign.create({
-      data: {
+    const campaign = await db.campaign.upsert({
+      where: { id: 'reference-campaign-spain' },
+      update: {
         name: campaignName,
         description:
           'Automated WhatsApp lead capture and response system for local businesses in Spain.',
-        stages: {
-          create: [
-            { name: 'M1-Initial-Hook', order: 1, waitHours: 0 },
-            { name: 'M2-Same-Day-FollowUp', order: 2, waitHours: 8 },
-            { name: 'M3-Final-Touch', order: 3, waitHours: 24 },
-            { name: 'CONVERSATIONAL_PRE_SALE', order: 4, waitHours: 0 },
-            { name: 'LIVE_DEMO', order: 5, waitHours: 0 },
-            { name: 'LONG_TERM_NURTURING', order: 6, waitHours: 0 },
-          ],
-        },
-        tags: {
-          create: [
-            { name: 'interested', category: 'INTENT' },
-            { name: 'not_interested', category: 'INTENT' },
-            { name: 'nurturing_opt_in', category: 'INTENT' },
-            { name: 'demo_completed', category: 'SYSTEM' },
-            { name: 'blocked', category: 'SYSTEM' },
-          ],
-        },
+      },
+      create: {
+        id: 'reference-campaign-spain',
+        name: campaignName,
+        description:
+          'Automated WhatsApp lead capture and response system for local businesses in Spain.',
       },
       include: {
         stages: true,
+        tags: true,
       },
     });
 
-    logger.info(`Reference campaign created with ${campaign.stages.length} stages.`);
+    // Seed stages if empty
+    if (campaign.stages.length === 0) {
+      logger.info('Seeding stages for reference campaign...');
+      await db.campaignStage.createMany({
+        data: [
+          { campaignId: campaign.id, name: 'M1-Initial-Hook', order: 1, waitHours: 0 },
+          { campaignId: campaign.id, name: 'M2-Same-Day-FollowUp', order: 2, waitHours: 8 },
+          { campaignId: campaign.id, name: 'M3-Final-Touch', order: 3, waitHours: 24 },
+          { campaignId: campaign.id, name: 'CONVERSATIONAL_PRE_SALE', order: 4, waitHours: 0 },
+          { campaignId: campaign.id, name: 'LIVE_DEMO', order: 5, waitHours: 0 },
+          { campaignId: campaign.id, name: 'LONG_TERM_NURTURING', order: 6, waitHours: 0 },
+        ],
+      });
+    }
+
+    // Seed tags if empty (safe way without violating unique Name)
+    if (campaign.tags.length === 0) {
+      logger.info('Linking tags for reference campaign...');
+      const tagNames = [
+        'interested',
+        'not_interested',
+        'nurturing_opt_in',
+        'demo_completed',
+        'blocked',
+      ];
+      for (const tName of tagNames) {
+        await db.campaign.update({
+          where: { id: campaign.id },
+          data: {
+            tags: {
+              connectOrCreate: {
+                where: { name: tName },
+                create: { name: tName, category: 'INTENT' },
+              },
+            },
+          },
+        });
+      }
+    }
+
+    logger.info(`Reference campaign ready with ${campaign.stages.length} stages.`);
     return campaign;
   }
 

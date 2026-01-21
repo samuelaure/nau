@@ -19,6 +19,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedCampaignId, setSelectedCampaignId] = useState('');
   const [newMessage, setNewMessage] = useState('');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const {
     stats,
@@ -86,13 +87,15 @@ function App() {
   }, [stats, selectedCampaignId]);
 
   return (
-    <div className="dashboard-container">
+    <div className={`dashboard-container ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         campaigns={stats}
         selectedCampaignId={selectedCampaignId}
         onSelectCampaign={setSelectedCampaignId}
+        isCollapsed={isSidebarCollapsed}
+        onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
       />
 
       <div className="main-content">

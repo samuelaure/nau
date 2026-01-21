@@ -9,6 +9,8 @@ import {
   FileText,
   PlusCircle,
   FolderTree,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import type { CampaignStats } from '../../types';
 
@@ -18,6 +20,8 @@ interface SidebarProps {
   campaigns: CampaignStats[];
   selectedCampaignId: string;
   onSelectCampaign: (id: string) => void;
+  isCollapsed: boolean;
+  onToggle: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -26,6 +30,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   campaigns,
   selectedCampaignId,
   onSelectCampaign,
+  isCollapsed,
+  onToggle,
 }) => {
   const menuItems = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -41,47 +47,56 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
       <div className="sidebar-header">
-        <div className="logo">
-          whatsna<span>ŭ</span>
-        </div>
+        {!isCollapsed && (
+          <div className="logo">
+            whatsna<span>ŭ</span>
+          </div>
+        )}
+        <button className="toggle-btn" onClick={onToggle}>
+          {isCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+        </button>
       </div>
 
       <div className="sidebar-section">
-        <label>Global Workspace</label>
+        {!isCollapsed && <label>Global Workspace</label>}
         <nav>
           {menuItems.map((item) => (
             <button
               key={item.id}
               className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
               onClick={() => setActiveTab(item.id)}
+              title={isCollapsed ? item.label : ''}
             >
               <item.icon size={18} />
-              <span>{item.label}</span>
+              {!isCollapsed && <span>{item.label}</span>}
             </button>
           ))}
         </nav>
       </div>
 
       <div className="sidebar-section">
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '0.75rem',
-          }}
-        >
-          <label>Campaign Workspaces</label>
-        </div>
+        {!isCollapsed && (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '0.75rem',
+            }}
+          >
+            <label>Campaign Workspaces</label>
+          </div>
+        )}
 
         <select
           className="campaign-selector"
           value={selectedCampaignId}
           onChange={(e) => onSelectCampaign(e.target.value)}
+          disabled={isCollapsed}
         >
-          <option value="">All Campaigns</option>
+          <option value="">{isCollapsed ? '...' : 'All Campaigns'}</option>
           {campaigns.map((c) => (
             <option key={c.campaignId} value={c.campaignId}>
               {c.name}
@@ -95,9 +110,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               key={item.id}
               className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
               onClick={() => setActiveTab(item.id)}
+              title={isCollapsed ? item.label : ''}
             >
               <item.icon size={18} />
-              <span>{item.label}</span>
+              {!isCollapsed && <span>{item.label}</span>}
             </button>
           ))}
 
@@ -105,17 +121,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
             className={`nav-item ${activeTab === 'campaigns' ? 'active' : ''}`}
             onClick={() => setActiveTab('campaigns')}
             style={{ marginTop: 'auto' }}
+            title={isCollapsed ? 'Manage Campaigns' : ''}
           >
             <Layers size={18} />
-            <span>Manage Campaigns</span>
+            {!isCollapsed && <span>Manage Campaigns</span>}
           </button>
         </nav>
       </div>
 
       <div className="sidebar-footer">
-        <button className="nav-item">
+        <button className="nav-item" title={isCollapsed ? 'New Campaign' : ''}>
           <PlusCircle size={18} />
-          <span>New Campaign</span>
+          {!isCollapsed && <span>New Campaign</span>}
         </button>
       </div>
     </aside>
