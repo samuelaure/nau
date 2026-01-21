@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { AuthService } from '../services/auth.service.js';
 import { asyncHandler } from '../core/errors/asyncHandler.js';
+import { authMiddleware } from '../core/authMiddleware.js';
 import { logger } from '../core/logger.js';
 
 const router = Router();
@@ -21,7 +22,7 @@ router.post(
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      sameSite: 'strict',
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
     });
 
     res.json({ success: true, user, token });
@@ -46,8 +47,8 @@ router.post(
  */
 router.get(
   '/me',
+  authMiddleware,
   asyncHandler(async (req: any, res) => {
-    // This route would be protected by authMiddleware in the main app
     res.json({ success: true, user: req.user });
   })
 );

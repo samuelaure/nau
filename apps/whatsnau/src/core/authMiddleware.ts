@@ -19,13 +19,8 @@ export const authMiddleware = asyncHandler(
     // 1. Get token from header or cookie
     if (req.headers.authorization?.startsWith('Bearer')) {
       token = req.headers.authorization.split(' ')[1];
-    } else if (req.headers.cookie) {
-      const cookies = req.headers.cookie.split(';').reduce((acc: any, curr) => {
-        const [key, value] = curr.trim().split('=');
-        acc[key] = value;
-        return acc;
-      }, {});
-      token = cookies.token;
+    } else if ((req as any).cookies?.token) {
+      token = (req as any).cookies.token;
     }
 
     if (!token) {
