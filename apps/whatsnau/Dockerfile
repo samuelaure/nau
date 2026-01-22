@@ -46,5 +46,6 @@ ENV PORT=3000
 # Expose port
 EXPOSE 3000
 
-# Start command
-CMD ["npm", "start"]
+# Start command - Run migrations then start
+CMD npx prisma migrate deploy && npm start
+
