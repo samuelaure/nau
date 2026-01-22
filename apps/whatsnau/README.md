@@ -93,7 +93,7 @@ npm run test:watch
 - **Frontend**: [React](https://reactjs.org/) + [Vite](https://vitejs.dev/) + [Lucide Icons](https://lucide.dev/)
 - **ORM**: [Prisma](https://www.prisma.io/)
 - **Testing**: [Vitest](https://vitest.dev/) + [Supertest](https://github.com/ladjs/supertest)
-- **Database**: SQLite (Dev) / PostgreSQL (Prod)
+- **Database**: [PostgreSQL](https://www.postgresql.org/)
 - **AI**: OpenAI API (GPT-4o & GPT-4o-mini)
 - **Styling**: Vanilla CSS (Premium Custom Design)
 
@@ -108,10 +108,11 @@ npm run test:watch
 │   ├── services/     # AI, WhatsApp, Lead, Sequence, Metrics, Events
 │   └── index.ts      # Application entry point & Observability
 ├── frontend/         # React SPA Dashboard + Resilience Components
-├── prisma/           # Schema & Migrations (SQLite/PostgreSQL)
+├── prisma/           # Schema & seed data (PostgreSQL)
 ├── .agent/           # Automation workflows & Project Rules
 └── .cursorrules      # Strategic AI coding rules
 ```
+
 
 ---
 
@@ -120,6 +121,7 @@ npm run test:watch
 ### Prerequisites
 
 - Node.js (v20+)
+- PostgreSQL (v15+)
 - Meta WhatsApp Cloud API credentials
 - OpenAI API Key
 
@@ -131,11 +133,14 @@ npm run test:watch
     cd frontend && npm install && cd ..
     ```
 2.  **Environment Setup**:
-    Copy `.env.example` to `.env` and fill in your Meta and OpenAI credentials.
-3.  **Database Migration**:
+    Copy `.env.example` to `.env` and fill in your credentials, including `DATABASE_URL`.
+3.  **Database Setup**:
+    Ensure your PostgreSQL server is running and run:
     ```bash
     npx prisma migrate dev
+    npx prisma db seed
     ```
+
 4.  **Run Development**:
     ```bash
     # Backend
