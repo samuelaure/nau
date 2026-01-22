@@ -86,6 +86,14 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
         <div className="login-footer">
           <p>© 2026 whatsnaŭ. Dashboard de Seguridad Avanzada.</p>
+          <p style={{ marginTop: '0.5rem' }}>
+            <span
+              className="privacy-link"
+              onClick={() => window.dispatchEvent(new CustomEvent('show-privacy'))}
+            >
+              Política de Privacidad
+            </span>
+          </p>
         </div>
       </div>
     </div>

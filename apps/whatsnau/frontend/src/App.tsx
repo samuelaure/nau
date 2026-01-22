@@ -14,6 +14,7 @@ import { useImport } from './hooks/useImport';
 import { useConfig } from './hooks/useConfig';
 import { Login } from './components/layout/Login';
 import { Sidebar } from './components/layout/Sidebar';
+import { PrivacyPolicy } from './components/features/PrivacyPolicy';
 import { Loader2 } from 'lucide-react';
 import type { User } from './types';
 
@@ -24,6 +25,21 @@ function App() {
   const [selectedCampaignId, setSelectedCampaignId] = useState('');
   const [newMessage, setNewMessage] = useState('');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
+
+  // Listen for privacy policy event and URL deep-link
+  useEffect(() => {
+    const handleShowPrivacy = () => setShowPrivacy(true);
+    window.addEventListener('show-privacy', handleShowPrivacy);
+
+    // Initial check for deep link ?privacy
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('privacy')) {
+      setShowPrivacy(true);
+    }
+
+    return () => window.removeEventListener('show-privacy', handleShowPrivacy);
+  }, []);
 
   // Check auth on mount
   useEffect(() => {
@@ -142,6 +158,10 @@ function App() {
         <Loader2 className="animate-spin" size={48} color="var(--primary)" />
       </div>
     );
+  }
+
+  if (showPrivacy) {
+    return <PrivacyPolicy onBack={() => setShowPrivacy(false)} />;
   }
 
   if (!user) {

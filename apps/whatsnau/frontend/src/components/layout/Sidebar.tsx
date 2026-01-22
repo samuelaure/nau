@@ -138,6 +138,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {!isCollapsed && <span>New Campaign</span>}
         </button>
         <button
+          className="nav-item"
+          onClick={() => window.dispatchEvent(new CustomEvent('show-privacy'))}
+          title={isCollapsed ? 'Privacidad' : ''}
+          style={{ marginTop: '0.5rem' }}
+        >
+          <PlusCircle size={18} style={{ color: 'var(--primary)' }} />
+          {!isCollapsed && <span>Política de Privacidad</span>}
+        </button>
+        <button
           className="nav-item danger"
           onClick={onLogout}
           title={isCollapsed ? 'Cerrar Sesión' : ''}
