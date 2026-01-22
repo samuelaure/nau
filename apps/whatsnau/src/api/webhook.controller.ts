@@ -10,7 +10,7 @@ const router = Router();
 /**
  * WhatsApp Webhook Verification (Handshake)
  */
-router.get('/whatsapp', (req: Request, res: Response) => {
+router.get('/', (req: Request, res: Response) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
@@ -18,7 +18,7 @@ router.get('/whatsapp', (req: Request, res: Response) => {
   if (mode && token) {
     if (mode === 'subscribe' && token === config.WHATSAPP_VERIFY_TOKEN) {
       logger.info('Webhook Verified Successfully');
-      return res.status(200).send(challenge);
+      return res.status(200).set('Content-Type', 'text/plain').send(challenge);
     } else {
       logger.warn('Webhook Verification Failed: Token Mismatch');
       return res.sendStatus(403);
@@ -30,7 +30,7 @@ router.get('/whatsapp', (req: Request, res: Response) => {
 /**
  * Handle Incoming WhatsApp Events
  */
-router.post('/whatsapp', async (req: Request, res: Response) => {
+router.post('/', async (req: Request, res: Response) => {
   const body = req.body;
 
   if (body.object) {

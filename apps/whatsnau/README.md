@@ -113,7 +113,6 @@ npm run test:watch
 └── .cursorrules      # Strategic AI coding rules
 ```
 
-
 ---
 
 ## 🚀 Getting Started
@@ -136,6 +135,7 @@ npm run test:watch
     Copy `.env.example` to `.env` and fill in your credentials, including `DATABASE_URL`.
 3.  **Database Setup**:
     Ensure your PostgreSQL server is running and run:
+
     ```bash
     npx prisma migrate dev
     npx prisma db seed

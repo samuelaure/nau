@@ -58,7 +58,7 @@ app.get('/health', (req, res) => {
 
 // Routes
 app.use('/api/auth', authRouter);
-app.use('/api', webhookRouter); // Webhooks are usually public or use different auth
+app.use('/api/webhooks/whatsapp', webhookRouter); // Industry standard hierarchical route
 app.use('/api/dashboard', authMiddleware, dashboardRouter);
 app.use('/api/dashboard/import', authMiddleware, importRouter);
 
