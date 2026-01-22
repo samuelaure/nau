@@ -63,12 +63,9 @@ export const useImport = (fetchData: () => void) => {
 
   const runAction = async (batchId: string, action: string) => {
     try {
-      const res = await fetch(
-        `/api/dashboard/import/batches/${batchId}/${action}`,
-        {
-          method: 'POST',
-        }
-      );
+      const res = await fetch(`/api/dashboard/import/batches/${batchId}/${action}`, {
+        method: 'POST',
+      });
       if (!res.ok) throw new Error('Action failed');
       notify('info', `Background ${action} started.`);
       fetchBatchDetails(batchId);
@@ -81,14 +78,11 @@ export const useImport = (fetchData: () => void) => {
   const executeBatch = async (batchId: string) => {
     if (!confirm('Are you sure you want to move these leads to the live campaign?')) return;
     try {
-      const res = await fetch(
-        `/api/dashboard/import/batches/${batchId}/execute`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ leadIds: null }),
-        }
-      );
+      const res = await fetch(`/api/dashboard/import/batches/${batchId}/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadIds: null }),
+      });
       if (!res.ok) throw new Error('Execution failed');
       notify('success', 'Leads integrated into campaign sequence.');
       fetchBatches();
@@ -104,12 +98,9 @@ export const useImport = (fetchData: () => void) => {
     if (!confirm('This will send the first WhatsApp message to all leads in this batch. Proceed?'))
       return;
     try {
-      const res = await fetch(
-        `/api/dashboard/import/batches/${batchId}/reach`,
-        {
-          method: 'POST',
-        }
-      );
+      const res = await fetch(`/api/dashboard/import/batches/${batchId}/reach`, {
+        method: 'POST',
+      });
       if (!res.ok) throw new Error('Reach failed');
       notify('success', 'Outreach campaign triggered. Sending WhatsApp messages...');
       setSelectedBatch(null);

@@ -1,4 +1,7 @@
 import express, { Request, Response } from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
 import bodyParser from 'body-parser';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -14,6 +17,9 @@ import dashboardRouter from './api/dashboard.controller.js';
 import importRouter from './api/import.controller.js';
 import authRouter from './api/auth.controller.js';
 import { errorMiddleware } from './core/errors/errorMiddleware.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export const app = express();
 
@@ -55,6 +61,20 @@ app.use('/api/auth', authRouter);
 app.use('/api', webhookRouter); // Webhooks are usually public or use different auth
 app.use('/api/dashboard', authMiddleware, dashboardRouter);
 app.use('/api/dashboard/import', authMiddleware, importRouter);
+
+// Serve static files from the frontend
+const frontendPath = path.join(__dirname, '../frontend/dist');
+app.use(express.static(frontendPath));
+
+// Fallback for SPA routing - serve index.html for non-API requests
+app.get(/^(?!\/api).*/, (req: Request, res: Response) => {
+  res.sendFile(path.join(frontendPath, 'index.html'), (err) => {
+    if (err) {
+      // If index.html is missing, it might be dev mode without a build
+      res.status(404).send('Frontend not found. Did you run npm run build in /frontend?');
+    }
+  });
+});
 
 // Error Handling Middleware
 app.use(errorMiddleware);
