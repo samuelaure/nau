@@ -25,9 +25,9 @@ Thumbs.db
 commit_msg.txt
 
 # Database
-/prisma/migrations/
 *.db
 *.db-journal
+docker-compose.override.yml
 
 # Testing
 coverage/
