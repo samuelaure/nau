@@ -31,48 +31,77 @@ router.get('/', (req: Request, res: Response) => {
 router.post('/', async (req: Request, res: Response) => {
   const body = req.body;
 
-  if (body.object) {
-    const changes = body.entry?.[0]?.changes?.[0]?.value;
-    if (!changes) return res.status(200).send('OK');
+  // Verbose logging for all incoming webhook payloads
+  logger.info({ body }, 'Incoming WhatsApp Webhook');
 
-    const message = changes.messages?.[0];
-    const status = changes.statuses?.[0];
+  if (body.object === 'whatsapp_business_account') {
+    const entry = body.entry?.[0];
+    const change = entry?.changes?.[0];
 
-    if (message) {
-      const from = message.from;
-      const text = message.text?.body;
-      const buttonId = message.interactive?.button_reply?.id;
-      const whatsappId = message.id;
+    if (change) {
+      const { field, value } = change;
+      logger.info({ field, value, wabaId: entry.id }, `WhatsApp Event: ${field}`);
 
-      const isOutbound = from === config.WHATSAPP_PHONE_NUMBER;
-      const direction = isOutbound ? 'OUTBOUND' : 'INBOUND';
-      const targetPhone = isOutbound ? (message as any).to : from;
+      // 1. Handle Messages
+      if (field === 'messages') {
+        const message = value.messages?.[0];
+        if (message) {
+          const from = message.from;
+          const text = message.text?.body;
+          const buttonId = message.interactive?.button_reply?.id;
+          const whatsappId = message.id;
 
-      logger.info(
-        { from, targetPhone, direction, text, whatsappId },
-        'Processing WhatsApp message'
-      );
+          const isOutbound = from === config.WHATSAPP_PHONE_NUMBER;
+          const direction = isOutbound ? 'OUTBOUND' : 'INBOUND';
+          const targetPhone = isOutbound ? (message as any).to : from;
 
-      try {
-        await Orchestrator.handleIncoming(targetPhone, text, buttonId, direction, whatsappId);
-      } catch (error) {
-        logger.error({ err: error, from }, 'Error in Orchestrator message handling');
+          logger.info(
+            { from, targetPhone, direction, text, whatsappId },
+            'Processing WhatsApp message'
+          );
+
+          try {
+            await Orchestrator.handleIncoming(targetPhone, text, buttonId, direction, whatsappId);
+          } catch (error) {
+            logger.error({ err: error, from }, 'Error in Orchestrator message handling');
+          }
+        }
+
+        // Handle Status Updates (sent, delivered, read) which also come under 'messages' field in some API versions
+        const status = value.statuses?.[0];
+        if (status) {
+          const messageId = status.id;
+          const deliveryStatus = status.status;
+          logger.info({ messageId, deliveryStatus }, 'Processing WhatsApp status update');
+          try {
+            await Orchestrator.handleStatusUpdate(messageId, deliveryStatus);
+          } catch (error) {
+            logger.error({ err: error, messageId }, 'Error in Orchestrator status handling');
+          }
+        }
       }
-    } else if (status) {
-      const messageId = status.id;
-      const deliveryStatus = status.status; // sent, delivered, read, failed
 
-      logger.info({ messageId, deliveryStatus }, 'Processing WhatsApp status update');
-
-      try {
-        await Orchestrator.handleStatusUpdate(messageId, deliveryStatus);
-      } catch (error) {
-        logger.error({ err: error, messageId }, 'Error in Orchestrator status handling');
+      // 2. Log specific business events for user testing
+      if (
+        [
+          'history',
+          'smb_app_state_sync',
+          'smb_message_echoes',
+          'business_status_update',
+          'message_template_status_update',
+          'phone_number_quality_update',
+          'account_update',
+          'template_category_update',
+        ].includes(field)
+      ) {
+        logger.info({ field, data: value }, `Special Meta Event Received: ${field}`);
       }
     }
+
     return res.status(200).send('OK');
   } else {
-    return res.sendStatus(404);
+    // If it's not a WABA object, it might be a different type of webhook or 404
+    return res.status(200).send('Event received');
   }
 });
 

@@ -210,8 +210,8 @@ export class WhatsAppService {
 
   static async getTemplates(campaignId?: string) {
     const creds = await this.getCredentials(campaignId);
-    if (!creds.accessToken || !creds.wabaId) {
-      logger.info('WhatsApp not configured yet, skipping template fetch');
+    if (!creds.accessToken || creds.accessToken.includes('YOUR_') || !creds.wabaId) {
+      logger.info('WhatsApp not configured or using placeholders, skipping template fetch');
       return { data: [] };
     }
 

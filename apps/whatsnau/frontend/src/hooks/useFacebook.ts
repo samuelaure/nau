@@ -32,10 +32,10 @@ export const useFacebook = (appId?: string) => {
           appId: appId,
           autoLogAppEvents: true,
           xfbml: true,
-          version: 'v21.0',
+          version: 'v22.0',
         });
         setIsLoaded(true);
-        console.log('[useFacebook] FB SDK initialized successfully');
+        console.log('[useFacebook] FB SDK initialized successfully (v22.0)');
       }
     };
 
@@ -56,17 +56,21 @@ export const useFacebook = (appId?: string) => {
   // Listen for messages from the Facebook popup
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      // Log all messages from Facebook to catch origin mismatches
-      if (event.origin.includes('facebook.com')) {
-        console.log('[useFacebook] Received window message from:', event.origin, event.data);
-      }
+      // DEBUG: Log everything to catch Meta's communication
+      console.log('[useFacebook] Received window message:', {
+        origin: event.origin,
+        data: event.data,
+      });
 
-      // Allow both facebook.com and web.facebook.com
-      if (
-        event.origin !== 'https://www.facebook.com' &&
-        event.origin !== 'https://web.facebook.com' &&
-        event.origin !== 'https://business.facebook.com'
-      ) {
+      // Allow all variations of facebook origins
+      const allowedOrigins = [
+        'https://www.facebook.com',
+        'https://web.facebook.com',
+        'https://business.facebook.com',
+        'https://facebook.com',
+      ];
+
+      if (!allowedOrigins.includes(event.origin)) {
         return;
       }
 
