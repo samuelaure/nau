@@ -3,7 +3,6 @@ import { db } from '../core/db.js';
 import { MetricsService } from '../services/metrics.service.js';
 import { WhatsAppService } from '../services/whatsapp.service.js';
 import { Orchestrator } from '../core/orchestrator.js';
-import { logger } from '../core/logger.js';
 import { EventsService } from '../services/events.service.js';
 import { asyncHandler } from '../core/errors/asyncHandler.js';
 import { NotFoundError } from '../core/errors/AppError.js';

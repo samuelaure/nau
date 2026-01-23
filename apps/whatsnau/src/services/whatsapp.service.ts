@@ -2,6 +2,7 @@ import { config } from '../core/config.js';
 import { logger } from '../core/logger.js';
 import { withRetry } from '../core/errors/withRetry.js';
 import { ExternalServiceError } from '../core/errors/AppError.js';
+import { db } from '../core/db.js';
 
 export interface WhatsAppMessagePayload {
   messaging_product: 'whatsapp';
@@ -21,34 +22,36 @@ export class WhatsAppService {
    * Helper to get the most relevant credentials (Campaign-specific > Default DB > .env)
    */
   private static async getCredentials(campaignId?: string) {
-    const { db } = await import('../core/db.js');
-
     try {
       // 1. Try to find config for a specific campaign if provided
       if (campaignId) {
         const campaign = await db.campaign.findUnique({
           where: { id: campaignId },
           include: { whatsAppConfig: true },
-        });
-        if (campaign?.whatsAppConfig) {
+        } as any);
+
+        // Use Type Assertion if compiler still struggles with include
+        const config = (campaign as any)?.whatsAppConfig;
+        if (config) {
           return {
-            accessToken: campaign.whatsAppConfig.accessToken,
-            phoneNumberId: campaign.whatsAppConfig.phoneNumberId,
-            wabaId: campaign.whatsAppConfig.wabaId,
+            accessToken: config.accessToken,
+            phoneNumberId: config.phoneNumberId,
+            wabaId: config.wabaId,
           };
         }
       }
 
       // 2. Try to find the default config in DB
-      const defaultConfig = await db.whatsAppConfig.findFirst({
+      // We use type assertion to bypass temporary Prisma type sync lag in IDE
+      const defaultConfig = await (db as any).whatsAppConfig.findFirst({
         where: { isDefault: true },
       });
 
       if (defaultConfig) {
         return {
-          accessToken: defaultConfig.accessToken,
-          phoneNumberId: defaultConfig.phoneNumberId,
-          wabaId: defaultConfig.wabaId,
+          accessToken: defaultConfig.accessToken as string,
+          phoneNumberId: defaultConfig.phoneNumberId as string,
+          wabaId: defaultConfig.wabaId as string,
         };
       }
     } catch (err) {

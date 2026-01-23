@@ -62,7 +62,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/webhooks/whatsapp', webhookRouter); // Industry standard hierarchical route
 app.use('/api/dashboard', authMiddleware, dashboardRouter);
 app.use('/api/dashboard/import', authMiddleware, importRouter);
-app.use('/api/whatsapp', whatsappRouter);
+app.use('/api/whatsapp', authMiddleware, whatsappRouter);
 
 // Serve static files from the frontend
 const frontendPath = path.join(__dirname, '../frontend/dist');

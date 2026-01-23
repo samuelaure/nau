@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 
 interface EmbeddedSignupData {
-    phone_number_id?: string;
-    waba_id?: string;
+  phone_number_id?: string;
+  waba_id?: string;
 }
 
 /**
@@ -10,83 +10,83 @@ interface EmbeddedSignupData {
  * Ensures the SDK is initialized before use.
  */
 export const useFacebook = () => {
-    const [isLoaded, setIsLoaded] = useState(false);
-    const [sessionInfo, setSessionInfo] = useState<EmbeddedSignupData | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [sessionInfo, setSessionInfo] = useState<EmbeddedSignupData | null>(null);
 
-    useEffect(() => {
-        // Check if FB is already available
+  useEffect(() => {
+    // Check if FB is already available
+    if (window.FB) {
+      setIsLoaded(true);
+    } else {
+      // Otherwise, poll for it (since it loads asynchronously)
+      const interval = setInterval(() => {
         if (window.FB) {
-            setIsLoaded(true);
-        } else {
-            // Otherwise, poll for it (since it loads asynchronously)
-            const interval = setInterval(() => {
-                if (window.FB) {
-                    setIsLoaded(true);
-                    clearInterval(interval);
-                }
-            }, 100);
-            return () => clearInterval(interval);
+          setIsLoaded(true);
+          clearInterval(interval);
         }
-    }, []);
+      }, 100);
+      return () => clearInterval(interval);
+    }
+  }, []);
 
-    // Listen for messages from the Facebook popup
-    useEffect(() => {
-        const handleMessage = (event: MessageEvent) => {
-            // Allow both facebook.com and web.facebook.com
-            if (
-                event.origin !== 'https://www.facebook.com' &&
-                event.origin !== 'https://web.facebook.com'
-            ) {
-                return;
-            }
+  // Listen for messages from the Facebook popup
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Allow both facebook.com and web.facebook.com
+      if (
+        event.origin !== 'https://www.facebook.com' &&
+        event.origin !== 'https://web.facebook.com'
+      ) {
+        return;
+      }
 
-            try {
-                const data = JSON.parse(event.data);
-                if (data.type === 'WA_EMBEDDED_SIGNUP') {
-                    if (data.event === 'FINISH') {
-                        const { phone_number_id, waba_id } = data.data;
-                        console.log('WA Embedded Signup FINISH:', { phone_number_id, waba_id });
-                        setSessionInfo({ phone_number_id, waba_id });
-                    } else if (data.event === 'CANCEL') {
-                        console.warn('WA Embedded Signup CANCEL at step:', data.data?.current_step);
-                    } else if (data.event === 'ERROR') {
-                        console.error('WA Embedded Signup ERROR:', data.data?.error_message);
-                    }
-                }
-            } catch (err) {
-                // Not a JSON message or unrelated to us
-            }
-        };
-
-        window.addEventListener('message', handleMessage);
-        return () => window.removeEventListener('message', handleMessage);
-    }, []);
-
-    /**
-     * Triggers the Facebook Login dialog for WhatsApp Embedded Signup.
-     * @param callback Function to handle the response from Meta.
-     */
-    const launchEmbeddedSignup = useCallback(
-        (callback: (response: facebook.StatusResponse) => void) => {
-            if (!window.FB) {
-                console.error('Facebook SDK not loaded yet.');
-                return;
-            }
-
-            window.FB.login(callback, {
-                config_id: import.meta.env.VITE_FB_CONFIG_ID,
-                response_type: 'code',
-                override_default_response_type: true,
-                extras: { version: 'v3', setup: {} },
-                scope: 'whatsapp_business_management,whatsapp_business_messaging',
-            });
-        },
-        []
-    );
-
-    return {
-        isLoaded,
-        sessionInfo,
-        launchEmbeddedSignup,
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'WA_EMBEDDED_SIGNUP') {
+          if (data.event === 'FINISH') {
+            const { phone_number_id, waba_id } = data.data;
+            console.log('WA Embedded Signup FINISH:', { phone_number_id, waba_id });
+            setSessionInfo({ phone_number_id, waba_id });
+          } else if (data.event === 'CANCEL') {
+            console.warn('WA Embedded Signup CANCEL at step:', data.data?.current_step);
+          } else if (data.event === 'ERROR') {
+            console.error('WA Embedded Signup ERROR:', data.data?.error_message);
+          }
+        }
+      } catch (err) {
+        // Not a JSON message or unrelated to us
+      }
     };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  /**
+   * Triggers the Facebook Login dialog for WhatsApp Embedded Signup.
+   * @param callback Function to handle the response from Meta.
+   */
+  const launchEmbeddedSignup = useCallback(
+    (callback: (response: facebook.StatusResponse) => void) => {
+      if (!window.FB) {
+        console.error('Facebook SDK not loaded yet.');
+        return;
+      }
+
+      window.FB.login(callback, {
+        config_id: import.meta.env.VITE_FB_CONFIG_ID,
+        response_type: 'code',
+        override_default_response_type: true,
+        extras: { version: 'v3', setup: {} },
+        scope: 'whatsapp_business_management,whatsapp_business_messaging',
+      });
+    },
+    []
+  );
+
+  return {
+    isLoaded,
+    sessionInfo,
+    launchEmbeddedSignup,
+  };
 };

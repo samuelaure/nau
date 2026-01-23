@@ -53,7 +53,7 @@ router.post(
 
       // 2. Persist to Database
       // We upsert the config based on the unique phoneNumberId
-      const whatsappConfig = await db.whatsAppConfig.upsert({
+      const whatsappConfig = await (db as any).whatsAppConfig.upsert({
         where: { phoneNumberId: phone_number_id },
         update: {
           accessToken,
@@ -68,7 +68,10 @@ router.post(
         },
       });
 
-      logger.info({ waba_id, configId: whatsappConfig.id }, 'WhatsApp account successfully linked and stored');
+      logger.info(
+        { waba_id, configId: whatsappConfig.id },
+        'WhatsApp account successfully linked and stored'
+      );
 
       res.json({
         success: true,

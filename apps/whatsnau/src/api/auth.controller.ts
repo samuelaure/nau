@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { AuthService } from '../services/auth.service.js';
 import { asyncHandler } from '../core/errors/asyncHandler.js';
 import { authMiddleware } from '../core/authMiddleware.js';
-import { logger } from '../core/logger.js';
 
 const router = Router();
 
