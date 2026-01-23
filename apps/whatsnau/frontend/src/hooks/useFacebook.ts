@@ -56,10 +56,16 @@ export const useFacebook = (appId?: string) => {
   // Listen for messages from the Facebook popup
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
+      // Log all messages from Facebook to catch origin mismatches
+      if (event.origin.includes('facebook.com')) {
+        console.log('[useFacebook] Received window message from:', event.origin, event.data);
+      }
+
       // Allow both facebook.com and web.facebook.com
       if (
         event.origin !== 'https://www.facebook.com' &&
-        event.origin !== 'https://web.facebook.com'
+        event.origin !== 'https://web.facebook.com' &&
+        event.origin !== 'https://business.facebook.com'
       ) {
         return;
       }
@@ -102,16 +108,7 @@ export const useFacebook = (appId?: string) => {
         import.meta.env.VITE_FB_CONFIG_ID
       );
 
-      let callbackFired = false;
-
-      const wrappedCallback = (response: facebook.StatusResponse) => {
-        if (callbackFired) return;
-        callbackFired = true;
-        console.log('[useFacebook] Callback fired with response:', response);
-        callback(response);
-      };
-
-      window.FB.login(wrappedCallback, {
+      window.FB.login(callback, {
         config_id: import.meta.env.VITE_FB_CONFIG_ID,
         response_type: 'code',
         override_default_response_type: true,
@@ -120,19 +117,7 @@ export const useFacebook = (appId?: string) => {
           featureType: 'whatsapp_business_app_onboarding',
           sessionInfoVersion: '3',
         },
-        scope: 'whatsapp_business_management,whatsapp_business_messaging',
       });
-
-      // Fallback: Poll for status changes in case the callback doesn't fire
-      setTimeout(() => {
-        if (!callbackFired) {
-          console.log('[useFacebook] Callback did not fire, polling for status...');
-          window.FB.getLoginStatus((response) => {
-            console.log('[useFacebook] Polled status:', response);
-            wrappedCallback(response);
-          }, true); // true = force refresh from server
-        }
-      }, 2000);
     },
     []
   );

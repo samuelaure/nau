@@ -209,8 +209,13 @@ export class WhatsAppService {
   }
 
   static async getTemplates(campaignId?: string) {
+    const creds = await this.getCredentials(campaignId);
+    if (!creds.accessToken || !creds.wabaId) {
+      logger.info('WhatsApp not configured yet, skipping template fetch');
+      return { data: [] };
+    }
+
     return withRetry(async () => {
-      const creds = await this.getCredentials(campaignId);
       const url = `https://graph.facebook.com/${config.WHATSAPP_VERSION}/${creds.wabaId}/message_templates`;
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${creds.accessToken}` },

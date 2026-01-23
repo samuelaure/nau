@@ -1,4 +1,5 @@
 import { Request, Response, Router } from 'express';
+import { logger } from '../core/logger.js';
 import { db } from '../core/db.js';
 import { MetricsService } from '../services/metrics.service.js';
 import { WhatsAppService } from '../services/whatsapp.service.js';
@@ -255,8 +256,13 @@ router.post(
 router.get(
   '/config/whatsapp-templates',
   asyncHandler(async (req: Request, res: Response) => {
-    const templates = await WhatsAppService.getTemplates();
-    res.json(templates);
+    try {
+      const templates = await WhatsAppService.getTemplates();
+      res.json(templates);
+    } catch (error) {
+      logger.warn({ error }, 'Could not fetch templates (likely WhatsApp not yet configured)');
+      res.json({ data: [] });
+    }
   })
 );
 

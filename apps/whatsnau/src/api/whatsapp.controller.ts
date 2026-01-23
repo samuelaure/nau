@@ -38,7 +38,7 @@ router.post(
           code: code,
           // Redirect URI is required by Meta and must match dashboard config
           // We use the primary production domain as the canonical redirect
-          redirect_uri: 'https://whatsnau.9nau.com',
+          redirect_uri: 'https://whatsnau.9nau.com/',
         }),
       });
 
