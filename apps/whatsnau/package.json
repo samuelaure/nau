@@ -1,6 +1,6 @@
 {
   "name": "whatsnau",
-  "version": "4.13.3",
+  "version": "4.13.4",
   "description": "Campaign-driven WhatsApp CRM & Automation platform",
   "type": "module",
   "main": "dist/index.js",

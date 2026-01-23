@@ -209,6 +209,20 @@ export class WhatsAppService {
   }
 
   static async getTemplates(campaignId?: string) {
+    // First, check if we have valid credentials in the database
+    try {
+      const hasValidConfig = await this.hasValidWhatsAppConfig(campaignId);
+      if (!hasValidConfig) {
+        logger.info(
+          'WhatsApp not yet configured in database, skipping template fetch to avoid API spam'
+        );
+        return { data: [] };
+      }
+    } catch (err) {
+      logger.warn({ err }, 'Failed to check WhatsApp config, skipping template fetch');
+      return { data: [] };
+    }
+
     const creds = await this.getCredentials(campaignId);
     if (!creds.accessToken || creds.accessToken.includes('YOUR_') || !creds.wabaId) {
       logger.info('WhatsApp not configured or using placeholders, skipping template fetch');
@@ -223,6 +237,45 @@ export class WhatsAppService {
       if (!res.ok) throw new ExternalServiceError('WhatsApp', 'Failed to fetch templates');
       return res.json();
     });
+  }
+
+  /**
+   * Check if we have a valid WhatsApp configuration in the database
+   * Returns false if no config exists or if credentials are missing/invalid
+   */
+  private static async hasValidWhatsAppConfig(campaignId?: string): Promise<boolean> {
+    try {
+      // Check campaign-specific config first
+      if (campaignId) {
+        const campaign = await db.campaign.findUnique({
+          where: { id: campaignId },
+          include: { whatsAppConfig: true },
+        } as any);
+
+        const config = (campaign as any)?.whatsAppConfig;
+        if (config?.accessToken && config?.wabaId && !config.accessToken.includes('YOUR_')) {
+          return true;
+        }
+      }
+
+      // Check default config in DB
+      const defaultConfig = await (db as any).whatsAppConfig.findFirst({
+        where: { isDefault: true },
+      });
+
+      if (
+        defaultConfig?.accessToken &&
+        defaultConfig?.wabaId &&
+        !defaultConfig.accessToken.includes('YOUR_')
+      ) {
+        return true;
+      }
+
+      return false;
+    } catch (err) {
+      logger.warn({ err }, 'Error checking WhatsApp config validity');
+      return false;
+    }
   }
 
   static async createTemplate(

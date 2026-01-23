@@ -11,7 +11,14 @@ export class TemplateSyncService {
 
     try {
       const response = await WhatsAppService.getTemplates();
-      const metaTemplates = response.data || [];
+
+      // If no templates returned (likely because WhatsApp isn't configured), skip sync
+      if (!response.data || response.data.length === 0) {
+        logger.info('No templates to sync (WhatsApp may not be configured yet)');
+        return { synced: 0 };
+      }
+
+      const metaTemplates = response.data;
 
       logger.info({ count: metaTemplates.length }, 'Fetched templates from Meta');
 
