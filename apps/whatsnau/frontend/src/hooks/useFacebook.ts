@@ -103,25 +103,34 @@ export const useFacebook = (appId?: string) => {
   const launchEmbeddedSignup = useCallback(
     (callback: (response: facebook.StatusResponse) => void) => {
       if (!window.FB) {
-        console.error('Facebook SDK not loaded yet.');
+        console.error('[useFacebook] Facebook SDK not loaded yet.');
         return;
       }
 
-      console.log(
-        '[useFacebook] Launching Embedded Signup with config_id:',
-        import.meta.env.VITE_FB_CONFIG_ID
-      );
+      const configId = import.meta.env.VITE_FB_CONFIG_ID;
+      const redirectUri = window.location.origin + '/';
 
-      window.FB.login(callback, {
-        config_id: import.meta.env.VITE_FB_CONFIG_ID,
+      console.log('[useFacebook] Launching Embedded Signup with:', {
+        config_id: configId,
+        redirect_uri: redirectUri,
+      });
+
+      // Extended options for WhatsApp Embedded Signup
+      // redirect_uri is required but not in the standard LoginOptions type
+      const loginOptions = {
+        config_id: configId,
         response_type: 'code',
         override_default_response_type: true,
+        redirect_uri: redirectUri,
+        scope: 'whatsapp_business_management,whatsapp_business_messaging',
         extras: {
           setup: {},
           featureType: 'whatsapp_business_app_onboarding',
           sessionInfoVersion: '3',
         },
-      });
+      } as facebook.LoginOptions & { redirect_uri: string };
+
+      window.FB.login(callback, loginOptions);
     },
     []
   );

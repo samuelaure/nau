@@ -28,6 +28,13 @@ router.post(
       // 1. Exchange code for access token (POST method with JSON body)
       const tokenUrl = `https://graph.facebook.com/${config.WHATSAPP_VERSION}/oauth/access_token`;
 
+      // Use the request origin as the redirect_uri to match what the frontend sent
+      const redirectUri = req.headers.origin
+        ? `${req.headers.origin}/`
+        : 'https://whatsnau.9nau.com/';
+
+      logger.info({ redirectUri }, 'Using redirect_uri for token exchange');
+
       const tokenRes = await fetch(tokenUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -36,17 +43,27 @@ router.post(
           client_secret: config.META_APP_SECRET,
           grant_type: 'authorization_code',
           code: code,
-          // Redirect URI is required by Meta and must match dashboard config
-          // We use the primary production domain as the canonical redirect
-          redirect_uri: 'https://whatsnau.9nau.com/',
+          redirect_uri: redirectUri,
         }),
       });
 
       const tokenData = await tokenRes.json();
 
       if (!tokenRes.ok) {
-        logger.error({ tokenData }, 'Failed to exchange code for token');
-        return res.status(500).json({ error: 'Token exchange failed', details: tokenData });
+        logger.error(
+          {
+            status: tokenRes.status,
+            statusText: tokenRes.statusText,
+            tokenData,
+            redirectUri,
+          },
+          'Failed to exchange code for token'
+        );
+        return res.status(500).json({
+          error: 'Token exchange failed',
+          details: tokenData,
+          hint: 'Check that the redirect_uri in Facebook App Dashboard matches your application URL',
+        });
       }
 
       const accessToken = tokenData.access_token;
