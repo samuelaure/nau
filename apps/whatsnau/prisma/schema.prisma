@@ -10,15 +10,39 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  isDemo    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users             User[]
+  campaigns         Campaign[]
+  leads             Lead[]
+  tags              Tag[]
+  whatsAppConfigs   WhatsAppConfig[]
+  leadImportBatches LeadImportBatch[]
+  stagingLeads      StagingLead[]
+  globalConfigs     GlobalConfig[]
+  businessProfiles  BusinessProfile[]
+  telegramConfigs   TelegramConfig[]
+  takeoverKeywords  TakeoverKeyword[]
+}
 
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
-  password  String   // Hashed
+  password  String // Hashed
   name      String?
   role      String   @default("ADMIN") // ADMIN, VIEWER
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
 }
 
 model Campaign {
@@ -26,270 +50,315 @@ model Campaign {
   name        String
   description String?
   isActive    Boolean  @default(true)
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  leads       Lead[]
-  stages      CampaignStage[]
-  tags        Tag[]
+  leads         Lead[]
+  stages        CampaignStage[]
+  tags          Tag[]
   importBatches LeadImportBatch[]
-  prompts     PromptConfig[]
-  
+  prompts       PromptConfig[]
+
   whatsAppConfigId String?
   whatsAppConfig   WhatsAppConfig? @relation(fields: [whatsAppConfigId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, isActive])
 }
 
 model WhatsAppConfig {
-  id                  String   @id @default(uuid())
-  phoneNumberId       String   @unique
-  wabaId              String
-  accessToken         String   // Permanent Access Token
-  phoneNumber         String?
-  displayName         String?
-  isDefault           Boolean  @default(false)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id            String   @id @default(uuid())
+  phoneNumberId String   @unique
+  wabaId        String
+  accessToken   String // Permanent Access Token
+  phoneNumber   String?
+  displayName   String?
+  isDefault     Boolean  @default(false)
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  campaigns           Campaign[]
+  campaigns Campaign[]
+
+  @@index([tenantId])
 }
 
 model CampaignStage {
-  id           String   @id @default(uuid())
-  campaignId   String
-  campaign     Campaign @relation(fields: [campaignId], references: [id])
-  
-  name         String   // e.g., "M1-Pitch", "M2-FollowUp", "M3-WeeklyTipsInvite"
-  order        Int      // To sequence them
-  waitHours    Int      @default(0) // Time to wait before triggering if no response
-  
+  id         String   @id @default(uuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+
+  name      String // e.g., "M1-Pitch", "M2-FollowUp", "M3-WeeklyTipsInvite"
+  order     Int // To sequence them
+  waitHours Int    @default(0) // Time to wait before triggering if no response
+
   messageTemplates MessageTemplate[]
-  leads        Lead[]   @relation("CurrentStage")
-  createdAt    DateTime @default(now())
+  leads            Lead[]            @relation("CurrentStage")
+  createdAt        DateTime          @default(now())
 }
 
 model Lead {
-  id             String   @id @default(uuid())
-  phoneNumber    String   @unique
-  name           String?
-  status         String   @default("ACTIVE") // ACTIVE, HANDOVER, BLOCKED
-  aiEnabled      Boolean  @default(true)
-  unansweredCount Int      @default(0) // New: track consecutive unanswered business messages
-  
+  id              String  @id @default(uuid())
+  phoneNumber     String
+  name            String?
+  status          String  @default("ACTIVE") // ACTIVE, HANDOVER, BLOCKED
+  aiEnabled       Boolean @default(true)
+  unansweredCount Int     @default(0) // New: track consecutive unanswered business messages
+  tenantId        String
+  tenant          Tenant  @relation(fields: [tenantId], references: [id])
+
   // State Machine Logic (Primary State)
-  state          String   @default("COLD") // COLD, INTERESTED, DEMO, NURTURING, CLIENTS
+  state          String         @default("COLD") // COLD, INTERESTED, DEMO, NURTURING, CLIENTS
   currentStageId String?
   currentStage   CampaignStage? @relation("CurrentStage", fields: [currentStageId], references: [id])
-  
-  campaignId     String
-  campaign       Campaign @relation(fields: [campaignId], references: [id])
-  
+
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+
   // Debouncing & AI State
-  lastInboundAt   DateTime?
-  isProcessingAI  Boolean   @default(false)
+  lastInboundAt  DateTime?
+  isProcessingAI Boolean   @default(false)
 
   // Timestamps
   lastInteraction DateTime @default(now())
   createdAt       DateTime @default(now())
-  
+
   // Flexible metadata (JSON)
-  metadata        String?   // JSON string for business info, research data, etc.
-  
+  metadata String? // JSON string for business info, research data, etc.
+
   // Demo Specifics
-  demoStartedAt   DateTime?
-  demoExpiresAt   DateTime?
-  demoMinutes     Int?      @default(10) // Configurable demo duration
-  
+  demoStartedAt DateTime?
+  demoExpiresAt DateTime?
+  demoMinutes   Int?      @default(10) // Configurable demo duration
+
   // Nurturing Specifics
   nurturingOptInAt            DateTime?
-  nurturingOnboardingComplete Boolean  @default(false)
+  nurturingOnboardingComplete Boolean   @default(false)
   lastBroadcastInteraction    DateTime?
-  
-  messages        Message[]
-  tags            Tag[]
-  summaries       ConversationSummary[]
-  opportunities   Opportunity[]
+
+  messages      Message[]
+  tags          Tag[]
+  summaries     ConversationSummary[]
+  opportunities Opportunity[]
+
+  @@unique([tenantId, phoneNumber])
+  @@index([tenantId])
+  @@index([tenantId, state])
 }
 
 model Message {
-  id            String   @id @default(uuid())
-  leadId        String
-  lead          Lead     @relation(fields: [leadId], references: [id])
-  
-  direction     String   // INBOUND, OUTBOUND
-  content       String
-  type          String   @default("TEXT") // TEXT, BUTTON_RESPONSE, TEMPLATE
-  status        String   @default("sent") // sent, delivered, read, failed
-  
-  timestamp     DateTime @default(now())
-  
+  id     String @id @default(uuid())
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id])
+
+  direction String // INBOUND, OUTBOUND
+  content   String
+  type      String @default("TEXT") // TEXT, BUTTON_RESPONSE, TEMPLATE
+  status    String @default("sent") // sent, delivered, read, failed
+
+  timestamp DateTime @default(now())
+
   // Logic tracking
-  whatsappId    String?  @unique // To handle idempotency
-  campaignStage String?  // Reference to stage when sent
-  aiGenerated   Boolean  @default(false)
-  wasRead       Boolean  @default(false)
-  isProcessed   Boolean  @default(false)
+  whatsappId    String? @unique // To handle idempotency
+  campaignStage String? // Reference to stage when sent
+  aiGenerated   Boolean @default(false)
+  wasRead       Boolean @default(false)
+  isProcessed   Boolean @default(false)
 }
 
 model Tag {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  category    String   @default("SYSTEM") // SYSTEM, INTENT, CAMPAIGN, CUSTOM
-  description String?  // What this tag means
+  id          String    @id @default(uuid())
+  name        String
+  category    String    @default("SYSTEM") // SYSTEM, INTENT, CAMPAIGN, CUSTOM
+  description String? // What this tag means
   campaignId  String?
   campaign    Campaign? @relation(fields: [campaignId], references: [id])
-  
-  leads       Lead[]
-  createdAt   DateTime @default(now())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+
+  leads     Lead[]
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model TakeoverKeyword {
   id        String   @id @default(uuid())
-  word      String   @unique
+  word      String
   type      String   @default("INTERNAL") // INTERNAL (for owner), LEAD (for leads)
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
   createdAt DateTime @default(now())
+
+  @@unique([tenantId, word])
+  @@index([tenantId])
 }
 
 model GlobalConfig {
-  id                String   @id @default("singleton")
-  availabilityStatus String?  // e.g. "meeting_until_1600"
+  id                 String   @id
+  availabilityStatus String? // e.g. "meeting_until_1600"
   ownerName          String   @default("Samuel")
+  tenantId           String
+  tenant             Tenant   @relation(fields: [tenantId], references: [id])
   updatedAt          DateTime @updatedAt
+
+  @@unique([tenantId])
 }
 
 model ConversationSummary {
-  id        String   @id @default(uuid())
-  leadId    String
-  lead      Lead     @relation(fields: [leadId], references: [id])
-  
+  id     String @id @default(uuid())
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id])
+
   content   String
   createdAt DateTime @default(now())
 }
 
 model BusinessProfile {
-  id            String   @id @default("singleton")
+  id            String   @id
   name          String   @default("whatsnaŭ")
-  knowledgeBase String?  // Extensive context about the business
+  knowledgeBase String? // Extensive context about the business
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
   updatedAt     DateTime @updatedAt
+
+  @@unique([tenantId])
 }
 
 model PromptConfig {
-  id            String   @id @default(uuid())
-  role          String   // CLOSER, RECEPTIONIST, NURTURING
-  campaignId    String
-  campaign      Campaign @relation(fields: [campaignId], references: [id])
-  basePrompt    String
-  
+  id         String   @id @default(uuid())
+  role       String // CLOSER, RECEPTIONIST, NURTURING
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  basePrompt String
+
   // Context injection rules
-  includeLeadName             Boolean @default(true)
-  includeLeadMetadata         Boolean @default(true)
-  includeLeadTags             Boolean @default(true)
-  includeConversationHistory  Boolean @default(true)
-  historyMessageCount         Int     @default(10)
-  
+  includeLeadName            Boolean @default(true)
+  includeLeadMetadata        Boolean @default(true)
+  includeLeadTags            Boolean @default(true)
+  includeConversationHistory Boolean @default(true)
+  historyMessageCount        Int     @default(10)
+
   // Behavior settings
   temperature     Float   @default(0.7)
   usePremiumModel Boolean @default(true)
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([role, campaignId])
 }
 
 // MASS OUTREACH MODELS
 model LeadImportBatch {
-  id          String   @id @default(uuid())
-  campaignId  String
-  campaign    Campaign @relation(fields: [campaignId], references: [id])
-  name        String   // e.g., "Google Maps Scraping - Jan 20"
-  status      String   @default("STAGING") // STAGING, ANALYZING, READY, EXECUTING, COMPLETED
-  createdAt   DateTime @default(now())
-  
+  id         String   @id @default(uuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  name       String // e.g., "Google Maps Scraping - Jan 20"
+  status     String   @default("STAGING") // STAGING, ANALYZING, READY, EXECUTING, COMPLETED
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt  DateTime @default(now())
+
   stagingLeads StagingLead[]
+
+  @@index([tenantId])
 }
 
 model StagingLead {
-  id              String   @id @default(uuid())
-  batchId         String
-  batch           LeadImportBatch @relation(fields: [batchId], references: [id])
-  
-  rawData         String   // JSON blob of original CSV row
-  phoneNumber     String
-  name            String?
-  email           String?
-  website         String?
-  
+  id      String          @id @default(uuid())
+  batchId String
+  batch   LeadImportBatch @relation(fields: [batchId], references: [id])
+
+  rawData     String // JSON blob of original CSV row
+  phoneNumber String
+  name        String?
+  email       String?
+  website     String?
+
   // Cleanse/Analysis Status
-  isValidWhatsApp Boolean  @default(false)
-  isVerified      Boolean  @default(false) // Checked against WA API
-  cleanseStatus   String   @default("PENDING") // PENDING, CLEANED, INVALID
-  
-  opportunities   Opportunity[]
+  isValidWhatsApp Boolean @default(false)
+  isVerified      Boolean @default(false) // Checked against WA API
+  cleanseStatus   String  @default("PENDING") // PENDING, CLEANED, INVALID
+  tenantId        String
+  tenant          Tenant  @relation(fields: [tenantId], references: [id])
+
+  opportunities Opportunity[]
+
+  @@index([tenantId])
 }
 
 model Opportunity {
-  id              String   @id @default(uuid())
-  stagingLeadId   String?
-  stagingLead     StagingLead? @relation(fields: [stagingLeadId], references: [id])
-  leadId          String?
-  lead            Lead? @relation(fields: [leadId], references: [id])
-  
-  type            String   // NO_WEBSITE, FEW_REVIEWS, LOW_RATING, CUSTOM
-  description     String
-  severity        String   @default("MEDIUM") // LOW, MEDIUM, HIGH (Priority)
-  aiGenerated     Boolean  @default(false)
-  createdAt       DateTime @default(now())
+  id            String       @id @default(uuid())
+  stagingLeadId String?
+  stagingLead   StagingLead? @relation(fields: [stagingLeadId], references: [id])
+  leadId        String?
+  lead          Lead?        @relation(fields: [leadId], references: [id])
+
+  type        String // NO_WEBSITE, FEW_REVIEWS, LOW_RATING, CUSTOM
+  description String
+  severity    String   @default("MEDIUM") // LOW, MEDIUM, HIGH (Priority)
+  aiGenerated Boolean  @default(false)
+  createdAt   DateTime @default(now())
 }
 
 model TelegramConfig {
-  id          String   @id @default("singleton")
-  botToken    String?
-  chatId      String?
-  isEnabled   Boolean  @default(false)
-  updatedAt   DateTime @updatedAt
+  id        String   @id
+  botToken  String?
+  chatId    String?
+  isEnabled Boolean  @default(false)
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId])
 }
 
 model MessageTemplate {
-  id              String   @id @default(uuid())
-  stageId         String
-  stage           CampaignStage @relation(fields: [stageId], references: [id])
-  
-  content         String   // Template with variables: "Hola {{name}}, ..."
-  order           Int      @default(1) // For multi-message stages
-  
+  id      String        @id @default(uuid())
+  stageId String
+  stage   CampaignStage @relation(fields: [stageId], references: [id])
+
+  content String // Template with variables: "Hola {{name}}, ..."
+  order   Int    @default(1) // For multi-message stages
+
   // Button support (for interactive messages)
-  hasButtons      Boolean  @default(false)
-  buttons         String?  // JSON array of button configs
-  
+  hasButtons Boolean @default(false)
+  buttons    String? // JSON array of button configs
+
   // Link to Meta-approved WhatsApp template (for business-initiated messages)
   whatsappTemplate WhatsAppTemplate?
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model WhatsAppTemplate {
-  id              String   @id @default(uuid())
-  
+  id String @id @default(uuid())
+
   // Meta template info
-  metaTemplateId  String?  @unique // Meta's template ID
-  name            String   @unique // Template name in Meta
-  status          String   // APPROVED, PENDING, REJECTED, DISABLED
-  category        String   // MARKETING, UTILITY, AUTHENTICATION
-  language        String   @default("es_ES")
-  
+  metaTemplateId String? @unique // Meta's template ID
+  name           String  @unique // Template name in Meta
+  status         String // APPROVED, PENDING, REJECTED, DISABLED
+  category       String // MARKETING, UTILITY, AUTHENTICATION
+  language       String  @default("es_ES")
+
   // Template structure from Meta
-  components      String   // JSON: header, body, footer, buttons
-  
+  components String // JSON: header, body, footer, buttons
+
   // Variable mapping (Meta {{1}} → Our {{name}})
-  variableMapping String?  // JSON: {"1": "name", "2": "business"}
-  
+  variableMapping String? // JSON: {"1": "name", "2": "business"}
+
   // Link to our internal template
-  messageTemplateId String? @unique
+  messageTemplateId String?          @unique
   messageTemplate   MessageTemplate? @relation(fields: [messageTemplateId], references: [id])
-  
+
   // Metadata
-  lastSyncedAt    DateTime @default(now())
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  lastSyncedAt DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }

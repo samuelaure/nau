@@ -9,7 +9,9 @@ export interface AuthRequest extends Request {
     id: string;
     email: string;
     role: string;
+    tenantId: string;
   };
+  tenantId?: string; // For easy access in controllers
 }
 
 export const authMiddleware = asyncHandler(
@@ -33,15 +35,21 @@ export const authMiddleware = asyncHandler(
     // 3. Check if user still exists
     const user = await db.user.findUnique({
       where: { id: decoded.id },
-      select: { id: true, email: true, role: true },
+      select: { id: true, email: true, role: true, tenantId: true },
     });
 
     if (!user) {
       throw new AppError('El usuario ya no existe.', 401);
     }
 
-    // 4. Attach user to request
+    // 4. Verify tenantId matches (security check)
+    if (user.tenantId !== decoded.tenantId) {
+      throw new AppError('Token inválido.', 401);
+    }
+
+    // 5. Attach user and tenantId to request
     req.user = user;
+    req.tenantId = user.tenantId;
     next();
   }
 );
