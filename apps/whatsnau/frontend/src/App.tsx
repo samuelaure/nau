@@ -131,6 +131,7 @@ function App() {
     sequences,
     templates,
     telegram,
+    metaAppId,
     fetchConfig,
     saveBusiness,
     savePrompt,
@@ -214,6 +215,7 @@ function App() {
             telegram={telegram}
             keywords={keywords}
             availability={availability}
+            metaAppId={metaAppId}
             onSaveBusiness={saveBusiness}
             onSavePrompt={savePrompt}
             onSaveTelegram={saveTelegram}

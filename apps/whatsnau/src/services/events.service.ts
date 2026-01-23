@@ -18,16 +18,17 @@ export class EventsService {
   }
 
   static addClient(id: string, res: Response) {
-    this.clients.push({ id, res });
-    logger.info({ clientId: id }, 'SSE Client connected');
-
-    // Initial setup for SSE
+    // 1. Initial setup for SSE - MUST happen before any logging or broadcasting
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
 
-    // Heartbeat
+    // 2. Now it is safe to add to broadcast list and log
+    this.clients.push({ id, res });
+    logger.info({ clientId: id }, 'SSE Client connected');
+
+    // 3. Heartbeat
     const heartbeat = setInterval(() => {
       res.write(':\n\n');
     }, 15000);

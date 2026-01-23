@@ -14,6 +14,7 @@ export const useConfig = (campaignId?: string) => {
   const [prompts, setPrompts] = useState<PromptConfig[]>([]);
   const [sequences, setSequences] = useState<SequenceConfig[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [metaAppId, setMetaAppId] = useState('');
   const [telegram, setTelegram] = useState<TelegramConfig>({
     botToken: '',
     chatId: '',
@@ -30,19 +31,30 @@ export const useConfig = (campaignId?: string) => {
         ? `${baseUrl}/sequences?campaignId=${campaignId}`
         : `${baseUrl}/sequences`;
 
-      const [bizRes, promptRes, seqRes, tempRes, teleRes] = await Promise.all([
+      const [bizRes, promptRes, seqRes, tempRes, teleRes, globalRes] = await Promise.all([
         fetch(`${baseUrl}/business`),
         fetch(promptUrl),
         fetch(seqUrl),
         fetch(`${baseUrl}/whatsapp-templates`),
         fetch(`${baseUrl}/telegram`),
+        fetch(`${baseUrl}/global`),
       ]);
-      setBusiness(await bizRes.json());
-      setPrompts(await promptRes.json());
-      setSequences(await seqRes.json());
-      const tempData = await tempRes.json();
-      setTemplates(tempData.data || []);
-      setTelegram(await teleRes.json());
+
+      const [biz, prompts, seqs, temps, tele, global] = await Promise.all([
+        bizRes.json(),
+        promptRes.json(),
+        seqRes.json(),
+        tempRes.json(),
+        teleRes.json(),
+        globalRes.json(),
+      ]);
+
+      setBusiness(biz);
+      setPrompts(prompts);
+      setSequences(seqs);
+      setTemplates(temps.data || []);
+      setTelegram(tele);
+      setMetaAppId(global.metaAppId || '');
     } catch (error) {
       console.error('Failed to fetch config:', error);
       notify('error', 'Configuration sync failed.');
@@ -174,6 +186,7 @@ export const useConfig = (campaignId?: string) => {
     sequences,
     templates,
     telegram,
+    metaAppId,
     setBusiness,
     setPrompts,
     setSequences,

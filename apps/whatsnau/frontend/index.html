@@ -5,28 +5,13 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>frontend</title>
-    <!-- Meta Pixel / Facebook SDK for WhatsApp Embedded Signup -->
-    <script>
-      window.fbAsyncInit = function () {
-        FB.init({
-          appId: '%VITE_FB_APP_ID%',
-          autoLogAppEvents: true,
-          xfbml: true,
-          version: 'v24.0',
-        });
-      };
-
-      // Load the JavaScript SDK asynchronously
-      (function (d, s, id) {
-        var js,
-          fjs = d.getElementsByTagName(s)[0];
-        if (d.getElementById(id)) return;
-        js = d.createElement(s);
-        js.id = id;
-        js.src = 'https://connect.facebook.net/en_US/sdk.js';
-        fjs.parentNode.insertBefore(js, fjs);
-      })(document, 'script', 'facebook-jssdk');
-    </script>
+    <!-- Meta SDK will be initialized dynamically in React -->
+    <script
+      async
+      defer
+      crossorigin="anonymous"
+      src="https://connect.facebook.net/en_US/sdk.js"
+    ></script>
   </head>
 
   <body>

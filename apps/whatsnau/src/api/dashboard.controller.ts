@@ -83,7 +83,10 @@ router.get(
         data: { id: 'singleton', availabilityStatus: 'disponible' },
       });
     }
-    res.json(config);
+    res.json({
+      ...(config as any),
+      metaAppId: process.env.META_APP_ID || '',
+    });
   })
 );
 

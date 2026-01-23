@@ -16,6 +16,7 @@ interface AIAgentsProps {
   onUpdateAvailability: (status: string) => void;
   onAddKeyword: (word: string, type: string) => void;
   onRemoveKeyword: (id: string) => void;
+  metaAppId?: string;
 }
 
 interface AgentPromptEditorProps {
@@ -87,6 +88,7 @@ export const AIAgents: React.FC<AIAgentsProps> = ({
   onUpdateAvailability,
   onAddKeyword,
   onRemoveKeyword,
+  metaAppId,
 }) => {
   const [newKeyword, setNewKeyword] = useState('');
   const [kwType, setKwType] = useState('INTERNAL');
@@ -139,7 +141,7 @@ export const AIAgents: React.FC<AIAgentsProps> = ({
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-        <WhatsAppOnboarding />
+        <WhatsAppOnboarding appId={metaAppId} />
         <div className="settings-section">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
             <Clock size={20} color="var(--accent)" />

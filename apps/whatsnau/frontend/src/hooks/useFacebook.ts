@@ -9,25 +9,38 @@ interface EmbeddedSignupData {
  * Hook to interact with the Facebook JavaScript SDK.
  * Ensures the SDK is initialized before use.
  */
-export const useFacebook = () => {
+export const useFacebook = (appId?: string) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [sessionInfo, setSessionInfo] = useState<EmbeddedSignupData | null>(null);
 
   useEffect(() => {
-    // Check if FB is already available
+    if (!appId || typeof window === 'undefined') return;
+
+    // Initialize the SDK if it's available
+    const initFB = () => {
+      if (window.FB) {
+        window.FB.init({
+          appId: appId,
+          autoLogAppEvents: true,
+          xfbml: true,
+          version: 'v21.0',
+        });
+        setIsLoaded(true);
+      }
+    };
+
     if (window.FB) {
-      setIsLoaded(true);
+      initFB();
     } else {
-      // Otherwise, poll for it (since it loads asynchronously)
       const interval = setInterval(() => {
         if (window.FB) {
-          setIsLoaded(true);
+          initFB();
           clearInterval(interval);
         }
       }, 100);
       return () => clearInterval(interval);
     }
-  }, []);
+  }, [appId]);
 
   // Listen for messages from the Facebook popup
   useEffect(() => {

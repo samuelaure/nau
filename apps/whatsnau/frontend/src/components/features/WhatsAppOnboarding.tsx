@@ -2,8 +2,12 @@ import React, { useState } from 'react';
 import { useFacebook } from '../../hooks/useFacebook';
 import { MessageSquare, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 
-export const WhatsAppOnboarding: React.FC = () => {
-  const { isLoaded, sessionInfo, launchEmbeddedSignup } = useFacebook();
+interface WhatsAppOnboardingProps {
+  appId?: string;
+}
+
+export const WhatsAppOnboarding: React.FC<WhatsAppOnboardingProps> = ({ appId }) => {
+  const { isLoaded, sessionInfo, launchEmbeddedSignup } = useFacebook(appId);
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
