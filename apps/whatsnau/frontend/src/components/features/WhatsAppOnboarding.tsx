@@ -18,52 +18,55 @@ export const WhatsAppOnboarding: React.FC<WhatsAppOnboardingProps> = ({ appId })
 
   const handleSignup = () => {
     setStatus('loading');
-    launchEmbeddedSignup(async (response) => {
-      if (response.authResponse) {
-        const code = (response.authResponse as any).code;
+    launchEmbeddedSignup((response) => {
+      // Handle the response in a non-async way by wrapping async logic
+      (async () => {
+        if (response.authResponse) {
+          const code = (response.authResponse as any).code;
 
-        // At this point we might or might not have sessionInfo from the window message
-        // The listener in useFacebook sets it. We wait a bit if needed.
-        let finalSession = sessionInfo;
+          // At this point we might or might not have sessionInfo from the window message
+          // The listener in useFacebook sets it. We wait a bit if needed.
+          let finalSession = sessionInfo;
 
-        // Wait up to 2 seconds for the postMessage to arrive if it hasn't yet
-        if (!finalSession) {
-          let retries = 0;
-          while (!finalSession && retries < 20) {
-            await new Promise((resolve) => setTimeout(resolve, 100));
-            // Note: sessionInfo from hook might not update in this closure easily
-            // but we'll try to use a local variable or just proceed.
-            // In a real hook, we'd use a ref or just rely on the next effect.
-            retries++;
+          // Wait up to 2 seconds for the postMessage to arrive if it hasn't yet
+          if (!finalSession) {
+            let retries = 0;
+            while (!finalSession && retries < 20) {
+              await new Promise((resolve) => setTimeout(resolve, 100));
+              // Note: sessionInfo from hook might not update in this closure easily
+              // but we'll try to use a local variable or just proceed.
+              // In a real hook, we'd use a ref or just rely on the next effect.
+              retries++;
+            }
           }
-        }
 
-        try {
-          const res = await fetch('/api/whatsapp/onboard', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              code,
-              phone_number_id: sessionInfo?.phone_number_id,
-              waba_id: sessionInfo?.waba_id,
-            }),
-          });
+          try {
+            const res = await fetch('/api/whatsapp/onboard', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                code,
+                phone_number_id: sessionInfo?.phone_number_id,
+                waba_id: sessionInfo?.waba_id,
+              }),
+            });
 
-          const data = await res.json();
-          if (res.ok && data.success) {
-            setStatus('success');
-          } else {
+            const data = await res.json();
+            if (res.ok && data.success) {
+              setStatus('success');
+            } else {
+              setStatus('error');
+              setErrorMessage(data.error || 'Failed to link account');
+            }
+          } catch (err) {
             setStatus('error');
-            setErrorMessage(data.error || 'Failed to link account');
+            setErrorMessage('Network error during onboarding');
           }
-        } catch (err) {
+        } else {
           setStatus('error');
-          setErrorMessage('Network error during onboarding');
+          setErrorMessage('Facebook login cancelled or failed');
         }
-      } else {
-        setStatus('error');
-        setErrorMessage('Facebook login cancelled or failed');
-      }
+      })();
     });
   };
 
