@@ -97,11 +97,20 @@ export const useFacebook = (appId?: string) => {
         return;
       }
 
+      console.log(
+        '[useFacebook] Launching Embedded Signup with config_id:',
+        import.meta.env.VITE_FB_CONFIG_ID
+      );
+
       window.FB.login(callback, {
         config_id: import.meta.env.VITE_FB_CONFIG_ID,
         response_type: 'code',
         override_default_response_type: true,
-        extras: { version: 'v3', setup: {} },
+        extras: {
+          feature_type: 'whatsapp_business_app_onboarding',
+          session_info_version: '3',
+          setup: {},
+        },
         scope: 'whatsapp_business_management,whatsapp_business_messaging',
       });
     },

@@ -23,6 +23,14 @@ export const WhatsAppOnboarding: React.FC<WhatsAppOnboardingProps> = ({ appId })
       console.log('[WhatsAppOnboarding] authResponse:', response.authResponse);
       console.log('[WhatsAppOnboarding] status:', response.status);
 
+      // Ignore the initial "unknown" status - this is fired immediately before the popup completes
+      if (response.status === 'unknown' && !response.authResponse) {
+        console.log(
+          '[WhatsAppOnboarding] Ignoring initial unknown status, waiting for completion...'
+        );
+        return;
+      }
+
       // Handle the response in a non-async way by wrapping async logic
       (async () => {
         if (response.authResponse) {
@@ -72,8 +80,12 @@ export const WhatsAppOnboarding: React.FC<WhatsAppOnboardingProps> = ({ appId })
             setStatus('error');
             setErrorMessage('Network error during onboarding');
           }
+        } else if (response.status === 'not_authorized') {
+          console.error('[WhatsAppOnboarding] User denied permissions');
+          setStatus('error');
+          setErrorMessage('You must grant permissions to connect WhatsApp');
         } else {
-          console.error('[WhatsAppOnboarding] No authResponse in response');
+          console.error('[WhatsAppOnboarding] Login cancelled or failed');
           setStatus('error');
           setErrorMessage('Facebook login cancelled or failed');
         }

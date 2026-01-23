@@ -1,7 +1,7 @@
 {
   "name": "frontend",
   "private": true,
-  "version": "1.1.13",
+  "version": "1.1.15",
   "author": "Samuel Aure",
   "type": "module",
   "scripts": {
