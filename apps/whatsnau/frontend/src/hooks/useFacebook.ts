@@ -102,7 +102,16 @@ export const useFacebook = (appId?: string) => {
         import.meta.env.VITE_FB_CONFIG_ID
       );
 
-      window.FB.login(callback, {
+      let callbackFired = false;
+
+      const wrappedCallback = (response: facebook.StatusResponse) => {
+        if (callbackFired) return;
+        callbackFired = true;
+        console.log('[useFacebook] Callback fired with response:', response);
+        callback(response);
+      };
+
+      window.FB.login(wrappedCallback, {
         config_id: import.meta.env.VITE_FB_CONFIG_ID,
         response_type: 'code',
         override_default_response_type: true,
@@ -113,6 +122,17 @@ export const useFacebook = (appId?: string) => {
         },
         scope: 'whatsapp_business_management,whatsapp_business_messaging',
       });
+
+      // Fallback: Poll for status changes in case the callback doesn't fire
+      setTimeout(() => {
+        if (!callbackFired) {
+          console.log('[useFacebook] Callback did not fire, polling for status...');
+          window.FB.getLoginStatus((response) => {
+            console.log('[useFacebook] Polled status:', response);
+            wrappedCallback(response);
+          }, true); // true = force refresh from server
+        }
+      }, 2000);
     },
     []
   );
