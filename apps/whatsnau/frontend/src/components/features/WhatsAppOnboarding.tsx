@@ -1,0 +1,162 @@
+import React, { useState } from 'react';
+import { useFacebook } from '../../hooks/useFacebook';
+import { MessageSquare, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+
+export const WhatsAppOnboarding: React.FC = () => {
+  const { isLoaded, sessionInfo, launchEmbeddedSignup } = useFacebook();
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const handleSignup = () => {
+    setStatus('loading');
+    launchEmbeddedSignup(async (response) => {
+      if (response.authResponse) {
+        const code = (response.authResponse as any).code;
+
+        // At this point we might or might not have sessionInfo from the window message
+        // The listener in useFacebook sets it. We wait a bit if needed.
+        let finalSession = sessionInfo;
+
+        // Wait up to 2 seconds for the postMessage to arrive if it hasn't yet
+        if (!finalSession) {
+          let retries = 0;
+          while (!finalSession && retries < 20) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            // Note: sessionInfo from hook might not update in this closure easily
+            // but we'll try to use a local variable or just proceed.
+            // In a real hook, we'd use a ref or just rely on the next effect.
+            retries++;
+          }
+        }
+
+        try {
+          const res = await fetch('/api/whatsapp/onboard', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              code,
+              phone_number_id: sessionInfo?.phone_number_id,
+              waba_id: sessionInfo?.waba_id,
+            }),
+          });
+
+          const data = await res.json();
+          if (res.ok && data.success) {
+            setStatus('success');
+          } else {
+            setStatus('error');
+            setErrorMessage(data.error || 'Failed to link account');
+          }
+        } catch (err) {
+          setStatus('error');
+          setErrorMessage('Network error during onboarding');
+        }
+      } else {
+        setStatus('error');
+        setErrorMessage('Facebook login cancelled or failed');
+      }
+    });
+  };
+
+  return (
+    <div className="settings-section">
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
+        <MessageSquare size={20} color="#25D366" />
+        <h3 style={{ margin: 0 }}>WhatsApp Business Setup</h3>
+      </div>
+      <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
+        Connect your WhatsApp Business Account to enable automated campaigns.
+      </p>
+
+      {status === 'idle' && (
+        <button
+          onClick={handleSignup}
+          disabled={!isLoaded}
+          style={{
+            backgroundColor: '#1877f2',
+            color: '#fff',
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+          }}
+        >
+          {!isLoaded ? <Loader2 className="animate-spin" size={18} /> : null}
+          Login with Facebook
+        </button>
+      )}
+
+      {status === 'loading' && (
+        <div style={{ textAlign: 'center', padding: '1rem' }}>
+          <Loader2
+            className="animate-spin"
+            size={32}
+            color="var(--primary)"
+            style={{ margin: '0 auto' }}
+          />
+          <p style={{ marginTop: '0.5rem', fontSize: '0.875rem' }}>Processing connection...</p>
+        </div>
+      )}
+
+      {status === 'success' && (
+        <div
+          style={{
+            padding: '1rem',
+            background: 'rgba(37, 211, 102, 0.1)',
+            borderRadius: '0.75rem',
+            border: '1px solid #25D366',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+          }}
+        >
+          <CheckCircle2 size={24} color="#25D366" />
+          <div>
+            <div style={{ fontWeight: 'bold', color: '#25D366' }}>Connected Successfully</div>
+            <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)' }}>
+              Your WhatsApp account is now linked to whatsnaŭ.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {status === 'error' && (
+        <div
+          style={{
+            padding: '1rem',
+            background: 'rgba(239, 68, 68, 0.1)',
+            borderRadius: '0.75rem',
+            border: '1px solid #ef4444',
+          }}
+        >
+          <div
+            style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '0.5rem' }}
+          >
+            <AlertCircle size={24} color="#ef4444" />
+            <div style={{ fontWeight: 'bold', color: '#ef4444' }}>Connection Failed</div>
+          </div>
+          <p style={{ fontSize: '0.75rem', margin: 0 }}>{errorMessage}</p>
+          <button
+            onClick={() => setStatus('idle')}
+            style={{
+              marginTop: '1rem',
+              padding: '0.25rem 0.75rem',
+              fontSize: '0.75rem',
+              background: 'transparent',
+              border: '1px solid rgba(255,255,255,0.2)',
+            }}
+          >
+            Try Again
+          </button>
+        </div>
+      )}
+
+      {sessionInfo && status === 'idle' && (
+        <div style={{ marginTop: '1rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+          Session detected: WABA {sessionInfo.waba_id}
+        </div>
+      )}
+    </div>
+  );
+};

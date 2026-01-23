@@ -16,6 +16,7 @@ import webhookRouter from './api/webhook.controller.js';
 import dashboardRouter from './api/dashboard.controller.js';
 import importRouter from './api/import.controller.js';
 import authRouter from './api/auth.controller.js';
+import whatsappRouter from './api/whatsapp.controller.js';
 import { errorMiddleware } from './core/errors/errorMiddleware.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -61,6 +62,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/webhooks/whatsapp', webhookRouter); // Industry standard hierarchical route
 app.use('/api/dashboard', authMiddleware, dashboardRouter);
 app.use('/api/dashboard/import', authMiddleware, importRouter);
+app.use('/api/whatsapp', whatsappRouter);
 
 // Serve static files from the frontend
 const frontendPath = path.join(__dirname, '../frontend/dist');
