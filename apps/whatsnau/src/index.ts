@@ -28,7 +28,7 @@ export const app = express();
 app.use(helmet()); // Basic security headers
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
-  : ['https://app.9nau.com', 'https://whatsnau.com'];
+  : ['https://whatsnau.9nau.com', 'https://9nau.com', 'https://www.9nau.com'];
 
 app.use(
   cors({
