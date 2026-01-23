@@ -24,8 +24,21 @@ const __dirname = path.dirname(__filename);
 
 export const app = express();
 
-// Security Middleware
-app.use(helmet()); // Basic security headers
+// Security Middleware with CSP for Facebook SDK
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", 'https://connect.facebook.net'],
+        connectSrc: ["'self'", 'https://*.facebook.com', 'https://*.facebook.net'],
+        frameSrc: ["'self'", 'https://*.facebook.com'],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+      },
+    },
+  })
+);
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
   : ['https://whatsnau.9nau.com', 'https://9nau.com', 'https://www.9nau.com'];

@@ -14,11 +14,20 @@ export const useFacebook = (appId?: string) => {
   const [sessionInfo, setSessionInfo] = useState<EmbeddedSignupData | null>(null);
 
   useEffect(() => {
-    if (!appId || typeof window === 'undefined') return;
+    if (typeof window === 'undefined') return;
+
+    // If no appId yet, we can't initialize but we should still load the SDK
+    if (!appId) {
+      console.log('[useFacebook] Waiting for appId...');
+      return;
+    }
+
+    console.log('[useFacebook] Initializing with appId:', appId);
 
     // Initialize the SDK if it's available
     const initFB = () => {
       if (window.FB) {
+        console.log('[useFacebook] FB SDK found, initializing...');
         window.FB.init({
           appId: appId,
           autoLogAppEvents: true,
@@ -26,12 +35,14 @@ export const useFacebook = (appId?: string) => {
           version: 'v21.0',
         });
         setIsLoaded(true);
+        console.log('[useFacebook] FB SDK initialized successfully');
       }
     };
 
     if (window.FB) {
       initFB();
     } else {
+      console.log('[useFacebook] FB SDK not loaded yet, polling...');
       const interval = setInterval(() => {
         if (window.FB) {
           initFB();

@@ -11,6 +11,11 @@ export const WhatsAppOnboarding: React.FC<WhatsAppOnboardingProps> = ({ appId })
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
+  React.useEffect(() => {
+    console.log('[WhatsAppOnboarding] Received appId:', appId);
+    console.log('[WhatsAppOnboarding] isLoaded:', isLoaded);
+  }, [appId, isLoaded]);
+
   const handleSignup = () => {
     setStatus('loading');
     launchEmbeddedSignup(async (response) => {
