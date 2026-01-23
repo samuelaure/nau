@@ -107,9 +107,9 @@ export const useFacebook = (appId?: string) => {
         response_type: 'code',
         override_default_response_type: true,
         extras: {
-          feature_type: 'whatsapp_business_app_onboarding',
-          session_info_version: '3',
           setup: {},
+          featureType: 'whatsapp_business_app_onboarding',
+          sessionInfoVersion: '3',
         },
         scope: 'whatsapp_business_management,whatsapp_business_messaging',
       });
