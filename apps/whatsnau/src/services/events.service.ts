@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import { logger } from '../core/logger.js';
+import { logStream } from '../core/logStream.js';
 
 interface SSEClient {
   id: string;
@@ -8,6 +9,13 @@ interface SSEClient {
 
 export class EventsService {
   private static clients: SSEClient[] = [];
+
+  static {
+    // Bridge internal logs to SSE
+    logStream.subscribe((log) => {
+      this.emit('log', log);
+    });
+  }
 
   static addClient(id: string, res: Response) {
     this.clients.push({ id, res });

@@ -8,6 +8,7 @@ import { CampaignManager } from './components/features/CampaignManager';
 import { BroadcastView } from './components/features/BroadcastView';
 import { AnalyticsView } from './components/features/AnalyticsView';
 import { TemplatesView } from './components/features/TemplatesView';
+import { LogViewer } from './components/features/LogViewer';
 import { ChatModal } from './components/features/ChatModal';
 import { useDashboard } from './hooks/useDashboard';
 import { useImport } from './hooks/useImport';
@@ -21,7 +22,14 @@ import type { User } from './types';
 function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('logs') === 'true' ? 'logs' : 'overview';
+  });
+  const [isDedicatedLogs] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('logs') === 'true';
+  });
   const [selectedCampaignId, setSelectedCampaignId] = useState('');
   const [newMessage, setNewMessage] = useState('');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -169,20 +177,26 @@ function App() {
   }
 
   return (
-    <div className={`dashboard-container ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-      <Sidebar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        campaigns={stats}
-        selectedCampaignId={selectedCampaignId}
-        onSelectCampaign={setSelectedCampaignId}
-        isCollapsed={isSidebarCollapsed}
-        onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-        onLogout={handleLogout}
-      />
+    <div
+      className={`dashboard-container ${isSidebarCollapsed ? 'sidebar-collapsed' : ''} ${isDedicatedLogs ? 'dedicated-view' : ''}`}
+    >
+      {!isDedicatedLogs && (
+        <Sidebar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          campaigns={stats}
+          selectedCampaignId={selectedCampaignId}
+          onSelectCampaign={setSelectedCampaignId}
+          isCollapsed={isSidebarCollapsed}
+          onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          onLogout={handleLogout}
+        />
+      )}
 
       <div className="main-content">
-        <Header activeTab={activeTab} loading={loading} onRefresh={fetchData} />
+        {!isDedicatedLogs && (
+          <Header activeTab={activeTab} loading={loading} onRefresh={fetchData} />
+        )}
 
         {activeTab === 'overview' && (
           <Overview
@@ -231,6 +245,8 @@ function App() {
         {activeTab === 'analytics' && <AnalyticsView />}
 
         {activeTab === 'templates' && <TemplatesView initialTemplates={templates} />}
+
+        {activeTab === 'logs' && <LogViewer />}
 
         {activeTab === 'import' && (
           <ImportManager

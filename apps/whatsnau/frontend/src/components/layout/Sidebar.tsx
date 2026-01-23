@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
+  Terminal,
 } from 'lucide-react';
 import type { CampaignStats } from '../../types';
 
@@ -41,6 +42,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'broadcast', label: 'Broadcast', icon: MessageSquare },
     { id: 'import', label: 'Import Leads', icon: Users },
+    { id: 'logs', label: 'System Logs', icon: Terminal },
   ];
 
   const workspaceItems = [

@@ -47,6 +47,14 @@ body {
   width: 100%;
 }
 
+.dashboard-container.dedicated-view .main-content {
+  max-width: none;
+  padding: 1rem;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
 /* Sidebar Styles */
 .sidebar {
   width: 280px;
