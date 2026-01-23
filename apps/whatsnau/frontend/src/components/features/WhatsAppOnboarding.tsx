@@ -19,10 +19,15 @@ export const WhatsAppOnboarding: React.FC<WhatsAppOnboardingProps> = ({ appId })
   const handleSignup = () => {
     setStatus('loading');
     launchEmbeddedSignup((response) => {
+      console.log('[WhatsAppOnboarding] Facebook response:', response);
+      console.log('[WhatsAppOnboarding] authResponse:', response.authResponse);
+      console.log('[WhatsAppOnboarding] status:', response.status);
+
       // Handle the response in a non-async way by wrapping async logic
       (async () => {
         if (response.authResponse) {
           const code = (response.authResponse as any).code;
+          console.log('[WhatsAppOnboarding] Authorization code:', code);
 
           // At this point we might or might not have sessionInfo from the window message
           // The listener in useFacebook sets it. We wait a bit if needed.
@@ -40,6 +45,8 @@ export const WhatsAppOnboarding: React.FC<WhatsAppOnboardingProps> = ({ appId })
             }
           }
 
+          console.log('[WhatsAppOnboarding] Final session info:', sessionInfo);
+
           try {
             const res = await fetch('/api/whatsapp/onboard', {
               method: 'POST',
@@ -52,6 +59,8 @@ export const WhatsAppOnboarding: React.FC<WhatsAppOnboardingProps> = ({ appId })
             });
 
             const data = await res.json();
+            console.log('[WhatsAppOnboarding] Backend response:', data);
+
             if (res.ok && data.success) {
               setStatus('success');
             } else {
@@ -59,10 +68,12 @@ export const WhatsAppOnboarding: React.FC<WhatsAppOnboardingProps> = ({ appId })
               setErrorMessage(data.error || 'Failed to link account');
             }
           } catch (err) {
+            console.error('[WhatsAppOnboarding] Network error:', err);
             setStatus('error');
             setErrorMessage('Network error during onboarding');
           }
         } else {
+          console.error('[WhatsAppOnboarding] No authResponse in response');
           setStatus('error');
           setErrorMessage('Facebook login cancelled or failed');
         }
