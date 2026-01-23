@@ -34,6 +34,23 @@ model Campaign {
   tags        Tag[]
   importBatches LeadImportBatch[]
   prompts     PromptConfig[]
+  
+  whatsAppConfigId String?
+  whatsAppConfig   WhatsAppConfig? @relation(fields: [whatsAppConfigId], references: [id])
+}
+
+model WhatsAppConfig {
+  id                  String   @id @default(uuid())
+  phoneNumberId       String   @unique
+  wabaId              String
+  accessToken         String   // Permanent Access Token
+  phoneNumber         String?
+  displayName         String?
+  isDefault           Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  campaigns           Campaign[]
 }
 
 model CampaignStage {

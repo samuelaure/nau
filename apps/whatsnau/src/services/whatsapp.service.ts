@@ -17,17 +17,64 @@ export interface WhatsAppMessagePayload {
 }
 
 export class WhatsAppService {
-  private static baseUrl = `https://graph.facebook.com/${config.WHATSAPP_VERSION}/${config.WHATSAPP_PHONE_NUMBER_ID}/messages`;
+  /**
+   * Helper to get the most relevant credentials (Campaign-specific > Default DB > .env)
+   */
+  private static async getCredentials(campaignId?: string) {
+    const { db } = await import('../core/db.js');
 
-  static async sendMessage(payload: WhatsAppMessagePayload) {
+    try {
+      // 1. Try to find config for a specific campaign if provided
+      if (campaignId) {
+        const campaign = await db.campaign.findUnique({
+          where: { id: campaignId },
+          include: { whatsAppConfig: true },
+        });
+        if (campaign?.whatsAppConfig) {
+          return {
+            accessToken: campaign.whatsAppConfig.accessToken,
+            phoneNumberId: campaign.whatsAppConfig.phoneNumberId,
+            wabaId: campaign.whatsAppConfig.wabaId,
+          };
+        }
+      }
+
+      // 2. Try to find the default config in DB
+      const defaultConfig = await db.whatsAppConfig.findFirst({
+        where: { isDefault: true },
+      });
+
+      if (defaultConfig) {
+        return {
+          accessToken: defaultConfig.accessToken,
+          phoneNumberId: defaultConfig.phoneNumberId,
+          wabaId: defaultConfig.wabaId,
+        };
+      }
+    } catch (err) {
+      logger.warn({ err }, 'Failed to fetch WhatsApp config from DB, falling back to .env');
+    }
+
+    // 3. Fallback to .env config
+    return {
+      accessToken: config.WHATSAPP_ACCESS_TOKEN,
+      phoneNumberId: config.WHATSAPP_PHONE_NUMBER_ID,
+      wabaId: config.WHATSAPP_BUSINESS_ACCOUNT_ID,
+    };
+  }
+
+  static async sendMessage(payload: WhatsAppMessagePayload, campaignId?: string) {
     return withRetry(
       async () => {
+        const creds = await this.getCredentials(campaignId);
+        const url = `https://graph.facebook.com/${config.WHATSAPP_VERSION}/${creds.phoneNumberId}/messages`;
+
         logger.info({ to: payload.to, type: payload.type }, 'Sending WhatsApp message');
 
-        const response = await fetch(this.baseUrl, {
+        const response = await fetch(url, {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${config.WHATSAPP_ACCESS_TOKEN}`,
+            Authorization: `Bearer ${creds.accessToken}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(payload),
@@ -56,74 +103,77 @@ export class WhatsAppService {
     to: string,
     templateName: string,
     languageCode = 'es_ES',
-    components: any[] = []
+    components: any[] = [],
+    campaignId?: string
   ) {
-    return this.sendMessage({
-      messaging_product: 'whatsapp',
-      to,
-      type: 'template',
-      template: {
-        name: templateName,
-        language: { code: languageCode },
-        components,
+    return this.sendMessage(
+      {
+        messaging_product: 'whatsapp',
+        to,
+        type: 'template',
+        template: {
+          name: templateName,
+          language: { code: languageCode },
+          components,
+        },
       },
-    });
+      campaignId
+    );
   }
 
-  static async sendText(to: string, text: string) {
-    return this.sendMessage({
-      messaging_product: 'whatsapp',
-      to,
-      type: 'text',
-      text: { body: text },
-    });
+  static async sendText(to: string, text: string, campaignId?: string) {
+    return this.sendMessage(
+      {
+        messaging_product: 'whatsapp',
+        to,
+        type: 'text',
+        text: { body: text },
+      },
+      campaignId
+    );
   }
 
   /**
    * Send interactive message with buttons (Quick Reply)
-   * @param to - Phone number
-   * @param bodyText - Message body text
-   * @param buttons - Array of buttons (max 3)
    */
   static async sendInteractiveButtons(
     to: string,
     bodyText: string,
-    buttons: Array<{ id: string; text: string }>
+    buttons: Array<{ id: string; text: string }>,
+    campaignId?: string
   ) {
-    // WhatsApp allows max 3 buttons
     if (buttons.length > 3) {
       logger.warn({ buttonCount: buttons.length }, 'Too many buttons, truncating to 3');
       buttons = buttons.slice(0, 3);
     }
 
-    return this.sendMessage({
-      messaging_product: 'whatsapp',
-      to,
-      type: 'interactive',
-      interactive: {
-        type: 'button',
-        body: {
-          text: bodyText,
-        },
-        action: {
-          buttons: buttons.map((btn, index) => ({
-            type: 'reply',
-            reply: {
-              id: btn.id,
-              title: btn.text.substring(0, 20), // Max 20 chars for button text
-            },
-          })),
+    return this.sendMessage(
+      {
+        messaging_product: 'whatsapp',
+        to,
+        type: 'interactive',
+        interactive: {
+          type: 'button',
+          body: {
+            text: bodyText,
+          },
+          action: {
+            buttons: buttons.map((btn) => ({
+              type: 'reply',
+              reply: {
+                id: btn.id,
+                title: btn.text.substring(0, 20),
+              },
+            })),
+          },
         },
       },
-    });
+      campaignId
+    );
   }
 
   /**
-   * Send interactive message with list (up to 10 options)
-   * @param to - Phone number
-   * @param bodyText - Message body text
-   * @param buttonText - Text for the list button
-   * @param sections - Array of list sections with rows
+   * Send interactive message with list
    */
   static async sendInteractiveList(
     to: string,
@@ -132,43 +182,55 @@ export class WhatsAppService {
     sections: Array<{
       title?: string;
       rows: Array<{ id: string; title: string; description?: string }>;
-    }>
+    }>,
+    campaignId?: string
   ) {
-    return this.sendMessage({
-      messaging_product: 'whatsapp',
-      to,
-      type: 'interactive',
-      interactive: {
-        type: 'list',
-        body: {
-          text: bodyText,
-        },
-        action: {
-          button: buttonText,
-          sections,
+    return this.sendMessage(
+      {
+        messaging_product: 'whatsapp',
+        to,
+        type: 'interactive',
+        interactive: {
+          type: 'list',
+          body: {
+            text: bodyText,
+          },
+          action: {
+            button: buttonText,
+            sections,
+          },
         },
       },
-    });
+      campaignId
+    );
   }
 
-  static async getTemplates() {
+  static async getTemplates(campaignId?: string) {
     return withRetry(async () => {
-      const url = `https://graph.facebook.com/${config.WHATSAPP_VERSION}/${config.WHATSAPP_BUSINESS_ACCOUNT_ID}/message_templates`;
+      const creds = await this.getCredentials(campaignId);
+      const url = `https://graph.facebook.com/${config.WHATSAPP_VERSION}/${creds.wabaId}/message_templates`;
       const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${config.WHATSAPP_ACCESS_TOKEN}` },
+        headers: { Authorization: `Bearer ${creds.accessToken}` },
       });
       if (!res.ok) throw new ExternalServiceError('WhatsApp', 'Failed to fetch templates');
       return res.json();
     });
   }
 
-  static async createTemplate(name: string, category: string, language: string, components: any[]) {
+  static async createTemplate(
+    name: string,
+    category: string,
+    language: string,
+    components: any[],
+    campaignId?: string
+  ) {
     return withRetry(async () => {
-      const url = `https://graph.facebook.com/${config.WHATSAPP_VERSION}/${config.WHATSAPP_BUSINESS_ACCOUNT_ID}/message_templates`;
+      const creds = await this.getCredentials(campaignId);
+      const url = `https://graph.facebook.com/${config.WHATSAPP_VERSION}/${creds.wabaId}/message_templates`;
       const res = await fetch(url, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${config.WHATSAPP_ACCESS_TOKEN}`,
+          Authorization: `Bearer ${creds.accessToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ name, category, language, components }),
@@ -179,25 +241,27 @@ export class WhatsAppService {
     });
   }
 
-  static async deleteTemplate(name: string) {
+  static async deleteTemplate(name: string, campaignId?: string) {
     return withRetry(async () => {
-      const url = `https://graph.facebook.com/${config.WHATSAPP_VERSION}/${config.WHATSAPP_BUSINESS_ACCOUNT_ID}/message_templates?name=${name}`;
+      const creds = await this.getCredentials(campaignId);
+      const url = `https://graph.facebook.com/${config.WHATSAPP_VERSION}/${creds.wabaId}/message_templates?name=${name}`;
       const res = await fetch(url, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${config.WHATSAPP_ACCESS_TOKEN}` },
+        headers: { Authorization: `Bearer ${creds.accessToken}` },
       });
       if (!res.ok) throw new ExternalServiceError('WhatsApp', 'Failed to delete template');
       return res.json();
     });
   }
 
-  static async verifyNumbers(phoneNumbers: string[]) {
+  static async verifyNumbers(phoneNumbers: string[], campaignId?: string) {
     return withRetry(async () => {
-      const url = `https://graph.facebook.com/${config.WHATSAPP_VERSION}/${config.WHATSAPP_PHONE_NUMBER_ID}/contacts`;
+      const creds = await this.getCredentials(campaignId);
+      const url = `https://graph.facebook.com/${config.WHATSAPP_VERSION}/${creds.phoneNumberId}/contacts`;
       const res = await fetch(url, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${config.WHATSAPP_ACCESS_TOKEN}`,
+          Authorization: `Bearer ${creds.accessToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -211,28 +275,17 @@ export class WhatsAppService {
     });
   }
 
-  /**
-   * Send template with variable substitution
-   * @param to - Phone number
-   * @param templateName - Meta template name
-   * @param components - Template components with variables
-   * @param languageCode - Template language
-   */
   static async sendTemplateWithVariables(
     to: string,
     templateName: string,
     components: any[],
-    languageCode = 'es_ES'
+    languageCode = 'es_ES',
+    campaignId?: string
   ) {
     logger.info({ to, templateName }, 'Sending WhatsApp template with variables');
-    return this.sendTemplate(to, templateName, languageCode, components);
+    return this.sendTemplate(to, templateName, languageCode, components, campaignId);
   }
 
-  /**
-   * Check if we can send freeform messages to a lead (24-hour window)
-   * @param leadId - Lead ID
-   * @returns true if lead is within 24-hour window
-   */
   static async canSendFreeform(leadId: string): Promise<boolean> {
     const { db } = await import('../core/db.js');
 
@@ -248,7 +301,6 @@ export class WhatsAppService {
     });
 
     if (!lead || !lead.messages || lead.messages.length === 0) {
-      // No inbound messages = business-initiated = need template
       return false;
     }
 
@@ -256,7 +308,6 @@ export class WhatsAppService {
     const hoursSinceLastInbound =
       (Date.now() - new Date(lastInbound.timestamp).getTime()) / (1000 * 60 * 60);
 
-    // WhatsApp allows 24 hours
     return hoursSinceLastInbound < 24;
   }
 }
