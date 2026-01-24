@@ -1,5 +1,6 @@
-import { db } from '../core/db.js';
-import { logger } from '../core/logger.js';
+import { db } from '../src/core/db.js';
+import { logger } from '../src/core/logger.js';
+import { AuthService } from '../src/services/auth.service.js';
 
 /**
  * Seed script for Meta Demo Tenant
@@ -10,13 +11,23 @@ async function main() {
   logger.info('Starting Meta demo data seed...');
 
   // Find the Meta demo tenant
-  const demoTenant = await (db as any).tenant.findUnique({
+  let demoTenant = await (db as any).tenant.findUnique({
     where: { slug: 'meta-demo' },
   });
 
   if (!demoTenant) {
-    logger.error('Meta demo tenant not found. Run seedAdmin first.');
-    process.exit(1);
+    logger.info('Meta demo tenant not found. Initializing system...');
+    await AuthService.seedAdmin();
+    await AuthService.createMetaReviewerAccount();
+
+    demoTenant = await (db as any).tenant.findUnique({
+      where: { slug: 'meta-demo' },
+    });
+
+    if (!demoTenant) {
+      logger.error('Failed to create Meta demo tenant');
+      process.exit(1);
+    }
   }
 
   const tenantId = demoTenant.id;

@@ -62,6 +62,7 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 // Observability: Health Check
+
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
