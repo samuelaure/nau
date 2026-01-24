@@ -160,15 +160,34 @@ router.post(
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     const { content } = req.body;
-    const lead = await db.lead.findUnique({ where: { id: id as string } });
+    const lead = await db.lead.findUnique({
+      where: { id: id as string },
+      include: { campaign: { include: { whatsAppConfig: true } } },
+    });
     if (!lead) throw new NotFoundError('Lead not found');
 
-    // Send via WhatsApp
-    const waRes = await WhatsAppService.sendText(lead.phoneNumber, content);
+    // Send via WhatsApp (use campaign context)
+    const waRes = await WhatsAppService.sendText(lead.phoneNumber, content, lead.campaignId);
     const whatsappId = waRes?.messages?.[0]?.id;
 
+    // Resolve phoneNumberId for Orchestrator context
+    let phoneNumberId = lead.campaign?.whatsAppConfig?.phoneNumberId;
+    if (!phoneNumberId) {
+      const defaultConfig = await db.whatsAppConfig.findFirst({
+        where: { tenantId: lead.tenantId, isDefault: true },
+      });
+      phoneNumberId = defaultConfig?.phoneNumberId;
+    }
+
     // Process as OUTBOUND via Orchestrator to ensure consistency
-    await Orchestrator.handleIncoming(lead.phoneNumber, content, undefined, 'OUTBOUND', whatsappId);
+    await Orchestrator.handleIncoming(
+      lead.phoneNumber,
+      content,
+      undefined,
+      'OUTBOUND',
+      whatsappId,
+      phoneNumberId
+    );
 
     res.json({ success: true, whatsappId });
   })

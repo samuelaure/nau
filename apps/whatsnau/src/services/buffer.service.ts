@@ -9,34 +9,40 @@ export class MessageBufferService {
   /**
    * Schedules or resets the debounced processing for a lead.
    */
-  static async scheduleProcessing(phoneNumber: string) {
-    logger.info({ phoneNumber }, 'Scheduling lead processing window');
+  static async scheduleProcessing(tenantId: string, phoneNumber: string) {
+    const key = `${tenantId}:${phoneNumber}`;
+    logger.info({ tenantId, phoneNumber }, 'Scheduling lead processing window');
 
     // 1. Clear existing timer if any
-    if (this.timers.has(phoneNumber)) {
-      clearTimeout(this.timers.get(phoneNumber));
+    if (this.timers.has(key)) {
+      clearTimeout(this.timers.get(key));
     }
 
     // 2. Set new timer
     const timeout = setTimeout(async () => {
       try {
-        await this.processLeadBuffer(phoneNumber);
+        await this.processLeadBuffer(tenantId, phoneNumber);
       } catch (error) {
-        logger.error({ err: error, phoneNumber }, 'Error processing lead buffer');
+        logger.error({ err: error, tenantId, phoneNumber }, 'Error processing lead buffer');
       } finally {
-        this.timers.delete(phoneNumber);
+        this.timers.delete(key);
       }
     }, this.WAIT_WINDOW_MS);
 
-    this.timers.set(phoneNumber, timeout);
+    this.timers.set(key, timeout);
   }
 
   /**
    * Triggers the Orchestrator for the accumulated messages.
    */
-  private static async processLeadBuffer(phoneNumber: string) {
-    const lead = await db.lead.findFirst({
-      where: { phoneNumber },
+  private static async processLeadBuffer(tenantId: string, phoneNumber: string) {
+    const lead = await db.lead.findUnique({
+      where: {
+        tenantId_phoneNumber: {
+          tenantId,
+          phoneNumber,
+        },
+      },
       select: { id: true, isProcessingAI: true },
     });
 
@@ -44,12 +50,12 @@ export class MessageBufferService {
 
     // Safety: don't start if already processing (unless the previous one hung)
     if (lead.isProcessingAI) {
-      logger.warn({ phoneNumber }, 'Lead already processing AI, delaying buffer');
+      logger.warn({ leadId: lead.id }, 'Lead already processing AI, delaying buffer');
       // Retry in 5 seconds
-      return this.scheduleProcessing(phoneNumber);
+      return this.scheduleProcessing(tenantId, phoneNumber);
     }
 
-    logger.info({ phoneNumber }, 'Processing buffered messages for lead');
+    logger.info({ leadId: lead.id }, 'Processing buffered messages for lead');
 
     // Set processing flag
     await db.lead.update({
@@ -58,7 +64,7 @@ export class MessageBufferService {
     });
 
     try {
-      await Orchestrator.processBurst(phoneNumber);
+      await Orchestrator.processBurst(tenantId, phoneNumber);
     } finally {
       // Release processing flag
       await db.lead.update({

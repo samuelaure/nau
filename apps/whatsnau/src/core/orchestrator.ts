@@ -18,25 +18,75 @@ export class Orchestrator {
     text?: string,
     buttonId?: string,
     direction: 'INBOUND' | 'OUTBOUND' = 'INBOUND',
-    whatsappId?: string
+    whatsappId?: string,
+    phoneNumberId?: string
   ) {
     const content = text || buttonId || '';
     logger.info({ from, content, direction, whatsappId }, 'Orchestrating interaction');
 
     // 1. Find or initialize Lead
-    let lead = await db.lead.findFirst({
-      where: { phoneNumber: from },
-      include: {
-        campaign: { include: { stages: { orderBy: { order: 'asc' } } } },
-        tags: true,
-        currentStage: true,
-      },
-    });
+    // 0. Resolve Tenant Context
+    let tenantId: string | undefined;
+    if (phoneNumberId) {
+      const config = await db.whatsAppConfig.findUnique({
+        where: { phoneNumberId },
+        select: { tenantId: true },
+      });
+      tenantId = config?.tenantId;
+    }
+
+    // 1. Find or initialize Lead
+    let lead;
+    if (tenantId) {
+      lead = await db.lead.findUnique({
+        where: {
+          tenantId_phoneNumber: {
+            tenantId,
+            phoneNumber: from,
+          },
+        },
+        include: {
+          campaign: { include: { stages: { orderBy: { order: 'asc' } } } },
+          tags: true,
+          currentStage: true,
+        },
+      });
+    } else {
+      // Fallback for legacy/loose lookup (e.g. outbound without context)
+      // Warning: This may find wrong lead if multiple exist with same phone
+      lead = await db.lead.findFirst({
+        where: { phoneNumber: from },
+        include: {
+          campaign: { include: { stages: { orderBy: { order: 'asc' } } } },
+          tags: true,
+          currentStage: true,
+        },
+      });
+    }
 
     if (!lead) {
       if (direction === 'OUTBOUND') return;
-      const campaign = await db.campaign.findFirst({ where: { isActive: true } });
-      if (!campaign) return;
+
+      // We must have a tenantId to create a lead properly
+      if (!tenantId) {
+        // Try to find a default tenant or fail?
+        // For now, if we can't determine tenant, we can't create lead safely in multi-tenant setup
+        // But let's try to find an active campaign globally if really desperate?
+        // No, that's what caused the issue.
+        // If we don't have tenantId, we skip creation to be safe.
+        logger.warn({ from, whatsappId }, 'Cannot create lead: No tenant context found');
+        return;
+      }
+
+      const campaign = await db.campaign.findFirst({
+        where: { tenantId, isActive: true },
+      });
+
+      if (!campaign) {
+        logger.warn({ tenantId }, 'No active campaign found for tenant');
+        return;
+      }
+
       const initialLead = await LeadService.initiateLead(from, campaign.id);
       lead = await db.lead.findUnique({
         where: { id: initialLead.id },
@@ -91,16 +141,24 @@ export class Orchestrator {
     if (direction === 'OUTBOUND') {
       await this.handleOutboundTakeover(lead, content);
     } else {
-      await MessageBufferService.scheduleProcessing(from);
+      // We need tenantId to schedule processing
+      if (lead.tenantId) {
+        await MessageBufferService.scheduleProcessing(lead.tenantId, from);
+      }
     }
   }
 
   /**
    * Process a burst of messages from a lead.
    */
-  static async processBurst(from: string) {
-    const lead = await db.lead.findFirst({
-      where: { phoneNumber: from },
+  static async processBurst(tenantId: string, from: string) {
+    const lead = await db.lead.findUnique({
+      where: {
+        tenantId_phoneNumber: {
+          tenantId,
+          phoneNumber: from,
+        },
+      },
       include: {
         campaign: { include: { stages: { orderBy: { order: 'asc' } } } },
         tags: true,

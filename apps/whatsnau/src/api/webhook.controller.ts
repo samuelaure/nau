@@ -55,13 +55,22 @@ router.post('/', async (req: Request, res: Response) => {
           const direction = isOutbound ? 'OUTBOUND' : 'INBOUND';
           const targetPhone = isOutbound ? (message as any).to : from;
 
+          const phoneNumberId = value.metadata?.phone_number_id;
+
           logger.info(
-            { from, targetPhone, direction, text, whatsappId },
+            { from, targetPhone, direction, text, whatsappId, phoneNumberId },
             'Processing WhatsApp message'
           );
 
           try {
-            await Orchestrator.handleIncoming(targetPhone, text, buttonId, direction, whatsappId);
+            await Orchestrator.handleIncoming(
+              targetPhone,
+              text,
+              buttonId,
+              direction,
+              whatsappId,
+              phoneNumberId
+            );
           } catch (error) {
             logger.error({ err: error, from }, 'Error in Orchestrator message handling');
           }
