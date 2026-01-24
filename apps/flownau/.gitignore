@@ -1,0 +1,57 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Testing
+coverage
+
+# Next.js
+.next/
+out/
+build/
+
+# Production
+dist/
+
+# Misc
+.DS_Store
+*.pem
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Environment Variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Remotion
+renders/
+.remotion/
+
+# Agent & Rules
+.agent/
+commit_msg.txt
+
+# Media output (Local Scratchpad)
+*.mp4
+*.webm
+*.gif
+*.mov
+*.avi
+*.mkv
+*.mp3
+*.wav
+*.m4a
+*.aac
+*.ogg
+
+# Docker volumes (Local Dev)
+postgres_data/
+redis_data/
