@@ -18,14 +18,22 @@ export class LeadService {
     const firstStage = await db.campaignStage.findFirst({
       where: { campaignId },
       orderBy: { order: 'asc' },
+      include: { campaign: true }, // Include campaign to get tenantId
     });
 
     if (!firstStage) {
       throw new Error('Campaign has no stages');
     }
 
+    const tenantId = firstStage.campaign.tenantId;
+
     return db.lead.upsert({
-      where: { phoneNumber },
+      where: {
+        tenantId_phoneNumber: {
+          tenantId,
+          phoneNumber,
+        },
+      },
       update: {
         campaignId,
         currentStageId: firstStage.id,
@@ -36,6 +44,7 @@ export class LeadService {
         phoneNumber,
         name,
         campaignId,
+        tenantId,
         currentStageId: firstStage.id,
         state: LeadState.COLD,
       },
@@ -90,10 +99,21 @@ export class LeadService {
     }
 
     // Find or create tag
-    let tag = await db.tag.findUnique({ where: { name: tagName } });
+    let tag = await db.tag.findUnique({
+      where: {
+        tenantId_name: {
+          tenantId: lead.tenantId,
+          name: tagName,
+        },
+      },
+    });
     if (!tag) {
       tag = await db.tag.create({
-        data: { name: tagName, category: 'CUSTOM' },
+        data: {
+          name: tagName,
+          category: 'CUSTOM',
+          tenantId: lead.tenantId,
+        },
       });
     }
 
@@ -109,7 +129,17 @@ export class LeadService {
    * Remove tag from lead
    */
   static async removeTag(leadId: string, tagName: string) {
-    const tag = await db.tag.findUnique({ where: { name: tagName } });
+    const lead = await db.lead.findUnique({ where: { id: leadId } });
+    if (!lead) return;
+
+    const tag = await db.tag.findUnique({
+      where: {
+        tenantId_name: {
+          tenantId: lead.tenantId,
+          name: tagName,
+        },
+      },
+    });
     if (!tag) return;
 
     await db.lead.update({

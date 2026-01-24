@@ -35,7 +35,7 @@ export class MessageBufferService {
    * Triggers the Orchestrator for the accumulated messages.
    */
   private static async processLeadBuffer(phoneNumber: string) {
-    const lead = await db.lead.findUnique({
+    const lead = await db.lead.findFirst({
       where: { phoneNumber },
       select: { id: true, isProcessingAI: true },
     });

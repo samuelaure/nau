@@ -24,7 +24,7 @@ export class Orchestrator {
     logger.info({ from, content, direction, whatsappId }, 'Orchestrating interaction');
 
     // 1. Find or initialize Lead
-    let lead = await db.lead.findUnique({
+    let lead = await db.lead.findFirst({
       where: { phoneNumber: from },
       include: {
         campaign: { include: { stages: { orderBy: { order: 'asc' } } } },
@@ -99,7 +99,7 @@ export class Orchestrator {
    * Process a burst of messages from a lead.
    */
   static async processBurst(from: string) {
-    const lead = await db.lead.findUnique({
+    const lead = await db.lead.findFirst({
       where: { phoneNumber: from },
       include: {
         campaign: { include: { stages: { orderBy: { order: 'asc' } } } },

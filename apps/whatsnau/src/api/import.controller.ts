@@ -118,7 +118,14 @@ router.post(
       });
 
       for (const s of stagingLeads) {
-        const existing = await tx.lead.findFirst({ where: { phoneNumber: s.phoneNumber } });
+        const existing = await tx.lead.findUnique({
+          where: {
+            tenantId_phoneNumber: {
+              tenantId: (req as any).user.tenantId,
+              phoneNumber: s.phoneNumber,
+            },
+          },
+        });
 
         if (existing) {
           await tx.lead.update({
@@ -136,8 +143,9 @@ router.post(
               name: s.name,
               campaignId: batch.campaignId,
               currentStageId: firstStage?.id,
-              state: 'OUTREACH',
+              state: 'COLD',
               metadata: s.rawData,
+              tenantId: (req as any).user.tenantId,
             },
           });
 

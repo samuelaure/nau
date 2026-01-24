@@ -313,13 +313,21 @@ export class SequenceService {
       });
 
       // Create tag if it doesn't exist
-      let tag = await db.tag.findUnique({ where: { name: 'handover_reassurance_sent' } });
+      let tag = await db.tag.findUnique({
+        where: {
+          tenantId_name: {
+            tenantId: lead.tenantId,
+            name: 'handover_reassurance_sent',
+          },
+        },
+      });
       if (!tag) {
         tag = await db.tag.create({
           data: {
             name: 'handover_reassurance_sent',
             category: 'SYSTEM',
             description: 'Handover reassurance message sent',
+            tenantId: lead.tenantId,
           },
         });
       }

@@ -81,7 +81,11 @@ router.get(
     let config = await db.globalConfig.findUnique({ where: { id: 'singleton' } });
     if (!config) {
       config = await db.globalConfig.create({
-        data: { id: 'singleton', availabilityStatus: 'disponible' },
+        data: {
+          id: 'singleton',
+          availabilityStatus: 'disponible',
+          tenant: { connect: { id: (req as any).user.tenantId } },
+        },
       });
     }
     res.json({
@@ -98,7 +102,11 @@ router.post(
     const config = await db.globalConfig.upsert({
       where: { id: 'singleton' },
       update: { availabilityStatus },
-      create: { id: 'singleton', availabilityStatus },
+      create: {
+        id: 'singleton',
+        availabilityStatus,
+        tenant: { connect: { id: (req as any).user.tenantId } },
+      },
     });
     res.json(config);
   })
@@ -125,6 +133,7 @@ router.post(
       data: {
         word: word.toUpperCase().trim(),
         type: type || 'INTERNAL',
+        tenant: { connect: { id: (req as any).user.tenantId } },
       },
     });
     res.json(keyword);
@@ -182,7 +191,12 @@ router.post(
     const { name, knowledgeBase } = req.body;
     const business = await (db as any).businessProfile.upsert({
       where: { id: 'singleton' },
-      create: { id: 'singleton', name, knowledgeBase },
+      create: {
+        id: 'singleton',
+        name,
+        knowledgeBase,
+        tenant: { connect: { id: (req as any).user.tenantId } },
+      },
       update: { name, knowledgeBase },
     });
     res.json(business);
@@ -325,7 +339,13 @@ router.post(
     const { botToken, chatId, isEnabled } = req.body;
     const config = await (db as any).telegramConfig.upsert({
       where: { id: 'singleton' },
-      create: { id: 'singleton', botToken, chatId, isEnabled },
+      create: {
+        id: 'singleton',
+        botToken,
+        chatId,
+        isEnabled,
+        tenant: { connect: { id: (req as any).user.tenantId } },
+      },
       update: { botToken, chatId, isEnabled },
     });
     res.json(config);
@@ -375,6 +395,7 @@ router.post(
         name,
         description: description || '',
         isActive: isActive !== undefined ? isActive : true,
+        tenant: { connect: { id: (req as any).user.tenantId } },
       },
     });
     res.json(campaign);

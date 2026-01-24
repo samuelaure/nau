@@ -9,9 +9,13 @@ export class CampaignService {
   static async seedReferenceCampaign() {
     const campaignName = 'Spain Local Businesses - AI Receptionist Demo';
 
+    const tenant = await db.tenant.findUnique({ where: { slug: 'production' } });
+    if (!tenant) return; // Should have been run after seedAdmin
+
     // Check for existing by name first to avoid unique constraint issues
     const byName = await db.campaign.findFirst({
-      where: { name: campaignName },
+      where: { name: campaignName, tenantId: tenant.id },
+      include: { stages: true, tags: true },
     });
 
     if (byName) {
@@ -30,6 +34,7 @@ export class CampaignService {
         name: campaignName,
         description:
           'Automated WhatsApp lead capture and response system for local businesses in Spain.',
+        tenantId: tenant.id,
       },
       include: {
         stages: true,
@@ -68,8 +73,10 @@ export class CampaignService {
           data: {
             tags: {
               connectOrCreate: {
-                where: { name: tName },
-                create: { name: tName, category: 'INTENT' },
+                where: {
+                  tenantId_name: { tenantId: tenant.id, name: tName },
+                },
+                create: { name: tName, category: 'INTENT', tenantId: tenant.id },
               },
             },
           },
