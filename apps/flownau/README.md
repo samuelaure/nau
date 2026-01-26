@@ -1,33 +1,57 @@
-# Flownaŭ
+# 🌊 Flownaŭ
 
-**An end-to-end automated video publishing platform.**
+> **The Unified Media Engine.** Orchestrating the future of programmatic short-form video.
 
-Flownaŭ is a unified media factory that orchestrates the entire lifecycle of short-form video content. It combines template-based programmatic rendering (Remotion) with a robust asset management pipeline (R2/FFmpeg) and automated social publishing (Instagram Graph API).
+Flownaŭ is a high-performance, end-to-end media factory designed to automate the entire lifecycle of video content—from raw asset ingestion and programmatic rendering to automated social publishing.
 
-## Core Capabilities
-*   **Media Factory**: Upload raw assets, auto-optimize/transcode, and securely store them in Cloudflare R2.
-*   **Programmatic Video**: Render dynamic videos based on flexible templates using Remotion.
-*   **Automated Publishing**: Schedule and auto-publish content to multiple Instagram accounts.
-*   **Multi-Tenancy**: Manage multiple workspaces, projects, and social profiles in a single dashboard.
+## 🚀 Vision
+Built for creators and enterprises who need to scale their video presence without the manual overhead. Flownaŭ unifies the power of **Remotion**, **Cloudflare R2**, and the **Instagram Graph API** into a single, cohesive engine.
 
-## Tech Stack
-*   **Framework**: Next.js 14 (App Router)
-*   **Language**: TypeScript
-*   **Database**: PostgreSQL + Prisma
-*   **Queue System**: Redis + BullMQ
-*   **Rendering**: Remotion + FFmpeg (Headless Chrome)
-*   **Storage**: Cloudflare R2
-*   **Infrastructure**: Docker (Hetzner Cloud)
+## ✨ Key Features
+- **Deterministic Rendering**: Programmatic video generation using React and Remotion.
+- **Intelligent Asset Pipeline**: Automated optimization and storage via R2 and custom FFmpeg routines.
+- **Social Orchestration**: Direct integration with Instagram for scheduled, hands-free publishing.
+- **Multi-Tenant Architecture**: Manage multiple brands and workflows within a unified dashboard.
 
-## Origins
-Flownaŭ is the evolution and unification of two previous projects:
-*   [Astromatic](https://github.com/samuelaure/astromatic): The original Remotion-based rendering engine.
-*   [R2 Asset Manager](https://github.com/samuelaure/r2-asset-manager): The CLI tool for optimizing and syncing media assets to R2.
+## 🛠 Tech Stack
+- **Frontend**: Next.js 15 (App Router), Tailwind CSS (User Request), Framer Motion.
+- **Backend**: Node.js, Prisma ORM, PostgreSQL.
+- **Media**: Remotion (v4), FFmpeg, Cloudflare R2.
+- **Auth**: NextAuth.js with Instagram OAuth.
+- **Infrastructure**: Dockerized deployments on Hetzner CX23.
+
+## 📁 Repository Structure
+```text
+├── prisma/             # Database schema and migrations
+├── public/             # Static assets
+├── src/
+│   ├── app/            # Next.js App Router (Pages & APIs)
+│   ├── components/     # Reusable UI components
+│   ├── lib/            # Core business logic (R2, Instagram, etc.)
+│   └── remotion/       # Video templates and configurations
+└── docker-compose.yml  # Orchestration
+```
+
+## 🛠 Getting Started
+1. **Clone & Install**:
+   ```bash
+   npm install
+   ```
+2. **Environment**:
+   Copy `.env.example` to `.env` and fill in your credentials.
+3. **Database**:
+   ```bash
+   npx prisma migrate dev
+   ```
+4. **Dev Server**:
+   ```bash
+   npm run dev
+   ```
 
 ---
 
-## License
+## ⚖️ License
 **Proprietary Software**
 
-Copyright (c) 2026 Samuel Aure. All Rights Reserved.
-Unauthorized copying of this file, via any medium, is strictly prohibited.
+Copyright (c) 2026 **Samuel Aure**. All rights reserved.
+Unauthorized copying, modification, or distribution of this software is strictly prohibited.
