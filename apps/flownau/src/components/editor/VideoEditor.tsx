@@ -131,7 +131,7 @@ export default function VideoEditor({ templateId, templateName, initialTemplate 
                                     <button onClick={() => handleAddElement('video')} title="Add Video" style={{ background: '#27272a', border: 'none', color: 'white', padding: '4px', borderRadius: '4px', cursor: 'pointer' }}><VideoIcon size={14} /></button>
                                 </div>
                             </div>
-                            <div style={{ flex: 1, overflowY: 'auto' }}>
+                            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
                                 {template.elements.length === 0 && (
                                     <div style={{ padding: '40px 20px', textAlign: 'center', color: '#666', fontSize: '13px' }}>
                                         No layers yet. Add one to get started.
@@ -170,7 +170,7 @@ export default function VideoEditor({ templateId, templateName, initialTemplate 
                             <div style={{ padding: '16px', borderBottom: '1px solid #333', fontWeight: 'bold' }}>
                                 Assets Library
                             </div>
-                            <div style={{ flex: 1, overflowY: 'auto', padding: '12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                                 {assets.map((asset: any) => (
                                     <div
                                         key={asset.id}
@@ -271,7 +271,7 @@ export default function VideoEditor({ templateId, templateName, initialTemplate 
                             <span>Timeline</span>
                             <span>{template.durationInFrames} frames</span>
                         </div>
-                        <div style={{ flex: 1, overflowY: 'auto', position: 'relative', padding: '10px 0' }}>
+                        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', position: 'relative', padding: '10px 0' }}>
                             {template.elements.map((el, i) => (
                                 <div key={el.id} style={{ height: '24px', margin: '4px 0', position: 'relative', display: 'flex', alignItems: 'center' }}>
                                     <div style={{
