@@ -64,67 +64,37 @@ export default function AddTemplateButton({
           action={handleSubmit}
           style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}
         >
-          <div>
-            <label
-              style={{
-                display: 'block',
-                marginBottom: '8px',
-                fontSize: '14px',
-                color: 'var(--text-secondary)',
-              }}
-            >
-              Template Name
-            </label>
+          <div className="form-group">
+            <label className="form-label">Template Name</label>
             <input
               name="name"
               type="text"
               className="input-field"
               placeholder="e.g. Daily Update"
-              style={{ width: '100%' }}
               required
             />
           </div>
 
-          <div>
-            <label
-              style={{
-                display: 'block',
-                marginBottom: '8px',
-                fontSize: '14px',
-                color: 'var(--text-secondary)',
-              }}
-            >
-              Remotion Component ID
-            </label>
+          <div className="form-group">
+            <label className="form-label">Remotion Component ID</label>
             <input
               name="remotionId"
               type="text"
               className="input-field"
               placeholder="e.g. MyVideoComposition"
-              style={{ width: '100%' }}
               required
             />
           </div>
 
-          <div>
-            <label
-              style={{
-                display: 'block',
-                marginBottom: '8px',
-                fontSize: '14px',
-                color: 'var(--text-secondary)',
-              }}
-            >
-              Linked Account
-            </label>
+          <div className="form-group">
+            <label className="form-label">Linked Account</label>
             <select
               name="accountId"
               className="input-field"
-              style={{ width: '100%', cursor: 'pointer' }}
               defaultValue={defaultAccountId || ''}
             >
               <option value="">No Account (Global)</option>
-              {accounts.map((account) => (
+              {accounts.map((account: any) => (
                 <option key={account.id} value={account.id}>
                   {account.username} ({account.platform})
                 </option>
@@ -132,23 +102,13 @@ export default function AddTemplateButton({
             </select>
           </div>
 
-          <div>
-            <label
-              style={{
-                display: 'block',
-                marginBottom: '8px',
-                fontSize: '14px',
-                color: 'var(--text-secondary)',
-              }}
-            >
-              Airtable Table ID (Optional)
-            </label>
+          <div className="form-group">
+            <label className="form-label">Airtable Table ID (Optional)</label>
             <input
               name="airtableTableId"
               type="text"
               className="input-field"
               placeholder="tbl..."
-              style={{ width: '100%' }}
             />
           </div>
 

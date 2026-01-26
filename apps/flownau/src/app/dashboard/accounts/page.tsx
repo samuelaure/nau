@@ -1,7 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { Instagram } from 'lucide-react'
 import AddAccountButton from './AddAccountButton'
-import ExternalAccountLink from './ExternalAccountLink'
 import { deleteAccount } from './actions'
 import ActionMenu from '@/components/ActionMenu'
 import Link from 'next/link'
@@ -118,9 +117,6 @@ export default async function AccountsPage() {
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <h3 style={{ fontSize: '18px' }}>{account.username || 'Syncing...'}</h3>
-                    <div style={{ position: 'relative', zIndex: 10 }}>
-                      <ExternalAccountLink username={account.username} />
-                    </div>
                   </div>
                   <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                     Added on {new Date(account.createdAt).toLocaleDateString()}

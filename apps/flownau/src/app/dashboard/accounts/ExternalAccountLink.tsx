@@ -3,7 +3,7 @@
 import { ExternalLink } from 'lucide-react'
 
 interface ExternalAccountLinkProps {
-  username?: string
+  username?: string | null
 }
 
 export default function ExternalAccountLink({ username }: ExternalAccountLinkProps) {
@@ -11,7 +11,7 @@ export default function ExternalAccountLink({ username }: ExternalAccountLinkPro
 
   return (
     <a
-      href={`https://instagram.com/${username.replace('@', '')}`}
+      href={`https://www.instagram.com/${username.replace('@', '')}`}
       target="_blank"
       rel="noopener noreferrer"
       onClick={(e) => e.stopPropagation()}

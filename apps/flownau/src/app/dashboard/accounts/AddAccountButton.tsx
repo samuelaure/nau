@@ -25,18 +25,7 @@ export default function AddAccountButton({ existingAccounts = [] }: AddAccountBu
   // State to manage the token input value, so we can control it
   const [tokenValue, setTokenValue] = useState('')
 
-  const handleTokenSourceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value
-    setSelectedTokenSource(value)
-    if (value) {
-      const account = existingAccounts.find(a => a.id === value)
-      if (account) {
-        setTokenValue(account.accessToken)
-      }
-    } else {
-      setTokenValue('')
-    }
-  }
+
 
   const handleSubmit = async (formData: FormData) => {
     setError(null)
@@ -90,15 +79,8 @@ export default function AddAccountButton({ existingAccounts = [] }: AddAccountBu
           action={handleSubmit}
           style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}
         >
-          <div>
-            <label
-              style={{
-                display: 'block',
-                marginBottom: '8px',
-                fontSize: '14px',
-                color: 'var(--text-secondary)',
-              }}
-            >
+          <div className="form-group">
+            <label className="form-label">
               Instagram Username
             </label>
             <input
@@ -106,20 +88,12 @@ export default function AddAccountButton({ existingAccounts = [] }: AddAccountBu
               type="text"
               className="input-field"
               placeholder="@username"
-              style={{ width: '100%' }}
               required
             />
           </div>
 
-          <div>
-            <label
-              style={{
-                display: 'block',
-                marginBottom: '8px',
-                fontSize: '14px',
-                color: 'var(--text-secondary)',
-              }}
-            >
+          <div className="form-group">
+            <label className="form-label">
               User ID (Platform ID)
             </label>
             <input
@@ -127,65 +101,92 @@ export default function AddAccountButton({ existingAccounts = [] }: AddAccountBu
               type="text"
               className="input-field"
               placeholder="1784140..."
-              style={{ width: '100%' }}
               required
             />
           </div>
 
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <label
+          <div className="form-group" style={{ position: 'relative' }}>
+            <label className="form-label">Access Token</label>
+            <div style={{ position: 'relative' }}>
+              <input
+                name="accessToken"
+                type="password"
+                className="input-field"
+                placeholder="EAAB..."
+                required
+                value={tokenValue}
+                onChange={(e) => setTokenValue(e.target.value)}
+                onFocus={() => accountsWithTokens.length > 0 && setSelectedTokenSource('open')}
+                onBlur={() => setTimeout(() => setSelectedTokenSource(''), 200)}
                 style={{
-                  fontSize: '14px',
-                  color: 'var(--text-secondary)',
+                  paddingRight: accountsWithTokens.length > 0 ? '40px' : '18px'
                 }}
-              >
-                Access Token
-              </label>
-
+              />
               {accountsWithTokens.length > 0 && (
-                <div style={{ position: 'relative' }}>
-                  <select
-                    value={selectedTokenSource}
-                    onChange={handleTokenSourceChange}
-                    style={{
-                      background: 'rgba(255,255,255,0.05)',
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      color: 'var(--text-primary)',
-                      fontSize: '12px',
-                      padding: '4px 8px',
-                      borderRadius: '4px',
-                      outline: 'none',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <option value="">Manual Entry</option>
-                    {accountsWithTokens.map(acc => (
-                      <option key={acc.id} value={acc.id}>
-                        Copy from {acc.username}
-                      </option>
-                    ))}
-                  </select>
+                <div
+                  style={{
+                    position: 'absolute',
+                    right: '16px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    pointerEvents: 'none',
+                    opacity: 0.5
+                  }}
+                >
+                  <Plus size={16} />
+                </div>
+              )}
+
+              {selectedTokenSource === 'open' && accountsWithTokens.length > 0 && (
+                <div
+                  className="glass"
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 8px)',
+                    left: 0,
+                    right: 0,
+                    zIndex: 20,
+                    padding: '8px',
+                    background: '#1a1a1c',
+                    boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                    border: '1px solid var(--border-color)',
+                    maxHeight: '200px',
+                    overflowY: 'auto'
+                  }}
+                >
+                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', padding: '8px', borderBottom: '1px solid var(--border-color)', marginBottom: '4px' }}>
+                    Copy from existing account:
+                  </p>
+                  {accountsWithTokens.map((acc) => (
+                    <div
+                      key={acc.id}
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        setTokenValue(acc.accessToken)
+                        setSelectedTokenSource('')
+                      }}
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        transition: 'background 0.2s'
+                      }}
+                      onMouseOver={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
+                      onMouseOut={(e) => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'rgba(225, 48, 108, 0.2)', display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center', color: '#e1306c' }}>
+                        <Instagram size={14} />
+                      </div>
+                      <span style={{ fontWeight: '500' }}>{acc.username}</span>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
-
-            <input
-              name="accessToken"
-              type="password"
-              className="input-field"
-              placeholder="EAAB..."
-              style={{ width: '100%' }}
-              required
-              value={tokenValue}
-              onChange={(e) => setTokenValue(e.target.value)}
-            />
-            {selectedTokenSource && (
-              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                <Copy size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                Using token from selected account
-              </p>
-            )}
           </div>
 
           {error && (

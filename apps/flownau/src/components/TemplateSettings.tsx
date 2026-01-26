@@ -74,82 +74,38 @@ export default function TemplateSettings({
           action={handleUpdate}
           style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}
         >
-          <div>
-            <label
-              style={{
-                display: 'block',
-                marginBottom: '8px',
-                fontSize: '14px',
-                color: 'var(--text-secondary)',
-              }}
-            >
-              Template Name
-            </label>
-            <input name="name" defaultValue={template.name} className="input" required />
+          <div className="form-group">
+            <label className="form-label">Template Name</label>
+            <input name="name" defaultValue={template.name} className="input-field" required />
           </div>
-          <div>
-            <label
-              style={{
-                display: 'block',
-                marginBottom: '8px',
-                fontSize: '14px',
-                color: 'var(--text-secondary)',
-              }}
-            >
-              Remotion Composition ID
-            </label>
+          <div className="form-group">
+            <label className="form-label">Remotion Composition ID</label>
             <input
               name="remotionId"
               defaultValue={template.remotionId}
-              className="input"
+              className="input-field"
               required
             />
           </div>
-          <div>
-            <label
-              style={{
-                display: 'block',
-                marginBottom: '8px',
-                fontSize: '14px',
-                color: 'var(--text-secondary)',
-              }}
-            >
-              Airtable Table ID
-            </label>
+          <div className="form-group">
+            <label className="form-label">Airtable Table ID</label>
             <input
               name="airtableTableId"
               defaultValue={template.airtableTableId || ''}
-              className="input"
+              className="input-field"
             />
           </div>
-          <div>
-            <label
-              style={{
-                display: 'block',
-                marginBottom: '8px',
-                fontSize: '14px',
-                color: 'var(--text-secondary)',
-              }}
-            >
-              Linked Account
-            </label>
+          <div className="form-group">
+            <label className="form-label">Linked Account</label>
             <select
               name="accountId"
               defaultValue={template.accountId || ''}
-              className="input"
-              style={{
-                width: '100%',
-                background: '#18181b',
-                border: '1px solid var(--border-color)',
-                padding: '10px',
-                borderRadius: '8px',
-                color: 'white',
-              }}
+              className="input-field"
             >
               <option value="">No linked account (Global)</option>
               {accounts?.map((acc: any) => (
                 <option key={acc.id} value={acc.id}>
-                  &nbsp;{acc.username} ({acc.platform})
+                  {acc.username} ({acc.platform})
                 </option>
               ))}
             </select>

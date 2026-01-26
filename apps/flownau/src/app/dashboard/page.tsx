@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { Instagram, Video, CheckCircle, Clock } from 'lucide-react'
+import { Instagram, Video } from 'lucide-react'
 
 export default async function DashboardPage() {
   const accountsCount = await prisma.socialAccount.count()
@@ -13,8 +13,6 @@ export default async function DashboardPage() {
   const stats = [
     { name: 'Active Accounts', value: accountsCount, icon: Instagram, color: '#E1306C' },
     { name: 'Total Templates', value: templatesCount, icon: Video, color: '#7C3AED' },
-    { name: 'Success Rate', value: '98.2%', icon: CheckCircle, color: '#10B981' },
-    { name: 'Est. Render Time', value: '42s', icon: Clock, color: '#F59E0B' },
   ]
 
   return (

@@ -6,6 +6,7 @@ import AssetsManager from '@/components/AssetsManager'
 import AddTemplateButton from '@/app/dashboard/templates/AddTemplateButton'
 import AccountSettings from '@/components/AccountSettings'
 import TemplateCard from '@/components/TemplateCard'
+import ExternalAccountLink from '../ExternalAccountLink'
 
 export default async function AccountPage({
   params,
@@ -84,7 +85,10 @@ export default async function AccountPage({
             </div>
           </div>
           <div>
-            <h1 style={{ fontSize: '32px', marginBottom: '8px' }}>{account.username}</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+              <h1 style={{ fontSize: '32px' }}>{account.username}</h1>
+              <ExternalAccountLink username={account.username} />
+            </div>
             <p style={{ color: 'var(--text-secondary)' }}>
               Instagram Business Account • {account.platformId}
             </p>

@@ -17,40 +17,34 @@ export default function AccountSettings({ account }: { account: any }) {
       <div className="card" style={{ padding: '32px' }}>
         <h3 style={{ fontSize: '20px', marginBottom: '24px' }}>Account Settings</h3>
 
-        <form action={handleUpdate} className="grid gap-6">
-          <div className="grid grid-cols-[1fr_2fr] items-center gap-4">
-            <label className="text-sm font-medium text-[var(--text-secondary)]">Username</label>
-            <input name="username" defaultValue={account.username} className="input" required />
+        <form action={handleUpdate} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div className="form-group">
+            <label className="form-label">Username</label>
+            <input name="username" defaultValue={account.username} className="input-field" required />
           </div>
-          <div className="grid grid-cols-[1fr_2fr] items-center gap-4">
-            <label className="text-sm font-medium text-[var(--text-secondary)]">
-              Instagram User ID
-            </label>
-            <input name="platformId" defaultValue={account.platformId} className="input" required />
+          <div className="form-group">
+            <label className="form-label">Instagram User ID</label>
+            <input name="platformId" defaultValue={account.platformId} className="input-field" required />
           </div>
-          <div className="grid grid-cols-[1fr_2fr] items-start gap-4">
-            <div className="pt-2">
-              <label className="block text-sm font-medium text-[var(--text-secondary)]">
-                Access Token
-              </label>
-              <span className="text-xs text-[var(--text-secondary)] mt-1 block">
-                Optional rotation
+          <div className="form-group">
+            <label className="form-label">
+              Access Token
+              <span style={{ fontSize: '12px', fontWeight: '400', marginLeft: '8px', opacity: 0.7 }}>
+                (Optional rotation)
               </span>
-            </div>
-            <div>
-              <input
-                name="accessToken"
-                placeholder="**********************"
-                className="input"
-                type="password"
-              />
-              <p className="mt-2 text-xs text-[var(--text-secondary)]">
-                Only provide a new token if you want to rotate it or it has expired.
-              </p>
-            </div>
+            </label>
+            <input
+              name="accessToken"
+              placeholder="**********************"
+              className="input-field"
+              type="password"
+            />
+            <p style={{ marginTop: '8px', color: 'var(--text-secondary)', fontSize: '12px' }}>
+              Only provide a new token if you want to rotate it or it has expired.
+            </p>
           </div>
 
-          <div className="flex justify-end pt-4 border-t border-[var(--border-color)]">
+          <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
             <button type="submit" className="btn-primary" disabled={isPending}>
               {isPending ? 'Saving...' : 'Save Changes'}
             </button>
