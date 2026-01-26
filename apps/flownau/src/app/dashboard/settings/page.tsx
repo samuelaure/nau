@@ -1,4 +1,5 @@
 import { getSetting, setSetting } from './actions'
+import SyncButton from './SyncButton'
 
 export default async function SettingsPage() {
   const apifyToken = await getSetting('apify_api_token')
@@ -39,6 +40,23 @@ export default async function SettingsPage() {
             </p>
           </div>
         </form>
+      </div>
+
+      <div className="card p-8 mt-6">
+        <h3 className="text-xl font-semibold mb-6">Storage & Sync</h3>
+
+        <div>
+          <div className="flex justify-between items-start">
+            <div>
+              <h4 className="font-medium mb-1">R2 Assets Sync</h4>
+              <p className="text-sm text-[var(--text-secondary)] mb-4 max-w-sm">
+                Re-scan the Cloudflare R2 bucket and update the database.
+                Useful if files were manually added, moved, or deleted in the storage bucket.
+              </p>
+            </div>
+            <SyncButton />
+          </div>
+        </div>
       </div>
     </div>
   )

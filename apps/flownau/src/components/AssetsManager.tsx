@@ -115,10 +115,12 @@ export default function AssetsManager({ ownerId, ownerType, assets, basePath }: 
         const startsWithBase = baseParts.every(
           (part, i) => parts[i]?.toLowerCase() === part.toLowerCase(),
         )
-        if (!startsWithBase) return acc
 
-        // Slice away the base
-        parts = parts.slice(baseParts.length)
+        // Only strip the base path if it matches
+        if (startsWithBase) {
+          parts = parts.slice(baseParts.length)
+        }
+        // If it doesn't match, we show the full path (starting from root or whatever structure exists)
       }
 
       // Check if asset is within currentPath
