@@ -75,3 +75,17 @@ export async function duplicateTemplate(id: string) {
 
   revalidatePath('/dashboard/templates')
 }
+
+export async function saveTemplateConfig(id: string, config: any) {
+  if (!id) throw new Error('Missing ID')
+
+  await prisma.template.update({
+    where: { id },
+    data: {
+      config,
+      remotionId: 'Universal',
+    },
+  })
+
+  revalidatePath(`/dashboard/templates/${id}`)
+}

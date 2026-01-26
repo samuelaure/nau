@@ -19,6 +19,7 @@
     "@remotion/bundler": "^4.0.409",
     "@remotion/cli": "^4.0.409",
     "@remotion/google-fonts": "^4.0.409",
+    "@remotion/player": "^4.0.409",
     "@remotion/renderer": "^4.0.409",
     "@types/bcryptjs": "^2.4.6",
     "@types/pg": "^8.16.0",

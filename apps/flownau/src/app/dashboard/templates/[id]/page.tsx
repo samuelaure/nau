@@ -99,6 +99,22 @@ export default async function TemplatePage({
           marginBottom: '32px',
         }}
       >
+        <Link
+          href={`/editor/${id}`}
+          style={{
+            padding: '12px 24px',
+            textDecoration: 'none',
+            color: 'var(--text-secondary)',
+            borderBottom: '2px solid transparent',
+            marginBottom: '-1px',
+            fontWeight: '400',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
+          Editor <ChevronRight size={12} />
+        </Link>
         <TabLink
           href={`/dashboard/templates/${id}?tab=overview`}
           active={activeTab === 'overview'}
