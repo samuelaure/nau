@@ -1,0 +1,9 @@
+.next
+node_modules
+public
+dist
+build
+package-lock.json
+*.json
+!package.json
+!tsconfig.json
