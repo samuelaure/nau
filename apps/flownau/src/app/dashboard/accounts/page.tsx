@@ -29,7 +29,13 @@ export default async function AccountsPage() {
             Manage multiple Instagram profiles and their connections.
           </p>
         </div>
-        <AddAccountButton />
+        <AddAccountButton
+          existingAccounts={accounts.map(a => ({
+            id: a.id,
+            username: a.username,
+            accessToken: a.accessToken
+          }))}
+        />
       </header>
 
       <div
@@ -49,7 +55,7 @@ export default async function AccountsPage() {
 
             <ActionMenu
               onDelete={deleteAccount.bind(null, account.id)}
-              // Audit: ActionMenu usually has z-index high enough (10 in component)
+            // Audit: ActionMenu usually has z-index high enough (10 in component)
             />
 
             <div
