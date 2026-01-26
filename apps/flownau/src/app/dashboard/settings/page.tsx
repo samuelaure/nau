@@ -1,5 +1,6 @@
-import { getSetting, setSetting } from './actions'
+import { getSetting } from '@/lib/settings'
 import SyncButton from './SyncButton'
+import ApifyTokenForm from './ApifyTokenForm'
 
 export default async function SettingsPage() {
   const apifyToken = await getSetting('apify_api_token')
@@ -16,30 +17,7 @@ export default async function SettingsPage() {
       <div className="card p-8">
         <h3 className="text-xl font-semibold mb-6">Integrations</h3>
 
-        <form action={setSetting} className="grid gap-6">
-          <input type="hidden" name="key" value="apify_api_token" />
-
-          <div>
-            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-              Apify API Token
-            </label>
-            <div className="flex gap-4">
-              <input
-                name="value"
-                defaultValue={apifyToken || ''}
-                placeholder="apify_api_..."
-                type="password"
-                className="input flex-1"
-              />
-              <button type="submit" className="btn-primary">
-                Save
-              </button>
-            </div>
-            <p className="mt-2 text-xs text-[var(--text-secondary)]">
-              Required for Instagram scraping and synchronization.
-            </p>
-          </div>
-        </form>
+        <ApifyTokenForm initialToken={apifyToken || ''} />
       </div>
 
       <div className="card p-8 mt-6">

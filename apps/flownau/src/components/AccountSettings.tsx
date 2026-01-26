@@ -2,6 +2,7 @@
 
 import { useTransition } from 'react'
 import { updateAccount } from '@/app/dashboard/accounts/actions'
+import RefreshProfileButton from '@/app/dashboard/accounts/RefreshProfileButton'
 
 export default function AccountSettings({ account }: { account: any }) {
   const [isPending, startTransition] = useTransition()
@@ -15,7 +16,10 @@ export default function AccountSettings({ account }: { account: any }) {
   return (
     <div className="animate-fade-in" style={{ maxWidth: '600px' }}>
       <div className="card" style={{ padding: '32px' }}>
-        <h3 style={{ fontSize: '20px', marginBottom: '24px' }}>Account Settings</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+          <h3 style={{ fontSize: '20px', margin: 0 }}>Account Settings</h3>
+          <RefreshProfileButton accountId={account.id} />
+        </div>
 
         <form action={handleUpdate} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <div className="form-group">

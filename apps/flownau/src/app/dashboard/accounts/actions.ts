@@ -81,6 +81,7 @@ export async function updateAccount(id: string, formData: FormData) {
 }
 
 import { ApifyService } from '@/lib/apify'
+import { downloadAndUploadProfileImage } from '@/lib/profile-image-service'
 
 export async function syncAccountProfile(id: string) {
   const account = await prisma.socialAccount.findUnique({ where: { id } })
@@ -89,15 +90,26 @@ export async function syncAccountProfile(id: string) {
   // Remove @ if present for logic (though ApifyService also does it, good to have it there)
   const result = await ApifyService.fetchProfile(account.username)
 
-  if (result.status === 'success' && result.profileImage) {
+  if (result.status === 'success') {
+    let finalProfileImage = account.profileImage
+
+    if (result.profileImage) {
+      // Download from Apify (temporary link) and upload to our R2
+      const r2Url = await downloadAndUploadProfileImage(result.profileImage, account.username)
+      if (r2Url) {
+        finalProfileImage = r2Url
+      }
+    }
+
     await prisma.socialAccount.update({
       where: { id },
       data: {
         // Update profile image and platform ID if found
-        profileImage: result.profileImage || null,
+        profileImage: finalProfileImage,
         platformId: result.id || account.platformId,
       },
     })
     revalidatePath('/dashboard/accounts')
+    revalidatePath(`/dashboard/accounts/${id}`)
   }
 }

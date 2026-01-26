@@ -68,6 +68,7 @@ export default async function AccountPage({
               background:
                 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)',
               padding: '3px',
+              overflow: 'hidden'
             }}
           >
             <div
@@ -79,9 +80,18 @@ export default async function AccountPage({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                overflow: 'hidden'
               }}
             >
-              <Instagram size={40} />
+              {account.profileImage ? (
+                <img
+                  src={account.profileImage}
+                  alt={account.username || 'Profile'}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              ) : (
+                <Instagram size={40} />
+              )}
             </div>
           </div>
           <div>

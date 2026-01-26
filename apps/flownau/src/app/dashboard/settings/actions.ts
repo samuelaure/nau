@@ -2,10 +2,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
-import { getSetting } from '@/lib/settings'
 import { syncR2Assets } from '@/lib/r2-sync-service'
-
-export { getSetting }
 
 export async function setSetting(formData: FormData) {
   const key = formData.get('key') as string
