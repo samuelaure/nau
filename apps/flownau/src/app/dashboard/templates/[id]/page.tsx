@@ -29,8 +29,8 @@ export default async function TemplatePage({
     prisma.user.findFirst().then((user) =>
       user
         ? prisma.socialAccount.findMany({
-            where: { userId: user.id },
-          })
+          where: { userId: user.id },
+        })
         : [],
     ),
   ])
@@ -176,10 +176,24 @@ function TabLink({
 }
 
 async function TemplateAssets({ templateId }: { templateId: string }) {
+  const template = await prisma.template.findUnique({
+    where: { id: templateId },
+    include: { account: true },
+  })
+
   const assets = await prisma.asset.findMany({
     where: { templateId },
     orderBy: { createdAt: 'desc' },
   })
 
-  return <AssetsManager ownerId={templateId} ownerType="template" assets={assets} />
+  let basePath = ''
+  if (template?.account) {
+    basePath = template.account.username || template.account.id
+  } else {
+    basePath = 'templates/global'
+  }
+
+  return (
+    <AssetsManager ownerId={templateId} ownerType="template" assets={assets} basePath={basePath} />
+  )
 }

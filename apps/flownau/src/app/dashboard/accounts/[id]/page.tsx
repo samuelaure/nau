@@ -216,10 +216,17 @@ async function AccountTemplates({ accountId }: { accountId: string }) {
 }
 
 async function AccountAssets({ accountId }: { accountId: string }) {
+  const account = await prisma.socialAccount.findUnique({
+    where: { id: accountId },
+    select: { username: true, id: true },
+  })
+
   const assets = await prisma.asset.findMany({
     where: { accountId },
     orderBy: { createdAt: 'desc' },
   })
 
-  return <AssetsManager ownerId={accountId} ownerType="account" assets={assets} />
+  const basePath = account?.username || account?.id || ''
+
+  return <AssetsManager ownerId={accountId} ownerType="account" assets={assets} basePath={basePath} />
 }

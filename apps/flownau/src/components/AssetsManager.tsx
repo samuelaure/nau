@@ -2,13 +2,25 @@
 
 import { useState, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { Upload, FileAudio, FileVideo, Image as ImageIcon, Copy, Loader2, Play } from 'lucide-react'
+import {
+  Upload,
+  FileAudio,
+  FileVideo,
+  Image as ImageIcon,
+  Copy,
+  Loader2,
+  Play,
+  Folder,
+  ChevronRight,
+  Home,
+} from 'lucide-react'
 import { deleteAsset } from '@/app/dashboard/actions'
 import ActionMenu from '@/components/ActionMenu'
 
 interface Asset {
   id: string
   url: string
+  r2Key: string
   systemFilename: string
   originalFilename: string
   type: string
@@ -20,11 +32,13 @@ interface AssetsManagerProps {
   ownerId: string
   ownerType: 'account' | 'template' // Context
   assets: Asset[]
+  basePath?: string // Logical root to hide (e.g., account name)
 }
 
-export default function AssetsManager({ ownerId, ownerType, assets }: AssetsManagerProps) {
+export default function AssetsManager({ ownerId, ownerType, assets, basePath }: AssetsManagerProps) {
   const [uploading, setUploading] = useState<boolean>(false)
   const [progress, setProgress] = useState<string>('')
+  const [currentPath, setCurrentPath] = useState<string[]>([])
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
@@ -89,8 +103,100 @@ export default function AssetsManager({ ownerId, ownerType, assets }: AssetsMana
     },
   })
 
+  // Grouping logic
+  const items = assets.reduce(
+    (acc, asset) => {
+      let parts = asset.r2Key ? asset.r2Key.split('/') : [asset.systemFilename]
+
+      // If basePath is provided, filter and slice parts
+      if (basePath) {
+        const baseParts = basePath.split('/').filter(Boolean)
+        // Check if starts with basePath (case-insensitive)
+        const startsWithBase = baseParts.every(
+          (part, i) => parts[i]?.toLowerCase() === part.toLowerCase(),
+        )
+        if (!startsWithBase) return acc
+
+        // Slice away the base
+        parts = parts.slice(baseParts.length)
+      }
+
+      // Check if asset is within currentPath
+      const isInPath = currentPath.every((part, i) => parts[i] === part)
+      if (!isInPath) return acc
+
+      const nextPart = parts[currentPath.length]
+      if (!nextPart) return acc // Should not happen if isInPath is true
+
+      if (parts.length > currentPath.length + 1) {
+        // It's a folder
+        if (!acc.folders.has(nextPart)) {
+          acc.folders.add(nextPart)
+        }
+      } else {
+        // It's a file
+        acc.files.push(asset)
+      }
+      return acc
+    },
+    { folders: new Set<string>(), files: [] as Asset[] },
+  )
+
+  const sortedFolders = Array.from(items.folders).sort()
+
   return (
     <div className="animate-fade-in">
+      {/* Breadcrumbs */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          marginBottom: '24px',
+          fontSize: '14px',
+          color: 'var(--text-secondary)',
+        }}
+      >
+        <button
+          onClick={() => setCurrentPath([])}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: currentPath.length === 0 ? 'white' : 'inherit',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            padding: '4px 8px',
+            borderRadius: '4px',
+            transition: 'background 0.2s',
+          }}
+          className="hover-bg"
+        >
+          <Home size={14} /> Root
+        </button>
+
+        {currentPath.map((part, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <ChevronRight size={14} />
+            <button
+              onClick={() => setCurrentPath(currentPath.slice(0, i + 1))}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: i === currentPath.length - 1 ? 'white' : 'inherit',
+                cursor: 'pointer',
+                padding: '4px 8px',
+                borderRadius: '4px',
+              }}
+              className="hover-bg"
+            >
+              {part}
+            </button>
+          </div>
+        ))}
+      </div>
+
       <div
         {...getRootProps()}
         style={{
@@ -142,16 +248,58 @@ export default function AssetsManager({ ownerId, ownerType, assets }: AssetsMana
           gap: '24px',
         }}
       >
-        {assets.map((asset) => (
+        {/* Folders */}
+        {sortedFolders.map((folder) => (
+          <div
+            key={folder}
+            className="card hover-glow"
+            style={{
+              cursor: 'pointer',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '24px',
+              gap: '12px',
+            }}
+            onClick={() => setCurrentPath([...currentPath, folder])}
+          >
+            <Folder size={48} style={{ color: 'var(--accent-color)', opacity: 0.8 }} />
+            <span
+              style={{
+                fontSize: '14px',
+                fontWeight: '500',
+                textAlign: 'center',
+                wordBreak: 'break-all',
+              }}
+            >
+              {folder}
+            </span>
+          </div>
+        ))}
+
+        {/* Files */}
+        {items.files.map((asset) => (
           <AssetCard key={asset.id} asset={asset} />
         ))}
       </div>
 
-      {assets.length === 0 && !uploading && (
+      {sortedFolders.length === 0 && items.files.length === 0 && !uploading && (
         <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '40px' }}>
-          No assets found.
+          No folders or assets found in this directory.
         </div>
       )}
+
+      <style jsx global>{`
+        .hover-bg:hover {
+          background: rgba(255, 255, 255, 0.05);
+        }
+        .hover-glow:hover {
+          border-color: var(--accent-color);
+          box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
+          transform: translateY(-2px);
+        }
+      `}</style>
     </div>
   )
 }
