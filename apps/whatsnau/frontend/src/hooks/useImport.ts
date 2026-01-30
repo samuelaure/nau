@@ -10,8 +10,10 @@ export const useImport = (fetchData: () => void) => {
 
   const fetchBatches = useCallback(async () => {
     try {
-      const res = await fetch('/api/dashboard/import/batches');
-      setBatches(await res.json());
+      const res = await fetch('/api/dashboard/import/batches?limit=50');
+      const data = await res.json();
+      // Handle both old format (array) and new format (object with data property)
+      setBatches(Array.isArray(data) ? data : data.data || []);
     } catch (error) {
       console.error('Failed to fetch batches:', error);
       notify('error', 'Failed to load import batches.');

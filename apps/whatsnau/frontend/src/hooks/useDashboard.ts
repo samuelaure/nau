@@ -18,8 +18,8 @@ export const useDashboard = (campaignId?: string) => {
     try {
       const baseUrl = '/api/dashboard';
       const leadsUrl = campaignId
-        ? `${baseUrl}/leads?campaignId=${campaignId}`
-        : `${baseUrl}/leads`;
+        ? `${baseUrl}/leads?campaignId=${campaignId}&limit=100`
+        : `${baseUrl}/leads?limit=100`;
 
       const [statsRes, leadsRes, keywordsRes, configRes] = await Promise.all([
         fetch(`${baseUrl}/stats`),
@@ -34,7 +34,8 @@ export const useDashboard = (campaignId?: string) => {
       const configData = await configRes.json();
 
       setStats(statsData);
-      setLeads(leadsData);
+      // Handle both old format (array) and new format (object with data property)
+      setLeads(Array.isArray(leadsData) ? leadsData : leadsData.data || []);
       setKeywords(keywordsData);
       setAvailability(configData.availabilityStatus || '');
     } catch (error) {

@@ -41,9 +41,10 @@ export const CampaignManager: React.FC = () => {
 
   const fetchCampaigns = async () => {
     try {
-      const res = await fetch('/api/campaigns');
+      const res = await fetch('/api/dashboard/campaigns?limit=50');
       const data = await res.json();
-      setCampaigns(data);
+      // Handle both old format (array) and new format (object with data property)
+      setCampaigns(Array.isArray(data) ? data : data.data || []);
     } catch (error) {
       console.error('Failed to fetch campaigns:', error);
     }
