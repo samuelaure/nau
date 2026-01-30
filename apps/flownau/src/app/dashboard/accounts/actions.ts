@@ -2,34 +2,51 @@
 
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
+import { ApifyService } from '@/lib/apify'
+import { downloadAndUploadProfileImage } from '@/lib/profile-image-service'
+import { auth } from '@/auth'
+import { z } from 'zod'
+
+const AccountSchema = z.object({
+  username: z.string().min(1, 'Username is required'),
+  accessToken: z.string().min(1, 'Access Token is required'),
+  platformId: z.string().min(1, 'Platform ID is required'),
+})
+
+const AccountUpdateSchema = z.object({
+  username: z.string().min(1, 'Username is required'),
+  platformId: z.string().min(1, 'Platform ID is required'),
+  accessToken: z.string().optional().or(z.literal('')).transform(val => val || undefined),
+})
+
+const IdSchema = z.string().min(1)
+
+async function checkAuth() {
+  const session = await auth()
+  if (!session?.user?.id) {
+    throw new Error('Unauthorized')
+  }
+  return { user: { ...session.user, id: session.user.id } } // Ensure id is string
+}
 
 export async function addAccount(formData: FormData) {
-  const username = formData.get('username') as string
-  const accessToken = formData.get('accessToken') as string
-  const platformId = formData.get('platformId') as string
+  const { user } = await checkAuth()
 
-  if (!username || !accessToken || !platformId) {
-    throw new Error('Missing required fields')
+  const rawData = {
+    username: formData.get('username'),
+    accessToken: formData.get('accessToken'),
+    platformId: formData.get('platformId'),
   }
 
-  // Find a default user or create one for dev purposes
-  let user = await prisma.user.findFirst()
-  if (!user) {
-    user = await prisma.user.create({
-      data: {
-        name: 'Dev User',
-        email: 'dev@example.com',
-      },
-    })
-  }
+  const data = AccountSchema.parse(rawData)
 
   const newAccount = await prisma.socialAccount.create({
     data: {
       userId: user.id,
       platform: 'instagram',
-      username,
-      accessToken,
-      platformId,
+      username: data.username,
+      accessToken: data.accessToken,
+      platformId: data.platformId,
     },
   })
 
@@ -40,24 +57,27 @@ export async function addAccount(formData: FormData) {
 }
 
 export async function deleteAccount(id: string) {
-  if (!id) throw new Error('Missing ID')
+  await checkAuth()
+  const parsedId = IdSchema.parse(id)
 
   await prisma.socialAccount.delete({
-    where: { id },
+    where: { id: parsedId },
   })
 
   revalidatePath('/dashboard/accounts')
 }
 
 export async function updateAccount(id: string, formData: FormData) {
-  const username = formData.get('username') as string
-  const platformId = formData.get('platformId') as string
-  // Access token optional on update? Assuming yes, or user might re-enter it.
-  const accessToken = formData.get('accessToken') as string
+  await checkAuth()
+  const parsedId = IdSchema.parse(id)
 
-  if (!id || !username || !platformId) {
-    throw new Error('Missing required fields')
+  const rawData = {
+    username: formData.get('username'),
+    platformId: formData.get('platformId'),
+    accessToken: formData.get('accessToken'),
   }
+
+  const { username, platformId, accessToken } = AccountUpdateSchema.parse(rawData)
 
   const data: any = {
     username,
@@ -69,22 +89,22 @@ export async function updateAccount(id: string, formData: FormData) {
   }
 
   await prisma.socialAccount.update({
-    where: { id },
+    where: { id: parsedId },
     data,
   })
 
   // Attempt sync on update
-  await syncAccountProfile(id)
+  await syncAccountProfile(parsedId)
 
   revalidatePath('/dashboard/accounts')
-  revalidatePath(`/dashboard/accounts/${id}`)
+  revalidatePath(`/dashboard/accounts/${parsedId}`)
 }
 
-import { ApifyService } from '@/lib/apify'
-import { downloadAndUploadProfileImage } from '@/lib/profile-image-service'
-
 export async function syncAccountProfile(id: string) {
-  const account = await prisma.socialAccount.findUnique({ where: { id } })
+  await checkAuth()
+  const parsedId = IdSchema.parse(id)
+
+  const account = await prisma.socialAccount.findUnique({ where: { id: parsedId } })
   if (!account || !account.username) return
 
   // Remove @ if present for logic (though ApifyService also does it, good to have it there)
@@ -102,7 +122,7 @@ export async function syncAccountProfile(id: string) {
     }
 
     await prisma.socialAccount.update({
-      where: { id },
+      where: { id: parsedId },
       data: {
         // Update profile image and platform ID if found
         profileImage: finalProfileImage,
@@ -110,6 +130,6 @@ export async function syncAccountProfile(id: string) {
       },
     })
     revalidatePath('/dashboard/accounts')
-    revalidatePath(`/dashboard/accounts/${id}`)
+    revalidatePath(`/dashboard/accounts/${parsedId}`)
   }
 }

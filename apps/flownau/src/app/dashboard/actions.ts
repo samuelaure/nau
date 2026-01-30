@@ -4,9 +4,28 @@ import { prisma } from '@/lib/prisma'
 import { r2, R2_BUCKET } from '@/lib/r2'
 import { DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { revalidatePath } from 'next/cache'
+import { auth } from '@/auth'
+import { z } from 'zod'
+
+const DeleteAssetSchema = z.string().min(1)
+const ToggleTemplateAssetsSchema = z.object({
+  templateId: z.string().min(1),
+  useAccountAssets: z.boolean(),
+})
+
+async function checkAuth() {
+  const session = await auth()
+  if (!session?.user) {
+    throw new Error('Unauthorized')
+  }
+  return session
+}
 
 export async function deleteAsset(assetId: string) {
-  const asset = await prisma.asset.findUnique({ where: { id: assetId } })
+  await checkAuth()
+  const parsedId = DeleteAssetSchema.parse(assetId)
+
+  const asset = await prisma.asset.findUnique({ where: { id: parsedId } })
   if (!asset) return
 
   // Delete from R2
@@ -22,7 +41,7 @@ export async function deleteAsset(assetId: string) {
   }
 
   // Delete from DB
-  await prisma.asset.delete({ where: { id: assetId } })
+  await prisma.asset.delete({ where: { id: parsedId } })
 
   // Revalidate paths
   if (asset.accountId) revalidatePath(`/dashboard/accounts/${asset.accountId}`)
@@ -30,9 +49,15 @@ export async function deleteAsset(assetId: string) {
 }
 
 export async function toggleTemplateAssets(templateId: string, useAccountAssets: boolean) {
-  await prisma.template.update({
-    where: { id: templateId },
-    data: { useAccountAssets },
+  await checkAuth()
+  const { templateId: parsedId, useAccountAssets: parsedUse } = ToggleTemplateAssetsSchema.parse({
+    templateId,
+    useAccountAssets,
   })
-  revalidatePath(`/dashboard/templates/${templateId}`)
+
+  await prisma.template.update({
+    where: { id: parsedId },
+    data: { useAccountAssets: parsedUse },
+  })
+  revalidatePath(`/dashboard/templates/${parsedId}`)
 }

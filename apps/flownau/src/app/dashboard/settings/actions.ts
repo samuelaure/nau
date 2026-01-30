@@ -3,12 +3,30 @@
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { syncR2Assets } from '@/lib/r2-sync-service'
+import { auth } from '@/auth'
+import { z } from 'zod'
+
+const SettingSchema = z.object({
+  key: z.string().min(1, 'Key is required'),
+  value: z.string(), // Allowing empty string
+})
+
+async function checkAuth() {
+  const session = await auth()
+  if (!session?.user) {
+    throw new Error('Unauthorized')
+  }
+}
 
 export async function setSetting(formData: FormData) {
-  const key = formData.get('key') as string
-  const value = formData.get('value') as string
+  await checkAuth()
 
-  if (!key) throw new Error('Key is required')
+  const rawData = {
+    key: formData.get('key'),
+    value: formData.get('value'),
+  }
+
+  const { key, value } = SettingSchema.parse(rawData)
 
   await prisma.systemSetting.upsert({
     where: { key },
@@ -20,6 +38,8 @@ export async function setSetting(formData: FormData) {
 }
 
 export async function triggerAssetSync() {
+  await checkAuth()
+
   try {
     const result = await syncR2Assets()
     if (result.success) {
