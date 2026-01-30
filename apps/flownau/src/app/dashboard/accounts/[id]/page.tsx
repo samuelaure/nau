@@ -7,6 +7,7 @@ import AddTemplateButton from '@/app/dashboard/templates/AddTemplateButton'
 import AccountSettings from '@/components/AccountSettings'
 import TemplateCard from '@/components/TemplateCard'
 import ExternalAccountLink from '../ExternalAccountLink'
+import { cn } from '@/lib/utils'
 
 export default async function AccountPage({
   params,
@@ -33,61 +34,24 @@ export default async function AccountPage({
   return (
     <div className="animate-fade-in">
       {/* Breadcrumb */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          color: 'var(--text-secondary)',
-          marginBottom: '24px',
-          fontSize: '14px',
-        }}
-      >
-        <Link href="/dashboard/accounts" style={{ color: 'inherit', textDecoration: 'none' }}>
+      <div className="flex items-center gap-2 text-text-secondary mb-6 text-sm">
+        <Link href="/dashboard/accounts" className="hover:text-white transition-colors">
           Accounts
         </Link>
         <ChevronRight size={16} />
-        <span style={{ color: 'white' }}>{account.username}</span>
+        <span className="text-white">{account.username}</span>
       </div>
 
       {/* Header */}
-      <header
-        style={{
-          marginBottom: '40px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-end',
-        }}
-      >
-        <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
-          <div
-            style={{
-              width: '80px',
-              height: '80px',
-              borderRadius: '50%',
-              background:
-                'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)',
-              padding: '3px',
-              overflow: 'hidden'
-            }}
-          >
-            <div
-              style={{
-                width: '100%',
-                height: '100%',
-                borderRadius: '50%',
-                background: 'var(--panel-color)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                overflow: 'hidden'
-              }}
-            >
+      <header className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+        <div className="flex gap-6 items-center">
+          <div className="w-20 h-20 rounded-full p-[3px] bg-[linear-gradient(45deg,#f09433_0%,#e6683c_25%,#dc2743_50%,#cc2366_75%,#bc1888_100%)] overflow-hidden shrink-0">
+            <div className="w-full h-full rounded-full bg-panel flex items-center justify-center overflow-hidden">
               {account.profileImage ? (
                 <img
                   src={account.profileImage}
                   alt={account.username || 'Profile'}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  className="w-full h-full object-cover"
                 />
               ) : (
                 <Instagram size={40} />
@@ -95,11 +59,11 @@ export default async function AccountPage({
             </div>
           </div>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-              <h1 style={{ fontSize: '32px' }}>{account.username}</h1>
+            <div className="flex items-center gap-3 mb-2">
+              <h1 className="text-3xl font-heading font-semibold">{account.username}</h1>
               <ExternalAccountLink username={account.username} />
             </div>
-            <p style={{ color: 'var(--text-secondary)' }}>
+            <p className="text-text-secondary">
               Instagram Business Account • {account.platformId}
             </p>
           </div>
@@ -107,13 +71,7 @@ export default async function AccountPage({
       </header>
 
       {/* Tabs */}
-      <div
-        style={{
-          display: 'flex',
-          borderBottom: '1px solid var(--border-color)',
-          marginBottom: '32px',
-        }}
-      >
+      <div className="flex border-b border-border mb-8">
         <TabLink
           href={`/dashboard/accounts/${id}?tab=templates`}
           active={activeTab === 'templates'}
@@ -155,27 +113,20 @@ function TabLink({
   return (
     <Link
       href={href}
-      style={{
-        padding: '12px 24px',
-        textDecoration: 'none',
-        color: active ? 'white' : 'var(--text-secondary)',
-        borderBottom: active ? '2px solid var(--accent-color)' : '2px solid transparent',
-        marginBottom: '-1px',
-        fontWeight: active ? '600' : '400',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-      }}
+      className={cn(
+        'px-6 py-3 -mb-px flex items-center gap-2 border-b-2 transition-colors',
+        active
+          ? 'text-white border-accent font-semibold'
+          : 'text-text-secondary border-transparent hover:text-white'
+      )}
     >
       {label}
       {count !== undefined && (
         <span
-          style={{
-            background: active ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.05)',
-            padding: '2px 8px',
-            borderRadius: '12px',
-            fontSize: '12px',
-          }}
+          className={cn(
+            'px-2 py-0.5 rounded-xl text-xs',
+            active ? 'bg-white/10' : 'bg-white/5'
+          )}
         >
           {count}
         </span>
@@ -193,15 +144,8 @@ async function AccountTemplates({ accountId }: { accountId: string }) {
 
   return (
     <div>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '24px',
-        }}
-      >
-        <h3 style={{ fontSize: '20px' }}>Attached Templates</h3>
+      <div className="flex justify-between items-center mb-6">
+        <h3 className="text-xl font-heading font-semibold">Attached Templates</h3>
         <AddTemplateButton
           label="Create Template"
           accounts={[{ id: accountId, username: 'Current Account', platform: 'Instagram' }]}
@@ -209,19 +153,13 @@ async function AccountTemplates({ accountId }: { accountId: string }) {
         />
       </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
-          gap: '24px',
-        }}
-      >
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(350px,1fr))] gap-6">
         {templates.map((template: any) => (
           <TemplateCard key={template.id} template={template} context="account" />
         ))}
       </div>
       {templates.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
+        <div className="text-center py-10 text-text-secondary">
           No templates attached to this account.
         </div>
       )}
