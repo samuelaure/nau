@@ -66,7 +66,7 @@ function normalizeUsername(username: string | null): string {
 
 async function main() {
     console.log('Importing Prisma...');
-    const prismaModule = await import('../../src/lib/prisma');
+    const prismaModule = await import('../../src/modules/shared/prisma');
     prisma = prismaModule.prisma;
 
     console.log('Fetching accounts...');

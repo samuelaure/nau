@@ -1,12 +1,12 @@
 
 import React from 'react';
 import { AbsoluteFill, Sequence, Video, Img } from 'remotion';
-import { VideoTemplate, VideoElement } from '../types/video-schema';
+import { VideoTemplate, VideoElement } from '@/types/video-schema';
 
 export const UniversalComposition: React.FC<{ template: VideoTemplate }> = ({ template }) => {
     return (
         <AbsoluteFill style={{ backgroundColor: '#0d0d0d' }}>
-            {template.elements.map((element) => (
+            {template.elements.map((element: VideoElement) => (
                 <Sequence
                     key={element.id}
                     from={element.startFrame}

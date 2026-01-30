@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma'
+import { prisma } from '@/modules/shared/prisma'
 
 export async function getSetting(key: string) {
   const setting = await prisma.systemSetting.findUnique({

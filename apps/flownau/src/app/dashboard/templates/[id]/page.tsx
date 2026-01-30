@@ -1,9 +1,9 @@
-import { prisma } from '@/lib/prisma'
+import { prisma } from '@/modules/shared/prisma'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronRight, LayoutTemplate, Settings, Video } from 'lucide-react'
-import AssetsManager from '@/components/AssetsManager'
-import TemplateSettings from '@/components/TemplateSettings'
+import AssetsManager from '@/modules/shared/components/AssetsManager'
+import TemplateSettings from '@/modules/video/components/TemplateSettings'
 
 export default async function TemplatePage({
   params,

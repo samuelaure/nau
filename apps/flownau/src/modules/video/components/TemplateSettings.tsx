@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { toggleTemplateAssets } from '@/app/dashboard/actions'
-import { updateTemplate, duplicateTemplate } from '@/app/dashboard/templates/actions'
+import { toggleTemplateAssets } from '@/modules/video/actions'
+import { updateTemplate, duplicateTemplate } from '@/modules/video/actions'
 import { Info, Lock, Copy } from 'lucide-react'
 
 export default function TemplateSettings({

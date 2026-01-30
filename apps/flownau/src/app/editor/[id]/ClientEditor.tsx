@@ -2,8 +2,8 @@
 'use client'
 
 import React, { useTransition } from 'react'
-import VideoEditor from '@/components/editor/VideoEditor'
-import { saveTemplateConfig } from '@/app/dashboard/templates/actions'
+import VideoEditor from '@/modules/video/components/editor/VideoEditor'
+import { saveTemplateConfig } from '@/modules/video/actions'
 import { VideoTemplate } from '@/types/video-schema'
 
 export default function ClientEditor({

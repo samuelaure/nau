@@ -2,7 +2,7 @@
 
 import { useTransition } from 'react'
 import { RotateCw } from 'lucide-react'
-import { syncAccountProfile } from './actions'
+import { syncAccountProfile } from '@/modules/accounts/actions'
 
 export default function RefreshProfileButton({ accountId }: { accountId: string }) {
     const [isPending, startTransition] = useTransition()

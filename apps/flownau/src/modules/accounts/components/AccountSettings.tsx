@@ -1,11 +1,11 @@
 'use client'
 
 import { useTransition } from 'react'
-import { updateAccount } from '@/app/dashboard/accounts/actions'
-import RefreshProfileButton from '@/app/dashboard/accounts/RefreshProfileButton'
-import { Card } from './ui/Card'
-import { Button } from './ui/Button'
-import { Input } from './ui/Input'
+import { updateAccount } from '@/modules/accounts/actions'
+import RefreshProfileButton from '@/modules/accounts/components/RefreshProfileButton'
+import { Card } from '@/modules/shared/components/ui/Card'
+import { Button } from '@/modules/shared/components/ui/Button'
+import { Input } from '@/modules/shared/components/ui/Input'
 import type { SocialAccount } from '@prisma/client'
 
 export default function AccountSettings({ account }: { account: SocialAccount }) {

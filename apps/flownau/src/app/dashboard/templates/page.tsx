@@ -1,8 +1,8 @@
-import { prisma } from '@/lib/prisma'
+import { prisma } from '@/modules/shared/prisma'
 import { Video, Globe } from 'lucide-react'
-import AddTemplateButton from './AddTemplateButton'
-import TemplateCard from '@/components/TemplateCard'
-import { Card } from '@/components/ui/Card'
+import AddTemplateButton from '@/modules/video/components/AddTemplateButton'
+import TemplateCard from '@/modules/video/components/TemplateCard'
+import { Card } from '@/modules/shared/components/ui/Card'
 
 export default async function TemplatesPage() {
   const [templates, accounts] = await Promise.all([

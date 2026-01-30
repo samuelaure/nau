@@ -3,7 +3,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { Player } from '@remotion/player';
-import { UniversalComposition } from '@/remotion/UniversalComposition';
+import { UniversalComposition } from '@/modules/video/remotion/UniversalComposition';
 import { VideoTemplate, VideoElement, ElementSchema } from '@/types/video-schema';
 import Link from 'next/link';
 import { Plus, Type, Image as ImageIcon, Video as VideoIcon, Save, Layers, Settings, Trash2, ArrowLeft, ChevronLeft } from 'lucide-react';

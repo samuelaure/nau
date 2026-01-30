@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import { Plus, Video, Loader2 } from 'lucide-react'
-import { addTemplate } from './actions'
-import Modal from '@/components/Modal'
+import { addTemplate } from '@/modules/video/actions'
+import Modal from '@/modules/shared/components/Modal'
 
 export default function AddTemplateButton({
   label = 'New Template',

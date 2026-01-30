@@ -1,7 +1,7 @@
-import { getSetting } from '@/lib/settings'
+import { getSetting } from '@/modules/shared/settings'
 import SyncButton from './SyncButton'
 import ApifyTokenForm from './ApifyTokenForm'
-import { Card } from '@/components/ui/Card'
+import { Card } from '@/modules/shared/components/ui/Card'
 
 export default async function SettingsPage() {
   const apifyToken = await getSetting('apify_api_token')

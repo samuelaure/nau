@@ -1,5 +1,5 @@
 
-import { prisma } from '@/lib/prisma'
+import { prisma } from '@/modules/shared/prisma'
 import { notFound } from 'next/navigation'
 import ClientEditor from './ClientEditor'
 import Link from 'next/link'

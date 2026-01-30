@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { decrypt } from './encryption'
+import { decrypt } from '@/modules/shared/encryption'
 
 const IG_API_VERSION = 'v19.0'
 const IG_BASE_URL = `https://graph.facebook.com/${IG_API_VERSION}`

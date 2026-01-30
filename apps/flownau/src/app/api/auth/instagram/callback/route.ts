@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
-import { prisma } from '@/lib/prisma'
-import { encrypt } from '@/lib/encryption'
+import { prisma } from '@/modules/shared/prisma'
+import { encrypt } from '@/modules/shared/encryption'
 import axios from 'axios'
-import { getLongLivedToken } from '@/lib/instagram'
+import { getLongLivedToken } from '@/modules/accounts/instagram'
 
 export async function GET(req: NextRequest) {
   try {

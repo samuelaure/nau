@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { r2, R2_BUCKET } from '@/lib/r2'
+import { prisma } from '@/modules/shared/prisma'
+import { r2, R2_BUCKET } from '@/modules/shared/r2'
 import { PutObjectCommand } from '@aws-sdk/client-s3'
-import { compressVideo, compressAudio, getTempPath } from '@/lib/ffmpeg'
+import { compressVideo, compressAudio, getTempPath } from '@/modules/video/ffmpeg'
 import fs from 'fs/promises'
 import { createReadStream } from 'fs'
 

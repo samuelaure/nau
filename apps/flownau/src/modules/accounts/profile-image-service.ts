@@ -1,5 +1,5 @@
 import { PutObjectCommand } from '@aws-sdk/client-s3'
-import { r2, R2_BUCKET, R2_PUBLIC_URL } from './r2'
+import { r2, R2_BUCKET, R2_PUBLIC_URL } from '@/modules/shared/r2'
 import axios from 'axios'
 
 export async function downloadAndUploadProfileImage(imageUrl: string, username: string): Promise<string | null> {

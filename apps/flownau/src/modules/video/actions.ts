@@ -1,8 +1,8 @@
 'use server'
 
-import { prisma } from '@/lib/prisma'
+import { prisma } from '@/modules/shared/prisma'
 import { revalidatePath } from 'next/cache'
-import { auth } from '@/auth'
+import { checkAuth } from '@/modules/shared/actions'
 import { z } from 'zod'
 
 // Schemas
@@ -16,17 +16,13 @@ const TemplateFormSchema = z.object({
 const IdSchema = z.string().min(1)
 
 const SaveConfigSchema = z.object({
-  config: z.unknown(), // safer than any
+  config: z.unknown(),
 })
 
-// Auth Helper
-async function checkAuth() {
-  const session = await auth()
-  if (!session?.user) {
-    throw new Error('Unauthorized')
-  }
-  return session
-}
+const ToggleTemplateAssetsSchema = z.object({
+  templateId: z.string().min(1),
+  useAccountAssets: z.boolean(),
+})
 
 export async function addTemplate(formData: FormData) {
   await checkAuth()
@@ -105,17 +101,27 @@ export async function saveTemplateConfig(id: string, config: unknown) {
   const parsedId = IdSchema.parse(id)
   const { config: parsedConfig } = SaveConfigSchema.parse({ config })
 
-  // Current logic overrides remotionId to 'Universal' ? keeping as is per original code
-  // Wait, original code: remotionId: 'Universal'. This seems intentional?
-  // "Universal" might be a magic string for configurable templates.
-
   await prisma.template.update({
     where: { id: parsedId },
     data: {
-      config: parsedConfig as any, // Json type in Prisma
+      config: parsedConfig as any,
       remotionId: 'Universal',
     },
   })
 
+  revalidatePath(`/dashboard/templates/${parsedId}`)
+}
+
+export async function toggleTemplateAssets(templateId: string, useAccountAssets: boolean) {
+  await checkAuth()
+  const { templateId: parsedId, useAccountAssets: parsedUse } = ToggleTemplateAssetsSchema.parse({
+    templateId,
+    useAccountAssets,
+  })
+
+  await prisma.template.update({
+    where: { id: parsedId },
+    data: { useAccountAssets: parsedUse },
+  })
   revalidatePath(`/dashboard/templates/${parsedId}`)
 }

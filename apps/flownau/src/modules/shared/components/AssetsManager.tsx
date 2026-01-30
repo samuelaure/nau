@@ -14,8 +14,8 @@ import {
   ChevronRight,
   Home,
 } from 'lucide-react'
-import { deleteAsset } from '@/app/dashboard/actions'
-import ActionMenu from '@/components/ActionMenu'
+import { deleteAsset } from '@/modules/shared/actions'
+import ActionMenu from '@/modules/shared/components/ActionMenu'
 
 interface Asset {
   id: string

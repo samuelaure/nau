@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { ArrowRight, Video, Instagram, Zap, Shield } from 'lucide-react'
-import { Card } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
+import { Card } from '@/modules/shared/components/ui/Card'
+import { Button } from '@/modules/shared/components/ui/Button'
 
 export default function LandingPage() {
   return (

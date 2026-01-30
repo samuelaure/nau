@@ -1,9 +1,9 @@
 import { auth } from '@/auth'
-import { prisma } from '@/lib/prisma'
-import { getTableData } from '@/lib/airtable'
-import { renderAndUpload } from '@/lib/renderer'
-import { publishVideoToInstagram } from '@/lib/instagram'
-import { decrypt } from '@/lib/encryption'
+import { prisma } from '@/modules/shared/prisma'
+import { getTableData } from '@/modules/video/airtable'
+import { renderAndUpload } from '@/modules/video/renderer'
+import { publishVideoToInstagram } from '@/modules/accounts/instagram'
+import { decrypt } from '@/modules/shared/encryption'
 import { NextResponse } from 'next/server'
 
 export const POST = auth(async function POST(req) {

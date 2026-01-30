@@ -44,7 +44,7 @@ async function main() {
     // 3. Dynamic import of Prisma Client (reusing app instance)
     // This ensures that process.env is fully populated before the module reads it.
     console.log('Importing Prisma client...');
-    const prismaModule = await import('../../src/lib/prisma');
+    const prismaModule = await import('../../src/modules/shared/prisma');
     prisma = prismaModule.prisma;
 
     console.log('Starting R2 cleanup...');

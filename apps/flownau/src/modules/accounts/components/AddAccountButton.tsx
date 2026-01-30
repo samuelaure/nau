@@ -2,10 +2,10 @@
 
 import { useState, useTransition } from 'react'
 import { Plus, Instagram, Loader2 } from 'lucide-react'
-import { addAccount } from './actions'
-import Modal from '@/components/Modal'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
+import { addAccount } from '@/modules/accounts/actions'
+import Modal from '@/modules/shared/components/Modal'
+import { Button } from '@/modules/shared/components/ui/Button'
+import { Input } from '@/modules/shared/components/ui/Input'
 
 interface SimpleAccount {
   id: string

@@ -1,4 +1,4 @@
-import { getSetting } from './settings'
+import { getSetting } from '@/modules/shared/settings'
 
 export interface ReferenceProfile {
   status: 'success' | 'error'

@@ -1,7 +1,7 @@
-import { prisma } from '@/lib/prisma'
+import { prisma } from '@/modules/shared/prisma'
 import { Instagram, Video } from 'lucide-react'
-import { Card } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
+import { Card } from '@/modules/shared/components/ui/Card'
+import { Button } from '@/modules/shared/components/ui/Button'
 import type { RenderWithTemplate } from '@/types'
 
 export default async function DashboardPage() {

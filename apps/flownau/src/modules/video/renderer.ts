@@ -1,7 +1,7 @@
 import { bundle } from '@remotion/bundler'
 import { renderMedia, getCompositions } from '@remotion/renderer'
 import path from 'path'
-import { r2, R2_BUCKET } from './r2'
+import { r2, R2_BUCKET } from '@/modules/shared/r2'
 import { PutObjectCommand } from '@aws-sdk/client-s3'
 import fs from 'fs'
 
@@ -14,7 +14,7 @@ export async function renderAndUpload({
   inputProps: any
   renderId: string
 }) {
-  const entry = path.join(process.cwd(), 'src/remotion/index.ts')
+  const entry = path.join(process.cwd(), 'src/modules/video/remotion/index.ts')
   const outputDir = path.join(process.cwd(), 'out')
 
   if (!fs.existsSync(outputDir)) {

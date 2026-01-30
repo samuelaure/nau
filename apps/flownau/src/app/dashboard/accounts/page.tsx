@@ -1,10 +1,10 @@
-import { prisma } from '@/lib/prisma'
+import { prisma } from '@/modules/shared/prisma'
 import { Instagram } from 'lucide-react'
-import AddAccountButton from './AddAccountButton'
-import { deleteAccount } from './actions'
-import ActionMenu from '@/components/ActionMenu'
+import AddAccountButton from '@/modules/accounts/components/AddAccountButton'
+import { deleteAccount } from '@/modules/accounts/actions'
+import ActionMenu from '@/modules/shared/components/ActionMenu'
 import Link from 'next/link'
-import { Card } from '@/components/ui/Card'
+import { Card } from '@/modules/shared/components/ui/Card'
 import type { AccountWithCounts } from '@/types'
 
 export default async function AccountsPage() {
