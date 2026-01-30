@@ -51,7 +51,15 @@ export const useImport = (fetchData: () => void) => {
           body: JSON.stringify({ campaignId, name, csvContent }),
         });
         if (!res.ok) throw new Error('Import failed');
-        notify('success', 'CSV processed and staged for analysis.');
+
+        const data = await res.json();
+
+        if (data.isDuplicate) {
+          notify('info', `Duplicate file detected. ${data.message || 'This file was already imported.'}`);
+        } else {
+          notify('success', 'CSV processed and staged for analysis.');
+        }
+
         fetchBatches();
       } catch (error) {
         console.error('Import failed:', error);

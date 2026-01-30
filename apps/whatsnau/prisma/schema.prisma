@@ -255,14 +255,15 @@ model PromptConfig {
 
 // MASS OUTREACH MODELS
 model LeadImportBatch {
-  id         String   @id @default(uuid())
-  campaignId String
-  campaign   Campaign @relation(fields: [campaignId], references: [id])
-  name       String // e.g., "Google Maps Scraping - Jan 20"
-  status     String   @default("STAGING") // STAGING, ANALYZING, READY, EXECUTING, COMPLETED
-  tenantId   String
-  tenant     Tenant   @relation(fields: [tenantId], references: [id])
-  createdAt  DateTime @default(now())
+  id          String   @id @default(uuid())
+  campaignId  String
+  campaign    Campaign @relation(fields: [campaignId], references: [id])
+  name        String // e.g., "Google Maps Scraping - Jan 20"
+  status      String   @default("STAGING") // STAGING, ANALYZING, READY, EXECUTING, COMPLETED
+  contentHash String?  @unique // SHA-256 hash of CSV content for deduplication
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt   DateTime @default(now())
 
   stagingLeads StagingLead[]
 

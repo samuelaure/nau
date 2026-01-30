@@ -14,7 +14,8 @@ router.post(
   '/csv',
   asyncHandler(async (req: Request, res: Response) => {
     const { campaignId, name, csvContent } = req.body;
-    const batch = await ImportService.processCSV(campaignId, name, csvContent);
+    const tenantId = (req as any).user.tenantId;
+    const batch = await ImportService.processCSV(campaignId, name, csvContent, tenantId);
     res.json(batch);
   })
 );
