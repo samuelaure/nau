@@ -1,5 +1,5 @@
 services:
-  db:
+  postgres:
     image: postgres:15-alpine
     container_name: flownau-db
     restart: always
@@ -12,5 +12,15 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  redis:
+    image: redis:alpine
+    container_name: flownau-redis
+    restart: always
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+
 volumes:
   postgres_data:
+  redis_data:

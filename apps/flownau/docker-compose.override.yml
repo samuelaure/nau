@@ -2,7 +2,11 @@ version: '3.8'
 
 services:
   # In production, we don't spawn a local DB but join the mesh
-  db:
+  postgres:
+    profiles:
+      - production_disabled
+  
+  redis:
     profiles:
       - production_disabled
 
