@@ -25,11 +25,30 @@ router.post(
 router.get(
   '/batches',
   asyncHandler(async (req: Request, res: Response) => {
-    const batches = await (db as any).leadImportBatch.findMany({
-      include: { _count: { select: { stagingLeads: true } } },
-      orderBy: { createdAt: 'desc' },
+    const { page = '1', limit = '20' } = req.query;
+    const pageNum = Math.max(1, parseInt(page as string, 10));
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit as string, 10))); // Cap at 50
+    const skip = (pageNum - 1) * limitNum;
+
+    const [batches, total] = await Promise.all([
+      (db as any).leadImportBatch.findMany({
+        include: { _count: { select: { stagingLeads: true } } },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limitNum,
+      }),
+      (db as any).leadImportBatch.count(),
+    ]);
+
+    res.json({
+      data: batches,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+      },
     });
-    res.json(batches);
   })
 );
 

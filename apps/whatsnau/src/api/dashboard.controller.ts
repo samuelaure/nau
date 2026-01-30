@@ -42,18 +42,36 @@ router.get(
 router.get(
   '/leads',
   asyncHandler(async (req: Request, res: Response) => {
-    const { campaignId } = req.query;
+    const { campaignId, page = '1', limit = '50' } = req.query;
+    const pageNum = Math.max(1, parseInt(page as string, 10));
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit as string, 10))); // Cap at 100
+    const skip = (pageNum - 1) * limitNum;
+
     const where = campaignId ? { campaignId: campaignId as string } : {};
 
-    const leads = await db.lead.findMany({
-      where,
-      include: {
-        tags: true,
-        currentStage: true,
+    const [leads, total] = await Promise.all([
+      db.lead.findMany({
+        where,
+        include: {
+          tags: true,
+          currentStage: true,
+        },
+        orderBy: { lastInteraction: 'desc' },
+        skip,
+        take: limitNum,
+      }),
+      db.lead.count({ where }),
+    ]);
+
+    res.json({
+      data: leads,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
       },
-      orderBy: { lastInteraction: 'desc' },
     });
-    res.json(leads);
   })
 );
 
@@ -388,20 +406,39 @@ router.delete(
 router.get(
   '/campaigns',
   asyncHandler(async (req: Request, res: Response) => {
-    const campaigns = await db.campaign.findMany({
-      include: {
-        stages: {
-          orderBy: { order: 'asc' },
-          include: {
-            messageTemplates: {
-              orderBy: { order: 'asc' },
+    const { page = '1', limit = '20' } = req.query;
+    const pageNum = Math.max(1, parseInt(page as string, 10));
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit as string, 10))); // Cap at 50
+    const skip = (pageNum - 1) * limitNum;
+
+    const [campaigns, total] = await Promise.all([
+      db.campaign.findMany({
+        include: {
+          stages: {
+            orderBy: { order: 'asc' },
+            include: {
+              messageTemplates: {
+                orderBy: { order: 'asc' },
+              },
             },
           },
         },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limitNum,
+      }),
+      db.campaign.count(),
+    ]);
+
+    res.json({
+      data: campaigns,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
       },
-      orderBy: { createdAt: 'desc' },
     });
-    res.json(campaigns);
   })
 );
 
