@@ -1,7 +1,8 @@
 
-import { S3Client, ListObjectsV2Command, CopyObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, ListObjectsV2Command, CopyObjectCommand, DeleteObjectCommand, HeadObjectCommand, type ListObjectsV2CommandOutput } from '@aws-sdk/client-s3';
 import type { PrismaClient } from '@prisma/client';
-import dotenv from 'dotenv';
+// @ts-ignore
+import * as dotenv from 'dotenv';
 import path from 'path';
 
 // 1. Load environment variables FIRST
@@ -58,7 +59,7 @@ async function main() {
                 ContinuationToken: continuationToken,
             });
 
-            const response = await r2.send(listCommand);
+            const response = await r2.send(listCommand) as ListObjectsV2CommandOutput;
             continuationToken = response.NextContinuationToken;
 
             if (!response.Contents) continue;

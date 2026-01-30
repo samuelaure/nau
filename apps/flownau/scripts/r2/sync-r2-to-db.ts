@@ -1,7 +1,8 @@
 
-import { S3Client, ListObjectsV2Command, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, ListObjectsV2Command, HeadObjectCommand, type ListObjectsV2CommandOutput } from '@aws-sdk/client-s3';
 import type { PrismaClient } from '@prisma/client';
-import dotenv from 'dotenv';
+// @ts-ignore
+import * as dotenv from 'dotenv';
 import path from 'path';
 
 // 1. Env Setup
@@ -90,7 +91,7 @@ async function main() {
                 Bucket: BUCKET_NAME,
                 ContinuationToken: continuationToken
             });
-            const res = await r2.send(listCmd);
+            const res = await r2.send(listCmd) as ListObjectsV2CommandOutput;
             continuationToken = res.NextContinuationToken;
 
             if (!res.Contents) continue;
