@@ -10,102 +10,86 @@ export default async function DashboardPage() {
     include: { template: true },
   })
 
+  // Using arbitrary values to match brand colors exactly while using Tailwind structure
   const stats = [
-    { name: 'Active Accounts', value: accountsCount, icon: Instagram, color: '#E1306C' },
-    { name: 'Total Templates', value: templatesCount, icon: Video, color: '#7C3AED' },
+    {
+      name: 'Active Accounts',
+      value: accountsCount,
+      icon: Instagram,
+      iconClass: 'text-[#E1306C]',
+      bgClass: 'bg-[#E1306C]/15'
+    },
+    {
+      name: 'Total Templates',
+      value: templatesCount,
+      icon: Video,
+      iconClass: 'text-[var(--accent-color)]',
+      bgClass: 'bg-[var(--accent-color)]/15'
+    },
   ]
 
   return (
     <div className="animate-fade-in">
-      <header style={{ marginBottom: '40px' }}>
-        <h1 style={{ fontSize: '32px', marginBottom: '8px' }}>Dashboard Overview</h1>
-        <p style={{ color: 'var(--text-secondary)' }}>Monitor your automated video workflows.</p>
+      <header className="mb-10">
+        <h1 className="text-3xl font-heading font-semibold mb-2">Dashboard Overview</h1>
+        <p className="text-text-secondary">Monitor your automated video workflows.</p>
       </header>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-          gap: '24px',
-          marginBottom: '48px',
-        }}
-      >
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-6 mb-12">
         {stats.map((stat) => (
           <div
             key={stat.name}
-            className="card"
-            style={{ display: 'flex', alignItems: 'center', gap: '20px' }}
+            className="card flex items-center gap-5"
           >
-            <div
-              style={{
-                padding: '12px',
-                background: `${stat.color}15`,
-                borderRadius: '12px',
-                color: stat.color,
-              }}
-            >
+            <div className={`p-3 rounded-xl ${stat.bgClass} ${stat.iconClass}`}>
               <stat.icon size={28} />
             </div>
             <div>
-              <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{stat.name}</p>
-              <h3 style={{ fontSize: '24px' }}>{stat.value}</h3>
+              <p className="text-sm text-text-secondary font-medium">{stat.name}</p>
+              <h3 className="text-2xl font-heading font-bold">{stat.value}</h3>
             </div>
           </div>
         ))}
       </div>
 
       <div>
-        <h2 style={{ fontSize: '24px', marginBottom: '24px' }}>Recent Activty</h2>
-        <div className="glass" style={{ overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+        <h2 className="text-2xl font-heading font-semibold mb-6">Recent Activity</h2>
+        <div className="glass overflow-hidden">
+          <table className="w-full border-collapse text-left">
             <thead>
-              <tr
-                style={{
-                  borderBottom: '1px solid var(--border-color)',
-                  color: 'var(--text-secondary)',
-                  fontSize: '14px',
-                }}
-              >
-                <th style={{ padding: '16px 24px' }}>Template</th>
-                <th style={{ padding: '16px 24px' }}>Status</th>
-                <th style={{ padding: '16px 24px' }}>Date</th>
-                <th style={{ padding: '16px 24px' }}>Action</th>
+              <tr className="border-b border-white/5 text-text-secondary text-sm font-medium">
+                <th className="p-4 pl-6 font-heading">Template</th>
+                <th className="p-4 font-heading">Status</th>
+                <th className="p-4 font-heading">Date</th>
+                <th className="p-4 pr-6 font-heading">Action</th>
               </tr>
             </thead>
             <tbody>
               {recentRenders.map((render: any) => (
                 <tr
                   key={render.id}
-                  style={{ borderBottom: '1px solid var(--border-color)', fontSize: '14px' }}
+                  className="border-b border-white/5 text-sm hover:bg-white/5 transition-colors duration-200"
                 >
-                  <td style={{ padding: '16px 24px' }}>{render.template.name}</td>
-                  <td style={{ padding: '16px 24px' }}>
+                  <td className="p-4 pl-6 font-medium text-white">{render.template.name}</td>
+                  <td className="p-4">
                     <span
-                      style={{
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        background: render.status === 'COMPLETED' ? '#10B98120' : '#F59E0B20',
-                        color: render.status === 'COMPLETED' ? '#10B981' : '#F59E0B',
-                        fontSize: '12px',
-                        fontWeight: '600',
-                      }}
+                      className={`px-2.5 py-1 rounded-md text-xs font-bold tracking-wide ${render.status === 'COMPLETED'
+                          ? 'bg-emerald-500/10 text-emerald-500'
+                          : 'bg-amber-500/10 text-amber-500'
+                        }`}
                     >
                       {render.status}
                     </span>
                   </td>
-                  <td style={{ padding: '16px 24px' }}>
-                    {new Date(render.createdAt).toLocaleDateString()}
+                  <td className="p-4 text-text-secondary">
+                    {new Date(render.createdAt).toLocaleDateString(undefined, {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric'
+                    })}
                   </td>
-                  <td style={{ padding: '16px 24px' }}>
-                    <button
-                      style={{
-                        color: 'var(--accent-color)',
-                        background: 'none',
-                        border: 'none',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                      }}
-                    >
+                  <td className="p-4 pr-6">
+                    <button className="text-accent hover:text-accent-hover font-semibold text-sm transition-colors">
                       View
                     </button>
                   </td>
@@ -115,7 +99,7 @@ export default async function DashboardPage() {
                 <tr>
                   <td
                     colSpan={4}
-                    style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}
+                    className="p-8 text-center text-text-secondary italic"
                   >
                     No recent activity found.
                   </td>
