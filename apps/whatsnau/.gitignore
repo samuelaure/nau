@@ -38,3 +38,4 @@ coverage/
 .parcel-cache/
 .next/
 out/
+UPGRADE_PLAN.md
