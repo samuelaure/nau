@@ -1,5 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { Instagram, Video } from 'lucide-react'
+import { Card } from '@/components/ui/Card'
+import { Button } from '@/components/ui/Button'
 
 export default async function DashboardPage() {
   const accountsCount = await prisma.socialAccount.count()
@@ -37,9 +39,9 @@ export default async function DashboardPage() {
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-6 mb-12">
         {stats.map((stat) => (
-          <div
+          <Card
             key={stat.name}
-            className="card flex items-center gap-5"
+            className="flex items-center gap-5"
           >
             <div className={`p-3 rounded-xl ${stat.bgClass} ${stat.iconClass}`}>
               <stat.icon size={28} />
@@ -48,7 +50,7 @@ export default async function DashboardPage() {
               <p className="text-sm text-text-secondary font-medium">{stat.name}</p>
               <h3 className="text-2xl font-heading font-bold">{stat.value}</h3>
             </div>
-          </div>
+          </Card>
         ))}
       </div>
 
@@ -74,8 +76,8 @@ export default async function DashboardPage() {
                   <td className="p-4">
                     <span
                       className={`px-2.5 py-1 rounded-md text-xs font-bold tracking-wide ${render.status === 'COMPLETED'
-                          ? 'bg-emerald-500/10 text-emerald-500'
-                          : 'bg-amber-500/10 text-amber-500'
+                        ? 'bg-emerald-500/10 text-emerald-500'
+                        : 'bg-amber-500/10 text-amber-500'
                         }`}
                     >
                       {render.status}
@@ -89,9 +91,9 @@ export default async function DashboardPage() {
                     })}
                   </td>
                   <td className="p-4 pr-6">
-                    <button className="text-accent hover:text-accent-hover font-semibold text-sm transition-colors">
+                    <Button variant="ghost" size="sm" className="text-accent hover:text-accent-hover font-semibold text-sm transition-colors">
                       View
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               ))}

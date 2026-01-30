@@ -34,84 +34,21 @@ export default function Modal({ isOpen, onClose, children }: ModalProps) {
 
   return createPortal(
     <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'rgba(0,0,0,0.8)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 100,
-        backdropFilter: 'blur(8px)',
-        animation: 'fadeIn 0.2s ease-out',
-      }}
+      className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] backdrop-blur-sm animate-fade-in"
       onClick={(e) => {
         // Close if clicked directly on the overlay
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div
-        className="glass"
-        style={{
-          width: '100%',
-          maxWidth: '480px',
-          padding: '32px',
-          position: 'relative',
-          background: '#1a1a1a',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-          maxHeight: '90vh',
-          overflowY: 'auto',
-          border: '1px solid rgba(255,255,255,0.1)',
-          animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-        }}
-      >
+      <div className="relative w-full max-w-lg p-8 bg-panel shadow-2xl max-h-[90vh] overflow-y-auto border border-white/10 rounded-2xl animate-slide-up glass">
         <button
           onClick={onClose}
-          style={{
-            position: 'absolute',
-            top: '20px',
-            right: '20px',
-            background: 'rgba(255,255,255,0.05)',
-            border: 'none',
-            color: 'var(--text-secondary)',
-            cursor: 'pointer',
-            padding: '8px',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'all 0.2s',
-          }}
-          onMouseOver={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
-          onMouseOut={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
+          className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center rounded-full bg-white/5 text-text-secondary hover:bg-white/10 transition-colors"
         >
           <X size={20} />
         </button>
         {children}
       </div>
-      <style jsx global>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
-        }
-        @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px) scale(0.96);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
-        }
-      `}</style>
     </div>,
     document.body,
   )

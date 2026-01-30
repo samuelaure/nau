@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Plus, Instagram, Loader2, Copy } from 'lucide-react'
+import { Plus, Instagram, Loader2 } from 'lucide-react'
 import { addAccount } from './actions'
 import Modal from '@/components/Modal'
+import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
 
 interface SimpleAccount {
   id: string
@@ -25,8 +27,6 @@ export default function AddAccountButton({ existingAccounts = [] }: AddAccountBu
   // State to manage the token input value, so we can control it
   const [tokenValue, setTokenValue] = useState('')
 
-
-
   const handleSubmit = async (formData: FormData) => {
     setError(null)
     startTransition(async () => {
@@ -47,71 +47,47 @@ export default function AddAccountButton({ existingAccounts = [] }: AddAccountBu
 
   return (
     <>
-      <button onClick={() => setIsOpen(true)} className="btn-primary">
-        <Plus size={20} />
+      <Button onClick={() => setIsOpen(true)}>
+        <Plus size={20} className="mr-2" />
         Add Account
-      </button>
+      </Button>
 
       <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <div
-            style={{
-              width: '64px',
-              height: '64px',
-              background: 'rgba(255, 255, 255, 0.05)',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 16px',
-              color: '#e1306c',
-            }}
-          >
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 text-[#e1306c]">
             <Instagram size={32} />
           </div>
-          <h2 style={{ fontSize: '24px', marginBottom: '8px' }}>Connect Instagram</h2>
-          <p style={{ color: 'var(--text-secondary)' }}>
+          <h2 className="text-2xl font-heading font-semibold mb-2">Connect Instagram</h2>
+          <p className="text-text-secondary">
             Enter your long-lived access token details manually.
           </p>
         </div>
 
         <form
           action={handleSubmit}
-          style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}
+          className="flex flex-col gap-5"
         >
-          <div className="form-group">
-            <label className="form-label">
-              Instagram Username
-            </label>
-            <input
-              name="username"
-              type="text"
-              className="input-field"
-              placeholder="@username"
-              required
-            />
-          </div>
+          <Input
+            name="username"
+            label="Instagram Username"
+            placeholder="@username"
+            required
+          />
 
-          <div className="form-group">
-            <label className="form-label">
-              User ID (Platform ID)
-            </label>
-            <input
-              name="platformId"
-              type="text"
-              className="input-field"
-              placeholder="1784140..."
-              required
-            />
-          </div>
+          <Input
+            name="platformId"
+            label="User ID (Platform ID)"
+            placeholder="1784140..."
+            required
+          />
 
-          <div className="form-group" style={{ position: 'relative' }}>
+          <div className="w-full relative">
             <label className="form-label">Access Token</label>
-            <div style={{ position: 'relative' }}>
+            <div className="relative">
               <input
                 name="accessToken"
                 type="password"
-                className="input-field"
+                className="input-field pr-10"
                 placeholder="EAAB..."
                 required
                 value={tokenValue}
@@ -123,38 +99,16 @@ export default function AddAccountButton({ existingAccounts = [] }: AddAccountBu
                 }}
               />
               {accountsWithTokens.length > 0 && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    right: '16px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    pointerEvents: 'none',
-                    opacity: 0.5
-                  }}
-                >
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-50">
                   <Plus size={16} />
                 </div>
               )}
 
               {selectedTokenSource === 'open' && accountsWithTokens.length > 0 && (
                 <div
-                  className="glass"
-                  style={{
-                    position: 'absolute',
-                    top: 'calc(100% + 8px)',
-                    left: 0,
-                    right: 0,
-                    zIndex: 20,
-                    padding: '8px',
-                    background: '#1a1a1c',
-                    boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
-                    border: '1px solid var(--border-color)',
-                    maxHeight: '200px',
-                    overflowY: 'auto'
-                  }}
+                  className="absolute top-[calc(100%+8px)] left-0 right-0 z-20 p-2 bg-[#1a1a1c] border border-border shadow-2xl rounded-xl max-h-[200px] overflow-y-auto"
                 >
-                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', padding: '8px', borderBottom: '1px solid var(--border-color)', marginBottom: '4px' }}>
+                  <p className="text-xs text-text-secondary p-2 border-b border-border mb-1">
                     Copy from existing account:
                   </p>
                   {accountsWithTokens.map((acc) => (
@@ -165,23 +119,12 @@ export default function AddAccountButton({ existingAccounts = [] }: AddAccountBu
                         setTokenValue(acc.accessToken)
                         setSelectedTokenSource('')
                       }}
-                      style={{
-                        padding: '10px 12px',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        transition: 'background 0.2s'
-                      }}
-                      onMouseOver={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
-                      onMouseOut={(e) => (e.currentTarget.style.background = 'transparent')}
+                      className="p-2.5 rounded-lg cursor-pointer text-sm flex items-center gap-2.5 hover:bg-white/5 transition-colors"
                     >
-                      <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'rgba(225, 48, 108, 0.2)', display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center', color: '#e1306c' }}>
+                      <div className="w-6 h-6 rounded-full bg-[#E1306C]/20 flex items-center justify-center text-[#e1306c]">
                         <Instagram size={14} />
                       </div>
-                      <span style={{ fontWeight: '500' }}>{acc.username}</span>
+                      <span className="font-medium">{acc.username}</span>
                     </div>
                   ))}
                 </div>
@@ -190,28 +133,19 @@ export default function AddAccountButton({ existingAccounts = [] }: AddAccountBu
           </div>
 
           {error && (
-            <div
-              style={{
-                padding: '12px',
-                background: 'rgba(239, 68, 68, 0.1)',
-                color: 'var(--error)',
-                borderRadius: '8px',
-                fontSize: '14px',
-                textAlign: 'center',
-              }}
-            >
+            <div className="p-3 bg-error/10 text-error rounded-lg text-sm text-center">
               {error}
             </div>
           )}
 
-          <button
+          <Button
             type="submit"
-            className="btn-primary"
             disabled={isPending}
-            style={{ justifyContent: 'center', marginTop: '12px' }}
+            className="mt-3 w-full"
           >
-            {isPending ? <Loader2 className="animate-spin" size={20} /> : 'Connect Account'}
-          </button>
+            {isPending ? <Loader2 className="animate-spin mr-2" size={20} /> : null}
+            {isPending ? 'Connecting...' : 'Connect Account'}
+          </Button>
         </form>
       </Modal>
     </>
