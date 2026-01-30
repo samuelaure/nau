@@ -8,6 +8,7 @@ import AccountSettings from '@/components/AccountSettings'
 import TemplateCard from '@/components/TemplateCard'
 import ExternalAccountLink from '../ExternalAccountLink'
 import { cn } from '@/lib/utils'
+import type { TemplateWithRelations } from '@/types'
 
 export default async function AccountPage({
   params,
@@ -139,7 +140,10 @@ async function AccountTemplates({ accountId }: { accountId: string }) {
   const templates = await prisma.template.findMany({
     where: { accountId },
     orderBy: { createdAt: 'desc' },
-    include: { _count: { select: { renders: true } } },
+    include: {
+      _count: { select: { renders: true } },
+      account: { select: { username: true, platform: true } }
+    },
   })
 
   return (
@@ -154,7 +158,7 @@ async function AccountTemplates({ accountId }: { accountId: string }) {
       </div>
 
       <div className="grid grid-cols-[repeat(auto-fill,minmax(350px,1fr))] gap-6">
-        {templates.map((template: any) => (
+        {templates.map((template: TemplateWithRelations) => (
           <TemplateCard key={template.id} template={template} context="account" />
         ))}
       </div>

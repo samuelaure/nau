@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { Instagram, Video } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
+import type { RenderWithTemplate } from '@/types'
 
 export default async function DashboardPage() {
   const accountsCount = await prisma.socialAccount.count()
@@ -67,7 +68,7 @@ export default async function DashboardPage() {
               </tr>
             </thead>
             <tbody>
-              {recentRenders.map((render: any) => (
+              {recentRenders.map((render: RenderWithTemplate) => (
                 <tr
                   key={render.id}
                   className="border-b border-white/5 text-sm hover:bg-white/5 transition-colors duration-200"

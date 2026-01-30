@@ -5,11 +5,12 @@ import { deleteAccount } from './actions'
 import ActionMenu from '@/components/ActionMenu'
 import Link from 'next/link'
 import { Card } from '@/components/ui/Card'
+import type { AccountWithCounts } from '@/types'
 
 export default async function AccountsPage() {
   const accounts = await prisma.socialAccount.findMany({
     orderBy: { createdAt: 'desc' },
-    include: { _count: { select: { templates: true } } },
+    include: { _count: { select: { templates: true, assets: true } } },
   })
 
   return (
@@ -31,7 +32,7 @@ export default async function AccountsPage() {
       </header>
 
       <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-6">
-        {accounts.map((account: any) => (
+        {accounts.map((account: AccountWithCounts) => (
           <Card key={account.id} className="relative group hover:border-accent/40 transition-colors">
             {/* Overlay Link for whole-card clickability */}
             <Link

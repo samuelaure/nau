@@ -3,8 +3,12 @@
 import { useTransition } from 'react'
 import { updateAccount } from '@/app/dashboard/accounts/actions'
 import RefreshProfileButton from '@/app/dashboard/accounts/RefreshProfileButton'
+import { Card } from './ui/Card'
+import { Button } from './ui/Button'
+import { Input } from './ui/Input'
+import type { SocialAccount } from '@prisma/client'
 
-export default function AccountSettings({ account }: { account: any }) {
+export default function AccountSettings({ account }: { account: SocialAccount }) {
   const [isPending, startTransition] = useTransition()
 
   const handleUpdate = (formData: FormData) => {
@@ -14,26 +18,32 @@ export default function AccountSettings({ account }: { account: any }) {
   }
 
   return (
-    <div className="animate-fade-in" style={{ maxWidth: '600px' }}>
-      <div className="card" style={{ padding: '32px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <h3 style={{ fontSize: '20px', margin: 0 }}>Account Settings</h3>
+    <div className="animate-fade-in max-w-2xl">
+      <Card className="p-8">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-xl font-heading font-semibold">Account Settings</h3>
           <RefreshProfileButton accountId={account.id} />
         </div>
 
-        <form action={handleUpdate} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          <div className="form-group">
-            <label className="form-label">Username</label>
-            <input name="username" defaultValue={account.username} className="input-field" required />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Instagram User ID</label>
-            <input name="platformId" defaultValue={account.platformId} className="input-field" required />
-          </div>
-          <div className="form-group">
+        <form action={handleUpdate} className="flex flex-col gap-6">
+          <Input
+            name="username"
+            label="Username"
+            defaultValue={account.username || ''}
+            required
+          />
+
+          <Input
+            name="platformId"
+            label="Instagram User ID"
+            defaultValue={account.platformId || ''}
+            required
+          />
+
+          <div className="w-full">
             <label className="form-label">
               Access Token
-              <span style={{ fontSize: '12px', fontWeight: '400', marginLeft: '8px', opacity: 0.7 }}>
+              <span className="text-xs font-normal ml-2 opacity-70">
                 (Optional rotation)
               </span>
             </label>
@@ -43,18 +53,18 @@ export default function AccountSettings({ account }: { account: any }) {
               className="input-field"
               type="password"
             />
-            <p style={{ marginTop: '8px', color: 'var(--text-secondary)', fontSize: '12px' }}>
+            <p className="mt-2 text-text-secondary text-xs">
               Only provide a new token if you want to rotate it or it has expired.
             </p>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
-            <button type="submit" className="btn-primary" disabled={isPending}>
+          <div className="flex justify-end pt-4 border-t border-border">
+            <Button type="submit" disabled={isPending}>
               {isPending ? 'Saving...' : 'Save Changes'}
-            </button>
+            </Button>
           </div>
         </form>
-      </div>
+      </Card>
     </div>
   )
 }

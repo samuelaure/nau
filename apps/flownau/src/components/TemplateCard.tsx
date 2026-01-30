@@ -4,10 +4,11 @@ import Link from 'next/link'
 import { Video, Table, CheckCircle, Play, ExternalLink } from 'lucide-react'
 import ActionMenu from '@/components/ActionMenu'
 import { deleteTemplate, duplicateTemplate } from '@/app/dashboard/templates/actions'
+import type { TemplateWithRelations } from '@/types'
 
 interface TemplateCardProps {
-  template: any // using any to match existing pattern, though types would be better
-  context?: 'account' | 'templates' // to determine back link behavior
+  template: TemplateWithRelations
+  context?: 'templates' | 'account' // to determine back link behavior
 }
 
 export default function TemplateCard({ template, context = 'templates' }: TemplateCardProps) {
