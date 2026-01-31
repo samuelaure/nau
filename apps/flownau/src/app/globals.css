@@ -15,6 +15,33 @@
   h4 {
     @apply font-heading font-semibold leading-tight;
   }
+
+  /* Global Input Styles */
+  input[type='text'],
+  input[type='password'],
+  input[type='email'],
+  input[type='number'],
+  input[type='search'],
+  input[type='tel'],
+  input[type='url'],
+  textarea,
+  select {
+    @apply w-full bg-input border border-border text-text-primary px-4 py-3 rounded-xl outline-none transition-all duration-200 text-[15px] placeholder:text-text-secondary/40 shadow-sm;
+  }
+
+  input:focus,
+  textarea:focus,
+  select:focus {
+    @apply border-accent bg-panel ring-4 ring-accent/10;
+  }
+
+  input:disabled,
+  textarea:disabled,
+  select:disabled {
+    @apply opacity-50 cursor-not-allowed bg-transparent border-dashed;
+  }
+  
+  /* Remove default file input styling if needed, or style it specifically */
 }
 
 @layer components {
@@ -25,26 +52,17 @@
   }
 
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl border-none font-semibold text-[15px] cursor-pointer text-white transition-all duration-200 ease-out shadow-lg;
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl border-none font-semibold text-[15px] cursor-pointer text-white transition-all duration-200 ease-out shadow-lg disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none hover:-translate-y-0.5 active:translate-y-0;
     background: linear-gradient(135deg, theme('colors.accent.DEFAULT'), theme('colors.accent.hover'));
     box-shadow: 0 4px 12px rgba(124, 58, 237, 0.15);
   }
 
-  .btn-primary:hover {
-    @apply -translate-y-0.5;
+  .btn-primary:hover:not(:disabled) {
     box-shadow: 0 8px 20px rgba(124, 58, 237, 0.3);
   }
 
-  .btn-primary:active {
-    @apply translate-y-0;
-  }
-
-  .btn-primary:disabled {
-    @apply opacity-60 cursor-not-allowed transform-none;
-  }
-
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border font-medium text-sm cursor-pointer transition-all duration-200 text-white;
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border font-medium text-sm cursor-pointer transition-all duration-200 text-white hover:-translate-y-px;
     background: rgba(255, 255, 255, 0.05);
     border-color: rgba(255, 255, 255, 0.08);
   }
@@ -52,63 +70,54 @@
   .btn-secondary:hover {
     background: rgba(255, 255, 255, 0.1);
     border-color: rgba(255, 255, 255, 0.2);
-    @apply -translate-y-px;
   }
 
-  .input-field {
-    @apply w-full bg-input border border-border text-text-primary px-[18px] py-[14px] rounded-xl outline-none transition-all duration-200 text-[15px];
+  /* .input-field retained for backward compatibility but mapped to match base */
+  .input, .input-field {
+    @apply w-full bg-input border border-border text-text-primary px-4 py-3 rounded-xl outline-none transition-all duration-200 text-[15px] placeholder:text-text-secondary/40 shadow-sm;
+  }
+  
+  .input:focus, .input-field:focus {
+    @apply border-accent bg-panel ring-4 ring-accent/10;
   }
 
-  .input-field:focus {
-    @apply border-accent;
-    background: #252528;
-    box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.1);
-  }
-
-  .input-field::placeholder {
-    @apply text-white/30;
-  }
-
-  select.input-field {
+  select.input, select.input-field {
     @apply appearance-none bg-no-repeat pr-12;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-    background-position: right 16px center;
-    background-size: 18px;
+    background-position: right 12px center;
+    background-size: 16px;
   }
 
-  select.input-field option {
+  select option {
     @apply bg-panel text-white p-3;
   }
 
   .form-label {
-    @apply block mb-2.5 text-sm font-medium text-text-secondary font-heading;
+    @apply block mb-2 text-[13px] font-medium text-text-secondary font-sans uppercase tracking-wide;
   }
 
   .form-group {
-    @apply flex flex-col gap-2;
+    @apply flex flex-col gap-1.5;
   }
 
   .card {
-    @apply p-8 bg-panel border border-border rounded-3xl transition-all duration-300;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+    @apply p-8 bg-panel border border-border rounded-3xl transition-all duration-300 shadow-xl;
   }
 
   .card:hover {
-    @apply -translate-y-1;
-    border-color: rgba(124, 58, 237, 0.4);
+    @apply -translate-y-1 border-accent/40;
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
   }
 
   .animate-fade-in {
-    animation: fadeIn 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+    animation: fadeIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
   }
 
   @keyframes fadeIn {
     from {
       opacity: 0;
-      transform: translateY(10px);
+      transform: translateY(8px);
     }
-
     to {
       opacity: 1;
       transform: translateY(0);
