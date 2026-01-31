@@ -31,6 +31,7 @@ model SocialAccount {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   shortCode         String?  // For asset naming (e.g. "AF")
+  assetsRoot        String?  // Path to the linked assets folder
   templates         Template[]
   assets            Asset[]
 
@@ -66,6 +67,7 @@ model Template {
   assets          Asset[]
   renders         Render[]
   useAccountAssets Boolean @default(true)
+  assetsRoot      String?  // Path to the linked assets folder
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }

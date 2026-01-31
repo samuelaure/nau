@@ -174,7 +174,7 @@ async function AccountTemplates({ accountId }: { accountId: string }) {
 async function AccountAssets({ accountId }: { accountId: string }) {
   const account = await prisma.socialAccount.findUnique({
     where: { id: accountId },
-    select: { username: true, id: true },
+    select: { username: true, id: true, assetsRoot: true },
   })
 
   const assets = await prisma.asset.findMany({
@@ -182,7 +182,7 @@ async function AccountAssets({ accountId }: { accountId: string }) {
     orderBy: { createdAt: 'desc' },
   })
 
-  const basePath = account?.username || account?.id || ''
+  const basePath = account?.assetsRoot || account?.username || account?.id || ''
 
   return <AssetsManager ownerId={accountId} ownerType="account" assets={assets} basePath={basePath} />
 }

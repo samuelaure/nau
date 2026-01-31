@@ -16,6 +16,9 @@ import {
 } from 'lucide-react'
 import { deleteAsset } from '@/modules/shared/actions'
 import ActionMenu from '@/modules/shared/components/ActionMenu'
+import Modal from '@/modules/shared/components/Modal'
+import R2FolderBrowser from '@/modules/shared/components/R2FolderBrowser'
+import { Link as LinkIcon } from 'lucide-react'
 
 interface Asset {
   id: string
@@ -39,6 +42,8 @@ export default function AssetsManager({ ownerId, ownerType, assets, basePath }: 
   const [uploading, setUploading] = useState<boolean>(false)
   const [progress, setProgress] = useState<string>('')
   const [currentPath, setCurrentPath] = useState<string[]>([])
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false)
+  const [linking, setLinking] = useState(false)
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
@@ -94,6 +99,34 @@ export default function AssetsManager({ ownerId, ownerType, assets, basePath }: 
     [ownerId, ownerType],
   )
 
+  const handleLinkFolder = async (prefix: string) => {
+    setLinking(true)
+    try {
+      const response = await fetch('/api/protected/r2/link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prefix,
+          accountId: ownerType === 'account' ? ownerId : null,
+          templateId: ownerType === 'template' ? ownerId : null,
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Linking failed')
+      }
+
+      window.location.reload()
+    } catch (error: any) {
+      console.error('Linking failed', error)
+      alert(`Linking failed: ${error.message}`)
+    } finally {
+      setLinking(false)
+      setIsLinkModalOpen(false)
+    }
+  }
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
@@ -116,11 +149,12 @@ export default function AssetsManager({ ownerId, ownerType, assets, basePath }: 
           (part, i) => parts[i]?.toLowerCase() === part.toLowerCase(),
         )
 
-        // Only strip the base path if it matches
+        // Only process if it starts with base path, otherwise hide it (it belongs to another account's structure)
         if (startsWithBase) {
           parts = parts.slice(baseParts.length)
+        } else {
+          return acc
         }
-        // If it doesn't match, we show the full path (starting from root or whatever structure exists)
       }
 
       // Check if asset is within currentPath
@@ -128,15 +162,15 @@ export default function AssetsManager({ ownerId, ownerType, assets, basePath }: 
       if (!isInPath) return acc
 
       const nextPart = parts[currentPath.length]
-      if (!nextPart) return acc // Should not happen if isInPath is true
+      if (!nextPart) return acc
 
+      // If it has more parts after currentPath + nextPart, it's in a subfolder
       if (parts.length > currentPath.length + 1) {
-        // It's a folder
         if (!acc.folders.has(nextPart)) {
           acc.folders.add(nextPart)
         }
       } else {
-        // It's a file
+        // It's a file at exactly this level
         acc.files.push(asset)
       }
       return acc
@@ -240,6 +274,22 @@ export default function AssetsManager({ ownerId, ownerType, assets, basePath }: 
           <p style={{ color: 'var(--text-secondary)' }}>
             {uploading ? progress : 'or click to browse. Supports Video, Audio, and Images.'}
           </p>
+          {!uploading && !isDragActive && (
+            <div style={{ marginTop: '24px', display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setIsLinkModalOpen(true)
+                }}
+                className="btn-secondary"
+                style={{ fontSize: '13px', padding: '8px 16px' }}
+              >
+                <LinkIcon size={14} className="mr-2" />
+                Link Existing Folder
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -287,10 +337,34 @@ export default function AssetsManager({ ownerId, ownerType, assets, basePath }: 
       </div>
 
       {sortedFolders.length === 0 && items.files.length === 0 && !uploading && (
-        <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '40px' }}>
-          No folders or assets found in this directory.
+        <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '60px 40px' }}>
+          <Folder size={48} style={{ margin: '0 auto 16px', opacity: 0.2 }} />
+          <p style={{ marginBottom: '24px', fontSize: '16px' }}>No folders or assets found in this directory.</p>
+          <button
+            onClick={() => setIsLinkModalOpen(true)}
+            className="btn-primary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+          >
+            <LinkIcon size={18} />
+            Browse & Link R2 Folder
+          </button>
         </div>
       )}
+
+      <Modal isOpen={isLinkModalOpen} onClose={() => setIsLinkModalOpen(false)} maxWidth="lg">
+        {linking ? (
+          <div style={{ textAlign: 'center', padding: '40px' }}>
+            <Loader2 className="animate-spin" size={48} style={{ margin: '0 auto 24px', color: 'var(--accent-color)' }} />
+            <h3 style={{ fontSize: '20px', marginBottom: '8px' }}>Linking assets...</h3>
+            <p style={{ color: 'var(--text-secondary)' }}>This may take a moment depending on the number of files.</p>
+          </div>
+        ) : (
+          <R2FolderBrowser
+            onSelect={handleLinkFolder}
+            onCancel={() => setIsLinkModalOpen(false)}
+          />
+        )}
+      </Modal>
 
       <style jsx global>{`
         .hover-bg:hover {

@@ -203,7 +203,11 @@ async function TemplateAssets({ templateId }: { templateId: string }) {
   })
 
   let basePath = ''
-  if (template?.account) {
+  if (template?.assetsRoot) {
+    basePath = template.assetsRoot
+  } else if (template?.account?.assetsRoot) {
+    basePath = template.account.assetsRoot
+  } else if (template?.account) {
     basePath = template.account.username || template.account.id
   } else {
     basePath = 'templates/global'
