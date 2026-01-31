@@ -63,16 +63,7 @@ export default function AddTemplateButton({
             />
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Remotion Component ID</label>
-            <input
-              name="remotionId"
-              type="text"
-              className="input-field"
-              placeholder="e.g. MyVideoComposition"
-              required
-            />
-          </div>
+          <input type="hidden" name="remotionId" value="Universal" />
 
           <div className="form-group">
             <label className="form-label">Linked Account</label>
