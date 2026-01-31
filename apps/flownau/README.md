@@ -33,17 +33,44 @@ Built for creators and enterprises who need to scale their video presence withou
 ```
 
 ## 🛠 Getting Started
+
+### 1. Standard Setup (Standalone)
+Ideal for new developers. Everything runs in isolated containers.
+
 1. **Clone & Install**:
    ```bash
    npm install
    ```
 2. **Environment**:
-   Copy `.env.example` to `.env` and fill in your credentials.
-3. **Database**:
+   Copy `.env.example` to `.env`:
+   ```bash
+   cp .env.example .env
+   ```
+3. **Start Infrastructure**:
+   Start the specialized database and redis containers:
+   ```bash
+   docker compose up -d
+   ```
+4. **Database Migration**:
    ```bash
    npx prisma migrate dev
    ```
-4. **Dev Server**:
+5. **Run App**:
+   ```bash
+   npm run dev
+   ```
+
+### 2. Shared Infrastructure (Advanced/Prod)
+Use this if you have a `shared-mesh` network with existing Postgres/Redis services.
+
+1. **Activate Shared Mode**:
+   Copy the shared configuration to the override file. Docker automatically reads `docker-compose.override.yml`.
+   ```bash
+   cp docker-compose.override.yml.example docker-compose.override.yml
+   ```
+   *This disables the local containers and connects to the `shared-mesh` network.*
+
+2. **Run App**:
    ```bash
    npm run dev
    ```
