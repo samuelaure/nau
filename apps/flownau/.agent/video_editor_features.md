@@ -6,11 +6,11 @@
 - [x] **Canvas & Player**: Basic playback works.
 - [x] **Project Structure**: `VideoTemplate` data model is in place.
 - [x] **Asset Pipeline**: Asset library visual and click-to-add works.
-- [ ] **Frame Sync**: Syncing `currentTime` with player is MISSING.
-- [ ] **Scrubbing/Seeking**: Ability to seek from timeline is MISSING.
+- [x] **Frame Sync**: Syncing `currentTime` with player is WORKING.
+- [x] **Scrubbing/Seeking**: Ability to seek from timeline is WORKING.
 
 ### Phase 2: Basic Timeline (P1)
-- [ ] **Visual Timeline**: Dedicated component with measure marks.
+- [x] **Visual Timeline**: Dedicated component with measure marks and playhead.
 - [ ] **Track Interaction**: Drag moving of clips.
 - [ ] **Trimming**: Drag handles for start/end.
 - [ ] **Transform Tools**: On-canvas handles (Gizmo) or just reliable property inputs.
@@ -28,16 +28,16 @@
 
 ---
 
-## Current Status (Commit 30cf170)
+## Current Status (Post-Refactor)
 
 ### 1. Core Component Structure
-- **Main Editor**: Monolithic `VideoEditor.tsx`.
-- **Player**: Standard Remotion Player.
+- **Main Editor**: Refactored into `VideoEditorContext` and subcomponents (`EditorCanvas`, `Timeline`, `LayerList`, etc.).
+- **Player**: Remotion Player with event listener sync.
 
 ### 2. Canvas & Playback
 - [x] **Video Player**
-- [ ] **Playback Control** (Keyboard shortcuts missing)
-- [ ] **Frame Sync** (Missing)
+- [x] **Playback Control** (Play/Pause syncs with UI)
+- [x] **Frame Sync** (Bidirectional sync via Context)
 
 ### 3. Tool Rail & Panels
 - [x] **Navigation Rail**: Basic toggle between Layers/Assets.
@@ -49,11 +49,10 @@
 - [x] **Click-to-Add**
 
 ### 5. Timeline
-- [ ] **Timeline Component** (Currently inline)
+- [x] **Timeline Component**: `Timeline.tsx` with scrubbing.
 - [ ] **Trimming** (Numeric only)
 - [ ] **Splitting** (Missing)
 
 ### 6. Layer Management
 - [x] **Layers List**
 - [ ] **Reordering** (Missing)
-
