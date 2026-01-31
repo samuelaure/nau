@@ -38,31 +38,19 @@ export default function AddTemplateButton({
       </button>
 
       <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <div
-            style={{
-              width: '64px',
-              height: '64px',
-              background: 'rgba(255, 255, 255, 0.05)',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 16px',
-              color: '#7c3aed',
-            }}
-          >
-            <Video size={32} />
+        <div className="text-center mb-10">
+          <div className="w-20 h-20 bg-accent/10 rounded-3xl flex items-center justify-center mx-auto mb-6 text-accent rotate-3 transition-transform hover:rotate-0 duration-300">
+            <Video size={36} />
           </div>
-          <h2 style={{ fontSize: '24px', marginBottom: '8px' }}>Create Template</h2>
-          <p style={{ color: 'var(--text-secondary)' }}>
-            Define a new video schema for automation.
+          <h2 className="text-3xl font-heading font-bold mb-3 tracking-tight">Create Template</h2>
+          <p className="text-text-secondary text-base max-w-[240px] mx-auto">
+            Define a new video schema for your automated workflow.
           </p>
         </div>
 
         <form
           action={handleSubmit}
-          style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}
+          className="flex flex-col gap-6"
         >
           <div className="form-group">
             <label className="form-label">Template Name</label>
@@ -113,27 +101,24 @@ export default function AddTemplateButton({
           </div>
 
           {error && (
-            <div
-              style={{
-                padding: '12px',
-                background: 'rgba(239, 68, 68, 0.1)',
-                color: 'var(--error)',
-                borderRadius: '8px',
-                fontSize: '14px',
-                textAlign: 'center',
-              }}
-            >
+            <div className="p-4 bg-error/10 text-error border border-error/20 rounded-2xl text-sm text-center font-medium animate-shake">
               {error}
             </div>
           )}
 
           <button
             type="submit"
-            className="btn-primary"
+            className="btn-primary w-full mt-4 py-4 rounded-2xl text-lg group"
             disabled={isPending}
-            style={{ justifyContent: 'center', marginTop: '12px' }}
           >
-            {isPending ? <Loader2 className="animate-spin" size={20} /> : 'Create Template'}
+            {isPending ? (
+              <Loader2 className="animate-spin" size={24} />
+            ) : (
+              <>
+                Create Template
+                <Plus size={20} className="group-hover:rotate-90 transition-transform duration-300" />
+              </>
+            )}
           </button>
         </form>
       </Modal>

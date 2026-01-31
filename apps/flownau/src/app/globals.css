@@ -40,7 +40,7 @@
   select:disabled {
     @apply opacity-50 cursor-not-allowed bg-transparent border-dashed;
   }
-  
+
   /* Remove default file input styling if needed, or style it specifically */
 }
 
@@ -73,15 +73,18 @@
   }
 
   /* .input-field retained for backward compatibility but mapped to match base */
-  .input, .input-field {
+  .input,
+  .input-field {
     @apply w-full bg-input border border-border text-text-primary px-4 py-3 rounded-xl outline-none transition-all duration-200 text-[15px] placeholder:text-text-secondary/40 shadow-sm;
   }
-  
-  .input:focus, .input-field:focus {
+
+  .input:focus,
+  .input-field:focus {
     @apply border-accent bg-panel ring-4 ring-accent/10;
   }
 
-  select.input, select.input-field {
+  select.input,
+  select.input-field {
     @apply appearance-none bg-no-repeat pr-12;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
     background-position: right 12px center;
@@ -113,14 +116,60 @@
     animation: fadeIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
   }
 
+  .animate-shake {
+    animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  }
+
   @keyframes fadeIn {
     from {
       opacity: 0;
       transform: translateY(8px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
     }
+  }
+
+  @keyframes shake {
+
+    10%,
+    90% {
+      transform: translate3d(-1px, 0, 0);
+    }
+
+    20%,
+    80% {
+      transform: translate3d(2px, 0, 0);
+    }
+
+    30%,
+    50%,
+    70% {
+      transform: translate3d(-4px, 0, 0);
+    }
+
+    40%,
+    60% {
+      transform: translate3d(4px, 0, 0);
+    }
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
   }
 }
