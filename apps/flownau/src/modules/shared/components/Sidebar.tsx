@@ -7,8 +7,8 @@ import { signOut } from 'next-auth/react'
 
 const navItems = [
   { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Templates', href: '/dashboard/templates', icon: Video },
   { name: 'IG Accounts', href: '/dashboard/accounts', icon: Instagram },
+  { name: 'Templates', href: '/dashboard/templates', icon: Video },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ]
 
@@ -32,7 +32,7 @@ export default function Sidebar() {
         <div style={{ padding: '8px', background: 'var(--accent-color)', borderRadius: '8px' }}>
           <Video size={20} color="white" />
         </div>
-        <span style={{ fontWeight: '800', fontSize: '20px', fontFamily: 'Outfit' }}>FLOWNAU</span>
+        <span style={{ fontWeight: '800', fontSize: '20px', fontFamily: 'Outfit', textTransform: 'lowercase' }}>flownaŭ</span>
       </div>
 
       <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
@@ -62,7 +62,7 @@ export default function Sidebar() {
                 if (!isActive) e.currentTarget.style.backgroundColor = 'transparent'
               }}
             >
-              <Icon size={20} color={isActive ? 'var(--accent-color)' : 'currentColor'} />
+              <Icon size={20} color={isActive ? 'white' : 'currentColor'} />
               {item.name}
             </Link>
           )

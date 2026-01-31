@@ -4,6 +4,19 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --accent-color: #7c3aed;
+  --accent-hover: #6d28d9;
+  --text-primary: #ffffff;
+  --text-secondary: #a1a1aa;
+  --background-color: #0d0d0d;
+  --panel-color: #1a1a1a;
+  --border-color: #27272a;
+  --input-bg: #1e1e20;
+  --success: #10b981;
+  --error: #ef4444;
+}
+
 @layer base {
   body {
     @apply bg-background text-text-primary font-sans antialiased;
