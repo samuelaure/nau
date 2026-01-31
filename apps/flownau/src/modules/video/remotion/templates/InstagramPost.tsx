@@ -10,7 +10,7 @@ export interface InstagramPostProps {
 
 export const InstagramPost: React.FC<Partial<InstagramPostProps>> = ({
   title = 'Hello World',
-  subtitle = 'Generated with Flownau',
+  subtitle = 'generated with flownaŭ',
   image,
   primaryColor = '#7C3AED',
 }) => {

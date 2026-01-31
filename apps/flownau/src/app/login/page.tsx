@@ -37,7 +37,7 @@ export default function LoginPage() {
           <div className="w-16 h-16 bg-accent rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-[0_0_20px_rgba(124,58,237,0.5)]">
             <Rocket size={32} color="white" />
           </div>
-          <h1 className="text-3xl font-heading font-bold mb-2">Flownau</h1>
+          <h1 className="text-3xl font-heading font-bold mb-2 lowercase">flownaŭ</h1>
           <p className="text-text-secondary">Welcome back, administrator.</p>
         </div>
 

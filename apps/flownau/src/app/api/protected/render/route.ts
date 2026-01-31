@@ -65,7 +65,7 @@ export const POST = auth(async function POST(req) {
           accessToken: decrypt(account.accessToken),
           instagramUserId: account.platformId,
           videoUrl: fullUrl,
-          caption: (row as any).Caption || 'Automated post from Flownau',
+          caption: (row as any).Caption || 'automated post from flownaŭ',
         })
 
         await prisma.render.update({

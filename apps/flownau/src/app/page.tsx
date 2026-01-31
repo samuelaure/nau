@@ -12,7 +12,7 @@ export default function LandingPage() {
           <div className="p-2 bg-accent rounded-lg">
             <Video size={20} color="white" />
           </div>
-          <span className="font-extrabold text-xl font-heading tracking-wide">FLOWNAU</span>
+          <span className="font-extrabold text-xl font-heading tracking-wide">flownaŭ</span>
         </div>
         <Link href="/login" className="btn-primary px-6 py-2">
           Dashboard <ArrowRight size={18} />

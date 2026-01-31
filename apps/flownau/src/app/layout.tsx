@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Flownau | Video Automation',
+  title: 'flownaŭ | Video Automation',
   description: 'Automate your Instagram presence with data-driven videos',
 }
 
