@@ -12,7 +12,16 @@ export async function checkAuth() {
     if (!session?.user?.id) {
         throw new Error('Unauthorized')
     }
-    return { user: { ...session.user, id: session.user.id } }
+
+    const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+    })
+
+    if (!user) {
+        throw new Error('User not found')
+    }
+
+    return { user }
 }
 
 const DeleteAssetSchema = z.string().min(1)
