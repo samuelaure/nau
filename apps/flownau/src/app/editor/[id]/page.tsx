@@ -28,6 +28,10 @@ export default async function EditorPage({ params }: { params: Promise<{ id: str
         ...(template.useAccountAssets && template.account ? template.account.assets : [])
     ]
 
+    const assetsRoot = template.useAccountAssets && template.account?.assetsRoot
+        ? template.account.assetsRoot
+        : template.assetsRoot;
+
     return (
         <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden', background: '#0d0d0d' }}>
             <ClientEditor
@@ -35,6 +39,7 @@ export default async function EditorPage({ params }: { params: Promise<{ id: str
                 templateName={template.name}
                 initialConfig={(template.config as any) || undefined}
                 assets={combinedAssets}
+                assetsRoot={assetsRoot || undefined}
             />
         </div>
     )

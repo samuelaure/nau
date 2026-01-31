@@ -20,6 +20,7 @@ interface VideoEditorProps {
     initialTemplate?: VideoTemplate;
     onSave: (template: VideoTemplate) => void;
     assets?: any[];
+    assetsRoot?: string;
 }
 
 const defaultTemplate: VideoTemplate = {
@@ -40,7 +41,7 @@ export default function VideoEditor(props: VideoEditorProps) {
     );
 }
 
-function VideoEditorLayout({ templateId, templateName, onSave, assets = [] }: VideoEditorProps) {
+function VideoEditorLayout({ templateId, templateName, onSave, assets = [], assetsRoot }: VideoEditorProps) {
     const { template } = useVideoEditor();
     const [sidebarTab, setSidebarTab] = useState<'layers' | 'assets'>('layers');
 
@@ -69,7 +70,7 @@ function VideoEditorLayout({ templateId, templateName, onSave, assets = [] }: Vi
 
                 {/* Side Panel (Layers or Assets) */}
                 <div style={{ width: '300px', borderRight: '1px solid #333', display: 'flex', flexDirection: 'column', background: '#161616' }}>
-                    {sidebarTab === 'layers' ? <LayerList /> : <AssetBrowser assets={assets} />}
+                    {sidebarTab === 'layers' ? <LayerList /> : <AssetBrowser assets={assets} assetsRoot={assetsRoot} />}
                 </div>
 
                 {/* Main Canvas / Player Area */}

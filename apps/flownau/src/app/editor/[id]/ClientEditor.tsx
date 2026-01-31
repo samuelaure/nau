@@ -11,11 +11,13 @@ export default function ClientEditor({
     templateName,
     initialConfig,
     assets = [],
+    assetsRoot
 }: {
     templateId: string
     templateName: string
     initialConfig: VideoTemplate
     assets?: any[]
+    assetsRoot?: string
 }) {
     const [isPending, startTransition] = useTransition()
 
@@ -39,6 +41,7 @@ export default function ClientEditor({
                 initialTemplate={initialConfig}
                 onSave={handleSave}
                 assets={assets}
+                assetsRoot={assetsRoot}
             />
         </div>
     )
