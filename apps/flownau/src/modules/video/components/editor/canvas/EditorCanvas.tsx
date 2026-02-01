@@ -8,9 +8,17 @@ export function EditorCanvas() {
     const { template, setSelectedElementId, currentFrame, setCurrentFrame, isPlaying, setIsPlaying } = useVideoEditor();
     const playerRef = useRef<PlayerRef>(null);
 
+    const isUpdatingFromPlayer = useRef(false);
+
     // Sync Context -> Player (seeking)
     useEffect(() => {
         if (!playerRef.current) return;
+
+        // Break loop if this update originated from the player
+        if (isUpdatingFromPlayer.current) {
+            isUpdatingFromPlayer.current = false;
+            return;
+        }
 
         const playerFrame = playerRef.current.getCurrentFrame();
         // Only seek if difference is significant (prevents infinite loop during playback)
@@ -37,12 +45,14 @@ export function EditorCanvas() {
         if (!player) return;
 
         const onFrameUpdate = (e: { detail: { frame: number } }) => {
+            isUpdatingFromPlayer.current = true;
             setCurrentFrame(e.detail.frame);
         };
 
         const onPlay = () => setIsPlaying(true);
         const onPause = () => setIsPlaying(false);
         const onSeeked = (e: { detail: { frame: number } }) => {
+            isUpdatingFromPlayer.current = true;
             setCurrentFrame(e.detail.frame);
         };
 

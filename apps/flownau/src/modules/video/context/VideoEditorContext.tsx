@@ -8,7 +8,7 @@ interface VideoEditorContextType {
     selectedElementId: string | null;
     setSelectedElementId: (id: string | null) => void;
     updateTemplate: (updates: Partial<VideoTemplate>) => void;
-    addElement: (type: VideoElement['type'], asset?: { url: string; name: string }) => void;
+    addElement: (type: VideoElement['type'], asset?: { url: string; name: string; width?: number; height?: number }) => void;
     updateElement: (id: string, changes: Partial<VideoElement> | Partial<VideoElement['style']>) => void;
     deleteElement: (id: string) => void;
     reorderElement: (id: string, direction: 'up' | 'down' | 'top' | 'bottom') => void;
@@ -41,7 +41,47 @@ export function VideoEditorProvider({ children, initialTemplate, onSave }: Video
         setTemplate((prev) => ({ ...prev, ...updates }));
     }, []);
 
-    const addElement = useCallback((type: VideoElement['type'], asset?: { url: string; name: string }) => {
+    const addElement = useCallback((type: VideoElement['type'], asset?: { url: string; name: string; width?: number; height?: number }) => {
+        let initialWidth = type === 'text' ? undefined : template.width * 0.5;
+        let initialHeight = undefined; // Default to undefined (auto aspect ratio)
+
+        // If asset provides dimensions, use them (scaled to fit if necessary)
+        if (asset?.width && asset?.height) {
+            let w = asset.width;
+            let h = asset.height;
+
+            // Check if larger than canvas
+            const scaleDown = Math.min(1, template.width / w, template.height / h);
+
+            // Or maybe we always want to fit it nicely, say 80% of screen?
+            // For now, let's just ensure it doesn't exceed bounds, or start at 50% screen width maintaining ratio?
+            // User expectation: "Original proportion". Usually implies "Natural size" or "Fit to screen".
+            // Let's cap max size at template size.
+            if (scaleDown < 1) {
+                w *= scaleDown;
+                h *= scaleDown;
+            }
+            // Actually, starting at 100% size is often annoying. 
+            // Let's start at max 80% of canvas width/height.
+            const fitScale = Math.min(0.8, (template.width * 0.8) / w, (template.height * 0.8) / h);
+            // If the image is tiny, don't upscale it?
+            // If image is 100x100 and template is 1920x1080. FitScale might be huge?
+            // No, min(0.8, ...) checks if it's TOO BIG.
+            // If w=100, template.width=1920. 1920*0.8/100 = 15. min(0.8, 15) = 0.8.
+            // So small images get shrunk to 80%! That's wrong.
+            // Logical Fit:
+            // If w > template.width * 0.8 -> Scale down.
+            // Else use w.
+            if (w > template.width * 0.8 || h > template.height * 0.8) {
+                const s = Math.min((template.width * 0.8) / w, (template.height * 0.8) / h);
+                w *= s;
+                h *= s;
+            }
+
+            initialWidth = w;
+            initialHeight = h;
+        }
+
         const newElement: VideoElement = {
             id: crypto.randomUUID(),
             type,
@@ -55,8 +95,8 @@ export function VideoEditorProvider({ children, initialTemplate, onSave }: Video
             style: {
                 x: 0,
                 y: 0,
-                width: type === 'text' ? undefined : template.width * 0.5,
-                height: undefined, // Let aspect ratio determine height initially
+                width: initialWidth,
+                height: initialHeight,
                 scale: 1,
                 rotation: 0,
                 opacity: 1,
@@ -70,6 +110,12 @@ export function VideoEditorProvider({ children, initialTemplate, onSave }: Video
         if (newElement.style.width && newElement.style.height) {
             newElement.style.x = (template.width - newElement.style.width) / 2;
             newElement.style.y = (template.height - newElement.style.height) / 2;
+        } else if (newElement.style.width) {
+            // We have width but no height (aspect ratio implicit)
+            // We can't perfectly center Y without height.
+            // Assume 16:9 for centering estimation? Or just center X only.
+            newElement.style.x = (template.width - newElement.style.width) / 2;
+            newElement.style.y = template.height / 2 - (newElement.style.width * 9 / 16) / 2; // Rough guess
         } else {
             newElement.style.x = template.width / 2;
             newElement.style.y = template.height / 2;

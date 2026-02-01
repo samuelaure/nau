@@ -44,19 +44,53 @@ export const TransformOverlay: React.FC<TransformOverlayProps> = ({ containerWid
             let newW = elementStart.w;
             let newH = elementStart.h;
 
+            const isCorner = ['nw', 'ne', 'sw', 'se'].includes(isResizing);
+            const aspectRatio = elementStart.h !== 0 ? elementStart.w / elementStart.h : 1; // Default to 1 if height is 0 to avoid division by zero
+
+            // Calculate potential new dimensions based on raw mouse movement
+            let potentialNewW = elementStart.w;
+            let potentialNewH = elementStart.h;
+
             if (isResizing.includes('w')) {
-                newW = Math.max(10, elementStart.w - dx);
-                newX = elementStart.x + (elementStart.w - newW);
+                potentialNewW = elementStart.w - dx;
             }
             if (isResizing.includes('e')) {
-                newW = Math.max(10, elementStart.w + dx);
+                potentialNewW = elementStart.w + dx;
             }
             if (isResizing.includes('n')) {
-                newH = Math.max(10, elementStart.h - dy);
-                newY = elementStart.y + (elementStart.h - newH);
+                potentialNewH = elementStart.h - dy;
             }
             if (isResizing.includes('s')) {
-                newH = Math.max(10, elementStart.h + dy);
+                potentialNewH = elementStart.h + dy;
+            }
+
+            // Apply aspect ratio lock for corner handles
+            if (isCorner) {
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    // Width change is dominant
+                    newW = potentialNewW;
+                    newH = newW / aspectRatio;
+                } else {
+                    // Height change is dominant or equal
+                    newH = potentialNewH;
+                    newW = newH * aspectRatio;
+                }
+            } else {
+                // For side handles, no aspect ratio lock
+                newW = potentialNewW;
+                newH = potentialNewH;
+            }
+
+            // Ensure minimum size
+            newW = Math.max(10, newW);
+            newH = Math.max(10, newH);
+
+            // Adjust position based on handle and new dimensions
+            if (isResizing.includes('w')) {
+                newX = elementStart.x + (elementStart.w - newW);
+            }
+            if (isResizing.includes('n')) {
+                newY = elementStart.y + (elementStart.h - newH);
             }
 
             updateElement(selectedElement.id, {
@@ -142,8 +176,8 @@ export const TransformOverlay: React.FC<TransformOverlayProps> = ({ containerWid
                 }}
                 onMouseDown={handleMouseDown}
             >
-                {/* Resize Handles (Corners) */}
-                {['nw', 'ne', 'sw', 'se'].map((cursor) => (
+                {/* Resize Handles (Corners + Sides) */}
+                {['nw', 'ne', 'sw', 'se', 'n', 's', 'e', 'w'].map((cursor) => (
                     <div
                         key={cursor}
                         onMouseDown={(e) => handleResizeStart(e, cursor)}
@@ -154,6 +188,7 @@ export const TransformOverlay: React.FC<TransformOverlayProps> = ({ containerWid
                             backgroundColor: 'white',
                             border: '1px solid #3b82f6',
                             borderRadius: '50%',
+                            zIndex: 20, /* Above border */
                             ...getHandleStyle(cursor as any)
                         }}
                     />
@@ -164,11 +199,19 @@ export const TransformOverlay: React.FC<TransformOverlayProps> = ({ containerWid
 };
 
 // Helper for positioning handles
-function getHandleStyle(pos: 'nw' | 'ne' | 'sw' | 'se') {
+function getHandleStyle(pos: 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w') {
+    const half = 'calc(50% - 5px)'; // Center of edge minus half handle size
+
     switch (pos) {
         case 'nw': return { top: -5, left: -5, cursor: 'nw-resize' };
         case 'ne': return { top: -5, right: -5, cursor: 'ne-resize' };
         case 'sw': return { bottom: -5, left: -5, cursor: 'sw-resize' };
         case 'se': return { bottom: -5, right: -5, cursor: 'se-resize' };
+
+        case 'n': return { top: -5, left: half, cursor: 'n-resize' };
+        case 's': return { bottom: -5, left: half, cursor: 's-resize' };
+        case 'e': return { top: half, right: -5, cursor: 'e-resize' };
+        case 'w': return { top: half, left: -5, cursor: 'w-resize' };
     }
 }
+

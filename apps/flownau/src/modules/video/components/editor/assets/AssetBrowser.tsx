@@ -82,7 +82,7 @@ export function AssetBrowser({ assets, assetsRoot }: AssetBrowserProps) {
         return 'unknown';
     };
 
-    const handleAddAsset = (url: string, name: string, typeHint?: string) => {
+    const handleAddAsset = async (url: string, name: string, typeHint?: string) => {
         let type: 'video' | 'image' | 'audio' = 'video';
 
         if (typeHint) {
@@ -97,7 +97,36 @@ export function AssetBrowser({ assets, assetsRoot }: AssetBrowserProps) {
             if (derived !== 'unknown') type = derived as any;
         }
 
-        addElement(type, { url, name });
+        let width: number | undefined;
+        let height: number | undefined;
+
+        // Attempt to detect dimensions
+        try {
+            if (url) {
+                if (type === 'image') {
+                    const img = new Image();
+                    img.src = url;
+                    await new Promise<void>((resolve, reject) => {
+                        img.onload = () => { width = img.naturalWidth; height = img.naturalHeight; resolve(); };
+                        img.onerror = reject;
+                        setTimeout(reject, 3000); // 3s timeout
+                    });
+                } else if (type === 'video') {
+                    const v = document.createElement('video');
+                    v.src = url;
+                    // Need to wait for metadata
+                    await new Promise<void>((resolve, reject) => {
+                        v.onloadedmetadata = () => { width = v.videoWidth; height = v.videoHeight; resolve(); };
+                        v.onerror = reject;
+                        setTimeout(reject, 3000);
+                    });
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to detect asset dimensions, using fallback', e);
+        }
+
+        addElement(type, { url, name, width, height });
     };
 
     return (
@@ -130,8 +159,8 @@ export function AssetBrowser({ assets, assetsRoot }: AssetBrowserProps) {
                                 key={t}
                                 onClick={() => setFilterType(t as FilterType)}
                                 className={`px-2.5 py-1 text-[10px] uppercase font-semibold rounded-full border transition-colors whitespace-nowrap ${filterType === t
-                                        ? 'bg-zinc-100 text-zinc-900 border-zinc-100'
-                                        : 'border-zinc-700 hover:border-zinc-500'
+                                    ? 'bg-zinc-100 text-zinc-900 border-zinc-100'
+                                    : 'border-zinc-700 hover:border-zinc-500'
                                     }`}
                             >
                                 {t}
