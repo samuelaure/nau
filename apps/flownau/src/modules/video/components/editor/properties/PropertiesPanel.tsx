@@ -9,6 +9,39 @@ export function PropertiesPanel() {
 
     const selectedElement = template.elements.find((el) => el.id === selectedElementId);
 
+    // Font Loading Logic
+    React.useEffect(() => {
+        const fonts = new Set<string>();
+        template.elements.forEach(el => {
+            if (el.type === 'text' && el.style.fontFamily) {
+                fonts.add(el.style.fontFamily);
+            }
+        });
+
+        if (fonts.size === 0) return;
+
+        // Construct Google Fonts URL
+        // Example: https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Lato:wght@400;700&display=swap
+        const fontParams = Array.from(fonts)
+            .map(font => `family=${font.replace(/ /g, '+')}:wght@400;700`)
+            .join('&');
+
+        if (!fontParams) return;
+
+        const linkId = 'dynamic-google-fonts';
+        let link = document.getElementById(linkId) as HTMLLinkElement;
+
+        if (!link) {
+            link = document.createElement('link');
+            link.id = linkId;
+            link.rel = 'stylesheet';
+            document.head.appendChild(link);
+        }
+
+        link.href = `https://fonts.googleapis.com/css2?${fontParams}&display=swap`;
+
+    }, [template.elements]);
+
     const renderInput = (label: string, value: string | number, onChange: (val: string) => void, type: 'text' | 'number' = 'text', step?: string) => (
         <div className="section">
             <label className="label">{label}</label>
@@ -77,7 +110,29 @@ export function PropertiesPanel() {
                             <hr className="border-zinc-800 my-2" />
                             <div className="text-xs text-zinc-500 font-bold uppercase tracking-wider mb-2">Text Style</div>
                             {renderInput("Font Size", selectedElement.style.fontSize || 40, (val) => updateElement(selectedElement.id, { fontSize: Number(val) }), 'number')}
-                            {/* Add Color Picker here later */}
+
+                            <div className="section">
+                                <label className="label">Font Family</label>
+                                <select
+                                    className="input-field"
+                                    value={selectedElement.style.fontFamily || 'Inter'}
+                                    onChange={(e) => updateElement(selectedElement.id, { fontFamily: e.target.value })}
+                                >
+                                    <option value="Inter">Inter</option>
+                                    <option value="Roboto">Roboto</option>
+                                    <option value="Lato">Lato</option>
+                                    <option value="Montserrat">Montserrat</option>
+                                    <option value="Open Sans">Open Sans</option>
+                                    <option value="Oswald">Oswald</option>
+                                    <option value="Raleway">Raleway</option>
+                                    <option value="Nunito">Nunito</option>
+                                    <option value="Poppins">Poppins</option>
+                                    <option value="Playfair Display">Playfair Display</option>
+                                </select>
+                            </div>
+
+                            {/* Color Picker Placeholder */}
+                            {renderInput("Color", selectedElement.style.color || '#ffffff', (val) => updateElement(selectedElement.id, { color: val }))}
                         </>
                     )}
 
