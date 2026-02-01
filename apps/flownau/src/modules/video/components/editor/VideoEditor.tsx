@@ -42,7 +42,7 @@ export default function VideoEditor(props: VideoEditorProps) {
 }
 
 function VideoEditorLayout({ templateId, templateName, onSave, assets = [], assetsRoot }: VideoEditorProps) {
-    const { template, selectedElementId, currentFrame, splitElement } = useVideoEditor();
+    const { template, selectedElementId, currentFrame, splitElement, isPlaying, setIsPlaying, deleteElement } = useVideoEditor();
     const [sidebarTab, setSidebarTab] = useState<'layers' | 'assets'>('layers');
 
     // Keyboard Shortcuts
@@ -51,16 +51,28 @@ function VideoEditorLayout({ templateId, templateName, onSave, assets = [], asse
             // Ignore if typing in an input
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
+            // Space: Toggle Play/Pause
+            if (e.code === 'Space') {
+                e.preventDefault();
+                setIsPlaying(!isPlaying);
+            }
+
+            // Split: 'S'
             if (e.key.toLowerCase() === 's') {
                 if (selectedElementId) {
                     splitElement(selectedElementId, currentFrame);
                 }
             }
+
+            // Delete: Backspace or Delete
+            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElementId) {
+                deleteElement(selectedElementId);
+            }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedElementId, currentFrame, splitElement]);
+    }, [selectedElementId, currentFrame, splitElement, isPlaying, setIsPlaying, deleteElement]);
 
     return (
         <div className="flex flex-col h-screen bg-[#0d0d0d] text-white overflow-hidden w-screen">

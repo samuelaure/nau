@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Player, PlayerRef } from '@remotion/player';
 import { useVideoEditor } from '@/modules/video/context/VideoEditorContext';
 import { UniversalComposition } from '@/modules/video/remotion/UniversalComposition';
+import { TransformOverlay } from './TransformOverlay';
 
 export function EditorCanvas() {
     const { template, setSelectedElementId, currentFrame, setCurrentFrame, isPlaying, setIsPlaying } = useVideoEditor();
@@ -74,7 +75,10 @@ export function EditorCanvas() {
                     boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
                     border: '1px solid #444',
                     background: 'black',
-                    display: 'flex'
+                    display: 'flex',
+                    position: 'relative', // Necessary for absolute overlay
+                    width: '360px', // Move size here to ensure container matches player
+                    height: '640px',
                 }}>
                 <Player
                     ref={playerRef}
@@ -85,12 +89,13 @@ export function EditorCanvas() {
                     compositionWidth={template.width}
                     compositionHeight={template.height}
                     style={{
-                        width: '360px', // TODO: Make responsive based on scale
-                        height: '640px',
+                        width: '100%',
+                        height: '100%',
                     }}
                     controls
                     clickToPlay={false}
                 />
+                <TransformOverlay containerWidth={360} containerHeight={640} />
             </div>
         </div>
     );

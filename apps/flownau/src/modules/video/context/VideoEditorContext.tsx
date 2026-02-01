@@ -50,11 +50,13 @@ export function VideoEditorProvider({ children, initialTemplate, onSave }: Video
             durationInFrames: template.durationInFrames,
             mediaStartOffset: 0,
             content: asset?.url || (type === 'text' ? 'New Text' : ''),
+            fadeInDuration: 0,
+            fadeOutDuration: 0,
             style: {
                 x: 0,
                 y: 0,
-                width: type === 'text' ? undefined : template.width * 0.5, // 50% width by default
-                height: type === 'text' ? undefined : template.width * 0.5, // Square aspect ratio default
+                width: type === 'text' ? undefined : template.width * 0.5,
+                height: undefined, // Let aspect ratio determine height initially
                 scale: 1,
                 rotation: 0,
                 opacity: 1,

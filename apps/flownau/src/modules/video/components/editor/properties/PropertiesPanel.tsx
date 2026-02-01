@@ -93,6 +93,14 @@ export function PropertiesPanel() {
 
                     <hr className="border-zinc-800 my-2" />
 
+                    <div className="text-xs text-zinc-500 font-bold uppercase tracking-wider mb-2">Animations (Crossfade)</div>
+                    <div className="grid grid-cols-2 gap-2">
+                        {renderInput("Fade In (Frames)", selectedElement.fadeInDuration || 0, (val) => updateElement(selectedElement.id, { fadeInDuration: Number(val) }), 'number')}
+                        {renderInput("Fade Out (Frames)", selectedElement.fadeOutDuration || 0, (val) => updateElement(selectedElement.id, { fadeOutDuration: Number(val) }), 'number')}
+                    </div>
+
+                    <hr className="border-zinc-800 my-2" />
+
                     <div className="text-xs text-zinc-500 font-bold uppercase tracking-wider mb-2">Transform</div>
 
                     <div className="grid grid-cols-2 gap-2">

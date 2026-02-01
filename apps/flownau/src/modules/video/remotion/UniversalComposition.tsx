@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { AbsoluteFill, Sequence, Video, Img } from 'remotion';
+import { AbsoluteFill, Sequence, Video, Img, useCurrentFrame, interpolate } from 'remotion';
 import { VideoTemplate, VideoElement } from '@/types/video-schema';
 
 export const UniversalComposition: React.FC<{ template: VideoTemplate }> = ({ template }) => {
@@ -20,7 +20,18 @@ export const UniversalComposition: React.FC<{ template: VideoTemplate }> = ({ te
 };
 
 const RenderElement: React.FC<{ element: VideoElement }> = ({ element }) => {
-    const { style, type, content } = element;
+    const { style, type, content, fadeInDuration, fadeOutDuration, durationInFrames } = element;
+    const frame = useCurrentFrame();
+
+    const fadeOpacityIn = fadeInDuration > 0
+        ? interpolate(frame, [0, fadeInDuration], [0, 1], { extrapolateRight: 'clamp' })
+        : 1;
+
+    const fadeOpacityOut = fadeOutDuration > 0
+        ? interpolate(frame, [durationInFrames - fadeOutDuration, durationInFrames], [1, 0], { extrapolateLeft: 'clamp' })
+        : 1;
+
+    const fadeOpacity = fadeOpacityIn * fadeOpacityOut;
 
     const commonStyle: React.CSSProperties = {
         position: 'absolute',
@@ -29,7 +40,7 @@ const RenderElement: React.FC<{ element: VideoElement }> = ({ element }) => {
         width: style.width ? style.width : undefined,
         height: style.height ? style.height : undefined,
         transform: `rotate(${style.rotation}deg) scale(${style.scale})`,
-        opacity: style.opacity,
+        opacity: style.opacity * fadeOpacity,
     };
 
     switch (type) {

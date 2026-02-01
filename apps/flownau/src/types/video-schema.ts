@@ -24,6 +24,8 @@ export const ElementSchema = z.object({
     startFrame: z.number(),
     durationInFrames: z.number(),
     mediaStartOffset: z.number().default(0), // Frame offset into the source media
+    fadeInDuration: z.number().default(0),
+    fadeOutDuration: z.number().default(0),
     style: ElementStyleSchema,
 });
 
