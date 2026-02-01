@@ -38,6 +38,7 @@ const RenderElement: React.FC<{ element: VideoElement }> = ({ element }) => {
             return (
                 <Video
                     src={content}
+                    startFrom={element.mediaStartOffset}
                     style={{
                         ...commonStyle,
                         objectFit: 'cover',

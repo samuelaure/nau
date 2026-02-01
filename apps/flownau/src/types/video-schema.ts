@@ -23,6 +23,7 @@ export const ElementSchema = z.object({
     content: z.string().optional(), // Text content or URL
     startFrame: z.number(),
     durationInFrames: z.number(),
+    mediaStartOffset: z.number().default(0), // Frame offset into the source media
     style: ElementStyleSchema,
 });
 

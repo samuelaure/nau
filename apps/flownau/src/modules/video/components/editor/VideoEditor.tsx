@@ -42,8 +42,25 @@ export default function VideoEditor(props: VideoEditorProps) {
 }
 
 function VideoEditorLayout({ templateId, templateName, onSave, assets = [], assetsRoot }: VideoEditorProps) {
-    const { template } = useVideoEditor();
+    const { template, selectedElementId, currentFrame, splitElement } = useVideoEditor();
     const [sidebarTab, setSidebarTab] = useState<'layers' | 'assets'>('layers');
+
+    // Keyboard Shortcuts
+    React.useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Ignore if typing in an input
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+            if (e.key.toLowerCase() === 's') {
+                if (selectedElementId) {
+                    splitElement(selectedElementId, currentFrame);
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [selectedElementId, currentFrame, splitElement]);
 
     return (
         <div className="flex flex-col h-screen bg-[#0d0d0d] text-white overflow-hidden w-screen">

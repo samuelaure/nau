@@ -11,6 +11,7 @@ interface VideoEditorContextType {
     addElement: (type: VideoElement['type'], asset?: { url: string; name: string }) => void;
     updateElement: (id: string, changes: Partial<VideoElement> | Partial<VideoElement['style']>) => void;
     deleteElement: (id: string) => void;
+    splitElement: (id: string, frame: number) => void;
 
     // Playback State
     currentFrame: number;
@@ -46,6 +47,7 @@ export function VideoEditorProvider({ children, initialTemplate, onSave }: Video
             name: asset?.name || `New ${type}`,
             startFrame: 0,
             durationInFrames: template.durationInFrames,
+            mediaStartOffset: 0,
             content: asset?.url || (type === 'text' ? 'New Text' : ''),
             style: {
                 x: 0,
@@ -105,6 +107,49 @@ export function VideoEditorProvider({ children, initialTemplate, onSave }: Video
         if (selectedElementId === id) setSelectedElementId(null);
     }, [selectedElementId]);
 
+    const splitElement = useCallback((id: string, splitFrame: number) => {
+        setTemplate((prev) => {
+            const element = prev.elements.find(e => e.id === id);
+            if (!element) return prev;
+
+            // Validate split point
+            if (splitFrame <= element.startFrame || splitFrame >= element.startFrame + element.durationInFrames) {
+                return prev;
+            }
+
+            const splitOffset = splitFrame - element.startFrame;
+
+            // Updated First Clip
+            const leftClip: VideoElement = {
+                ...element,
+                durationInFrames: splitOffset,
+            };
+
+            // New Second Clip
+            const rightClip: VideoElement = {
+                ...element,
+                id: crypto.randomUUID(),
+                startFrame: splitFrame,
+                durationInFrames: element.durationInFrames - splitOffset,
+                mediaStartOffset: element.mediaStartOffset + splitOffset,
+                name: `${element.name} (Split)`,
+            };
+
+            // Replace original with both
+            const elementIndex = prev.elements.findIndex(e => e.id === id);
+            const newElements = [...prev.elements];
+            newElements.splice(elementIndex, 1, leftClip, rightClip);
+
+            return {
+                ...prev,
+                elements: newElements,
+            };
+        });
+
+        // Select the right clip after split for continuity
+        // setTimeout(() => setSelectedElementId(rightClip.id), 0); // Logic difficult inside setState callback
+    }, []);
+
     // Construct the value object
     const value = {
         template,
@@ -114,6 +159,7 @@ export function VideoEditorProvider({ children, initialTemplate, onSave }: Video
         addElement,
         updateElement,
         deleteElement,
+        splitElement,
         currentFrame,
         setCurrentFrame,
         isPlaying,
