@@ -11,6 +11,7 @@ interface VideoEditorContextType {
     addElement: (type: VideoElement['type'], asset?: { url: string; name: string }) => void;
     updateElement: (id: string, changes: Partial<VideoElement> | Partial<VideoElement['style']>) => void;
     deleteElement: (id: string) => void;
+    reorderElement: (id: string, direction: 'up' | 'down' | 'top' | 'bottom') => void;
     splitElement: (id: string, frame: number) => void;
 
     // Playback State
@@ -107,6 +108,36 @@ export function VideoEditorProvider({ children, initialTemplate, onSave }: Video
         if (selectedElementId === id) setSelectedElementId(null);
     }, [selectedElementId]);
 
+    const reorderElement = useCallback((id: string, direction: 'up' | 'down' | 'top' | 'bottom') => {
+        setTemplate((prev) => {
+            const index = prev.elements.findIndex((el) => el.id === id);
+            if (index === -1) return prev;
+
+            const newElements = [...prev.elements];
+            const element = newElements[index];
+
+            if (direction === 'up') {
+                if (index < newElements.length - 1) {
+                    newElements[index] = newElements[index + 1];
+                    newElements[index + 1] = element;
+                }
+            } else if (direction === 'down') {
+                if (index > 0) {
+                    newElements[index] = newElements[index - 1];
+                    newElements[index - 1] = element;
+                }
+            } else if (direction === 'top') {
+                newElements.splice(index, 1);
+                newElements.push(element);
+            } else if (direction === 'bottom') {
+                newElements.splice(index, 1);
+                newElements.unshift(element);
+            }
+
+            return { ...prev, elements: newElements };
+        });
+    }, []);
+
     const splitElement = useCallback((id: string, splitFrame: number) => {
         setTemplate((prev) => {
             const element = prev.elements.find(e => e.id === id);
@@ -159,6 +190,7 @@ export function VideoEditorProvider({ children, initialTemplate, onSave }: Video
         addElement,
         updateElement,
         deleteElement,
+        reorderElement,
         splitElement,
         currentFrame,
         setCurrentFrame,
