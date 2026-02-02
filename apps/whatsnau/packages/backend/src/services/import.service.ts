@@ -8,12 +8,7 @@ export class ImportService {
   /**
    * Process CSV content with streaming and deduplication
    */
-  static async processCSV(
-    campaignId: string,
-    name: string,
-    csvContent: string,
-    tenantId: string
-  ) {
+  static async processCSV(campaignId: string, name: string, csvContent: string, tenantId: string) {
     logger.info({ campaignId, name }, 'Starting CSV import process');
 
     // Generate content hash for deduplication
@@ -67,13 +62,7 @@ export class ImportService {
 
     // Transform records to staging leads
     const stagingLeads = records.map((record: any) => {
-      const phoneKey = this.findKey(record, [
-        'phone',
-        'tel',
-        'nmero',
-        'whatsapp',
-        'mobile',
-      ]);
+      const phoneKey = this.findKey(record, ['phone', 'tel', 'nmero', 'whatsapp', 'mobile']);
       const nameKey = this.findKey(record, ['name', 'nombre', 'business', 'company', 'title']);
       const websiteKey = this.findKey(record, ['web', 'sitio', 'url', 'link', 'domain']);
       const emailKey = this.findKey(record, ['email', 'correo', 'mail']);
