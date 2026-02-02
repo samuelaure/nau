@@ -1,8 +1,8 @@
 services:
   whatsnau:
     build: 
-      context: ./packages/backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: packages/backend/Dockerfile
     restart: always
     ports:
       - '3000:3000'
