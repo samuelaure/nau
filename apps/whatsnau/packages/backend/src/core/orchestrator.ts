@@ -9,6 +9,7 @@ import { MessageBufferService } from '../services/buffer.service.js';
 import { TemplateService } from '../services/template.service.js';
 import { ProviderFactory } from './providers/ProviderFactory.js';
 import { IWhatsAppProvider } from './providers/IWhatsAppProvider.js';
+import { outboundQueue } from '../infrastructure/queues/outbound.queue.js';
 
 export class Orchestrator {
   /**
@@ -300,32 +301,58 @@ export class Orchestrator {
 
     const responseMsg = `Perfecto, le avisaré a Samuel que deseas hablar con él directamente.${statusMsg} Mientras esperamos, aquí estaré si necesitas algo.`;
 
-    // REPLACED: WhatsAppService.sendText
-    const provider = ProviderFactory.getProvider(lead.campaignId);
-    const msgId = await provider.sendMessage(lead.phoneNumber, 'text', { body: responseMsg });
-
-    await this.trackOutboundMessage(lead, responseMsg, msgId, 'HANDOVER_ENTERTAIN', true);
+    // Queue Message
+    await this.sendAsync(
+      lead,
+      'text',
+      { body: responseMsg },
+      responseMsg,
+      'HANDOVER_ENTERTAIN',
+      true
+    );
   }
 
-  private static async trackOutboundMessage(
+  /**
+   * Helper to queue outbound messages and track them in DB
+   */
+  private static async sendAsync(
     lead: any,
+    type: 'text' | 'template' | 'interactive',
+    payload: any,
     content: string,
-    whatsappId: string,
     stage?: string,
     aiGenerated = false
   ) {
-    if (!whatsappId) return;
-    await (db as any).message.create({
+    const campaignStage = stage || lead.currentStage?.name || lead.state;
+
+    // 1. Create Pending Record
+    const message = await (db as any).message.create({
       data: {
         leadId: lead.id,
         direction: 'OUTBOUND',
         content,
-        whatsappId,
+        whatsappId: 'pending',
         aiGenerated,
-        campaignStage: stage || lead.currentStage?.name || lead.state,
-        status: 'sent',
+        campaignStage,
+        status: 'pending',
       },
     });
+
+    // 2. Queue Job
+    await outboundQueue.add(
+      'outbound-message',
+      {
+        campaignId: lead.campaignId,
+        phoneNumber: lead.phoneNumber,
+        type,
+        payload,
+        messageId: message.id, // Pass DB ID so worker can update it
+        leadId: lead.id,
+      },
+      {
+        removeOnComplete: true,
+      }
+    );
   }
 
   /**
@@ -400,28 +427,32 @@ export class Orchestrator {
 
     // --- SMART COMPLIANCE ROUTING ---
     const canSendFreeform = await WhatsAppService.canSendFreeform(lead.id);
-    const provider = ProviderFactory.getProvider(lead.campaignId);
-    let msgId;
 
     if (canSendFreeform) {
       if (buttons && buttons.length > 0) {
         // REPLACED: WhatsAppService.sendInteractiveButtons
-        msgId = await provider.sendMessage(lead.phoneNumber, 'interactive', {
-          type: 'button',
-          body: { text: message },
-          action: {
-            buttons: buttons.map((btn: any) => ({
-              type: 'reply',
-              reply: {
-                id: btn.id,
-                title: btn.text.substring(0, 20),
-              },
-            })),
+        await this.sendAsync(
+          lead,
+          'interactive',
+          {
+            type: 'button',
+            body: { text: message },
+            action: {
+              buttons: buttons.map((btn: any) => ({
+                type: 'reply',
+                reply: {
+                  id: btn.id,
+                  title: btn.text.substring(0, 20),
+                },
+              })),
+            },
           },
-        });
+          message,
+          m3Stage.name
+        );
       } else {
         // REPLACED: WhatsAppService.sendText
-        msgId = await provider.sendMessage(lead.phoneNumber, 'text', { body: message });
+        await this.sendAsync(lead, 'text', { body: message }, message, m3Stage.name);
       }
     } else {
       const { TemplateSyncService } = await import('../services/template-sync.service.js');
@@ -444,18 +475,24 @@ export class Orchestrator {
         );
 
         // REPLACED: WhatsAppService.sendTemplateWithVariables
-        msgId = await provider.sendMessage(lead.phoneNumber, 'template', {
-          name: waTemplate.name,
-          language: { code: waTemplate.language || 'es_ES' },
-          components: components,
-        });
+        await this.sendAsync(
+          lead,
+          'template',
+          {
+            name: waTemplate.name,
+            language: { code: waTemplate.language || 'es_ES' },
+            components: components,
+          },
+          message,
+          m3Stage.name
+        );
       } else {
         logger.error(
           { leadId: lead.id, stage: m3Stage.name },
           'Compliance Error: No approved WhatsApp Template linked for M3 business-initiated message'
         );
         // Fallback or fail
-        msgId = await provider.sendMessage(lead.phoneNumber, 'text', { body: message });
+        await this.sendAsync(lead, 'text', { body: message }, message, m3Stage.name);
       }
     }
 
@@ -467,19 +504,6 @@ export class Orchestrator {
         lastInteraction: new Date(),
       },
     });
-
-    if (msgId) {
-      await db.message.create({
-        data: {
-          leadId: lead.id,
-          direction: 'OUTBOUND',
-          content: message,
-          whatsappId: msgId,
-          campaignStage: m3Stage.name,
-          status: 'sent',
-        },
-      });
-    }
   }
 
   /**
@@ -499,10 +523,7 @@ export class Orchestrator {
       await LeadService.endDemo(lead.id);
       const msg = 'La demo ha finalizado. Regresamos a nuestra charla. ¿Qué te ha parecido?';
 
-      const provider = ProviderFactory.getProvider(lead.campaignId);
-      const msgId = await provider.sendMessage(lead.phoneNumber, 'text', { body: msg });
-
-      await this.trackOutboundMessage(lead, msg, msgId);
+      await this.sendAsync(lead, 'text', { body: msg }, msg);
       return;
     }
     await this.triggerAgent(lead, 'RECEPTIONIST', content);
@@ -516,10 +537,7 @@ export class Orchestrator {
     const msg =
       '¡Genial! A partir de ahora hablas con mi **Recepcionista IA**. Prueba a preguntarme sobre el negocio.';
 
-    const provider = ProviderFactory.getProvider(lead.campaignId);
-    const msgId = await provider.sendMessage(lead.phoneNumber, 'text', { body: msg });
-
-    await this.trackOutboundMessage({ ...lead, state: LeadState.DEMO }, msg, msgId);
+    await this.sendAsync({ ...lead, state: LeadState.DEMO }, 'text', { body: msg }, msg);
     await this.triggerAgent(
       { ...lead, state: LeadState.DEMO },
       'RECEPTIONIST',
@@ -563,13 +581,11 @@ export class Orchestrator {
     );
 
     if (response) {
-      const provider = ProviderFactory.getProvider(lead.campaignId);
-      const msgId = await provider.sendMessage(lead.phoneNumber, 'text', { body: response });
-
-      await this.trackOutboundMessage(
+      await this.sendAsync(
         lead,
+        'text',
+        { body: response },
         response,
-        msgId,
         lead.currentStage?.name || lead.state,
         true
       );

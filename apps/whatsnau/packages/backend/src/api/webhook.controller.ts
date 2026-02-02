@@ -3,6 +3,7 @@ import { config } from '../core/config.js';
 import { logger } from '../core/logger.js';
 import { Orchestrator } from '../core/orchestrator.js';
 import { ProviderFactory } from '../core/providers/ProviderFactory.js';
+import { inboundQueue } from '../infrastructure/queues/inbound.queue.js';
 
 const router = Router();
 
@@ -47,44 +48,18 @@ router.post('/', async (req: Request, res: Response) => {
     const events = provider.normalizeWebhook(body);
 
     for (const event of events) {
-      if (event.type === 'message') {
-        const from = event.from;
-        const text = event.payload.text;
-        const buttonId = event.payload.buttonId;
-        const whatsappId = event.id;
-        const phoneNumberId = event.metadata?.phoneNumberId;
-
-        // Determine direction (inbound usually)
-        // Meta normalizes outbound "echoes" differently, assume INBOUND for now unless payload says otherwise
-        const direction = 'INBOUND';
-
-        logger.info(
-          { from, direction, text, whatsappId, phoneNumberId },
-          'Processing WhatsApp message'
+      if (event.type === 'message' || event.type === 'status') {
+        // Decoupled Processing: Push to Queue
+        await inboundQueue.add(
+          'inbound-event',
+          { event },
+          {
+            jobId: event.id, // Prevent duplicates (deduplication by message ID)
+            removeOnComplete: true,
+          }
         );
 
-        try {
-          await Orchestrator.handleIncoming(
-            from, // targetPhone for INBOUND is the sender
-            text,
-            buttonId,
-            direction,
-            whatsappId,
-            phoneNumberId
-          );
-        } catch (error) {
-          logger.error({ err: error, from }, 'Error in Orchestrator message handling');
-        }
-      } else if (event.type === 'status') {
-        const messageId = event.id;
-        const deliveryStatus = event.payload.status;
-
-        logger.info({ messageId, deliveryStatus }, 'Processing WhatsApp status update');
-        try {
-          await Orchestrator.handleStatusUpdate(messageId, deliveryStatus);
-        } catch (error) {
-          logger.error({ err: error, messageId }, 'Error in Orchestrator status handling');
-        }
+        logger.info({ type: event.type, id: event.id }, 'Event queued for processing');
       }
     }
   } catch (err) {

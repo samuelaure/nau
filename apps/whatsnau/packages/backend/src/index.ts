@@ -108,6 +108,15 @@ async function bootstrap() {
     const port = process.env.PORT || 3000;
     app.listen(port, () => {
       logger.info(`🌐 Server running on port ${port}`);
+
+      // Initialize Workers (Queues)
+      import('./infrastructure/workers/index.js')
+        .then(({ initWorkers }) => {
+          initWorkers();
+        })
+        .catch((err) => {
+          logger.error({ err }, 'Failed to initialize workers');
+        });
     });
 
     setInterval(
