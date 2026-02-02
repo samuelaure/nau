@@ -32,6 +32,15 @@ const configSchema = z.object({
   // Auth
   JWT_SECRET: z.string().default('super-secret-change-me-in-production'),
   JWT_EXPIRES_IN: z.string().default('7d'),
+
+  // Redis
+  REDIS_HOST: z.string().default('localhost'),
+  REDIS_PORT: z.coerce.number().default(6379),
+  REDIS_PASSWORD: z.string().optional(),
+
+  // YCloud
+  YCLOUD_API_KEY: z.string().optional(),
+  WHATSAPP_PROVIDER: z.enum(['meta', 'ycloud']).default('meta'),
 });
 
 const isTest = process.env.NODE_ENV === 'test';
