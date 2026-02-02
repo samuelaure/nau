@@ -87,7 +87,7 @@ export const useFacebook = (appId?: string) => {
             console.error('WA Embedded Signup ERROR:', data.data?.error_message);
           }
         }
-      } catch (err) {
+      } catch {
         // Not a JSON message or unrelated to us
       }
     };

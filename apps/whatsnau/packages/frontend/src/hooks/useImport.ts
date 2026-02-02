@@ -55,7 +55,10 @@ export const useImport = (fetchData: () => void) => {
         const data = await res.json();
 
         if (data.isDuplicate) {
-          notify('info', `Duplicate file detected. ${data.message || 'This file was already imported.'}`);
+          notify(
+            'info',
+            `Duplicate file detected. ${data.message || 'This file was already imported.'}`
+          );
         } else {
           notify('success', 'CSV processed and staged for analysis.');
         }

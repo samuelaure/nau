@@ -168,7 +168,16 @@ export const AnalyticsView: React.FC = () => {
   );
 };
 
-const FunnelStep = ({ label, value, total, percentage, color, icon }: any) => (
+interface FunnelStepProps {
+  label: string;
+  value: number;
+  total: number;
+  percentage: number;
+  color: string;
+  icon: React.ReactNode;
+}
+
+const FunnelStep = ({ label, value, total, percentage, color, icon }: FunnelStepProps) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
     <div
       style={{

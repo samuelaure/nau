@@ -21,7 +21,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Plus, Save } from 'lucide-react';
 import { CustomNode } from './CustomNode';
 import { ConditionBuilder } from './ConditionBuilder';
-import type { NodeType, WorkflowDefinition, WorkflowCondition } from './types';
+import type { NodeType, WorkflowDefinition, WorkflowCondition, NodeData } from './types';
 
 const initialNodes: Node[] = [
   {
@@ -33,11 +33,11 @@ const initialNodes: Node[] = [
 ];
 
 const nodeTypes: NodeTypes = {
-  trigger: CustomNode as any,
-  message: CustomNode as any,
-  wait: CustomNode as any,
-  logic: CustomNode as any,
-  end: CustomNode as any,
+  trigger: CustomNode,
+  message: CustomNode,
+  wait: CustomNode,
+  logic: CustomNode,
+  end: CustomNode,
 };
 
 export const WorkflowBuilder: React.FC = () => {
@@ -88,7 +88,7 @@ export const WorkflowBuilder: React.FC = () => {
     [nodes, selectedNodeId]
   );
 
-  const updateNodeData = (id: string, newData: any) => {
+  const updateNodeData = (id: string, newData: Partial<NodeData>) => {
     setNodes((nds) =>
       nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...newData } } : n))
     );
@@ -99,7 +99,7 @@ export const WorkflowBuilder: React.FC = () => {
       nodes: nodes.map((n) => ({
         id: n.id,
         type: n.type as NodeType,
-        data: n.data as any,
+        data: n.data as unknown as NodeData,
         position: n.position,
       })),
       edges: edges.map((e) => ({
@@ -188,7 +188,7 @@ export const WorkflowBuilder: React.FC = () => {
                 <label>Unit</label>
                 <select
                   value={(selectedNode.data.unit as string) || 'hours'}
-                  onChange={(e) => updateNodeData(selectedNode.id, { unit: e.target.value })}
+                  onChange={(e) => updateNodeData(selectedNode.id, { unit: e.target.value as NodeData['unit'] })}
                 >
                   <option value="minutes">Minutes</option>
                   <option value="hours">Hours</option>

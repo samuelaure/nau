@@ -35,10 +35,6 @@ export const CampaignManager: React.FC = () => {
     isActive: true,
   });
 
-  useEffect(() => {
-    fetchCampaigns();
-  }, []);
-
   const fetchCampaigns = async () => {
     try {
       const res = await fetch('/api/dashboard/campaigns?limit=50');
@@ -49,6 +45,11 @@ export const CampaignManager: React.FC = () => {
       console.error('Failed to fetch campaigns:', error);
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchCampaigns();
+  }, []);
 
   const handleCreateCampaign = async (e: React.FormEvent) => {
     e.preventDefault();

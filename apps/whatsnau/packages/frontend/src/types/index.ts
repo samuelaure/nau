@@ -114,5 +114,5 @@ export interface LogEntry {
   msg: string;
   pid?: number;
   hostname?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }

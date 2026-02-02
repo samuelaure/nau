@@ -34,12 +34,12 @@ export const WhatsAppOnboarding: React.FC<WhatsAppOnboardingProps> = ({ appId })
       // Handle the response in a non-async way by wrapping async logic
       (async () => {
         if (response.authResponse) {
-          const code = (response.authResponse as any).code;
+          const code = (response.authResponse as facebook.AuthResponse & { code: string }).code;
           console.log('[WhatsAppOnboarding] Authorization code:', code);
 
           // At this point we might or might not have sessionInfo from the window message
           // The listener in useFacebook sets it. We wait a bit if needed.
-          let finalSession = sessionInfo;
+          const finalSession = sessionInfo;
 
           // Wait up to 2 seconds for the postMessage to arrive if it hasn't yet
           if (!finalSession) {
@@ -75,8 +75,8 @@ export const WhatsAppOnboarding: React.FC<WhatsAppOnboardingProps> = ({ appId })
               setStatus('error');
               setErrorMessage(data.error || 'Failed to link account');
             }
-          } catch (err) {
-            console.error('[WhatsAppOnboarding] Network error:', err);
+          } catch {
+            console.error('[WhatsAppOnboarding] Network error');
             setStatus('error');
             setErrorMessage('Network error during onboarding');
           }

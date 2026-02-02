@@ -21,7 +21,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       if (!success) {
         setError('Acceso inválido. Por favor revisa tus credenciales.');
       }
-    } catch (err) {
+    } catch {
       setError('Ocurrió un error al iniciar sesión.');
     } finally {
       setLoading(false);

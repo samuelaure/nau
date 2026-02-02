@@ -8,11 +8,7 @@ interface CampaignFlowProps {
   onUpdateSequences: (sequences: SequenceConfig[]) => void;
 }
 
-export const CampaignFlow: React.FC<CampaignFlowProps> = (
-  {
-    // We'll keep props for compatibility but use the new builder
-  }
-) => {
+export const CampaignFlow: React.FC<CampaignFlowProps> = () => {
   return (
     <div
       className="settings-section"

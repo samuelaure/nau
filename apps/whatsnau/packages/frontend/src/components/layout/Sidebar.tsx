@@ -18,7 +18,7 @@ import type { CampaignStats } from '../../types';
 
 interface SidebarProps {
   activeTab: string;
-  setActiveTab: (tab: any) => void;
+  setActiveTab: (tab: string) => void;
   campaigns: CampaignStats[];
   selectedCampaignId: string;
   onSelectCampaign: (id: string) => void;

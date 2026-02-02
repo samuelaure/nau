@@ -58,7 +58,7 @@ function App() {
           const data = await res.json();
           setUser(data.user);
         }
-      } catch (err) {
+      } catch {
         console.error('Auth check failed');
       } finally {
         setIsAuthLoading(false);
@@ -81,7 +81,7 @@ function App() {
         return true;
       }
       return false;
-    } catch (err) {
+    } catch {
       return false;
     }
   };
@@ -90,7 +90,7 @@ function App() {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
       setUser(null);
-    } catch (err) {
+    } catch {
       console.error('Logout failed');
     }
   };

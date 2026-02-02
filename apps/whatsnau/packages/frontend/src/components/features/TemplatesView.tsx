@@ -51,7 +51,7 @@ export const TemplatesView: React.FC<TemplatesViewProps> = ({ initialTemplates }
       let variableMapping = null;
       try {
         variableMapping = JSON.parse(mapping);
-      } catch (e) {
+      } catch {
         return alert('Invalid JSON mapping');
       }
 
