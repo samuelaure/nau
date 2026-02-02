@@ -66,31 +66,71 @@ export class YCloudWhatsAppProvider implements IWhatsAppProvider {
   }
 
   validateWebhookSignature(req: Request): boolean {
-    const signature = req.headers['x-ycloud-signature'] as string;
-    if (!signature) return false;
+    const signatureHeader = req.headers['x-ycloud-signature'] as string;
+    if (!signatureHeader) return false;
 
-    // TODO: Verify signature using HMAC-SHA256 with API Key or Webhook Secret
-    return true;
+    // YCloud header format: t=... ,v1=...
+    const parts = signatureHeader.split(',');
+    const timestampPart = parts.find((p) => p.startsWith('t='));
+    const signaturePart = parts.find((p) => p.startsWith('v1='));
+
+    if (!timestampPart || !signaturePart) return false;
+
+    const timestamp = timestampPart.split('=')[1];
+    const signature = signaturePart.split('=')[1];
+    const body = JSON.stringify(req.body);
+
+    const signedPayload = `${timestamp}.${body}`;
+    const expectedSignature = crypto
+      .createHmac('sha256', this.apiKey)
+      .update(signedPayload)
+      .digest('hex');
+
+    // Time-constant comparison to prevent timing attacks
+    try {
+      return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
+    } catch {
+      return false;
+    }
   }
 
   normalizeWebhook(payload: any): StandardMessageEvent[] {
     const events: StandardMessageEvent[] = [];
 
-    // YCloud webhook structure handling (placeholder)
-    // Needs actual YCloud payload structure
-    // Example: { data: [ { id: ..., from: ..., type: ..., text: ... } ] }
-    if (payload.data && Array.isArray(payload.data)) {
-      for (const item of payload.data) {
-        // Basic mapping
-        events.push({
-          type: 'message', // or determine from item
-          from: item.from,
-          id: item.id,
-          timestamp: item.timestamp,
-          payload: item,
-          raw: item,
-        });
-      }
+    // YCloud v2 Webhook Structure
+    // { "type": "whatsapp.message.incoming", "whatsappMessage": { ... } }
+    // Reference: https://docs.ycloud.com/api-reference/whatsapp/webhooks
+
+    if (payload.type === 'whatsapp.message.incoming' && payload.whatsappMessage) {
+      const msg = payload.whatsappMessage;
+      events.push({
+        type: 'message',
+        from: msg.from,
+        id: msg.id,
+        timestamp: msg.timestamp,
+        payload: {
+          text: msg.text?.body,
+          type: msg.type,
+          context: msg.context,
+        },
+        raw: payload,
+      });
+    }
+
+    // Handle status updates
+    // { "type": "whatsapp.message.updated", "whatsappMessage": { ... } }
+    if (payload.type === 'whatsapp.message.updated' && payload.whatsappMessage) {
+      const msg = payload.whatsappMessage;
+      events.push({
+        type: 'status',
+        from: msg.from,
+        id: msg.id,
+        timestamp: msg.timestamp,
+        payload: {
+          status: msg.status,
+        },
+        raw: payload,
+      });
     }
 
     return events;
