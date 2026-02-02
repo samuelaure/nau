@@ -66,7 +66,12 @@ export const ConditionBuilder: React.FC<ConditionBuilderProps> = ({
 
         <select
           value={condition.conditionOperator}
-          onChange={(e) => onChange({ ...condition, conditionOperator: e.target.value as WorkflowCondition['conditionOperator'] })}
+          onChange={(e) =>
+            onChange({
+              ...condition,
+              conditionOperator: e.target.value as WorkflowCondition['conditionOperator'],
+            })
+          }
         >
           <option value="equals">equals</option>
           <option value="not_equals">not equals</option>
@@ -96,7 +101,9 @@ export const ConditionBuilder: React.FC<ConditionBuilderProps> = ({
       <div className="group-header">
         <select
           value={condition.operator}
-          onChange={(e) => onChange({ ...condition, operator: e.target.value as WorkflowCondition['operator'] })}
+          onChange={(e) =>
+            onChange({ ...condition, operator: e.target.value as WorkflowCondition['operator'] })
+          }
           className="operator-select"
         >
           <option value="AND">AND</option>

@@ -188,7 +188,9 @@ export const WorkflowBuilder: React.FC = () => {
                 <label>Unit</label>
                 <select
                   value={(selectedNode.data.unit as string) || 'hours'}
-                  onChange={(e) => updateNodeData(selectedNode.id, { unit: e.target.value as NodeData['unit'] })}
+                  onChange={(e) =>
+                    updateNodeData(selectedNode.id, { unit: e.target.value as NodeData['unit'] })
+                  }
                 >
                   <option value="minutes">Minutes</option>
                   <option value="hours">Hours</option>
