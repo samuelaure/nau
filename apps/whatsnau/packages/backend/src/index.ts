@@ -79,7 +79,7 @@ app.use('/api/dashboard/import', authMiddleware, importRouter);
 app.use('/api/whatsapp', authMiddleware, whatsappRouter);
 
 // Serve static files from the frontend
-const frontendPath = path.join(__dirname, '../frontend/dist');
+const frontendPath = path.join(__dirname, '../../frontend/dist');
 app.use(express.static(frontendPath));
 
 // Fallback for SPA routing - serve index.html for non-API requests

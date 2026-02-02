@@ -5,7 +5,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspaces",
+    "dev": "concurrently \"npm run dev -w packages/backend\" \"npm run dev -w packages/frontend\"",
     "build": "npm run build --workspaces",
     "test": "npm run test --workspaces",
     "clean": "rm -rf node_modules packages/*/node_modules"

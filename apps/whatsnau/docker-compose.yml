@@ -7,7 +7,7 @@ services:
     ports:
       - '3000:3000'
     env_file:
-      - .env
+      - ./packages/backend/.env
     # Connects to shared-mesh network defined in override
     networks:
       - default
