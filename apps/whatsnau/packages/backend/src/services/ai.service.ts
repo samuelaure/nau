@@ -220,17 +220,84 @@ ${globalGuidelines}
     // Determine model
     const model = promptConfig.usePremiumModel ? config.PRIMARY_AI_MODEL : config.CHEAP_AI_MODEL;
 
+    // Define tools
+    const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
+      {
+        type: 'function',
+        function: {
+          name: 'create_order',
+          description: 'Crea un borrador de pedido para el cliente.',
+          parameters: {
+            type: 'object',
+            properties: {
+              items: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    productId: { type: 'string', description: 'El ID del producto.' },
+                    quantity: { type: 'number', description: 'La cantidad a pedir.' },
+                  },
+                  required: ['productId', 'quantity'],
+                },
+              },
+            },
+            required: ['items'],
+          },
+        },
+      },
+    ];
+
     return withRetry(
       async () => {
-        logger.info({ model, role, leadId }, 'Requesting AI response with context');
+        logger.info({ model, role, leadId }, 'Requesting AI response with context and tools');
 
         const response = await this.client.chat.completions.create({
           model,
           messages: [{ role: 'system', content: systemPrompt }, ...messages],
           temperature: promptConfig.temperature,
+          tools,
+          tool_choice: 'auto',
         });
 
-        return response.choices[0].message.content;
+        const message = response.choices[0].message;
+
+        // Handle Tool Calls
+        if (message.tool_calls && message.tool_calls.length > 0) {
+          for (const toolCall of message.tool_calls) {
+            const tc = toolCall as any;
+            if (tc.function.name === 'create_order') {
+              const args = JSON.parse(tc.function.arguments);
+              const { OrderService } = await import('./order.service.js');
+              try {
+                const order = await OrderService.createDraftOrder(leadId, args.items);
+                logger.info({ orderId: order.id }, 'AI successfully called create_order');
+              } catch (err: any) {
+                logger.error({ err }, 'AI failed to create order via tool');
+              }
+            }
+          }
+
+          // After tool execution, we usually want a second pass to get the final text response
+          // or we can just return a confirmation text if we don't want to loop.
+          // To keep it simple and avoid infinite loops for now, we'll do one tool pass and then a text response.
+          const secondResponse = await this.client.chat.completions.create({
+            model,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              ...messages,
+              message, // The original tool call message
+              {
+                role: 'tool',
+                tool_call_id: message.tool_calls[0].id,
+                content: 'Pedido creado exitosamente en estado borrador.',
+              },
+            ],
+          });
+          return secondResponse.choices[0].message.content;
+        }
+
+        return message.content;
       },
       {
         retries: 2,

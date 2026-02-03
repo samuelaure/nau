@@ -357,7 +357,7 @@ export class Orchestrator {
   /**
    * Helper to queue outbound messages and track them in DB
    */
-  private static async sendAsync(
+  public static async sendAsync(
     lead: any,
     type: 'text' | 'template' | 'interactive',
     payload: any,
