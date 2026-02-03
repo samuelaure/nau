@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [6.1.0](https://github.com/samuelaure/whatsnau/compare/v6.0.0...v6.1.0) (2026-02-03)
+
+
+### Features
+
+* **deploy:** implement tag-based automated deployment system ([b755376](https://github.com/samuelaure/whatsnau/commit/b7553765c47be1d697334ddb607c0b9447a7cb0c))
+
 ## 6.0.0 (2026-02-03)
 
 

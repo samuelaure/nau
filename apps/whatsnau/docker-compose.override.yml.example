@@ -1,19 +1,17 @@
 services:
-  # --- OVERRIDE PATTERN ---
-  # Rename this file to docker-compose.override.yml on the SERVER
-  # to hook into the shared infrastructure layer.
-
-  # Disable local DB container
-  db:
-    profiles: ["donotstart"] 
-
   whatsnau:
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@shared_postgres:5432/${DB_NAME}?schema=public
+      - REDIS_HOST=shared_redis
+    depends_on: []
     networks:
       - shared-mesh
-    environment:
-      # Point to shared container (shared_postgres)
-      # Ensure you create the 'whatsnau' database inside that postgres instance first!
-      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@shared_postgres:5432/${DB_NAME}?schema=public
+
+  postgres:
+    profiles: [disabled]
+
+  redis:
+    profiles: [disabled]
 
 networks:
   shared-mesh:
