@@ -71,12 +71,15 @@ app.get('/health', (req, res) => {
   });
 });
 
+import configRouter from './api/config.router.js';
+
 // Routes
 app.use('/api/auth', authRouter);
-app.use('/api/webhooks/whatsapp', webhookRouter); // Industry standard hierarchical route
+app.use('/api/webhooks/whatsapp', webhookRouter);
 app.use('/api/dashboard', authMiddleware, dashboardRouter);
 app.use('/api/dashboard/import', authMiddleware, importRouter);
 app.use('/api/whatsapp', authMiddleware, whatsappRouter);
+app.use('/api/config', authMiddleware, configRouter);
 
 // Serve static files from the frontend
 const frontendPath = path.join(__dirname, '../../frontend/dist');
