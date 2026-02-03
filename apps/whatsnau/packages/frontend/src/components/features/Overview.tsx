@@ -1,12 +1,13 @@
 import React from 'react';
-import { BarChart3, Mail, Send, MessageSquare, Target, UserCheck, Search } from 'lucide-react';
-import type { CampaignStats, Lead } from '../../types';
+import { Mail, Send, MessageSquare, Target, Search, Zap, ShoppingBag } from 'lucide-react';
+import type { CampaignStats, Lead, TenantStats } from '../../types';
 import { StatCard } from '../ui/StatCard';
 import { Badge } from '../ui/Badge';
 import { Tag } from '../ui/Tag';
 
 interface OverviewProps {
   stats: CampaignStats[];
+  tenantStats: TenantStats | null;
   leads: Lead[];
   onSelectLead: (lead: Lead) => void;
   resolveHandover: (id: string) => void;
@@ -14,6 +15,7 @@ interface OverviewProps {
 
 export const Overview: React.FC<OverviewProps> = ({
   stats,
+  tenantStats,
   leads,
   onSelectLead,
   resolveHandover,
@@ -46,24 +48,22 @@ export const Overview: React.FC<OverviewProps> = ({
         style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}
       >
         <StatCard
-          label="Total Outbound"
-          value={totalMetrics.totalContacts}
-          trend="Leads imported"
-          icon={<BarChart3 size={16} color="var(--primary)" />}
+          label="AI Efficiency"
+          value={tenantStats?.aiHandledLeads || 0}
+          trend={`${tenantStats?.pendingHandover || 0} pending handover`}
+          trendColor={
+            tenantStats?.pendingHandover && tenantStats.pendingHandover > 0
+              ? 'var(--warning)'
+              : 'var(--success)'
+          }
+          icon={<Zap size={16} color="var(--primary)" />}
         />
         <StatCard
-          label="Delivered"
-          value={totalMetrics.delivered}
-          trend={`${((totalMetrics.delivered / (totalMetrics.totalContacts || 1)) * 100).toFixed(1)}% reach`}
-          trendColor="var(--success)"
-          icon={<Mail size={16} color="var(--success)" />}
-        />
-        <StatCard
-          label="Read (Opens)"
-          value={totalMetrics.read}
-          trend={`${((totalMetrics.read / (totalMetrics.delivered || 1)) * 100).toFixed(1)}% open rate`}
-          trendColor="var(--primary)"
-          icon={<Send size={16} color="var(--primary)" />}
+          label="Pending Orders"
+          value={(tenantStats?.draftOrders || 0) + (tenantStats?.pendingOrders || 0)}
+          trend={`${tenantStats?.totalPendingValue || 0} EUR total value`}
+          trendColor="var(--accent)"
+          icon={<ShoppingBag size={16} color="var(--accent)" />}
         />
         <StatCard
           label="Replied"
@@ -73,62 +73,93 @@ export const Overview: React.FC<OverviewProps> = ({
           icon={<MessageSquare size={16} color="var(--accent)" />}
         />
         <StatCard
-          label="Interested"
-          value={totalMetrics.interested}
-          trend="High potential"
-          icon={<Target size={16} color="var(--accent)" />}
-        />
-        <StatCard
-          label="Converted"
-          value={totalMetrics.conversions}
-          trend={`${((totalMetrics.conversions / (totalMetrics.totalContacts || 1)) * 100).toFixed(1)}% success`}
-          trendColor="var(--success)"
-          icon={<UserCheck size={16} color="var(--success)" />}
+          label="Read (Opens)"
+          value={totalMetrics.read}
+          trend={`${((totalMetrics.read / (totalMetrics.delivered || 1)) * 100).toFixed(1)}% open rate`}
+          trendColor="var(--primary)"
+          icon={<Send size={16} color="var(--primary)" />}
         />
       </div>
 
-      {/* Lead State Segmentation */}
-      <div style={{ marginTop: '2rem', marginBottom: '2rem' }}>
-        <h2 style={{ marginBottom: '1rem', color: 'var(--primary)' }}>Lead Segmentation</h2>
-        <div
-          className="stats-grid"
-          style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}
-        >
-          <StatCard
-            label="COLD"
-            value={leads.filter((l) => l.state === 'COLD').length}
-            trend="Not yet engaged"
-            trendColor="rgba(255, 255, 255, 0.5)"
-            icon={<Target size={16} color="#94a3b8" />}
-          />
-          <StatCard
-            label="INTERESTED"
-            value={leads.filter((l) => l.state === 'INTERESTED').length}
-            trend="In conversation"
-            trendColor="var(--accent)"
-            icon={<MessageSquare size={16} color="var(--accent)" />}
-          />
-          <StatCard
-            label="DEMO"
-            value={leads.filter((l) => l.state === 'DEMO').length}
-            trend="Testing product"
-            trendColor="var(--primary)"
-            icon={<Search size={16} color="var(--primary)" />}
-          />
-          <StatCard
-            label="NURTURING"
-            value={leads.filter((l) => l.state === 'NURTURING').length}
-            trend="Weekly tips"
-            trendColor="#f59e0b"
-            icon={<Mail size={16} color="#f59e0b" />}
-          />
-          <StatCard
-            label="CLIENTS"
-            value={leads.filter((l) => l.state === 'CLIENTS').length}
-            trend="Converted!"
-            trendColor="var(--success)"
-            icon={<UserCheck size={16} color="var(--success)" />}
-          />
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '2fr 1fr',
+          gap: '2rem',
+          marginBottom: '2rem',
+        }}
+      >
+        {/* Lead State Segmentation */}
+        <div>
+          <h2 style={{ marginBottom: '1rem', color: 'var(--primary)', fontSize: '1.25rem' }}>
+            Lead Segmentation
+          </h2>
+          <div
+            className="stats-grid"
+            style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem' }}
+          >
+            <StatCard
+              label="COLD"
+              value={leads.filter((l) => l.state === 'COLD').length}
+              icon={<Target size={14} color="#94a3b8" />}
+            />
+            <StatCard
+              label="INTERESTED"
+              value={leads.filter((l) => l.state === 'INTERESTED').length}
+              icon={<MessageSquare size={14} color="var(--accent)" />}
+            />
+            <StatCard
+              label="DEMO"
+              value={leads.filter((l) => l.state === 'DEMO').length}
+              icon={<Search size={14} color="var(--primary)" />}
+            />
+            <StatCard
+              label="NURTURING"
+              value={leads.filter((l) => l.state === 'NURTURING').length}
+              icon={<Mail size={14} color="#f59e0b" />}
+            />
+          </div>
+        </div>
+
+        {/* Recent Orders */}
+        <div className="leads-container" style={{ maxHeight: '280px' }}>
+          <div className="leads-header" style={{ padding: '1rem' }}>
+            <h3 style={{ fontSize: '1rem' }}>Last AI Orders</h3>
+          </div>
+          <div style={{ padding: '0.5rem 1rem' }}>
+            {tenantStats?.recentOrders && tenantStats.recentOrders.length > 0 ? (
+              tenantStats.recentOrders.map((order) => (
+                <div
+                  key={order.id}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    marginBottom: '0.75rem',
+                    fontSize: '0.875rem',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{order.leadName}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                      {new Date(order.createdAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                  <div style={{ color: 'var(--success)', fontWeight: 700 }}>{order.amount}€</div>
+                </div>
+              ))
+            ) : (
+              <div
+                style={{
+                  color: 'var(--text-muted)',
+                  fontSize: '0.875rem',
+                  textAlign: 'center',
+                  marginTop: '1rem',
+                }}
+              >
+                No orders yet.
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

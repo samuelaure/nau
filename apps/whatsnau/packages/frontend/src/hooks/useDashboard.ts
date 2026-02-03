@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { CampaignStats, Lead, KeywordConfig, Message } from '../types';
+import type { CampaignStats, Lead, KeywordConfig, Message, TenantStats } from '../types';
 import { useNotification } from '../context/NotificationContext';
 
 export const useDashboard = (campaignId?: string) => {
   const { notify } = useNotification();
   const [stats, setStats] = useState<CampaignStats[]>([]);
+  const [tenantStats, setTenantStats] = useState<TenantStats | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [keywords, setKeywords] = useState<KeywordConfig[]>([]);
   const [availability, setAvailability] = useState('');
@@ -21,19 +22,22 @@ export const useDashboard = (campaignId?: string) => {
         ? `${baseUrl}/leads?campaignId=${campaignId}&limit=100`
         : `${baseUrl}/leads?limit=100`;
 
-      const [statsRes, leadsRes, keywordsRes, configRes] = await Promise.all([
+      const [statsRes, leadsRes, keywordsRes, configRes, tenantStatsRes] = await Promise.all([
         fetch(`${baseUrl}/stats`),
         fetch(leadsUrl),
         fetch(`${baseUrl}/config/keywords`),
         fetch(`${baseUrl}/config/global`),
+        fetch(`${baseUrl}/tenant-stats`),
       ]);
 
       const statsData = await statsRes.json();
       const leadsData = await leadsRes.json();
       const keywordsData = await keywordsRes.json();
       const configData = await configRes.json();
+      const tenantStatsData = tenantStatsRes.ok ? await tenantStatsRes.json() : null;
 
       setStats(statsData);
+      setTenantStats(tenantStatsData);
       // Handle both old format (array) and new format (object with data property)
       setLeads(Array.isArray(leadsData) ? leadsData : leadsData.data || []);
       setKeywords(keywordsData);
@@ -139,6 +143,7 @@ export const useDashboard = (campaignId?: string) => {
 
   return {
     stats,
+    tenantStats,
     leads,
     keywords,
     availability,

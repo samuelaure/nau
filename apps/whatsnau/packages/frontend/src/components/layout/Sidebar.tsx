@@ -39,6 +39,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const menuItems = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+    { id: 'pipeline', label: 'Lead Pipeline', icon: Layers },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'broadcast', label: 'Broadcast', icon: MessageSquare },
     { id: 'import', label: 'Import Leads', icon: Users },

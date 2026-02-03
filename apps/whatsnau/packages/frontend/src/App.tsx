@@ -10,6 +10,7 @@ import { AnalyticsView } from './components/features/AnalyticsView';
 import { TemplatesView } from './components/features/TemplatesView';
 import { LogViewer } from './components/features/LogViewer';
 import { ChatModal } from './components/features/ChatModal';
+import { PipelineView } from './components/features/PipelineView';
 import { useDashboard } from './hooks/useDashboard';
 import { useImport } from './hooks/useImport';
 import { useConfig } from './hooks/useConfig';
@@ -97,6 +98,7 @@ function App() {
 
   const {
     stats,
+    tenantStats,
     leads,
     keywords,
     availability,
@@ -202,11 +204,14 @@ function App() {
         {activeTab === 'overview' && (
           <Overview
             stats={stats}
+            tenantStats={tenantStats}
             leads={leads}
             onSelectLead={setSelectedLead}
             resolveHandover={resolveHandover}
           />
         )}
+
+        {activeTab === 'pipeline' && <PipelineView leads={leads} onSelectLead={setSelectedLead} />}
 
         {activeTab === 'settings' && (
           <AIAgents

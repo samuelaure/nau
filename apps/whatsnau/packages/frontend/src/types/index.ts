@@ -116,3 +116,17 @@ export interface LogEntry {
   hostname?: string;
   [key: string]: unknown;
 }
+
+export interface TenantStats {
+  aiHandledLeads: number;
+  pendingHandover: number;
+  draftOrders: number;
+  pendingOrders: number;
+  totalPendingValue: number;
+  recentOrders: {
+    id: string;
+    leadName: string;
+    amount: number;
+    createdAt: string;
+  }[];
+}
