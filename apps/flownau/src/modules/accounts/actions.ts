@@ -20,7 +20,11 @@ const AccountSchema = z.object({
 const AccountUpdateSchema = z.object({
   username: z.string().min(1, 'Username is required'),
   platformId: z.string().min(1, 'Platform ID is required'),
-  accessToken: z.string().optional().or(z.literal('')).transform(val => val || undefined),
+  accessToken: z
+    .string()
+    .optional()
+    .or(z.literal(''))
+    .transform((val) => val || undefined),
 })
 
 const PrepareUploadSchema = z.object({
@@ -41,7 +45,7 @@ const ConfirmUploadSchema = z.object({
     mimeType: z.string(),
     hash: z.string(),
     type: z.string(),
-  })
+  }),
 })
 
 const IdSchema = z.string().min(1)

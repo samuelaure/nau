@@ -48,10 +48,7 @@ export default function AddTemplateButton({
           </p>
         </div>
 
-        <form
-          action={handleSubmit}
-          className="flex flex-col gap-6"
-        >
+        <form action={handleSubmit} className="flex flex-col gap-6">
           <div className="form-group">
             <label className="form-label">Template Name</label>
             <input
@@ -67,11 +64,7 @@ export default function AddTemplateButton({
 
           <div className="form-group">
             <label className="form-label">Linked Account</label>
-            <select
-              name="accountId"
-              className="input-field"
-              defaultValue={defaultAccountId || ''}
-            >
+            <select name="accountId" className="input-field" defaultValue={defaultAccountId || ''}>
               <option value="">No Account (Global)</option>
               {accounts.map((account: any) => (
                 <option key={account.id} value={account.id}>
@@ -107,7 +100,10 @@ export default function AddTemplateButton({
             ) : (
               <>
                 Create Template
-                <Plus size={20} className="group-hover:rotate-90 transition-transform duration-300" />
+                <Plus
+                  size={20}
+                  className="group-hover:rotate-90 transition-transform duration-300"
+                />
               </>
             )}
           </button>

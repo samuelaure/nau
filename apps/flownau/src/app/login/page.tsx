@@ -63,10 +63,7 @@ export default function LoginPage() {
 
           {error && <p className="text-error text-sm">{error}</p>}
 
-          <Button
-            type="submit"
-            className="w-full h-12 justify-center mt-3"
-          >
+          <Button type="submit" className="w-full h-12 justify-center mt-3">
             Sign In
           </Button>
         </form>

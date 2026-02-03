@@ -29,8 +29,8 @@ export default async function TemplatePage({
     prisma.user.findFirst().then((user) =>
       user
         ? prisma.socialAccount.findMany({
-          where: { userId: user.id },
-        })
+            where: { userId: user.id },
+          })
         : [],
     ),
   ])

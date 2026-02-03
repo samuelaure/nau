@@ -64,9 +64,7 @@ export default async function AccountPage({
               <h1 className="text-3xl font-heading font-semibold">{account.username}</h1>
               <ExternalAccountLink username={account.username} />
             </div>
-            <p className="text-text-secondary">
-              Instagram Business Account • {account.platformId}
-            </p>
+            <p className="text-text-secondary">Instagram Business Account • {account.platformId}</p>
           </div>
         </div>
       </header>
@@ -118,16 +116,13 @@ function TabLink({
         'px-6 py-3 -mb-px flex items-center gap-2 border-b-2 transition-colors',
         active
           ? 'text-white border-accent font-semibold'
-          : 'text-text-secondary border-transparent hover:text-white'
+          : 'text-text-secondary border-transparent hover:text-white',
       )}
     >
       {label}
       {count !== undefined && (
         <span
-          className={cn(
-            'px-2 py-0.5 rounded-xl text-xs',
-            active ? 'bg-white/10' : 'bg-white/5'
-          )}
+          className={cn('px-2 py-0.5 rounded-xl text-xs', active ? 'bg-white/10' : 'bg-white/5')}
         >
           {count}
         </span>
@@ -142,7 +137,7 @@ async function AccountTemplates({ accountId }: { accountId: string }) {
     orderBy: { createdAt: 'desc' },
     include: {
       _count: { select: { renders: true } },
-      account: { select: { username: true, platform: true } }
+      account: { select: { username: true, platform: true } },
     },
   })
 
@@ -184,5 +179,7 @@ async function AccountAssets({ accountId }: { accountId: string }) {
 
   const basePath = account?.assetsRoot || account?.username || account?.id || ''
 
-  return <AssetsManager ownerId={accountId} ownerType="account" assets={assets} basePath={basePath} />
+  return (
+    <AssetsManager ownerId={accountId} ownerType="account" assets={assets} basePath={basePath} />
+  )
 }

@@ -44,7 +44,7 @@ export default function AddAccountButton({ existingAccounts = [] }: AddAccountBu
   }
 
   // Filter accounts that actually have an access token
-  const accountsWithTokens = existingAccounts.filter(a => a.accessToken && a.username)
+  const accountsWithTokens = existingAccounts.filter((a) => a.accessToken && a.username)
 
   return (
     <>
@@ -64,10 +64,7 @@ export default function AddAccountButton({ existingAccounts = [] }: AddAccountBu
           </p>
         </div>
 
-        <form
-          action={handleSubmit}
-          className="flex flex-col gap-6"
-        >
+        <form action={handleSubmit} className="flex flex-col gap-6">
           <Input
             name="username"
             label="Instagram Username"
@@ -98,7 +95,7 @@ export default function AddAccountButton({ existingAccounts = [] }: AddAccountBu
                 onFocus={() => accountsWithTokens.length > 0 && setSelectedTokenSource('open')}
                 onBlur={() => setTimeout(() => setSelectedTokenSource(''), 200)}
                 style={{
-                  paddingRight: accountsWithTokens.length > 0 ? '48px' : '18px'
+                  paddingRight: accountsWithTokens.length > 0 ? '48px' : '18px',
                 }}
               />
               {accountsWithTokens.length > 0 && (

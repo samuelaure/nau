@@ -36,17 +36,10 @@ export default function LandingPage() {
         </p>
 
         <div className="animate-fade-in flex gap-4">
-          <Link
-            href="/login"
-            className="btn-primary px-8 py-4 text-lg"
-          >
+          <Link href="/login" className="btn-primary px-8 py-4 text-lg">
             Get Started <ArrowRight size={20} />
           </Link>
-          <Button
-            variant="outline"
-            size="lg"
-            className="text-lg"
-          >
+          <Button variant="outline" size="lg" className="text-lg">
             Watch Demo
           </Button>
         </div>

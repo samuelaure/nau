@@ -16,8 +16,8 @@ export default async function TemplatesPage() {
     prisma.user.findFirst().then((user) =>
       user
         ? prisma.socialAccount.findMany({
-          where: { userId: user.id },
-        })
+            where: { userId: user.id },
+          })
         : [],
     ),
   ])
@@ -43,9 +43,7 @@ export default async function TemplatesPage() {
       <header className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h1 className="text-3xl font-heading font-semibold mb-2">Video Templates</h1>
-          <p className="text-text-secondary">
-            Automated video schemas linked to Airtable tables.
-          </p>
+          <p className="text-text-secondary">Automated video schemas linked to Airtable tables.</p>
         </div>
         <AddTemplateButton label="New Template" accounts={accounts} />
       </header>
@@ -87,10 +85,7 @@ export default async function TemplatesPage() {
 
         {templates.length === 0 && (
           <Card className="col-span-full py-20 px-10 text-center border-dashed bg-transparent flex flex-col items-center">
-            <Video
-              size={48}
-              className="text-text-secondary mb-4 opacity-50"
-            />
+            <Video size={48} className="text-text-secondary mb-4 opacity-50" />
             <h3 className="text-xl font-semibold mb-2">No templates created</h3>
             <p className="text-text-secondary mb-6">
               Create your first video template and link it to an Airtable table.

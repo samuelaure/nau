@@ -29,8 +29,8 @@ export default async function SettingsPage() {
             <div>
               <h4 className="font-medium mb-1">R2 Assets Sync</h4>
               <p className="text-sm text-text-secondary mb-4 max-w-sm">
-                Re-scan the Cloudflare R2 bucket and update the database.
-                Useful if files were manually added, moved, or deleted in the storage bucket.
+                Re-scan the Cloudflare R2 bucket and update the database. Useful if files were
+                manually added, moved, or deleted in the storage bucket.
               </p>
             </div>
             <SyncButton />

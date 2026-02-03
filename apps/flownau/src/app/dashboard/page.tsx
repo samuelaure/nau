@@ -20,14 +20,14 @@ export default async function DashboardPage() {
       value: accountsCount,
       icon: Instagram,
       iconClass: 'text-[#E1306C]',
-      bgClass: 'bg-[#E1306C]/15'
+      bgClass: 'bg-[#E1306C]/15',
     },
     {
       name: 'Total Templates',
       value: templatesCount,
       icon: Video,
       iconClass: 'text-[var(--accent-color)]',
-      bgClass: 'bg-[var(--accent-color)]/15'
+      bgClass: 'bg-[var(--accent-color)]/15',
     },
   ]
 
@@ -40,10 +40,7 @@ export default async function DashboardPage() {
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-6 mb-12">
         {stats.map((stat) => (
-          <Card
-            key={stat.name}
-            className="flex items-center gap-5"
-          >
+          <Card key={stat.name} className="flex items-center gap-5">
             <div className={`p-3 rounded-xl ${stat.bgClass} ${stat.iconClass}`}>
               <stat.icon size={28} />
             </div>
@@ -76,10 +73,11 @@ export default async function DashboardPage() {
                   <td className="p-4 pl-6 font-medium text-white">{render.template.name}</td>
                   <td className="p-4">
                     <span
-                      className={`px-2.5 py-1 rounded-md text-xs font-bold tracking-wide ${render.status === 'COMPLETED'
-                        ? 'bg-emerald-500/10 text-emerald-500'
-                        : 'bg-amber-500/10 text-amber-500'
-                        }`}
+                      className={`px-2.5 py-1 rounded-md text-xs font-bold tracking-wide ${
+                        render.status === 'COMPLETED'
+                          ? 'bg-emerald-500/10 text-emerald-500'
+                          : 'bg-amber-500/10 text-amber-500'
+                      }`}
                     >
                       {render.status}
                     </span>
@@ -88,11 +86,15 @@ export default async function DashboardPage() {
                     {new Date(render.createdAt).toLocaleDateString(undefined, {
                       month: 'short',
                       day: 'numeric',
-                      year: 'numeric'
+                      year: 'numeric',
                     })}
                   </td>
                   <td className="p-4 pr-6">
-                    <Button variant="ghost" size="sm" className="text-accent hover:text-accent-hover font-semibold text-sm transition-colors">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-accent hover:text-accent-hover font-semibold text-sm transition-colors"
+                    >
                       View
                     </Button>
                   </td>
@@ -100,10 +102,7 @@ export default async function DashboardPage() {
               ))}
               {recentRenders.length === 0 && (
                 <tr>
-                  <td
-                    colSpan={4}
-                    className="p-8 text-center text-text-secondary italic"
-                  >
+                  <td colSpan={4} className="p-8 text-center text-text-secondary italic">
                     No recent activity found.
                   </td>
                 </tr>

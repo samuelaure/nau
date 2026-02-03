@@ -8,47 +8,47 @@ import { auth } from '@/auth'
 import { z } from 'zod'
 
 export async function checkAuth() {
-    const session = await auth()
-    if (!session?.user?.id) {
-        throw new Error('Unauthorized')
-    }
+  const session = await auth()
+  if (!session?.user?.id) {
+    throw new Error('Unauthorized')
+  }
 
-    const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
-    })
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+  })
 
-    if (!user) {
-        throw new Error('User not found')
-    }
+  if (!user) {
+    throw new Error('User not found')
+  }
 
-    return { user }
+  return { user }
 }
 
 const DeleteAssetSchema = z.string().min(1)
 
 export async function deleteAsset(assetId: string) {
-    await checkAuth()
-    const parsedId = DeleteAssetSchema.parse(assetId)
+  await checkAuth()
+  const parsedId = DeleteAssetSchema.parse(assetId)
 
-    const asset = await prisma.asset.findUnique({ where: { id: parsedId } })
-    if (!asset) return
+  const asset = await prisma.asset.findUnique({ where: { id: parsedId } })
+  if (!asset) return
 
-    // Delete from R2
-    try {
-        await r2.send(
-            new DeleteObjectCommand({
-                Bucket: R2_BUCKET,
-                Key: asset.r2Key,
-            }),
-        )
-    } catch (e) {
-        console.error('Failed to delete from R2', e)
-    }
+  // Delete from R2
+  try {
+    await r2.send(
+      new DeleteObjectCommand({
+        Bucket: R2_BUCKET,
+        Key: asset.r2Key,
+      }),
+    )
+  } catch (e) {
+    console.error('Failed to delete from R2', e)
+  }
 
-    // Delete from DB
-    await prisma.asset.delete({ where: { id: parsedId } })
+  // Delete from DB
+  await prisma.asset.delete({ where: { id: parsedId } })
 
-    // Revalidate paths
-    if (asset.accountId) revalidatePath(`/dashboard/accounts/${asset.accountId}`)
-    if (asset.templateId) revalidatePath(`/dashboard/templates/${asset.templateId}`)
+  // Revalidate paths
+  if (asset.accountId) revalidatePath(`/dashboard/accounts/${asset.accountId}`)
+  if (asset.templateId) revalidatePath(`/dashboard/templates/${asset.templateId}`)
 }

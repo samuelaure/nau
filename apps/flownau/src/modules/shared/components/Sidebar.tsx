@@ -32,7 +32,16 @@ export default function Sidebar() {
         <div style={{ padding: '8px', background: 'var(--accent-color)', borderRadius: '8px' }}>
           <Video size={20} color="white" />
         </div>
-        <span style={{ fontWeight: '800', fontSize: '20px', fontFamily: 'Outfit', textTransform: 'lowercase' }}>flownaŭ</span>
+        <span
+          style={{
+            fontWeight: '800',
+            fontSize: '20px',
+            fontFamily: 'Outfit',
+            textTransform: 'lowercase',
+          }}
+        >
+          flownaŭ
+        </span>
       </div>
 
       <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>

@@ -26,12 +26,7 @@ export default function AccountSettings({ account }: { account: SocialAccount })
         </div>
 
         <form action={handleUpdate} className="flex flex-col gap-6">
-          <Input
-            name="username"
-            label="Username"
-            defaultValue={account.username || ''}
-            required
-          />
+          <Input name="username" label="Username" defaultValue={account.username || ''} required />
 
           <Input
             name="platformId"
@@ -43,9 +38,7 @@ export default function AccountSettings({ account }: { account: SocialAccount })
           <div className="w-full">
             <label className="form-label">
               Access Token
-              <span className="text-xs font-normal ml-2 opacity-70">
-                (Optional rotation)
-              </span>
+              <span className="text-xs font-normal ml-2 opacity-70">(Optional rotation)</span>
             </label>
             <input
               name="accessToken"

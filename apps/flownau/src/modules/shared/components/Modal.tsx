@@ -67,11 +67,11 @@ export default function Modal({ isOpen, onClose, children, maxWidth = 'md' }: Mo
               type: 'spring',
               damping: 25,
               stiffness: 300,
-              duration: 0.3
+              duration: 0.3,
             }}
             className={cn(
-              "relative w-full bg-panel border border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] rounded-[2.5rem] glass overflow-hidden flex flex-col max-h-[calc(100vh-3rem)] sm:max-h-[90vh]",
-              maxWidthClasses[maxWidth]
+              'relative w-full bg-panel border border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] rounded-[2.5rem] glass overflow-hidden flex flex-col max-h-[calc(100vh-3rem)] sm:max-h-[90vh]',
+              maxWidthClasses[maxWidth],
             )}
             role="dialog"
             aria-modal="true"
@@ -83,9 +83,7 @@ export default function Modal({ isOpen, onClose, children, maxWidth = 'md' }: Mo
               <X className="h-5 w-5" />
               <span className="sr-only">Close</span>
             </button>
-            <div className="p-8 md:p-12 overflow-y-auto flex-1 custom-scrollbar">
-              {children}
-            </div>
+            <div className="p-8 md:p-12 overflow-y-auto flex-1 custom-scrollbar">{children}</div>
           </motion.div>
         </div>
       )}
@@ -93,4 +91,3 @@ export default function Modal({ isOpen, onClose, children, maxWidth = 'md' }: Mo
     document.body,
   )
 }
-

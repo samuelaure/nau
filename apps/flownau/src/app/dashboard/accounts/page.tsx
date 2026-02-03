@@ -23,26 +23,24 @@ export default async function AccountsPage() {
           </p>
         </div>
         <AddAccountButton
-          existingAccounts={accounts.map(a => ({
+          existingAccounts={accounts.map((a) => ({
             id: a.id,
             username: a.username,
-            accessToken: a.accessToken
+            accessToken: a.accessToken,
           }))}
         />
       </header>
 
       <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-6">
         {accounts.map((account: AccountWithCounts) => (
-          <Card key={account.id} className="relative group hover:border-accent/40 transition-colors">
+          <Card
+            key={account.id}
+            className="relative group hover:border-accent/40 transition-colors"
+          >
             {/* Overlay Link for whole-card clickability */}
-            <Link
-              href={`/dashboard/accounts/${account.id}`}
-              className="absolute inset-0 z-[1]"
-            />
+            <Link href={`/dashboard/accounts/${account.id}`} className="absolute inset-0 z-[1]" />
 
-            <ActionMenu
-              onDelete={deleteAccount.bind(null, account.id)}
-            />
+            <ActionMenu onDelete={deleteAccount.bind(null, account.id)} />
 
             <div className="relative z-[2] pointer-events-none">
               <div className="flex items-center gap-4 mb-5">
@@ -74,17 +72,13 @@ export default async function AccountsPage() {
                   <p className="text-[10px] text-text-secondary uppercase tracking-wider mb-1">
                     Status
                   </p>
-                  <p className="text-sm font-semibold text-success">
-                    Connected
-                  </p>
+                  <p className="text-sm font-semibold text-success">Connected</p>
                 </div>
                 <div className="flex-1 p-3 bg-white/5 rounded-lg text-center">
                   <p className="text-[10px] text-text-secondary uppercase tracking-wider mb-1">
                     Templates
                   </p>
-                  <p className="text-sm font-semibold">
-                    {account._count?.templates || 0}
-                  </p>
+                  <p className="text-sm font-semibold">{account._count?.templates || 0}</p>
                 </div>
               </div>
             </div>
@@ -93,10 +87,7 @@ export default async function AccountsPage() {
 
         {accounts.length === 0 && (
           <Card className="col-span-full py-20 px-10 text-center border-dashed bg-transparent flex flex-col items-center">
-            <Instagram
-              size={48}
-              className="text-text-secondary mb-4 opacity-50"
-            />
+            <Instagram size={48} className="text-text-secondary mb-4 opacity-50" />
             <h3 className="text-xl font-semibold mb-2">No accounts linked</h3>
             <p className="text-text-secondary mb-6">
               Connect your first Instagram Business account to start publishing.
