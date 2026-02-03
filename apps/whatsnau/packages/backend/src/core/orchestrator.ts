@@ -142,7 +142,7 @@ export class Orchestrator {
 
     // 4. Source-Aware Processing
     if (direction === 'OUTBOUND') {
-      await this.handleOutboundTakeover(lead, content);
+      await this.handleOutboundTakeover(lead, whatsappId, content);
     } else {
       // We need tenantId to schedule processing
       if (lead.tenantId) {
@@ -218,18 +218,60 @@ export class Orchestrator {
   }
 
   /**
-   * SILENT TAKEOVER: Triggered by business/owner messages.
+   * SILENT TAKEOVER & REACTIVATION: Triggered by business/owner messages.
    */
-  private static async handleOutboundTakeover(lead: any, content: string) {
-    const internalKeywords = await db.takeoverKeyword.findMany({ where: { type: 'INTERNAL' } });
-    const triggers = internalKeywords.map((k) => k.word.toUpperCase());
+  private static async handleOutboundTakeover(lead: any, whatsappId?: string, content?: string) {
+    if (!whatsappId || whatsappId === 'pending') return;
 
-    if (triggers.includes(content.toUpperCase().trim())) {
+    // 1. Check if this message was already sent by our AI (avoid self-handover)
+    const existingMessage = await db.message.findUnique({
+      where: { whatsappId },
+      select: { aiGenerated: true },
+    });
+
+    if (existingMessage?.aiGenerated) {
+      return; // It's an AI message, don't trigger handover logic
+    }
+
+    const normalizedContent = content?.toUpperCase().trim() || '';
+
+    // 2. Check for REACTIVATION triggers in DB
+    const reactivationKeywords = await (db as any).takeoverKeyword.findMany({
+      where: { tenantId: lead.tenantId, type: 'INTERNAL', category: 'REACTIVATION' },
+    });
+
+    const isReactivation = reactivationKeywords.some((k: any) =>
+      normalizedContent.includes(k.word.toUpperCase())
+    );
+
+    if (isReactivation) {
+      await db.lead.update({
+        where: { id: lead.id },
+        data: { status: 'ACTIVE', aiEnabled: true },
+      });
+      logger.info({ leadId: lead.id }, 'AI Agent reactivated by owner magic phrase');
+      return;
+    }
+
+    // 3. Check for TAKEOVER triggers in DB
+    const takeoverKeywords = await (db as any).takeoverKeyword.findMany({
+      where: { tenantId: lead.tenantId, type: 'INTERNAL', category: 'TAKEOVER' },
+    });
+
+    const isExplicitTakeover = takeoverKeywords.some((k: any) =>
+      normalizedContent.includes(k.word.toUpperCase())
+    );
+
+    // If it's a manual message (and not a reactivation), trigger HANDOVER
+    if (lead.status !== 'HANDOVER' || isExplicitTakeover) {
       await db.lead.update({
         where: { id: lead.id },
         data: { status: 'HANDOVER' },
       });
-      logger.info({ leadId: lead.id }, 'Silent takeover triggered by owner message');
+      logger.info(
+        { leadId: lead.id },
+        'Handover triggered: Manual message or explicit takeover detected'
+      );
     }
   }
 

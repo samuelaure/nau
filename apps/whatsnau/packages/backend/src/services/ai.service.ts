@@ -120,12 +120,12 @@ export class AIService {
       contextParts.push(`Nombre del lead: ${lead.name}`);
     }
 
-    // Lead metadata (business info, research, etc.)
+    // Lead metadata
     if (lead.metadata) {
       try {
         const metadata = JSON.parse(lead.metadata);
         if (Object.keys(metadata).length > 0) {
-          contextParts.push(`Información del negocio:`);
+          contextParts.push(`Información del negocio del lead:`);
           Object.entries(metadata).forEach(([key, value]) => {
             contextParts.push(`  - ${key}: ${value}`);
           });
@@ -141,6 +141,8 @@ export class AIService {
       contextParts.push(`Tags: ${tagNames}`);
     }
 
+    // Demo context
+
     // Demo context (if in demo)
     if (lead.state === 'DEMO' && lead.demoExpiresAt) {
       const now = new Date();
@@ -152,12 +154,6 @@ export class AIService {
         `Tiempo restante: ${minutesLeft} minutos.`,
         `Adapta tus respuestas al contexto de su negocio y demuestra competencia.`
       );
-    }
-
-    // Nurturing context
-    if (lead.state === 'NURTURING') {
-      const onboardingStatus = lead.nurturingOnboardingComplete ? 'completado' : 'en progreso';
-      contextParts.push(`Estado de onboarding: ${onboardingStatus}`);
     }
 
     return contextParts.join('\n');
@@ -180,11 +176,22 @@ export class AIService {
       throw new Error(`Prompt config not found for role: ${role} in campaign: ${campaignId}`);
     }
 
-    // Get business knowledge base
-    const business = await db.businessProfile.findUnique({ where: { id: 'singleton' } });
+    // Get business knowledge base for this tenant
+    const lead = await db.lead.findUnique({ where: { id: leadId }, select: { tenantId: true } });
+    const business = await db.businessProfile.findUnique({
+      where: { tenantId: lead?.tenantId || 'singleton' },
+    });
     const knowledgeBase = business?.knowledgeBase || 'No hay información adicional del negocio.';
 
-    // Build lead context
+    // Build dynamic context using RetrievalService (Context Weaver)
+    const lastMessage = messages[messages.length - 1]?.content || '';
+    const dynamicContext = lead?.tenantId
+      ? await (
+          await import('./retrieval.service.js')
+        ).RetrievalService.getRelevantContext(leadId, lead.tenantId, lastMessage)
+      : '';
+
+    // Build static lead context (Base info only)
     const leadContext = await this.buildLeadContext(leadId);
 
     // Global guidelines
@@ -204,6 +211,8 @@ ${promptConfig.basePrompt}
 ${knowledgeBase}
 
 ${leadContext ? `### CONTEXTO DEL LEAD:\n${leadContext}` : ''}
+
+${dynamicContext ? `### INFORMACIÓN RELEVANTE:\n${dynamicContext}` : ''}
 
 ${globalGuidelines}
     `.trim();
