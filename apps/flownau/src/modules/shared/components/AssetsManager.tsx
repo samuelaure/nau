@@ -13,32 +13,30 @@ import {
   Folder,
   ChevronRight,
   Home,
+  Sparkles,
+  Link as LinkIcon,
+  Trash2,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { deleteAsset } from '@/modules/shared/actions'
 import ActionMenu from '@/modules/shared/components/ActionMenu'
 import Modal from '@/modules/shared/components/Modal'
 import R2FolderBrowser from '@/modules/shared/components/R2FolderBrowser'
-import { Link as LinkIcon } from 'lucide-react'
-
-interface Asset {
-  id: string
-  url: string
-  r2Key: string
-  systemFilename: string
-  originalFilename: string
-  type: string
-  size: number
-  mimeType: string
-}
+import { Asset } from '@/types/video-schema'
 
 interface AssetsManagerProps {
   ownerId: string
-  ownerType: 'account' | 'template' // Context
+  ownerType: 'account' | 'template'
   assets: Asset[]
-  basePath?: string // Logical root to hide (e.g., account name)
+  basePath?: string
 }
 
-export default function AssetsManager({ ownerId, ownerType, assets, basePath }: AssetsManagerProps) {
+export default function AssetsManager({
+  ownerId,
+  ownerType,
+  assets,
+  basePath,
+}: AssetsManagerProps) {
   const [uploading, setUploading] = useState<boolean>(false)
   const [progress, setProgress] = useState<string>('')
   const [currentPath, setCurrentPath] = useState<string[]>([])
@@ -54,20 +52,17 @@ export default function AssetsManager({ ownerId, ownerType, assets, basePath }: 
         for (const file of acceptedFiles) {
           setProgress(`Processing ${file.name}...`)
 
-          // 1. Calculate Hash
           const buffer = await file.arrayBuffer()
           const hashBuffer = await crypto.subtle.digest('SHA-256', buffer)
           const hashArray = Array.from(new Uint8Array(hashBuffer))
           const hash = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
 
-          // 2. Upload & Optimize via Server
           setProgress(`Uploading & Optimizing ${file.name}...`)
 
           const formData = new FormData()
           formData.append('file', file)
           formData.append('hash', hash)
 
-          // Pass correct context ID
           if (ownerType === 'account') {
             formData.append('accountId', ownerId)
           } else {
@@ -83,14 +78,12 @@ export default function AssetsManager({ ownerId, ownerType, assets, basePath }: 
             const error = await response.json()
             throw new Error(error.error || 'Upload failed')
           }
-
-          setProgress(`Completed ${file.name}`)
         }
-
+        toast.success('Assets uploaded successfully')
         window.location.reload()
-      } catch (error) {
+      } catch (error: any) {
         console.error('Upload failed', error)
-        alert('Upload failed. See console.')
+        toast.error(`Upload failed: ${error.message}`)
       } finally {
         setUploading(false)
         setProgress('')
@@ -117,10 +110,11 @@ export default function AssetsManager({ ownerId, ownerType, assets, basePath }: 
         throw new Error(error.error || 'Linking failed')
       }
 
+      toast.success('R2 folder linked successfully')
       window.location.reload()
     } catch (error: any) {
       console.error('Linking failed', error)
-      alert(`Linking failed: ${error.message}`)
+      toast.error(`Linking failed: ${error.message}`)
     } finally {
       setLinking(false)
       setIsLinkModalOpen(false)
@@ -141,15 +135,12 @@ export default function AssetsManager({ ownerId, ownerType, assets, basePath }: 
     (acc, asset) => {
       let parts = asset.r2Key ? asset.r2Key.split('/') : [asset.systemFilename]
 
-      // If basePath is provided, filter and slice parts
       if (basePath) {
         const baseParts = basePath.split('/').filter(Boolean)
-        // Check if starts with basePath (case-insensitive)
         const startsWithBase = baseParts.every(
           (part, i) => parts[i]?.toLowerCase() === part.toLowerCase(),
         )
 
-        // Only process if it starts with base path, otherwise hide it (it belongs to another account's structure)
         if (startsWithBase) {
           parts = parts.slice(baseParts.length)
         } else {
@@ -157,20 +148,17 @@ export default function AssetsManager({ ownerId, ownerType, assets, basePath }: 
         }
       }
 
-      // Check if asset is within currentPath
       const isInPath = currentPath.every((part, i) => parts[i] === part)
       if (!isInPath) return acc
 
       const nextPart = parts[currentPath.length]
       if (!nextPart) return acc
 
-      // If it has more parts after currentPath + nextPart, it's in a subfolder
       if (parts.length > currentPath.length + 1) {
         if (!acc.folders.has(nextPart)) {
           acc.folders.add(nextPart)
         }
       } else {
-        // It's a file at exactly this level
         acc.files.push(asset)
       }
       return acc
@@ -181,152 +169,97 @@ export default function AssetsManager({ ownerId, ownerType, assets, basePath }: 
   const sortedFolders = Array.from(items.folders).sort()
 
   return (
-    <div className="animate-fade-in">
-      {/* Breadcrumbs */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          marginBottom: '24px',
-          fontSize: '14px',
-          color: 'var(--text-secondary)',
-        }}
-      >
-        <button
-          onClick={() => setCurrentPath([])}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: currentPath.length === 0 ? 'white' : 'inherit',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-            padding: '4px 8px',
-            borderRadius: '4px',
-            transition: 'background 0.2s',
-          }}
-          className="hover-bg"
-        >
-          <Home size={14} /> Root
-        </button>
-
-        {currentPath.map((part, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <ChevronRight size={14} />
-            <button
-              onClick={() => setCurrentPath(currentPath.slice(0, i + 1))}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: i === currentPath.length - 1 ? 'white' : 'inherit',
-                cursor: 'pointer',
-                padding: '4px 8px',
-                borderRadius: '4px',
-              }}
-              className="hover-bg"
-            >
-              {part}
-            </button>
+    <div className="flex flex-col gap-8 animate-fade-in text-text-secondary">
+      {/* Header & Breadcrumbs */}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles size={20} className="text-accent" />
+            <h2 className="text-xl font-bold text-white tracking-tight">Asset Library</h2>
           </div>
-        ))}
+          <button
+            onClick={() => setIsLinkModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold transition-all"
+          >
+            <LinkIcon size={14} /> Link R2 Folder
+          </button>
+        </div>
+
+        <nav className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-widest text-text-secondary/50 overflow-x-auto pb-1 custom-scrollbar">
+          <button
+            onClick={() => setCurrentPath([])}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors ${currentPath.length === 0 ? 'text-accent bg-accent/5' : 'hover:text-white'}`}
+          >
+            <Home size={12} /> Root
+          </button>
+
+          {currentPath.map((part, i) => (
+            <div key={i} className="flex items-center gap-1">
+              <ChevronRight size={12} className="opacity-20" />
+              <button
+                onClick={() => setCurrentPath(currentPath.slice(0, i + 1))}
+                className={`px-3 py-1.5 rounded-lg transition-colors ${i === currentPath.length - 1 ? 'text-accent bg-accent/5' : 'hover:text-white'}`}
+              >
+                {part}
+              </button>
+            </div>
+          ))}
+        </nav>
       </div>
 
+      {/* Dropzone */}
       <div
         {...getRootProps()}
-        style={{
-          border: '2px dashed var(--border-color)',
-          borderColor: isDragActive ? 'var(--accent-color)' : 'var(--border-color)',
-          borderRadius: '16px',
-          padding: '40px',
-          textAlign: 'center',
-          marginBottom: '40px',
-          background: isDragActive ? 'rgba(59, 130, 246, 0.1)' : 'rgba(255,255,255,0.02)',
-          transition: 'all 0.2s',
-          cursor: 'pointer',
-        }}
+        className={`
+            relative p-12 border-2 border-dashed rounded-2xl text-center transition-all cursor-pointer group
+            ${isDragActive ? 'border-accent bg-accent/5' : 'border-white/5 bg-white/[0.01] hover:bg-white/[0.03] hover:border-white/10'}
+            ${uploading ? 'pointer-events-none' : ''}
+        `}
       >
         <input {...getInputProps()} />
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div className="flex flex-col items-center gap-4">
           <div
-            style={{
-              width: '64px',
-              height: '64px',
-              borderRadius: '50%',
-              background: 'var(--panel-color)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: '16px',
-              border: '1px solid var(--border-color)',
-            }}
+            className={`p-4 rounded-full transition-all duration-300 ${uploading ? 'bg-accent/20 text-accent animate-pulse' : 'bg-white/5 text-zinc-500 group-hover:scale-110 group-hover:text-white'}`}
           >
             {uploading ? <Loader2 className="animate-spin" size={32} /> : <Upload size={32} />}
           </div>
-          <h3 style={{ fontSize: '18px', marginBottom: '8px' }}>
-            {uploading
-              ? 'Processing files...'
-              : isDragActive
-                ? 'Drop files now'
-                : 'Drop assets here'}
-          </h3>
-          <p style={{ color: 'var(--text-secondary)' }}>
-            {uploading ? progress : 'or click to browse. Supports Video, Audio, and Images.'}
-          </p>
-          {!uploading && !isDragActive && (
-            <div style={{ marginTop: '24px', display: 'flex', gap: '12px', justifyContent: 'center' }}>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setIsLinkModalOpen(true)
-                }}
-                className="btn-secondary"
-                style={{ fontSize: '13px', padding: '8px 16px' }}
-              >
-                <LinkIcon size={14} className="mr-2" />
-                Link Existing Folder
-              </button>
-            </div>
-          )}
+          <div className="flex flex-col gap-1">
+            <h3 className="text-sm font-bold text-white uppercase tracking-widest">
+              {uploading
+                ? 'System Operating...'
+                : isDragActive
+                  ? 'Release to Upload'
+                  : 'Deploy Assets'}
+            </h3>
+            <p className="text-xs max-w-xs mx-auto leading-relaxed opacity-50 font-medium">
+              {uploading
+                ? progress
+                : 'Drag & drop media files directly into this target area to initialize processing.'}
+            </p>
+          </div>
         </div>
       </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-          gap: '24px',
-        }}
-      >
+      {/* Grid Content */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
         {/* Folders */}
         {sortedFolders.map((folder) => (
           <div
             key={folder}
-            className="card hover-glow"
-            style={{
-              cursor: 'pointer',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '24px',
-              gap: '12px',
-            }}
             onClick={() => setCurrentPath([...currentPath, folder])}
+            className="group p-6 bg-white/[0.02] border border-white/5 rounded-2xl hover:border-accent/50 hover:bg-accent/5 transition-all cursor-pointer flex flex-col items-center gap-4 text-center"
           >
-            <Folder size={48} style={{ color: 'var(--accent-color)', opacity: 0.8 }} />
-            <span
-              style={{
-                fontSize: '14px',
-                fontWeight: '500',
-                textAlign: 'center',
-                wordBreak: 'break-all',
-              }}
-            >
-              {folder}
-            </span>
+            <div className="p-4 rounded-xl bg-accent/10 text-accent group-hover:scale-110 transition-transform shadow-2xl shadow-accent/20">
+              <Folder size={40} />
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-xs font-bold text-zinc-400 group-hover:text-white transition-colors">
+                {folder}
+              </span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-text-secondary/30">
+                Directory
+              </span>
+            </div>
           </div>
         ))}
 
@@ -336,120 +269,115 @@ export default function AssetsManager({ ownerId, ownerType, assets, basePath }: 
         ))}
       </div>
 
+      {/* Empty States */}
       {sortedFolders.length === 0 && items.files.length === 0 && !uploading && (
-        <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '60px 40px' }}>
-          <Folder size={48} style={{ margin: '0 auto 16px', opacity: 0.2 }} />
-          <p style={{ marginBottom: '24px', fontSize: '16px' }}>No folders or assets found in this directory.</p>
-          <button
-            onClick={() => setIsLinkModalOpen(true)}
-            className="btn-primary"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
-          >
-            <LinkIcon size={18} />
-            Browse & Link R2 Folder
-          </button>
+        <div className="flex flex-col items-center justify-center py-20 px-10 gap-6 grayscale opacity-20">
+          <Folder size={64} strokeWidth={1} />
+          <div className="flex flex-col gap-1 text-center">
+            <h3 className="text-sm font-bold uppercase tracking-[0.2em]">Zero Data Points</h3>
+            <p className="text-xs max-w-xs mx-auto leading-relaxed">
+              No entities found in this logical path. Initialize an upload or link a remote
+              repository.
+            </p>
+          </div>
         </div>
       )}
 
+      {/* Modals */}
       <Modal isOpen={isLinkModalOpen} onClose={() => setIsLinkModalOpen(false)} maxWidth="lg">
         {linking ? (
-          <div style={{ textAlign: 'center', padding: '40px' }}>
-            <Loader2 className="animate-spin" size={48} style={{ margin: '0 auto 24px', color: 'var(--accent-color)' }} />
-            <h3 style={{ fontSize: '20px', marginBottom: '8px' }}>Linking assets...</h3>
-            <p style={{ color: 'var(--text-secondary)' }}>This may take a moment depending on the number of files.</p>
+          <div className="flex flex-col items-center justify-center py-16 gap-6">
+            <Loader2 className="animate-spin text-accent" size={48} />
+            <div className="flex flex-col gap-1 text-center">
+              <h3 className="text-lg font-bold text-white uppercase tracking-widest">
+                Handshaking...
+              </h3>
+              <p className="text-sm opacity-50">
+                Indexing remote R2 objects and establishing secure links.
+              </p>
+            </div>
           </div>
         ) : (
-          <R2FolderBrowser
-            onSelect={handleLinkFolder}
-            onCancel={() => setIsLinkModalOpen(false)}
-          />
+          <R2FolderBrowser onSelect={handleLinkFolder} onCancel={() => setIsLinkModalOpen(false)} />
         )}
       </Modal>
-
-      <style jsx global>{`
-        .hover-bg:hover {
-          background: rgba(255, 255, 255, 0.05);
-        }
-        .hover-glow:hover {
-          border-color: var(--accent-color);
-          box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
-          transform: translateY(-2px);
-        }
-      `}</style>
     </div>
   )
 }
 
 function AssetCard({ asset }: { asset: Asset }) {
-  return (
-    <div className="card" style={{ padding: '0', overflow: 'hidden', position: 'relative' }}>
-      <div style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 10 }}>
-        <ActionMenu onDelete={deleteAsset.bind(null, asset.id)} />
-      </div>
+  const isImage = asset.type === 'IMG' || asset.mimeType.startsWith('image/')
+  const isVideo = asset.type === 'VID' || asset.mimeType.startsWith('video/')
+  const isAudio = asset.type === 'AUD' || asset.mimeType.startsWith('audio/')
 
-      <div
-        style={{
-          aspectRatio: '16/9',
-          background: '#111',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderBottom: '1px solid var(--border-color)',
-        }}
-      >
-        {asset.type === 'VID' && <FileVideo size={48} style={{ opacity: 0.5 }} />}
-        {asset.type === 'AUD' && <FileAudio size={48} style={{ opacity: 0.5 }} />}
-        {asset.type === 'IMG' && (
+  return (
+    <div className="group relative bg-[#161616] border border-white/5 rounded-2xl overflow-hidden hover:border-accent/50 transition-all duration-300 flex flex-col shadow-2xl shadow-black/40">
+      {/* Media Preview */}
+      <div className="relative aspect-video bg-black/40 flex items-center justify-center overflow-hidden border-b border-white/5">
+        {isImage && (
           <img
             src={asset.url}
-            alt={asset.systemFilename}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            alt={asset.originalFilename}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 opacity-70 group-hover:opacity-100"
             loading="lazy"
           />
         )}
-      </div>
+        {!isImage && (
+          <div className="flex flex-col items-center gap-3 text-zinc-600 transition-colors group-hover:text-white">
+            {isVideo ? <FileVideo size={32} /> : isAudio ? <FileAudio size={32} /> : <div />}
+            <span className="text-[10px] font-bold uppercase tracking-widest opacity-30">
+              {asset.mimeType.split('/')[1] || 'Media'}
+            </span>
+          </div>
+        )}
 
-      <div style={{ padding: '16px' }}>
-        <h4
-          style={{
-            fontSize: '14px',
-            marginBottom: '4px',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-          }}
-          title={asset.systemFilename}
-        >
-          {asset.systemFilename}
-        </h4>
-        <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-          {(asset.size / 1024 / 1024).toFixed(2)} MB
-        </p>
-
-        <div style={{ display: 'flex', gap: '8px' }}>
+        {/* Action Overlay */}
+        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
           <button
-            className="btn-primary"
-            style={{ padding: '8px', flex: 1, fontSize: '12px' }}
-            onClick={() => {
-              window.open(asset.url, '_blank')
-            }}
+            onClick={() => window.open(asset.url, '_blank')}
+            className="p-3 rounded-full bg-white text-black hover:scale-110 transition-transform shadow-xl"
+            title="Open Source"
           >
-            <Play size={12} /> Open
+            <Play size={16} fill="black" />
           </button>
           <button
-            style={{
-              padding: '8px',
-              background: 'transparent',
-              border: '1px solid var(--border-color)',
-              borderRadius: '8px',
-              color: 'var(--text-secondary)',
-              cursor: 'pointer',
+            onClick={() => {
+              navigator.clipboard.writeText(asset.url)
+              toast.success('URL copied to clipboard')
             }}
-            onClick={() => navigator.clipboard.writeText(asset.url)}
+            className="p-3 rounded-full bg-white/10 backdrop-blur-md text-white border border-white/10 hover:bg-white/20 transition-all"
             title="Copy URL"
           >
-            <Copy size={12} />
+            <Copy size={16} />
           </button>
+        </div>
+
+        <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-all -translate-y-2 group-hover:translate-y-0">
+          <ActionMenu
+            onDelete={async () => {
+              try {
+                await deleteAsset(asset.id)
+                toast.success('Asset deleted')
+                window.location.reload()
+              } catch (e) {
+                toast.error('Failed to delete asset')
+              }
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Info */}
+      <div className="p-4 flex flex-col gap-1 min-w-0">
+        <h4
+          className="text-[11px] font-bold text-zinc-300 truncate tracking-tight group-hover:text-white transition-colors"
+          title={asset.originalFilename}
+        >
+          {asset.originalFilename}
+        </h4>
+        <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-widest text-text-secondary/40 group-hover:text-accent/60 transition-colors">
+          <span>{(asset.size / 1024 / 1024).toFixed(2)} MB</span>
+          <span className="opacity-0 group-hover:opacity-100 transition-opacity">Asset Entity</span>
         </div>
       </div>
     </div>

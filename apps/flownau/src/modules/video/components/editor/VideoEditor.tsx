@@ -1,119 +1,140 @@
-'use client';
+'use client'
 
-import React, { useState } from 'react';
-import Link from 'next/link';
-import { ChevronLeft } from 'lucide-react';
-import { VideoTemplate } from '@/types/video-schema';
-import { VideoEditorProvider, useVideoEditor } from '@/modules/video/context/VideoEditorContext';
+import React, { useState, useEffect } from 'react'
+import Link from 'next/link'
+import { ChevronLeft } from 'lucide-react'
+import { VideoTemplate, Asset } from '@/types/video-schema'
+import { useEditorStore } from '@/modules/video/store/useEditorStore'
+import { usePlaybackStore } from '@/modules/video/store/usePlaybackStore'
 
 // Components
-import { EditorSidebar } from './EditorSidebar';
-import { LayerList } from './layers/LayerList';
-import { AssetBrowser } from './assets/AssetBrowser';
-import { EditorCanvas } from './canvas/EditorCanvas';
-import { PropertiesPanel } from './properties/PropertiesPanel';
-import { Timeline } from './timeline/Timeline';
+import { EditorSidebar } from './EditorSidebar'
+import { LayerList } from './layers/LayerList'
+import { AssetBrowser } from './assets/AssetBrowser'
+import { EditorCanvas } from './canvas/EditorCanvas'
+import { PropertiesPanel } from './properties/PropertiesPanel'
+import { Timeline } from './timeline/Timeline'
 
 interface VideoEditorProps {
-    templateId: string;
-    templateName: string;
-    initialTemplate?: VideoTemplate;
-    onSave: (template: VideoTemplate) => void;
-    assets?: any[];
-    assetsRoot?: string;
+  templateId: string
+  templateName: string
+  initialTemplate?: VideoTemplate
+  onSave: (template: VideoTemplate) => void
+  assets?: Asset[]
+  assetsRoot?: string
 }
 
 const defaultTemplate: VideoTemplate = {
-    width: 1080,
-    height: 1920,
-    fps: 30,
-    durationInFrames: 150,
-    elements: [],
-};
-
-export default function VideoEditor(props: VideoEditorProps) {
-    const { initialTemplate = defaultTemplate, onSave } = props;
-
-    return (
-        <VideoEditorProvider initialTemplate={initialTemplate} onSave={onSave}>
-            <VideoEditorLayout {...props} />
-        </VideoEditorProvider>
-    );
+  width: 1080,
+  height: 1920,
+  fps: 30,
+  durationInFrames: 150,
+  elements: [],
 }
 
-function VideoEditorLayout({ templateId, templateName, onSave, assets = [], assetsRoot }: VideoEditorProps) {
-    const { template, selectedElementId, currentFrame, splitElement, isPlaying, setIsPlaying, deleteElement } = useVideoEditor();
-    const [sidebarTab, setSidebarTab] = useState<'layers' | 'assets'>('layers');
+export default function VideoEditor(props: VideoEditorProps) {
+  const { initialTemplate = defaultTemplate, onSave } = props
+  const setTemplate = useEditorStore((state) => state.setTemplate)
 
-    // Keyboard Shortcuts
-    React.useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            // Ignore if typing in an input
-            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+  // Initialize Store with initial template
+  // We use a ref to only do this once on mount
+  const initialized = React.useRef(false)
+  if (!initialized.current) {
+    setTemplate(initialTemplate)
+    initialized.current = true
+  }
 
-            // Space: Toggle Play/Pause
-            if (e.code === 'Space') {
-                e.preventDefault();
-                setIsPlaying(!isPlaying);
-            }
+  return <VideoEditorLayout {...props} />
+}
 
-            // Split: 'S'
-            if (e.key.toLowerCase() === 's') {
-                if (selectedElementId) {
-                    splitElement(selectedElementId, currentFrame);
-                }
-            }
+function VideoEditorLayout({
+  templateId,
+  templateName,
+  onSave,
+  assets = [],
+  assetsRoot,
+}: VideoEditorProps) {
+  const template = useEditorStore((state) => state.template)
+  const selectedElementId = useEditorStore((state) => state.selectedElementId)
+  const splitElement = useEditorStore((state) => state.splitElement)
+  const deleteElement = useEditorStore((state) => state.deleteElement)
 
-            // Delete: Backspace or Delete
-            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElementId) {
-                deleteElement(selectedElementId);
-            }
-        };
+  const currentFrame = usePlaybackStore((state) => state.currentFrame)
+  const isPlaying = usePlaybackStore((state) => state.isPlaying)
+  const setIsPlaying = usePlaybackStore((state) => state.setIsPlaying)
 
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedElementId, currentFrame, splitElement, isPlaying, setIsPlaying, deleteElement]);
+  const [sidebarTab, setSidebarTab] = useState<'layers' | 'assets'>('layers')
 
-    return (
-        <div className="flex flex-col h-screen bg-[#0d0d0d] text-white overflow-hidden w-screen">
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
 
-            {/* Top Bar / Header */}
-            <div style={{ height: '50px', borderBottom: '1px solid #333', display: 'flex', alignItems: 'center', padding: '0 16px', gap: '16px', background: '#111' }}>
-                <Link href={`/dashboard/templates/${templateId}`} className="text-zinc-400 hover:text-white no-underline flex items-center gap-1.5 text-[13px] transition-colors">
-                    <ChevronLeft size={16} /> Back to Dashboard
-                </Link>
-                <div style={{ width: '1px', height: '20px', background: '#333' }} />
-                <div style={{ fontSize: '14px', fontWeight: 600 }}>{templateName}</div>
-                <div style={{ flex: 1 }} />
-            </div>
+      if (e.code === 'Space') {
+        e.preventDefault()
+        setIsPlaying(!isPlaying)
+      }
 
-            {/* Main Editor Body */}
-            <div className="flex flex-1 overflow-hidden">
+      if (e.key.toLowerCase() === 's') {
+        if (selectedElementId) {
+          splitElement(selectedElementId, currentFrame)
+        }
+      }
 
-                {/* Sidebar - Tools */}
-                <EditorSidebar
-                    activeTab={sidebarTab}
-                    setActiveTab={setSidebarTab}
-                    onSave={() => onSave(template)}
-                />
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElementId) {
+        deleteElement(selectedElementId)
+      }
+    }
 
-                {/* Side Panel (Layers or Assets) */}
-                <div style={{ width: '300px', borderRight: '1px solid #333', display: 'flex', flexDirection: 'column', background: '#161616' }}>
-                    {sidebarTab === 'layers' ? <LayerList /> : <AssetBrowser assets={assets} assetsRoot={assetsRoot} />}
-                </div>
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedElementId, currentFrame, splitElement, isPlaying, setIsPlaying, deleteElement])
 
-                {/* Main Canvas / Player Area */}
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                    <EditorCanvas />
-                    <Timeline />
-                </div>
+  return (
+    <div className="flex flex-col h-screen bg-background text-text-primary overflow-hidden w-screen">
+      {/* Top Bar / Header */}
+      <header className="h-[50px] border-b border-border flex items-center px-4 gap-4 bg-panel">
+        <Link
+          href={`/dashboard/templates/${templateId}`}
+          className="text-text-secondary hover:text-text-primary no-underline flex items-center gap-1.5 text-[13px] transition-colors"
+        >
+          <ChevronLeft size={16} /> Back to Dashboard
+        </Link>
+        <div className="w-px h-5 bg-border" />
+        <div className="text-sm font-semibold">{templateName}</div>
+        <div className="flex-1" />
+        {/* Save button could go here or in sidebar rail */}
+      </header>
 
-                {/* Properties Panel */}
-                <div style={{ width: '300px', borderLeft: '1px solid #333', background: '#111' }}>
-                    <PropertiesPanel />
-                </div>
+      {/* Main Editor Body */}
+      <main className="flex flex-1 overflow-hidden">
+        {/* Sidebar - Tools (Rail) */}
+        <EditorSidebar
+          activeTab={sidebarTab}
+          setActiveTab={setSidebarTab}
+          onSave={() => onSave(template)}
+        />
 
-            </div>
-        </div>
-    );
+        {/* Side Panel (Layers or Assets) - Contextual Drawer */}
+        <aside className="w-[300px] border-r border-border flex flex-col bg-[#161616]">
+          {sidebarTab === 'layers' ? (
+            <LayerList />
+          ) : (
+            <AssetBrowser assets={assets} assetsRoot={assetsRoot} />
+          )}
+        </aside>
+
+        {/* Main Canvas / Player Area */}
+        <section className="flex-1 flex flex-col relative overflow-hidden">
+          <EditorCanvas />
+          <Timeline />
+        </section>
+
+        {/* Properties Panel */}
+        <aside className="w-[300px] border-l border-border bg-panel">
+          <PropertiesPanel />
+        </aside>
+      </main>
+    </div>
+  )
 }

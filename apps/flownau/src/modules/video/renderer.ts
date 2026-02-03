@@ -11,7 +11,7 @@ export async function renderAndUpload({
   renderId,
 }: {
   templateId: string
-  inputProps: any
+  inputProps: Record<string, unknown>
   renderId: string
 }) {
   const entry = path.join(process.cwd(), 'src/modules/video/remotion/index.ts')

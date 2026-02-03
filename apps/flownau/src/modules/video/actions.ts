@@ -4,13 +4,22 @@ import { prisma } from '@/modules/shared/prisma'
 import { revalidatePath } from 'next/cache'
 import { checkAuth } from '@/modules/shared/actions'
 import { z } from 'zod'
+import { TemplateSchema } from '@/types/video-schema'
 
 // Schemas
 const TemplateFormSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   remotionId: z.string().min(1, 'Remotion ID is required'),
-  airtableTableId: z.string().optional().nullable().transform(val => val || null),
-  accountId: z.string().optional().nullable().transform(val => val || null),
+  airtableTableId: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((val) => val || null),
+  accountId: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((val) => val || null),
 })
 
 const IdSchema = z.string().min(1)
@@ -99,7 +108,7 @@ export async function duplicateTemplate(id: string) {
 export async function saveTemplateConfig(id: string, config: unknown) {
   await checkAuth()
   const parsedId = IdSchema.parse(id)
-  const { config: parsedConfig } = SaveConfigSchema.parse({ config })
+  const parsedConfig = TemplateSchema.parse(config)
 
   await prisma.template.update({
     where: { id: parsedId },

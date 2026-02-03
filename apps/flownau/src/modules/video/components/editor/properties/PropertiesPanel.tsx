@@ -1,185 +1,284 @@
-'use client';
+'use client'
 
-import React from 'react';
-import { Settings } from 'lucide-react';
-import { useVideoEditor } from '@/modules/video/context/VideoEditorContext';
+import React from 'react'
+import { Settings, Maximize2, Type, Box } from 'lucide-react'
+import { useEditorStore } from '@/modules/video/store/useEditorStore'
 
 export function PropertiesPanel() {
-    const { template, selectedElementId, updateElement, updateTemplate } = useVideoEditor();
+  const template = useEditorStore((state) => state.template)
+  const selectedElementId = useEditorStore((state) => state.selectedElementId)
+  const updateElement = useEditorStore((state) => state.updateElement)
+  const updateElementStyle = useEditorStore((state) => state.updateElementStyle)
+  const updateTemplate = useEditorStore((state) => state.updateTemplate)
 
-    const selectedElement = template.elements.find((el) => el.id === selectedElementId);
+  const selectedElement = template.elements.find((el) => el.id === selectedElementId)
 
-    // Font Loading Logic
-    React.useEffect(() => {
-        const fonts = new Set<string>();
-        template.elements.forEach(el => {
-            if (el.type === 'text' && el.style.fontFamily) {
-                fonts.add(el.style.fontFamily);
-            }
-        });
+  // Font Loading Logic
+  React.useEffect(() => {
+    const fonts = new Set<string>()
+    template.elements.forEach((el) => {
+      if (el.type === 'text' && el.style.fontFamily) {
+        fonts.add(el.style.fontFamily)
+      }
+    })
 
-        if (fonts.size === 0) return;
+    if (fonts.size === 0) return
 
-        // Construct Google Fonts URL
-        // Example: https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Lato:wght@400;700&display=swap
-        const fontParams = Array.from(fonts)
-            .map(font => `family=${font.replace(/ /g, '+')}:wght@400;700`)
-            .join('&');
+    const fontParams = Array.from(fonts)
+      .map((font) => `family=${font.replace(/ /g, '+')}:wght@400;700`)
+      .join('&')
 
-        if (!fontParams) return;
+    if (!fontParams) return
 
-        const linkId = 'dynamic-google-fonts';
-        let link = document.getElementById(linkId) as HTMLLinkElement;
+    const linkId = 'dynamic-google-fonts'
+    let link = document.getElementById(linkId) as HTMLLinkElement
 
-        if (!link) {
-            link = document.createElement('link');
-            link.id = linkId;
-            link.rel = 'stylesheet';
-            document.head.appendChild(link);
-        }
+    if (!link) {
+      link = document.createElement('link')
+      link.id = linkId
+      link.rel = 'stylesheet'
+      document.head.appendChild(link)
+    }
 
-        link.href = `https://fonts.googleapis.com/css2?${fontParams}&display=swap`;
+    link.href = `https://fonts.googleapis.com/css2?${fontParams}&display=swap`
+  }, [template.elements])
 
-    }, [template.elements]);
+  const renderHeader = (icon: React.ReactNode, title: string) => (
+    <div className="flex items-center gap-2 mb-4 px-1">
+      <div className="text-accent">{icon}</div>
+      <h3 className="text-[11px] font-bold uppercase tracking-widest text-text-secondary">
+        {title}
+      </h3>
+    </div>
+  )
 
-    const renderInput = (label: string, value: string | number, onChange: (val: string) => void, type: 'text' | 'number' = 'text', step?: string) => (
-        <div className="section">
-            <label className="label">{label}</label>
-            <input
-                type={type}
-                step={step}
-                className="input-field"
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-            />
-        </div>
-    );
+  const renderInputGroup = (
+    label: string,
+    value: string | number,
+    onChange: (val: string) => void,
+    type: 'text' | 'number' = 'text',
+    step?: string,
+  ) => (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-[10px] font-semibold text-text-secondary/60 uppercase tracking-wider pl-1">
+        {label}
+      </label>
+      <input
+        type={type}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full bg-white/[0.03] border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-accent focus:bg-accent/5 transition-all"
+      />
+    </div>
+  )
 
-    return (
-        <div style={{ padding: '16px', overflowY: 'auto', height: '100%' }}>
-            <div style={{ marginBottom: '24px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Settings size={16} /> Properties
+  return (
+    <div className="flex flex-col h-full bg-panel overflow-y-auto custom-scrollbar p-5">
+      <div className="flex items-center gap-2 mb-8 border-b border-white/5 pb-4">
+        <Settings size={18} className="text-accent" />
+        <h2 className="font-bold text-sm tracking-tight">Properties</h2>
+      </div>
+
+      {selectedElement ? (
+        <div className="flex flex-col gap-8 animate-fade-in">
+          {/* Element Identity */}
+          <section>
+            {renderHeader(<Box size={14} />, 'Identity')}
+            <div className="flex flex-col gap-4 bg-white/[0.02] p-4 rounded-xl border border-white/5">
+              {renderInputGroup('Name', selectedElement.name, (val) =>
+                updateElement(selectedElement.id, { name: val }),
+              )}
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-semibold text-text-secondary/60 uppercase tracking-wider pl-1">
+                  {selectedElement.type === 'text' ? 'Content' : 'Source URL'}
+                </label>
+                {selectedElement.type === 'text' ? (
+                  <textarea
+                    value={selectedElement.content || ''}
+                    onChange={(e) => updateElement(selectedElement.id, { content: e.target.value })}
+                    className="w-full bg-white/[0.03] border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-accent focus:bg-accent/5 transition-all min-h-[80px] resize-none"
+                  />
+                ) : (
+                  <input
+                    value={selectedElement.content || ''}
+                    onChange={(e) => updateElement(selectedElement.id, { content: e.target.value })}
+                    className="w-full bg-white/[0.03] border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-accent focus:bg-accent/5 transition-all"
+                    placeholder="https://..."
+                  />
+                )}
+              </div>
             </div>
+          </section>
 
-            {selectedElement ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    <div className="text-xs text-zinc-500 font-bold uppercase tracking-wider mb-2">Element</div>
+          {/* Timeline Controls */}
+          <section>
+            {renderHeader(<Maximize2 size={14} />, 'Timing & Motion')}
+            <div className="bg-white/[0.02] p-4 rounded-xl border border-white/5 flex flex-col gap-4">
+              <div className="grid grid-cols-2 gap-3">
+                {renderInputGroup(
+                  'Start Frame',
+                  selectedElement.startFrame,
+                  (val) => updateElement(selectedElement.id, { startFrame: Number(val) }),
+                  'number',
+                )}
+                {renderInputGroup(
+                  'Duration',
+                  selectedElement.durationInFrames,
+                  (val) => updateElement(selectedElement.id, { durationInFrames: Number(val) }),
+                  'number',
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {renderInputGroup(
+                  'Fade In',
+                  selectedElement.fadeInDuration || 0,
+                  (val) => updateElement(selectedElement.id, { fadeInDuration: Number(val) }),
+                  'number',
+                )}
+                {renderInputGroup(
+                  'Fade Out',
+                  selectedElement.fadeOutDuration || 0,
+                  (val) => updateElement(selectedElement.id, { fadeOutDuration: Number(val) }),
+                  'number',
+                )}
+              </div>
+            </div>
+          </section>
 
-                    {renderInput("Name", selectedElement.name, (val) => updateElement(selectedElement.id, { name: val }))}
+          {/* Transform */}
+          <section>
+            {renderHeader(<Maximize2 size={14} />, 'Transform')}
+            <div className="bg-white/[0.02] p-4 rounded-xl border border-white/5 flex flex-col gap-4">
+              <div className="grid grid-cols-2 gap-3">
+                {renderInputGroup(
+                  'X Pos',
+                  selectedElement.style.x,
+                  (val) => updateElementStyle(selectedElement.id, { x: Number(val) }),
+                  'number',
+                )}
+                {renderInputGroup(
+                  'Y Pos',
+                  selectedElement.style.y,
+                  (val) => updateElementStyle(selectedElement.id, { y: Number(val) }),
+                  'number',
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {renderInputGroup(
+                  'Scale',
+                  selectedElement.style.scale,
+                  (val) => updateElementStyle(selectedElement.id, { scale: Number(val) }),
+                  'number',
+                  '0.1',
+                )}
+                {renderInputGroup(
+                  'Rotation',
+                  selectedElement.style.rotation,
+                  (val) => updateElementStyle(selectedElement.id, { rotation: Number(val) }),
+                  'number',
+                )}
+              </div>
+            </div>
+          </section>
 
-                    <div className="section">
-                        <label className="label">Content / URL</label>
-                        {selectedElement.type === 'text' ? (
-                            <textarea
-                                className="input-field min-h-[80px]"
-                                rows={3}
-                                value={selectedElement.content || ''}
-                                onChange={(e) => updateElement(selectedElement.id, { content: e.target.value })}
-                            />
-                        ) : (
-                            <input
-                                className="input-field"
-                                value={selectedElement.content || ''}
-                                onChange={(e) => updateElement(selectedElement.id, { content: e.target.value })}
-                                placeholder="https://..."
-                            />
-                        )}
-                    </div>
+          {/* Typography */}
+          {selectedElement.type === 'text' && (
+            <section>
+              {renderHeader(<Type size={14} />, 'Typography')}
+              <div className="bg-white/[0.02] p-4 rounded-xl border border-white/5 flex flex-col gap-4">
+                {renderInputGroup(
+                  'Font Size',
+                  selectedElement.style.fontSize || 40,
+                  (val) => updateElementStyle(selectedElement.id, { fontSize: Number(val) }),
+                  'number',
+                )}
 
-                    <div className="grid grid-cols-2 gap-2">
-                        {renderInput("Start", selectedElement.startFrame, (val) => updateElement(selectedElement.id, { startFrame: Number(val) }), 'number')}
-                        {renderInput("Duration", selectedElement.durationInFrames, (val) => updateElement(selectedElement.id, { durationInFrames: Number(val) }), 'number')}
-                    </div>
-
-                    <hr className="border-zinc-800 my-2" />
-
-                    <div className="text-xs text-zinc-500 font-bold uppercase tracking-wider mb-2">Animations (Crossfade)</div>
-                    <div className="grid grid-cols-2 gap-2">
-                        {renderInput("Fade In (Frames)", selectedElement.fadeInDuration || 0, (val) => updateElement(selectedElement.id, { fadeInDuration: Number(val) }), 'number')}
-                        {renderInput("Fade Out (Frames)", selectedElement.fadeOutDuration || 0, (val) => updateElement(selectedElement.id, { fadeOutDuration: Number(val) }), 'number')}
-                    </div>
-
-                    <hr className="border-zinc-800 my-2" />
-
-                    <div className="text-xs text-zinc-500 font-bold uppercase tracking-wider mb-2">Transform</div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                        {renderInput("X", selectedElement.style.x, (val) => updateElement(selectedElement.id, { x: Number(val) }), 'number')}
-                        {renderInput("Y", selectedElement.style.y, (val) => updateElement(selectedElement.id, { y: Number(val) }), 'number')}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                        {renderInput("Scale", selectedElement.style.scale, (val) => updateElement(selectedElement.id, { scale: Number(val) }), 'number', "0.1")}
-                        {renderInput("Rotation", selectedElement.style.rotation, (val) => updateElement(selectedElement.id, { rotation: Number(val) }), 'number')}
-                    </div>
-
-                    {selectedElement.type === 'text' && (
-                        <>
-                            <hr className="border-zinc-800 my-2" />
-                            <div className="text-xs text-zinc-500 font-bold uppercase tracking-wider mb-2">Text Style</div>
-                            {renderInput("Font Size", selectedElement.style.fontSize || 40, (val) => updateElement(selectedElement.id, { fontSize: Number(val) }), 'number')}
-
-                            <div className="section">
-                                <label className="label">Font Family</label>
-                                <select
-                                    className="input-field"
-                                    value={selectedElement.style.fontFamily || 'Inter'}
-                                    onChange={(e) => updateElement(selectedElement.id, { fontFamily: e.target.value })}
-                                >
-                                    <option value="Inter">Inter</option>
-                                    <option value="Roboto">Roboto</option>
-                                    <option value="Lato">Lato</option>
-                                    <option value="Montserrat">Montserrat</option>
-                                    <option value="Open Sans">Open Sans</option>
-                                    <option value="Oswald">Oswald</option>
-                                    <option value="Raleway">Raleway</option>
-                                    <option value="Nunito">Nunito</option>
-                                    <option value="Poppins">Poppins</option>
-                                    <option value="Playfair Display">Playfair Display</option>
-                                </select>
-                            </div>
-
-                            {/* Color Picker Placeholder */}
-                            {renderInput("Color", selectedElement.style.color || '#ffffff', (val) => updateElement(selectedElement.id, { color: val }))}
-                        </>
-                    )}
-
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-semibold text-text-secondary/60 uppercase tracking-wider pl-1">
+                    Font Family
+                  </label>
+                  <select
+                    value={selectedElement.style.fontFamily || 'Inter'}
+                    onChange={(e) =>
+                      updateElementStyle(selectedElement.id, { fontFamily: e.target.value })
+                    }
+                    className="w-full bg-white/[0.03] border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-accent focus:bg-accent/5 transition-all appearance-none"
+                    style={{
+                      backgroundImage:
+                        "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E\")",
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: 'right 10px center',
+                      backgroundSize: '12px',
+                    }}
+                  >
+                    {[
+                      'Inter',
+                      'Outfit',
+                      'Roboto',
+                      'Lato',
+                      'Montserrat',
+                      'Oswald',
+                      'Poppins',
+                      'Playfair Display',
+                    ].map((f) => (
+                      <option key={f} value={f} className="bg-panel">
+                        {f}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-            ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    <div className="text-xs text-zinc-500 font-bold uppercase tracking-wider mb-2">Project Settings</div>
 
-                    <div className="grid grid-cols-2 gap-2">
-                        {renderInput("Width", template.width, (val) => updateTemplate({ width: Number(val) }), 'number')}
-                        {renderInput("Height", template.height, (val) => updateTemplate({ height: Number(val) }), 'number')}
-                    </div>
-
-                    {renderInput("Duration (Frames)", template.durationInFrames, (val) => updateTemplate({ durationInFrames: Number(val) }), 'number')}
-                    {renderInput("FPS", template.fps, (val) => updateTemplate({ fps: Number(val) }), 'number')}
-
-                    <div style={{ marginTop: '20px', padding: '12px', background: 'rgba(124, 58, 237, 0.1)', borderRadius: '8px', border: '1px solid rgba(124, 58, 237, 0.2)', fontSize: '11px', color: '#aaa' }}>
-                        Tip: Select a layer to edit its individual properties.
-                    </div>
-                </div>
-            )}
-
-            <style jsx>{`
-                .section { display: flex; flex-direction: column; gap: 4px; }
-                .label { font-size: 11px; color: #71717a; font-weight: 500; }
-                .input-field { 
-                    background: #27272a; 
-                    border: 1px solid #3f3f46; 
-                    padding: 8px; 
-                    border-radius: 6px; 
-                    color: white; 
-                    width: 100%;
-                    font-size: 12px;
-                }
-                .input-field:focus {
-                    outline: none;
-                    border-color: #7c3aed;
-                }
-            `}</style>
+                {renderInputGroup('Color', selectedElement.style.color || '#ffffff', (val) =>
+                  updateElementStyle(selectedElement.id, { color: val }),
+                )}
+              </div>
+            </section>
+          )}
         </div>
-    );
+      ) : (
+        <div className="flex flex-col gap-8 animate-fade-in">
+          <section>
+            {renderHeader(<Settings size={14} />, 'Project Constraints')}
+            <div className="bg-white/[0.02] p-4 rounded-xl border border-white/5 flex flex-col gap-4">
+              <div className="grid grid-cols-2 gap-3">
+                {renderInputGroup(
+                  'Canvas W',
+                  template.width,
+                  (val) => updateTemplate({ width: Number(val) }),
+                  'number',
+                )}
+                {renderInputGroup(
+                  'Canvas H',
+                  template.height,
+                  (val) => updateTemplate({ height: Number(val) }),
+                  'number',
+                )}
+              </div>
+              {renderInputGroup(
+                'Duration (Frames)',
+                template.durationInFrames,
+                (val) => updateTemplate({ durationInFrames: Number(val) }),
+                'number',
+              )}
+              {renderInputGroup(
+                'Framerate (FPS)',
+                template.fps,
+                (val) => updateTemplate({ fps: Number(val) }),
+                'number',
+              )}
+            </div>
+          </section>
+
+          <div className="mt-4 p-4 rounded-2xl bg-accent/5 border border-accent/10">
+            <p className="text-[11px] text-text-secondary leading-relaxed">
+              <span className="text-accent font-bold">Pro Tip:</span> Select any layer from the list
+              or canvas to unlock contextual properties and fine-tune your composition.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
