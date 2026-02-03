@@ -37,6 +37,21 @@ router.get(
 );
 
 /**
+ * Get overall metrics for the current tenant
+ */
+router.get(
+  '/tenant-stats',
+  asyncHandler(async (req: Request, res: Response) => {
+    const tenantId = (req as any).user.tenantId;
+    if (!tenantId) {
+      return res.status(400).json({ error: 'Tenant ID not found in request context' });
+    }
+    const metrics = await MetricsService.getTenantMetrics(tenantId);
+    res.json(metrics);
+  })
+);
+
+/**
  * Get all leads with their current status and tags
  */
 router.get(

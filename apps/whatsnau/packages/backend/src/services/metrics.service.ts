@@ -64,4 +64,45 @@ export class MetricsService {
       conversionRate: totalContacts > 0 ? (conversions / totalContacts) * 100 : 0,
     };
   }
+
+  /**
+   * Get overall metrics for a tenant, including AI efficiency and orders.
+   */
+  static async getTenantMetrics(tenantId: string) {
+    const [aiHandledLeads, pendingHandover, draftOrders, pendingOrders] = await Promise.all([
+      db.lead.count({
+        where: { tenantId, status: 'ACTIVE', aiEnabled: true },
+      }),
+      db.lead.count({
+        where: { tenantId, status: 'HANDOVER' },
+      }),
+      (db as any).order.count({
+        where: { tenantId, status: 'DRAFT' },
+      }),
+      (db as any).order.count({
+        where: { tenantId, status: 'PENDING' },
+      }),
+    ]);
+
+    const recentDrafts = await (db as any).order.findMany({
+      where: { tenantId, status: 'DRAFT' },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      include: { lead: true, items: { include: { product: true } } },
+    });
+
+    return {
+      aiHandledLeads,
+      pendingHandover,
+      draftOrders,
+      pendingOrders,
+      totalPendingValue: recentDrafts.reduce((acc: number, o: any) => acc + o.totalAmount, 0),
+      recentOrders: recentDrafts.map((o: any) => ({
+        id: o.id,
+        leadName: o.lead.name || o.lead.phoneNumber,
+        amount: o.totalAmount,
+        createdAt: o.createdAt,
+      })),
+    };
+  }
 }
