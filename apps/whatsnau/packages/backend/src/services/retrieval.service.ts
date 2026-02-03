@@ -18,7 +18,7 @@ export class RetrievalService {
     // This is the "AI Assistant for the AI Assistant"
     const intentQuery = `
       Basado en el siguiente mensaje de un cliente, ¿qué información del negocio crees que es necesaria para responder?
-      Categorías: [PRODUCTOS, PEDIDOS, INFORMACION_GENERAL, NINGUNA]
+      Categorías: [PRODUCTOS, PEDIDOS, INFORMACION_NEGOCIO, NINGUNA]
       Mensaje: "${lastMessage}"
       Responde solo con la categoría o categorías separadas por coma.
     `;
@@ -28,19 +28,19 @@ export class RetrievalService {
 
     // 2. Conditional data fetching
     if (needsUpper.includes('PRODUCTOS')) {
-      const products = await (db as any).product.findMany({
+      const products = await db.product.findMany({
         where: { tenantId, isActive: true },
-        take: 5,
+        take: 10, // Increased limit for better coverage
       });
       if (products.length > 0) {
         contextParts.push(
-          `### PRODUCTOS RELEVANTES:\n${products.map((p: any) => `- ${p.name}: ${p.description} (${p.price} EUR)`).join('\n')}`
+          `### PRODUCTOS RELEVANTES:\n${products.map((p: any) => `- ${p.name}: ${p.description} (${p.price} EUR) [ID: ${p.id}]`).join('\n')}`
         );
       }
     }
 
     if (needsUpper.includes('PEDIDOS')) {
-      const lastOrders = await (db as any).order.findMany({
+      const lastOrders = await db.order.findMany({
         where: { leadId },
         orderBy: { createdAt: 'desc' },
         take: 3,
@@ -53,9 +53,13 @@ export class RetrievalService {
       }
     }
 
-    // 3. Always include core business summary if context is light
-    if (contextParts.length === 0 || needsUpper.includes('INFORMACION_GENERAL')) {
-      // We could fetch a short summary here
+    if (needsUpper.includes('INFORMACION_NEGOCIO') || contextParts.length === 0) {
+      const business = await db.businessProfile.findUnique({
+        where: { tenantId },
+      });
+      if (business?.knowledgeBase) {
+        contextParts.push(`### INFORMACIÓN DEL NEGOCIO:\n${business.knowledgeBase}`);
+      }
     }
 
     return contextParts.join('\n\n');
