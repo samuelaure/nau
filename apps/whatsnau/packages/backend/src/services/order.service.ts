@@ -15,8 +15,8 @@ export class OrderService {
 
     // 1. Fetch products to get prices
     const productIds = items.map((i) => i.productId);
-    const products = await (db as any).product.findMany({
-      where: { id: { in: productIds } },
+    const products = await db.product.findMany({
+      where: { id: { in: productIds }, tenantId: lead.tenantId },
     });
 
     // 2. Calculate totals
@@ -36,7 +36,7 @@ export class OrderService {
     });
 
     // 3. Create Order
-    const order = await (db as any).order.create({
+    const order = await db.order.create({
       data: {
         leadId,
         tenantId: lead.tenantId,

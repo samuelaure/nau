@@ -10,6 +10,7 @@ import { TemplateService } from '../services/template.service.js';
 import { ProviderFactory } from './providers/ProviderFactory.js';
 import { IWhatsAppProvider } from './providers/IWhatsAppProvider.js';
 import { outboundQueue } from '../infrastructure/queues/outbound.queue.js';
+import { maintenanceQueue } from '../infrastructure/queues/maintenance.queue.js';
 
 export class Orchestrator {
   /**
@@ -122,7 +123,7 @@ export class Orchestrator {
 
     // 3. Update Activity Timestamp for Debouncing & Reset Unanswered Counter
     if (direction === 'INBOUND') {
-      await (db as any).lead.update({
+      await db.lead.update({
         where: { id: lead.id },
         data: {
           lastInboundAt: new Date(),
@@ -199,7 +200,7 @@ export class Orchestrator {
   static async handleStatusUpdate(whatsappId: string, status: string) {
     logger.info({ whatsappId, status }, 'Updating message status');
     try {
-      await (db as any).message.updateMany({
+      await db.message.updateMany({
         where: { whatsappId },
         data: { status },
       });
@@ -272,6 +273,17 @@ export class Orchestrator {
         { leadId: lead.id },
         'Handover triggered: Manual message or explicit takeover detected'
       );
+
+      // Schedule Recovery Job (Delayed)
+      const config = (await db.globalConfig.findUnique({
+        where: { tenantId: lead.tenantId },
+      })) as any;
+      const delayMinutes = config?.recoveryTimeoutMinutes || 240;
+      await maintenanceQueue.add(
+        'lead-recovery',
+        { leadId: lead.id, tenantId: lead.tenantId },
+        { delay: delayMinutes * 60 * 1000, jobId: `recovery-${lead.id}` }
+      );
     }
   }
 
@@ -287,7 +299,9 @@ export class Orchestrator {
       return;
     }
 
-    const leadKeywords = await db.takeoverKeyword.findMany({ where: { type: 'LEAD' } });
+    const leadKeywords = await db.takeoverKeyword.findMany({
+      where: { tenantId: lead.tenantId, type: 'LEAD' },
+    });
     const leadTriggers = leadKeywords.map((k) => k.word.toUpperCase());
 
     let requiresHuman = leadTriggers.includes(content.toUpperCase().trim());
@@ -335,6 +349,17 @@ export class Orchestrator {
     });
     EventsService.emit('handover', { leadId: lead.id, reasoning });
     await NotificationService.notifyHandover(lead, reasoning);
+
+    // Schedule Recovery Job (Delayed)
+    const gConfig = (await db.globalConfig.findUnique({
+      where: { tenantId: lead.tenantId },
+    })) as any;
+    const delayMins = gConfig?.recoveryTimeoutMinutes || 240;
+    await maintenanceQueue.add(
+      'lead-recovery',
+      { leadId: lead.id, tenantId: lead.tenantId },
+      { delay: delayMins * 60 * 1000, jobId: `recovery-${lead.id}` }
+    );
 
     const config = await db.globalConfig.findUnique({ where: { id: 'singleton' } });
     const statusMsg = config?.availabilityStatus
