@@ -15,14 +15,6 @@ export const maintenanceQueue = new Queue(MAINTENANCE_QUEUE_NAME, {
  * Initialize repeatable jobs
  */
 export const initRepeatableJobs = async () => {
-  // Check for lead recovery every 15 minutes
-  await maintenanceQueue.add(
-    'lead-recovery',
-    {},
-    {
-      repeat: {
-        pattern: '*/15 * * * *', // Every 15 minutes
-      },
-    }
-  );
+  // Add other maintenance tasks here if needed
+  // Lead recovery is now event-driven (scheduled on HANDOVER)
 };

@@ -9,18 +9,19 @@ const worker = new Worker(
   MAINTENANCE_QUEUE_NAME,
   async (job: Job) => {
     if (job.name === 'lead-recovery') {
-      await handleLeadRecovery();
+      const { leadId, tenantId } = job.data;
+      await handleSingleLeadRecovery(leadId, tenantId);
     }
   },
   { connection }
 );
 
-async function handleLeadRecovery() {
-  logger.info('Starting Lead Recovery check...');
+async function handleSingleLeadRecovery(leadId: string, tenantId: string) {
+  logger.info({ leadId, tenantId }, 'Processing targeted Lead Recovery...');
 
-  // 1. Find leads in HANDOVER status
-  const handoverLeads = await db.lead.findMany({
-    where: { status: 'HANDOVER' },
+  // 1. Fetch targeted lead
+  const lead = await db.lead.findUnique({
+    where: { id: leadId },
     include: {
       tenant: {
         include: {
@@ -35,49 +36,57 @@ async function handleLeadRecovery() {
     },
   });
 
-  for (const lead of handoverLeads) {
-    const lastMessage = lead.messages[0];
-    if (!lastMessage || lastMessage.direction === 'OUTBOUND') {
-      // If the last message was outbound, a human responded. Handover is valid.
-      continue;
-    }
+  if (!lead || lead.status !== 'HANDOVER') {
+    logger.info({ leadId }, 'Lead recovery skipped: Lead not in HANDOVER state or not found');
+    return;
+  }
 
-    // 2. Determine timeout
-    const config = lead.tenant.globalConfigs[0] as any;
-    const timeoutMinutes = config?.recoveryTimeoutMinutes || 240; // Default 4 hours
-    const timeoutMs = timeoutMinutes * 60 * 1000;
+  const lastMessage = lead.messages[0];
+  if (lastMessage && lastMessage.direction === 'OUTBOUND') {
+    // If the last message was outbound, a human responded. Handover recovery cancelled.
+    logger.info({ leadId }, 'Lead recovery skipped: Human already responded');
+    return;
+  }
 
-    const lastInboundAt = lead.lastInboundAt || lastMessage.timestamp;
-    const timeSinceLastInbound = Date.now() - new Date(lastInboundAt).getTime();
+  // 2. Determine timeout (Double check if still valid)
+  const config = lead.tenant.globalConfigs[0] as any;
+  const timeoutMinutes = config?.recoveryTimeoutMinutes || 240;
+  const timeoutMs = timeoutMinutes * 60 * 1000;
 
-    if (timeSinceLastInbound > timeoutMs) {
-      logger.info(
-        { leadId: lead.id, tenantId: lead.tenantId },
-        'Lead recovery triggered: Timeout exceeded'
-      );
+  const lastInboundAt =
+    lead.lastInboundAt || (lastMessage ? lastMessage.timestamp : lead.createdAt);
+  const timeSinceLastInbound = Date.now() - new Date(lastInboundAt).getTime();
 
-      // 3. Reactivate AI
-      await db.lead.update({
-        where: { id: lead.id },
-        data: {
-          status: 'ACTIVE',
-          aiEnabled: true,
-        },
-      });
+  // We add a small buffer (5s) to avoid race conditions with BullMQ accuracy
+  if (timeSinceLastInbound >= timeoutMs - 5000) {
+    logger.info({ leadId }, 'Lead recovery triggered: Reactivating AI agent');
 
-      // 4. Send a bridge message
-      const bridgeMsg =
-        'Sigues ahí? He notificado a mi equipo humano pero están algo ocupados ahora mismo. En qué más puedo ayudarte mientras tanto?';
+    // 3. Reactivate AI
+    await db.lead.update({
+      where: { id: lead.id },
+      data: {
+        status: 'ACTIVE',
+        aiEnabled: true,
+      },
+    });
 
-      await Orchestrator.sendAsync(
-        lead,
-        'text',
-        { body: bridgeMsg },
-        bridgeMsg,
-        lead.currentStage?.name || lead.state,
-        true
-      );
-    }
+    // 4. Send a bridge message
+    const bridgeMsg =
+      '¿Sigues ahí? He notificado a mi equipo humano pero están ocupados ahora mismo. ¿En qué más puedo ayudarte mientras tanto?';
+
+    await Orchestrator.sendAsync(
+      lead,
+      'text',
+      { body: bridgeMsg },
+      bridgeMsg,
+      lead.currentStage?.name || lead.state,
+      true
+    );
+  } else {
+    logger.info(
+      { leadId, timeSinceLastInbound, timeoutMs },
+      'Lead recovery skipped: Timeout not yet reached'
+    );
   }
 }
 
