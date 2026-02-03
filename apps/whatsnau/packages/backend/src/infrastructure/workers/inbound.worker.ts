@@ -17,13 +17,13 @@ const worker = new Worker<InboundJobData>(
 
     try {
       if (event.type === 'message') {
-        const { from, payload, id, metadata } = event;
+        const { from, payload, id, metadata, direction } = event;
 
         await Orchestrator.handleIncoming(
           from,
           payload.text,
           payload.buttonId,
-          'INBOUND',
+          direction,
           id,
           metadata?.phoneNumberId
         );

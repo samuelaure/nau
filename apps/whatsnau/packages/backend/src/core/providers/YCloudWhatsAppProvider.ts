@@ -105,6 +105,7 @@ export class YCloudWhatsAppProvider implements IWhatsAppProvider {
       const msg = payload.whatsappMessage;
       events.push({
         type: 'message',
+        direction: 'INBOUND',
         from: msg.from,
         id: msg.id,
         timestamp: msg.timestamp,
@@ -123,6 +124,7 @@ export class YCloudWhatsAppProvider implements IWhatsAppProvider {
       const msg = payload.whatsappMessage;
       events.push({
         type: 'status',
+        direction: 'OUTBOUND',
         from: msg.from,
         id: msg.id,
         timestamp: msg.timestamp,

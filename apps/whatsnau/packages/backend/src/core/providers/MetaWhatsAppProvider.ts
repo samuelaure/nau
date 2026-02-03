@@ -69,12 +69,16 @@ export class MetaWhatsAppProvider implements IWhatsAppProvider {
       if (change.field === 'messages') {
         const value = change.value;
 
-        // Handle Inbound Messages
+        // Handle Inbound/Outbound Messages
         if (value.messages) {
           for (const msg of value.messages) {
+            const businessNumber = value.metadata?.display_phone_number;
+            const direction = msg.from === businessNumber ? 'OUTBOUND' : 'INBOUND';
+
             events.push({
               type: 'message',
-              from: msg.from,
+              direction,
+              from: direction === 'INBOUND' ? msg.from : msg.to || 'unknown',
               id: msg.id,
               timestamp: msg.timestamp,
               payload: {
@@ -85,18 +89,19 @@ export class MetaWhatsAppProvider implements IWhatsAppProvider {
               },
               metadata: {
                 phoneNumberId: value.metadata?.phone_number_id,
-                displayPhoneNumber: value.metadata?.display_phone_number,
+                displayPhoneNumber: businessNumber,
               },
               raw: msg,
             });
           }
         }
 
-        // Handle Status Updates
+        // Handle Status Updates (Always relate to OUTBOUND messages)
         if (value.statuses) {
           for (const status of value.statuses) {
             events.push({
               type: 'status',
+              direction: 'OUTBOUND',
               from: status.recipient_id,
               id: status.id, // Message ID being updated
               timestamp: status.timestamp,

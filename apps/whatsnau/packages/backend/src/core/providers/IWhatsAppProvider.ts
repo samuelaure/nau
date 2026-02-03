@@ -2,6 +2,7 @@ import { Request } from 'express';
 
 export interface StandardMessageEvent {
   type: 'message' | 'status' | 'unknown';
+  direction: 'INBOUND' | 'OUTBOUND';
   from: string;
   id: string; // Message ID
   timestamp: string;
