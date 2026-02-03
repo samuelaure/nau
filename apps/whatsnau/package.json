@@ -8,9 +8,11 @@
     "dev": "concurrently \"npm run dev -w packages/backend\" \"npm run dev -w packages/frontend\"",
     "build": "npm run build --workspaces",
     "test": "npm run test --workspaces",
+    "release": "standard-version",
     "clean": "rm -rf node_modules packages/*/node_modules"
   },
   "devDependencies": {
-    "concurrently": "^8.2.0"
+    "concurrently": "^8.2.0",
+    "standard-version": "^9.5.0"
   }
 }
