@@ -176,14 +176,8 @@ export class AIService {
       throw new Error(`Prompt config not found for role: ${role} in campaign: ${campaignId}`);
     }
 
-    // Get business knowledge base for this tenant
-    const lead = await db.lead.findUnique({ where: { id: leadId }, select: { tenantId: true } });
-    const business = await db.businessProfile.findUnique({
-      where: { tenantId: lead?.tenantId || 'singleton' },
-    });
-    const knowledgeBase = business?.knowledgeBase || 'No hay información adicional del negocio.';
-
     // Build dynamic context using RetrievalService (Context Weaver)
+    const lead = await db.lead.findUnique({ where: { id: leadId }, select: { tenantId: true } });
     const lastMessage = messages[messages.length - 1]?.content || '';
     const dynamicContext = lead?.tenantId
       ? await (
@@ -206,9 +200,6 @@ export class AIService {
     // Construct full system prompt
     const systemPrompt = `
 ${promptConfig.basePrompt}
-
-### CONTEXTO DEL NEGOCIO:
-${knowledgeBase}
 
 ${leadContext ? `### CONTEXTO DEL LEAD:\n${leadContext}` : ''}
 
@@ -264,6 +255,8 @@ ${globalGuidelines}
 
         // Handle Tool Calls
         if (message.tool_calls && message.tool_calls.length > 0) {
+          const toolMessages: OpenAI.Chat.Completions.ChatCompletionToolMessageParam[] = [];
+
           for (const toolCall of message.tool_calls) {
             const tc = toolCall as any;
             if (tc.function.name === 'create_order') {
@@ -272,26 +265,36 @@ ${globalGuidelines}
               try {
                 const order = await OrderService.createDraftOrder(leadId, args.items);
                 logger.info({ orderId: order.id }, 'AI successfully called create_order');
+                toolMessages.push({
+                  role: 'tool',
+                  tool_call_id: toolCall.id,
+                  content: 'Pedido creado exitosamente en estado borrador.',
+                });
               } catch (err: any) {
                 logger.error({ err }, 'AI failed to create order via tool');
+                toolMessages.push({
+                  role: 'tool',
+                  tool_call_id: toolCall.id,
+                  content: `Error al crear el pedido: ${err.message}`,
+                });
               }
+            } else {
+              toolMessages.push({
+                role: 'tool',
+                tool_call_id: toolCall.id,
+                content: 'Error: Herramienta desconocida.',
+              });
             }
           }
 
           // After tool execution, we usually want a second pass to get the final text response
-          // or we can just return a confirmation text if we don't want to loop.
-          // To keep it simple and avoid infinite loops for now, we'll do one tool pass and then a text response.
           const secondResponse = await this.client.chat.completions.create({
             model,
             messages: [
               { role: 'system', content: systemPrompt },
               ...messages,
-              message, // The original tool call message
-              {
-                role: 'tool',
-                tool_call_id: message.tool_calls[0].id,
-                content: 'Pedido creado exitosamente en estado borrador.',
-              },
+              message,
+              ...toolMessages,
             ],
           });
           return secondResponse.choices[0].message.content;
