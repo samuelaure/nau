@@ -1,7 +1,8 @@
 'use client'
 
 import React from 'react'
-import { Layers, Image as ImageIcon, Save, Sparkles } from 'lucide-react'
+import { Layers, Image as ImageIcon, Save, Sparkles, Undo2, Redo2 } from 'lucide-react'
+import { useHistoryStore } from '../../store/useHistoryStore'
 
 interface EditorSidebarProps {
   activeTab: 'layers' | 'assets'
@@ -10,6 +11,11 @@ interface EditorSidebarProps {
 }
 
 export function EditorSidebar({ activeTab, setActiveTab, onSave }: EditorSidebarProps) {
+  const undo = useHistoryStore((state) => state.undo)
+  const redo = useHistoryStore((state) => state.redo)
+  const canUndo = useHistoryStore((state) => state.canUndo)
+  const canRedo = useHistoryStore((state) => state.canRedo)
+
   return (
     <aside className="w-[64px] border-r border-border flex flex-col items-center py-6 gap-6 bg-panel z-20">
       <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent mb-2">
@@ -30,6 +36,23 @@ export function EditorSidebar({ activeTab, setActiveTab, onSave }: EditorSidebar
           label="Assets"
           onClick={() => setActiveTab('assets')}
           active={activeTab === 'assets'}
+        />
+
+        <div className="h-px bg-border my-2" />
+
+        <ToolButton
+          icon={<Undo2 size={20} />}
+          label="Undo"
+          onClick={undo}
+          active={false}
+          disabled={!canUndo}
+        />
+        <ToolButton
+          icon={<Redo2 size={20} />}
+          label="Redo"
+          onClick={redo}
+          active={false}
+          disabled={!canRedo}
         />
       </div>
 
@@ -53,18 +76,22 @@ function ToolButton({
   label,
   onClick,
   active,
+  disabled,
 }: {
   icon: React.ReactNode
   label: string
   onClick: () => void
   active: boolean
+  disabled?: boolean
 }) {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
       className={`
                 flex flex-col items-center justify-center gap-1.5 w-full py-3 rounded-xl transition-all duration-300 relative group
                 ${active ? 'text-accent bg-accent/10' : 'text-zinc-500 hover:text-white hover:bg-white/5'}
+                ${disabled ? 'opacity-20 cursor-not-allowed grayscale' : 'opacity-100'}
             `}
     >
       {active && <div className="absolute left-0 top-3 bottom-3 w-1 bg-accent rounded-r-full" />}
