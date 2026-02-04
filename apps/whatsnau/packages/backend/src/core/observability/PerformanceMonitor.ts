@@ -26,11 +26,13 @@ export class PerformanceMonitor {
       const duration = Date.now() - start;
 
       // Log to database asynchronously (don't block)
-      db.performanceMetric
-        .create({
-          data: { operation, duration, success, tenantId },
-        })
-        .catch((err) => logger.error({ err }, 'Failed to log performance metric'));
+      if (db.performanceMetric) {
+        db.performanceMetric
+          .create({
+            data: { operation, duration, success, tenantId },
+          })
+          .catch((err) => logger.error({ err }, 'Failed to log performance metric'));
+      }
 
       // Log to console
       logger.info({ operation, duration, success, tenantId }, 'Performance metric');
