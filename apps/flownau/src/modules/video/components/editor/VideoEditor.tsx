@@ -15,6 +15,14 @@ import { EditorCanvas } from './canvas/EditorCanvas'
 import { PropertiesPanel } from './properties/PropertiesPanel'
 import { Timeline } from './timeline/Timeline'
 
+// Error Boundaries
+import {
+  EditorErrorBoundary,
+  CanvasErrorBoundary,
+  TimelineErrorBoundary,
+  AssetErrorBoundary,
+} from '../boundaries'
+
 interface VideoEditorProps {
   templateId: string
   templateName: string
@@ -33,18 +41,20 @@ const defaultTemplate: VideoTemplate = {
 }
 
 export default function VideoEditor(props: VideoEditorProps) {
-  const { initialTemplate = defaultTemplate, onSave } = props
+  const { initialTemplate = defaultTemplate } = props
   const setTemplate = useEditorStore((state) => state.setTemplate)
 
-  // Initialize Store with initial template
-  // We use a ref to only do this once on mount
-  const initialized = React.useRef(false)
-  if (!initialized.current) {
+  // Initialize Store with initial template (React 19 compliant)
+  useEffect(() => {
     setTemplate(initialTemplate)
-    initialized.current = true
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Empty deps = run once on mount
 
-  return <VideoEditorLayout {...props} />
+  return (
+    <EditorErrorBoundary>
+      <VideoEditorLayout {...props} />
+    </EditorErrorBoundary>
+  )
 }
 
 function VideoEditorLayout({
@@ -120,14 +130,20 @@ function VideoEditorLayout({
           {sidebarTab === 'layers' ? (
             <LayerList />
           ) : (
-            <AssetBrowser assets={assets} assetsRoot={assetsRoot} />
+            <AssetErrorBoundary>
+              <AssetBrowser assets={assets} assetsRoot={assetsRoot} />
+            </AssetErrorBoundary>
           )}
         </aside>
 
         {/* Main Canvas / Player Area */}
         <section className="flex-1 flex flex-col relative overflow-hidden">
-          <EditorCanvas />
-          <Timeline />
+          <CanvasErrorBoundary>
+            <EditorCanvas />
+          </CanvasErrorBoundary>
+          <TimelineErrorBoundary>
+            <Timeline />
+          </TimelineErrorBoundary>
         </section>
 
         {/* Properties Panel */}

@@ -17,8 +17,11 @@ import {
   FileVideo,
   FileAudio,
   Sparkles,
+  AlertCircle,
 } from 'lucide-react'
 import { useEditorStore } from '@/modules/video/store/useEditorStore'
+import { retryWithBackoff, isOnline } from '@/modules/video/utils/retry'
+import { toast } from 'sonner'
 
 interface Asset {
   id: string
@@ -54,6 +57,8 @@ export function AssetBrowser({ assets, assetsRoot }: AssetBrowserProps) {
   const [files, setFiles] = useState<any[]>([]) // R2 Files metadata
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [loadingAssetId, setLoadingAssetId] = useState<string | null>(null)
 
   // Fetch R2 Data when in Cloud mode and prefix changes
   useEffect(() => {
@@ -63,14 +68,42 @@ export function AssetBrowser({ assets, assetsRoot }: AssetBrowserProps) {
   }, [currentPrefix, browserMode])
 
   const fetchFolders = async (prefix: string) => {
+    // Check if online
+    if (!isOnline()) {
+      setError('You are offline. Cloud assets unavailable.')
+      toast.error('You are offline. Cloud assets unavailable.')
+      return
+    }
+
     setLoading(true)
+    setError(null)
+
     try {
-      const res = await fetch(`/api/protected/r2/list?prefix=${encodeURIComponent(prefix)}`)
-      const data = await res.json()
-      if (data.folders) setFolders(data.folders)
-      if (data.files) setFiles(data.files)
-    } catch (error) {
-      console.error('Failed to fetch folders', error)
+      await retryWithBackoff(
+        async () => {
+          const res = await fetch(`/api/protected/r2/list?prefix=${encodeURIComponent(prefix)}`)
+
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+          }
+
+          const data = await res.json()
+          if (data.folders) setFolders(data.folders)
+          if (data.files) setFiles(data.files)
+        },
+        3,
+        1000,
+      )
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch cloud assets'
+      console.error('Failed to fetch folders:', err)
+      setError(errorMessage)
+      toast.error(errorMessage, {
+        action: {
+          label: 'Retry',
+          onClick: () => fetchFolders(prefix),
+        },
+      })
     } finally {
       setLoading(false)
     }
@@ -96,7 +129,13 @@ export function AssetBrowser({ assets, assetsRoot }: AssetBrowserProps) {
     return 'unknown'
   }
 
-  const handleAddAsset = async (url: string, name: string, typeHint?: string) => {
+  const handleAddAsset = async (url: string, name: string, typeHint?: string, assetId?: string) => {
+    // Check if online
+    if (!isOnline()) {
+      toast.error('You are offline. Cannot load asset.')
+      return
+    }
+
     let type: 'video' | 'image' | 'audio' = 'video'
 
     if (typeHint) {
@@ -105,45 +144,68 @@ export function AssetBrowser({ assets, assetsRoot }: AssetBrowserProps) {
       else if (typeHint === 'AUD' || typeHint === 'audio') type = 'audio'
     } else {
       const derived = getCloudFileType(name)
-      if (derived !== 'unknown') type = derived as any
+      if (derived !== 'unknown') type = derived as 'video' | 'image' | 'audio'
     }
 
     let width: number | undefined
     let height: number | undefined
 
+    // Show loading state
+    if (assetId) setLoadingAssetId(assetId)
+
     try {
-      if (url) {
-        if (type === 'image') {
-          const img = new Image()
-          img.src = url
-          await new Promise<void>((resolve, reject) => {
-            img.onload = () => {
-              width = img.naturalWidth
-              height = img.naturalHeight
-              resolve()
+      if (url && (type === 'image' || type === 'video')) {
+        // Retry dimension detection with exponential backoff
+        await retryWithBackoff(
+          async () => {
+            if (type === 'image') {
+              const img = new Image()
+              img.src = url
+              await new Promise<void>((resolve, reject) => {
+                img.onload = () => {
+                  width = img.naturalWidth
+                  height = img.naturalHeight
+                  resolve()
+                }
+                img.onerror = () => reject(new Error('Failed to load image'))
+                setTimeout(() => reject(new Error('Image load timeout')), 10000) // 10s timeout
+              })
+            } else if (type === 'video') {
+              const v = document.createElement('video')
+              v.src = url
+              await new Promise<void>((resolve, reject) => {
+                v.onloadedmetadata = () => {
+                  width = v.videoWidth
+                  height = v.videoHeight
+                  resolve()
+                }
+                v.onerror = () => reject(new Error('Failed to load video'))
+                setTimeout(() => reject(new Error('Video load timeout')), 10000) // 10s timeout
+              })
             }
-            img.onerror = reject
-            setTimeout(reject, 3000)
-          })
-        } else if (type === 'video') {
-          const v = document.createElement('video')
-          v.src = url
-          await new Promise<void>((resolve, reject) => {
-            v.onloadedmetadata = () => {
-              width = v.videoWidth
-              height = v.videoHeight
-              resolve()
-            }
-            v.onerror = reject
-            setTimeout(reject, 3000)
-          })
-        }
+          },
+          3,
+          1000,
+        )
       }
     } catch (e) {
-      console.warn('Failed to detect asset dimensions', e)
+      const errorMessage = e instanceof Error ? e.message : 'Failed to detect asset dimensions'
+      console.warn('Asset dimension detection failed:', e)
+      toast.error(`${errorMessage}. Using default dimensions.`, {
+        action: {
+          label: 'Retry',
+          onClick: () => handleAddAsset(url, name, typeHint, assetId),
+        },
+      })
+      // Fallback to default dimensions
+      width = undefined
+      height = undefined
+    } finally {
+      if (assetId) setLoadingAssetId(null)
     }
 
     addElement(type, { url, name, width, height })
+    toast.success(`Added ${name} to timeline`)
   }
 
   return (
@@ -257,7 +319,23 @@ export function AssetBrowser({ assets, assetsRoot }: AssetBrowserProps) {
 
       {/* Content Area */}
       <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-        {browserMode === 'cloud' && loading ? (
+        {browserMode === 'cloud' && error ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-4">
+            <div className="w-16 h-16 bg-error/10 rounded-full flex items-center justify-center">
+              <AlertCircle className="text-error" size={32} />
+            </div>
+            <div className="text-center max-w-xs">
+              <p className="text-sm font-bold text-text-primary mb-2">Cloud Assets Unavailable</p>
+              <p className="text-xs text-text-secondary mb-4">{error}</p>
+              <button
+                onClick={() => fetchFolders(currentPrefix)}
+                className="px-4 py-2 bg-accent hover:bg-accent/90 rounded-lg text-xs font-medium text-white transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        ) : browserMode === 'cloud' && loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4 opacity-20">
             <Loader2 className="animate-spin text-accent" size={32} />
             <span className="text-[10px] font-bold uppercase tracking-widest">
@@ -312,13 +390,20 @@ export function AssetBrowser({ assets, assetsRoot }: AssetBrowserProps) {
                     : 'audio'
                 : getCloudFileType(name)
 
+              const assetId = isProject ? asset.id : asset.key
+              const isLoading = loadingAssetId === assetId
+
               return (
                 <div
-                  key={isProject ? asset.id : asset.key}
-                  onClick={() => handleAddAsset(url, name, isProject ? asset.type : undefined)}
+                  key={assetId}
+                  onClick={() =>
+                    !isLoading &&
+                    handleAddAsset(url, name, isProject ? asset.type : undefined, assetId)
+                  }
                   className={`
                                         group cursor-pointer bg-white/[0.02] border border-white/5 rounded-xl relative overflow-hidden transition-all duration-300
                                         ${viewMode === 'list' ? 'p-3 gap-4 flex items-center hover:bg-white/[0.05]' : 'aspect-square hover:border-accent/50 hover:bg-accent/5 hover:-translate-y-1 shadow-2xl shadow-black/20'}
+                                        ${isLoading ? 'opacity-50 cursor-wait' : ''}
                                     `}
                 >
                   {/* Thumbnail / Icon Container */}
@@ -339,16 +424,22 @@ export function AssetBrowser({ assets, assetsRoot }: AssetBrowserProps) {
                       />
                     )}
 
-                    {/* Overlay Icon */}
+                    {/* Overlay Icon or Loading Spinner */}
                     <div
-                      className={`absolute inset-0 flex items-center justify-center pointer-events-none transition-all duration-300 ${viewMode !== 'list' ? 'group-hover:opacity-0 group-hover:scale-150' : ''}`}
+                      className={`absolute inset-0 flex items-center justify-center pointer-events-none transition-all duration-300 ${viewMode !== 'list' && !isLoading ? 'group-hover:opacity-0 group-hover:scale-150' : ''}`}
                     >
-                      <div className="p-2 rounded-full bg-black/40 backdrop-blur-sm border border-white/10">
-                        {type === 'video' && <FileVideo size={16} className="text-blue-400" />}
-                        {type === 'image' && <ImageIcon size={16} className="text-purple-400" />}
-                        {type === 'audio' && <FileAudio size={16} className="text-green-400" />}
-                        {type === 'unknown' && <FileIcon size={16} className="text-zinc-500" />}
-                      </div>
+                      {isLoading ? (
+                        <div className="p-3 rounded-full bg-accent/20 backdrop-blur-sm border border-accent/30">
+                          <Loader2 size={20} className="text-accent animate-spin" />
+                        </div>
+                      ) : (
+                        <div className="p-2 rounded-full bg-black/40 backdrop-blur-sm border border-white/10">
+                          {type === 'video' && <FileVideo size={16} className="text-blue-400" />}
+                          {type === 'image' && <ImageIcon size={16} className="text-purple-400" />}
+                          {type === 'audio' && <FileAudio size={16} className="text-green-400" />}
+                          {type === 'unknown' && <FileIcon size={16} className="text-zinc-500" />}
+                        </div>
+                      )}
                     </div>
 
                     {/* Play Indicator for Video */}

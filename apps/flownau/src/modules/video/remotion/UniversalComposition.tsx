@@ -30,8 +30,8 @@ const RenderElement: React.FC<{ element: VideoElement }> = ({ element }) => {
   const fadeOpacityOut =
     fadeOutDuration > 0
       ? interpolate(frame, [durationInFrames - fadeOutDuration, durationInFrames], [1, 0], {
-        extrapolateLeft: 'clamp',
-      })
+          extrapolateLeft: 'clamp',
+        })
       : 1
 
   const fadeOpacity = fadeOpacityIn * fadeOpacityOut
