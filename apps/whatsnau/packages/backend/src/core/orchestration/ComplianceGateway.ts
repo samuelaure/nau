@@ -17,25 +17,32 @@ export class ComplianceGateway {
    * Check if we are allowed to send a message to a lead (Anti-Spam)
    */
   static async canSendMessage(leadId: string): Promise<boolean> {
-    const lead = await db.lead.findUnique({
-      where: { id: leadId },
-      select: { unansweredCount: true, tenantId: true },
-    });
+    if (!leadId) return false;
 
-    if (!lead) return false;
+    try {
+      const lead = await db.lead.findUnique({
+        where: { id: leadId },
+        select: { unansweredCount: true, tenantId: true },
+      });
 
-    const config = await GlobalConfigService.getConfig(lead.tenantId);
-    const maxUnanswered = config.maxUnansweredMessages;
+      if (!lead) return false;
 
-    if (lead.unansweredCount >= maxUnanswered) {
-      logger.warn(
-        { leadId, unansweredCount: lead.unansweredCount, maxUnanswered },
-        'Compliance: Max unanswered messages reached. Blocking outbound message.'
-      );
-      return false;
+      const config = await GlobalConfigService.getConfig(lead.tenantId);
+      const maxUnanswered = config.maxUnansweredMessages;
+
+      if (lead.unansweredCount >= maxUnanswered) {
+        logger.warn(
+          { leadId, unansweredCount: lead.unansweredCount, maxUnanswered },
+          'Compliance: Max unanswered messages reached. Blocking outbound message.'
+        );
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      logger.error({ err: error, leadId }, 'Failed to check anti-spam compliance');
+      return false; // Safest default: block
     }
-
-    return true;
   }
 
   /**
@@ -43,13 +50,18 @@ export class ComplianceGateway {
    * based on the 24-hour window compliance.
    */
   static async resolveMessageRoute(leadId: string): Promise<MessageRoute> {
-    const isWithinWindow = await WhatsAppService.canSendFreeform(leadId);
+    try {
+      const isWithinWindow = await WhatsAppService.canSendFreeform(leadId);
 
-    if (isWithinWindow) {
-      return { type: 'FREEFORM' };
+      if (isWithinWindow) {
+        return { type: 'FREEFORM' };
+      }
+
+      return { type: 'TEMPLATE' };
+    } catch (error) {
+      logger.error({ err: error, leadId }, 'Failed to resolve message route');
+      return { type: 'TEMPLATE' }; // Safest default: template
     }
-
-    return { type: 'TEMPLATE' };
   }
 
   /**

@@ -86,119 +86,136 @@ export class StateTransitionEngine {
   }
 
   private static async handleNurturingPhase(lead: any, content: string) {
-    await db.lead.update({
-      where: { id: lead.id },
-      data: { lastBroadcastInteraction: new Date() },
-    });
-    await AgentCoordinator.triggerAgent(lead, 'NURTURING', content);
+    try {
+      await db.lead.update({
+        where: { id: lead.id },
+        data: { lastBroadcastInteraction: new Date() },
+      });
+      await AgentCoordinator.triggerAgent(lead, 'NURTURING', content);
+    } catch (error) {
+      logger.error({ err: error, leadId: lead.id }, 'Failed to handle nurturing phase');
+    }
   }
 
   private static async startDemo(lead: any) {
-    const config = await GlobalConfigService.getConfig(lead.tenantId);
-    const duration = config.defaultDemoDurationMinutes;
+    try {
+      const config = await GlobalConfigService.getConfig(lead.tenantId);
+      const duration = config.defaultDemoDurationMinutes;
 
-    await LeadService.startDemo(lead.id, duration);
-    const msg =
-      '¡Genial! A partir de ahora hablas con mi **Recepcionista IA**. Prueba a preguntarme sobre el negocio.';
+      await LeadService.startDemo(lead.id, duration);
+      const msg =
+        '¡Genial! A partir de ahora hablas con mi **Recepcionista IA**. Prueba a preguntarme sobre el negocio.';
 
-    const demoLead = { ...lead, state: LeadState.DEMO };
-    await AgentCoordinator.sendAsync(demoLead, 'text', { body: msg }, msg);
-    await AgentCoordinator.triggerAgent(
-      demoLead,
-      'RECEPTIONIST',
-      'Hola, soy tu nueva recepcionista.'
-    );
+      const demoLead = { ...lead, state: LeadState.DEMO };
+      await AgentCoordinator.sendAsync(demoLead, 'text', { body: msg }, msg);
+      await AgentCoordinator.triggerAgent(
+        demoLead,
+        'RECEPTIONIST',
+        'Hola, soy tu nueva recepcionista.'
+      );
+    } catch (error) {
+      logger.error({ err: error, leadId: lead.id }, 'Failed to start demo');
+    }
   }
 
   private static async sendWeeklyTipsInvite(lead: any) {
-    const campaign = await db.campaign.findUnique({
-      where: { id: lead.campaignId },
-      include: { stages: true },
-    });
-
-    const m3Stage = campaign?.stages.find((s) => s.name === 'M3-WeeklyTipsInvite');
-    if (!m3Stage) return;
-
-    // Check anti-spam
-    if (!(await ComplianceGateway.canSendMessage(lead.id))) {
+    if (!lead.campaignId) {
+      logger.warn({ leadId: lead.id }, 'Lead has no campaignId, cannot send weekly tips invite');
       return;
     }
 
-    const message = await TemplateService.getRenderedMessage(lead.id, m3Stage.id);
-    if (!message) return;
+    try {
+      const campaign = await db.campaign.findUnique({
+        where: { id: lead.campaignId },
+        include: { stages: true },
+      });
 
-    const route = await ComplianceGateway.resolveMessageRoute(lead.id);
+      const m3Stage = campaign?.stages.find((s) => s.name === 'M3-WeeklyTipsInvite');
+      if (!m3Stage) return;
 
-    if (route.type === 'FREEFORM') {
-      const template = await TemplateService.getTemplate(m3Stage.id);
-      const buttons =
-        template?.hasButtons && template.buttons ? JSON.parse(template.buttons) : null;
+      // Check anti-spam
+      if (!(await ComplianceGateway.canSendMessage(lead.id))) {
+        return;
+      }
 
-      if (buttons && buttons.length > 0) {
-        await AgentCoordinator.sendAsync(
-          lead,
-          'interactive',
-          {
-            type: 'button',
-            body: { text: message },
-            action: {
-              buttons: buttons.map((btn: any) => ({
-                type: 'reply',
-                reply: { id: btn.id, title: btn.text.substring(0, 20) },
-              })),
+      const message = await TemplateService.getRenderedMessage(lead.id, m3Stage.id);
+      if (!message) return;
+
+      const route = await ComplianceGateway.resolveMessageRoute(lead.id);
+
+      if (route.type === 'FREEFORM') {
+        const template = await TemplateService.getTemplate(m3Stage.id);
+        const buttons =
+          template?.hasButtons && template.buttons ? JSON.parse(template.buttons) : null;
+
+        if (buttons && buttons.length > 0) {
+          await AgentCoordinator.sendAsync(
+            lead,
+            'interactive',
+            {
+              type: 'button',
+              body: { text: message },
+              action: {
+                buttons: buttons.map((btn: any) => ({
+                  type: 'reply',
+                  reply: { id: btn.id, title: btn.text.substring(0, 20) },
+                })),
+              },
             },
-          },
-          message,
-          m3Stage.name
-        );
+            message,
+            m3Stage.name
+          );
+        } else {
+          await AgentCoordinator.sendAsync(lead, 'text', { body: message }, message, m3Stage.name);
+        }
       } else {
-        await AgentCoordinator.sendAsync(lead, 'text', { body: message }, message, m3Stage.name);
+        // Template route
+        const { TemplateSyncService } = await import('../../services/template-sync.service.js');
+        const waTemplate = await TemplateSyncService.getWhatsAppTemplateForMessage(m3Stage.id);
+
+        if (waTemplate && waTemplate.status === 'APPROVED') {
+          const context = {
+            name: lead.name || 'amigo',
+            business: 'whatsnaŭ',
+            ...(lead.metadata ? JSON.parse(lead.metadata) : {}),
+          };
+
+          const components = TemplateSyncService.renderTemplateForMeta(
+            message,
+            context,
+            waTemplate.variableMapping ? JSON.parse(waTemplate.variableMapping) : {}
+          );
+
+          await AgentCoordinator.sendAsync(
+            lead,
+            'template',
+            {
+              name: waTemplate.name,
+              language: { code: waTemplate.language || 'es_ES' },
+              components,
+            },
+            message,
+            m3Stage.name
+          );
+        } else {
+          logger.error(
+            { leadId: lead.id, stage: m3Stage.name },
+            'Compliance: No approved template for M3'
+          );
+          await AgentCoordinator.sendAsync(lead, 'text', { body: message }, message, m3Stage.name);
+        }
       }
-    } else {
-      // Template route
-      const { TemplateSyncService } = await import('../../services/template-sync.service.js');
-      const waTemplate = await TemplateSyncService.getWhatsAppTemplateForMessage(m3Stage.id);
 
-      if (waTemplate && waTemplate.status === 'APPROVED') {
-        const context = {
-          name: lead.name || 'amigo',
-          business: 'whatsnaŭ',
-          ...(lead.metadata ? JSON.parse(lead.metadata) : {}),
-        };
-
-        const components = TemplateSyncService.renderTemplateForMeta(
-          message,
-          context,
-          waTemplate.variableMapping ? JSON.parse(waTemplate.variableMapping) : {}
-        );
-
-        await AgentCoordinator.sendAsync(
-          lead,
-          'template',
-          {
-            name: waTemplate.name,
-            language: { code: waTemplate.language || 'es_ES' },
-            components,
-          },
-          message,
-          m3Stage.name
-        );
-      } else {
-        logger.error(
-          { leadId: lead.id, stage: m3Stage.name },
-          'Compliance: No approved template for M3'
-        );
-        await AgentCoordinator.sendAsync(lead, 'text', { body: message }, message, m3Stage.name);
-      }
+      await db.lead.update({
+        where: { id: lead.id },
+        data: {
+          currentStageId: m3Stage.id,
+          unansweredCount: { increment: 1 },
+          lastInteraction: new Date(),
+        },
+      });
+    } catch (error) {
+      logger.error({ err: error, leadId: lead.id }, 'Failed to send weekly tips invite');
     }
-
-    await db.lead.update({
-      where: { id: lead.id },
-      data: {
-        currentStageId: m3Stage.id,
-        unansweredCount: { increment: 1 },
-        lastInteraction: new Date(),
-      },
-    });
   }
 }

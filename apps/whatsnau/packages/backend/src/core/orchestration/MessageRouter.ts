@@ -16,67 +16,79 @@ export class MessageRouter {
   static async resolveTenantId(phoneNumberId?: string): Promise<string | undefined> {
     if (!phoneNumberId) return undefined;
 
-    const config = await db.whatsAppConfig.findUnique({
-      where: { phoneNumberId },
-      select: { tenantId: true },
-    });
-    return config?.tenantId;
+    try {
+      const config = await db.whatsAppConfig.findUnique({
+        where: { phoneNumberId },
+        select: { tenantId: true },
+      });
+      return config?.tenantId;
+    } catch (error) {
+      logger.error({ err: error, phoneNumberId }, 'Failed to resolve tenant ID');
+      return undefined;
+    }
   }
 
   /**
    * Find an existing lead or create a new one for a given tenant
    */
   static async findOrInitializeLead(phoneNumber: string, tenantId?: string) {
-    let lead;
+    if (!phoneNumber) return null;
 
-    if (tenantId) {
-      lead = await db.lead.findUnique({
-        where: {
-          tenantId_phoneNumber: {
-            tenantId,
-            phoneNumber,
+    try {
+      let lead;
+
+      if (tenantId) {
+        lead = await db.lead.findUnique({
+          where: {
+            tenantId_phoneNumber: {
+              tenantId,
+              phoneNumber,
+            },
           },
-        },
-        include: {
-          campaign: { include: { stages: { orderBy: { order: 'asc' } } } },
-          tags: true,
-          currentStage: true,
-        },
-      });
-    } else {
-      // Fallback for legacy/loose lookup
-      lead = await db.lead.findFirst({
-        where: { phoneNumber },
-        include: {
-          campaign: { include: { stages: { orderBy: { order: 'asc' } } } },
-          tags: true,
-          currentStage: true,
-        },
-      });
-    }
-
-    if (!lead && tenantId) {
-      const campaign = await db.campaign.findFirst({
-        where: { tenantId, isActive: true },
-      });
-
-      if (!campaign) {
-        logger.warn({ tenantId }, 'No active campaign found for tenant');
-        return null;
+          include: {
+            campaign: { include: { stages: { orderBy: { order: 'asc' } } } },
+            tags: true,
+            currentStage: true,
+          },
+        });
+      } else {
+        // Fallback for legacy/loose lookup
+        lead = await db.lead.findFirst({
+          where: { phoneNumber },
+          include: {
+            campaign: { include: { stages: { orderBy: { order: 'asc' } } } },
+            tags: true,
+            currentStage: true,
+          },
+        });
       }
 
-      const initialLead = await LeadService.initiateLead(phoneNumber, campaign.id);
-      lead = await db.lead.findUnique({
-        where: { id: initialLead.id },
-        include: {
-          campaign: { include: { stages: { orderBy: { order: 'asc' } } } },
-          tags: true,
-          currentStage: true,
-        },
-      });
-    }
+      if (!lead && tenantId) {
+        const campaign = await db.campaign.findFirst({
+          where: { tenantId, isActive: true },
+        });
 
-    return lead;
+        if (!campaign) {
+          logger.warn({ tenantId }, 'No active campaign found for tenant');
+          return null;
+        }
+
+        const initialLead = await LeadService.initiateLead(phoneNumber, campaign.id);
+        lead = await db.lead.findUnique({
+          where: { id: initialLead.id },
+          include: {
+            campaign: { include: { stages: { orderBy: { order: 'asc' } } } },
+            tags: true,
+            currentStage: true,
+          },
+        });
+      }
+
+      return lead;
+    } catch (error) {
+      logger.error({ err: error, phoneNumber, tenantId }, 'Failed to find or initialize lead');
+      return undefined;
+    }
   }
 
   /**
@@ -92,22 +104,35 @@ export class MessageRouter {
     aiGenerated?: boolean;
     isProcessed?: boolean;
   }) {
-    return db.message.upsert({
-      where: { whatsappId: params.whatsappId || 'unknown' },
-      create: {
-        leadId: params.leadId,
-        direction: params.direction,
-        content: params.content,
-        whatsappId: params.whatsappId,
-        type: params.type,
-        campaignStage: params.stageName,
-        isProcessed: params.isProcessed ?? params.direction === 'OUTBOUND',
-        aiGenerated: params.aiGenerated ?? false,
-      },
-      update: {
-        content: params.content,
-      },
-    });
+    try {
+      return await db.message.upsert({
+        where: { whatsappId: params.whatsappId || 'unknown' },
+        create: {
+          leadId: params.leadId,
+          direction: params.direction,
+          content: params.content,
+          whatsappId: params.whatsappId,
+          type: params.type,
+          campaignStage: params.stageName,
+          isProcessed: params.isProcessed ?? params.direction === 'OUTBOUND',
+          aiGenerated: params.aiGenerated ?? false,
+        },
+        update: {
+          content: params.content,
+        },
+      });
+    } catch (error) {
+      // Handle idempotency (P2002 is Prisma unique constraint error)
+      if ((error as any).code === 'P2002') {
+        logger.info(
+          { whatsappId: params.whatsappId },
+          'Message already exists, ignoring duplicate'
+        );
+        return null;
+      }
+      logger.error({ err: error, whatsappId: params.whatsappId }, 'Failed to persist message');
+      throw error;
+    }
   }
 
   /**
@@ -183,7 +208,7 @@ export class MessageRouter {
   static async handleStatusUpdate(whatsappId: string, status: string) {
     logger.info({ whatsappId, status }, 'Updating message status');
     try {
-      await db.message.updateMany({
+      await db.message.update({
         where: { whatsappId },
         data: {
           status,
