@@ -21,12 +21,12 @@ export class GracefulShutdown {
 
     process.on('uncaughtException', (error) => {
       logger.fatal({ err: error }, 'Uncaught exception');
-      this.initiate('UNCAUGHT_EXCEPTION', error);
+      return this.initiate('UNCAUGHT_EXCEPTION', error);
     });
 
     process.on('unhandledRejection', (reason) => {
       logger.fatal({ reason }, 'Unhandled rejection');
-      this.initiate('UNHANDLED_REJECTION', new Error(String(reason)));
+      return this.initiate('UNHANDLED_REJECTION', new Error(String(reason)));
     });
 
     logger.info('GracefulShutdown initialized');
@@ -104,7 +104,9 @@ export class GracefulShutdown {
         `SHUTDOWN_${reason}`,
         error || new Error(`Graceful shutdown initiated: ${reason}`)
       );
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      if (process.env.NODE_ENV !== 'test') {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
     } catch (err) {
       logger.error({ err }, 'Failed to send shutdown alert');
     }
