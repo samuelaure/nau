@@ -4,9 +4,17 @@ import { logger } from '../core/logger.js';
 import { withRetry } from '../core/errors/withRetry.js';
 import { ExternalServiceError } from '../core/errors/AppError.js';
 import { db } from '../core/db.js';
+import { CircuitBreaker } from '../core/resilience/CircuitBreaker.js';
+import { PerformanceMonitor } from '../core/observability/PerformanceMonitor.js';
+import { NotificationService } from './notification.service.js';
+import { getCorrelationId } from '../core/observability/CorrelationId.js';
 
 export class AIService {
   private static _openai: OpenAI | null = null;
+  private static aiCircuitBreaker = new CircuitBreaker('OpenAI', {
+    failureThreshold: 5,
+    timeout: 60000,
+  });
 
   static get client(): OpenAI {
     if (!this._openai) {
@@ -310,5 +318,46 @@ ${globalGuidelines}
     ).catch((error) => {
       throw new ExternalServiceError('OpenAI', error.message, error);
     });
+  }
+
+  /**
+   * Enhanced AI call with circuit breaker and fallback
+   */
+  static async getChatResponseWithFallback(
+    leadId: string,
+    campaignId: string,
+    role: 'CLOSER' | 'RECEPTIONIST' | 'NURTURING',
+    messages: { role: 'user' | 'assistant' | 'system'; content: string }[]
+  ): Promise<string | null> {
+    const correlationId = getCorrelationId();
+    const lead = await db.lead.findUnique({ where: { id: leadId }, select: { tenantId: true } });
+
+    try {
+      return await this.aiCircuitBreaker.execute(() =>
+        PerformanceMonitor.track(
+          'AI_CALL',
+          () => this.getChatResponseWithContext(leadId, campaignId, role, messages),
+          lead?.tenantId
+        )
+      );
+    } catch (error: any) {
+      logger.error(
+        {
+          err: error,
+          correlationId,
+          leadId,
+          role,
+          circuitState: this.aiCircuitBreaker.getState(),
+        },
+        'AI service call failed in AIService'
+      );
+
+      // Notify on fallback trigger (only if it's a real failure, not just a full circuit)
+      if (this.aiCircuitBreaker.getState() === 'OPEN') {
+        await NotificationService.notifyAIDegradation(leadId);
+      }
+
+      return null;
+    }
   }
 }

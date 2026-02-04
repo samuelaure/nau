@@ -3,6 +3,10 @@ import { logger } from '../core/logger.js';
 import { withRetry } from '../core/errors/withRetry.js';
 import { ExternalServiceError } from '../core/errors/AppError.js';
 import { db } from '../core/db.js';
+import { CircuitBreaker } from '../core/resilience/CircuitBreaker.js';
+import { PerformanceMonitor } from '../core/observability/PerformanceMonitor.js';
+import { NotificationService } from './notification.service.js';
+import { getCorrelationId } from '../core/observability/CorrelationId.js';
 
 export interface WhatsAppMessagePayload {
   messaging_product: 'whatsapp';
@@ -18,6 +22,10 @@ export interface WhatsAppMessagePayload {
 }
 
 export class WhatsAppService {
+  private static whatsappCircuitBreaker = new CircuitBreaker('WhatsApp', {
+    failureThreshold: 5,
+    timeout: 60000,
+  });
   /**
    * Helper to get the most relevant credentials (Campaign-specific > Default DB > .env)
    */
@@ -67,39 +75,76 @@ export class WhatsAppService {
   }
 
   static async sendMessage(payload: WhatsAppMessagePayload, campaignId?: string) {
-    return withRetry(
-      async () => {
-        const creds = await this.getCredentials(campaignId);
-        const url = `https://graph.facebook.com/${config.WHATSAPP_VERSION}/${creds.phoneNumberId}/messages`;
+    const correlationId = getCorrelationId();
 
-        logger.info({ to: payload.to, type: payload.type }, 'Sending WhatsApp message');
+    try {
+      return await this.whatsappCircuitBreaker.execute(() =>
+        PerformanceMonitor.track('WHATSAPP_SEND', async () => {
+          return withRetry(
+            async () => {
+              const creds = await this.getCredentials(campaignId);
+              const url = `https://graph.facebook.com/${config.WHATSAPP_VERSION}/${creds.phoneNumberId}/messages`;
 
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${creds.accessToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload),
+              logger.info(
+                { to: payload.to, type: payload.type, correlationId, campaignId },
+                'Sending WhatsApp message'
+              );
+
+              const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${creds.accessToken}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+              });
+
+              const data = await response.json();
+
+              if (!response.ok) {
+                throw new ExternalServiceError('WhatsApp', 'API Request Failed', data);
+              }
+
+              logger.info(
+                {
+                  messageId: (data as any).messages?.[0]?.id,
+                  correlationId,
+                  to: payload.to,
+                },
+                'WhatsApp message sent successfully'
+              );
+              return data;
+            },
+            {
+              retries: 3,
+              delay: 500,
+            }
+          );
+        })
+      );
+    } catch (error: any) {
+      logger.error(
+        {
+          err: error,
+          correlationId,
+          to: payload.to,
+          circuitState: this.whatsappCircuitBreaker.getState(),
+        },
+        'WhatsApp sendMessage failed'
+      );
+
+      if (this.whatsappCircuitBreaker.getState() === 'OPEN') {
+        const lead = await db.lead.findFirst({ where: { phoneNumber: payload.to } });
+        await NotificationService.notifySystemError('WARN', {
+          category: 'WHATSAPP_CIRCUIT_OPEN',
+          message: 'WhatsApp circuit is OPEN, message could not be sent',
+          leadId: lead?.id,
+          recipient: payload.to,
         });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new ExternalServiceError('WhatsApp', 'API Request Failed', data);
-        }
-
-        logger.info(
-          { messageId: (data as any).messages?.[0]?.id },
-          'WhatsApp message sent successfully'
-        );
-        return data;
-      },
-      {
-        retries: 3,
-        delay: 500,
       }
-    );
+
+      throw error;
+    }
   }
 
   static async sendTemplate(
