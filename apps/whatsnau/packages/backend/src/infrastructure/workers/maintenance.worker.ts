@@ -4,13 +4,32 @@ import { MAINTENANCE_QUEUE_NAME } from '../queues/maintenance.queue.js';
 import { db } from '../../core/db.js';
 import { logger } from '../../core/logger.js';
 import { Orchestrator } from '../../core/orchestrator.js';
+import { NotificationService } from '../../services/notification.service.js';
 
 const worker = new Worker(
   MAINTENANCE_QUEUE_NAME,
   async (job: Job) => {
-    if (job.name === 'lead-recovery') {
-      const { leadId, tenantId } = job.data;
-      await handleSingleLeadRecovery(leadId, tenantId);
+    try {
+      if (job.name === 'lead-recovery') {
+        const { leadId, tenantId } = job.data;
+        await handleSingleLeadRecovery(leadId, tenantId);
+      }
+    } catch (error: any) {
+      logger.error(
+        { err: error, jobId: job.id, jobName: job.name, attemptsMade: job.attemptsMade },
+        'Worker: Failed to process maintenance job'
+      );
+
+      if (job.attemptsMade >= 3) {
+        await NotificationService.notifySystemError('CRITICAL', {
+          category: 'WORKER_MAINTENANCE_EXHAUSTED',
+          message: `Maintenance job ${job.name} exhausted retries`,
+          error,
+          jobId: job.id,
+        });
+      }
+
+      throw error;
     }
   },
   { connection }
@@ -90,8 +109,26 @@ async function handleSingleLeadRecovery(leadId: string, tenantId: string) {
   }
 }
 
-worker.on('failed', (job, err) => {
+worker.on('failed', async (job, err) => {
   logger.error({ jobId: job?.id, err }, 'Maintenance worker job failed');
+
+  // Log to SystemAlert table
+  try {
+    await db.systemAlert.create({
+      data: {
+        severity: 'WARN',
+        category: 'WORKER_MAINTENANCE_FAILED',
+        message: err.message,
+        context: {
+          jobId: job?.id,
+          data: job?.data as any,
+          stack: err.stack,
+        },
+      },
+    });
+  } catch (alertErr) {
+    logger.error({ err: alertErr }, 'Failed to log maintenance worker failure to SystemAlert');
+  }
 });
 
 export const maintenanceWorker = worker;
