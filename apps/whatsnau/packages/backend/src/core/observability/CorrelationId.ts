@@ -32,3 +32,21 @@ export const correlationIdMiddleware = (req: Request, res: Response, next: NextF
 export function getCorrelationId(): string | undefined {
   return correlationIdStorage.getStore();
 }
+
+/**
+ * FOR TESTING ONLY: Set a correlation ID context manually
+ */
+export function setCorrelationId(id: string): void {
+  // Use run to enter the context. Note: this only works if the function
+  // passed to run is where the testing happens, but for simple mocks
+  // or non-standard usage, we provide this.
+  // In a real test, one should use correlationIdStorage.run() directly.
+  (correlationIdStorage as any).enterWith(id);
+}
+
+/**
+ * FOR TESTING ONLY: Clear the correlation ID context manually
+ */
+export function clearCorrelationId(): void {
+  (correlationIdStorage as any).enterWith(undefined);
+}
