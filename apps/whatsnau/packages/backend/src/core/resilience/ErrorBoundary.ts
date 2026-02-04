@@ -3,7 +3,7 @@ import { getCorrelationId } from '../observability/CorrelationId.js';
 import { db } from '../db.js';
 
 interface ErrorBoundaryContext {
-  name: string;
+  category: string;
   severity: 'WARN' | 'CRITICAL';
   metadata?: any;
   tenantId?: string;
@@ -38,12 +38,12 @@ export async function withErrorBoundary<T>(
       {
         err: error,
         correlationId,
-        operationName: context.name,
+        operationName: context.category,
         severity: context.severity,
         metadata: context.metadata,
         tenantId: context.tenantId,
       },
-      `Error boundary caught: ${context.name}`
+      `Error boundary caught: ${context.category}`
     );
 
     // Emit SystemAlert to database (async, don't block)
@@ -75,7 +75,7 @@ async function emitSystemAlert(
     await db.systemAlert.create({
       data: {
         severity: context.severity,
-        category: context.name,
+        category: context.category,
         message: error.message,
         context: {
           ...context.metadata,
@@ -100,7 +100,7 @@ async function sendCriticalAlert(context: ErrorBoundaryContext, error: Error): P
     const { NotificationService } = await import('../../services/notification.service.js');
 
     await NotificationService.notifySystemError(context.severity, {
-      category: context.name,
+      category: context.category,
       error,
       message: error.message,
       tenantId: context.tenantId,
