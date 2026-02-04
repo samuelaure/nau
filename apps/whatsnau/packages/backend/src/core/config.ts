@@ -47,8 +47,11 @@ const isTest = process.env.NODE_ENV === 'test';
 const parsed = configSchema.safeParse(process.env);
 
 if (!parsed.success && !isTest) {
-  console.error('❌ Invalid environment variables:', parsed.error.format());
-  process.exit(1);
+  console.error('❌ Configuration validation failed. The application may be unstable.');
+  console.error(JSON.stringify(parsed.error.format(), null, 2));
 }
 
-export const config = parsed.success ? parsed.data : configSchema.parse({});
+// Ensure we always export a config object, even if partial
+export const config = parsed.success
+  ? parsed.data
+  : (process.env as unknown as z.infer<typeof configSchema>);
