@@ -5,6 +5,7 @@ import { db } from '../core/db.js';
 export class NotificationService {
   private static botToken = config.TELEGRAM_BOT_TOKEN;
   private static chatId = config.TELEGRAM_CHAT_ID;
+  private static alertCooldowns = new Map<string, number>();
 
   private static async getSettings() {
     try {
@@ -69,5 +70,83 @@ export class NotificationService {
       `🔗 <a href="${leadLink}">Open Chat and Intervene</a>`;
 
     await this.sendTelegramAlert(text);
+  }
+
+  // NEW: Generic system error notification with cooldown
+  static async notifySystemError(severity: 'WARN' | 'CRITICAL', context: any): Promise<void> {
+    // Check cooldown to avoid spam
+    const key = `${severity}-${context.category}`;
+    const lastAlert = this.alertCooldowns.get(key);
+    const cooldownMs = 15 * 60 * 1000; // 15 minutes
+
+    if (lastAlert && Date.now() - lastAlert < cooldownMs) {
+      logger.debug({ key }, 'Alert skipped due to cooldown');
+      return;
+    }
+
+    this.alertCooldowns.set(key, Date.now());
+
+    // Log to database
+    try {
+      await db.systemAlert.create({
+        data: {
+          severity,
+          category: context.category,
+          message: context.error?.message || context.message,
+          context: context,
+          tenantId: context.tenantId,
+        },
+      });
+    } catch (err) {
+      logger.error({ err }, 'Failed to create SystemAlert');
+    }
+
+    // Send Telegram alert
+    const icon = severity === 'CRITICAL' ? '🚨' : '⚠️';
+    const message =
+      `${icon} <b>${severity}</b>: ${context.category}\\n\\n` +
+      `${context.error?.message || context.message}\\n\\n` +
+      `Tenant: ${context.tenantId || 'N/A'}\\n` +
+      `Time: ${new Date().toISOString()}`;
+
+    await this.sendTelegramAlert(message);
+
+    logger.error({ ...context, severity }, 'System error notification sent');
+  }
+
+  // NEW: Fatal error notification (critical failures requiring immediate attention)
+  static async notifyFatalError(category: string, error: Error): Promise<void> {
+    return this.notifySystemError('CRITICAL', {
+      category,
+      error,
+      message: 'Fatal error occurred',
+    });
+  }
+
+  // NEW: Infrastructure failure notification (DB/Redis/etc)
+  static async notifyInfrastructureFailure(service: string, error: any): Promise<void> {
+    return this.notifySystemError('CRITICAL', {
+      category: `INFRASTRUCTURE_${service.toUpperCase()}`,
+      error,
+      message: `${service} infrastructure failure`,
+    });
+  }
+
+  // NEW: AI service degradation notification
+  static async notifyAIDegradation(leadId: string): Promise<void> {
+    return this.notifySystemError('WARN', {
+      category: 'AI_DEGRADATION',
+      message: 'AI service unavailable, triggering human handover',
+      leadId,
+    });
+  }
+
+  // NEW: Message send failure notification (after retry exhaustion)
+  static async notifyMessageFailure(leadId: string, error: Error): Promise<void> {
+    return this.notifySystemError('WARN', {
+      category: 'MESSAGE_SEND_FAILED',
+      error,
+      leadId,
+    });
   }
 }
