@@ -256,9 +256,20 @@ model GlobalConfig {
   availabilityStatus     String? // e.g. "meeting_until_1600"
   ownerName              String   @default("Samuel")
   recoveryTimeoutMinutes Int      @default(240) // Default 4 hours
-  tenantId               String
-  tenant                 Tenant   @relation(fields: [tenantId], references: [id])
-  updatedAt              DateTime @updatedAt
+  
+  // NEW: Anti-spam configuration
+  maxUnansweredMessages Int @default(2)
+  
+  // NEW: Demo configuration
+  defaultDemoDurationMinutes Int @default(10)
+  
+  // NEW: Alerting configuration
+  telegramAlertsEnabled Boolean @default(true)
+  alertCooldownMinutes  Int     @default(15)
+  
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  updatedAt DateTime @updatedAt
 
   @@unique([tenantId])
 }
@@ -416,4 +427,32 @@ model WhatsAppTemplate {
   lastSyncedAt DateTime @default(now())
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+// NEW: System Alert Tracking (for resilience monitoring)
+model SystemAlert {
+  id         String   @id @default(cuid())
+  severity   String   // WARN | CRITICAL
+  category   String   // DB_ERROR | REDIS_ERROR | AI_DEGRADATION | etc.
+  message    String
+  context    Json?
+  tenantId   String?
+  resolved   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  resolvedAt DateTime?
+
+  @@index([severity, resolved])
+  @@index([tenantId])
+}
+
+// NEW: Performance Metric Tracking (for observability)
+model PerformanceMetric {
+  id        String   @id @default(cuid())
+  operation String   // AI_CALL | WHATSAPP_SEND | DB_QUERY
+  duration  Int      // milliseconds
+  success   Boolean
+  tenantId  String?
+  createdAt DateTime @default(now())
+
+  @@index([operation, createdAt])
 }
