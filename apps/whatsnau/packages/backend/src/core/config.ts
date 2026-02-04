@@ -41,17 +41,21 @@ const configSchema = z.object({
   // YCloud
   YCLOUD_API_KEY: z.string().optional(),
   WHATSAPP_PROVIDER: z.enum(['meta', 'ycloud']).default('meta'),
-});
+}).refine(
+  (data) => data.NODE_ENV !== 'production' || !!data.REDIS_PASSWORD,
+  {
+    message: 'REDIS_PASSWORD is required in production environment',
+    path: ['REDIS_PASSWORD'],
+  }
+);
 
 const isTest = process.env.NODE_ENV === 'test';
 const parsed = configSchema.safeParse(process.env);
 
 if (!parsed.success && !isTest) {
-  console.error('❌ Configuration validation failed. The application may be unstable.');
-  console.error(JSON.stringify(parsed.error.format(), null, 2));
+  const error = new Error('Invalid environment variables');
+  console.error('❌ Invalid environment variables:', parsed.error.format());
+  throw error;
 }
 
-// Ensure we always export a config object, even if partial
-export const config = parsed.success
-  ? parsed.data
-  : (process.env as unknown as z.infer<typeof configSchema>);
+export const config = parsed.success ? parsed.data : configSchema.parse({});
