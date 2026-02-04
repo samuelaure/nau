@@ -2,6 +2,7 @@
 
 import React, { useRef, useEffect, useState } from 'react'
 import { useEditorStore } from '@/modules/video/store/useEditorStore'
+import { ElementStyle } from '@/types/video-schema'
 
 interface TransformOverlayProps {
   containerWidth: number
@@ -21,12 +22,23 @@ export const TransformOverlay: React.FC<TransformOverlayProps> = ({
   const [isResizing, setIsResizing] = useState<string | null>(null)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [elementStart, setElementStart] = useState({ x: 0, y: 0, w: 0, h: 0 })
+  const [elementStyleAtStart, setElementStyleAtStart] = useState<ElementStyle | null>(null)
 
   const selectedElement = template.elements.find((el) => el.id === selectedElementId)
 
   const handleMouseUp = () => {
+    if ((isDragging || isResizing) && selectedElement && elementStyleAtStart) {
+      // Commit the final state to history
+      updateElementStyle(
+        selectedElement.id,
+        { ...selectedElement.style },
+        true,
+        elementStyleAtStart,
+      )
+    }
     setIsDragging(false)
     setIsResizing(null)
+    setElementStyleAtStart(null)
   }
 
   const handleMouseMove = (e: MouseEvent) => {
@@ -39,10 +51,14 @@ export const TransformOverlay: React.FC<TransformOverlayProps> = ({
     const dy = (e.clientY - dragStart.y) / scaleY
 
     if (isDragging) {
-      updateElementStyle(selectedElement.id, {
-        x: elementStart.x + dx,
-        y: elementStart.y + dy,
-      })
+      updateElementStyle(
+        selectedElement.id,
+        {
+          x: elementStart.x + dx,
+          y: elementStart.y + dy,
+        },
+        false,
+      )
     } else if (isResizing) {
       let newX = elementStart.x
       let newY = elementStart.y
@@ -79,12 +95,16 @@ export const TransformOverlay: React.FC<TransformOverlayProps> = ({
       if (isResizing.includes('w')) newX = elementStart.x + (elementStart.w - newW)
       if (isResizing.includes('n')) newY = elementStart.y + (elementStart.h - newH)
 
-      updateElementStyle(selectedElement.id, {
-        x: newX,
-        y: newY,
-        width: newW,
-        height: newH,
-      })
+      updateElementStyle(
+        selectedElement.id,
+        {
+          x: newX,
+          y: newY,
+          width: newW,
+          height: newH,
+        },
+        false,
+      )
     }
   }
 
@@ -130,6 +150,7 @@ export const TransformOverlay: React.FC<TransformOverlayProps> = ({
     setIsDragging(true)
     setDragStart({ x: e.clientX, y: e.clientY })
     setElementStart({ x, y, w: elWidth, h: elHeight })
+    setElementStyleAtStart({ ...selectedElement.style })
   }
 
   const handleResizeStart = (e: React.MouseEvent, direction: string) => {
@@ -138,6 +159,7 @@ export const TransformOverlay: React.FC<TransformOverlayProps> = ({
     setIsResizing(direction)
     setDragStart({ x: e.clientX, y: e.clientY })
     setElementStart({ x, y, w: elWidth, h: elHeight })
+    setElementStyleAtStart({ ...selectedElement.style })
   }
 
   return (

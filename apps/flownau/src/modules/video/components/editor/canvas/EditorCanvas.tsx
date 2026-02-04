@@ -4,8 +4,10 @@ import React, { useEffect, useRef } from 'react'
 import { Player, PlayerRef } from '@remotion/player'
 import { useEditorStore } from '@/modules/video/store/useEditorStore'
 import { usePlaybackStore } from '@/modules/video/store/usePlaybackStore'
+import { useCanvasStore } from '@/modules/video/store/useCanvasStore'
 import { UniversalComposition } from '@/modules/video/remotion/UniversalComposition'
 import { TransformOverlay } from './TransformOverlay'
+import { ZoomIn, ZoomOut, Maximize, MousePointer2 } from 'lucide-react'
 
 export function EditorCanvas() {
   const template = useEditorStore((state) => state.template)
@@ -17,7 +19,13 @@ export function EditorCanvas() {
   const setIsPlaying = usePlaybackStore((state) => state.setIsPlaying)
 
   const playerRef = useRef<PlayerRef>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const isUpdatingFromPlayer = useRef(false)
+
+  const zoom = useCanvasStore((state) => state.zoom)
+  const setZoom = useCanvasStore((state) => state.setZoom)
+  const [fitScale, setFitScale] = React.useState(1)
+  const [containerSize, setContainerSize] = React.useState({ width: 0, height: 0 })
 
   // Sync Store -> Player (seeking)
   useEffect(() => {
@@ -74,21 +82,45 @@ export function EditorCanvas() {
     }
   }, [setCurrentFrame, setIsPlaying])
 
-  // TODO: Calculation for responsive scaling/fit
-  const containerWidth = 360
-  const containerHeight = 640
+  // Responsive Scaling Logic
+  useEffect(() => {
+    if (!containerRef.current) return
 
+    const observer = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect
+      if (width === 0 || height === 0) return
+
+      const padding = 80
+      const availableWidth = width - padding
+      const availableHeight = height - padding
+
+      const scaleX = availableWidth / template.width
+      const scaleY = availableHeight / template.height
+      const newFitScale = Math.min(scaleX, scaleY)
+
+      setFitScale(newFitScale)
+      setContainerSize({ width, height })
+    })
+
+    observer.observe(containerRef.current)
+    return () => observer.disconnect()
+  }, [template.width, template.height])
+
+  const totalScale = fitScale * zoom
+  const currentWidth = template.width * totalScale
+  const currentHeight = template.height * totalScale
   return (
     <div
+      ref={containerRef}
       onClick={() => setSelectedElementId(null)}
-      className="flex-1 bg-background select-none flex items-center justify-center relative p-10 overflow-hidden bg-[radial-gradient(rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[length:32px_32px]"
+      className="flex-1 bg-background select-none flex items-center justify-center relative overflow-hidden bg-[radial-gradient(rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[length:32px_32px]"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative bg-black shadow-[0_30px_100px_rgba(0,0,0,0.8)] border border-white/5 ring-1 ring-white/5 scale-[0.85] origin-center"
+        className="relative bg-black shadow-[0_30px_100px_rgba(0,0,0,0.8)] border border-white/5 ring-1 ring-white/5 origin-center transition-transform duration-300 ease-out"
         style={{
-          width: `${containerWidth}px`,
-          height: `${containerHeight}px`,
+          width: `${currentWidth}px`,
+          height: `${currentHeight}px`,
         }}
       >
         <Player
@@ -100,15 +132,50 @@ export function EditorCanvas() {
           compositionWidth={template.width}
           compositionHeight={template.height}
           className="w-full h-full"
-          controls
           clickToPlay={false}
         />
-        <TransformOverlay containerWidth={containerWidth} containerHeight={containerHeight} />
+        <TransformOverlay containerWidth={currentWidth} containerHeight={currentHeight} />
       </div>
 
-      {/* View Controls Helper (Zoom etc) - Placeholder */}
-      <div className="absolute bottom-6 right-6 flex items-center gap-2 bg-panel/80 backdrop-blur-md border border-white/5 px-4 py-2 rounded-2xl text-[10px] font-bold text-text-secondary uppercase tracking-[0.2em] shadow-2xl">
-        Canvas 85%
+      {/* View Controls Helper (Zoom etc) */}
+      <div className="absolute bottom-6 right-6 flex items-center gap-1.5 bg-panel/80 backdrop-blur-md border border-white/10 p-1.5 rounded-2xl shadow-2xl z-30">
+        <button
+          onClick={() => setZoom(zoom - 0.1)}
+          className="p-2 hover:bg-white/5 rounded-xl text-text-secondary hover:text-white transition-colors"
+          title="Zoom Out"
+        >
+          <ZoomOut size={16} />
+        </button>
+
+        <button
+          onClick={() => setZoom(1)}
+          className="px-3 py-1.5 hover:bg-white/5 rounded-xl text-[10px] font-bold text-text-secondary hover:text-white transition-colors uppercase tracking-wider"
+        >
+          {Math.round(zoom * 100)}%
+        </button>
+
+        <button
+          onClick={() => setZoom(zoom + 0.1)}
+          className="p-2 hover:bg-white/5 rounded-xl text-text-secondary hover:text-white transition-colors"
+          title="Zoom In"
+        >
+          <ZoomIn size={16} />
+        </button>
+
+        <div className="w-px h-4 bg-white/10 mx-1" />
+
+        <button
+          onClick={() => setZoom(1)} // In this context zoom 1 is fit because fitScale is separate
+          className="p-2 hover:bg-white/5 rounded-xl text-text-secondary hover:text-white transition-colors"
+          title="Fit to Screen"
+        >
+          <Maximize size={16} />
+        </button>
+      </div>
+
+      {/* Pan helper (future) */}
+      <div className="absolute bottom-6 left-6 text-[9px] font-bold text-white/20 uppercase tracking-[0.2em]">
+        {template.width} x {template.height} @ {template.fps}fps
       </div>
     </div>
   )
