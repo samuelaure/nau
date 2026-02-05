@@ -1,0 +1,25 @@
+FROM node:20-alpine
+
+# Install system dependencies
+# ffmpeg: required for Remotion/Video processing
+# openssl: required for Prisma
+# git: convenient for inside-container operations
+# procps: provides 'ps' command, often needed for healthchecks/tools
+RUN apk add --no-cache ffmpeg openssl git procps
+
+WORKDIR /app
+
+# Install dependencies first (caching layer)
+COPY package.json package-lock.json ./
+RUN npm install
+
+# Copy source code
+COPY . .
+
+RUN npx prisma generate
+
+# Expose Next.js port
+EXPOSE 3000
+
+# Default command (can be overridden by compose)
+CMD ["npm", "run", "dev"]
