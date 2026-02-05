@@ -1,17 +1,25 @@
 {
-    "name": "@whatsnau/shared",
-    "version": "1.0.0",
-    "private": true,
-    "main": "dist/index.js",
-    "types": "dist/index.d.ts",
-    "scripts": {
-        "build": "tsc",
-        "dev": "tsc --watch"
-    },
-    "devDependencies": {
-        "typescript": "^5.3.3"
-    },
-    "dependencies": {
-        "zod": "^4.3.6"
-    }
+  "name": "@whatsnau/shared",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "eslint src/**",
+    "format": "prettier --write .",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.54.0",
+    "@typescript-eslint/parser": "^8.54.0",
+    "eslint": "^9.39.2",
+    "prettier": "^3.8.1",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "zod": "^4.3.6"
+  }
 }

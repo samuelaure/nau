@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import {
-    CampaignSchema,
-    CreateCampaignSchema,
-    UpdateCampaignSchema,
-    LeadSchema,
-    UpdateLeadSchema,
-    MessageSchema,
-    GlobalConfigSchema
+  CampaignSchema,
+  CreateCampaignSchema,
+  UpdateCampaignSchema,
+  LeadSchema,
+  UpdateLeadSchema,
+  MessageSchema,
+  GlobalConfigSchema,
 } from './schemas.js';
 
 export type Campaign = z.infer<typeof CampaignSchema>;
