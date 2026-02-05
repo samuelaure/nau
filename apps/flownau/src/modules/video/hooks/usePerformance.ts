@@ -15,12 +15,10 @@ export function useFPSMonitor(enabled = true) {
   useEffect(() => {
     if (!enabled) return
 
-    fpsMonitor.start((newMetrics) => {
-      setMetrics(newMetrics)
-    })
+    fpsMonitor.subscribe(setMetrics)
 
     return () => {
-      fpsMonitor.stop()
+      fpsMonitor.unsubscribe(setMetrics)
     }
   }, [enabled])
 

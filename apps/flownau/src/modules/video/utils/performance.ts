@@ -14,21 +14,27 @@ export class FPSMonitor {
   private frames: number[] = []
   private lastTime: number = performance.now()
   private rafId: number | null = null
-  private callback: ((metrics: PerformanceMetrics) => void) | null = null
+  private listeners: Set<(metrics: PerformanceMetrics) => void> = new Set()
 
-  start(callback: (metrics: PerformanceMetrics) => void) {
-    this.callback = callback
-    this.lastTime = performance.now()
-    this.frames = []
-    this.tick()
+  subscribe(callback: (metrics: PerformanceMetrics) => void) {
+    this.listeners.add(callback)
+
+    // Start if this is the first listener
+    if (this.listeners.size === 1 && this.rafId === null) {
+      this.lastTime = performance.now()
+      this.frames = []
+      this.tick()
+    }
   }
 
-  stop() {
-    if (this.rafId !== null) {
+  unsubscribe(callback: (metrics: PerformanceMetrics) => void) {
+    this.listeners.delete(callback)
+
+    // Stop if no more listeners
+    if (this.listeners.size === 0 && this.rafId !== null) {
       cancelAnimationFrame(this.rafId)
       this.rafId = null
     }
-    this.callback = null
   }
 
   private tick = () => {
@@ -46,14 +52,15 @@ export class FPSMonitor {
     const avgFrameTime = this.frames.reduce((a, b) => a + b, 0) / this.frames.length
     const fps = 1000 / avgFrameTime
 
-    if (this.callback) {
-      this.callback({
-        fps: Math.round(fps),
-        frameTime: avgFrameTime,
-        renderTime: delta,
-        timestamp: now,
-      })
+    const metrics: PerformanceMetrics = {
+      fps: Math.round(fps),
+      frameTime: avgFrameTime,
+      renderTime: delta,
+      timestamp: now,
     }
+
+    // Notify all listeners
+    this.listeners.forEach((listener) => listener(metrics))
 
     this.lastTime = now
     this.rafId = requestAnimationFrame(this.tick)
