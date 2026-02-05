@@ -41,7 +41,7 @@
     "body-parser": "^2.2.2",
     "bullmq": "^5.67.2",
     "cookie-parser": "^1.4.7",
-    "cors": "^2.8.5",
+    "cors": "^2.8.6",
     "csv-parse": "^6.1.0",
     "dotenv": "^16.3.1",
     "express": "^5.2.1",
