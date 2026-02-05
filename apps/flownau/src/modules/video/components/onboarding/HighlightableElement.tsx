@@ -23,7 +23,7 @@ export function HighlightableElement({
       id={id}
       className={`
         ${className}
-        ${isHighlighted ? 'relative z-[103] ring-4 ring-accent ring-offset-4 ring-offset-background rounded-xl transition-all duration-300' : ''}
+        ${isHighlighted ? 'relative z-[50] ring-4 ring-accent ring-offset-4 ring-offset-background rounded-xl transition-all duration-300' : ''}
       `}
     >
       {children}

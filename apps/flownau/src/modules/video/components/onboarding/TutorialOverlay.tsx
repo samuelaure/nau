@@ -4,6 +4,7 @@ import React, { useEffect } from 'react'
 import { X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useOnboardingStore } from '../../store/useOnboardingStore'
 import { tutorialContent } from '../../config/tutorialContent'
+import { useElementSpotlight } from './HighlightableElement'
 
 export function TutorialOverlay() {
   const {
@@ -16,6 +17,7 @@ export function TutorialOverlay() {
     setHighlightedElement,
   } = useOnboardingStore()
 
+  const spotlightPos = useElementSpotlight(highlightedElement)
   const stepContent = tutorialContent[currentStep]
   const stepIndex = Object.keys(tutorialContent).indexOf(currentStep)
   const totalSteps = Object.keys(tutorialContent).length - 1 // Exclude 'complete'
@@ -39,18 +41,18 @@ export function TutorialOverlay() {
 
   return (
     <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] animate-fade-in" />
-
-      {/* Spotlight Effect for Highlighted Elements */}
-      {highlightedElement && (
-        <div
-          className="fixed inset-0 z-[101] pointer-events-none"
-          style={{
-            background: `radial-gradient(circle at var(--spotlight-x, 50%) var(--spotlight-y, 50%), transparent 200px, rgba(0,0,0,0.7) 400px)`,
-          }}
-        />
-      )}
+      {/* Consolidated Pierced Backdrop & Spotlight */}
+      <div
+        className="fixed inset-0 z-[100] animate-fade-in pointer-events-none"
+        style={{
+          background: highlightedElement
+            ? `radial-gradient(circle at ${spotlightPos.x}% ${spotlightPos.y}%, transparent 120px, rgba(0,0,0,0.7) 250px)`
+            : 'rgba(0,0,0,0.6)',
+          backdropFilter: 'blur(4px)',
+          pointerEvents: 'auto',
+        }}
+        onClick={skipOnboarding} // Clicking backdrop skips/closes tutorial
+      />
 
       {/* Tutorial Card */}
       <div
