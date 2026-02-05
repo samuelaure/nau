@@ -26,13 +26,22 @@ export default async function TemplatePage({
         },
       },
     }),
-    prisma.user.findFirst().then((user) =>
-      user
-        ? prisma.socialAccount.findMany({
-            where: { userId: user.id },
-          })
-        : [],
-    ),
+    prisma.user
+      .findFirst()
+      .then((user) =>
+        user
+          ? prisma.socialAccount.findMany({
+              where: { userId: user.id },
+              select: { id: true, username: true, platform: true },
+            })
+          : [],
+      )
+      .then((accounts) =>
+        accounts.map((acc) => ({
+          ...acc,
+          username: acc.username || '',
+        })),
+      ),
   ])
 
   if (!template) notFound()
@@ -83,8 +92,8 @@ export default async function TemplatePage({
         <div>
           <h1 style={{ fontSize: '32px', marginBottom: '8px' }}>{template.name}</h1>
           <p style={{ color: 'var(--text-secondary)' }}>
-            {template.account
-              ? `Linked to ${template.account.username?.startsWith('@') ? '' : '@'}${template.account.username || 'Unknown'}`
+            {template.account && template.account.username
+              ? `Linked to ${template.account.username.startsWith('@') ? '' : '@'}${template.account.username}`
               : 'Global Template'}{' '}
             • {template.remotionId}
           </p>

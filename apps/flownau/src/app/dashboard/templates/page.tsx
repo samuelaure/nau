@@ -13,13 +13,22 @@ export default async function TemplatesPage() {
         account: { select: { username: true, platform: true } },
       },
     }),
-    prisma.user.findFirst().then((user) =>
-      user
-        ? prisma.socialAccount.findMany({
-            where: { userId: user.id },
-          })
-        : [],
-    ),
+    prisma.user
+      .findFirst()
+      .then((user) =>
+        user
+          ? prisma.socialAccount.findMany({
+              where: { userId: user.id },
+              select: { id: true, username: true, platform: true },
+            })
+          : [],
+      )
+      .then((accounts) =>
+        accounts.map((acc) => ({
+          ...acc,
+          username: acc.username || '',
+        })),
+      ),
   ])
 
   // Group templates by account
