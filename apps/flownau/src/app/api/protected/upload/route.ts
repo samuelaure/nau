@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
     // 6. Naming
     const prefix = `${shortCode}_${type}_`
 
-    let whereClause: any = {}
+    const whereClause: any = {}
     if (templateId) whereClause.templateId = templateId
     else if (contextAccountId) whereClause.accountId = contextAccountId
 

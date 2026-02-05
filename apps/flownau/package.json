@@ -20,7 +20,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "test": "vitest",
     "type-check": "tsc --noEmit",
     "prisma:generate": "prisma generate",
@@ -28,20 +28,19 @@
     "prisma:seed": "prisma db seed",
     "remotion": "remotion",
     "format": "prettier --write .",
-    "docker:dev": "docker compose -f docker-compose.yml up -d",
-    "docker:build": "docker compose -f docker-compose.yml build",
-    "docker:nuke": "docker compose -f docker-compose.yml down -v"
+    "docker:dev": "docker compose up -d",
+    "docker:build": "docker compose build",
+    "docker:nuke": "docker compose down -v",
+    "verify": "npm run format && npm run lint && npm run type-check && npm run test"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.975.0",
     "@aws-sdk/s3-request-presigner": "^3.975.0",
     "@prisma/adapter-pg": "^7.3.0",
     "@prisma/client": "^7.3.0",
-    "@remotion/bundler": "^4.0.409",
-    "@remotion/cli": "^4.0.409",
-    "@remotion/google-fonts": "^4.0.409",
-    "@remotion/player": "^4.0.409",
-    "@remotion/renderer": "^4.0.409",
+    "@remotion/google-fonts": "^4.0.419",
+    "@remotion/player": "^4.0.419",
+    "@remotion/renderer": "^4.0.419",
     "@types/bcryptjs": "^2.4.6",
     "@types/pg": "^8.16.0",
     "airtable": "^0.12.2",
@@ -60,7 +59,7 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-dropzone": "^14.3.8",
-    "remotion": "^4.0.409",
+    "remotion": "^4.0.419",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
     "zod": "^4.3.6",
@@ -68,6 +67,9 @@
   },
   "devDependencies": {
     "@auth/prisma-adapter": "^2.11.1",
+    "@remotion/bundler": "^4.0.419",
+    "@remotion/cli": "^4.0.419",
+    "@remotion/studio-server": "^4.0.419",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
     "@types/fluent-ffmpeg": "^2.1.28",
@@ -86,7 +88,8 @@
     "tailwindcss": "^3.4.17",
     "ts-node": "^10.9.2",
     "typescript": "^5",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "webpack": "^5.105.0"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
@@ -94,6 +97,7 @@
   "overrides": {
     "chevrotain": "^11.1.1",
     "hono": "^4.11.7",
-    "fast-xml-parser": "5.3.4"
+    "fast-xml-parser": "5.3.4",
+    "webpack": "^5.105.0"
   }
 }
