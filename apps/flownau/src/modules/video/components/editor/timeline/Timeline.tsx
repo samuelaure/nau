@@ -1,6 +1,7 @@
-import React, { useRef, useState, useEffect, MouseEvent } from 'react'
+import React, { useEffect, useRef, useState, type MouseEvent } from 'react'
 import { useEditorStore } from '@/modules/video/store/useEditorStore'
 import { usePlaybackStore } from '@/modules/video/store/usePlaybackStore'
+import { snapElementOperation } from '@/modules/video/utils/snap'
 
 // Optimized sub-components for avoiding full timeline re-renders
 const Playhead = React.memo(
@@ -47,9 +48,9 @@ interface TimelineClipProps {
   originalStartFrame: number
   originalDuration: number
   dragFrameDelta: number
-  onClipMouseDown: (e: MouseEvent<HTMLDivElement>, id: string, startFrame: number) => void
+  onClipMouseDown: (e: React.MouseEvent<HTMLDivElement>, id: string, startFrame: number) => void
   onResizeMouseDown: (
-    e: MouseEvent<HTMLDivElement>,
+    e: React.MouseEvent<HTMLDivElement>,
     id: string,
     startFrame: number,
     duration: number,
@@ -150,9 +151,12 @@ export function Timeline() {
   const selectedElementId = useEditorStore((state) => state.selectedElementId)
   const setSelectedElementId = useEditorStore((state) => state.setSelectedElementId)
   const updateElement = useEditorStore((state) => state.updateElement)
+  const snapEnabled = useEditorStore((state) => state.snapEnabled)
+  const currentFrame = usePlaybackStore((state) => state.currentFrame)
 
   const setCurrentFrame = usePlaybackStore((state) => state.setCurrentFrame)
   const [timelineWidth, setTimelineWidth] = useState(0)
+  const [snapGuideFrame, setSnapGuideFrame] = useState<number | null>(null)
 
   const timelineRef = useRef<HTMLDivElement>(null)
 
@@ -223,7 +227,49 @@ export function Timeline() {
       const availableWidth = rect.width - padding * 2
 
       const pixelDelta = e.clientX - dragStartX
-      const frameDelta = Math.round((pixelDelta / availableWidth) * template.durationInFrames)
+      let frameDelta = Math.round((pixelDelta / availableWidth) * template.durationInFrames)
+
+      // Apply snapping if enabled
+      if (snapEnabled) {
+        if (draggingId) {
+          const proposedFrame = originalStartFrame + frameDelta
+          const { snappedFrame, snapPoint } = snapElementOperation(
+            proposedFrame,
+            template.elements,
+            currentFrame,
+            template.durationInFrames,
+            draggingId,
+          )
+          frameDelta = snappedFrame - originalStartFrame
+          setSnapGuideFrame(snapPoint ? snapPoint.frame : null)
+        } else if (resizingId && resizeHandle) {
+          if (resizeHandle === 'start') {
+            const proposedFrame = originalStartFrame + frameDelta
+            const { snappedFrame, snapPoint } = snapElementOperation(
+              proposedFrame,
+              template.elements,
+              currentFrame,
+              template.durationInFrames,
+              resizingId,
+            )
+            frameDelta = snappedFrame - originalStartFrame
+            setSnapGuideFrame(snapPoint ? snapPoint.frame : null)
+          } else {
+            const proposedEndFrame = originalStartFrame + originalDuration + frameDelta
+            const { snappedFrame, snapPoint } = snapElementOperation(
+              proposedEndFrame,
+              template.elements,
+              currentFrame,
+              template.durationInFrames,
+              resizingId,
+            )
+            frameDelta = snappedFrame - (originalStartFrame + originalDuration)
+            setSnapGuideFrame(snapPoint ? snapPoint.frame : null)
+          }
+        }
+      } else {
+        setSnapGuideFrame(null)
+      }
 
       setDragFrameDelta(frameDelta)
     }
@@ -260,6 +306,7 @@ export function Timeline() {
       setResizingId(null)
       setResizeHandle(null)
       setDragFrameDelta(0)
+      setSnapGuideFrame(null)
     }
 
     window.addEventListener('mousemove', handleWindowMouseMove)
@@ -279,6 +326,9 @@ export function Timeline() {
     originalMediaStartOffset,
     dragFrameDelta,
     template.durationInFrames,
+    template.elements,
+    currentFrame,
+    snapEnabled,
     updateElement,
   ])
 
@@ -310,6 +360,19 @@ export function Timeline() {
       >
         {/* Playhead Line */}
         <Playhead durationInFrames={template.durationInFrames} timelineWidth={timelineWidth} />
+
+        {/* Snap Guide */}
+        {snapGuideFrame !== null && (
+          <div
+            className="absolute top-0 bottom-0 w-px bg-yellow-400 z-40 pointer-events-none"
+            style={{
+              left: `16px`,
+              transform: `translateX(${(snapGuideFrame / template.durationInFrames) * (timelineWidth - 32)}px)`,
+            }}
+          >
+            <div className="absolute top-0 bottom-0 w-px border-l-2 border-dashed border-yellow-400 opacity-70" />
+          </div>
+        )}
 
         {/* Tracks */}
         <div className="relative min-h-full">

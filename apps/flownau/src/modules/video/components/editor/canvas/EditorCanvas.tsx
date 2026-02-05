@@ -8,6 +8,7 @@ import { useCanvasStore } from '@/modules/video/store/useCanvasStore'
 import { UniversalComposition } from '@/modules/video/remotion/UniversalComposition'
 import { TransformOverlay } from './TransformOverlay'
 import { ZoomIn, ZoomOut, Maximize, MousePointer2 } from 'lucide-react'
+import { Tooltip } from '@/modules/video/components/ui/Tooltip'
 
 export function EditorCanvas() {
   const template = useEditorStore((state) => state.template)
@@ -139,13 +140,14 @@ export function EditorCanvas() {
 
       {/* View Controls Helper (Zoom etc) */}
       <div className="absolute bottom-6 right-6 flex items-center gap-1.5 bg-panel/80 backdrop-blur-md border border-white/10 p-1.5 rounded-2xl shadow-2xl z-30">
-        <button
-          onClick={() => setZoom(zoom - 0.1)}
-          className="p-2 hover:bg-white/5 rounded-xl text-text-secondary hover:text-white transition-colors"
-          title="Zoom Out"
-        >
-          <ZoomOut size={16} />
-        </button>
+        <Tooltip content="Zoom Out">
+          <button
+            onClick={() => setZoom(zoom - 0.1)}
+            className="p-2 hover:bg-white/5 rounded-xl text-text-secondary hover:text-white transition-colors"
+          >
+            <ZoomOut size={16} />
+          </button>
+        </Tooltip>
 
         <button
           onClick={() => setZoom(1)}
@@ -154,23 +156,25 @@ export function EditorCanvas() {
           {Math.round(zoom * 100)}%
         </button>
 
-        <button
-          onClick={() => setZoom(zoom + 0.1)}
-          className="p-2 hover:bg-white/5 rounded-xl text-text-secondary hover:text-white transition-colors"
-          title="Zoom In"
-        >
-          <ZoomIn size={16} />
-        </button>
+        <Tooltip content="Zoom In">
+          <button
+            onClick={() => setZoom(zoom + 0.1)}
+            className="p-2 hover:bg-white/5 rounded-xl text-text-secondary hover:text-white transition-colors"
+          >
+            <ZoomIn size={16} />
+          </button>
+        </Tooltip>
 
         <div className="w-px h-4 bg-white/10 mx-1" />
 
-        <button
-          onClick={() => setZoom(1)} // In this context zoom 1 is fit because fitScale is separate
-          className="p-2 hover:bg-white/5 rounded-xl text-text-secondary hover:text-white transition-colors"
-          title="Fit to Screen"
-        >
-          <Maximize size={16} />
-        </button>
+        <Tooltip content="Fit to Screen">
+          <button
+            onClick={() => setZoom(1)} // In this context zoom 1 is fit because fitScale is separate
+            className="p-2 hover:bg-white/5 rounded-xl text-text-secondary hover:text-white transition-colors"
+          >
+            <Maximize size={16} />
+          </button>
+        </Tooltip>
       </div>
 
       {/* Pan helper (future) */}
