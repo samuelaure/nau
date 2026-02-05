@@ -1,16 +1,23 @@
-version: '3.8'
-
 services:
-  # In production, we don't spawn a local DB but join the mesh
+  app:
+    container_name: flownau
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@shared_postgres:5432/${POSTGRES_DB}?schema=public
+      - REDIS_HOST=shared_redis
+    depends_on: []
+    networks:
+      - shared-mesh
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.flownau.rule=Host(`${PUBLIC_DOMAIN:-flownau.localhost}`)"
+      - "traefik.http.routers.flownau.entrypoints=web"
+
   postgres:
-    profiles:
-      - production_disabled
-  
+    profiles: [disabled]
+
   redis:
-    profiles:
-      - production_disabled
+    profiles: [disabled]
 
 networks:
-  default:
-    external:
-      name: shared-mesh
+  shared-mesh:
+    external: true
