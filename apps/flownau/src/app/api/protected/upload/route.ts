@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
     // 6. Naming
     const prefix = `${shortCode}_${type}_`
 
-    const whereClause: any = {}
+    const whereClause: { templateId?: string; accountId?: string } = {}
     if (templateId) whereClause.templateId = templateId
     else if (contextAccountId) whereClause.accountId = contextAccountId
 
@@ -159,9 +159,9 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ success: true, asset })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Processing failed', error)
     await fs.unlink(inputPath).catch(() => {})
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: (error as Error).message }, { status: 500 })
   }
 }

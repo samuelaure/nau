@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import NextImage from 'next/image'
 import { useDropzone } from 'react-dropzone'
 import {
   Upload,
@@ -81,9 +82,9 @@ export default function AssetsManager({
         }
         toast.success('Assets uploaded successfully')
         window.location.reload()
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Upload failed', error)
-        toast.error(`Upload failed: ${error.message}`)
+        toast.error(`Upload failed: ${(error as Error).message}`)
       } finally {
         setUploading(false)
         setProgress('')
@@ -112,9 +113,9 @@ export default function AssetsManager({
 
       toast.success('R2 folder linked successfully')
       window.location.reload()
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Linking failed', error)
-      toast.error(`Linking failed: ${error.message}`)
+      toast.error(`Linking failed: ${(error as Error).message}`)
     } finally {
       setLinking(false)
       setIsLinkModalOpen(false)
@@ -315,12 +316,16 @@ function AssetCard({ asset }: { asset: Asset }) {
       {/* Media Preview */}
       <div className="relative aspect-video bg-black/40 flex items-center justify-center overflow-hidden border-b border-white/5">
         {isImage && (
-          <img
-            src={asset.url}
-            alt={asset.originalFilename}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 opacity-70 group-hover:opacity-100"
-            loading="lazy"
-          />
+          <div className="w-full h-full relative">
+            <NextImage
+              src={asset.url}
+              alt={asset.originalFilename}
+              fill
+              className="object-cover transition-transform duration-500 group-hover:scale-110 opacity-70 group-hover:opacity-100"
+              sizes="(max-width: 768px) 50vw, 20vw"
+              unoptimized
+            />
+          </div>
         )}
         {!isImage && (
           <div className="flex flex-col items-center gap-3 text-zinc-600 transition-colors group-hover:text-white">

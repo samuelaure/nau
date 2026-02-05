@@ -113,7 +113,7 @@ export async function saveTemplateConfig(id: string, config: unknown) {
   await prisma.template.update({
     where: { id: parsedId },
     data: {
-      config: parsedConfig as any,
+      config: parsedConfig,
       remotionId: 'Universal',
     },
   })

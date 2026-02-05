@@ -104,7 +104,11 @@ export async function updateAccount(id: string, formData: FormData) {
 
   const { username, platformId, accessToken } = AccountUpdateSchema.parse(rawData)
 
-  const data: any = {
+  const data: {
+    username: string
+    platformId: string
+    accessToken?: string
+  } = {
     username,
     platformId,
   }

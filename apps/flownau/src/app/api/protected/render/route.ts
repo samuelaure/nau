@@ -1,5 +1,6 @@
 import { auth } from '@/auth'
 import { prisma } from '@/modules/shared/prisma'
+import { Prisma } from '@prisma/client'
 import { getTableData } from '@/modules/video/airtable'
 import { renderAndUpload } from '@/modules/video/renderer'
 import { publishVideoToInstagram } from '@/modules/accounts/instagram'
@@ -31,7 +32,7 @@ export const POST = auth(async function POST(req) {
       data: {
         templateId: template.id,
         status: 'RENDERING',
-        inputData: row as any,
+        inputData: row as Prisma.InputJsonValue,
       },
     })
 
@@ -65,7 +66,7 @@ export const POST = auth(async function POST(req) {
           accessToken: decrypt(account.accessToken),
           instagramUserId: account.platformId,
           videoUrl: fullUrl,
-          caption: (row as any).Caption || 'automated post from flownaŭ',
+          caption: (row as Record<string, string>).Caption || 'automated post from flownaŭ',
         })
 
         await prisma.render.update({
@@ -79,8 +80,8 @@ export const POST = auth(async function POST(req) {
     }
 
     return NextResponse.json({ success: true, renderId: render.id })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Render failed:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: (error as Error).message }, { status: 500 })
   }
 })

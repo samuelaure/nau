@@ -4,6 +4,13 @@ import React from 'react'
 import { Settings, Maximize2, Type, Box } from 'lucide-react'
 import { useEditorStore } from '@/modules/video/store/useEditorStore'
 import { Tooltip } from '@/modules/video/components/ui/Tooltip'
+import { toast } from 'sonner'
+import {
+  validateNumber,
+  validateFrame,
+  validateDimension,
+  validatePosition,
+} from '@/modules/video/utils/validation'
 
 export function PropertiesPanel() {
   const template = useEditorStore((state) => state.template)
@@ -43,14 +50,6 @@ export function PropertiesPanel() {
 
     link.href = `https://fonts.googleapis.com/css2?${fontParams}&display=swap`
   }, [template.elements])
-
-  const { toast } = require('sonner')
-  const {
-    validateNumber,
-    validateFrame,
-    validateDimension,
-    validatePosition,
-  } = require('@/modules/video/utils/validation')
 
   const renderHeader = (icon: React.ReactNode, title: string) => (
     <div className="flex items-center gap-2 mb-4 px-1">

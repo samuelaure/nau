@@ -27,9 +27,9 @@ export default function SyncButton() {
         setStatus('error')
         setMessage(result.message || 'Sync failed')
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       setStatus('error')
-      setMessage(e.message || 'Error triggering sync')
+      setMessage((e as Error).message || 'Error triggering sync')
     }
   }
 

@@ -5,6 +5,16 @@ import { encrypt } from '@/modules/shared/encryption'
 import axios from 'axios'
 import { getLongLivedToken } from '@/modules/accounts/instagram'
 
+interface FacebookPage {
+  id: string
+  name: string
+  instagram_business_account?: {
+    id: string
+    username: string
+    profile_picture_url: string
+  }
+}
+
 export async function GET(req: NextRequest) {
   try {
     const session = await auth()
@@ -50,8 +60,8 @@ export async function GET(req: NextRequest) {
       },
     })
 
-    const pages = pagesResponse.data.data || []
-    const connectedPage = pages.find((p: any) => p.instagram_business_account)
+    const pages = (pagesResponse.data.data as FacebookPage[]) || []
+    const connectedPage = pages.find((p) => p.instagram_business_account)
 
     if (!connectedPage) {
       return NextResponse.redirect(
@@ -60,6 +70,12 @@ export async function GET(req: NextRequest) {
     }
 
     const igAccount = connectedPage.instagram_business_account
+
+    if (!igAccount) {
+      return NextResponse.redirect(
+        new URL('/dashboard/accounts?error=no_instagram_account', req.url),
+      )
+    }
 
     // 4. Save to Database
     // We use upsert to update if it exists or create if new
@@ -87,8 +103,12 @@ export async function GET(req: NextRequest) {
     })
 
     return NextResponse.redirect(new URL('/dashboard/accounts?success=true', req.url))
-  } catch (err: any) {
-    console.error('Instagram Auth Error:', err?.response?.data || err.message)
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err)) {
+      console.error('Instagram Auth Error:', err.response?.data || err.message)
+    } else {
+      console.error('Instagram Auth Error:', (err as Error).message)
+    }
     return NextResponse.redirect(new URL('/dashboard/accounts?error=server_error', req.url))
   }
 }

@@ -5,17 +5,35 @@ import { toggleTemplateAssets } from '@/modules/video/actions'
 import { updateTemplate, duplicateTemplate } from '@/modules/video/actions'
 import { Info, Lock, Copy } from 'lucide-react'
 
+interface TemplateWithCount {
+  id: string
+  name: string
+  remotionId: string
+  airtableTableId?: string | null
+  accountId?: string | null
+  useAccountAssets: boolean
+  _count?: {
+    assets: number
+  }
+}
+
+interface Account {
+  id: string
+  username: string
+  platform: string
+}
+
 export default function TemplateSettings({
   template,
   accounts = [],
 }: {
-  template: any
-  accounts?: any[]
+  template: TemplateWithCount
+  accounts?: Account[]
 }) {
   const [isPending, startTransition] = useTransition()
 
   // Logic: If no assets, forced to true
-  const hasAssets = template._count?.assets > 0
+  const hasAssets = (template._count?.assets ?? 0) > 0
   const isForced = !hasAssets
 
   const handleToggle = () => {
@@ -103,7 +121,7 @@ export default function TemplateSettings({
               className="input-field"
             >
               <option value="">No linked account (Global)</option>
-              {accounts?.map((acc: any) => (
+              {accounts?.map((acc) => (
                 <option key={acc.id} value={acc.id}>
                   {acc.username} ({acc.platform})
                 </option>
@@ -147,7 +165,7 @@ export default function TemplateSettings({
               )}
             </div>
             <p style={{ color: 'var(--text-secondary)', fontSize: '14px', maxWidth: '400px' }}>
-              If enabled, this template will have access to the parent Account's asset library.
+              If enabled, this template will have access to the parent Account&apos;s asset library.
               Disable this to strictly use only assets uploaded directly to this template.
             </p>
             {!hasAssets && (

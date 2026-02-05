@@ -1,6 +1,12 @@
 import { create } from 'zustand'
 import { VideoTemplate, VideoElement, ElementStyle } from '@/types/video-schema'
 import { useHistoryStore } from './useHistoryStore'
+import { toast } from 'sonner'
+import {
+  AddElementCommand,
+  DeleteElementCommand,
+  UpdateElementStyleCommand,
+} from '../utils/commands'
 
 interface EditorState {
   template: VideoTemplate
@@ -116,7 +122,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     // Record deletion for undo/redo
     const { execute } = useHistoryStore.getState()
     selectedElementIds.forEach((id) => {
-      const DeleteElementCommand = require('../utils/commands').DeleteElementCommand
       execute(new DeleteElementCommand(id))
     })
 
@@ -131,7 +136,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (selectedElementIds.size === 0) return
 
     const { execute } = useHistoryStore.getState()
-    const UpdateElementStyleCommand = require('../utils/commands').UpdateElementStyleCommand
 
     selectedElementIds.forEach((id) => {
       const element = get().template.elements.find((el) => el.id === id)
@@ -154,7 +158,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const elementsToCopy = template.elements.filter((el) => selectedElementIds.has(el.id))
     set({ clipboard: elementsToCopy })
 
-    const { toast } = require('sonner')
     toast.success(
       `Copied ${elementsToCopy.length} element${elementsToCopy.length > 1 ? 's' : ''}`,
       {
@@ -172,7 +175,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     // Delete the elements (with undo support)
     const { execute } = useHistoryStore.getState()
-    const DeleteElementCommand = require('../utils/commands').DeleteElementCommand
     selectedElementIds.forEach((id) => {
       execute(new DeleteElementCommand(id))
     })
@@ -182,18 +184,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedElementId: null,
     })
 
-    const { toast } = require('sonner')
     toast.success(`Cut ${elementsToCut.length} element${elementsToCut.length > 1 ? 's' : ''}`, {
       duration: 1500,
     })
   },
 
   pasteElements: (atFrame) => {
-    const { clipboard, template } = get()
+    const { clipboard } = get()
     if (clipboard.length === 0) return
 
     const { execute } = useHistoryStore.getState()
-    const AddElementCommand = require('../utils/commands').AddElementCommand
     const newElementIds: string[] = []
 
     clipboard.forEach((element) => {
@@ -215,7 +215,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedElementId: newElementIds.length === 1 ? newElementIds[0] : null,
     })
 
-    const { toast } = require('sonner')
     toast.success(`Pasted ${clipboard.length} element${clipboard.length > 1 ? 's' : ''}`, {
       duration: 1500,
     })

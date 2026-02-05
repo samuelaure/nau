@@ -184,7 +184,7 @@ export const TransformOverlay: React.FC<TransformOverlayProps> = ({
                             absolute w-2.5 h-2.5 bg-white border border-accent rounded-full z-20 transition-transform hover:scale-150
                             ${getCursorClass(cursor)}
                         `}
-            style={getHandleStyle(cursor as any)}
+            style={getHandleStyle(cursor as 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w')}
           />
         ))}
 

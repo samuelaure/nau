@@ -83,9 +83,9 @@ export async function syncR2Assets() {
     await cleanupOrphans(allR2Keys, log)
 
     return { success: true, logs }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Sync failed', error)
-    return { success: false, error: error.message, logs }
+    return { success: false, error: (error as Error).message, logs }
   }
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { fpsMonitor, renderTimeTracker, PerformanceMetrics } from '../utils/performance'
 
 /**
@@ -74,9 +74,8 @@ export function useAllRenderStats(enabled = true) {
  */
 export function usePerformanceWarnings(fpsThreshold = 30) {
   const metrics = useFPSMonitor()
-  const [warnings, setWarnings] = useState<string[]>([])
 
-  useEffect(() => {
+  const warnings = useMemo(() => {
     const newWarnings: string[] = []
 
     if (metrics.fps < fpsThreshold) {
@@ -87,7 +86,7 @@ export function usePerformanceWarnings(fpsThreshold = 30) {
       newWarnings.push(`High frame time: ${metrics.frameTime.toFixed(2)}ms`)
     }
 
-    setWarnings(newWarnings)
+    return newWarnings
   }, [metrics, fpsThreshold])
 
   return warnings

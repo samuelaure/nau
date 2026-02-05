@@ -7,7 +7,7 @@ import {
   type ListObjectsV2CommandOutput,
 } from '@aws-sdk/client-s3'
 import type { PrismaClient } from '@prisma/client'
-// @ts-ignore
+// @ts-expect-error - External module
 import * as dotenv from 'dotenv'
 import path from 'path'
 
@@ -98,8 +98,11 @@ async function processFile(oldKey: string) {
     await r2.send(new HeadObjectCommand({ Bucket: BUCKET_NAME, Key: newKey }))
     console.warn(`WARNING: Target key ${newKey} already exists. Skipping to avoid overwrite.`)
     return
-  } catch (e: any) {
-    if (e.name !== 'NotFound' && e.$metadata?.httpStatusCode !== 404) {
+  } catch (e: unknown) {
+    if (
+      (e as { name: string }).name !== 'NotFound' &&
+      (e as { $metadata?: { httpStatusCode: number } }).$metadata?.httpStatusCode !== 404
+    ) {
       console.error(`Error checking existence of ${newKey}:`, e)
       return
     }

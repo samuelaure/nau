@@ -5,13 +5,19 @@ import { Plus, Video, Loader2 } from 'lucide-react'
 import { addTemplate } from '@/modules/video/actions'
 import Modal from '@/modules/shared/components/Modal'
 
+interface Account {
+  id: string
+  username: string
+  platform: string
+}
+
 export default function AddTemplateButton({
   label = 'New Template',
   accounts = [],
   defaultAccountId,
 }: {
   label?: string
-  accounts?: any[]
+  accounts?: Account[]
   defaultAccountId?: string
 }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -66,7 +72,7 @@ export default function AddTemplateButton({
             <label className="form-label">Linked Account</label>
             <select name="accountId" className="input-field" defaultValue={defaultAccountId || ''}>
               <option value="">No Account (Global)</option>
-              {accounts.map((account: any) => (
+              {accounts.map((account) => (
                 <option key={account.id} value={account.id}>
                   {account.username} ({account.platform})
                 </option>

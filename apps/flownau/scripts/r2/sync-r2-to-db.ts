@@ -5,7 +5,7 @@ import {
   type ListObjectsV2CommandOutput,
 } from '@aws-sdk/client-s3'
 import type { PrismaClient } from '@prisma/client'
-// @ts-ignore
+// @ts-expect-error - External module
 import * as dotenv from 'dotenv'
 import path from 'path'
 

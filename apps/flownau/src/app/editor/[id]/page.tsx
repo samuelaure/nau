@@ -1,7 +1,7 @@
 import { prisma } from '@/modules/shared/prisma'
 import { notFound } from 'next/navigation'
 import ClientEditor from './ClientEditor'
-import { VideoTemplate } from '@/types/video-schema'
+import { VideoTemplate, Asset } from '@/types/video-schema'
 
 export default async function EditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -24,7 +24,7 @@ export default async function EditorPage({ params }: { params: Promise<{ id: str
   const combinedAssets = [
     ...template.assets,
     ...(template.useAccountAssets && template.account ? template.account.assets : []),
-  ] as any[] // Prisma Asset model matches our Asset interface
+  ] as Asset[] // Prisma Asset model matches our Asset interface
 
   const assetsRoot =
     template.useAccountAssets && template.account?.assetsRoot

@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
+import NextImage from 'next/image'
 import {
   Video as VideoIcon,
   Image as ImageIcon,
@@ -44,6 +45,12 @@ type ViewMode = 'grid-lg' | 'grid-sm' | 'list'
 type FilterType = 'all' | 'video' | 'audio' | 'image'
 type BrowserMode = 'project' | 'cloud'
 
+interface R2File {
+  key: string
+  size: number
+  lastModified?: string
+}
+
 export function AssetBrowser({ assets, assetsRoot }: AssetBrowserProps) {
   const addElement = useEditorStore((state) => state.addElement)
 
@@ -55,60 +62,63 @@ export function AssetBrowser({ assets, assetsRoot }: AssetBrowserProps) {
   // Cloud Browser State
   const [currentPrefix, setCurrentPrefix] = useState(assetsRoot || '')
   const [folders, setFolders] = useState<string[]>([])
-  const [files, setFiles] = useState<any[]>([]) // R2 Files metadata
+  const [files, setFiles] = useState<R2File[]>([]) // R2 Files metadata
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loadingAssetId, setLoadingAssetId] = useState<string | null>(null)
 
-  // Fetch R2 Data when in Cloud mode and prefix changes
+  const fetchFolders = useCallback(
+    async (prefix: string) => {
+      // Check if online
+      if (!isOnline()) {
+        setError('You are offline. Cloud assets unavailable.')
+        toast.error('You are offline. Cloud assets unavailable.')
+        return
+      }
+
+      setLoading(true)
+      setError(null)
+
+      try {
+        await retryWithBackoff(
+          async () => {
+            const res = await fetch(`/api/protected/r2/list?prefix=${encodeURIComponent(prefix)}`)
+
+            if (!res.ok) {
+              throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+            }
+
+            const data = await res.json()
+            if (data.folders) setFolders(data.folders)
+            if (data.files) setFiles(data.files)
+          },
+          3,
+          1000,
+        )
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to fetch cloud assets'
+        console.error('Failed to fetch folders:', err)
+        setError(errorMessage)
+        toast.error(errorMessage, {
+          action: {
+            label: 'Retry',
+            onClick: () => fetchFolders(prefix),
+          },
+        })
+      } finally {
+        setLoading(false)
+      }
+    },
+    [assetsRoot],
+  )
+
+  // Cloud Browser State
   useEffect(() => {
     if (browserMode === 'cloud') {
       fetchFolders(currentPrefix)
     }
-  }, [currentPrefix, browserMode])
-
-  const fetchFolders = async (prefix: string) => {
-    // Check if online
-    if (!isOnline()) {
-      setError('You are offline. Cloud assets unavailable.')
-      toast.error('You are offline. Cloud assets unavailable.')
-      return
-    }
-
-    setLoading(true)
-    setError(null)
-
-    try {
-      await retryWithBackoff(
-        async () => {
-          const res = await fetch(`/api/protected/r2/list?prefix=${encodeURIComponent(prefix)}`)
-
-          if (!res.ok) {
-            throw new Error(`HTTP ${res.status}: ${res.statusText}`)
-          }
-
-          const data = await res.json()
-          if (data.folders) setFolders(data.folders)
-          if (data.files) setFiles(data.files)
-        },
-        3,
-        1000,
-      )
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch cloud assets'
-      console.error('Failed to fetch folders:', err)
-      setError(errorMessage)
-      toast.error(errorMessage, {
-        action: {
-          label: 'Retry',
-          onClick: () => fetchFolders(prefix),
-        },
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [currentPrefix, browserMode, fetchFolders])
 
   // Filter Project Assets
   const filteredProjectAssets = assets.filter((asset) => {
@@ -160,7 +170,7 @@ export function AssetBrowser({ assets, assetsRoot }: AssetBrowserProps) {
         await retryWithBackoff(
           async () => {
             if (type === 'image') {
-              const img = new Image()
+              const img = new globalThis.Image()
               img.src = url
               await new Promise<void>((resolve, reject) => {
                 img.onload = () => {
@@ -385,23 +395,25 @@ export function AssetBrowser({ assets, assetsRoot }: AssetBrowserProps) {
               ))}
 
             {/* Assets */}
-            {(browserMode === 'project' ? filteredProjectAssets : files).map((asset: any) => {
+            {(browserMode === 'project' ? filteredProjectAssets : files).map((asset) => {
               const isProject = browserMode === 'project'
-              const name = isProject ? asset.originalFilename : asset.key.split('/').pop()
+              const name = isProject
+                ? (asset as Asset).originalFilename
+                : (asset as R2File).key.split('/').pop() || ''
 
               // Domain Logic
               const R2_DOMAIN = 'https://pub-2a95574384d748f6834d852cb7ec9aa1.r2.dev'
-              const url = isProject ? asset.url : `${R2_DOMAIN}/${asset.key}`
+              const url = isProject ? (asset as Asset).url : `${R2_DOMAIN}/${(asset as R2File).key}`
 
               const type = isProject
-                ? asset.type === 'VID'
+                ? (asset as Asset).type === 'VID'
                   ? 'video'
-                  : asset.type === 'IMG'
+                  : (asset as Asset).type === 'IMG'
                     ? 'image'
                     : 'audio'
                 : getCloudFileType(name)
 
-              const assetId = isProject ? asset.id : asset.key
+              const assetId = isProject ? (asset as Asset).id : (asset as R2File).key
               const isLoading = loadingAssetId === assetId
 
               return (
@@ -409,7 +421,12 @@ export function AssetBrowser({ assets, assetsRoot }: AssetBrowserProps) {
                   key={assetId}
                   onClick={() =>
                     !isLoading &&
-                    handleAddAsset(url, name, isProject ? asset.type : undefined, assetId)
+                    handleAddAsset(
+                      url,
+                      name,
+                      isProject ? (asset as Asset).type : undefined,
+                      assetId,
+                    )
                   }
                   className={`
                                         group cursor-pointer bg-white/[0.02] border border-white/5 rounded-xl relative overflow-hidden transition-all duration-300
@@ -425,14 +442,16 @@ export function AssetBrowser({ assets, assetsRoot }: AssetBrowserProps) {
                                     `}
                   >
                     {(type === 'image' || type === 'video') && (
-                      <img
-                        src={url}
-                        className="w-full h-full object-cover opacity-40 group-hover:opacity-80 transition-all duration-500 group-hover:scale-110"
-                        loading="lazy"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none'
-                        }}
-                      />
+                      <div className="w-full h-full relative">
+                        <NextImage
+                          src={url}
+                          alt={name}
+                          fill
+                          className="object-cover opacity-40 group-hover:opacity-80 transition-all duration-500 group-hover:scale-110"
+                          sizes="(max-width: 768px) 50vw, 25vw"
+                          unoptimized // External R2 URLs
+                        />
+                      </div>
                     )}
 
                     {/* Overlay Icon or Loading Spinner */}

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, type MouseEvent } from 'react'
 import { useEditorStore } from '@/modules/video/store/useEditorStore'
+import { VideoElement } from '@/types/video-schema'
 import { usePlaybackStore } from '@/modules/video/store/usePlaybackStore'
 import { snapElementOperation } from '@/modules/video/utils/snap'
 
@@ -39,7 +40,7 @@ const CurrentTime = React.memo(
 CurrentTime.displayName = 'CurrentTime'
 
 interface TimelineClipProps {
-  el: any
+  el: VideoElement
   durationInFrames: number
   selectedElementId: string | null
   draggingId: string | null

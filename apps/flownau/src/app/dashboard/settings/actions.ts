@@ -48,7 +48,7 @@ export async function triggerAssetSync() {
     } else {
       return { success: false, message: result.error || 'Unknown error' }
     }
-  } catch (err: any) {
-    return { success: false, message: err.message }
+  } catch (err: unknown) {
+    return { success: false, message: (err as Error).message }
   }
 }
