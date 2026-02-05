@@ -112,9 +112,16 @@ router.post(
       }
 
       // 3. Persist to Database
-      // We upsert the config based on the unique phoneNumberId
+      // We upsert the config based on the tenant-scoped unique key
+      const tenantId = (req as any).tenantId;
+
       const whatsappConfig = await (db as any).whatsAppConfig.upsert({
-        where: { phoneNumberId: finalPhoneNumberId },
+        where: {
+          tenantId_phoneNumberId: {
+            tenantId,
+            phoneNumberId: finalPhoneNumberId,
+          },
+        },
         update: {
           accessToken,
           wabaId: finalWabaId,
@@ -124,12 +131,13 @@ router.post(
           phoneNumberId: finalPhoneNumberId,
           wabaId: finalWabaId,
           accessToken,
-          isDefault: true, // Mark the first/latest connected account as default
+          isDefault: true,
+          tenantId,
         },
       });
 
       logger.info(
-        { waba_id: finalWabaId, configId: whatsappConfig.id },
+        { waba_id: finalWabaId, configId: whatsappConfig.id, tenantId },
         'WhatsApp account successfully linked and stored'
       );
 

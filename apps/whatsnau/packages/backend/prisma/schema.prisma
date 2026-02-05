@@ -135,6 +135,7 @@ model WhatsAppConfig {
   campaigns Campaign[]
 
   @@index([tenantId])
+  @@unique([tenantId, phoneNumberId])
 }
 
 model CampaignStage {
