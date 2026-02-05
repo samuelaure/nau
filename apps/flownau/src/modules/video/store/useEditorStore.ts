@@ -5,11 +5,30 @@ import { useHistoryStore } from './useHistoryStore'
 interface EditorState {
   template: VideoTemplate
   selectedElementId: string | null
+  selectedElementIds: Set<string>
+  clipboard: VideoElement[]
+  snapEnabled: boolean
 
   // Actions
   setTemplate: (template: VideoTemplate) => void
   updateTemplate: (updates: Partial<VideoTemplate>) => void
   setSelectedElementId: (id: string | null) => void
+
+  // Multi-select actions
+  toggleElementSelection: (id: string) => void
+  selectMultipleElements: (ids: string[]) => void
+  selectAllElements: () => void
+  clearSelection: () => void
+  deleteSelectedElements: () => void
+  moveSelectedElements: (deltaX: number, deltaY: number) => void
+
+  // Clipboard actions
+  copySelectedElements: () => void
+  cutSelectedElements: () => void
+  pasteElements: (atFrame?: number) => void
+
+  // Snap settings
+  toggleSnap: () => void
 
   addElement: (
     type: VideoElement['type'],
@@ -36,6 +55,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     elements: [],
   },
   selectedElementId: null,
+  selectedElementIds: new Set<string>(),
+  clipboard: [],
+  snapEnabled: true,
 
   setTemplate: (template) => set({ template }),
 
@@ -44,7 +66,165 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       template: { ...state.template, ...updates },
     })),
 
-  setSelectedElementId: (id) => set({ selectedElementId: id }),
+  setSelectedElementId: (id) =>
+    set({ selectedElementId: id, selectedElementIds: new Set(id ? [id] : []) }),
+
+  // Multi-select actions
+  toggleElementSelection: (id) => {
+    set((state) => {
+      const newSelectedIds = new Set(state.selectedElementIds)
+      if (newSelectedIds.has(id)) {
+        newSelectedIds.delete(id)
+      } else {
+        newSelectedIds.add(id)
+      }
+      return {
+        selectedElementIds: newSelectedIds,
+        selectedElementId: newSelectedIds.size === 1 ? Array.from(newSelectedIds)[0] : null,
+      }
+    })
+  },
+
+  selectMultipleElements: (ids) => {
+    const newSelectedIds = new Set(ids)
+    set({
+      selectedElementIds: newSelectedIds,
+      selectedElementId: newSelectedIds.size === 1 ? ids[0] : null,
+    })
+  },
+
+  selectAllElements: () => {
+    const { template } = get()
+    const allIds = template.elements.map((el) => el.id)
+    set({
+      selectedElementIds: new Set(allIds),
+      selectedElementId: null,
+    })
+  },
+
+  clearSelection: () => {
+    set({
+      selectedElementIds: new Set(),
+      selectedElementId: null,
+    })
+  },
+
+  deleteSelectedElements: () => {
+    const { selectedElementIds, template } = get()
+    if (selectedElementIds.size === 0) return
+
+    // Record deletion for undo/redo
+    const { execute } = useHistoryStore.getState()
+    selectedElementIds.forEach((id) => {
+      const DeleteElementCommand = require('../utils/commands').DeleteElementCommand
+      execute(new DeleteElementCommand(id))
+    })
+
+    set({
+      selectedElementIds: new Set(),
+      selectedElementId: null,
+    })
+  },
+
+  moveSelectedElements: (deltaX, deltaY) => {
+    const { selectedElementIds } = get()
+    if (selectedElementIds.size === 0) return
+
+    const { execute } = useHistoryStore.getState()
+    const UpdateElementStyleCommand = require('../utils/commands').UpdateElementStyleCommand
+
+    selectedElementIds.forEach((id) => {
+      const element = get().template.elements.find((el) => el.id === id)
+      if (!element) return
+
+      execute(
+        new UpdateElementStyleCommand(id, {
+          x: element.style.x + deltaX,
+          y: element.style.y + deltaY,
+        }),
+      )
+    })
+  },
+
+  // Clipboard actions
+  copySelectedElements: () => {
+    const { selectedElementIds, template } = get()
+    if (selectedElementIds.size === 0) return
+
+    const elementsToCopy = template.elements.filter((el) => selectedElementIds.has(el.id))
+    set({ clipboard: elementsToCopy })
+
+    const { toast } = require('sonner')
+    toast.success(
+      `Copied ${elementsToCopy.length} element${elementsToCopy.length > 1 ? 's' : ''}`,
+      {
+        duration: 1500,
+      },
+    )
+  },
+
+  cutSelectedElements: () => {
+    const { selectedElementIds, template } = get()
+    if (selectedElementIds.size === 0) return
+
+    const elementsToCut = template.elements.filter((el) => selectedElementIds.has(el.id))
+    set({ clipboard: elementsToCut })
+
+    // Delete the elements (with undo support)
+    const { execute } = useHistoryStore.getState()
+    const DeleteElementCommand = require('../utils/commands').DeleteElementCommand
+    selectedElementIds.forEach((id) => {
+      execute(new DeleteElementCommand(id))
+    })
+
+    set({
+      selectedElementIds: new Set(),
+      selectedElementId: null,
+    })
+
+    const { toast } = require('sonner')
+    toast.success(`Cut ${elementsToCut.length} element${elementsToCut.length > 1 ? 's' : ''}`, {
+      duration: 1500,
+    })
+  },
+
+  pasteElements: (atFrame) => {
+    const { clipboard, template } = get()
+    if (clipboard.length === 0) return
+
+    const { execute } = useHistoryStore.getState()
+    const AddElementCommand = require('../utils/commands').AddElementCommand
+    const newElementIds: string[] = []
+
+    clipboard.forEach((element) => {
+      // Create a deep copy with new ID
+      const newElement: VideoElement = {
+        ...element,
+        id: crypto.randomUUID(),
+        name: `${element.name} (Copy)`,
+        startFrame: atFrame !== undefined ? atFrame : element.startFrame,
+      }
+
+      execute(new AddElementCommand(newElement))
+      newElementIds.push(newElement.id)
+    })
+
+    // Select the pasted elements
+    set({
+      selectedElementIds: new Set(newElementIds),
+      selectedElementId: newElementIds.length === 1 ? newElementIds[0] : null,
+    })
+
+    const { toast } = require('sonner')
+    toast.success(`Pasted ${clipboard.length} element${clipboard.length > 1 ? 's' : ''}`, {
+      duration: 1500,
+    })
+  },
+
+  // Snap settings
+  toggleSnap: () => {
+    set((state) => ({ snapEnabled: !state.snapEnabled }))
+  },
 
   addElement: (type, asset) => {
     const { template } = get()
