@@ -15,6 +15,7 @@ import { AssetBrowser } from './assets/AssetBrowser'
 import { EditorCanvas } from './canvas/EditorCanvas'
 import { PropertiesPanel } from './properties/PropertiesPanel'
 import { Timeline } from './timeline/Timeline'
+import { ShortcutsModal } from './ShortcutsModal'
 // Error Boundaries
 import {
   EditorErrorBoundary,
@@ -99,6 +100,21 @@ function VideoEditorLayout({
   const redo = useHistoryStore((state) => state.redo)
 
   const [sidebarTab, setSidebarTab] = useState<'layers' | 'assets'>('layers')
+  const [showShortcuts, setShowShortcuts] = useState(false)
+
+  // Multi-select store actions
+  const selectedElementIds = useEditorStore((state) => state.selectedElementIds)
+  const selectAllElements = useEditorStore((state) => state.selectAllElements)
+  const clearSelection = useEditorStore((state) => state.clearSelection)
+  const deleteSelectedElements = useEditorStore((state) => state.deleteSelectedElements)
+
+  // Clipboard store actions
+  const copySelectedElements = useEditorStore((state) => state.copySelectedElements)
+  const cutSelectedElements = useEditorStore((state) => state.cutSelectedElements)
+  const pasteElements = useEditorStore((state) => state.pasteElements)
+
+  // Snap settings
+  const toggleSnap = useEditorStore((state) => state.toggleSnap)
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -116,8 +132,57 @@ function VideoEditorLayout({
         }
       }
 
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElementId) {
-        deleteElement(selectedElementId)
+      // Delete - works with both single and multi-select
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedElementIds.size > 0) {
+          e.preventDefault()
+          deleteSelectedElements()
+        } else if (selectedElementId) {
+          e.preventDefault()
+          deleteElement(selectedElementId)
+        }
+      }
+
+      // Select All (Cmd+A)
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
+        e.preventDefault()
+        selectAllElements()
+      }
+
+      // Clear Selection (Cmd+D)
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd') {
+        e.preventDefault()
+        clearSelection()
+      }
+
+      // Copy (Cmd+C)
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'c') {
+        e.preventDefault()
+        copySelectedElements()
+      }
+
+      // Cut (Cmd+X)
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'x') {
+        e.preventDefault()
+        cutSelectedElements()
+      }
+
+      // Paste (Cmd+V) - paste at current playhead position
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'v') {
+        e.preventDefault()
+        pasteElements(currentFrame)
+      }
+
+      // Toggle Snap (Cmd+;)
+      if ((e.metaKey || e.ctrlKey) && e.key === ';') {
+        e.preventDefault()
+        toggleSnap()
+      }
+
+      // Toggle Shortcuts Legend (Shift + ?)
+      if (e.key === '?' && e.shiftKey) {
+        e.preventDefault()
+        setShowShortcuts((prev) => !prev)
       }
 
       // Undo/Redo Shortcuts
@@ -140,11 +205,19 @@ function VideoEditorLayout({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [
     selectedElementId,
+    selectedElementIds,
     currentFrame,
     splitElement,
     isPlaying,
     setIsPlaying,
     deleteElement,
+    deleteSelectedElements,
+    selectAllElements,
+    clearSelection,
+    copySelectedElements,
+    cutSelectedElements,
+    pasteElements,
+    toggleSnap,
     undo,
     redo,
   ])
@@ -222,6 +295,8 @@ function VideoEditorLayout({
           <PropertiesPanel />
         </aside>
       </main>
+
+      <ShortcutsModal isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} />
     </div>
   )
 }
