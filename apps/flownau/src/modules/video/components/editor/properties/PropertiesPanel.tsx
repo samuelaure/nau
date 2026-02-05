@@ -3,6 +3,7 @@
 import React from 'react'
 import { Settings, Maximize2, Type, Box } from 'lucide-react'
 import { useEditorStore } from '@/modules/video/store/useEditorStore'
+import { Tooltip } from '@/modules/video/components/ui/Tooltip'
 
 export function PropertiesPanel() {
   const template = useEditorStore((state) => state.template)
@@ -43,6 +44,14 @@ export function PropertiesPanel() {
     link.href = `https://fonts.googleapis.com/css2?${fontParams}&display=swap`
   }, [template.elements])
 
+  const { toast } = require('sonner')
+  const {
+    validateNumber,
+    validateFrame,
+    validateDimension,
+    validatePosition,
+  } = require('@/modules/video/utils/validation')
+
   const renderHeader = (icon: React.ReactNode, title: string) => (
     <div className="flex items-center gap-2 mb-4 px-1">
       <div className="text-accent">{icon}</div>
@@ -58,20 +67,48 @@ export function PropertiesPanel() {
     onChange: (val: string) => void,
     type: 'text' | 'number' = 'text',
     step?: string,
-  ) => (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-[10px] font-semibold text-text-secondary/60 uppercase tracking-wider pl-1">
-        {label}
-      </label>
-      <input
-        type={type}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-white/[0.03] border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-accent focus:bg-accent/5 transition-all"
-      />
-    </div>
-  )
+    validator?: (val: string) => { isValid: boolean; error?: string },
+    tooltip?: string,
+  ) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const newVal = e.target.value
+
+      if (validator) {
+        const { isValid, error } = validator(newVal)
+        if (!isValid) {
+          toast.error(error || 'Invalid input')
+          return
+        }
+      }
+
+      onChange(newVal)
+    }
+
+    return (
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center">
+          <label className="text-[10px] font-semibold text-text-secondary/60 uppercase tracking-wider pl-1">
+            {tooltip ? (
+              <Tooltip content={tooltip} position="right" className="cursor-help">
+                <span className="border-b border-dotted border-white/10 hover:border-accent/50 transition-colors">
+                  {label}
+                </span>
+              </Tooltip>
+            ) : (
+              label
+            )}
+          </label>
+        </div>
+        <input
+          type={type}
+          step={step}
+          value={value}
+          onChange={handleChange}
+          className="w-full bg-white/[0.03] border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-accent focus:bg-accent/5 transition-all invalid:border-red-500 invalid:text-red-500"
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col h-full bg-panel overflow-y-auto custom-scrollbar p-5">
@@ -122,12 +159,16 @@ export function PropertiesPanel() {
                   selectedElement.startFrame,
                   (val) => updateElement(selectedElement.id, { startFrame: Number(val) }),
                   'number',
+                  undefined,
+                  (val) => validateFrame(val, template.durationInFrames),
                 )}
                 {renderInputGroup(
                   'Duration',
                   selectedElement.durationInFrames,
                   (val) => updateElement(selectedElement.id, { durationInFrames: Number(val) }),
                   'number',
+                  undefined,
+                  (val) => validateNumber(val, 1, template.durationInFrames),
                 )}
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -136,12 +177,16 @@ export function PropertiesPanel() {
                   selectedElement.fadeInDuration || 0,
                   (val) => updateElement(selectedElement.id, { fadeInDuration: Number(val) }),
                   'number',
+                  undefined,
+                  (val) => validateNumber(val, 0, selectedElement.durationInFrames / 2),
                 )}
                 {renderInputGroup(
                   'Fade Out',
                   selectedElement.fadeOutDuration || 0,
                   (val) => updateElement(selectedElement.id, { fadeOutDuration: Number(val) }),
                   'number',
+                  undefined,
+                  (val) => validateNumber(val, 0, selectedElement.durationInFrames / 2),
                 )}
               </div>
             </div>
@@ -157,12 +202,16 @@ export function PropertiesPanel() {
                   selectedElement.style.x,
                   (val) => updateElementStyle(selectedElement.id, { x: Number(val) }),
                   'number',
+                  undefined,
+                  (val) => validatePosition(val, template),
                 )}
                 {renderInputGroup(
                   'Y Pos',
                   selectedElement.style.y,
                   (val) => updateElementStyle(selectedElement.id, { y: Number(val) }),
                   'number',
+                  undefined,
+                  (val) => validatePosition(val, template),
                 )}
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -172,12 +221,16 @@ export function PropertiesPanel() {
                   (val) => updateElementStyle(selectedElement.id, { scale: Number(val) }),
                   'number',
                   '0.1',
+                  (val) => validateNumber(val, 0.1, 10),
+                  'Zoom multiplier (0.1x - 10x)',
                 )}
                 {renderInputGroup(
                   'Rotation',
                   selectedElement.style.rotation,
                   (val) => updateElementStyle(selectedElement.id, { rotation: Number(val) }),
                   'number',
+                  undefined,
+                  (val) => validateNumber(val, -360, 360),
                 )}
               </div>
             </div>
@@ -193,6 +246,8 @@ export function PropertiesPanel() {
                   selectedElement.style.fontSize || 40,
                   (val) => updateElementStyle(selectedElement.id, { fontSize: Number(val) }),
                   'number',
+                  undefined,
+                  (val) => validateNumber(val, 1, 500),
                 )}
 
                 <div className="flex flex-col gap-1.5">
@@ -248,12 +303,16 @@ export function PropertiesPanel() {
                   template.width,
                   (val) => updateTemplate({ width: Number(val) }),
                   'number',
+                  undefined,
+                  (val) => validateNumber(val, 100, 3840),
                 )}
                 {renderInputGroup(
                   'Canvas H',
                   template.height,
                   (val) => updateTemplate({ height: Number(val) }),
                   'number',
+                  undefined,
+                  (val) => validateNumber(val, 100, 3840),
                 )}
               </div>
               {renderInputGroup(
@@ -261,12 +320,18 @@ export function PropertiesPanel() {
                 template.durationInFrames,
                 (val) => updateTemplate({ durationInFrames: Number(val) }),
                 'number',
+                undefined,
+                (val) => validateNumber(val, 30, 36000),
+                'Total length in frames (30 = 1 sec)',
               )}
               {renderInputGroup(
                 'Framerate (FPS)',
                 template.fps,
                 (val) => updateTemplate({ fps: Number(val) }),
                 'number',
+                undefined,
+                (val) => validateNumber(val, 1, 120),
+                'Playback speed',
               )}
             </div>
           </section>
