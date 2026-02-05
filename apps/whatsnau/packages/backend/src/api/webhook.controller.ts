@@ -41,8 +41,14 @@ router.post('/', async (req: Request, res: Response) => {
     return res.sendStatus(403);
   }
 
-  // Verbose logging for all incoming webhook payloads
-  logger.info({ body }, 'Incoming WhatsApp Webhook');
+  // Sanitized logging for incoming webhook payloads (avoid PII exposure)
+  const webhookMetadata = {
+    bodySize: JSON.stringify(body).length,
+    entryCount: body.entry?.length || 0,
+    messageType: body.entry?.[0]?.changes?.[0]?.value?.messages?.[0]?.type,
+    hasStatuses: !!body.entry?.[0]?.changes?.[0]?.value?.statuses,
+  };
+  logger.info(webhookMetadata, 'Incoming WhatsApp Webhook');
 
   try {
     const events = provider.normalizeWebhook(body);

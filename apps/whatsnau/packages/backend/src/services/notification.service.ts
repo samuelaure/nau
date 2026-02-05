@@ -1,6 +1,7 @@
 import { config } from '../core/config.js';
 import { logger } from '../core/logger.js';
 import { db } from '../core/db.js';
+import { sanitizeForTelegram, formatContextForTelegram } from './sanitization.util.js';
 
 export class NotificationService {
   private static botToken = config.TELEGRAM_BOT_TOKEN;
@@ -49,11 +50,12 @@ export class NotificationService {
   }
 
   static async notifyHandover(lead: any, reasoning?: string) {
+    const sanitizedLead = sanitizeForTelegram(lead);
     const dashboardUrl = `http://localhost:5173/`; // Should be configurable
     const leadLink = `${dashboardUrl}?leadId=${lead.id}`;
     const text =
       `🚨 <b>Intelligent Handover Triggered</b>\n\n` +
-      `👤 <b>Lead:</b> ${lead.name || 'Unknown'} (${lead.phoneNumber})\n` +
+      `👤 <b>Lead:</b> ${sanitizedLead.name || 'Unknown'} (${sanitizedLead.phoneNumber})\n` +
       `📝 <b>Reasoning:</b> ${reasoning || 'Lead requested human intervention.'}\n\n` +
       `🔗 <a href="${leadLink}">Open Chat</a>`;
 
@@ -61,12 +63,14 @@ export class NotificationService {
   }
 
   static async notifyHighIntent(lead: any, message: string) {
+    const sanitizedLead = sanitizeForTelegram(lead);
+    const sanitizedMessage = '[REDACTED]'; // Never send message content to Telegram
     const dashboardUrl = `http://localhost:5173/`;
     const leadLink = `${dashboardUrl}?leadId=${lead.id}`;
     const text =
       `🔥 <b>High Intent Detected</b>\n\n` +
-      `👤 <b>Lead:</b> ${lead.name || 'Unknown'} (${lead.phoneNumber})\n` +
-      `💬 <b>Message:</b> "${message}"\n\n` +
+      `👤 <b>Lead:</b> ${sanitizedLead.name || 'Unknown'} (${sanitizedLead.phoneNumber})\n` +
+      `💬 <b>Message:</b> "${sanitizedMessage}"\n\n` +
       `🔗 <a href="${leadLink}">Open Chat and Intervene</a>`;
 
     await this.sendTelegramAlert(text);
@@ -86,6 +90,9 @@ export class NotificationService {
 
     this.alertCooldowns.set(key, Date.now());
 
+    // Sanitize context before storing and sending
+    const sanitizedContext = sanitizeForTelegram(context);
+
     // Log to database
     try {
       await db.systemAlert.create({
@@ -93,7 +100,7 @@ export class NotificationService {
           severity,
           category: context.category,
           message: context.error?.message || context.message,
-          context: context,
+          context: sanitizedContext, // Store sanitized version
           tenantId: context.tenantId,
         },
       });
@@ -101,17 +108,17 @@ export class NotificationService {
       logger.error({ err }, 'Failed to create SystemAlert');
     }
 
-    // Send Telegram alert
+    // Send Telegram alert with sanitized data
     const icon = severity === 'CRITICAL' ? '🚨' : '⚠️';
     const message =
       `${icon} <b>${severity}</b>: ${context.category}\\n\\n` +
       `${context.error?.message || context.message}\\n\\n` +
-      `Tenant: ${context.tenantId || 'N/A'}\\n` +
+      `Tenant: ${sanitizedContext.tenantId || 'N/A'}\\n` +
       `Time: ${new Date().toISOString()}`;
 
     await this.sendTelegramAlert(message);
 
-    logger.error({ ...context, severity }, 'System error notification sent');
+    logger.error({ ...sanitizedContext, severity }, 'System error notification sent');
   }
 
   // NEW: Fatal error notification (critical failures requiring immediate attention)
