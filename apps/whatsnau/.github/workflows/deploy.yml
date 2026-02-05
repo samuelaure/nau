@@ -26,6 +26,10 @@ jobs:
       - name: 📦 Install Dependencies
         run: npm ci
 
+      - name: 🔧 Generate Prisma Client
+        run: npx prisma generate
+        working-directory: packages/backend
+
       - name: 🧪 Run Verification
         run: npm run verify
 
