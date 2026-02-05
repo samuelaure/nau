@@ -62,4 +62,4 @@ EXPOSE 3000
 
 # Start command
 WORKDIR /app/packages/backend
-CMD npx prisma migrate deploy && npm start
+CMD npm start

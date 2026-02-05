@@ -1,11 +1,35 @@
 services:
-  whatsnau:
+  app:
+    container_name: whatsnau
     environment:
       - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@shared_postgres:5432/${DB_NAME}?schema=public
       - REDIS_HOST=shared_redis
-    depends_on: []
+    depends_on:
+      migration-runner:
+        condition: service_completed_successfully
     networks:
       - shared-mesh
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.whatsnau.rule=Host(`${PUBLIC_DOMAIN:-whatsnau.localhost}`)"
+      - "traefik.http.routers.whatsnau.entrypoints=web"
+      - "traefik.http.services.whatsnau.loadbalancer.server.port=3000"
+      - "traefik.docker.network=shared-mesh"
+
+  migration-runner:
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@shared_postgres:5432/${DB_NAME}?schema=public
+    networks:
+      - shared-mesh
+    depends_on: []
+
+  worker:
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@shared_postgres:5432/${DB_NAME}?schema=public
+      - REDIS_HOST=shared_redis
+    networks:
+      - shared-mesh
+    depends_on: []
 
   postgres:
     profiles: [disabled]

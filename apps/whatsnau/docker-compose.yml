@@ -1,11 +1,11 @@
 services:
-  whatsnau:
+  app:
     build: 
       context: .
       dockerfile: packages/backend/Dockerfile
     restart: always
-    ports:
-      - '3000:3000'
+    # ports:
+    #   - '3000:3000'
     env_file:
       - ./packages/backend/.env
     environment:
@@ -13,6 +13,47 @@ services:
       - REDIS_HOST=redis
     networks:
       - app-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migration-runner:
+        condition: service_completed_successfully
+
+  migration-runner:
+    build: 
+      context: .
+      dockerfile: packages/backend/Dockerfile
+    command: npx prisma migrate deploy
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?schema=public
+    networks:
+      - app-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker:
+    build: 
+      context: .
+      dockerfile: packages/backend/Dockerfile
+    command: npm run start:worker
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?schema=public
+      - REDIS_HOST=redis
+    networks:
+      - app-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   postgres:
     image: postgres:16-alpine
