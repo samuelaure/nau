@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [6.7.0](https://github.com/samuelaure/whatsnau/compare/v6.0.0...v6.7.0) (2026-02-05)
+
+
+### Features
+
+* **api:** add admin and health endpoints ([643e93c](https://github.com/samuelaure/whatsnau/commit/643e93c84d6f2462eb539d655ff371fbc147039e))
+* **backend:** add cors and helmet for security hardening ([84c2e37](https://github.com/samuelaure/whatsnau/commit/84c2e37a3f95666a37136686778fde7d996b6775))
+* **backend:** add sanitization utility for PII redaction and sensitive data masking ([a7675fc](https://github.com/samuelaure/whatsnau/commit/a7675fc1c09891f74cf00e10fd4cc8d997e3522e))
+* **backend:** improve core orchestration type safety and resolve any assertions ([8239123](https://github.com/samuelaure/whatsnau/commit/823912372b4d0f9d8a262bab607321263e6834bb))
+* **bootstrap:** integrate resilience features into application startup ([4fd1889](https://github.com/samuelaure/whatsnau/commit/4fd18895322a85deb68a5e12c00950064cf8a4c0))
+* **ci:** harden deployment pipeline with quality gates and formal releases ([bc0fa78](https://github.com/samuelaure/whatsnau/commit/bc0fa7872418638a0fdfb99c7555afee3070a8c6))
+* **config:** add global config service with caching and graceful degradation ([0b32629](https://github.com/samuelaure/whatsnau/commit/0b326291cd6f66e98a4018dd93950790914f46fc))
+* **config:** enhance configuration validation and security ([7e576bd](https://github.com/samuelaure/whatsnau/commit/7e576bdbe6cc7a9e017a734e2c56ef90ec5de955))
+* **db:** add monitoring models and migration ([0520a5b](https://github.com/samuelaure/whatsnau/commit/0520a5b9a6d6471ce62a4f59c1ecf4d82d201402))
+* **deploy:** implement tag-based automated deployment system ([b755376](https://github.com/samuelaure/whatsnau/commit/b7553765c47be1d697334ddb607c0b9447a7cb0c))
+* **infra:** implement retry logic for db and redis ([12b0fde](https://github.com/samuelaure/whatsnau/commit/12b0fded1296fa16e1ab2d6ad45d88b91782bb62))
+* **infra:** standardize docker topology and environment-aware routing ([5ce8c12](https://github.com/samuelaure/whatsnau/commit/5ce8c129c29fd6a6f1b3d0fbfca2e72823a141c2))
+* **infra:** sync backend env example with backbone defaults ([137f357](https://github.com/samuelaure/whatsnau/commit/137f357a15d6ba803c266886675091494a441e0d))
+* **notifications:** add system alerting capabilities ([654c801](https://github.com/samuelaure/whatsnau/commit/654c80188b1e11ab2d24c82592d1ff15c297accc))
+* **observability:** add correlation tracking and performance monitoring ([85c426a](https://github.com/samuelaure/whatsnau/commit/85c426aa473be234866178b9f9d1471be73a2340))
+* **observability:** add testing utilities to correlation id module ([c14c716](https://github.com/samuelaure/whatsnau/commit/c14c71682e01ae799694d05433e9f91c216c9408))
+* **resilience:** add graceful shutdown, error boundary, and circuit breaker ([a5faea3](https://github.com/samuelaure/whatsnau/commit/a5faea35387ab8487ca96ef7c5e73ae968cd2b1b))
+* **resilience:** enhance error boundary and graceful shutdown with http server support ([10451aa](https://github.com/samuelaure/whatsnau/commit/10451aa8cee659e20f99f0caf43953848f14a41a))
+* **security:** harden auth, secrets, and cors ([3fdc6f1](https://github.com/samuelaure/whatsnau/commit/3fdc6f1b2c887f191079d34196a81432dbfad07f))
+* **services:** add circuit breakers and performance monitoring to ai and whatsapp services ([50872fb](https://github.com/samuelaure/whatsnau/commit/50872fbc2d839e7899f21b54580a458db11c9c46))
+* **worker:** implement dedicated worker service ([781e9ed](https://github.com/samuelaure/whatsnau/commit/781e9ed73f2dd61adb53a73b15a7af5ea72ea992))
+* **workers:** add error boundaries and retry exhaustion handling ([845e847](https://github.com/samuelaure/whatsnau/commit/845e847b603598dbefa355c453d504a795f511eb))
+
+
+### Bug Fixes
+
+* **ci:** add config mocking and prisma generation for CI tests ([565a3b5](https://github.com/samuelaure/whatsnau/commit/565a3b5682fcff93cffbc1fc104d3742b3124291))
+* **ci:** fix cross-platform env setting and mock infrastructure in tests ([913e5c1](https://github.com/samuelaure/whatsnau/commit/913e5c18bc005f08a2260216e88d410317ee9bc5))
+* **frontend:** add array safety checks and fix analytics endpoint ([5e8e8a7](https://github.com/samuelaure/whatsnau/commit/5e8e8a7bfec305f2844c02cdc427b9f09bb6fb7a))
+* **security:** enforce tenant-scoping for WhatsApp onboarding ([20db58a](https://github.com/samuelaure/whatsnau/commit/20db58a68b7c54e71589f4ea449afb15d8652bf6))
+
 ### [6.6.1](https://github.com/samuelaure/whatsnau/compare/v6.6.0...v6.6.1) (2026-02-05)
 
 
