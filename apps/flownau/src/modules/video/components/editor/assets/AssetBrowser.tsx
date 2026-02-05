@@ -22,6 +22,7 @@ import {
 import { useEditorStore } from '@/modules/video/store/useEditorStore'
 import { retryWithBackoff, isOnline } from '@/modules/video/utils/retry'
 import { toast } from 'sonner'
+import { AssetCardSkeleton, FolderCardSkeleton } from '../../ui/Skeleton'
 
 interface Asset {
   id: string
@@ -336,11 +337,21 @@ export function AssetBrowser({ assets, assetsRoot }: AssetBrowserProps) {
             </div>
           </div>
         ) : browserMode === 'cloud' && loading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-4 opacity-20">
-            <Loader2 className="animate-spin text-accent" size={32} />
-            <span className="text-[10px] font-bold uppercase tracking-widest">
-              Querying Cloud...
-            </span>
+          <div
+            className={`
+              gap-3
+              ${viewMode === 'list' ? 'flex flex-col' : 'grid'}
+              ${viewMode === 'grid-lg' ? 'grid-cols-2' : ''}
+              ${viewMode === 'grid-sm' ? 'grid-cols-3' : ''}
+            `}
+          >
+            {/* Show skeleton loaders */}
+            {Array.from({ length: 6 }).map((_, i) => (
+              <React.Fragment key={i}>
+                {i < 2 && <FolderCardSkeleton viewMode={viewMode} />}
+                {i >= 2 && <AssetCardSkeleton viewMode={viewMode} />}
+              </React.Fragment>
+            ))}
           </div>
         ) : (
           <div
