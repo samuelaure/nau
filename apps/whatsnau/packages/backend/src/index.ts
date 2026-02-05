@@ -7,6 +7,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { rateLimit } from 'express-rate-limit';
+import { config } from './core/config.js';
 import { logger } from './core/logger.js';
 import { db, connectWithRetry } from './core/db.js';
 import { CampaignService } from './services/campaign.service.js';
@@ -47,13 +48,19 @@ app.use(
   })
 );
 
-const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',')
-  : ['https://whatsnau.9nau.com', 'https://9nau.com', 'https://www.9nau.com'];
+const allowedOrigins = config.ALLOWED_ORIGINS.split(',');
 
 app.use(
   cors({
-    origin: process.env.NODE_ENV === 'production' ? allowedOrigins : true,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        return callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
   })
 );

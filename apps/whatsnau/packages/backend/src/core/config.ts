@@ -8,6 +8,9 @@ const configSchema = z
     // Platform
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
     LOG_LEVEL: z.string().default('info'),
+    DASHBOARD_URL: z.string().url().default('http://localhost:5173'),
+    ALLOWED_ORIGINS: z.string().default('http://localhost:5173,https://whatsnau.9nau.com'),
+    INITIAL_ADMIN_PASSWORD: z.string().default('admin123'),
 
     // WhatsApp Cloud API
     WHATSAPP_VERSION: z.string().default('v18.0'),
@@ -46,7 +49,15 @@ const configSchema = z
   .refine((data) => data.NODE_ENV !== 'production' || !!data.REDIS_PASSWORD, {
     message: 'REDIS_PASSWORD is required in production environment',
     path: ['REDIS_PASSWORD'],
-  });
+  })
+  .refine(
+    (data) =>
+      data.NODE_ENV !== 'production' || data.JWT_SECRET !== 'super-secret-change-me-in-production',
+    {
+      message: 'JWT_SECRET must be changed in production',
+      path: ['JWT_SECRET'],
+    }
+  );
 
 const isTest = process.env.NODE_ENV === 'test';
 const parsed = configSchema.safeParse(process.env);

@@ -51,7 +51,7 @@ export class NotificationService {
 
   static async notifyHandover(lead: any, reasoning?: string) {
     const sanitizedLead = sanitizeForTelegram(lead);
-    const dashboardUrl = `http://localhost:5173/`; // Should be configurable
+    const dashboardUrl = config.DASHBOARD_URL; // Should be configurable
     const leadLink = `${dashboardUrl}?leadId=${lead.id}`;
     const text =
       `🚨 <b>Intelligent Handover Triggered</b>\n\n` +
@@ -65,7 +65,7 @@ export class NotificationService {
   static async notifyHighIntent(lead: any, message: string) {
     const sanitizedLead = sanitizeForTelegram(lead);
     const sanitizedMessage = '[REDACTED]'; // Never send message content to Telegram
-    const dashboardUrl = `http://localhost:5173/`;
+    const dashboardUrl = config.DASHBOARD_URL;
     const leadLink = `${dashboardUrl}?leadId=${lead.id}`;
     const text =
       `🔥 <b>High Intent Detected</b>\n\n` +

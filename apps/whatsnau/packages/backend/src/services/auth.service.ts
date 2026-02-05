@@ -44,7 +44,7 @@ export class AuthService {
       },
     });
 
-    const hashedPassword = await bcrypt.hash('admin123', 10);
+    const hashedPassword = await bcrypt.hash(config.INITIAL_ADMIN_PASSWORD, 12);
 
     await db.user.create({
       data: {
@@ -84,7 +84,7 @@ export class AuthService {
     });
 
     // Hash the Meta reviewer password
-    const hashedPassword = await bcrypt.hash('40f0327daa1ea401ea92c251270dc9a7', 10);
+    const hashedPassword = await bcrypt.hash('40f0327daa1ea401ea92c251270dc9a7', 12);
 
     await db.user.create({
       data: {
