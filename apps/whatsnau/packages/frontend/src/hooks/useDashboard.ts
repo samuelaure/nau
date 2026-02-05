@@ -36,11 +36,11 @@ export const useDashboard = (campaignId?: string) => {
       const configData = await configRes.json();
       const tenantStatsData = tenantStatsRes.ok ? await tenantStatsRes.json() : null;
 
-      setStats(statsData);
+      setStats(Array.isArray(statsData) ? statsData : []);
       setTenantStats(tenantStatsData);
       // Handle both old format (array) and new format (object with data property)
       setLeads(Array.isArray(leadsData) ? leadsData : leadsData.data || []);
-      setKeywords(keywordsData);
+      setKeywords(Array.isArray(keywordsData) ? keywordsData : []);
       setAvailability(configData.availabilityStatus || '');
     } catch (error) {
       console.error('Failed to fetch data:', error);
@@ -59,7 +59,7 @@ export const useDashboard = (campaignId?: string) => {
       try {
         const res = await fetch(`/api/dashboard/leads/${leadId}/messages`);
         const data = await res.json();
-        setMessages(data);
+        setMessages(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error('Failed to fetch messages:', error);
         notify('error', 'Failed to sync lead messages.');

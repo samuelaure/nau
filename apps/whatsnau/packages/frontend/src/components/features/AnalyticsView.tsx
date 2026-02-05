@@ -25,9 +25,9 @@ export const AnalyticsView: React.FC = () => {
 
   const fetchAnalytics = async () => {
     try {
-      const res = await fetch('/api/stats');
+      const res = await fetch('/api/dashboard/stats');
       const stats = await res.json();
-      setData(stats);
+      setData(Array.isArray(stats) ? stats : []);
     } catch (error) {
       console.error('Failed to fetch analytics:', error);
     } finally {
