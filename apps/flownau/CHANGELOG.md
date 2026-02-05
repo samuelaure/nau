@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2026-02-05
+
+### Changed
+- **Infrastructure Standardization (Phase 1)**
+  - Enforced a **Zero-Error Policy** across the entire codebase (Linting/Types/Tests).
+  - Standardized all imports to ES6 modules (purged `require()`).
+  - Hardened Type System: Eliminated `any` sprawl in critical video/account modules.
+  - Optimized React Stability: Resolved synchronous `setState` anti-patterns in hooks.
+  - Local Cloud Mesh: Verified `docker-compose.override` alignment for shared infrastructure pivot.
+
+### Technical Wins
+- **Type Sovereignty**: Complete elimination of `any` types in core business logic.
+- **Hygiene**: `npm run verify` now passes with 0 errors.
+
 ## [0.1.9] - 2026-02-05
 
 ### Added
