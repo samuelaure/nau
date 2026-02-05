@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [6.6.1](https://github.com/samuelaure/whatsnau/compare/v6.6.0...v6.6.1) (2026-02-05)
+
+
+### Bug Fixes
+
+* **ci:** fix cross-platform env setting and mock infrastructure in tests ([59c7fe3](https://github.com/samuelaure/whatsnau/commit/59c7fe313dacb516eeb9c068c3e6b3a5cea6a8da))
+
 ## [6.6.0](https://github.com/samuelaure/whatsnau/compare/v6.0.0...v6.6.0) (2026-02-05)
 
 
