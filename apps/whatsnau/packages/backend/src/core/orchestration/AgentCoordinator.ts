@@ -6,6 +6,9 @@ import { EventsService } from '../../services/events.service.js';
 import { maintenanceQueue } from '../../infrastructure/queues/maintenance.queue.js';
 import { outboundQueue } from '../../infrastructure/queues/outbound.queue.js';
 import { getCorrelationId } from '../observability/CorrelationId.js';
+import { Lead, CampaignStage } from '@prisma/client';
+
+type AgentLead = Lead & { currentStage?: CampaignStage | null };
 
 /**
  * AgentCoordinator - Orchestrates AI logic, manual handover, and asynchronous sending
@@ -15,7 +18,7 @@ export class AgentCoordinator {
    * Main entry point for deciding how to process an inbound message based on AI intent
    */
   static async handleInboundAI(
-    lead: any,
+    lead: AgentLead,
     content: string,
     onPhaseRequest: (phase: string) => Promise<void>
   ) {
@@ -61,7 +64,7 @@ export class AgentCoordinator {
   /**
    * Transition lead to manual handover mode
    */
-  static async initiateHandover(lead: any, reasoning?: string) {
+  static async initiateHandover(lead: AgentLead, reasoning?: string) {
     logger.info(
       { leadId: lead.id, reasoning, correlationId: getCorrelationId() },
       'Initiating manual handover'
@@ -76,9 +79,9 @@ export class AgentCoordinator {
     await NotificationService.notifyHandover(lead, reasoning);
 
     // Schedule Recovery
-    const config = (await db.globalConfig.findUnique({
+    const config = await db.globalConfig.findUnique({
       where: { tenantId: lead.tenantId },
-    })) as any;
+    });
     const delayMins = config?.recoveryTimeoutMinutes || 240;
 
     await maintenanceQueue.add(
@@ -89,11 +92,10 @@ export class AgentCoordinator {
 
     // Send bridge message
     const availStatus = config?.availabilityStatus;
-    const responseMsg = `Perfecto, le avisaré a Samuel que deseas hablar con él directamente.${
-      availStatus
-        ? ` Samuel está actualmente ${availStatus}, pero ya sabe que quieres hablar con él.`
-        : ' Le he notificado a Samuel, vendrá lo antes que pueda.'
-    } Mientras esperamos, aquí estaré si necesitas algo.`;
+    const responseMsg = `Perfecto, le avisaré a Samuel que deseas hablar con él directamente.${availStatus
+      ? ` Samuel está actualmente ${availStatus}, pero ya sabe que quieres hablar con él.`
+      : ' Le he notificado a Samuel, vendrá lo antes que pueda.'
+      } Mientras esperamos, aquí estaré si necesitas algo.`;
 
     await this.sendAsync(
       lead,
@@ -109,7 +111,7 @@ export class AgentCoordinator {
    * Trigger appropriate AI agent based on role
    */
   static async triggerAgent(
-    lead: any,
+    lead: AgentLead,
     role: 'CLOSER' | 'RECEPTIONIST' | 'NURTURING',
     userMessage?: string
   ) {

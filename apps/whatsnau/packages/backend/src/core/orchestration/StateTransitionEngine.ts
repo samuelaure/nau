@@ -5,6 +5,7 @@ import { TemplateService } from '../../services/template.service.js';
 import { GlobalConfigService } from '../../services/config.global.service.js';
 import { AgentCoordinator } from './AgentCoordinator.js';
 import { ComplianceGateway } from './ComplianceGateway.js';
+import { Lead } from '@prisma/client';
 
 /**
  * StateTransitionEngine - Handles phase-specific business logic and transitions
@@ -13,7 +14,7 @@ export class StateTransitionEngine {
   /**
    * Main entry point for phase handling
    */
-  static async handlePhase(lead: any, content: string, buttonId?: string) {
+  static async handlePhase(lead: Lead, content: string, buttonId?: string) {
     switch (lead.state as LeadState) {
       case LeadState.COLD:
         await this.handleColdPhase(lead, content, buttonId);
@@ -30,7 +31,7 @@ export class StateTransitionEngine {
     }
   }
 
-  private static async handleColdPhase(lead: any, content: string, buttonId?: string) {
+  private static async handleColdPhase(lead: Lead, content: string, buttonId?: string) {
     if (
       buttonId === 'yes_interested' ||
       content.toLowerCase().includes('si') ||
@@ -68,14 +69,14 @@ export class StateTransitionEngine {
     await AgentCoordinator.triggerAgent(lead, 'CLOSER', content);
   }
 
-  private static async handleInterestedPhase(lead: any, content: string, buttonId?: string) {
+  private static async handleInterestedPhase(lead: Lead, content: string, buttonId?: string) {
     if (buttonId === 'ver_demo' || content.toLowerCase().includes('demo')) {
       return this.startDemo(lead);
     }
     await AgentCoordinator.triggerAgent(lead, 'CLOSER', content);
   }
 
-  private static async handleDemoPhase(lead: any, content: string, buttonId?: string) {
+  private static async handleDemoPhase(lead: Lead, content: string, buttonId?: string) {
     if (lead.demoExpiresAt && new Date() > new Date(lead.demoExpiresAt)) {
       await LeadService.endDemo(lead.id);
       const msg = 'La demo ha finalizado. Regresamos a nuestra charla. ¿Qué te ha parecido?';
@@ -85,7 +86,7 @@ export class StateTransitionEngine {
     await AgentCoordinator.triggerAgent(lead, 'RECEPTIONIST', content);
   }
 
-  private static async handleNurturingPhase(lead: any, content: string) {
+  private static async handleNurturingPhase(lead: Lead, content: string) {
     try {
       await db.lead.update({
         where: { id: lead.id },
@@ -97,7 +98,7 @@ export class StateTransitionEngine {
     }
   }
 
-  private static async startDemo(lead: any) {
+  private static async startDemo(lead: Lead) {
     try {
       const config = await GlobalConfigService.getConfig(lead.tenantId);
       const duration = config.defaultDemoDurationMinutes;
@@ -118,7 +119,7 @@ export class StateTransitionEngine {
     }
   }
 
-  private static async sendWeeklyTipsInvite(lead: any) {
+  private static async sendWeeklyTipsInvite(lead: Lead) {
     if (!lead.campaignId) {
       logger.warn({ leadId: lead.id }, 'Lead has no campaignId, cannot send weekly tips invite');
       return;

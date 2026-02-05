@@ -5,6 +5,7 @@ import { EventsService } from '../../services/events.service.js';
 import { MessageBufferService } from '../../services/buffer.service.js';
 import { maintenanceQueue } from '../../infrastructure/queues/maintenance.queue.js';
 import { getCorrelationId } from '../observability/CorrelationId.js';
+import { Lead, Prisma } from '@prisma/client';
 
 /**
  * MessageRouter - Handles initial message routing, persistence, and tenant resolution
@@ -123,7 +124,10 @@ export class MessageRouter {
       });
     } catch (error) {
       // Handle idempotency (P2002 is Prisma unique constraint error)
-      if ((error as any).code === 'P2002') {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
         logger.info(
           { whatsappId: params.whatsappId },
           'Message already exists, ignoring duplicate'
@@ -138,7 +142,7 @@ export class MessageRouter {
   /**
    * Handle SILENT TAKEOVER & REACTIVATION triggers
    */
-  static async handleOutboundTakeover(lead: any, whatsappId?: string, content?: string) {
+  static async handleOutboundTakeover(lead: Lead, whatsappId?: string, content?: string) {
     if (!whatsappId || whatsappId === 'pending') return;
 
     // 1. Avoid self-handover for AI messages
@@ -189,9 +193,9 @@ export class MessageRouter {
       );
 
       // Schedule Recovery
-      const config = (await db.globalConfig.findUnique({
+      const config = await db.globalConfig.findUnique({
         where: { tenantId: lead.tenantId },
-      })) as any;
+      });
       const delayMinutes = config?.recoveryTimeoutMinutes || 240;
 
       await maintenanceQueue.add(
