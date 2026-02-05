@@ -2,18 +2,24 @@
   "name": "whatsnau-monorepo",
   "private": true,
   "version": "6.2.0",
+  "packageManager": "npm@10.9.4",
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev -w packages/backend\" \"npm run dev -w packages/frontend\"",
-    "build": "npm run build --workspaces",
-    "test": "npm run test --workspaces",
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "format": "turbo run format",
+    "type-check": "turbo run type-check",
+    "verify": "turbo run format lint type-check test",
     "release": "standard-version",
     "clean": "rm -rf node_modules packages/*/node_modules"
   },
   "devDependencies": {
     "concurrently": "^8.2.0",
-    "standard-version": "^9.5.0"
+    "standard-version": "^9.5.0",
+    "turbo": "^2.8.3"
   }
 }
