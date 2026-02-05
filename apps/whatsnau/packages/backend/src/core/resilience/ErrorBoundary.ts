@@ -1,12 +1,14 @@
 import { logger } from '../logger.js';
 import { getCorrelationId } from '../observability/CorrelationId.js';
 import { db } from '../db.js';
+import { sanitizeForTelegram } from '../../services/sanitization.util.js';
 
 interface ErrorBoundaryContext {
   category: string;
   severity: 'WARN' | 'CRITICAL';
   metadata?: any;
   tenantId?: string;
+  rethrow?: boolean;
 }
 
 /**
@@ -14,48 +16,56 @@ interface ErrorBoundaryContext {
  *
  * Responsibilities:
  * - Wrap async operations in try-catch
- * - Log errors with correlation ID and context
+ * - Log errors with correlation ID and context (Sanitized)
  * - Emit SystemAlert to database
  * - Send Telegram notifications for CRITICAL errors
- * - Return null on error for graceful degradation
+ * - Handle rethrowing for worker retry logic
+ * - Return null on error for graceful degradation (when rethrow=false)
  */
 
 /**
  * Wrap an async operation with error boundary
- * Returns null on error instead of throwing (graceful degradation)
+ * Returns null on error instead of throwing (unless rethrow is true)
  */
 export async function withErrorBoundary<T>(
   operation: () => Promise<T>,
   context: ErrorBoundaryContext
 ): Promise<T | null> {
+  const sanitizedMetadata = context.metadata ? sanitizeForTelegram(context.metadata) : undefined;
+
   try {
     return await operation();
   } catch (error: any) {
     const correlationId = getCorrelationId();
 
-    // Log error with full context
+    // Log error with sanitized context
     logger.error(
       {
         err: error,
         correlationId,
         operationName: context.category,
         severity: context.severity,
-        metadata: context.metadata,
+        metadata: sanitizedMetadata,
         tenantId: context.tenantId,
       },
       `Error boundary caught: ${context.category}`
     );
 
     // Emit SystemAlert to database (async, don't block)
-    emitSystemAlert(context, error, correlationId).catch((err) => {
+    emitSystemAlert(context, error, correlationId, sanitizedMetadata).catch((err) => {
       logger.error({ err }, 'Failed to emit SystemAlert');
     });
 
     // Send notification for CRITICAL errors
     if (context.severity === 'CRITICAL') {
-      sendCriticalAlert(context, error).catch((err) => {
+      sendCriticalAlert(context, error, sanitizedMetadata).catch((err) => {
         logger.error({ err }, 'Failed to send critical alert');
       });
+    }
+
+    // Rethrow if requested (e.g., for BullMQ workers to trigger retries)
+    if (context.rethrow) {
+      throw error;
     }
 
     // Return null for graceful degradation
@@ -69,7 +79,8 @@ export async function withErrorBoundary<T>(
 async function emitSystemAlert(
   context: ErrorBoundaryContext,
   error: Error,
-  correlationId?: string
+  correlationId?: string,
+  sanitizedMetadata?: any
 ): Promise<void> {
   try {
     await db.systemAlert.create({
@@ -78,7 +89,7 @@ async function emitSystemAlert(
         category: context.category,
         message: error.message,
         context: {
-          ...context.metadata,
+          ...sanitizedMetadata,
           correlationId,
           stack: error.stack,
         },
@@ -94,7 +105,11 @@ async function emitSystemAlert(
 /**
  * Send critical alert via notification service
  */
-async function sendCriticalAlert(context: ErrorBoundaryContext, error: Error): Promise<void> {
+async function sendCriticalAlert(
+  context: ErrorBoundaryContext,
+  error: Error,
+  sanitizedMetadata?: any
+): Promise<void> {
   try {
     // Dynamic import to avoid circular dependency
     const { NotificationService } = await import('../../services/notification.service.js');
@@ -104,7 +119,7 @@ async function sendCriticalAlert(context: ErrorBoundaryContext, error: Error): P
       error,
       message: error.message,
       tenantId: context.tenantId,
-      metadata: context.metadata,
+      metadata: sanitizedMetadata,
     });
   } catch (err) {
     // Don't throw - this is a best-effort operation
