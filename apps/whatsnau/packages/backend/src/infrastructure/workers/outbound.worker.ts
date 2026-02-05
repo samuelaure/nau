@@ -57,10 +57,12 @@ const worker = new Worker<OutboundJobData>(
 
           // Mark as failed in DB immediately
           if (messageId) {
-            await db.message.update({
-              where: { id: messageId },
-              data: { status: 'failed' },
-            }).catch(() => { }); // Best effort
+            await db.message
+              .update({
+                where: { id: messageId },
+                data: { status: 'failed' },
+              })
+              .catch(() => {}); // Best effort
           }
 
           throw error;

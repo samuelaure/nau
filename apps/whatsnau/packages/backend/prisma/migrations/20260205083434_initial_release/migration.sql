@@ -11,6 +11,48 @@ CREATE TABLE "Tenant" (
 );
 
 -- CreateTable
+CREATE TABLE "Product" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "price" DOUBLE PRECISION NOT NULL,
+    "sku" TEXT,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "tenantId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Product_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Order" (
+    "id" TEXT NOT NULL,
+    "leadId" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'DRAFT',
+    "totalAmount" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "currency" TEXT NOT NULL DEFAULT 'EUR',
+    "deliveryAddress" TEXT,
+    "notes" TEXT,
+    "tenantId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Order_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "OrderItem" (
+    "id" TEXT NOT NULL,
+    "orderId" TEXT NOT NULL,
+    "productId" TEXT NOT NULL,
+    "quantity" INTEGER NOT NULL DEFAULT 1,
+    "unitPrice" DOUBLE PRECISION NOT NULL,
+
+    CONSTRAINT "OrderItem_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "User" (
     "id" TEXT NOT NULL,
     "email" TEXT NOT NULL,
@@ -129,6 +171,7 @@ CREATE TABLE "TakeoverKeyword" (
     "id" TEXT NOT NULL,
     "word" TEXT NOT NULL,
     "type" TEXT NOT NULL DEFAULT 'INTERNAL',
+    "category" TEXT NOT NULL DEFAULT 'TAKEOVER',
     "tenantId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -140,6 +183,11 @@ CREATE TABLE "GlobalConfig" (
     "id" TEXT NOT NULL,
     "availabilityStatus" TEXT,
     "ownerName" TEXT NOT NULL DEFAULT 'Samuel',
+    "recoveryTimeoutMinutes" INTEGER NOT NULL DEFAULT 240,
+    "maxUnansweredMessages" INTEGER NOT NULL DEFAULT 2,
+    "defaultDemoDurationMinutes" INTEGER NOT NULL DEFAULT 10,
+    "telegramAlertsEnabled" BOOLEAN NOT NULL DEFAULT true,
+    "alertCooldownMinutes" INTEGER NOT NULL DEFAULT 15,
     "tenantId" TEXT NOT NULL,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -192,6 +240,7 @@ CREATE TABLE "LeadImportBatch" (
     "campaignId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'STAGING',
+    "contentHash" TEXT,
     "tenantId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -274,6 +323,33 @@ CREATE TABLE "WhatsAppTemplate" (
 );
 
 -- CreateTable
+CREATE TABLE "SystemAlert" (
+    "id" TEXT NOT NULL,
+    "severity" TEXT NOT NULL,
+    "category" TEXT NOT NULL,
+    "message" TEXT NOT NULL,
+    "context" JSONB,
+    "tenantId" TEXT,
+    "resolved" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "resolvedAt" TIMESTAMP(3),
+
+    CONSTRAINT "SystemAlert_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "PerformanceMetric" (
+    "id" TEXT NOT NULL,
+    "operation" TEXT NOT NULL,
+    "duration" INTEGER NOT NULL,
+    "success" BOOLEAN NOT NULL,
+    "tenantId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "PerformanceMetric_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "_LeadToTag" (
     "A" TEXT NOT NULL,
     "B" TEXT NOT NULL
@@ -281,6 +357,18 @@ CREATE TABLE "_LeadToTag" (
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Tenant_slug_key" ON "Tenant"("slug");
+
+-- CreateIndex
+CREATE INDEX "Product_tenantId_idx" ON "Product"("tenantId");
+
+-- CreateIndex
+CREATE INDEX "Order_tenantId_idx" ON "Order"("tenantId");
+
+-- CreateIndex
+CREATE INDEX "Order_leadId_idx" ON "Order"("leadId");
+
+-- CreateIndex
+CREATE INDEX "OrderItem_orderId_idx" ON "OrderItem"("orderId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
@@ -334,6 +422,9 @@ CREATE UNIQUE INDEX "BusinessProfile_tenantId_key" ON "BusinessProfile"("tenantI
 CREATE UNIQUE INDEX "PromptConfig_role_campaignId_key" ON "PromptConfig"("role", "campaignId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "LeadImportBatch_contentHash_key" ON "LeadImportBatch"("contentHash");
+
+-- CreateIndex
 CREATE INDEX "LeadImportBatch_tenantId_idx" ON "LeadImportBatch"("tenantId");
 
 -- CreateIndex
@@ -352,10 +443,34 @@ CREATE UNIQUE INDEX "WhatsAppTemplate_name_key" ON "WhatsAppTemplate"("name");
 CREATE UNIQUE INDEX "WhatsAppTemplate_messageTemplateId_key" ON "WhatsAppTemplate"("messageTemplateId");
 
 -- CreateIndex
+CREATE INDEX "SystemAlert_severity_resolved_idx" ON "SystemAlert"("severity", "resolved");
+
+-- CreateIndex
+CREATE INDEX "SystemAlert_tenantId_idx" ON "SystemAlert"("tenantId");
+
+-- CreateIndex
+CREATE INDEX "PerformanceMetric_operation_createdAt_idx" ON "PerformanceMetric"("operation", "createdAt");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "_LeadToTag_AB_unique" ON "_LeadToTag"("A", "B");
 
 -- CreateIndex
 CREATE INDEX "_LeadToTag_B_index" ON "_LeadToTag"("B");
+
+-- AddForeignKey
+ALTER TABLE "Product" ADD CONSTRAINT "Product_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Order" ADD CONSTRAINT "Order_leadId_fkey" FOREIGN KEY ("leadId") REFERENCES "Lead"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Order" ADD CONSTRAINT "Order_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "OrderItem" ADD CONSTRAINT "OrderItem_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "OrderItem" ADD CONSTRAINT "OrderItem_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "User" ADD CONSTRAINT "User_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

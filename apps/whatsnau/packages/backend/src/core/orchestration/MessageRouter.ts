@@ -124,10 +124,7 @@ export class MessageRouter {
       });
     } catch (error) {
       // Handle idempotency (P2002 is Prisma unique constraint error)
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         logger.info(
           { whatsappId: params.whatsappId },
           'Message already exists, ignoring duplicate'

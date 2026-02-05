@@ -92,10 +92,11 @@ export class AgentCoordinator {
 
     // Send bridge message
     const availStatus = config?.availabilityStatus;
-    const responseMsg = `Perfecto, le avisaré a Samuel que deseas hablar con él directamente.${availStatus
-      ? ` Samuel está actualmente ${availStatus}, pero ya sabe que quieres hablar con él.`
-      : ' Le he notificado a Samuel, vendrá lo antes que pueda.'
-      } Mientras esperamos, aquí estaré si necesitas algo.`;
+    const responseMsg = `Perfecto, le avisaré a Samuel que deseas hablar con él directamente.${
+      availStatus
+        ? ` Samuel está actualmente ${availStatus}, pero ya sabe que quieres hablar con él.`
+        : ' Le he notificado a Samuel, vendrá lo antes que pueda.'
+    } Mientras esperamos, aquí estaré si necesitas algo.`;
 
     await this.sendAsync(
       lead,

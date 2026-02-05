@@ -124,7 +124,11 @@ describe('StateTransitionEngine', () => {
     });
 
     it('should start demo on "demo" keyword', async () => {
-      await StateTransitionEngine.handlePhase(interestedLead as any, 'Quiero ver la demo', undefined);
+      await StateTransitionEngine.handlePhase(
+        interestedLead as any,
+        'Quiero ver la demo',
+        undefined
+      );
 
       expect(LeadService.startDemo).toHaveBeenCalledWith('lead-456', 10);
     });
@@ -150,7 +154,11 @@ describe('StateTransitionEngine', () => {
     };
 
     it('should trigger RECEPTIONIST agent during active demo', async () => {
-      await StateTransitionEngine.handlePhase(demoLead as any, '¿Qué servicios ofrecen?', undefined);
+      await StateTransitionEngine.handlePhase(
+        demoLead as any,
+        '¿Qué servicios ofrecen?',
+        undefined
+      );
 
       expect(AgentCoordinator.triggerAgent).toHaveBeenCalledWith(
         demoLead,
@@ -202,7 +210,11 @@ describe('StateTransitionEngine', () => {
       const mockUpdate = vi.fn();
       (db as any).lead = { update: mockUpdate };
 
-      await StateTransitionEngine.handlePhase(nurturingLead as any, 'Gracias por el tip', undefined);
+      await StateTransitionEngine.handlePhase(
+        nurturingLead as any,
+        'Gracias por el tip',
+        undefined
+      );
 
       expect(mockUpdate).toHaveBeenCalledWith({
         where: { id: 'lead-999' },
@@ -278,7 +290,9 @@ describe('StateTransitionEngine', () => {
         tenantId: 'tenant-123',
       };
 
-      await expect(StateTransitionEngine.handlePhase(lead as any, '', undefined)).resolves.not.toThrow();
+      await expect(
+        StateTransitionEngine.handlePhase(lead as any, '', undefined)
+      ).resolves.not.toThrow();
     });
 
     it('should handle case-insensitive keywords', async () => {
@@ -373,9 +387,9 @@ describe('StateTransitionEngine', () => {
         tenantId: 'tenant-123',
       };
 
-      await expect(StateTransitionEngine.handlePhase(lead as any, 'Hola', undefined)).rejects.toThrow(
-        'AI error'
-      );
+      await expect(
+        StateTransitionEngine.handlePhase(lead as any, 'Hola', undefined)
+      ).rejects.toThrow('AI error');
     });
   });
 });
