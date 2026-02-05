@@ -52,7 +52,7 @@ describe('StateTransitionEngine', () => {
     };
 
     it('should transition to INTERESTED on "yes_interested" button', async () => {
-      await StateTransitionEngine.handlePhase(coldLead, '', 'yes_interested');
+      await StateTransitionEngine.handlePhase(coldLead as any, '', 'yes_interested');
 
       expect(LeadService.transition).toHaveBeenCalledWith('lead-123', LeadState.INTERESTED);
       expect(LeadService.addTag).toHaveBeenCalledWith('lead-123', 'interested');
@@ -60,14 +60,14 @@ describe('StateTransitionEngine', () => {
     });
 
     it('should transition to INTERESTED on affirmative text', async () => {
-      await StateTransitionEngine.handlePhase(coldLead, 'Si, me interesa', undefined);
+      await StateTransitionEngine.handlePhase(coldLead as any, 'Si, me interesa', undefined);
 
       expect(LeadService.transition).toHaveBeenCalledWith('lead-123', LeadState.INTERESTED);
       expect(LeadService.addTag).toHaveBeenCalledWith('lead-123', 'interested');
     });
 
     it('should send weekly tips invite on "no_thanks" button', async () => {
-      await StateTransitionEngine.handlePhase(coldLead, '', 'no_thanks');
+      await StateTransitionEngine.handlePhase(coldLead as any, '', 'no_thanks');
 
       // Should call sendWeeklyTipsInvite (private method)
       // Verify it doesn't transition to INTERESTED
@@ -75,7 +75,7 @@ describe('StateTransitionEngine', () => {
     });
 
     it('should opt into nurturing on "yes_nurturing" button', async () => {
-      await StateTransitionEngine.handlePhase(coldLead, '', 'yes_nurturing');
+      await StateTransitionEngine.handlePhase(coldLead as any, '', 'yes_nurturing');
 
       expect(LeadService.optIntoNurturing).toHaveBeenCalledWith('lead-123');
       expect(AgentCoordinator.triggerAgent).toHaveBeenCalledWith(coldLead, 'NURTURING');
@@ -84,7 +84,7 @@ describe('StateTransitionEngine', () => {
     it('should add "colder" tag on "no_nurturing" if not interested', async () => {
       vi.mocked(LeadService.hasTag).mockResolvedValue(false);
 
-      await StateTransitionEngine.handlePhase(coldLead, '', 'no_nurturing');
+      await StateTransitionEngine.handlePhase(coldLead as any, '', 'no_nurturing');
 
       expect(LeadService.addTag).toHaveBeenCalledWith('lead-123', 'colder');
     });
@@ -92,13 +92,13 @@ describe('StateTransitionEngine', () => {
     it('should not add "colder" tag if already interested', async () => {
       vi.mocked(LeadService.hasTag).mockResolvedValue(true);
 
-      await StateTransitionEngine.handlePhase(coldLead, '', 'no_nurturing');
+      await StateTransitionEngine.handlePhase(coldLead as any, '', 'no_nurturing');
 
       expect(LeadService.addTag).not.toHaveBeenCalled();
     });
 
     it('should handle ambiguous response by transitioning to INTERESTED', async () => {
-      await StateTransitionEngine.handlePhase(coldLead, 'Cuéntame más', undefined);
+      await StateTransitionEngine.handlePhase(coldLead as any, 'Cuéntame más', undefined);
 
       expect(LeadService.transition).toHaveBeenCalledWith('lead-123', LeadState.INTERESTED);
       expect(AgentCoordinator.triggerAgent).toHaveBeenCalledWith(
@@ -118,19 +118,19 @@ describe('StateTransitionEngine', () => {
     };
 
     it('should start demo on "ver_demo" button', async () => {
-      await StateTransitionEngine.handlePhase(interestedLead, '', 'ver_demo');
+      await StateTransitionEngine.handlePhase(interestedLead as any, '', 'ver_demo');
 
       expect(LeadService.startDemo).toHaveBeenCalledWith('lead-456', 10);
     });
 
     it('should start demo on "demo" keyword', async () => {
-      await StateTransitionEngine.handlePhase(interestedLead, 'Quiero ver la demo', undefined);
+      await StateTransitionEngine.handlePhase(interestedLead as any, 'Quiero ver la demo', undefined);
 
       expect(LeadService.startDemo).toHaveBeenCalledWith('lead-456', 10);
     });
 
     it('should trigger CLOSER agent for other messages', async () => {
-      await StateTransitionEngine.handlePhase(interestedLead, '¿Cuánto cuesta?', undefined);
+      await StateTransitionEngine.handlePhase(interestedLead as any, '¿Cuánto cuesta?', undefined);
 
       expect(AgentCoordinator.triggerAgent).toHaveBeenCalledWith(
         interestedLead,
@@ -150,7 +150,7 @@ describe('StateTransitionEngine', () => {
     };
 
     it('should trigger RECEPTIONIST agent during active demo', async () => {
-      await StateTransitionEngine.handlePhase(demoLead, '¿Qué servicios ofrecen?', undefined);
+      await StateTransitionEngine.handlePhase(demoLead as any, '¿Qué servicios ofrecen?', undefined);
 
       expect(AgentCoordinator.triggerAgent).toHaveBeenCalledWith(
         demoLead,
@@ -165,7 +165,7 @@ describe('StateTransitionEngine', () => {
         demoExpiresAt: new Date(Date.now() - 1000), // Expired 1 second ago
       };
 
-      await StateTransitionEngine.handlePhase(expiredDemoLead, 'Hola', undefined);
+      await StateTransitionEngine.handlePhase(expiredDemoLead as any, 'Hola', undefined);
 
       expect(LeadService.endDemo).toHaveBeenCalledWith('lead-789');
       expect(AgentCoordinator.sendAsync).toHaveBeenCalledWith(
@@ -182,7 +182,7 @@ describe('StateTransitionEngine', () => {
         demoExpiresAt: new Date(Date.now() + 60000), // Expires in 1 minute
       };
 
-      await StateTransitionEngine.handlePhase(activeDemoLead, 'Hola', undefined);
+      await StateTransitionEngine.handlePhase(activeDemoLead as any, 'Hola', undefined);
 
       expect(LeadService.endDemo).not.toHaveBeenCalled();
       expect(AgentCoordinator.triggerAgent).toHaveBeenCalled();
@@ -202,7 +202,7 @@ describe('StateTransitionEngine', () => {
       const mockUpdate = vi.fn();
       (db as any).lead = { update: mockUpdate };
 
-      await StateTransitionEngine.handlePhase(nurturingLead, 'Gracias por el tip', undefined);
+      await StateTransitionEngine.handlePhase(nurturingLead as any, 'Gracias por el tip', undefined);
 
       expect(mockUpdate).toHaveBeenCalledWith({
         where: { id: 'lead-999' },
@@ -211,7 +211,7 @@ describe('StateTransitionEngine', () => {
     });
 
     it('should trigger NURTURING agent', async () => {
-      await StateTransitionEngine.handlePhase(nurturingLead, 'Más información', undefined);
+      await StateTransitionEngine.handlePhase(nurturingLead as any, 'Más información', undefined);
 
       expect(AgentCoordinator.triggerAgent).toHaveBeenCalledWith(
         nurturingLead,
@@ -232,14 +232,14 @@ describe('StateTransitionEngine', () => {
     it('should use GlobalConfigService for demo duration', async () => {
       const { GlobalConfigService } = await import('../../services/config.global.service.js');
 
-      await StateTransitionEngine.handlePhase(interestedLead, '', 'ver_demo');
+      await StateTransitionEngine.handlePhase(interestedLead as any, '', 'ver_demo');
 
       expect(GlobalConfigService.getConfig).toHaveBeenCalledWith('tenant-123');
       expect(LeadService.startDemo).toHaveBeenCalledWith('lead-demo', 10);
     });
 
     it('should send welcome message and trigger RECEPTIONIST', async () => {
-      await StateTransitionEngine.handlePhase(interestedLead, '', 'ver_demo');
+      await StateTransitionEngine.handlePhase(interestedLead as any, '', 'ver_demo');
 
       expect(AgentCoordinator.sendAsync).toHaveBeenCalledWith(
         expect.objectContaining({ state: LeadState.DEMO }),
@@ -266,7 +266,7 @@ describe('StateTransitionEngine', () => {
       };
 
       await expect(
-        StateTransitionEngine.handlePhase(lead, 'Hello', null as any)
+        StateTransitionEngine.handlePhase(lead as any, 'Hello', null as any)
       ).resolves.not.toThrow();
     });
 
@@ -278,7 +278,7 @@ describe('StateTransitionEngine', () => {
         tenantId: 'tenant-123',
       };
 
-      await expect(StateTransitionEngine.handlePhase(lead, '', undefined)).resolves.not.toThrow();
+      await expect(StateTransitionEngine.handlePhase(lead as any, '', undefined)).resolves.not.toThrow();
     });
 
     it('should handle case-insensitive keywords', async () => {
@@ -289,7 +289,7 @@ describe('StateTransitionEngine', () => {
         tenantId: 'tenant-123',
       };
 
-      await StateTransitionEngine.handlePhase(lead, 'SI, ME INTERESA', undefined);
+      await StateTransitionEngine.handlePhase(lead as any, 'SI, ME INTERESA', undefined);
 
       expect(LeadService.transition).toHaveBeenCalledWith('lead-case', LeadState.INTERESTED);
     });
@@ -302,7 +302,7 @@ describe('StateTransitionEngine', () => {
         tenantId: 'tenant-123',
       };
 
-      await StateTransitionEngine.handlePhase(lead, 'Quiero ver la DEMO', undefined);
+      await StateTransitionEngine.handlePhase(lead as any, 'Quiero ver la DEMO', undefined);
 
       expect(LeadService.startDemo).toHaveBeenCalled();
     });
@@ -326,7 +326,7 @@ describe('StateTransitionEngine', () => {
         };
 
         await expect(
-          StateTransitionEngine.handlePhase(lead, 'Test', undefined)
+          StateTransitionEngine.handlePhase(lead as any, 'Test', undefined)
         ).resolves.not.toThrow();
       }
     });
@@ -341,7 +341,7 @@ describe('StateTransitionEngine', () => {
 
       // Should not throw, just do nothing
       await expect(
-        StateTransitionEngine.handlePhase(clientLead, 'Hello', undefined)
+        StateTransitionEngine.handlePhase(clientLead as any, 'Hello', undefined)
       ).resolves.not.toThrow();
     });
   });
@@ -358,7 +358,7 @@ describe('StateTransitionEngine', () => {
       };
 
       // Should propagate error for proper handling upstream
-      await expect(StateTransitionEngine.handlePhase(lead, 'Si', undefined)).rejects.toThrow(
+      await expect(StateTransitionEngine.handlePhase(lead as any, 'Si', undefined)).rejects.toThrow(
         'DB error'
       );
     });
@@ -373,7 +373,7 @@ describe('StateTransitionEngine', () => {
         tenantId: 'tenant-123',
       };
 
-      await expect(StateTransitionEngine.handlePhase(lead, 'Hola', undefined)).rejects.toThrow(
+      await expect(StateTransitionEngine.handlePhase(lead as any, 'Hola', undefined)).rejects.toThrow(
         'AI error'
       );
     });
