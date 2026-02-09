@@ -109,6 +109,15 @@ jobs:
           echo "$BRIEF" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
+      - name: 🚚 Transfer Deployment Files
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: ${{ secrets.HETZNER_USER }}
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          source: "docker-compose.yml,scripts/deploy/*"
+          target: "${{ secrets.HETZNER_DEPLOY_PATH || 'whatsnau' }}"
+
       - name: 🚚 Deploy to Server
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -116,11 +125,13 @@ jobs:
           username: ${{ secrets.HETZNER_USER }}
           key: ${{ secrets.HETZNER_SSH_KEY }}
           script: |
-            cd /app/whatsnau
-            # Ensure the scripts are executable (in case git forgot)
+            mkdir -p ${{ secrets.HETZNER_DEPLOY_PATH || 'whatsnau' }}
+            cd ${{ secrets.HETZNER_DEPLOY_PATH || 'whatsnau' }}
+            # Ensure the scripts are executable
             chmod +x scripts/deploy/*.sh
             cd scripts/deploy
             ./server-orchestrator.sh ${{ github.ref_name }}
+
 
       - name: 📢 Notify Telegram (Success)
         if: success()
