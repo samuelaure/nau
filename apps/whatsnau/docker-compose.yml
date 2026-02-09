@@ -10,9 +10,9 @@ services:
       - REDIS_HOST=${REDIS_HOST:-redis}
     networks:
       - app-network
-    depends_on:
-      migration-runner:
-        condition: service_completed_successfully
+    # Decoupled to allow orchestration script to handle migrations and capture logs.
+    # App will restart until database is ready.
+    depends_on: []
 
   migration-runner:
     image: ghcr.io/samuelaure/whatsnau-backend:latest

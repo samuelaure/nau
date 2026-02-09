@@ -4,9 +4,7 @@ services:
     environment:
       - DB_HOST=shared_postgres
       - REDIS_HOST=shared_redis
-    depends_on:
-      migration-runner:
-        condition: service_completed_successfully
+
     networks:
       - shared-mesh
     labels:
