@@ -21,7 +21,7 @@ services:
       - DB_HOST=shared_postgres
     networks:
       - shared-mesh
-    depends_on: [] # Remove dependency on the local postgres service
+    # Inherits depends_on: [] from base, avoiding conflicts with shared infra.
 
   worker:
     environment:
@@ -29,7 +29,7 @@ services:
       - REDIS_HOST=shared_redis
     networks:
       - shared-mesh
-    depends_on: [] # Remove dependency on the local postgres/redis services
+    # Inherits depends_on: [] from base.
 
   postgres:
     profiles: [disabled]

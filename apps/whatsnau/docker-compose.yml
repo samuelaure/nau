@@ -11,10 +11,6 @@ services:
     networks:
       - app-network
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
       migration-runner:
         condition: service_completed_successfully
 
@@ -32,9 +28,9 @@ services:
       - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST:-postgres}:5432/${DB_NAME}?schema=public
     networks:
       - app-network
-    depends_on:
-      postgres:
-        condition: service_healthy
+    # Dependency on postgres is handled by retry logic/restart policy in shared infra
+    # To avoid 'undefined service' errors when postgres is disabled in overrides.
+    depends_on: []
 
   worker:
     image: ghcr.io/samuelaure/whatsnau-backend:latest
@@ -48,11 +44,7 @@ services:
       - REDIS_HOST=${REDIS_HOST:-redis}
     networks:
       - app-network
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+    depends_on: []
 
   postgres:
     image: postgres:16-alpine
