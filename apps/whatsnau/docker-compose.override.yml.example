@@ -2,7 +2,7 @@ services:
   app:
     container_name: whatsnau
     environment:
-      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@shared_postgres:5432/${DB_NAME}?schema=public
+      - DB_HOST=shared_postgres
       - REDIS_HOST=shared_redis
     depends_on:
       migration-runner:
@@ -18,24 +18,16 @@ services:
 
   migration-runner:
     environment:
-      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@shared_postgres:5432/${DB_NAME}?schema=public
+      - DB_HOST=shared_postgres
     networks:
       - shared-mesh
-    depends_on: []
 
   worker:
     environment:
-      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@shared_postgres:5432/${DB_NAME}?schema=public
+      - DB_HOST=shared_postgres
       - REDIS_HOST=shared_redis
     networks:
       - shared-mesh
-    depends_on: []
-
-  postgres:
-    profiles: [disabled]
-
-  redis:
-    profiles: [disabled]
 
 networks:
   shared-mesh:
