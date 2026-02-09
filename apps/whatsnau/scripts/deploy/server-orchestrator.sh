@@ -63,13 +63,29 @@ $DOCKER_COMPOSE_CMD up -d
 # 6. Run Migrations
 echo "🏃 Running database migrations..."
 MIGRATION_STATUS=1
+CONTAINER_NAME=""
+
 for i in {1..10}; do
-    CONTAINER_NAME=$(docker ps --format '{{.Names}}' | grep -E "whatsnau-app-1|app" | head -n 1)
+    # Try multiple common naming patterns for the app container
+    CONTAINER_NAME=$(docker ps --format '{{.Names}}' | grep -E "whatsnau|whatsnau-app-1|^app$" | head -n 1)
+    
     if [ ! -z "$CONTAINER_NAME" ]; then
-        echo "📡 Found container: $CONTAINER_NAME. Running migrations..."
+        echo "📡 Found running container: $CONTAINER_NAME. Running migrations..."
         docker exec $CONTAINER_NAME npx prisma migrate deploy
         MIGRATION_STATUS=$?
         break
+    else
+        # Check if it crashed
+        CRASHED_CONTAINER=$(docker ps -a --format '{{.Names}}' | grep -E "whatsnau|whatsnau-app-1|^app$" | head -n 1)
+        if [ ! -z "$CRASHED_CONTAINER" ]; then
+            STATE=$(docker inspect -f '{{.State.Status}}' $CRASHED_CONTAINER)
+            if [ "$STATE" == "exited" ]; then
+                echo "🚨 Container $CRASHED_CONTAINER crashed! Status: $STATE"
+                echo "📝 Last 20 lines of logs:"
+                docker logs --tail 20 $CRASHED_CONTAINER
+                break
+            fi
+        fi
     fi
     echo "⏳ Waiting for app container (attempt $i/10)..."
     sleep 3

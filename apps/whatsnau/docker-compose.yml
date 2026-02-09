@@ -11,25 +11,20 @@ services:
     networks:
       - app-network
     # Decoupled to allow orchestration script to handle migrations and capture logs.
-    # App will restart until database is ready.
     depends_on: []
 
   migration-runner:
     image: ghcr.io/samuelaure/whatsnau-backend:latest
+    profiles:
+      - tools
     build: 
       context: .
       dockerfile: packages/backend/Dockerfile
     command: npx prisma migrate deploy
-    deploy:
-      restart_policy:
-        condition: on-failure
-        max_attempts: 3
     environment:
       - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST:-postgres}:5432/${DB_NAME}?schema=public
     networks:
       - app-network
-    # Dependency on postgres is handled by retry logic/restart policy in shared infra
-    # To avoid 'undefined service' errors when postgres is disabled in overrides.
     depends_on: []
 
   worker:
