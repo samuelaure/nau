@@ -38,8 +38,23 @@ if [ ! -z "$CURRENT_IMAGE_ID" ]; then
     docker tag $IMAGE_BASE:latest $IMAGE_BASE:rollback_backup
 fi
 
-# 4. Update and Restart
-echo "🔄 Updating service..."
+# 4. Infrastructure Cleanup & Setup
+echo "🧹 Cleaning up stray containers..."
+# Remove containers that should be provided by shared infrastructure
+STRAY_CONTAINERS=("whatsnau-redis-1" "whatsnau-postgres-1" "whatsnau-redis" "whatsnau-postgres")
+for container in "${STRAY_CONTAINERS[@]}"; do
+    if docker ps -a --format '{{.Names}}' | grep -q "^${container}$"; then
+        echo "🛑 Removing stray container: $container"
+        docker stop $container >/dev/null 2>&1
+        docker rm -f $container >/dev/null 2>&1
+    fi
+done
+
+echo "⚙️ Setting up infrastructure overrides..."
+if [ ! -f "docker-compose.override.yml" ] && [ -f "docker-compose.override.yml.example" ]; then
+    echo "📄 Copying docker-compose.override.yml from example..."
+    cp docker-compose.override.yml.example docker-compose.override.yml
+fi
 
 # Detect docker compose version
 DOCKER_COMPOSE_CMD="docker compose"
@@ -47,6 +62,9 @@ if ! $DOCKER_COMPOSE_CMD version >/dev/null 2>&1; then
     DOCKER_COMPOSE_CMD="docker-compose"
 fi
 echo "🛠 Using command: $DOCKER_COMPOSE_CMD"
+
+# 5. Update and Restart
+echo "🔄 Updating service..."
 
 # Update the .env or use environment variables to point to the new tag
 # If using a docker-compose.yml that uses 'image: ...:latest', 
@@ -57,7 +75,8 @@ docker tag $IMAGE_FULL $IMAGE_BASE:latest
 $DOCKER_COMPOSE_CMD up -d app
 $DOCKER_COMPOSE_CMD up -d worker
 
-# 5. Run Migrations
+
+# 6. Run Migrations
 echo "🏃 Running database migrations..."
 # The container name might be different depending on project name, but 'docker-compose up' 
 # usually names it <folder>-<service>-1. Let's try to find it.
@@ -71,12 +90,13 @@ else
     MIGRATION_STATUS=$?
 fi
 
-# 6. Health Check
+# 7. Health Check
 ./health-check.sh
 HEALTH_STATUS=$?
 
-# 7. Rollback if needed
+# 8. Rollback if needed
 if [ $MIGRATION_STATUS -ne 0 ] || [ $HEALTH_STATUS -ne 0 ]; then
+
     echo "🚨 Deployment FAILED! Initiating Rollback..."
     
     # Revert image
