@@ -129,10 +129,22 @@ jobs:
           script: |
             mkdir -p ${{ secrets.HETZNER_DEPLOY_PATH || 'whatsnau' }}
             cd ${{ secrets.HETZNER_DEPLOY_PATH || 'whatsnau' }}
+            
+            # Create .env file for Docker Compose
+            echo "DB_USER=${{ secrets.DB_USER }}" > .env
+            echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
+            echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
+            echo "PUBLIC_DOMAIN=${{ secrets.PUBLIC_DOMAIN }}" >> .env
+            echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
+            echo "REDIS_HOST=shared_redis" >> .env
+
+            
             # Ensure the scripts are executable
             chmod +x scripts/deploy/*.sh
-            cd scripts/deploy
-            ./server-orchestrator.sh ${{ github.ref_name }}
+            
+            # Run orchestration (Main script handles the rest)
+            ./scripts/deploy/server-orchestrator.sh ${{ github.ref_name }}
+
 
 
       - name: 📢 Notify Telegram (Success)

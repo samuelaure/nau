@@ -13,7 +13,12 @@ IMAGE_BASE="ghcr.io/${GITHUB_REPOSITORY_OWNER:-samuelaure}/whatsnau-backend"
 IMAGE_FULL="$IMAGE_BASE:$TAG"
 CONTAINER_NAME="whatsnau"
 
-echo "🚀 Starting Orchestration for version $TAG..."
+# Determine project root (two levels up from scripts/deploy)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+cd "$PROJECT_ROOT"
+
+echo "🚀 Starting Orchestration for version $TAG from $PROJECT_ROOT..."
 
 # 1. Pull the new image first (to minimize downtime later)
 echo "📥 Pulling image: $IMAGE_FULL..."
@@ -24,14 +29,13 @@ if [ $? -ne 0 ]; then
 fi
 
 # 2. Database Backup
-./backup-db.sh
+./scripts/deploy/backup-db.sh
 if [ $? -ne 0 ]; then
     echo "❌ Database backup failed. Aborting deployment."
     exit 1
 fi
 
 # 3. Tag current image for rollback
-# We assume the service is named 'whatsnau' in docker-compose
 CURRENT_IMAGE_ID=$(docker images -q $IMAGE_BASE:latest 2>/dev/null)
 if [ ! -z "$CURRENT_IMAGE_ID" ]; then
     echo "💾 Tagging current version for rollback..."
@@ -40,7 +44,6 @@ fi
 
 # 4. Infrastructure Cleanup & Setup
 echo "🧹 Cleaning up stray containers..."
-# Remove containers that should be provided by shared infrastructure
 STRAY_CONTAINERS=("whatsnau-redis-1" "whatsnau-postgres-1" "whatsnau-redis" "whatsnau-postgres")
 for container in "${STRAY_CONTAINERS[@]}"; do
     if docker ps -a --format '{{.Names}}' | grep -q "^${container}$"; then
@@ -62,6 +65,7 @@ if ! $DOCKER_COMPOSE_CMD version >/dev/null 2>&1; then
     DOCKER_COMPOSE_CMD="docker-compose"
 fi
 echo "🛠 Using command: $DOCKER_COMPOSE_CMD"
+
 
 # 5. Update and Restart
 echo "🔄 Updating service..."
@@ -91,7 +95,8 @@ else
 fi
 
 # 7. Health Check
-./health-check.sh
+./scripts/deploy/health-check.sh
+
 HEALTH_STATUS=$?
 
 # 8. Rollback if needed
@@ -108,7 +113,8 @@ if [ $MIGRATION_STATUS -ne 0 ] || [ $HEALTH_STATUS -ne 0 ]; then
 
     
     # Restore DB
-    ./restore-db.sh
+    ./scripts/deploy/restore-db.sh
+
     
     echo "🛑 Rollback complete. System restored to previous state."
     exit 1
