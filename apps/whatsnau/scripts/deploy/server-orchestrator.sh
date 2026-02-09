@@ -40,18 +40,36 @@ fi
 
 # 4. Update and Restart
 echo "🔄 Updating service..."
+
+# Detect docker compose version
+DOCKER_COMPOSE_CMD="docker compose"
+if ! $DOCKER_COMPOSE_CMD version >/dev/null 2>&1; then
+    DOCKER_COMPOSE_CMD="docker-compose"
+fi
+echo "🛠 Using command: $DOCKER_COMPOSE_CMD"
+
 # Update the .env or use environment variables to point to the new tag
 # If using a docker-compose.yml that uses 'image: ...:latest', 
 # we need to retag the new image as latest.
 docker tag $IMAGE_FULL $IMAGE_BASE:latest
 
-docker-compose up -d whatsnau
+# In docker-compose.yml, the service is named 'app'
+$DOCKER_COMPOSE_CMD up -d app
+$DOCKER_COMPOSE_CMD up -d worker
 
 # 5. Run Migrations
 echo "🏃 Running database migrations..."
-# Assuming prisma is in the backend package and we use the backend container
-docker exec $CONTAINER_NAME npx prisma migrate deploy
-MIGRATION_STATUS=$?
+# The container name might be different depending on project name, but 'docker-compose up' 
+# usually names it <folder>-<service>-1. Let's try to find it.
+CONTAINER_NAME=$(docker ps --format '{{.Names}}' | grep -E "whatsnau-app-1|app" | head -n 1)
+if [ -z "$CONTAINER_NAME" ]; then
+    echo "❌ Could not find running app container!"
+    MIGRATION_STATUS=1
+else
+    echo "📡 Found container: $CONTAINER_NAME"
+    docker exec $CONTAINER_NAME npx prisma migrate deploy
+    MIGRATION_STATUS=$?
+fi
 
 # 6. Health Check
 ./health-check.sh
@@ -64,8 +82,10 @@ if [ $MIGRATION_STATUS -ne 0 ] || [ $HEALTH_STATUS -ne 0 ]; then
     # Revert image
     if docker image inspect $IMAGE_BASE:rollback_backup >/dev/null 2>&1; then
         docker tag $IMAGE_BASE:rollback_backup $IMAGE_BASE:latest
-        docker-compose up -d whatsnau
+        $DOCKER_COMPOSE_CMD up -d app
+        $DOCKER_COMPOSE_CMD up -d worker
     fi
+
     
     # Restore DB
     ./restore-db.sh

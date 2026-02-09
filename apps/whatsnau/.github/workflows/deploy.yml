@@ -115,8 +115,9 @@ jobs:
           host: ${{ secrets.HETZNER_HOST }}
           username: ${{ secrets.HETZNER_USER }}
           key: ${{ secrets.HETZNER_SSH_KEY }}
-          source: "docker-compose.yml,scripts/deploy/*"
+          source: "docker-compose.yml,docker-compose.override.yml,scripts/deploy/*"
           target: "${{ secrets.HETZNER_DEPLOY_PATH || 'whatsnau' }}"
+
 
       - name: 🚚 Deploy to Server
         uses: appleboy/ssh-action@v1.0.3
