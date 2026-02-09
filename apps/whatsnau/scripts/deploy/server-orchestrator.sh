@@ -43,8 +43,8 @@ fi
 
 # 4. Infrastructure Setup
 echo "⚙️ Setting up infrastructure overrides..."
-if [ ! -f "docker-compose.override.yml" ] && [ -f "docker-compose.override.yml.example" ]; then
-    echo "📄 Copying docker-compose.override.yml from example..."
+if [ -f "docker-compose.override.yml.example" ]; then
+    echo "📄 Forced sync: Updating docker-compose.override.yml from example..."
     cp docker-compose.override.yml.example docker-compose.override.yml
 fi
 
@@ -58,7 +58,7 @@ echo "🛠 Using command: $DOCKER_COMPOSE_CMD"
 # 5. Update and Restart
 echo "🔄 Updating service..."
 docker tag $IMAGE_FULL $IMAGE_BASE:latest
-$DOCKER_COMPOSE_CMD up -d
+$DOCKER_COMPOSE_CMD up -d --remove-orphans
 
 # 6. Run Migrations
 echo "🏃 Running database migrations..."
@@ -66,28 +66,37 @@ MIGRATION_STATUS=1
 CONTAINER_NAME=""
 
 for i in {1..10}; do
-    # Try multiple common naming patterns for the app container
-    CONTAINER_NAME=$(docker ps --format '{{.Names}}' | grep -E "whatsnau|whatsnau-app-1|^app$" | head -n 1)
+    # 1. Look for the exact container name specified in the override
+    CONTAINER_NAME=$(docker ps --format '{{.Names}}' | grep -E "^whatsnau$" | head -n 1)
+    
+    # 2. Fallback to default compose pattern (project-service-index)
+    if [ -z "$CONTAINER_NAME" ]; then
+        CONTAINER_NAME=$(docker ps --format '{{.Names}}' | grep -E "whatsnau-app-1" | head -n 1)
+    fi
     
     if [ ! -z "$CONTAINER_NAME" ]; then
-        echo "📡 Found running container: $CONTAINER_NAME. Running migrations..."
-        docker exec $CONTAINER_NAME npx prisma migrate deploy
-        MIGRATION_STATUS=$?
-        break
+        # Check if the container is actually running and not restarting
+        IS_RUNNING=$(docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null)
+        if [ "$IS_RUNNING" == "true" ]; then
+            echo "📡 Found running container: $CONTAINER_NAME. Running migrations..."
+            docker exec "$CONTAINER_NAME" npx prisma migrate deploy
+            MIGRATION_STATUS=$?
+            break
+        fi
     else
-        # Check if it crashed
-        CRASHED_CONTAINER=$(docker ps -a --format '{{.Names}}' | grep -E "whatsnau|whatsnau-app-1|^app$" | head -n 1)
+        # Diagnostic: Check for crashed containers if not found running
+        CRASHED_CONTAINER=$(docker ps -a --format '{{.Names}}' | grep -E "^whatsnau$" | head -n 1)
         if [ ! -z "$CRASHED_CONTAINER" ]; then
-            STATE=$(docker inspect -f '{{.State.Status}}' $CRASHED_CONTAINER)
+            STATE=$(docker inspect -f '{{.State.Status}}' "$CRASHED_CONTAINER")
             if [ "$STATE" == "exited" ]; then
                 echo "🚨 Container $CRASHED_CONTAINER crashed! Status: $STATE"
                 echo "📝 Last 20 lines of logs:"
-                docker logs --tail 20 $CRASHED_CONTAINER
+                docker logs --tail 20 "$CRASHED_CONTAINER"
                 break
             fi
         fi
     fi
-    echo "⏳ Waiting for app container (attempt $i/10)..."
+    echo "⏳ Waiting for app container to stabilize (attempt $i/10)..."
     sleep 3
 done
 

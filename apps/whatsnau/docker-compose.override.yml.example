@@ -4,7 +4,6 @@ services:
     environment:
       - DB_HOST=shared_postgres
       - REDIS_HOST=shared_redis
-
     networks:
       - shared-mesh
     labels:
@@ -14,20 +13,12 @@ services:
       - "traefik.http.services.whatsnau.loadbalancer.server.port=3000"
       - "traefik.docker.network=shared-mesh"
 
-  migration-runner:
-    environment:
-      - DB_HOST=shared_postgres
-    networks:
-      - shared-mesh
-    # Inherits depends_on: [] from base, avoiding conflicts with shared infra.
-
   worker:
     environment:
       - DB_HOST=shared_postgres
       - REDIS_HOST=shared_redis
     networks:
       - shared-mesh
-    # Inherits depends_on: [] from base.
 
   postgres:
     profiles: [disabled]
