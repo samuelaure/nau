@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [6.8.1](https://github.com/samuelaure/whatsnau/compare/v6.8.0...v6.8.1) (2026-02-10)
+
+
+### Bug Fixes
+
+* **deploy:** stabilize production infrastructure and workflow ([1873362](https://github.com/samuelaure/whatsnau/commit/187336263a3a85bdb182bafb53e40bc73be519e8))
+
 ## [6.7.0](https://github.com/samuelaure/whatsnau/compare/v6.0.0...v6.7.0) (2026-02-05)
 
 
