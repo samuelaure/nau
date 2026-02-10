@@ -1,13 +1,10 @@
 services:
   app:
     image: ghcr.io/samuelaure/whatsnau-backend:latest
-    build: 
-      context: .
-      dockerfile: packages/backend/Dockerfile
     restart: always
     environment:
-      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST:-postgres}:5432/${DB_NAME}?schema=public
-      - REDIS_HOST=${REDIS_HOST:-redis}
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:5432/${DB_NAME}?schema=public
+      - REDIS_HOST=${REDIS_HOST}
     networks:
       - app-network
     # Decoupled: migrations are run via docker exec by the orchestrator.
@@ -15,14 +12,11 @@ services:
 
   worker:
     image: ghcr.io/samuelaure/whatsnau-backend:latest
-    build: 
-      context: .
-      dockerfile: packages/backend/Dockerfile
     command: npm run start:worker
     restart: always
     environment:
-      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST:-postgres}:5432/${DB_NAME}?schema=public
-      - REDIS_HOST=${REDIS_HOST:-redis}
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:5432/${DB_NAME}?schema=public
+      - REDIS_HOST=${REDIS_HOST}
     networks:
       - app-network
     depends_on: []
