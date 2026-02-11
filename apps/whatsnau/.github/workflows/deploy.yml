@@ -141,6 +141,7 @@ jobs:
             echo "PUBLIC_DOMAIN=${{ secrets.PUBLIC_DOMAIN }}" >> .env
             echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
             echo "REDIS_HOST=shared_redis" >> .env
+            echo "REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}" >> .env
 
             # Ensure the scripts are executable
             chmod +x scripts/deploy/*.sh

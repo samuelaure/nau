@@ -12,7 +12,7 @@ services:
 
   worker:
     image: ghcr.io/samuelaure/whatsnau-backend:latest
-    command: npm run start:worker
+    command: npm run start:worker:prod
     restart: always
     environment:
       - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:5432/${DB_NAME}?schema=public

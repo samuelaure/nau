@@ -18,7 +18,8 @@
     "test": "cross-env NODE_ENV=test vitest run",
     "test:watch": "cross-env NODE_ENV=test vitest",
     "test:coverage": "cross-env NODE_ENV=test vitest run --coverage",
-    "start:worker": "tsx src/worker.ts"
+    "start:worker": "tsx src/worker.ts",
+    "start:worker:prod": "node dist/worker.js"
   },
   "keywords": [
     "whatsapp",
