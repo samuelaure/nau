@@ -78,10 +78,27 @@ for i in {1..10}; do
         # Check if the container is actually running and not restarting
         IS_RUNNING=$(docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null)
         if [ "$IS_RUNNING" == "true" ]; then
-            echo "📡 Found running container: $CONTAINER_NAME. Running migrations..."
-            docker exec "$CONTAINER_NAME" npx prisma migrate deploy
-            MIGRATION_STATUS=$?
-            break
+            echo "📡 Found running container: $CONTAINER_NAME. Attempting migrations..."
+            
+            # Retry migration up to 3 times inside the running container
+            for attempt in {1..3}; do
+                docker exec "$CONTAINER_NAME" npx prisma migrate deploy > migration_output.log 2>&1
+                MIGRATION_STATUS=$?
+                
+                if [ $MIGRATION_STATUS -eq 0 ]; then
+                    echo "✅ Migrations applied successfully."
+                    rm migration_output.log
+                    break 2
+                else
+                    echo "⚠️ Migration attempt $attempt failed. Logs:"
+                    cat migration_output.log
+                    if [ $attempt -lt 3 ]; then
+                        echo "⏳ Retrying migration in 5 seconds..."
+                        sleep 5
+                    fi
+                fi
+            done
+            break # Exit the container-wait loop if we finished (success or final failure)
         fi
     else
         # Diagnostic: Check for crashed containers if not found running
@@ -101,11 +118,11 @@ for i in {1..10}; do
 done
 
 if [ $MIGRATION_STATUS -ne 0 ]; then
-    echo "❌ Database migrations failed!"
+    echo "❌ Database migrations failed permanently!"
 fi
 
-# 7. Health Check
-./scripts/deploy/health-check.sh
+# 7. Health Check (Pass container name for internal check)
+./scripts/deploy/health-check.sh "http://localhost:3000/health" "$CONTAINER_NAME"
 HEALTH_STATUS=$?
 
 # 8. Rollback if needed

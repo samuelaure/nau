@@ -37,7 +37,7 @@ FROM node:20-slim
 WORKDIR /app
 
 # Install runtime dependencies
-RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y openssl curl && rm -rf /var/lib/apt/lists/*
 
 # Copy root node_modules (production deps are mixed with dev deps usually, 
 # unless we prune. For simplicity, copy all, or run install --prod. 
