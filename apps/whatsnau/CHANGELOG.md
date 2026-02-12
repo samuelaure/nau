@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [6.8.3](https://github.com/samuelaure/whatsnau/compare/v6.8.2...v6.8.3) (2026-02-12)
+
+
+### Bug Fixes
+
+* **deploy:** resolve production boot crash and improve orchestration logs ([1069326](https://github.com/samuelaure/whatsnau/commit/1069326433804d34fd1eb3988ddd52176dbad745))
+
 ### [6.8.2](https://github.com/samuelaure/whatsnau/compare/v6.8.1...v6.8.2) (2026-02-11)
 
 
