@@ -143,6 +143,17 @@ jobs:
             echo "REDIS_HOST=shared_redis" >> .env
             echo "REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}" >> .env
 
+            # Add WhatsApp and AI secrets (Required for boot validation)
+            echo "WHATSAPP_PHONE_NUMBER_ID=${{ secrets.WHATSAPP_PHONE_NUMBER_ID }}" >> .env
+            echo "WHATSAPP_PHONE_NUMBER=${{ secrets.WHATSAPP_PHONE_NUMBER }}" >> .env
+            echo "WHATSAPP_BUSINESS_ACCOUNT_ID=${{ secrets.WHATSAPP_BUSINESS_ACCOUNT_ID }}" >> .env
+            echo "WHATSAPP_ACCESS_TOKEN=${{ secrets.WHATSAPP_ACCESS_TOKEN }}" >> .env
+            echo "WHATSAPP_VERIFY_TOKEN=${{ secrets.WHATSAPP_VERIFY_TOKEN }}" >> .env
+            echo "META_APP_ID=${{ secrets.META_APP_ID }}" >> .env
+            echo "META_APP_SECRET=${{ secrets.META_APP_SECRET }}" >> .env
+            echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
+            echo "WHATSAPP_VERSION=${{ secrets.WHATSAPP_VERSION || 'v18.0' }}" >> .env
+
             # Ensure the scripts are executable
             chmod +x scripts/deploy/*.sh
             

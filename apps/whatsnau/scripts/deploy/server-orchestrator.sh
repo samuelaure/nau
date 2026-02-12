@@ -75,9 +75,10 @@ for i in {1..10}; do
     fi
     
     if [ ! -z "$CONTAINER_NAME" ]; then
-        # Check if the container is actually running and not restarting
-        IS_RUNNING=$(docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null)
-        if [ "$IS_RUNNING" == "true" ]; then
+        # Check if the container is actually running, restarting, or exited
+        STATUS=$(docker inspect -f '{{.State.Status}}' "$CONTAINER_NAME" 2>/dev/null)
+        
+        if [ "$STATUS" == "running" ]; then
             echo "📡 Found running container: $CONTAINER_NAME. Attempting migrations..."
             
             # Retry migration up to 3 times inside the running container
@@ -90,7 +91,8 @@ for i in {1..10}; do
                     rm migration_output.log
                     break 2
                 else
-                    echo "⚠️ Migration attempt $attempt failed. Logs:"
+                    echo "⚠️ Migration attempt $attempt failed. Status: $MIGRATION_STATUS"
+                    echo "📝 Migration Logs:"
                     cat migration_output.log
                     if [ $attempt -lt 3 ]; then
                         echo "⏳ Retrying migration in 5 seconds..."
@@ -98,7 +100,12 @@ for i in {1..10}; do
                     fi
                 fi
             done
-            break # Exit the container-wait loop if we finished (success or final failure)
+            break # Exit the container-wait loop
+        elif [ "$STATUS" == "restarting" ]; then
+            echo "🚨 Container $CONTAINER_NAME is in a RESTART LOOP! This usually indicates a crash on startup (e.g. missing env vars)."
+            echo "📝 Container logs (last 50 lines):"
+            docker logs --tail 50 "$CONTAINER_NAME"
+            break # Fail fast if it's already in a restart loop
         fi
     else
         # Diagnostic: Check for crashed containers if not found running
@@ -107,7 +114,7 @@ for i in {1..10}; do
             STATE=$(docker inspect -f '{{.State.Status}}' "$CRASHED_CONTAINER")
             if [ "$STATE" == "exited" ]; then
                 echo "🚨 Container $CRASHED_CONTAINER crashed! Status: $STATE"
-                echo "📝 Last 20 lines of logs:"
+                echo "📝 last 20 lines of logs:"
                 docker logs --tail 20 "$CRASHED_CONTAINER"
                 break
             fi
@@ -119,6 +126,8 @@ done
 
 if [ $MIGRATION_STATUS -ne 0 ]; then
     echo "❌ Database migrations failed permanently!"
+    echo "📝 Checking final container logs before rollback:"
+    [ ! -z "$CONTAINER_NAME" ] && docker logs --tail 50 "$CONTAINER_NAME"
 fi
 
 # 7. Health Check (Pass container name for internal check)

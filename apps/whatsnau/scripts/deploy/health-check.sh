@@ -12,8 +12,14 @@ echo "🔍 Checking health at $URL..."
 
 for ((i=1; i<=MAX_RETRIES; i++)); do
     if [ ! -z "$CONTAINER_NAME" ]; then
-        # Run curl inside the container to reach localhost:3000
-        response=$(docker exec "$CONTAINER_NAME" curl -s -o /dev/null -w "%{http_code}" $URL)
+        # Check if container is running before trying exec
+        STATUS=$(docker inspect -f '{{.State.Status}}' "$CONTAINER_NAME" 2>/dev/null)
+        if [ "$STATUS" != "running" ]; then
+            echo "⏳ Attempt $i/$MAX_RETRIES: Container $CONTAINER_NAME is $STATUS, waiting..."
+        else
+            # Run curl inside the container to reach localhost:3000
+            response=$(docker exec "$CONTAINER_NAME" curl -s -o /dev/null -w "%{http_code}" $URL)
+        fi
     else
         # Standard local curl
         response=$(curl -s -o /dev/null -w "%{http_code}" $URL)
