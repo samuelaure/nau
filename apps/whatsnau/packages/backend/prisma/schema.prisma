@@ -23,6 +23,8 @@ model Tenant {
   leads             Lead[]
   tags              Tag[]
   whatsAppConfigs   WhatsAppConfig[]
+  yCloudConfigs     YCloudConfig[]
+  openAIConfigs     OpenAIConfig[]
   leadImportBatches LeadImportBatch[]
   stagingLeads      StagingLead[]
   globalConfigs     GlobalConfig[]
@@ -374,15 +376,42 @@ model Opportunity {
 }
 
 model TelegramConfig {
-  id        String   @id
-  botToken  String?
-  chatId    String?
+  id        String   @id @default(uuid())
+  chatId    String?  // Tenant's Telegram chat ID
   isEnabled Boolean  @default(false)
   tenantId  String
   tenant    Tenant   @relation(fields: [tenantId], references: [id])
   updatedAt DateTime @updatedAt
 
   @@unique([tenantId])
+}
+
+model YCloudConfig {
+  id        String   @id @default(uuid())
+  apiKey    String   // YCloud API Key
+  isDefault Boolean  @default(false)
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, isDefault])
+  @@index([tenantId])
+}
+
+model OpenAIConfig {
+  id           String   @id @default(uuid())
+  apiKey       String   // OpenAI API Key
+  primaryModel String   @default("gpt-4o")
+  cheapModel   String   @default("gpt-4o-mini")
+  isDefault    Boolean  @default(false)
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([tenantId, isDefault])
+  @@index([tenantId])
 }
 
 model MessageTemplate {
