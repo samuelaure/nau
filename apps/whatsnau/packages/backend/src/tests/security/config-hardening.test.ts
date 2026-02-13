@@ -12,7 +12,9 @@ const runnerScript = path.resolve(__dirname, 'load-config.ts');
 describe('Config Hardening', () => {
   it('should fail to load in production with default secrets', async () => {
     // We explicitly set the FORBIDDEN default secret to trigger the validation error
-    const cmd = `npx cross-env NODE_ENV=production REDIS_PASSWORD=secure JWT_SECRET=super-secret-change-me-in-production WHATSAPP_PHONE_NUMBER_ID=123 WHATSAPP_PHONE_NUMBER=123 WHATSAPP_BUSINESS_ACCOUNT_ID=123 WHATSAPP_ACCESS_TOKEN=token WHATSAPP_VERIFY_TOKEN=token META_APP_ID=123 META_APP_SECRET=secret OPENAI_API_KEY=sk-123 npx tsx "${runnerScript}"`;
+    // New required fields added: TELEGRAM_BOT_TOKEN, TELEGRAM_SYSTEM_CHAT_ID, DASHBOARD_URL, ALLOWED_ORIGINS
+    // Optional fields removed: WHATSAPP_*, META_APP_*, OPENAI_API_KEY
+    const cmd = `npx cross-env NODE_ENV=production REDIS_PASSWORD=secure JWT_SECRET=super-secret-change-me-in-production TELEGRAM_BOT_TOKEN=test-token TELEGRAM_SYSTEM_CHAT_ID=123 DASHBOARD_URL=http://localhost:5173 ALLOWED_ORIGINS=http://localhost:5173 npx tsx "${runnerScript}"`;
 
     try {
       await execAsync(cmd);
@@ -26,7 +28,8 @@ describe('Config Hardening', () => {
   }, 20000);
 
   it('should pass in production with proper secrets', async () => {
-    const cmd = `npx cross-env NODE_ENV=production REDIS_PASSWORD=secure JWT_SECRET=really-secure-key-12345 WHATSAPP_PHONE_NUMBER_ID=123 WHATSAPP_PHONE_NUMBER=123 WHATSAPP_BUSINESS_ACCOUNT_ID=123 WHATSAPP_ACCESS_TOKEN=token WHATSAPP_VERIFY_TOKEN=token META_APP_ID=123 META_APP_SECRET=secret OPENAI_API_KEY=sk-123 npx tsx "${runnerScript}"`;
+    // Valid production config without optional tenant credentials
+    const cmd = `npx cross-env NODE_ENV=production REDIS_PASSWORD=secure JWT_SECRET=really-secure-key-12345 TELEGRAM_BOT_TOKEN=test-token TELEGRAM_SYSTEM_CHAT_ID=123 DASHBOARD_URL=http://localhost:5173 ALLOWED_ORIGINS=http://localhost:5173 npx tsx "${runnerScript}"`;
 
     await execAsync(cmd);
   }, 20000);

@@ -43,7 +43,7 @@ describe('WhatsAppService Unit Tests', () => {
         text: { body: 'Hello' },
       };
 
-      await WhatsAppService.sendMessage(payload, 'camp-1');
+      await WhatsAppService.sendMessage('tenant-1', payload, 'camp-1');
 
       expect(db.campaign.findUnique).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -75,7 +75,7 @@ describe('WhatsAppService Unit Tests', () => {
         json: async () => ({ messages: [{ id: 'wa-msg-id' }] }),
       });
 
-      await WhatsAppService.sendText('34600111222', 'Hello');
+      await WhatsAppService.sendText('tenant-1', '34600111222', 'Hello');
 
       expect((db as any).whatsAppConfig.findFirst).toHaveBeenCalled();
       expect(global.fetch).toHaveBeenCalledWith(
