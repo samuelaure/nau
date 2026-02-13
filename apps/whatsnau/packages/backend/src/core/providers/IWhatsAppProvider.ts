@@ -15,6 +15,6 @@ export interface IWhatsAppProvider {
   name: string;
   sendMessage(to: string, type: 'text' | 'template' | 'interactive', payload: any): Promise<string>;
   sendTemplate(to: string, template: string, components: any[]): Promise<string>;
-  validateWebhookSignature(req: Request): boolean;
+  validateWebhookSignature(req: Request): Promise<boolean>;
   normalizeWebhook(payload: any): StandardMessageEvent[];
 }

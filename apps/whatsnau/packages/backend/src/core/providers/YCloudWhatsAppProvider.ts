@@ -3,16 +3,25 @@ import crypto from 'crypto';
 import { IWhatsAppProvider, StandardMessageEvent } from './IWhatsAppProvider.js';
 import { config } from '../config.js';
 import { logger } from '../logger.js';
+import { db } from '../db.js';
 
 export class YCloudWhatsAppProvider implements IWhatsAppProvider {
   name = 'ycloud';
-  private apiKey: string;
 
-  constructor() {
-    this.apiKey = config.YCLOUD_API_KEY || '';
-    if (!this.apiKey) {
-      logger.warn('YCloud API Key is missing');
+  constructor(private tenantId: string) { }
+
+  private async getApiKey(): Promise<string> {
+    // 1. Try tenant config from DB
+    const configData = await db.yCloudConfig.findFirst({
+      where: { tenantId: this.tenantId, isDefault: true },
+    });
+
+    if (configData) {
+      return configData.apiKey;
     }
+
+    // 2. Fallback to .env (Legacy/Migration)
+    return config.YCLOUD_API_KEY || '';
   }
 
   async sendMessage(
@@ -39,11 +48,13 @@ export class YCloudWhatsAppProvider implements IWhatsAppProvider {
       body.interactive = payload.interactive || payload;
     }
 
+    const apiKey = await this.getApiKey();
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-API-Key': this.apiKey,
+        'X-API-Key': apiKey,
       },
       body: JSON.stringify(body),
     });
@@ -65,7 +76,7 @@ export class YCloudWhatsAppProvider implements IWhatsAppProvider {
     });
   }
 
-  validateWebhookSignature(req: Request): boolean {
+  async validateWebhookSignature(req: Request): Promise<boolean> {
     const signatureHeader = req.headers['x-ycloud-signature'] as string;
     if (!signatureHeader) return false;
 
@@ -80,9 +91,12 @@ export class YCloudWhatsAppProvider implements IWhatsAppProvider {
     const signature = signaturePart.split('=')[1];
     const body = JSON.stringify(req.body);
 
+    const apiKey = await this.getApiKey();
+    if (!apiKey) return false;
+
     const signedPayload = `${timestamp}.${body}`;
     const expectedSignature = crypto
-      .createHmac('sha256', this.apiKey)
+      .createHmac('sha256', apiKey)
       .update(signedPayload)
       .digest('hex');
 

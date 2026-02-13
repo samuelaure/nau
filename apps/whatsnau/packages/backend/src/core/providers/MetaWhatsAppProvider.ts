@@ -7,7 +7,7 @@ import { config } from '../config.js';
 export class MetaWhatsAppProvider implements IWhatsAppProvider {
   name = 'meta';
 
-  constructor(private campaignId?: string) {}
+  constructor(private tenantId: string, private campaignId?: string) { }
 
   async sendMessage(
     to: string,
@@ -33,16 +33,23 @@ export class MetaWhatsAppProvider implements IWhatsAppProvider {
       metaPayload.interactive = payload.interactive || payload;
     }
 
-    const res = await WhatsAppService.sendMessage(metaPayload, this.campaignId);
+    const res = await WhatsAppService.sendMessage(this.tenantId, metaPayload, this.campaignId);
     return (res as any)?.messages?.[0]?.id || '';
   }
 
   async sendTemplate(to: string, template: string, components: any[]): Promise<string> {
-    const res = await WhatsAppService.sendTemplate(to, template, 'es', components, this.campaignId);
+    const res = await WhatsAppService.sendTemplate(
+      this.tenantId,
+      to,
+      template,
+      'es',
+      components,
+      this.campaignId
+    );
     return (res as any)?.messages?.[0]?.id || '';
   }
 
-  validateWebhookSignature(req: Request): boolean {
+  async validateWebhookSignature(req: Request): Promise<boolean> {
     const signature = req.headers['x-hub-signature-256'] as string;
     if (!signature) return false; // Signature is required for security
 
@@ -52,6 +59,11 @@ export class MetaWhatsAppProvider implements IWhatsAppProvider {
 
     // TODO: Get APP_SECRET based on campaign/config
     const appSecret = config.META_APP_SECRET;
+
+    if (!appSecret) {
+      // If secret is not configured, we cannot validate. Secure default is to fail.
+      return false;
+    }
 
     const hmac = crypto.createHmac('sha256', appSecret);
     hmac.update((req as any).rawBody || JSON.stringify(req.body));
