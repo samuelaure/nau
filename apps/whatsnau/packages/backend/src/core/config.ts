@@ -12,26 +12,27 @@ const configSchema = z
     ALLOWED_ORIGINS: z.string().default('http://localhost:5173,https://whatsnau.9nau.com'),
     INITIAL_ADMIN_PASSWORD: z.string().default('admin123'),
 
-    // WhatsApp Cloud API
+    // WhatsApp Cloud API (Tenant-scoped, optional for boot)
     WHATSAPP_VERSION: z.string().default('v18.0'),
-    WHATSAPP_PHONE_NUMBER_ID: z.string(),
-    WHATSAPP_PHONE_NUMBER: z.string(),
-    WHATSAPP_BUSINESS_ACCOUNT_ID: z.string(),
-    WHATSAPP_ACCESS_TOKEN: z.string(),
-    WHATSAPP_VERIFY_TOKEN: z.string(),
+    WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
+    WHATSAPP_PHONE_NUMBER: z.string().optional(),
+    WHATSAPP_BUSINESS_ACCOUNT_ID: z.string().optional(),
+    WHATSAPP_ACCESS_TOKEN: z.string().optional(),
+    WHATSAPP_VERIFY_TOKEN: z.string().optional(),
 
-    // Meta App (for Embedded Signup)
-    META_APP_ID: z.string(),
-    META_APP_SECRET: z.string(),
+    // Meta App (for Embedded Signup) - Optional
+    META_APP_ID: z.string().optional(),
+    META_APP_SECRET: z.string().optional(),
 
-    // OpenAI
-    OPENAI_API_KEY: z.string(),
+    // OpenAI (Tenant-scoped, optional for boot)
+    OPENAI_API_KEY: z.string().optional(),
     PRIMARY_AI_MODEL: z.string().default('gpt-4o'),
     CHEAP_AI_MODEL: z.string().default('gpt-4o-mini'),
 
-    // Telegram
-    TELEGRAM_BOT_TOKEN: z.string().optional(),
-    TELEGRAM_CHAT_ID: z.string().optional(),
+    // Telegram (Hybrid: system bot + tenant chat IDs)
+    TELEGRAM_BOT_TOKEN: z.string(),
+    TELEGRAM_SYSTEM_CHAT_ID: z.string(),
+    TELEGRAM_CHAT_ID: z.string().optional(), // Deprecated, for backward compatibility
 
     // Auth
     JWT_SECRET: z.string().default('super-secret-change-me-in-production'),
@@ -42,7 +43,7 @@ const configSchema = z
     REDIS_PORT: z.coerce.number().default(6379),
     REDIS_PASSWORD: z.string().optional(),
 
-    // YCloud
+    // YCloud (Tenant-scoped, optional for boot)
     YCLOUD_API_KEY: z.string().optional(),
     WHATSAPP_PROVIDER: z.enum(['meta', 'ycloud']).default('meta'),
   })
