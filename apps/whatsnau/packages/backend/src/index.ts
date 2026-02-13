@@ -65,7 +65,11 @@ app.use(
   })
 );
 app.use(cookieParser());
-app.use(bodyParser.json());
+app.use(bodyParser.json({
+  verify: (req: any, res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 app.use(correlationIdMiddleware as RequestHandler);
 
 // Rate Limiting

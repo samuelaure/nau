@@ -65,16 +65,19 @@ export class HealthCheck {
   }
 
   /**
-   * Check OpenAI configuration (lightweight - don't make API call)
+   * Check OpenAI status
+   * Now tenant-scoped, so we consider it healthy by default at system level.
+   * Actual availability depends on individual tenant configuration.
    */
   private static async checkOpenAI(): Promise<boolean> {
-    return !!config.OPENAI_API_KEY && !config.OPENAI_API_KEY.includes('YOUR_');
+    return true;
   }
 
   /**
-   * Check WhatsApp configuration (lightweight - don't make API call)
+   * Check WhatsApp status
+   * Now tenant-scoped, so we consider it healthy by default at system level.
    */
   private static async checkWhatsApp(): Promise<boolean> {
-    return !!config.WHATSAPP_ACCESS_TOKEN && !config.WHATSAPP_ACCESS_TOKEN.includes('YOUR_');
+    return true;
   }
 }

@@ -13,6 +13,7 @@ interface OutboundJobData {
   payload: any;
   messageId?: string;
   leadId?: string;
+  tenantId?: string;
   correlationId?: string;
 }
 
@@ -21,16 +22,21 @@ const worker = new Worker<OutboundJobData>(
   async (job: Job<OutboundJobData>) => {
     return withErrorBoundary(
       async () => {
-        const { campaignId, phoneNumber, type, payload, leadId, messageId, correlationId } =
+        const { campaignId, phoneNumber, type, payload, leadId, messageId, tenantId, correlationId } =
           job.data;
 
         logger.info(
-          { jobId: job.id, leadId, type, phoneNumber, correlationId },
+          { jobId: job.id, leadId, tenantId, type, phoneNumber, correlationId },
           'Worker: Processing outbound message'
         );
 
         try {
-          const provider = ProviderFactory.getProvider(campaignId);
+          // If tenantId is missing (legacy job?), try to resolve or fail gracefully
+          if (!tenantId) {
+            throw new Error('Tenant ID missing in outbound job');
+          }
+
+          const provider = ProviderFactory.getProvider(tenantId, campaignId);
           const whatsappId = await provider.sendMessage(phoneNumber, type, payload);
 
           logger.info(
@@ -62,7 +68,7 @@ const worker = new Worker<OutboundJobData>(
                 where: { id: messageId },
                 data: { status: 'failed' },
               })
-              .catch(() => {}); // Best effort
+              .catch(() => { }); // Best effort
           }
 
           throw error;

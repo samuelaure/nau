@@ -42,11 +42,7 @@ if [ ! -z "$CURRENT_IMAGE_ID" ]; then
 fi
 
 # 4. Infrastructure Setup
-echo "⚙️ Setting up infrastructure overrides..."
-if [ -f "docker-compose.override.yml.example" ]; then
-    echo "📄 Forced sync: Updating docker-compose.override.yml from example..."
-    cp docker-compose.override.yml.example docker-compose.override.yml
-fi
+# (De-sentinel: Overrides removed. Relying on Clean Docker Compose)
 
 # Detect docker compose version
 DOCKER_COMPOSE_CMD="docker compose"
@@ -66,13 +62,9 @@ MIGRATION_STATUS=1
 CONTAINER_NAME=""
 
 for i in {1..10}; do
-    # 1. Look for the exact container name specified in the override
-    CONTAINER_NAME=$(docker ps --format '{{.Names}}' | grep -E "^whatsnau$" | head -n 1)
-    
-    # 2. Fallback to default compose pattern (project-service-index)
-    if [ -z "$CONTAINER_NAME" ]; then
-        CONTAINER_NAME=$(docker ps --format '{{.Names}}' | grep -E "whatsnau-app-1" | head -n 1)
-    fi
+    # 1. Look for the service container (standard compose naming)
+    # Matches whatsnau-app-1, whatsnau_app_1, or just whatsnau-app
+    CONTAINER_NAME=$(docker ps --format '{{.Names}}' | grep -E "whatsnau[-_]app" | head -n 1)
     
     if [ ! -z "$CONTAINER_NAME" ]; then
         # Check if the container is actually running, restarting, or exited
