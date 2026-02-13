@@ -27,9 +27,9 @@ export class WhatsAppService {
     timeout: 60000,
   });
   /**
-   * Helper to get the most relevant credentials (Campaign-specific > Default DB > .env)
+   * Helper to get the most relevant credentials (Campaign-specific > Tenant Default > .env)
    */
-  private static async getCredentials(campaignId?: string) {
+  private static async getCredentials(tenantId: string, campaignId?: string) {
     try {
       // 1. Try to find config for a specific campaign if provided
       if (campaignId) {
@@ -38,7 +38,6 @@ export class WhatsAppService {
           include: { whatsAppConfig: true },
         } as any);
 
-        // Use Type Assertion if compiler still struggles with include
         const config = (campaign as any)?.whatsAppConfig;
         if (config) {
           return {
@@ -49,10 +48,9 @@ export class WhatsAppService {
         }
       }
 
-      // 2. Try to find the default config in DB
-      // We use type assertion to bypass temporary Prisma type sync lag in IDE
+      // 2. Try to find the default config for the tenant in DB
       const defaultConfig = await (db as any).whatsAppConfig.findFirst({
-        where: { isDefault: true },
+        where: { tenantId, isDefault: true },
       });
 
       if (defaultConfig) {
@@ -63,10 +61,10 @@ export class WhatsAppService {
         };
       }
     } catch (err) {
-      logger.warn({ err }, 'Failed to fetch WhatsApp config from DB, falling back to .env');
+      logger.warn({ err, tenantId }, 'Failed to fetch WhatsApp config from DB, falling back to .env');
     }
 
-    // 3. Fallback to .env config
+    // 3. Fallback to .env config (Global/Legacy)
     return {
       accessToken: config.WHATSAPP_ACCESS_TOKEN,
       phoneNumberId: config.WHATSAPP_PHONE_NUMBER_ID,
@@ -74,7 +72,7 @@ export class WhatsAppService {
     };
   }
 
-  static async sendMessage(payload: WhatsAppMessagePayload, campaignId?: string) {
+  static async sendMessage(tenantId: string, payload: WhatsAppMessagePayload, campaignId?: string) {
     const correlationId = getCorrelationId();
 
     try {
@@ -82,7 +80,7 @@ export class WhatsAppService {
         PerformanceMonitor.track('WHATSAPP_SEND', async () => {
           return withRetry(
             async () => {
-              const creds = await this.getCredentials(campaignId);
+              const creds = await this.getCredentials(tenantId, campaignId);
               const url = `https://graph.facebook.com/${config.WHATSAPP_VERSION}/${creds.phoneNumberId}/messages`;
 
               logger.info(
@@ -148,6 +146,7 @@ export class WhatsAppService {
   }
 
   static async sendTemplate(
+    tenantId: string,
     to: string,
     templateName: string,
     languageCode = 'es_ES',
@@ -155,6 +154,7 @@ export class WhatsAppService {
     campaignId?: string
   ) {
     return this.sendMessage(
+      tenantId,
       {
         messaging_product: 'whatsapp',
         to,
@@ -169,8 +169,9 @@ export class WhatsAppService {
     );
   }
 
-  static async sendText(to: string, text: string, campaignId?: string) {
+  static async sendText(tenantId: string, to: string, text: string, campaignId?: string) {
     return this.sendMessage(
+      tenantId,
       {
         messaging_product: 'whatsapp',
         to,
@@ -185,6 +186,7 @@ export class WhatsAppService {
    * Send interactive message with buttons (Quick Reply)
    */
   static async sendInteractiveButtons(
+    tenantId: string,
     to: string,
     bodyText: string,
     buttons: Array<{ id: string; text: string }>,
@@ -196,6 +198,7 @@ export class WhatsAppService {
     }
 
     return this.sendMessage(
+      tenantId,
       {
         messaging_product: 'whatsapp',
         to,
@@ -224,6 +227,7 @@ export class WhatsAppService {
    * Send interactive message with list
    */
   static async sendInteractiveList(
+    tenantId: string,
     to: string,
     bodyText: string,
     buttonText: string,
@@ -234,6 +238,7 @@ export class WhatsAppService {
     campaignId?: string
   ) {
     return this.sendMessage(
+      tenantId,
       {
         messaging_product: 'whatsapp',
         to,
@@ -253,10 +258,10 @@ export class WhatsAppService {
     );
   }
 
-  static async getTemplates(campaignId?: string) {
+  static async getTemplates(tenantId: string, campaignId?: string) {
     // First, check if we have valid credentials in the database
     try {
-      const hasValidConfig = await this.hasValidWhatsAppConfig(campaignId);
+      const hasValidConfig = await this.hasValidWhatsAppConfig(tenantId, campaignId);
       if (!hasValidConfig) {
         logger.info(
           'WhatsApp not yet configured in database, skipping template fetch to avoid API spam'
@@ -268,7 +273,7 @@ export class WhatsAppService {
       return { data: [] };
     }
 
-    const creds = await this.getCredentials(campaignId);
+    const creds = await this.getCredentials(tenantId, campaignId);
     if (!creds.accessToken || creds.accessToken.includes('YOUR_') || !creds.wabaId) {
       logger.info('WhatsApp not configured or using placeholders, skipping template fetch');
       return { data: [] };
@@ -288,7 +293,7 @@ export class WhatsAppService {
    * Check if we have a valid WhatsApp configuration in the database
    * Returns false if no config exists or if credentials are missing/invalid
    */
-  private static async hasValidWhatsAppConfig(campaignId?: string): Promise<boolean> {
+  private static async hasValidWhatsAppConfig(tenantId: string, campaignId?: string): Promise<boolean> {
     try {
       // Check campaign-specific config first
       if (campaignId) {
@@ -305,7 +310,7 @@ export class WhatsAppService {
 
       // Check default config in DB
       const defaultConfig = await (db as any).whatsAppConfig.findFirst({
-        where: { isDefault: true },
+        where: { tenantId, isDefault: true },
       });
 
       if (
@@ -324,6 +329,7 @@ export class WhatsAppService {
   }
 
   static async createTemplate(
+    tenantId: string,
     name: string,
     category: string,
     language: string,
@@ -331,7 +337,7 @@ export class WhatsAppService {
     campaignId?: string
   ) {
     return withRetry(async () => {
-      const creds = await this.getCredentials(campaignId);
+      const creds = await this.getCredentials(tenantId, campaignId);
       const url = `https://graph.facebook.com/${config.WHATSAPP_VERSION}/${creds.wabaId}/message_templates`;
       const res = await fetch(url, {
         method: 'POST',
@@ -347,9 +353,9 @@ export class WhatsAppService {
     });
   }
 
-  static async deleteTemplate(name: string, campaignId?: string) {
+  static async deleteTemplate(tenantId: string, name: string, campaignId?: string) {
     return withRetry(async () => {
-      const creds = await this.getCredentials(campaignId);
+      const creds = await this.getCredentials(tenantId, campaignId);
       const url = `https://graph.facebook.com/${config.WHATSAPP_VERSION}/${creds.wabaId}/message_templates?name=${name}`;
       const res = await fetch(url, {
         method: 'DELETE',
@@ -360,9 +366,9 @@ export class WhatsAppService {
     });
   }
 
-  static async verifyNumbers(phoneNumbers: string[], campaignId?: string) {
+  static async verifyNumbers(tenantId: string, phoneNumbers: string[], campaignId?: string) {
     return withRetry(async () => {
-      const creds = await this.getCredentials(campaignId);
+      const creds = await this.getCredentials(tenantId, campaignId);
       const url = `https://graph.facebook.com/${config.WHATSAPP_VERSION}/${creds.phoneNumberId}/contacts`;
       const res = await fetch(url, {
         method: 'POST',
@@ -382,6 +388,7 @@ export class WhatsAppService {
   }
 
   static async sendTemplateWithVariables(
+    tenantId: string,
     to: string,
     templateName: string,
     components: any[],
@@ -389,7 +396,7 @@ export class WhatsAppService {
     campaignId?: string
   ) {
     logger.info({ to, templateName }, 'Sending WhatsApp template with variables');
-    return this.sendTemplate(to, templateName, languageCode, components, campaignId);
+    return this.sendTemplate(tenantId, to, templateName, languageCode, components, campaignId);
   }
 
   static async canSendFreeform(leadId: string): Promise<boolean> {

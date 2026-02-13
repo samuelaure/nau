@@ -6,11 +6,11 @@ export class TemplateSyncService {
   /**
    * Sync WhatsApp templates from Meta API to database
    */
-  static async syncTemplatesFromMeta() {
-    logger.info('Syncing WhatsApp templates from Meta...');
+  static async syncTemplatesFromMeta(tenantId: string) {
+    logger.info({ tenantId }, 'Syncing WhatsApp templates from Meta for tenant...');
 
     try {
-      const response = await WhatsAppService.getTemplates();
+      const response = await WhatsAppService.getTemplates(tenantId);
 
       // If no templates returned (likely because WhatsApp isn't configured), skip sync
       if (!response.data || response.data.length === 0) {

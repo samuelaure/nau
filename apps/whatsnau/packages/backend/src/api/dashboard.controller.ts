@@ -200,7 +200,7 @@ router.post(
     if (!lead) throw new NotFoundError('Lead not found');
 
     // Send via WhatsApp (use campaign context)
-    const waRes = await WhatsAppService.sendText(lead.phoneNumber, content, lead.campaignId);
+    const waRes = await WhatsAppService.sendText(lead.tenantId, lead.phoneNumber, content, lead.campaignId);
     const whatsappId = waRes?.messages?.[0]?.id;
 
     // Resolve phoneNumberId for Orchestrator context
@@ -323,7 +323,8 @@ router.get(
   '/config/whatsapp-templates',
   asyncHandler(async (req: Request, res: Response) => {
     try {
-      const templates = await WhatsAppService.getTemplates();
+      const tenantId = (req as any).user.tenantId;
+      const templates = await WhatsAppService.getTemplates(tenantId);
       res.json(templates);
     } catch (error) {
       logger.warn({ error }, 'Could not fetch templates (likely WhatsApp not yet configured)');
@@ -336,7 +337,8 @@ router.post(
   '/config/whatsapp-templates',
   asyncHandler(async (req: Request, res: Response) => {
     const { name, category, language, components } = req.body;
-    const result = await WhatsAppService.createTemplate(name, category, language, components);
+    const tenantId = (req as any).user.tenantId;
+    const result = await WhatsAppService.createTemplate(tenantId, name, category, language, components);
     res.json(result);
   })
 );
@@ -345,7 +347,8 @@ router.post(
   '/config/whatsapp-templates/sync',
   asyncHandler(async (req: Request, res: Response) => {
     const { TemplateSyncService } = await import('../services/template-sync.service.js');
-    const result = await TemplateSyncService.syncTemplatesFromMeta();
+    const tenantId = (req as any).user.tenantId;
+    const result = await TemplateSyncService.syncTemplatesFromMeta(tenantId);
     res.json(result);
   })
 );

@@ -110,12 +110,13 @@ export class SequenceService {
       // Within 24-hour window: send freeform text or interactive buttons
       if (buttons && buttons.length > 0) {
         res = await WhatsAppService.sendInteractiveButtons(
+          lead.tenantId,
           lead.phoneNumber,
           renderedMessage,
           buttons
         );
       } else {
-        res = await WhatsAppService.sendText(lead.phoneNumber, renderedMessage);
+        res = await WhatsAppService.sendText(lead.tenantId, lead.phoneNumber, renderedMessage);
       }
     } else {
       // Outside 24-hour window: MUST use Meta-approved template
@@ -141,6 +142,7 @@ export class SequenceService {
         );
 
         res = await WhatsAppService.sendTemplateWithVariables(
+          lead.tenantId,
           lead.phoneNumber,
           waTemplate.name,
           components,
@@ -152,7 +154,7 @@ export class SequenceService {
           'Compliance Error: No approved WhatsApp Template linked for business-initiated message'
         );
         // Fallback: Try to send as text but expect Meta rejection (error code 131030)
-        res = await WhatsAppService.sendText(lead.phoneNumber, renderedMessage);
+        res = await WhatsAppService.sendText(lead.tenantId, lead.phoneNumber, renderedMessage);
       }
     }
 
@@ -302,7 +304,7 @@ export class SequenceService {
       const message =
         'Hola, sigo aquí. Samuel está tardando un poco más de lo previsto en liberarse, pero no me he olvidado de ti. ¿Hay algo más en lo que pueda ayudarte mientras esperas?';
 
-      const res = await WhatsAppService.sendText(lead.phoneNumber, message);
+      const res = await WhatsAppService.sendText(lead.tenantId, lead.phoneNumber, message);
       const whatsappId = res?.messages?.[0]?.id;
 
       await db.lead.update({

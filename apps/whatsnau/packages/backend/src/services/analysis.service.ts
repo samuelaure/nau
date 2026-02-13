@@ -83,6 +83,17 @@ export class AnalysisService {
    * VERIFY: Check WhatsApp activity (Massive check)
    */
   static async verifyBatchWhatsApp(batchId: string) {
+    const batch = await db.leadImportBatch.findUnique({
+      where: { id: batchId },
+      select: { tenantId: true },
+    });
+    const tenantId = batch?.tenantId;
+
+    if (!tenantId) {
+      logger.error({ batchId }, 'Batch not found or missing tenantId, skipping WhatsApp verification');
+      return;
+    }
+
     const stagingLeads = await (db as any).stagingLead.findMany({
       where: { batchId, cleanseStatus: 'CLEANED' },
     });
@@ -92,7 +103,7 @@ export class AnalysisService {
 
     for (const chunk of chunks) {
       try {
-        const results = await WhatsAppService.verifyNumbers(chunk);
+        const results = await WhatsAppService.verifyNumbers(tenantId, chunk);
         if (results.contacts) {
           for (const contact of results.contacts) {
             const isValid = contact.status === 'valid';
@@ -120,6 +131,18 @@ export class AnalysisService {
       include: { opportunities: true },
     });
 
+    // Need tenant context for AI
+    const batch = await db.leadImportBatch.findUnique({
+      where: { id: batchId },
+      select: { tenantId: true },
+    });
+    const tenantId = batch?.tenantId;
+
+    if (!tenantId) {
+      logger.error({ batchId }, 'Batch not found or missing tenantId, skipping deep AI analysis');
+      return;
+    }
+
     for (const lead of stagingLeads) {
       const prompt =
         `Actúa como un experto en análisis comercial B2B. Analiza los siguientes datos de un cliente potencial y detecta oportunidades específicas de venta o mejora.\n\n` +
@@ -134,6 +157,7 @@ export class AnalysisService {
 
       try {
         const aiResponse = await AIService.getChatResponse(
+          tenantId,
           'Eres un experto en análisis de oportunidades comerciales B2B.',
           [{ role: 'user', content: prompt }],
           false // deterministic

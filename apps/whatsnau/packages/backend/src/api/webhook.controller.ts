@@ -30,23 +30,75 @@ router.get('/', (req: Request, res: Response) => {
 /**
  * Handle Incoming WhatsApp Events
  */
+import { db } from '../core/db.js';
+
+// ... (router definition)
+
+/**
+ * Resolve Tenant ID from Webhook Payload
+ */
+async function resolveTenant(body: any): Promise<string | null> {
+  let searchKey = '';
+
+  // 1. Meta / Standard Payload
+  if (body.object === 'whatsapp_business_account') {
+    searchKey = body.entry?.[0]?.changes?.[0]?.value?.metadata?.phone_number_id;
+  }
+
+  // 2. YCloud Payload
+  // Type: whatsapp.message.incoming | whatsapp.message.updated
+  if (body.type?.startsWith('whatsapp') && body.whatsappMessage) {
+    // YCloud 'to' is the business number (Sender ID)
+    searchKey = body.whatsappMessage.to;
+
+    // Sometimes YCloud sends just the number, sometimes with +. 
+    // We might need to handle normalization. 
+    // For now assuming strict match with DB config.
+  }
+
+  if (!searchKey) return null;
+
+  const conf = await db.whatsAppConfig.findFirst({
+    where: { phoneNumberId: searchKey },
+    select: { tenantId: true },
+  });
+
+  return conf?.tenantId || null;
+}
+
+/**
+ * Handle Incoming WhatsApp Events
+ */
 router.post('/', async (req: Request, res: Response) => {
   const body = req.body;
-  const provider = ProviderFactory.getProvider();
 
-  // Validate Signature if provider requires it
-  // Note: YCloud might handle validation differently or use middleware
-  if (config.WHATSAPP_PROVIDER === 'meta' && !provider.validateWebhookSignature(req)) {
-    logger.warn('Webhook Verification Failed: Invalid Signature');
+  // 1. Resolve Tenant
+  const tenantId = await resolveTenant(body);
+
+  if (!tenantId) {
+    // If we can't identify the tenant, we can't process the webhook (no credentials)
+    // We log it but return 200 to acknowledge receipt and prevent retries of junk data.
+    logger.warn({ bodySample: JSON.stringify(body).substring(0, 100) }, 'Webhook received but Tenant not found');
+    return res.status(200).send('OK');
+  }
+
+  // 2. Get Provider for Tenant
+  const provider = ProviderFactory.getProvider(tenantId);
+
+  // 3. Validate Signature
+  const isValid = await provider.validateWebhookSignature(req);
+  if (!isValid) {
+    logger.warn({ tenantId }, 'Webhook Verification Failed: Invalid Signature');
     return res.sendStatus(403);
   }
 
   // Sanitized logging for incoming webhook payloads (avoid PII exposure)
+  // ... (keep existing logging)
   const webhookMetadata = {
     bodySize: JSON.stringify(body).length,
+    tenantId,
     entryCount: body.entry?.length || 0,
     messageType: body.entry?.[0]?.changes?.[0]?.value?.messages?.[0]?.type,
-    hasStatuses: !!body.entry?.[0]?.changes?.[0]?.value?.statuses,
   };
   logger.info(webhookMetadata, 'Incoming WhatsApp Webhook');
 
@@ -55,6 +107,10 @@ router.post('/', async (req: Request, res: Response) => {
 
     for (const event of events) {
       if (event.type === 'message' || event.type === 'status') {
+        // Enriched with Tenant ID if not already present in metadata
+        if (!event.metadata) event.metadata = {};
+        event.metadata.tenantId = tenantId;
+
         // Decoupled Processing: Push to Queue
         await inboundQueue.add(
           'inbound-event',
@@ -65,7 +121,7 @@ router.post('/', async (req: Request, res: Response) => {
           }
         );
 
-        logger.info({ type: event.type, id: event.id }, 'Event queued for processing');
+        logger.info({ type: event.type, id: event.id, tenantId }, 'Event queued for processing');
       }
     }
   } catch (err) {
