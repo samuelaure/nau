@@ -1,7 +1,18 @@
 import { AIService } from './ai.service.js';
+import { db } from '../core/db.js';
+
+// Mock DB
+vi.mock('../core/db.js', () => ({
+  db: {
+    openAIConfig: {
+      findFirst: vi.fn(),
+    },
+  },
+}));
 
 describe('AIService Unit Tests', () => {
   let mockClient: any;
+  const mockTenantId = 'tenant-123';
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -13,6 +24,13 @@ describe('AIService Unit Tests', () => {
       },
     };
     AIService.setClient(mockClient);
+
+    // Mock DB response for config
+    (db.openAIConfig.findFirst as any).mockResolvedValue({
+      apiKey: 'sk-test',
+      primaryModel: 'gpt-4o',
+      cheapModel: 'gpt-4o-mini',
+    });
   });
 
   describe('getChatResponse', () => {
@@ -23,7 +41,7 @@ describe('AIService Unit Tests', () => {
 
       mockClient.chat.completions.create.mockResolvedValue(mockResponse);
 
-      const result = await AIService.getChatResponse('System Prompt', [
+      const result = await AIService.getChatResponse(mockTenantId, 'System Prompt', [
         { role: 'user', content: 'Hello' },
       ]);
 
@@ -34,7 +52,7 @@ describe('AIService Unit Tests', () => {
       mockClient.chat.completions.create.mockRejectedValue(new Error('OpenAI Overloaded'));
 
       await expect(
-        AIService.getChatResponse('System Prompt', [{ role: 'user', content: 'Hello' }])
+        AIService.getChatResponse(mockTenantId, 'System Prompt', [{ role: 'user', content: 'Hello' }])
       ).rejects.toThrow('OpenAI');
     });
   });

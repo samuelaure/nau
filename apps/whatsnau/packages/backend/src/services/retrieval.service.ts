@@ -23,7 +23,7 @@ export class RetrievalService {
       Responde solo con la categoría o categorías separadas por coma.
     `;
 
-    const needs = await AIService.getChatResponse(intentQuery, [], false); // Use cheap model
+    const needs = await AIService.getChatResponse(tenantId, intentQuery, [], false); // Use cheap model
     const needsUpper = needs?.toUpperCase() || '';
 
     // 2. Conditional data fetching

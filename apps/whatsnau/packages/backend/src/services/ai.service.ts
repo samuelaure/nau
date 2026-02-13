@@ -10,37 +10,63 @@ import { NotificationService } from './notification.service.js';
 import { getCorrelationId } from '../core/observability/CorrelationId.js';
 
 export class AIService {
-  private static _openai: OpenAI | null = null;
   private static aiCircuitBreaker = new CircuitBreaker('OpenAI', {
     failureThreshold: 5,
     timeout: 60000,
   });
 
-  static get client(): OpenAI {
-    if (!this._openai) {
-      this._openai = new OpenAI({
-        apiKey: config.OPENAI_API_KEY,
-      });
+  /**
+   * Get tenant-specific OpenAI configuration
+   */
+  private static async getOpenAIConfig(tenantId: string) {
+    // 1. Try tenant config from DB
+    const configData = await db.openAIConfig.findFirst({
+      where: { tenantId, isDefault: true },
+    });
+
+    if (configData) {
+      return {
+        apiKey: configData.apiKey,
+        primaryModel: configData.primaryModel,
+        cheapModel: configData.cheapModel,
+      };
     }
-    return this._openai;
+
+    // 2. Fallback to .env (Legacy/Migration path)
+    return {
+      apiKey: config.OPENAI_API_KEY,
+      primaryModel: config.PRIMARY_AI_MODEL,
+      cheapModel: config.CHEAP_AI_MODEL,
+    };
   }
 
   /**
-   * For testing purposes to inject a mock client
+   * Get OpenAI client for a specific tenant
    */
-  static setClient(mockClient: any) {
-    this._openai = mockClient;
+  private static async getClient(tenantId: string): Promise<OpenAI> {
+    const conf = await this.getOpenAIConfig(tenantId);
+    if (!conf.apiKey) {
+      throw new Error(`OpenAI API Key not configured for tenant ${tenantId}`);
+    }
+    return new OpenAI({
+      apiKey: conf.apiKey,
+    });
   }
 
   /**
    * General purpose completion for conversational agents.
+   * Now requires tenantId context.
    */
   static async getChatResponse(
+    tenantId: string,
     systemPrompt: string,
     messages: { role: 'user' | 'assistant' | 'system'; content: string }[],
     usePremium = false
   ) {
-    const model = usePremium ? config.PRIMARY_AI_MODEL : config.CHEAP_AI_MODEL;
+    const conf = await this.getOpenAIConfig(tenantId);
+    const model = usePremium ? conf.primaryModel : conf.cheapModel;
+
+    // Global guidelines remain same
     const globalGuidelines = `
 ### DIRECTRICES DE RESPUESTA:
 1. Mantén tus respuestas lo más cortas posible sin sacrificar la "integridad" (wholeness).
@@ -51,9 +77,11 @@ export class AIService {
 
     return withRetry(
       async () => {
-        logger.info({ model }, 'Requesting AI response');
+        logger.info({ model, tenantId }, 'Requesting AI response');
 
-        const response = await this.client.chat.completions.create({
+        const client = await this.getClient(tenantId);
+
+        const response = await client.chat.completions.create({
           model,
           messages: [
             { role: 'system', content: `${systemPrompt}\n${globalGuidelines}` },
@@ -67,7 +95,7 @@ export class AIService {
       {
         retries: 2,
         delay: 1000,
-        onRetry: (err) => logger.warn({ err }, 'Retrying OpenAI chat response'),
+        onRetry: (err) => logger.warn({ err, tenantId }, 'Retrying OpenAI chat response'),
       }
     ).catch((error) => {
       throw new ExternalServiceError('OpenAI', error.message, error);
@@ -76,8 +104,9 @@ export class AIService {
 
   /**
    * Detects lead intent and tags from a message (Spanish).
+   * Requires tenantId.
    */
-  static async classifyIntent(message: string, contextSummaries: string = '') {
+  static async classifyIntent(tenantId: string, message: string, contextSummaries: string = '') {
     const prompt = `
       Eres un experto analista de ventas para whatsnaŭ. Tu tarea es clasificar el intento de un mensaje de WhatsApp en español.
       Contexto previo: ${contextSummaries}
@@ -94,8 +123,11 @@ export class AIService {
 
     return withRetry(
       async () => {
-        const result = await this.client.chat.completions.create({
-          model: config.CHEAP_AI_MODEL,
+        const conf = await this.getOpenAIConfig(tenantId);
+        const client = await this.getClient(tenantId);
+
+        const result = await client.chat.completions.create({
+          model: conf.cheapModel,
           messages: [{ role: 'user', content: prompt }],
           response_format: { type: 'json_object' },
         });
@@ -105,9 +137,17 @@ export class AIService {
       },
       { retries: 2 }
     ).catch((error) => {
-      logger.error({ err: error }, 'Intent classification failed after retries');
+      logger.error({ err: error, tenantId }, 'Intent classification failed after retries');
       return null;
     });
+  }
+
+  /**
+   * For testing purposes to inject a mock client
+   */
+  static setClient(mockClient: any) {
+    // We override the getClient method for testing
+    this.getClient = async () => mockClient;
   }
 
   /**
@@ -149,8 +189,6 @@ export class AIService {
       contextParts.push(`Tags: ${tagNames}`);
     }
 
-    // Demo context
-
     // Demo context (if in demo)
     if (lead.state === 'DEMO' && lead.demoExpiresAt) {
       const now = new Date();
@@ -186,12 +224,13 @@ export class AIService {
 
     // Build dynamic context using RetrievalService (Context Weaver)
     const lead = await db.lead.findUnique({ where: { id: leadId }, select: { tenantId: true } });
+    if (!lead) throw new Error(`Lead not found: ${leadId}`);
+
+    const tenantId = lead.tenantId;
     const lastMessage = messages[messages.length - 1]?.content || '';
-    const dynamicContext = lead?.tenantId
-      ? await (
-          await import('./retrieval.service.js')
-        ).RetrievalService.getRelevantContext(leadId, lead.tenantId, lastMessage)
-      : '';
+    const dynamicContext = await (
+      await import('./retrieval.service.js')
+    ).RetrievalService.getRelevantContext(leadId, tenantId, lastMessage);
 
     // Build static lead context (Base info only)
     const leadContext = await this.buildLeadContext(leadId);
@@ -217,7 +256,8 @@ ${globalGuidelines}
     `.trim();
 
     // Determine model
-    const model = promptConfig.usePremiumModel ? config.PRIMARY_AI_MODEL : config.CHEAP_AI_MODEL;
+    const conf = await this.getOpenAIConfig(tenantId);
+    const model = promptConfig.usePremiumModel ? conf.primaryModel : conf.cheapModel;
 
     // Define tools
     const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
@@ -249,9 +289,11 @@ ${globalGuidelines}
 
     return withRetry(
       async () => {
-        logger.info({ model, role, leadId }, 'Requesting AI response with context and tools');
+        logger.info({ model, role, leadId, tenantId }, 'Requesting AI response with context and tools');
 
-        const response = await this.client.chat.completions.create({
+        const client = await this.getClient(tenantId);
+
+        const response = await client.chat.completions.create({
           model,
           messages: [{ role: 'system', content: systemPrompt }, ...messages],
           temperature: promptConfig.temperature,
@@ -296,7 +338,7 @@ ${globalGuidelines}
           }
 
           // After tool execution, we usually want a second pass to get the final text response
-          const secondResponse = await this.client.chat.completions.create({
+          const secondResponse = await client.chat.completions.create({
             model,
             messages: [
               { role: 'system', content: systemPrompt },

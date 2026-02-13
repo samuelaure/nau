@@ -1,57 +1,15 @@
 import { config } from '../core/config.js';
 import { logger } from '../core/logger.js';
 import { db } from '../core/db.js';
-import { sanitizeForTelegram, formatContextForTelegram } from './sanitization.util.js';
+import { sanitizeForTelegram } from './sanitization.util.js';
+import { TelegramService } from './telegram.service.js';
 
 export class NotificationService {
-  private static botToken = config.TELEGRAM_BOT_TOKEN;
-  private static chatId = config.TELEGRAM_CHAT_ID;
   private static alertCooldowns = new Map<string, number>();
-
-  private static async getSettings() {
-    try {
-      return await (db as any).telegramConfig.findUnique({ where: { id: 'singleton' } });
-    } catch (error) {
-      return null;
-    }
-  }
-
-  static async sendTelegramAlert(message: string) {
-    const settings = await this.getSettings();
-    const token = settings?.botToken || this.botToken;
-    const chat = settings?.chatId || this.chatId;
-    const enabled = settings?.isEnabled ?? !!token;
-
-    if (!enabled || !token || !chat) {
-      logger.debug('Telegram notifications are disabled or not configured');
-      return;
-    }
-
-    const url = `https://api.telegram.org/bot${token}/sendMessage`;
-
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chat,
-          text: message,
-          parse_mode: 'HTML',
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        logger.error({ data }, 'Telegram API Error');
-      }
-    } catch (error) {
-      logger.error({ err: error }, 'Failed to send Telegram notification');
-    }
-  }
 
   static async notifyHandover(lead: any, reasoning?: string) {
     const sanitizedLead = sanitizeForTelegram(lead);
-    const dashboardUrl = config.DASHBOARD_URL; // Should be configurable
+    const dashboardUrl = config.DASHBOARD_URL;
     const leadLink = `${dashboardUrl}?leadId=${lead.id}`;
     const text =
       `🚨 <b>Intelligent Handover Triggered</b>\n\n` +
@@ -59,7 +17,11 @@ export class NotificationService {
       `📝 <b>Reasoning:</b> ${reasoning || 'Lead requested human intervention.'}\n\n` +
       `🔗 <a href="${leadLink}">Open Chat</a>`;
 
-    await this.sendTelegramAlert(text);
+    if (lead.tenantId) {
+      await TelegramService.sendTenantNotification(lead.tenantId, text);
+    } else {
+      logger.warn({ leadId: lead.id }, 'Lead missing tenantId, cannot send handover notification');
+    }
   }
 
   static async notifyHighIntent(lead: any, message: string) {
@@ -73,10 +35,12 @@ export class NotificationService {
       `💬 <b>Message:</b> "${sanitizedMessage}"\n\n` +
       `🔗 <a href="${leadLink}">Open Chat and Intervene</a>`;
 
-    await this.sendTelegramAlert(text);
+    if (lead.tenantId) {
+      await TelegramService.sendTenantNotification(lead.tenantId, text);
+    }
   }
 
-  // NEW: Generic system error notification with cooldown
+  // Generic system error notification with cooldown (System Admin)
   static async notifySystemError(severity: 'WARN' | 'CRITICAL', context: any): Promise<void> {
     // Check cooldown to avoid spam
     const key = `${severity}-${context.category}`;
@@ -108,20 +72,20 @@ export class NotificationService {
       logger.error({ err }, 'Failed to create SystemAlert');
     }
 
-    // Send Telegram alert with sanitized data
+    // Send Telegram alert with sanitized data to SYSTEM ADMIN
     const icon = severity === 'CRITICAL' ? '🚨' : '⚠️';
     const message =
-      `${icon} <b>${severity}</b>: ${context.category}\\n\\n` +
-      `${context.error?.message || context.message}\\n\\n` +
-      `Tenant: ${sanitizedContext.tenantId || 'N/A'}\\n` +
+      `${icon} <b>${severity}</b>: ${context.category}\n\n` + // Use \n not \\n for template string
+      `${context.error?.message || context.message}\n\n` +
+      `Tenant: ${sanitizedContext.tenantId || 'N/A'}\n` +
       `Time: ${new Date().toISOString()}`;
 
-    await this.sendTelegramAlert(message);
+    await TelegramService.sendSystemNotification(message);
 
     logger.error({ ...sanitizedContext, severity }, 'System error notification sent');
   }
 
-  // NEW: Fatal error notification (critical failures requiring immediate attention)
+  // Fatal error notification (critical failures requiring immediate attention)
   static async notifyFatalError(category: string, error: Error): Promise<void> {
     return this.notifySystemError('CRITICAL', {
       category,
@@ -130,7 +94,7 @@ export class NotificationService {
     });
   }
 
-  // NEW: Infrastructure failure notification (DB/Redis/etc)
+  // Infrastructure failure notification (DB/Redis/etc)
   static async notifyInfrastructureFailure(service: string, error: any): Promise<void> {
     return this.notifySystemError('CRITICAL', {
       category: `INFRASTRUCTURE_${service.toUpperCase()}`,
@@ -139,8 +103,11 @@ export class NotificationService {
     });
   }
 
-  // NEW: AI service degradation notification
+  // AI service degradation notification
   static async notifyAIDegradation(leadId: string): Promise<void> {
+    // Try to get tenantId if possible? 
+    // Usually degradation is system wide or tenant wide. 
+    // Here we treat it as system alert for Ops to investigate.
     return this.notifySystemError('WARN', {
       category: 'AI_DEGRADATION',
       message: 'AI service unavailable, triggering human handover',
@@ -148,7 +115,7 @@ export class NotificationService {
     });
   }
 
-  // NEW: Message send failure notification (after retry exhaustion)
+  // Message send failure notification (after retry exhaustion)
   static async notifyMessageFailure(leadId: string, error: Error): Promise<void> {
     return this.notifySystemError('WARN', {
       category: 'MESSAGE_SEND_FAILED',
