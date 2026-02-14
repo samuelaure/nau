@@ -43,6 +43,11 @@ fi
 
 # 4. Infrastructure Setup
 # (De-sentinel: Overrides removed. Relying on Clean Docker Compose)
+# Clean up legacy artifacts that might interfere with the consolidated config
+if [ -f "docker-compose.override.yml" ]; then
+    echo "🧹 Removing legacy docker-compose.override.yml..."
+    rm docker-compose.override.yml
+fi
 
 # Detect docker compose version
 DOCKER_COMPOSE_CMD="docker compose"
