@@ -2,6 +2,81 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [6.9.0](https://github.com/samuelaure/whatsnau/compare/v6.8.3...v6.9.0) (2026-02-14)
+
+### Features
+
+* **config:** implement tenant-scoped credential management system ([c0799b6](https://github.com/samuelaure/whatsnau/commit/c0799b6))
+  - Add `YCloudConfig`, `OpenAIConfig`, and `TelegramConfig` database models
+  - Support tenant-specific credentials with environment variable fallbacks
+  - Implement hybrid Telegram model (system bot + tenant chat IDs)
+  - Add database migration for new credential tables
+
+* **infra:** de-sentinel docker setup and modernize deployment pipeline ([302abd4](https://github.com/samuelaure/whatsnau/commit/302abd4))
+  - Remove `docker-compose.override.yml` dependency for portable local development
+  - Expose ports (3000, 5432, 6379) for flexible local/production deployment
+  - Update GitHub Actions to inject environment variables directly
+  - Improve orchestration script for better container detection
+
+* **services:** implement tenant-scoped provider resolution ([d000cbc](https://github.com/samuelaure/whatsnau/commit/d000cbc))
+  - Refactor `WhatsAppService` to accept `tenantId` parameter
+  - Update `MetaWhatsAppProvider` and `YCloudWhatsAppProvider` for tenant-scoped credentials
+  - Implement asynchronous webhook signature validation
+  - Create `TelegramService` for hybrid notification routing
+
+* **whatsapp:** update provider layer for tenant-scoped credentials ([4235f92](https://github.com/samuelaure/whatsnau/commit/4235f92))
+  - Add `tenantId` to provider constructors and methods
+  - Implement async `validateWebhookSignature` method
+  - Update `ProviderFactory` to pass `tenantId` to providers
+
+* **infra:** support multi-tenancy in outbound workers and orchestration ([82efd8a](https://github.com/samuelaure/whatsnau/commit/82efd8a))
+  - Add `tenantId` to `OutboundJobData` interface
+  - Update webhook controller to resolve tenant from payload
+  - Propagate `tenantId` through orchestration pipeline
+
+* **services:** implement tenant-scoped AI and notification routing ([180d44d](https://github.com/samuelaure/whatsnau/commit/180d44d))
+  - Refactor `AIService` to fetch tenant-specific OpenAI credentials
+  - Update `NotificationService` to use `TelegramService` for hybrid notifications
+  - Implement credential inheritance (Database > Environment)
+
+* **api:** add OpenAI configuration management endpoints ([f505668](https://github.com/samuelaure/whatsnau/commit/f505668))
+  - Create `OpenAIConfigService` for CRUD operations
+  - Implement `OpenAIConfigController` with authentication
+  - Add API routes at `/api/config/openai`
+  - Support API key validation and testing
+
+* **frontend:** add OpenAI configuration settings component ([f505668](https://github.com/samuelaure/whatsnau/commit/f505668))
+  - Create `OpenAISettings` component with full CRUD interface
+  - Implement secure API key input with show/hide toggle
+  - Add model selection (Primary/Cheap models)
+  - Include connection testing and validation
+
+* **whatsapp:** hide embedded signup when meta app not configured ([b62fb7b](https://github.com/samuelaure/whatsnau/commit/b62fb7b))
+  - Return `null` for `metaAppId` when credentials missing
+  - Hide `WhatsAppOnboarding` component when not configured
+  - Improve UX for optional Meta App integration
+
+### Bug Fixes
+
+* **errors:** fix AppError inheritance for proper error type checking ([c0799b6](https://github.com/samuelaure/whatsnau/commit/c0799b6))
+  - Use `new.target.prototype` for correct prototype chain
+  - Ensure `ValidationError` and `NotFoundError` work with `instanceof`
+
+### Tests
+
+* **backend:** update test suite for tenant-scoped configuration ([c9b3a3e](https://github.com/samuelaure/whatsnau/commit/c9b3a3e))
+  - Add comprehensive unit tests for `OpenAIConfigService`
+  - Update `WhatsAppService` tests for tenant-scoped methods
+  - Ensure all 177 tests passing
+
+### Technical Improvements
+
+* **Architecture**: Implemented full tenant-scoped credential management with database-first approach
+* **Security**: API keys masked in responses, proper validation, async webhook verification
+* **Portability**: Docker Compose works out-of-the-box for both local and production
+* **Backward Compatibility**: Environment variable fallbacks preserve existing deployments
+* **Testing**: 177/177 backend tests passing, comprehensive coverage for new features
+
 ### [6.8.3](https://github.com/samuelaure/whatsnau/compare/v6.8.2...v6.8.3) (2026-02-12)
 
 
