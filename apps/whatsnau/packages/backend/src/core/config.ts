@@ -8,7 +8,10 @@ const configSchema = z
     // Platform
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
     LOG_LEVEL: z.string().default('info'),
-    DASHBOARD_URL: z.string().url().default('http://localhost:5173'),
+    DASHBOARD_URL: z.preprocess(
+      (val) => (val === '' ? undefined : val),
+      z.string().url().default('http://localhost:5173')
+    ),
     ALLOWED_ORIGINS: z.string().default('http://localhost:5173,https://whatsnau.9nau.com'),
     INITIAL_ADMIN_PASSWORD: z.string().default('admin123'),
 
@@ -30,8 +33,8 @@ const configSchema = z
     CHEAP_AI_MODEL: z.string().default('gpt-4o-mini'),
 
     // Telegram (Hybrid: system bot + tenant chat IDs)
-    TELEGRAM_BOT_TOKEN: z.string(),
-    TELEGRAM_SYSTEM_CHAT_ID: z.string(),
+    TELEGRAM_BOT_TOKEN: z.string().optional(),
+    TELEGRAM_SYSTEM_CHAT_ID: z.string().optional(),
     TELEGRAM_CHAT_ID: z.string().optional(), // Deprecated, for backward compatibility
 
     // Auth
@@ -46,10 +49,6 @@ const configSchema = z
     // YCloud (Tenant-scoped, optional for boot)
     YCLOUD_API_KEY: z.string().optional(),
     WHATSAPP_PROVIDER: z.enum(['meta', 'ycloud']).default('meta'),
-  })
-  .refine((data) => data.NODE_ENV !== 'production' || !!data.REDIS_PASSWORD, {
-    message: 'REDIS_PASSWORD is required in production environment',
-    path: ['REDIS_PASSWORD'],
   })
   .refine(
     (data) =>

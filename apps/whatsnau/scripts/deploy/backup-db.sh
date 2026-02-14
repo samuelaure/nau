@@ -8,15 +8,16 @@
 
 TIMESTAMP=$(date +%Y%m%d%H%M%S)
 BACKUP_DIR="./backups"
-DB_CONTAINER="shared_postgres"
+# Find the postgres container dynamically
+DB_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E "postgres" | head -n 1)
 DB_NAME=${DB_NAME:-whatsnau}
 BACKUP_FILE="${BACKUP_DIR}/${DB_NAME}_${TIMESTAMP}.sql"
 
 mkdir -p $BACKUP_DIR
 
 # Check if container exists and is running
-if ! docker ps --format '{{.Names}}' | grep -q "^${DB_CONTAINER}$"; then
-    echo "⚠️  Container $DB_CONTAINER not found or not running. Skipping backup (likely first deploy)."
+if [ -z "$DB_CONTAINER" ]; then
+    echo "⚠️  Postgres container not found or not running. Skipping backup (likely first deploy)."
     exit 0
 fi
 
