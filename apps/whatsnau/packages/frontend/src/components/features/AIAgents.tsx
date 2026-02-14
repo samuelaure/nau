@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Clock, Shield, Send, X } from 'lucide-react';
 import { WhatsAppOnboarding } from './WhatsAppOnboarding';
+import { OpenAISettings } from './OpenAISettings';
 import type { BusinessConfig, PromptConfig, TelegramConfig, KeywordConfig } from '../../types';
 import { Tag } from '../ui/Tag';
 
@@ -142,6 +143,7 @@ export const AIAgents: React.FC<AIAgentsProps> = ({
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         <WhatsAppOnboarding appId={metaAppId} />
+        <OpenAISettings />
         <div className="settings-section">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
             <Clock size={20} color="var(--accent)" />
