@@ -123,7 +123,7 @@ router.get(
     }
     res.json({
       ...(config as any),
-      metaAppId: process.env.META_APP_ID || '',
+      metaAppId: (process.env.META_APP_ID && process.env.META_APP_SECRET) ? process.env.META_APP_ID : null,
     });
   })
 );

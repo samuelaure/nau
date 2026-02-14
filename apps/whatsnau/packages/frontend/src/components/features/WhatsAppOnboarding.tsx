@@ -16,6 +16,11 @@ export const WhatsAppOnboarding: React.FC<WhatsAppOnboardingProps> = ({ appId })
     console.log('[WhatsAppOnboarding] isLoaded:', isLoaded);
   }, [appId, isLoaded]);
 
+  // Hide component if Meta App credentials are not configured
+  if (!appId) {
+    return null;
+  }
+
   const handleSignup = () => {
     setStatus('loading');
     launchEmbeddedSignup((response) => {
