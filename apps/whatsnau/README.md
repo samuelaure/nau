@@ -2,7 +2,7 @@
 
 whatsnaŭ is a premium, high-performance CRM and orchestration platform for WhatsApp-based sales campaigns. It is designed to bridge the gap between automated lead nurturing and high-conversion human intervention using strategic AI integration.
 
-Built with **enterprise-grade resilience** and **world-class development standards**, it serves as a robust backbone for modern digital sales teams.
+The system has evolved into a **v7 High-Resilience Monorepo**, featuring strict multi-tenancy, tenant-scoped credentials, and a de-sentinelized infrastructure for absolute isolation and portability.
 
 ---
 
@@ -12,106 +12,72 @@ The platform empowers businesses to scale their WhatsApp outreach while maintain
 
 ### Core Philosophy
 
-- **Campaign-First Logic**: System behavior is governed by structured outreach sequences.
-- **Strategic AI usage**: AI acts as a sophisticated assistant (Closer or Receptionist), while deterministic logic ensures outreach reliability.
-- **Human-in-the-Loop**: Seamless transitions between AI and manual agents to ensure no "bot-like" friction during high-stakes moments.
-- **Spanish-First**: Native support for Spanish (Spain) linguistic and cultural nuances.
+-   **Multi-Tenancy First**: Complete isolation between business accounts with tenant-scoped configurations.
+-   **Campaign-First Logic**: System behavior is governed by structured outreach sequences.
+-   **Strategic AI usage**: AI acts as a sophisticated assistant (Closer, Receptionist, or Nurturing Buddy).
+-   **Human-in-the-Loop**: Seamless transitions between AI and manual agents to ensure no "bot-like" friction.
+-   **Spanish-First**: Native support for Spanish (Spain) linguistic and cultural nuances.
 
 ---
 
-## ✨ Key Features (Platform v2.0)
+## ✨ Key Features (Platform v7.0)
 
 ### 🖥️ High-End Dashboard
+-   **Glassmorphic UI**: A premium, modern interface for managing leads and campaigns.
+-   **Real-time SSE Engine**: Instant updates for new messages, delivery statuses, and handover alerts.
+-   **Unified Command Center**: Overview of campaign metrics, conversion rates, and active outreach.
+-   **Visual DAG Builder**: A sophisticated node-based interface for designing complex message sequences.
 
-- **Glassmorphic UI**: A premium, modern interface for managing leads and campaigns.
-- **Real-time SSE Engine**: Instant updates for new messages, delivery statuses, and handover alerts via Server-Sent Events.
-- **Unified Command Center**: Overview of campaign metrics, conversion rates, and active outreach.
-- **Lead Segmentation**: Visual breakdown of COLD, INTERESTED, NURTURING, and CLIENT leads.
-- **Visual DAG Builder**: A sophisticated node-based interface for designing complex message sequences, featuring a nested Boolean logic engine for advanced branching.
-
-### 🤖 Intelligent AI Agents (3 Specialized Roles)
-
-- **Conversational Closer**: Pre-sale conversations with INTERESTED leads, gathering key information and warming relationships.
-- **Receptionist (Demo Agent)**: Time-limited demo sessions (5-10 min) using lead's business context to demonstrate competence.
-- **Nurturing Buddy**: Community host for weekly tips subscribers, building long-term relationships and identifying opportunities.
-- **Lead-Specific Context**: All agents receive personalized context (name, business data, tags, conversation history).
-- **Business Knowledge Base**: Inject your specific business context directly into the AI's "brain".
-- **Dynamic Prompt Management**: Fine-tune agent personality and instructions through the dashboard.
-- **Manual AI Toggle**: Granular control to enable/disable the AI assistant on a per-lead basis.
+### 🤖 Intelligent AI Agents (Multi-Role)
+-   **Conversational Closer**: Warm relationship building and pre-sale qualification.
+-   **Receptionist (Demo Agent)**: Time-limited sessions demonstrating competence using lead context.
+-   **Nurturing Buddy**: Long-term relationship maintenance for weekly subscriber updates.
+-   **Tenant-Scoped Brain**: Each business can configure its own OpenAI keys and custom prompt instructions.
 
 ### 💬 Advanced Messaging & CRM
-
-- **Live Chat**: Integrated chat modal with real-time feedback and delivery status tracking (Sent, Delivered, Read).
-- **Intelligent Handover**: Automatic detection of human intent with "Silent Takeover" for manual agents.
-- **Template-Driven Sequences**: Configurable message templates with variable substitution ({{name}}, {{business}}, etc.).
-- **Multi-Stage Campaigns**:
-  - Main Outreach: M1 (Pitch) → M2 (Follow-up) → M3 (Weekly Tips Invite)
-  - Nurturing Onboarding: 3 welcome messages over 23 hours
-- **Smart State Machine**: Automatic lead progression through COLD → INTERESTED → DEMO → NURTURING → CLIENTS.
-- **Conditional Logic**: YES/NO response handling with immediate M3 delivery on rejection.
+-   **Live Chat**: Real-time feedback and delivery status tracking (Sent, Delivered, Read).
+-   **Intelligent Handover**: Automatic detection of human intent with "Silent Takeover".
+-   **Smart State Machine**: Automatic lead progression through COLD → INTERESTED → DEMO → NURTURING → CLIENTS.
+-   **Tenant-Scoped Providers**: Support for Meta WhatsApp Cloud API and YCloud with independent credentials per tenant.
 
 ---
 
-## 🛡️ Resilience & Reliability (Standard)
+## 📂 Monorepo Architecture
 
-whatsnaŭ is engineered for production environments where reliability is non-negotiable:
+whatsnaŭ is managed as a high-performance monorepo using **Turborepo** for optimized task execution.
 
-- **Unified Error Architecture**: Centralized error handling using custom `AppError` classes and global middleware to ensure no crash goes silent.
-- **Self-Healing Integrations**: All external API calls (WhatsApp, OpenAI) are wrapped in a **Retry Utility with Exponential Backoff**.
-- **Data Atomicity**: Critical multi-step operations (like Mass Import) are protected by **Prisma Transactions** to prevent partial data state.
-- **Observability**: Standardized structured logging and a `/health` endpoint for external monitoring and uptime validation.
-- **Defensive UI**: Global React Error Boundaries and a real-time Notification System (Toasts) provide immediate user feedback on system status.
-
----
-
-## 🧪 Testing & Quality Assurance
-
-We follow industry-standard TDD (Test-Driven Development) practices to ensure the platform remains stable as it evolves.
-
-- **Unit Tests**: Critical logic normalization and AI service interactions are fully unit-tested with **Vitest**.
-- **Integration Tests**: Full-flow API validation using **Supertest**, verifying everything from health checks to error propagation.
-- **Deterministic Mocking**: All external service dependencies are mocked to ensure tests are fast, reliable, and offline-compatible.
-
-### Run Tests:
-
-```bash
-# Run all tests
-npm test
-
-# Run tests with coverage report
-npm run test:coverage
-
-# Watch mode for development
-npm run test:watch
+```text
+├── packages/
+│   ├── backend/      # Node.js (ESM) API, Workers, and Orchestration Core
+│   ├── frontend/     # React SPA Dashboard (Vite + Framer Motion)
+│   └── shared/       # Shared types, schemas, and utilities
+├── prisma/           # Centralized Database Schema (PostgreSQL)
+├── scripts/          # Orchestration and deployment utilities
+├── .agent/           # Strategic evolution plans and phase tracking
+└── turbo.json        # Turborepo task configuration
 ```
+
+---
+
+## 🛡️ Resilience & Reliability
+
+-   **Isolated Infrastructure**: De-sentinelized setup where each instance manages its own PostgreSQL and Redis (BullMQ).
+-   **Unified Error Architecture**: Centralized error handling using custom `AppError` classes.
+-   **Self-Healing Integrations**: All external API calls (WhatsApp, OpenAI) feature **Retry Utility with Exponential Backoff**.
+-   **Data Atomicity**: Multi-step operations protected by **Prisma Transactions**.
+-   **Observability**: Structured logging, `/health` endpoints, and system-level alerting.
 
 ---
 
 ## 🛠 Tech Stack
 
-- **Runtime**: [Node.js](https://nodejs.org/) (ESM) + [TypeScript](https://www.typescriptlang.org/) (Strict Mode)
-- **Frontend**: [React](https://reactjs.org/) + [Vite](https://vitejs.dev/) + [Lucide Icons](https://lucide.dev/)
-- **ORM**: [Prisma](https://www.prisma.io/)
-- **Testing**: [Vitest](https://vitest.dev/) + [Supertest](https://github.com/ladjs/supertest)
-- **Database**: [PostgreSQL](https://www.postgresql.org/)
-- **AI**: OpenAI API (GPT-4o & GPT-4o-mini)
-- **Styling**: Vanilla CSS (Premium Custom Design)
-
----
-
-## 📂 Project Structure
-
-```text
-├── src/
-│   ├── core/         # Orchestrator, Database, Config, Logger, Errors (Resilience Core)
-│   ├── api/          # Webhook, Dashboard, & Import Controllers
-│   ├── services/     # AI, WhatsApp, Lead, Sequence, Metrics, Events
-│   └── index.ts      # Application entry point & Observability
-├── frontend/         # React SPA Dashboard + Resilience Components
-├── prisma/           # Schema & seed data (PostgreSQL)
-├── .agent/           # Automation workflows & Project Rules
-└── .cursorrules      # Strategic AI coding rules
-```
+-   **Runtime**: [Node.js](https://nodejs.org/) (ESM) + [TypeScript](https://www.typescriptlang.org/) (Strict Mode)
+-   **Orchestration**: [Turborepo](https://turbo.build/repo)
+-   **Frontend**: [React](https://reactjs.org/) + [Vite](https://vitejs.dev/) + [Framer Motion](https://www.framer.com/motion/)
+-   **Database**: [PostgreSQL](https://www.postgresql.org/) + [Prisma](https://www.prisma.io/)
+-   **Queuing**: [BullMQ](https://bullmq.io/) (Redis-backed)
+-   **AI**: OpenAI API (GPT-4o & GPT-4o-mini)
+-   **Styling**: Vanilla CSS (Premium Custom Design) + TailwindCSS
 
 ---
 
@@ -119,38 +85,55 @@ npm run test:watch
 
 ### Prerequisites
 
-- Node.js (v20+)
-- PostgreSQL (v15+)
-- Meta WhatsApp Cloud API credentials
-- OpenAI API Key
+-   Node.js (v20+)
+-   PostgreSQL (v15+)
+-   Redis (v7+)
+-   Meta WhatsApp / YCloud credentials
 
 ### Installation
 
 1.  **Clone and Install**:
     ```bash
     npm install
-    cd frontend && npm install && cd ..
     ```
 2.  **Environment Setup**:
-    Copy `.env.example` to `.env` and fill in your credentials, including `DATABASE_URL`.
+    Copy `.env.example` to `.env` and configure your `DATABASE_URL` and other credentials.
 3.  **Database Setup**:
-    Ensure your PostgreSQL server is running and run:
-
     ```bash
     npx prisma migrate dev
     npx prisma db seed
     ```
 
-4.  **Run Development**:
-    ```bash
-    # Backend
-    npm run dev
-    # Frontend (Separate terminal)
-    cd frontend && npm run dev
-    ```
+### Development
+
+```bash
+# Run all services in development mode
+npm run dev
+
+# Run full project verification (lint, format, type-check, test)
+npm run verify
+
+# Build for production
+npm run build
+```
+
+---
+
+## 🧪 Testing
+
+We follow TDD practices with a focus on high-fidelity service mocking and integration validation.
+
+```bash
+# Run all tests via Turbo
+npm test
+
+# Run tests with coverage report
+turbo run test -- --coverage
+```
 
 ---
 
 ## ⚖️ License
 
 Proprietary. Developed for high-performance production environments.
+
