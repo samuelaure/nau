@@ -32,6 +32,9 @@ jobs:
         run: npx prisma generate
         working-directory: packages/backend
 
+      - name: 🛡️ Infrastructure Security Check
+        run: npm run security:infra
+
       - name: 🧪 Run Verification
         run: npm run verify
 
