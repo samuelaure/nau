@@ -92,7 +92,7 @@
     "webpack": "^5.105.0"
   },
   "prisma": {
-    "seed": "ts-node prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts"
   },
   "overrides": {
     "chevrotain": "^11.1.1",
