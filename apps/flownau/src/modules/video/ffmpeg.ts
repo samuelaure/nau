@@ -1,12 +1,31 @@
 import ffmpeg from 'fluent-ffmpeg'
 import os from 'os'
 import path from 'path'
-import fs from 'fs/promises'
-import { createReadStream, createWriteStream } from 'fs'
+import fs from 'fs'
 
 // Helper to determine temp file paths
 export function getTempPath(filename: string) {
   return path.join(os.tmpdir(), `flownau_${Date.now()}_${filename}`)
+}
+
+// Set custom paths if env vars exist (optional)
+const isWin = process.platform === 'win32'
+const envFfmpeg = isWin
+  ? process.env.FFMPEG_PATH_WIN || process.env.FFMPEG_PATH
+  : process.env.FFMPEG_PATH
+const envFfprobe = isWin
+  ? process.env.FFPROBE_PATH_WIN || process.env.FFPROBE_PATH
+  : process.env.FFPROBE_PATH
+
+// Only apply custom paths if they actually exist on the current filesystem
+if (envFfmpeg && fs.existsSync(envFfmpeg)) {
+  console.log(`[FFMPEG] Setting custom path: ${envFfmpeg}`)
+  ffmpeg.setFfmpegPath(envFfmpeg)
+}
+
+if (envFfprobe && fs.existsSync(envFfprobe)) {
+  console.log(`[FFPROBE] Setting custom path: ${envFfprobe}`)
+  ffmpeg.setFfprobePath(envFfprobe)
 }
 
 /**
@@ -15,11 +34,6 @@ export function getTempPath(filename: string) {
  */
 export function compressVideo(inputPath: string, outputPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    // Set custom path if env var exists (optional)
-    if (process.env.FFMPEG_PATH) {
-      ffmpeg.setFfmpegPath(process.env.FFMPEG_PATH)
-    }
-
     ffmpeg(inputPath)
       .outputOptions([
         '-c:v libx264',
@@ -53,10 +67,6 @@ export function compressVideo(inputPath: string, outputPath: string): Promise<vo
  */
 export function compressAudio(inputPath: string, outputPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    if (process.env.FFMPEG_PATH) {
-      ffmpeg.setFfmpegPath(process.env.FFMPEG_PATH)
-    }
-
     ffmpeg(inputPath)
       .outputOptions(['-c:a aac', '-b:a 128k'])
       .on('start', (commandLine) => {
