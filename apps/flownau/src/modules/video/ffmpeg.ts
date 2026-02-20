@@ -83,3 +83,26 @@ export function compressAudio(inputPath: string, outputPath: string): Promise<vo
       .save(outputPath)
   })
 }
+
+/**
+ * Generates a thumbnail image from a video at 1s mark.
+ */
+export function generateThumbnail(inputPath: string, outputPath: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .screenshots({
+        timestamps: [1],
+        filename: path.basename(outputPath),
+        folder: path.dirname(outputPath),
+        size: '1280x?',
+      })
+      .on('end', () => {
+        console.log('Thumbnail generated')
+        resolve()
+      })
+      .on('error', (err) => {
+        console.error('Thumbnail generation error:', err)
+        reject(err)
+      })
+  })
+}

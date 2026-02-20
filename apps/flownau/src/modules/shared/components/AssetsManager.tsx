@@ -43,6 +43,34 @@ export default function AssetsManager({
   const [currentPath, setCurrentPath] = useState<string[]>([])
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false)
   const [linking, setLinking] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  const clearSelection = () => setSelectedIds(new Set())
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+    if (!confirm(`Are you sure you want to delete ${selectedIds.size} assets?`)) return
+
+    const toastId = toast.loading(`Deleting ${selectedIds.size} assets...`)
+    try {
+      for (const id of Array.from(selectedIds)) {
+        await deleteAsset(id)
+      }
+      toast.success('Assets deleted successfully', { id: toastId })
+      window.location.reload()
+    } catch (error) {
+      toast.error('Bulk delete failed', { id: toastId })
+    }
+  }
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
@@ -170,7 +198,48 @@ export default function AssetsManager({
   const sortedFolders = Array.from(items.folders).sort()
 
   return (
-    <div className="flex flex-col gap-8 animate-fade-in text-text-secondary">
+    <div className="flex flex-col gap-8 animate-fade-in text-text-secondary relative">
+      {/* Floating Bulk Actions Bar */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-6 px-6 py-4 bg-zinc-900/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="flex items-center gap-3 pr-6 border-r border-white/10">
+            <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-xs font-bold text-black">
+              {selectedIds.size}
+            </div>
+            <span className="text-xs font-bold text-white uppercase tracking-widest whitespace-nowrap">
+              Items Selected
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                const urls = Array.from(selectedIds)
+                  .map((id) => assets.find((a) => a.id === id)?.url)
+                  .filter(Boolean)
+                  .join('\n')
+                navigator.clipboard.writeText(urls)
+                toast.success(`${selectedIds.size} URLs copied`)
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-xl text-xs font-bold transition-all border border-white/10"
+            >
+              <Copy size={14} /> Copy URLs
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl text-xs font-bold transition-all border border-red-500/20"
+            >
+              <Trash2 size={14} /> Bulk Delete
+            </button>
+            <button
+              onClick={clearSelection}
+              className="text-xs font-bold hover:text-white transition-colors uppercase tracking-widest px-2"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header & Breadcrumbs */}
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
@@ -266,7 +335,12 @@ export default function AssetsManager({
 
         {/* Files */}
         {items.files.map((asset) => (
-          <AssetCard key={asset.id} asset={asset} />
+          <AssetCard
+            key={asset.id}
+            asset={asset}
+            selected={selectedIds.has(asset.id)}
+            onToggleSelect={() => toggleSelect(asset.id)}
+          />
         ))}
       </div>
 
@@ -306,29 +380,72 @@ export default function AssetsManager({
   )
 }
 
-function AssetCard({ asset }: { asset: Asset }) {
+function AssetCard({
+  asset,
+  selected,
+  onToggleSelect,
+}: {
+  asset: Asset
+  selected: boolean
+  onToggleSelect: () => void
+}) {
   const isImage = asset.type === 'IMG' || asset.mimeType.startsWith('image/')
   const isVideo = asset.type === 'VID' || asset.mimeType.startsWith('video/')
   const isAudio = asset.type === 'AUD' || asset.mimeType.startsWith('audio/')
 
   return (
-    <div className="group relative bg-[#161616] border border-white/5 rounded-2xl overflow-hidden hover:border-accent/50 transition-all duration-300 flex flex-col shadow-2xl shadow-black/40">
+    <div
+      onClick={(e) => {
+        if (e.ctrlKey || e.metaKey) {
+          onToggleSelect()
+        }
+      }}
+      className={`group relative bg-[#161616] border rounded-2xl overflow-hidden transition-all duration-300 flex flex-col shadow-2xl shadow-black/40 ${selected ? 'border-accent ring-1 ring-accent bg-accent/5' : 'border-white/5 hover:border-accent/50'}`}
+    >
+      {/* Selection Overlay Checkbox */}
+      <div
+        onClick={(e) => {
+          e.stopPropagation()
+          onToggleSelect()
+        }}
+        className={`absolute top-3 left-3 z-20 w-5 h-5 rounded-md border transition-all cursor-pointer flex items-center justify-center ${selected ? 'bg-accent border-accent text-black shadow-lg shadow-accent/20' : 'bg-black/40 border-white/20 opacity-0 group-hover:opacity-100 hover:border-white/40'}`}
+      >
+        {selected && (
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="4"
+            className="w-3.5 h-3.5"
+          >
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        )}
+      </div>
+
       {/* Media Preview */}
       <div className="relative aspect-video bg-black/40 flex items-center justify-center overflow-hidden border-b border-white/5">
-        {isImage && (
+        {(isImage || (isVideo && asset.thumbnailUrl)) && (
           <div className="w-full h-full relative">
             <NextImage
-              src={asset.url}
+              src={isImage ? asset.url : asset.thumbnailUrl!}
               alt={asset.originalFilename}
               fill
-              className="object-cover transition-transform duration-500 group-hover:scale-110 opacity-70 group-hover:opacity-100"
+              className={`object-cover transition-all duration-500 ${selected ? 'scale-110 opacity-100' : 'opacity-70 group-hover:opacity-100 group-hover:scale-110'}`}
               sizes="(max-width: 768px) 50vw, 20vw"
               unoptimized
             />
           </div>
         )}
-        {!isImage && (
-          <div className="flex flex-col items-center gap-3 text-zinc-600 transition-colors group-hover:text-white">
+        {isVideo && asset.thumbnailUrl && (
+          <div className="absolute bottom-2 right-2 z-10 p-1.5 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 text-white/70">
+            <Play size={10} fill="currentColor" />
+          </div>
+        )}
+        {!isImage && (!isVideo || !asset.thumbnailUrl) && (
+          <div
+            className={`flex flex-col items-center gap-3 transition-colors ${selected ? 'text-accent' : 'text-zinc-600 group-hover:text-white'}`}
+          >
             {isVideo ? <FileVideo size={32} /> : isAudio ? <FileAudio size={32} /> : <div />}
             <span className="text-[10px] font-bold uppercase tracking-widest opacity-30">
               {asset.mimeType.split('/')[1] || 'Media'}
@@ -375,12 +492,14 @@ function AssetCard({ asset }: { asset: Asset }) {
       {/* Info */}
       <div className="p-4 flex flex-col gap-1 min-w-0">
         <h4
-          className="text-[11px] font-bold text-zinc-300 truncate tracking-tight group-hover:text-white transition-colors"
+          className={`text-[11px] font-bold truncate tracking-tight transition-colors ${selected ? 'text-accent' : 'text-zinc-300 group-hover:text-white'}`}
           title={asset.originalFilename}
         >
           {asset.originalFilename}
         </h4>
-        <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-widest text-text-secondary/40 group-hover:text-accent/60 transition-colors">
+        <div
+          className={`flex items-center justify-between text-[9px] font-bold uppercase tracking-widest transition-colors ${selected ? 'text-accent/60' : 'text-text-secondary/40 group-hover:text-accent/60'}`}
+        >
           <span>{(asset.size / 1024 / 1024).toFixed(2)} MB</span>
           <span className="opacity-0 group-hover:opacity-100 transition-opacity">Asset Entity</span>
         </div>

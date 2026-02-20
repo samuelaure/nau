@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 import { r2, R2_BUCKET } from '@/modules/shared/r2'
 import { PutObjectCommand } from '@aws-sdk/client-s3'
-import { compressVideo, compressAudio, getTempPath } from '@/modules/video/ffmpeg'
+import {
+  compressVideo,
+  compressAudio,
+  getTempPath,
+  generateThumbnail,
+} from '@/modules/video/ffmpeg'
 import fs from 'fs/promises'
 import { createReadStream } from 'fs'
 
@@ -76,12 +81,22 @@ export async function POST(req: NextRequest) {
     let outputPath = inputPath
     let finalExt = file.name.split('.').pop() || ''
     let finalMime = file.type
+    let thumbPath: string | null = null
 
     if (type === 'VID') {
       finalExt = 'mp4'
       finalMime = 'video/mp4'
       outputPath = getTempPath(`optimized_${Date.now()}.mp4`)
       await compressVideo(inputPath, outputPath)
+
+      // Generate thumbnail
+      thumbPath = getTempPath(`thumb_${Date.now()}.jpg`)
+      try {
+        await generateThumbnail(outputPath, thumbPath)
+      } catch (e) {
+        console.error('Thumbnail generation failed, continuing without it', e)
+        thumbPath = null
+      }
     } else if (type === 'AUD') {
       finalExt = 'm4a'
       finalMime = 'audio/mp4'
@@ -132,6 +147,28 @@ export async function POST(req: NextRequest) {
       }),
     )
 
+    // Upload thumbnail if exists
+    let thumbnailUrl: string | null = null
+    if (thumbPath) {
+      const thumbKey = `${projectFolder}/thumbnails/${systemFilename.split('.')[0]}_thumb.jpg`
+      const thumbStream = createReadStream(thumbPath)
+      const thumbStats = await fs.stat(thumbPath)
+
+      await r2.send(
+        new PutObjectCommand({
+          Bucket: R2_BUCKET,
+          Key: thumbKey,
+          Body: thumbStream,
+          ContentType: 'image/jpeg',
+          ContentLength: thumbStats.size,
+        }),
+      )
+
+      thumbnailUrl = process.env.R2_PUBLIC_URL
+        ? `${process.env.R2_PUBLIC_URL}/${thumbKey}`
+        : `https://${R2_BUCKET}.r2.cloudflarestorage.com/${thumbKey}`
+    }
+
     // 8. DB Record
     const publicUrl = process.env.R2_PUBLIC_URL
       ? `${process.env.R2_PUBLIC_URL}/${r2Key}`
@@ -149,6 +186,7 @@ export async function POST(req: NextRequest) {
         hash: clientHash,
         type,
         url: publicUrl,
+        thumbnailUrl: thumbnailUrl,
       },
     })
 
@@ -156,6 +194,9 @@ export async function POST(req: NextRequest) {
     await fs.unlink(inputPath).catch(console.error)
     if (outputPath !== inputPath) {
       await fs.unlink(outputPath).catch(console.error)
+    }
+    if (thumbPath) {
+      await fs.unlink(thumbPath).catch(console.error)
     }
 
     return NextResponse.json({ success: true, asset })

@@ -9,6 +9,7 @@ export const AssetSchema = z.object({
   type: z.string(),
   size: z.number(),
   mimeType: z.string(),
+  thumbnailUrl: z.string().optional().nullable(),
 })
 
 export const ElementStyleSchema = z.object({
