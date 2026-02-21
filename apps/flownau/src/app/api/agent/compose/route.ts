@@ -22,9 +22,12 @@ export async function POST(req: Request) {
 
     // 2. Parse payload
     const json = await req.json()
+    console.log('[DEBUG] Compose Payload:', JSON.stringify(json, null, 2))
+
     const parsed = ComposeRequestSchema.safeParse(json)
 
     if (!parsed.success) {
+      console.error('[DEBUG] Validation Errors:', JSON.stringify(parsed.error.format(), null, 2))
       return NextResponse.json(
         { error: 'Invalid request payload', details: parsed.error.format() },
         { status: 400 },
