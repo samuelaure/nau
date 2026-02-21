@@ -7,104 +7,103 @@ datasource db {
 }
 
 model User {
-  id            String          @id @default(cuid())
-  name          String?
-  email         String?         @unique
-  password      String?
-  image         String?
-  accounts      SocialAccount[]
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  id        String          @id @default(cuid())
+  name      String?
+  email     String?         @unique
+  password  String?
+  image     String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  accounts  SocialAccount[]
 }
 
 model SocialAccount {
-  id                String   @id @default(cuid())
-  userId            String
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  platform          String   @default("instagram")
-  platformId        String?  // Instagram User ID
-  username          String?
-  profileImage      String?  // Sync from social platform
-  accessToken       String   @db.Text // Encrypted
-  refreshToken      String?  @db.Text // Encrypted
-  expiresAt         DateTime?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  shortCode         String?  // For asset naming (e.g. "AF")
-  assetsRoot        String?  // Path to the linked assets folder
-  templates         Template[]
-  assets            Asset[]
-  compositions      Composition[]
+  id           String        @id @default(cuid())
+  userId       String
+  platform     String        @default("instagram")
+  platformId   String?
+  username     String?
+  profileImage String?
+  accessToken  String
+  refreshToken String?
+  expiresAt    DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  shortCode    String?
+  assetsRoot   String?
+  assets       Asset[]
+  compositions Composition[]
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  templates    Template[]
 
   @@unique([platform, platformId])
 }
 
 model Asset {
-  id                String        @id @default(cuid())
-  accountId         String?
-  account           SocialAccount? @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  templateId        String?
-  template          Template?     @relation(fields: [templateId], references: [id], onDelete: SetNull)
-  type              String        // "VIDEO", "AUDIO", "IMAGE"
-  systemFilename    String        // e.g. AF_VID_0001.mp4
-  originalFilename  String
-  r2Key             String
-  url               String        @db.Text
-  size              Int
-  mimeType          String
-  hash              String?       // SHA-256 for deduplication
-  thumbnailUrl      String?       @db.Text
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  id               String         @id @default(cuid())
+  accountId        String?
+  templateId       String?
+  type             String
+  systemFilename   String
+  originalFilename String
+  r2Key            String
+  url              String
+  size             Int
+  mimeType         String
+  hash             String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  thumbnailUrl     String?
+  account          SocialAccount? @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  template         Template?      @relation(fields: [templateId], references: [id])
 }
 
 model Template {
-  id              String   @id @default(cuid())
-  name            String
-  remotionId      String   // The ID of the component in Remotion
-  airtableTableId String?
-  config          Json?    // Specific layout or style config
-  accountId       String?
-  account         SocialAccount? @relation(fields: [accountId], references: [id])
-  assets          Asset[]
-  renders         Render[]
-  useAccountAssets Boolean @default(true)
-  assetsRoot      String?  // Path to the linked assets folder
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id               String         @id @default(cuid())
+  name             String
+  remotionId       String
+  airtableTableId  String?
+  config           Json?
+  accountId        String?
+  useAccountAssets Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  assetsRoot       String?
+  assets           Asset[]
+  renders          Render[]
+  account          SocialAccount? @relation(fields: [accountId], references: [id])
 }
 
 model Render {
-  id                String   @id @default(cuid())
-  templateId        String
-  template          Template @relation(fields: [templateId], references: [id])
-  status            String   @default("IDLE") // IDLE, QUEUED, RENDERING, COMPLETED, FAILED, PUBLISHED
-  progress          Float    @default(0)
-  inputData         Json?    // Snapshot of Airtable data used
-  r2Url             String?  @db.Text
-  instagramMediaId  String?
-  instagramStatus   String?
-  error             String?  @db.Text
-  renderLog         String?  @db.Text
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id               String   @id @default(cuid())
+  templateId       String
+  status           String   @default("IDLE")
+  progress         Float    @default(0)
+  inputData        Json?
+  r2Url            String?
+  instagramMediaId String?
+  instagramStatus  String?
+  error            String?
+  renderLog        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  template         Template @relation(fields: [templateId], references: [id])
 }
 
 model SystemSetting {
-  key   String @id
-  value String
+  key       String   @id
+  value     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model Composition {
-  id          String   @id @default(cuid())
-  accountId   String
-  prompt      String?  @db.Text
-  schemaJson  Json     // The validated target payload
-  videoUrl    String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  account     SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  id         String        @id @default(cuid())
+  accountId  String
+  prompt     String?
+  schemaJson Json
+  videoUrl   String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  account    SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 }
