@@ -10,10 +10,18 @@ export const TypographyNode: React.FC<TypographyNodeProps> = ({ node }) => {
   const frame = useCurrentFrame()
   const { fps } = useVideoConfig()
 
-  // Determine positioning based on SafeZone
+  // Determine positioning based on SafeZone (Instagram optimized)
   let justifyContent = 'center'
-  if (node.safeZone === 'top-third') justifyContent = 'flex-start'
-  if (node.safeZone === 'bottom-third') justifyContent = 'flex-end'
+  let paddingTop = '0'
+  let paddingBottom = '0'
+
+  if (node.safeZone === 'top-third') {
+    justifyContent = 'flex-start'
+    paddingTop = '15%' // Stay below the notch/top UI
+  } else if (node.safeZone === 'bottom-third') {
+    justifyContent = 'flex-end'
+    paddingBottom = '35%' // Stay above the caption/engagement area
+  }
 
   // Animation logic
   let opacity = 1
@@ -50,7 +58,10 @@ export const TypographyNode: React.FC<TypographyNodeProps> = ({ node }) => {
         flexDirection: 'column',
         justifyContent,
         alignItems: 'center',
-        padding: '10%', // Padding to ensure text is within fully safe boundaries
+        paddingLeft: '10%',
+        paddingRight: '10%',
+        paddingTop,
+        paddingBottom,
       }}
     >
       <div
