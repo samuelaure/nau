@@ -74,6 +74,7 @@ export const RemotionVideo: React.FC = () => {
                       'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
                     startFrame: 0,
                     durationInFrames: 150,
+                    mediaStartAt: 0,
                     scale: 'cover',
                   },
                   {
