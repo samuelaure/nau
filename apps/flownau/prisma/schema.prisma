@@ -34,6 +34,7 @@ model SocialAccount {
   assetsRoot        String?  // Path to the linked assets folder
   templates         Template[]
   assets            Asset[]
+  compositions      Composition[]
 
   @@unique([platform, platformId])
 }
@@ -94,4 +95,16 @@ model SystemSetting {
   value String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Composition {
+  id          String   @id @default(cuid())
+  accountId   String
+  prompt      String?  @db.Text
+  schemaJson  Json     // The validated target payload
+  videoUrl    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  account     SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 }
