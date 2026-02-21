@@ -14,7 +14,7 @@ export async function renderAndUpload({
   inputProps: Record<string, unknown>
   renderId: string
 }) {
-  const entry = path.join(process.cwd(), 'src/modules/video/remotion/index.ts')
+  const entry = path.join(process.cwd(), 'src/modules/video/remotion/index.tsx')
   const outputDir = path.join(process.cwd(), 'out')
 
   if (!fs.existsSync(outputDir)) {
