@@ -1,9 +1,8 @@
 'use client'
 
 import React, { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { Card } from '@/modules/shared/components/ui/Card'
-import { Input } from '@/modules/shared/components/ui/Input'
 import { Button } from '@/modules/shared/components/ui/Button'
 import { Label } from '@/modules/shared/components/ui/Label'
 import { Textarea } from '@/modules/shared/components/ui/Textarea'
@@ -15,9 +14,10 @@ import { DynamicCompositionSchema } from '@/modules/rendering/DynamicComposition
 import type { DynamicCompositionSchemaType } from '@/modules/rendering/DynamicComposition/schema'
 import { z } from 'zod'
 
-export default function ComposePage({ params }: { params: { id: string } }) {
+export default function ComposePage() {
   const router = useRouter()
-  const accountId = params.id
+  const params = useParams()
+  const accountId = params.id as string
 
   const [prompt, setPrompt] = useState('')
   const [format, setFormat] = useState('reel')
