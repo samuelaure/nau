@@ -3,6 +3,7 @@ import { registerRoot, Composition } from 'remotion'
 import { InstagramPost } from './templates/InstagramPost'
 import { UniversalComposition } from './UniversalComposition'
 import { DynamicComposition } from '../../rendering/DynamicComposition'
+import type { DynamicCompositionSchemaType } from '../../rendering/DynamicComposition/schema'
 
 export const RemotionVideo: React.FC = () => {
   return (
@@ -43,6 +44,15 @@ export const RemotionVideo: React.FC = () => {
         fps={30}
         width={1080}
         height={1920}
+        calculateMetadata={({ props }) => {
+          const schema = props.schema as DynamicCompositionSchemaType
+          return {
+            durationInFrames: schema?.durationInFrames || 150,
+            fps: schema?.fps || 30,
+            width: schema?.width || 1080,
+            height: schema?.height || 1920,
+          }
+        }}
         defaultProps={{
           schema: {
             format: 'reel',
