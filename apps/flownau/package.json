@@ -34,6 +34,7 @@
     "verify": "npm run format && npm run lint && npm run type-check && npm run test"
   },
   "dependencies": {
+    "@ai-sdk/google": "^3.0.30",
     "@aws-sdk/client-s3": "^3.975.0",
     "@aws-sdk/s3-request-presigner": "^3.975.0",
     "@prisma/adapter-pg": "^7.3.0",
@@ -43,6 +44,7 @@
     "@remotion/renderer": "^4.0.419",
     "@types/bcryptjs": "^2.4.6",
     "@types/pg": "^8.16.0",
+    "ai": "^6.0.97",
     "airtable": "^0.12.2",
     "axios": "^1.13.3",
     "bcryptjs": "^3.0.3",
