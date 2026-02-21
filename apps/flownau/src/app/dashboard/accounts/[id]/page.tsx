@@ -84,6 +84,11 @@ export default async function AccountPage({
           count={account._count.assets}
         />
         <TabLink
+          href={`/dashboard/accounts/${id}/compose`}
+          active={false}
+          label="Agent Compose ✨"
+        />
+        <TabLink
           href={`/dashboard/accounts/${id}?tab=settings`}
           active={activeTab === 'settings'}
           label="Settings"
