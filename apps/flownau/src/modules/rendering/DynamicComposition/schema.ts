@@ -8,6 +8,7 @@ export const MediaNodeSchema = z.object({
   assetUrl: z.string(), // Could be from DB asset, mapped to presigned URL
   startFrame: z.number(),
   durationInFrames: z.number(),
+  mediaStartAt: z.number().default(0), // Offset in frames from the start of the source video
   scale: z.enum(['cover', 'contain']).default('cover'),
 })
 

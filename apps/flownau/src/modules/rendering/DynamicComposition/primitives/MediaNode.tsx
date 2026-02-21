@@ -19,7 +19,7 @@ export const MediaNode: React.FC<MediaNodeProps> = ({ node }) => {
   }
 
   if (isVideo) {
-    return <Video src={node.assetUrl} style={style} />
+    return <Video src={node.assetUrl} style={style} startFrom={node.mediaStartAt} />
   }
 
   return <Img src={node.assetUrl} style={style} />
