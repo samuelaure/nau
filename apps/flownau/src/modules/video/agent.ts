@@ -1,67 +1,112 @@
-import { generateObject } from 'ai'
-import { google } from '@ai-sdk/google'
+import Groq from 'groq-sdk'
 import { prisma } from '@/modules/shared/prisma'
 import { DynamicCompositionSchema } from '@/modules/rendering/DynamicComposition/schema'
 
+/**
+ * AI Video Composition Agent using Groq (Llama 3.3 70B)
+ * Provides $0 cost, high privacy (no training), and ultra-fast inference.
+ */
 export async function composeVideoWithAgent(
   prompt: string,
   accountId: string,
   format: 'reel' | 'post' | 'story',
 ) {
-  // 1. Fetch assets and pre-select to save tokens
+  // 1. Fetch available brand assets (everything EXCEPT anything in 'outputs' folders)
   const allAssets = await prisma.asset.findMany({
-    where: { accountId },
-    select: { id: true, type: true, url: true, originalFilename: true },
-    take: 20, // Limit to most recent/relevant assets to save tokens
+    where: {
+      accountId,
+      NOT: {
+        OR: [
+          { r2Key: { contains: 'outputs/', mode: 'insensitive' } },
+          { r2Key: { contains: 'output/', mode: 'insensitive' } },
+        ],
+      },
+    },
+    select: { id: true, type: true, url: true, originalFilename: true, r2Key: true },
+    take: 60,
   })
 
-  // Format assets into a compact context string
+  // Format assets for the LLM
   const assetsContext =
     allAssets.length > 0
-      ? allAssets.map((a) => `- ID: ${a.id}, Type: ${a.type}, URL: ${a.url}`).join('\n')
+      ? allAssets
+          .map((a) => `- ID: ${a.id}, Type: ${a.type}, Name: ${a.originalFilename}, URL: ${a.url}`)
+          .join('\n')
       : 'No assets available.'
 
-  if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-    throw new Error('GOOGLE_GENERATIVE_AI_API_KEY is not configured.')
+  if (!process.env.GROQ_API_KEY) {
+    throw new Error('GROQ_API_KEY is not configured in .env')
   }
 
-  // 2. Structure the LLM call with Creative Director intelligence
+  const groq = new Groq({
+    apiKey: process.env.GROQ_API_KEY,
+  })
+
+  // 2. Execute High-Fidelity Creative Direction
   try {
-    const result = await generateObject({
-      model: google('gemini-2.5-flash'),
-      schema: DynamicCompositionSchema,
-      system: `You are an expert autonomous creative director. 
-You are tasked with generating a dynamic video composition schema.
-You will be provided with a user prompt and a list of available brand assets.
-Your job is to produce a structurally perfect JSON payload that maps to the timeline mathematically.
+    const chatCompletion = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a Senior Creative Director. Generate a video composition JSON strictly following this structure:
+{
+  "format": "${format}",
+  "fps": 30,
+  "durationInFrames": number,
+  "width": 1080,
+  "height": 1920,
+  "scenes": [
+    {
+      "id": "string",
+      "startFrame": number,
+      "durationInFrames": number,
+      "layout": "full" | "split-horizontal" | "split-vertical",
+      "nodes": [
+        { "type": "media", "id": "string", "assetUrl": "url", "startFrame": number, "durationInFrames": number, "mediaStartAt": number, "scale": "cover" | "contain" },
+        { "type": "text", "id": "string", "content": "string", "startFrame": number, "durationInFrames": number, "safeZone": "top-third" | "center-safe" | "bottom-third", "fontSize": number, "color": "hex", "animation": "fade" | "pop" | "slide-up" | "none" },
+        { "type": "audio", "id": "string", "assetUrl": "url", "startFrame": number, "durationInFrames": number, "volume": number }
+      ]
+    }
+  ]
+}
 
-CREATIVE FREEDOM:
-- Do not follow rigid scene-per-background rules. You can have one background video spanning multiple text scenes, or multiple background cuts within one thematic scene.
-- DYNAMIC MEDIA OFFSETS: To keep content fresh, avoid always starting videos from frame 0. Use 'mediaStartAt' to pick interesting segments from the available video assets (e.g., start at frame 150 or 300 if the video is long).
-- VISUAL STORYTELLING: Understand the emotion of the user's prompt. If it's "energetic", use faster cuts and bolder animations. If it's "meditative", use longer scenes and fades.
-- TYPOGRAPHY: Choose safeZones ('top-third', 'center-safe', 'bottom-third') based on where they fit best with the background content. 
-  * Note: 'top-third' stays below the notch (15% padding). 'bottom-third' stays above the caption (35% padding). 'center-safe' is perfectly centered.
+RULES:
+- Use only IDs and URLs from the available assets.
+- Ensure scenes flow mathematically without gaps.
+- Use 18% horizontal margins.
+- BACKGROUND MEDIA: Every scene MUST include a background video or image if available assets are provided. Do not use plain black backgrounds.
+- AUDIO INTEGRATION: Always include an audio node for background music if audio assets are provided.
+- Return ONLY the JSON object.
 
-AVAILABLE BRAND ASSETS:
-${assetsContext}
-
-TECHNICAL CONSTRAINTS:
-- Format requested: ${format}
-- Typical FPS: 30
-- Total duration should be determined by the sum of scenes duration or pacing of the prompt.
-- For videos and images, ALWAYS use the provided Asset URLs if they match the creative prompt. Never invent fake URLs.
-- For each scene, ensure startFrames and durationInFrames mathematical flow makes sense.
-- Scene startFrame usually starts where the previous scene left off, or overlap if instructed.
-- Place text dynamically and safely (use 'top-third', 'center-safe', 'bottom-third').
-- Do not output pixel coordinates, rely strictly on the schema definitions.
-- Respect ZOD typings and constraints exactly.`,
-      prompt: `Generate a dynamic composition schema for the following prompt: "${prompt}"`,
+AVAILABLE BRAND ASSETS (Only Videos and Audios):
+${assetsContext}`,
+        },
+        {
+          role: 'user',
+          content: `Create a cinematic reel for: "${prompt}"`,
+        },
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.1,
     })
 
-    return result.object
+    const rawContent = chatCompletion.choices[0]?.message?.content
+    if (!rawContent) throw new Error('Groq returned an empty response')
+
+    console.log('[DEBUG] RAW GROQ RESPONSE:', rawContent) // Critical for debugging
+
+    const jsonObject = JSON.parse(rawContent)
+
+    // Check if the model wrapped the response (common fallback)
+    const resultObject = jsonObject.scenes
+      ? jsonObject
+      : jsonObject.composition || jsonObject.data || jsonObject
+
+    return DynamicCompositionSchema.parse(resultObject)
   } catch (error: unknown) {
-    console.error('[AGENT_COMPOSE_API_ERROR] FULL ERROR:', error)
+    console.error('[GROQ_AGENT_ERROR]', error)
     const msg = error instanceof Error ? error.message : 'Unknown error'
-    throw new Error(`Agent failed to generate composition: ${msg}`)
+    throw new Error(`Groq Agent failed: ${msg}`)
   }
 }
