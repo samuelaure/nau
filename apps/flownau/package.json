@@ -27,7 +27,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:seed": "prisma db seed",
-    "db:bootstrap": "if [ \"$NODE_ENV\" = \"production\" ]; then npm run prisma:deploy; else npm run prisma:migrate; fi",
+    "db:bootstrap": "node -e \"const { execSync } = require('child_process'); try { execSync(process.env.NODE_ENV === 'production' ? 'npm run prisma:deploy' : 'npm run prisma:migrate', { stdio: 'inherit' }); } catch (e) { process.exit(1); }\"",
     "remotion": "remotion",
     "format": "prettier --write .",
     "docker:dev": "docker compose up -d",
