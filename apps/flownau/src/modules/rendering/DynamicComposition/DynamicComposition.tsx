@@ -3,6 +3,7 @@ import { AbsoluteFill, Sequence, useVideoConfig } from 'remotion'
 import { DynamicCompositionSchemaType } from './schema'
 import { MediaNode } from './primitives/MediaNode'
 import { TypographyNode } from './primitives/TypographyNode'
+import { AudioNode } from './primitives/AudioNode'
 
 export type DynamicCompositionProps = {
   schema: DynamicCompositionSchemaType
@@ -29,6 +30,7 @@ export const DynamicComposition: React.FC<DynamicCompositionProps> = ({ schema }
                   <div key={node.id} style={{ flex: 1, position: 'relative' }}>
                     {node.type === 'media' && <MediaNode node={node} />}
                     {node.type === 'text' && <TypographyNode node={node} />}
+                    {node.type === 'audio' && <AudioNode node={node} />}
                   </div>
                 ))}
               </div>
@@ -41,6 +43,7 @@ export const DynamicComposition: React.FC<DynamicCompositionProps> = ({ schema }
                   <div key={node.id} style={{ flex: 1, position: 'relative' }}>
                     {node.type === 'media' && <MediaNode node={node} />}
                     {node.type === 'text' && <TypographyNode node={node} />}
+                    {node.type === 'audio' && <AudioNode node={node} />}
                   </div>
                 ))}
               </div>
@@ -56,6 +59,7 @@ export const DynamicComposition: React.FC<DynamicCompositionProps> = ({ schema }
                   >
                     {node.type === 'media' && <MediaNode node={node} />}
                     {node.type === 'text' && <TypographyNode node={node} />}
+                    {node.type === 'audio' && <AudioNode node={node} />}
                   </div>
                 ))}
               </div>
