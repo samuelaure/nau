@@ -235,8 +235,8 @@ export default function ComposePage() {
                 <Player
                   component={DynamicComposition}
                   inputProps={{ schema }}
-                  durationInFrames={schema.durationInFrames || 150}
-                  fps={schema.fps || 30}
+                  durationInFrames={Math.max(1, schema.durationInFrames || 150)}
+                  fps={Math.max(1, schema.fps || 30)}
                   compositionWidth={schema.width || 1080}
                   compositionHeight={schema.height || 1920}
                   style={{ width: '100%', height: '100%' }}

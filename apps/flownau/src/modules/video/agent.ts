@@ -30,8 +30,8 @@ export async function composeVideoWithAgent(
   const assetsContext =
     allAssets.length > 0
       ? allAssets
-          .map((a) => `- ID: ${a.id}, Type: ${a.type}, Name: ${a.originalFilename}, URL: ${a.url}`)
-          .join('\n')
+        .map((a) => `- ID: ${a.id}, Type: ${a.type}, Name: ${a.originalFilename}, URL: ${a.url}`)
+        .join('\n')
       : 'No assets available.'
 
   if (!process.env.GROQ_API_KEY) {
@@ -73,6 +73,7 @@ export async function composeVideoWithAgent(
 }
 
 RULES:
+- DURATION: All \`durationInFrames\` (for the overall video, scenes, and nodes) MUST be an integer greater than 0. Never output 0 duration.
 - Use only IDs and URLs from the available assets.
 - Ensure scenes flow mathematically without gaps.
 - Use 18% horizontal margins.

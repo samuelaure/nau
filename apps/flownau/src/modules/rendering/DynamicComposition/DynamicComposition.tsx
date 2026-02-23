@@ -18,8 +18,8 @@ export const DynamicComposition: React.FC<DynamicCompositionProps> = ({ schema }
         return (
           <Sequence
             key={scene.id}
-            from={scene.startFrame}
-            durationInFrames={scene.durationInFrames}
+            from={Math.max(0, scene.startFrame)}
+            durationInFrames={Math.max(1, scene.durationInFrames)}
           >
             {/* Split layout mapping logic */}
             {scene.layout === 'split-horizontal' && (
