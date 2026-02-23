@@ -43,6 +43,7 @@ export const SceneSchema = z.object({
 })
 
 export const DynamicCompositionSchema = z.object({
+  _thought: z.string().optional(),
   format: z.enum(['reel', 'post', 'story']).default('reel'),
   fps: z.number().default(30),
   durationInFrames: z.number(),

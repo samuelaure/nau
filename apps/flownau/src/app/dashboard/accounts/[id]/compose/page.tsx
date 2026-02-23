@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { Card } from '@/modules/shared/components/ui/Card'
 import { Button } from '@/modules/shared/components/ui/Button'
@@ -9,6 +9,7 @@ import { Textarea } from '@/modules/shared/components/ui/Textarea'
 import { Select } from '@/modules/shared/components/ui/Select'
 import { Loader2, Wand2, Film } from 'lucide-react'
 import { Player } from '@remotion/player'
+import { preloadAudio, preloadVideo } from '@remotion/preload'
 import { DynamicComposition } from '@/modules/rendering/DynamicComposition'
 import { DynamicCompositionSchema } from '@/modules/rendering/DynamicComposition/schema'
 import type { DynamicCompositionSchemaType } from '@/modules/rendering/DynamicComposition/schema'
@@ -83,6 +84,39 @@ export default function ComposePage() {
     }
   }
 
+  useEffect(() => {
+    if (!schema) return
+    const unmounts: Array<() => void> = []
+
+    schema.scenes.forEach((scene) => {
+      scene.nodes.forEach((node) => {
+        if (node.type === 'media' && node.assetUrl) {
+          try {
+            unmounts.push(preloadVideo(node.assetUrl))
+          } catch (e) {
+            console.error('Failed to preload video', node.assetUrl, e)
+          }
+        } else if (node.type === 'audio' && node.assetUrl) {
+          try {
+            unmounts.push(preloadAudio(node.assetUrl))
+          } catch (e) {
+            console.error('Failed to preload audio', node.assetUrl, e)
+          }
+        }
+      })
+    })
+
+    return () => {
+      unmounts.forEach((unmount) => {
+        try {
+          unmount()
+        } catch (e) {
+          console.error(e)
+        }
+      })
+    }
+  }, [schema])
+
   const handleRender = async () => {
     if (!schema || !compositionId) return
 
@@ -103,7 +137,7 @@ export default function ComposePage() {
         throw new Error(data.error || 'Render failed')
       }
 
-      setRenderSuccess(`Render complete! Saved to ${data.videoUrl}`)
+      setRenderSuccess(data.videoUrl)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Unknown error'
       setError(msg)
@@ -251,8 +285,16 @@ export default function ComposePage() {
           </div>
           <div className="p-4">
             {renderSuccess && (
-              <div className="mb-4 p-4 bg-green-500/10 border border-green-500/50 rounded-md text-green-500 text-sm">
-                {renderSuccess}
+              <div className="mb-4 p-4 bg-green-500/10 border border-green-500/50 rounded-md text-green-500 text-sm flex items-center justify-between">
+                <span>Render complete! Compilation successful.</span>
+                <a
+                  href={renderSuccess}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1 bg-green-500/20 rounded hover:bg-green-500/30 transition-colors"
+                >
+                  View MP4
+                </a>
               </div>
             )}
             <Textarea

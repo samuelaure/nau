@@ -51,6 +51,7 @@ export async function composeVideoWithAgent(
           role: 'system',
           content: `You are a Senior Creative Director. Generate a video composition JSON strictly following this structure:
 {
+  "_thought": "string detailing your chosen Composition Archetype (e.g., fast-paced trailer, slow narrative), narrative pacing, and why you are choosing specific assets and audio placement.",
   "format": "${format}",
   "fps": 30,
   "durationInFrames": number,
@@ -76,11 +77,12 @@ RULES:
 - Ensure scenes flow mathematically without gaps.
 - Use 18% horizontal margins.
 - BACKGROUND MEDIA: Every scene MUST include a background video or image if available assets are provided. Do not use plain black backgrounds.
-- AUDIO INTEGRATION: Always include an audio node for background music if audio assets are provided.
+- AUDIO INTEGRATION: Do not put a new audio clip on every single scene unless it's a sound effect. For background music, use ONE long audio node in the first scene extending across the total duration.
+- COMPOSITION ARCHETYPES: Choose a style. E.g., Fast cuts (every 30-60 frames), or Slow narrative (longer scenes, sparse text). Stick to it.
 - Return ONLY the JSON object.
 
 AVAILABLE BRAND ASSETS (Only Videos and Audios):
-${assetsContext}`,
+\${assetsContext}`,
         },
         {
           role: 'user',
