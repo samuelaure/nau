@@ -30,8 +30,8 @@ export async function composeVideoWithAgent(
   const assetsContext =
     allAssets.length > 0
       ? allAssets
-        .map((a) => `- ID: ${a.id}, Type: ${a.type}, Name: ${a.originalFilename}, URL: ${a.url}`)
-        .join('\n')
+          .map((a) => `- ID: ${a.id}, Type: ${a.type}, Name: ${a.originalFilename}, URL: ${a.url}`)
+          .join('\n')
       : 'No assets available.'
 
   if (!process.env.GROQ_API_KEY) {
@@ -51,35 +51,32 @@ export async function composeVideoWithAgent(
           role: 'system',
           content: `You are a Senior Creative Director. Generate a video composition JSON strictly following this structure:
 {
-  "_thought": "string detailing your chosen Composition Archetype (e.g., fast-paced trailer, slow narrative), narrative pacing, and why you are choosing specific assets and audio placement.",
+  "_thought": "string detailing your chosen Composition Archetype, narrative pacing, and why you are choosing specific assets and audio placement across the global timeline.",
   "format": "${format}",
   "fps": 30,
   "durationInFrames": number,
   "width": 1080,
   "height": 1920,
-  "scenes": [
-    {
-      "id": "string",
-      "startFrame": number,
-      "durationInFrames": number,
-      "layout": "full" | "split-horizontal" | "split-vertical",
-      "nodes": [
-        { "type": "media", "id": "string", "assetUrl": "url", "startFrame": number, "durationInFrames": number, "mediaStartAt": number, "scale": "cover" | "contain" },
-        { "type": "text", "id": "string", "content": "string", "startFrame": number, "durationInFrames": number, "safeZone": "top-third" | "center-safe" | "bottom-third", "fontSize": number, "color": "hex", "animation": "fade" | "pop" | "slide-up" | "none" },
-        { "type": "audio", "id": "string", "assetUrl": "url", "startFrame": number, "durationInFrames": number, "volume": number }
-      ]
-    }
-  ]
+  "tracks": {
+    "media": [
+      { "id": "string", "assetUrl": "url", "startFrame": number, "durationInFrames": number, "mediaStartAt": number, "scale": "cover" | "contain" }
+    ],
+    "text": [
+      { "id": "string", "content": "string", "startFrame": number, "durationInFrames": number, "safeZone": "top-third" | "center-safe" | "bottom-third", "fontSize": number, "color": "hex", "animation": "fade" | "pop" | "slide-up" | "none" }
+    ],
+    "audio": [
+      { "id": "string", "assetUrl": "url", "startFrame": number, "durationInFrames": number, "volume": number }
+    ]
+  }
 }
 
 RULES:
-- DURATION: All \`durationInFrames\` (for the overall video, scenes, and nodes) MUST be an integer greater than 0. Never output 0 duration.
-- Use only IDs and URLs from the available assets.
-- Ensure scenes flow mathematically without gaps.
-- Use 18% horizontal margins.
-- BACKGROUND MEDIA: Every scene MUST include a background video or image if available assets are provided. Do not use plain black backgrounds.
-- AUDIO INTEGRATION: Do not put a new audio clip on every single scene unless it's a sound effect. For background music, use ONE long audio node in the first scene extending across the total duration.
-- COMPOSITION ARCHETYPES: Choose a style. E.g., Fast cuts (every 30-60 frames), or Slow narrative (longer scenes, sparse text). Stick to it.
+- DURATION: All \`durationInFrames\` (for the overall video and individual nodes) MUST be an integer greater than 0. Never output 0 duration.
+- ASSET VERACITY: Use ONLY IDs and URLs from the AVAILABLE BRAND ASSETS. 
+- ANTI-HALLUCINATION: NEVER use placeholder URLs like "example.com" or "video-1.mp4". If no suitable asset is provided, DO NOT include a media or audio node.
+- GLOBAL TIMELINE: Nodes are absolute. A single media node in the "media" track can span the entire video (startFrame: 0, durationInFrames: Total), while multiple "text" nodes appear and disappear at intervals.
+- Ensure all tracks flow logically without unintended gaps in core background media.
+- COMPOSITION ARCHETYPES: Choose a style. E.g., Fast cuts, or Slow narrative. Stick to it.
 - Return ONLY the JSON object.
 
 AVAILABLE BRAND ASSETS (Only Videos and Audios):
