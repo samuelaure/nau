@@ -88,22 +88,24 @@ export default function ComposePage() {
     if (!schema) return
     const unmounts: Array<() => void> = []
 
-    schema.scenes.forEach((scene) => {
-      scene.nodes.forEach((node) => {
-        if (node.type === 'media' && node.assetUrl) {
-          try {
-            unmounts.push(preloadVideo(node.assetUrl))
-          } catch (e) {
-            console.error('Failed to preload video', node.assetUrl, e)
-          }
-        } else if (node.type === 'audio' && node.assetUrl) {
-          try {
-            unmounts.push(preloadAudio(node.assetUrl))
-          } catch (e) {
-            console.error('Failed to preload audio', node.assetUrl, e)
-          }
+    schema.tracks.media.forEach((node) => {
+      if (node.assetUrl) {
+        try {
+          unmounts.push(preloadVideo(node.assetUrl))
+        } catch (e) {
+          console.error('Failed to preload video', node.assetUrl, e)
         }
-      })
+      }
+    })
+
+    schema.tracks.audio.forEach((node) => {
+      if (node.assetUrl) {
+        try {
+          unmounts.push(preloadAudio(node.assetUrl))
+        } catch (e) {
+          console.error('Failed to preload audio', node.assetUrl, e)
+        }
+      }
     })
 
     return () => {
