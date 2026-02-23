@@ -30,7 +30,9 @@ export default async function AccountPage({
     },
   })
 
-  if (!account) notFound()
+  if (!account) {
+    throw new Error("Account not found for id: '" + id + "'")
+  }
 
   return (
     <div className="animate-fade-in">

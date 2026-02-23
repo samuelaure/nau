@@ -30,8 +30,8 @@ export async function composeVideoWithAgent(
   const assetsContext =
     allAssets.length > 0
       ? allAssets
-          .map((a) => `- ID: ${a.id}, Type: ${a.type}, Name: ${a.originalFilename}, URL: ${a.url}`)
-          .join('\n')
+        .map((a) => `- ID: ${a.id}, Type: ${a.type}, Name: ${a.originalFilename}, URL: ${a.url}`)
+        .join('\n')
       : 'No assets available.'
 
   if (!process.env.GROQ_API_KEY) {
@@ -59,13 +59,13 @@ export async function composeVideoWithAgent(
   "height": 1920,
   "tracks": {
     "media": [
-      { "id": "string", "assetUrl": "url", "startFrame": number, "durationInFrames": number, "mediaStartAt": number, "scale": "cover" | "contain" }
+      { "id": "string", "type": "media", "assetUrl": "url", "startFrame": number, "durationInFrames": number, "mediaStartAt": number, "scale": "cover" | "contain" }
     ],
     "text": [
-      { "id": "string", "content": "string", "startFrame": number, "durationInFrames": number, "safeZone": "top-third" | "center-safe" | "bottom-third", "fontSize": number, "color": "hex", "animation": "fade" | "pop" | "slide-up" | "none" }
+      { "id": "string", "type": "text", "content": "string", "startFrame": number, "durationInFrames": number, "safeZone": "top-third" | "center-safe" | "bottom-third", "fontSize": number, "color": "hex", "animation": "fade" | "pop" | "slide-up" | "none" }
     ],
     "audio": [
-      { "id": "string", "assetUrl": "url", "startFrame": number, "durationInFrames": number, "volume": number }
+      { "id": "string", "type": "audio", "assetUrl": "url", "startFrame": number, "durationInFrames": number, "volume": number }
     ]
   }
 }
@@ -80,7 +80,7 @@ RULES:
 - Return ONLY the JSON object.
 
 AVAILABLE BRAND ASSETS (Only Videos and Audios):
-\${assetsContext}`,
+${assetsContext}`,
         },
         {
           role: 'user',
