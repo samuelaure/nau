@@ -14,59 +14,38 @@ export const DynamicComposition: React.FC<DynamicCompositionProps> = ({ schema }
 
   return (
     <AbsoluteFill style={{ backgroundColor: 'black', width, height }}>
-      {schema.scenes.map((scene) => {
-        return (
-          <Sequence
-            key={scene.id}
-            from={Math.max(0, scene.startFrame)}
-            durationInFrames={Math.max(1, scene.durationInFrames)}
-          >
-            {/* Split layout mapping logic */}
-            {scene.layout === 'split-horizontal' && (
-              <div
-                style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }}
-              >
-                {scene.nodes.map((node, i) => (
-                  <div key={node.id} style={{ flex: 1, position: 'relative' }}>
-                    {node.type === 'media' && <MediaNode node={node} />}
-                    {node.type === 'text' && <TypographyNode node={node} />}
-                    {node.type === 'audio' && <AudioNode node={node} />}
-                  </div>
-                ))}
-              </div>
-            )}
+      {/* 1. Media Track Layer */}
+      {schema.tracks.media.map((node) => (
+        <Sequence
+          key={node.id}
+          from={Math.max(0, node.startFrame)}
+          durationInFrames={Math.max(1, node.durationInFrames)}
+        >
+          <MediaNode node={node} />
+        </Sequence>
+      ))}
 
-            {/* Split vertical mapping logic */}
-            {scene.layout === 'split-vertical' && (
-              <div style={{ display: 'flex', flexDirection: 'row', width: '100%', height: '100%' }}>
-                {scene.nodes.map((node, i) => (
-                  <div key={node.id} style={{ flex: 1, position: 'relative' }}>
-                    {node.type === 'media' && <MediaNode node={node} />}
-                    {node.type === 'text' && <TypographyNode node={node} />}
-                    {node.type === 'audio' && <AudioNode node={node} />}
-                  </div>
-                ))}
-              </div>
-            )}
+      {/* 2. Typography Track Layer */}
+      {schema.tracks.text.map((node) => (
+        <Sequence
+          key={node.id}
+          from={Math.max(0, node.startFrame)}
+          durationInFrames={Math.max(1, node.durationInFrames)}
+        >
+          <TypographyNode node={node} />
+        </Sequence>
+      ))}
 
-            {/* Full layout mapping logic */}
-            {scene.layout === 'full' && (
-              <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-                {scene.nodes.map((node) => (
-                  <div
-                    key={node.id}
-                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
-                  >
-                    {node.type === 'media' && <MediaNode node={node} />}
-                    {node.type === 'text' && <TypographyNode node={node} />}
-                    {node.type === 'audio' && <AudioNode node={node} />}
-                  </div>
-                ))}
-              </div>
-            )}
-          </Sequence>
-        )
-      })}
+      {/* 3. Audio Track Layer */}
+      {schema.tracks.audio.map((node) => (
+        <Sequence
+          key={node.id}
+          from={Math.max(0, node.startFrame)}
+          durationInFrames={Math.max(1, node.durationInFrames)}
+        >
+          <AudioNode node={node} />
+        </Sequence>
+      ))}
     </AbsoluteFill>
   )
 }
