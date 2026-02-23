@@ -46,6 +46,7 @@
     "@radix-ui/react-slot": "^1.2.4",
     "@remotion/google-fonts": "^4.0.419",
     "@remotion/player": "^4.0.419",
+    "@remotion/preload": "^4.0.428",
     "@remotion/renderer": "^4.0.419",
     "@types/bcryptjs": "^2.4.6",
     "@types/pg": "^8.16.0",
