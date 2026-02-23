@@ -12,7 +12,9 @@ async function main() {
   const adminPassword = process.env.INITIAL_ADMIN_PASSWORD
 
   if (!adminEmail || !adminPassword) {
-    console.error('❌ Skipping admin creation: INITIAL_ADMIN_EMAIL or INITIAL_ADMIN_PASSWORD not set in .env')
+    console.error(
+      '❌ Skipping admin creation: INITIAL_ADMIN_EMAIL or INITIAL_ADMIN_PASSWORD not set in .env',
+    )
   } else {
     const hashedPassword = await bcrypt.hash(adminPassword, 10)
 

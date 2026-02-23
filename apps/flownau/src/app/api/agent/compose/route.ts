@@ -75,9 +75,6 @@ export async function POST(req: Request) {
     }
 
     const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json(
-      { error: 'Failed to generate composition', message },
-      { status: 500 },
-    )
+    return NextResponse.json({ error: 'Failed to generate composition', message }, { status: 500 })
   }
 }

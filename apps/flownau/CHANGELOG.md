@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [0.2.1] - 2026-02-20
 
 ### Added
+
 - **Asset Management Enhancements**
   - Implemented multi-selection capabilities within the Assets Manager.
   - Added a floating toolbar for bulk actions including copying multiple URLs.
@@ -13,9 +14,10 @@ All notable changes to this project will be documented in this file.
   - Updated Prisma schema to support `thumbnailUrl` for media items.
 
 ### Fixed
+
 - **De-Sentinel Architecture**
   - Fully decoupled the project from shared infrastructure constraints.
-  - Secured Redis and Postgres with proper local passwords and internal network isolation. 
+  - Secured Redis and Postgres with proper local passwords and internal network isolation.
   - Restored local mapping for Postgres (`5434:5432`) and Redis (`6380:6379`) to circumvent conflicts with other hosted environments on the machine.
   - Safely configured Prisma to connect to the new mapped ports, enabling migrations without phantom authentication failures.
   - Dynamically resolved cross-platform FFMpeg paths between host and container boundaries.
