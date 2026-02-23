@@ -34,14 +34,6 @@ export const AudioNodeSchema = z.object({
   volume: z.number().default(1),
 })
 
-export const SceneSchema = z.object({
-  id: z.string(),
-  startFrame: z.number(),
-  durationInFrames: z.number(),
-  layout: z.enum(['full', 'split-horizontal', 'split-vertical']).default('full'),
-  nodes: z.array(z.union([MediaNodeSchema, TypographyNodeSchema, AudioNodeSchema])),
-})
-
 export const DynamicCompositionSchema = z.object({
   _thought: z.string().optional(),
   format: z.enum(['reel', 'post', 'story']).default('reel'),
@@ -49,11 +41,14 @@ export const DynamicCompositionSchema = z.object({
   durationInFrames: z.number(),
   width: z.number().default(1080),
   height: z.number().default(1920),
-  scenes: z.array(SceneSchema),
+  tracks: z.object({
+    media: z.array(MediaNodeSchema).default([]),
+    text: z.array(TypographyNodeSchema).default([]),
+    audio: z.array(AudioNodeSchema).default([]),
+  }),
 })
 
 export type DynamicCompositionSchemaType = z.infer<typeof DynamicCompositionSchema>
-export type SceneSchemaType = z.infer<typeof SceneSchema>
 export type MediaNodeSchemaType = z.infer<typeof MediaNodeSchema>
 export type TypographyNodeSchemaType = z.infer<typeof TypographyNodeSchema>
 export type AudioNodeSchemaType = z.infer<typeof AudioNodeSchema>
