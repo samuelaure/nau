@@ -2,7 +2,7 @@ import React from 'react'
 import { registerRoot, Composition } from 'remotion'
 import { InstagramPost } from './templates/InstagramPost'
 import { UniversalComposition } from './UniversalComposition'
-import { DynamicComposition } from '../../rendering/DynamicComposition'
+import { DynamicTemplateMaster } from '../../rendering/DynamicComposition'
 import type { DynamicCompositionSchemaType } from '../../rendering/DynamicComposition/schema'
 
 export const RemotionVideo: React.FC = () => {
@@ -38,8 +38,8 @@ export const RemotionVideo: React.FC = () => {
         }}
       />
       <Composition
-        id="DynamicComposition"
-        component={DynamicComposition}
+        id="DynamicTemplateMaster"
+        component={DynamicTemplateMaster}
         durationInFrames={150}
         fps={30}
         width={1080}

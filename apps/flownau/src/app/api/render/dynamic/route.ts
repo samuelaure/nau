@@ -41,7 +41,7 @@ export async function POST(req: Request) {
 
     // Start rendering. Vercel development will allow this to block.
     const videoUrl = await renderAndUpload({
-      templateId: 'DynamicComposition',
+      templateId: 'DynamicTemplateMaster',
       inputProps: { schema: parsedSchema.data },
       renderId,
     })
@@ -50,7 +50,7 @@ export async function POST(req: Request) {
     await prisma.composition.update({
       where: { id: compositionId },
       data: {
-        schemaJson: parsedSchema.data as unknown as import('@prisma/client').Prisma.InputJsonValue,
+        payload: parsedSchema.data as unknown as import('@prisma/client').Prisma.InputJsonValue,
         videoUrl,
       },
     })
