@@ -7,6 +7,7 @@ import { Card } from '@/modules/shared/components/ui/Card'
 import { Button } from '@/modules/shared/components/ui/Button'
 import { Input } from '@/modules/shared/components/ui/Input'
 import type { SocialAccount } from '@prisma/client'
+import AccountSchedulerSettings from '@/modules/accounts/components/AccountSchedulerSettings'
 
 export default function AccountSettings({ account }: { account: SocialAccount }) {
   const [isPending, startTransition] = useTransition()
@@ -58,6 +59,9 @@ export default function AccountSettings({ account }: { account: SocialAccount })
           </div>
         </form>
       </Card>
+      <div className="mt-8">
+        <AccountSchedulerSettings accountId={account.id} />
+      </div>
     </div>
   )
 }

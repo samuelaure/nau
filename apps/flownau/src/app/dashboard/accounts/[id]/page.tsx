@@ -5,6 +5,9 @@ import { ChevronRight, Instagram } from 'lucide-react'
 import AssetsManager from '@/modules/shared/components/AssetsManager'
 import AddTemplateButton from '@/modules/video/components/AddTemplateButton'
 import AccountSettings from '@/modules/accounts/components/AccountSettings'
+import AccountPersonas from '@/modules/accounts/components/AccountPersonas'
+import AccountIdeas from '@/modules/accounts/components/AccountIdeas'
+import AccountDrafts from '@/modules/accounts/components/AccountDrafts'
 import TemplateCard from '@/modules/video/components/TemplateCard'
 import ExternalAccountLink from '@/modules/accounts/components/ExternalAccountLink'
 import { cn } from '@/modules/shared/utils'
@@ -72,7 +75,7 @@ export default async function AccountPage({
       </header>
 
       {/* Tabs */}
-      <div className="flex border-b border-border mb-8">
+      <div className="flex border-b border-border mb-8 overflow-x-auto">
         <TabLink
           href={`/dashboard/accounts/${id}?tab=templates`}
           active={activeTab === 'templates'}
@@ -86,9 +89,19 @@ export default async function AccountPage({
           count={account._count.assets}
         />
         <TabLink
-          href={`/dashboard/accounts/${id}/compose`}
-          active={false}
-          label="Agent Compose ✨"
+          href={`/dashboard/accounts/${id}?tab=personas`}
+          active={activeTab === 'personas'}
+          label="Brand Personas"
+        />
+        <TabLink
+          href={`/dashboard/accounts/${id}?tab=ideas`}
+          active={activeTab === 'ideas'}
+          label="Ideas Backlog"
+        />
+        <TabLink
+          href={`/dashboard/accounts/${id}?tab=drafts`}
+          active={activeTab === 'drafts'}
+          label="Drafts"
         />
         <TabLink
           href={`/dashboard/accounts/${id}?tab=settings`}
@@ -100,6 +113,9 @@ export default async function AccountPage({
       {/* Content */}
       {activeTab === 'templates' && <AccountTemplates accountId={id} />}
       {activeTab === 'assets' && <AccountAssets accountId={id} />}
+      {activeTab === 'personas' && <AccountPersonas accountId={id} />}
+      {activeTab === 'ideas' && <AccountIdeas accountId={id} />}
+      {activeTab === 'drafts' && <AccountDrafts accountId={id} />}
       {activeTab === 'settings' && <AccountSettings account={account} />}
     </div>
   )

@@ -10,7 +10,7 @@ import { Select } from '@/modules/shared/components/ui/Select'
 import { Loader2, Wand2, Film } from 'lucide-react'
 import { Player } from '@remotion/player'
 import { preloadAudio, preloadVideo } from '@remotion/preload'
-import { DynamicComposition } from '@/modules/rendering/DynamicComposition'
+import { DynamicTemplateMaster } from '@/modules/rendering/DynamicComposition'
 import { DynamicCompositionSchema } from '@/modules/rendering/DynamicComposition/schema'
 import type { DynamicCompositionSchemaType } from '@/modules/rendering/DynamicComposition/schema'
 import { z } from 'zod'
@@ -235,7 +235,7 @@ export default function ComposePage() {
             ) : schema ? (
               <div className="w-full max-w-[340px] aspect-[9/16] shadow-2xl rounded-lg overflow-hidden relative">
                 <Player
-                  component={DynamicComposition}
+                  component={DynamicTemplateMaster}
                   inputProps={{ schema }}
                   durationInFrames={Math.max(1, schema.durationInFrames || 150)}
                   fps={Math.max(1, schema.fps || 30)}
