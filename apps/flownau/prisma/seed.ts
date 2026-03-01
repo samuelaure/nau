@@ -47,6 +47,32 @@ async function main() {
   } else {
     console.log('ℹ️ Skipping sample template: AIRTABLE_ASFA_T1_TABLE_ID not set')
   }
+
+  // Restore VideoTemplates from backup
+  try {
+    const fs = require('fs')
+    const path = require('path')
+    const backupPath = path.join(process.cwd(), 'backups', 'templates-backup-latest.json')
+    if (fs.existsSync(backupPath)) {
+      const backupData = fs.readFileSync(backupPath, 'utf8')
+      const templates = JSON.parse(backupData)
+
+      let restoredCount = 0
+      for (const t of templates) {
+        await prisma.videoTemplate.upsert({
+          where: { id: t.id },
+          update: t,
+          create: t,
+        })
+        restoredCount++
+      }
+      console.log(`✅ Restored ${restoredCount} VideoTemplates from backup.`)
+    } else {
+      console.log('ℹ️ No VideoTemplate backup found at', backupPath)
+    }
+  } catch (err) {
+    console.error('❌ Failed to restore VideoTemplates:', err)
+  }
 }
 
 main()

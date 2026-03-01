@@ -31,10 +31,13 @@ model SocialAccount {
   updatedAt    DateTime      @updatedAt
   shortCode    String?
   assetsRoot   String?
-  assets       Asset[]
-  compositions Composition[]
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  templates    Template[]
+  assets          Asset[]
+  compositions    Composition[]
+  brandPersonas   BrandPersona[]
+  contentIdeas    ContentIdea[]
+  postingSchedule PostingSchedule?
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  templates       Template[]
 
   @@unique([platform, platformId])
 }
@@ -97,13 +100,62 @@ model SystemSetting {
   updatedAt DateTime @updatedAt
 }
 
+model BrandPersona {
+  id                      String   @id @default(cuid())
+  accountId               String
+  name                    String   // e.g. "Sassy Educator", "Formal B2B"
+  systemPrompt            String   @db.Text
+  ideasFrameworkPrompt    String   @db.Text // Controls the structure/logic of how ideas are brainstormed
+  isDefault               Boolean  @default(false)
+  autoApproveIdeas        Boolean  @default(false) // Ideas skip PENDING and become APPROVED
+  autoApproveCompositions Boolean  @default(false) // First half of trusted composition state
+  
+  account                 SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+}
+
+model VideoTemplate {
+  id                      String   @id @default(cuid())
+  name                    String
+  description             String   @db.Text // Auto-generated short description for LLM target selection
+  contentPrompt           String   @db.Text // The prompt that instructs the AI what data this specific template needs
+  schemaJson              Json     // The structural JSON blueprint
+  isActive                Boolean  @default(true) // Is this template included in the AI content generation selection?
+  autoApproveCompositions Boolean  @default(false) // Second half of trusted composition state
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  
+  compositions            Composition[]
+}
+
+model ContentIdea {
+  id          String   @id @default(cuid())
+  accountId   String
+  ideaText    String   @db.Text
+  status      String   @default("PENDING") // PENDING, APPROVED, REJECTED, USED
+  createdAt   DateTime @default(now())
+  
+  account     SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+}
+
 model Composition {
-  id         String        @id @default(cuid())
-  accountId  String
-  prompt     String?
-  schemaJson Json
-  videoUrl   String?
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
-  account    SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  id          String        @id @default(cuid())
+  accountId   String
+  templateId  String
+  payload     Json          // The mapped content variables the AI outputted (Text strings, Asset IDs)
+  videoUrl    String?
+  status      String        @default("DRAFT") // DRAFT, APPROVED, PUBLISHED
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  
+  account     SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  template    VideoTemplate @relation(fields: [templateId], references: [id])
+}
+
+model PostingSchedule {
+  id            String        @id @default(cuid())
+  accountId     String        @unique
+  frequencyDays Int           @default(1) // E.g., post every X days
+  lastPostedAt  DateTime?
+  
+  account       SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 }
