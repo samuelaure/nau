@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2026-03-01
+
+### Added
+
+- **Autonomous Content Engine (Phase 1-6)**
+  - Engineered JSON-based database layout representing the new Autonomous Content Engine Models (`VideoTemplate`, `BrandPersona`, `PostingSchedule`, `Composition`).
+  - Scaffolded Next.js Segment CRUD routes targeting templates and personas decoupled from Airtable.
+  - Developed the AI-assisted Builder UI modifying raw Remotion component geometries securely via `zod` and Groq.
+  - Empowered `DynamicTemplateMaster` interpreting variable data arrays bounding constraints dynamically mapping text boundaries and media dimensions.
+  - Scaffolded the "Brand Persona" global constraints mapping 1-click Idea Generators fetching 5 constrained concepts.
+  - Refactored `agent.ts` to output deterministic structural maps targeting database-controlled `VideoTemplate` structures.
+  - Implemented real-time Kanban draft approval layout feeding direct dynamic `APPROVED` compositions ready for publishing.
+  - Created standard Account-scoped Posting Scheduler mappings bridging automatic IG executions rendering headless Remotion lambdas safely pushing MP4 outputs over Cloudflare R2 securely into Meta APIs.
+
+### Changed
+
+- **Code Health and Reliability**
+  - Updated ESLint configuration logic enabling smoother integration loops gracefully passing React's strict boundary inferences against generic Remotion component types.
+
 ## [0.2.1] - 2026-02-20
 
 ### Added
