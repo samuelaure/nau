@@ -6,7 +6,7 @@ const prisma = new PrismaClient()
 
 async function exportTemplates() {
   try {
-    const templates = await prisma.videoTemplate.findMany()
+    const templates = await prisma.template.findMany()
     const exportPath = path.join(process.cwd(), 'backups', `templates-backup-latest.json`)
 
     // Ensure backups directory exists

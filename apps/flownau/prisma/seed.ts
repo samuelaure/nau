@@ -59,7 +59,7 @@ async function main() {
 
       let restoredCount = 0
       for (const t of templates) {
-        await prisma.videoTemplate.upsert({
+        await prisma.template.upsert({
           where: { id: t.id },
           update: t,
           create: t,

@@ -27,6 +27,8 @@ model SocialAccount {
   accessToken  String
   refreshToken String?
   expiresAt    DateTime?
+  directorPrompt String?     @db.Text // ONE: Selection logic for idea-template fit
+  creationPrompt String?     @db.Text // NEW: Native iteration instructions for template building
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   shortCode    String?
@@ -35,6 +37,7 @@ model SocialAccount {
   compositions    Composition[]
   brandPersonas   BrandPersona[]
   contentIdeas    ContentIdea[]
+  ideasFrameworks IdeasFramework[]
   postingSchedule PostingSchedule?
   user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   templates       Template[]
@@ -72,8 +75,12 @@ model Template {
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   assetsRoot       String?
+  systemPrompt     String?        @db.Text // TEMPLATE SPECIFIC: Narrative multiplier
+  creationPrompt   String?        @db.Text // NEW: Specific iteration logic for this template
+  schemaJson       Json?          // Added for structural mapping
   assets           Asset[]
   renders          Render[]
+  compositions     Composition[]
   account          SocialAccount? @relation(fields: [accountId], references: [id])
 }
 
@@ -100,32 +107,46 @@ model SystemSetting {
   updatedAt DateTime @updatedAt
 }
 
+enum AIModel {
+  GROQ_LLAMA_3_3
+  GROQ_LLAMA_3_1_70B
+  GROQ_LLAMA_3_1_8B
+  GROQ_MIXTRAL_8X7B
+  GROQ_DEEPSEEK_R1_70B
+  OPENAI_GPT_4O
+  OPENAI_GPT_4O_MINI
+  OPENAI_GPT_4_TURBO
+  OPENAI_GPT_4_1
+  OPENAI_O1
+  OPENAI_O1_MINI
+}
+
 model BrandPersona {
   id                      String   @id @default(cuid())
   accountId               String
   name                    String   // e.g. "Sassy Educator", "Formal B2B"
-  systemPrompt            String   @db.Text
-  ideasFrameworkPrompt    String   @db.Text // Controls the structure/logic of how ideas are brainstormed
+  systemPrompt            String   @db.Text // Tone, Voice, Personality
+  modelSelection          AIModel  @default(GROQ_LLAMA_3_3)
   isDefault               Boolean  @default(false)
-  autoApproveIdeas        Boolean  @default(false) // Ideas skip PENDING and become APPROVED
-  autoApproveCompositions Boolean  @default(false) // First half of trusted composition state
+  autoApproveIdeas        Boolean  @default(false) 
+  autoApproveCompositions Boolean  @default(false) 
   
   account                 SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 }
 
-model VideoTemplate {
+model IdeasFramework {
   id                      String   @id @default(cuid())
-  name                    String
-  description             String   @db.Text // Auto-generated short description for LLM target selection
-  contentPrompt           String   @db.Text // The prompt that instructs the AI what data this specific template needs
-  schemaJson              Json     // The structural JSON blueprint
-  isActive                Boolean  @default(true) // Is this template included in the AI content generation selection?
-  autoApproveCompositions Boolean  @default(false) // Second half of trusted composition state
+  accountId               String
+  name                    String   // e.g. "Viral Hook Framework", "Educational Series"
+  systemPrompt            String   @db.Text // Used ONLY for generating ideas list
+  isDefault               Boolean  @default(false)
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
-  
-  compositions            Composition[]
+
+  account                 SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 }
+
+
 
 model ContentIdea {
   id          String   @id @default(cuid())
@@ -148,7 +169,7 @@ model Composition {
   updatedAt   DateTime      @updatedAt
   
   account     SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  template    VideoTemplate @relation(fields: [templateId], references: [id])
+  template    Template      @relation(fields: [templateId], references: [id])
 }
 
 model PostingSchedule {
