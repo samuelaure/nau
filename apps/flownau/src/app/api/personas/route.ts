@@ -34,7 +34,7 @@ export async function POST(req: Request) {
         accountId: body.accountId,
         name: body.name,
         systemPrompt: body.systemPrompt,
-        ideasFrameworkPrompt: body.ideasFrameworkPrompt ?? '',
+        modelSelection: body.modelSelection ?? 'GROQ_LLAMA_3_3',
         isDefault: body.isDefault ?? false,
         autoApproveIdeas: body.autoApproveIdeas ?? false,
         autoApproveCompositions: body.autoApproveCompositions ?? false,

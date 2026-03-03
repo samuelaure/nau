@@ -3,7 +3,7 @@ import { prisma } from '@/modules/shared/prisma' // Assuming a centralized prism
 
 export async function GET() {
   try {
-    const templates = await prisma.videoTemplate.findMany({
+    const templates = await prisma.template.findMany({
       orderBy: { updatedAt: 'desc' },
     })
     return NextResponse.json({ templates }, { status: 200 })
@@ -15,14 +15,13 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const template = await prisma.videoTemplate.create({
+    const template = await prisma.template.create({
       data: {
         name: body.name,
-        description: body.description ?? '',
-        contentPrompt: body.contentPrompt ?? '',
+        remotionId: body.remotionId ?? 'default',
         schemaJson: body.schemaJson ?? {},
-        isActive: body.isActive ?? true,
-        autoApproveCompositions: body.autoApproveCompositions ?? false,
+        systemPrompt: body.systemPrompt ?? '',
+        creationPrompt: body.creationPrompt ?? '',
       },
     })
     return NextResponse.json({ template }, { status: 201 })

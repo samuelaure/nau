@@ -11,7 +11,7 @@ export async function POST(req: Request) {
     }
 
     const json = await req.json()
-    const { accountId } = json
+    const { accountId, personaId, frameworkId } = json
 
     if (!accountId) {
       return NextResponse.json({ error: 'Missing accountId' }, { status: 400 })
@@ -27,20 +27,21 @@ export async function POST(req: Request) {
     }
 
     // 1. Fetch persona to check ideation auto-approve state
-    const persona =
-      (await prisma.brandPersona.findFirst({
-        where: { accountId, isDefault: true },
-      })) ||
-      (await prisma.brandPersona.findFirst({
-        where: { accountId },
-      }))
+    const persona = personaId
+      ? await prisma.brandPersona.findUnique({ where: { id: personaId } })
+      : (await prisma.brandPersona.findFirst({
+          where: { accountId, isDefault: true },
+        })) ||
+        (await prisma.brandPersona.findFirst({
+          where: { accountId },
+        }))
 
     if (!persona) {
       return NextResponse.json({ error: 'No Brand Persona setup yet.' }, { status: 400 })
     }
 
     // 2. Generate Ideas
-    const ideasTextArray = await generateContentIdeas(accountId)
+    const ideasTextArray = await generateContentIdeas(accountId, personaId, frameworkId)
 
     // 3. Trust Logic Implementation: Determine status
     const initialStatus = persona.autoApproveIdeas ? 'APPROVED' : 'PENDING'

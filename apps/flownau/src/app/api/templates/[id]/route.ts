@@ -4,7 +4,7 @@ import { prisma } from '@/modules/shared/prisma'
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const resolvedParams = await params
-    const template = await prisma.videoTemplate.findUnique({
+    const template = await prisma.template.findUnique({
       where: { id: resolvedParams.id },
     })
     if (!template) {
@@ -20,15 +20,14 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   try {
     const resolvedParams = await params
     const body = await req.json()
-    const template = await prisma.videoTemplate.update({
+    const template = await prisma.template.update({
       where: { id: resolvedParams.id },
       data: {
         name: body.name,
-        description: body.description,
-        contentPrompt: body.contentPrompt,
+        remotionId: body.remotionId,
         schemaJson: body.schemaJson,
-        isActive: body.isActive,
-        autoApproveCompositions: body.autoApproveCompositions,
+        systemPrompt: body.systemPrompt,
+        creationPrompt: body.creationPrompt,
       },
     })
     return NextResponse.json({ template }, { status: 200 })
@@ -40,7 +39,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const resolvedParams = await params
-    await prisma.videoTemplate.delete({
+    await prisma.template.delete({
       where: { id: resolvedParams.id },
     })
     return NextResponse.json({ success: true }, { status: 200 })

@@ -3,13 +3,13 @@ import { composeVideoWithAgent } from '@/modules/video/agent'
 import { prisma } from '@/modules/shared/prisma'
 import { auth } from '@/auth'
 import { z } from 'zod'
-import { DynamicCompositionSchema } from '@/modules/rendering/DynamicComposition/schema'
 
 const ComposeRequestSchema = z.object({
   prompt: z.string().min(3),
   accountId: z.string(),
   format: z.enum(['reel', 'post', 'story']).default('reel'),
   ideaId: z.string().optional(),
+  personaId: z.string().optional(),
 })
 
 export async function POST(req: Request) {
@@ -20,8 +20,6 @@ export async function POST(req: Request) {
     }
 
     const json = await req.json()
-    console.log('[DEBUG] Compose Payload:', JSON.stringify(json, null, 2))
-
     const parsed = ComposeRequestSchema.safeParse(json)
 
     if (!parsed.success) {
@@ -31,7 +29,7 @@ export async function POST(req: Request) {
       )
     }
 
-    const { prompt, accountId, format, ideaId } = parsed.data
+    const { prompt, accountId, format, ideaId, personaId } = parsed.data
 
     const account = await prisma.socialAccount.findUnique({
       where: { id: accountId },
@@ -41,82 +39,41 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Account not found or unauthorized' }, { status: 403 })
     }
 
-    // 1. Run AI Step getting the Target instructions map
-    const agentInstructions = await composeVideoWithAgent(prompt, accountId, format)
+    // 1. Run AI Step (Director -> Creative -> Technical)
+    const { composition, templateId } = await composeVideoWithAgent(
+      prompt,
+      accountId,
+      format,
+      undefined,
+      personaId,
+    )
 
-    // 2. Fetch the actual target Video Template
-    const template = await prisma.videoTemplate.findUnique({
-      where: { id: agentInstructions.templateId },
-    })
+    // 2. Determine Approval State (Trust Logic)
+    const persona = (
+      personaId
+        ? await prisma.brandPersona.findUnique({ where: { id: personaId } })
+        : (await prisma.brandPersona.findFirst({ where: { accountId, isDefault: true } })) ||
+          (await prisma.brandPersona.findFirst({ where: { accountId } }))
+    ) as any
 
-    if (!template) {
-      throw new Error(
-        `Agent hallucinated non-existent template ID: ${agentInstructions.templateId}`,
-      )
-    }
+    const template = (await prisma.template.findUnique({ where: { id: templateId } })) as any
 
-    // 3. Merge Variables into Target Template
-    const baseSchema = JSON.parse(JSON.stringify(template.schemaJson)) as any
-
-    if (baseSchema.tracks) {
-      // Merge Text Slots
-      if (baseSchema.tracks.text) {
-        baseSchema.tracks.text = baseSchema.tracks.text.map((n: any) => {
-          if (agentInstructions.textSlots[n.id]) {
-            n.content = agentInstructions.textSlots[n.id]
-          }
-          return n
-        })
-      }
-
-      // Merge Media Slots (both visual media and audio mapped under mediaSlots in AI proxy)
-      if (baseSchema.tracks.media) {
-        baseSchema.tracks.media = baseSchema.tracks.media.map((n: any) => {
-          if (agentInstructions.mediaSlots[n.id]) {
-            n.assetUrl = agentInstructions.mediaSlots[n.id]
-          }
-          return n
-        })
-      }
-
-      if (baseSchema.tracks.audio) {
-        baseSchema.tracks.audio = baseSchema.tracks.audio.map((n: any) => {
-          if (agentInstructions.mediaSlots[n.id]) {
-            n.assetUrl = agentInstructions.mediaSlots[n.id]
-          }
-          return n
-        })
-      }
-    }
-
-    // Explicitly validate the merged geometry so we don't blow up the video pipeline later
-    const validatedSchema = DynamicCompositionSchema.parse(baseSchema)
-
-    // Determine Target Approval State (Phase 5 Trust Logic)
     let isApproved = false
-    const persona =
-      (await prisma.brandPersona.findFirst({
-        where: { accountId, isDefault: true },
-      })) ||
-      (await prisma.brandPersona.findFirst({
-        where: { accountId },
-      }))
-
-    if (persona && persona.autoApproveCompositions && template.autoApproveCompositions) {
+    if (persona?.autoApproveCompositions && template?.autoApproveCompositions) {
       isApproved = true
     }
 
-    // 4. Save to Database
-    const composition = await prisma.composition.create({
+    // 3. Save to Database
+    const newComposition = await prisma.composition.create({
       data: {
         accountId,
-        templateId: template.id,
-        payload: validatedSchema as unknown as import('@prisma/client').Prisma.InputJsonValue,
+        templateId,
+        payload: composition as any,
         status: isApproved ? 'APPROVED' : 'DRAFT',
       },
     })
 
-    // 5. Consume Idea
+    // 4. Consume Idea
     if (ideaId) {
       await prisma.contentIdea.update({
         where: { id: ideaId },
@@ -124,15 +81,9 @@ export async function POST(req: Request) {
       })
     }
 
-    return NextResponse.json({ composition }, { status: 200 })
+    return NextResponse.json({ composition: newComposition }, { status: 200 })
   } catch (error: unknown) {
     console.error('[AGENT_COMPOSE_ROUTE_ERROR]', error)
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'AI output template merge validation failed', details: error.format() },
-        { status: 500 },
-      )
-    }
     const message = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json({ error: 'Failed to generate composition', message }, { status: 500 })
   }
