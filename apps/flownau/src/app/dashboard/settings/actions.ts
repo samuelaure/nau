@@ -18,6 +18,8 @@ async function checkAuth() {
   }
 }
 
+import { encrypt } from '@/modules/shared/encryption'
+
 export async function setSetting(formData: FormData) {
   await checkAuth()
 
@@ -28,10 +30,15 @@ export async function setSetting(formData: FormData) {
 
   const { key, value } = SettingSchema.parse(rawData)
 
+  let finalValue = value
+  if (value && (key.includes('key') || key.includes('token'))) {
+    finalValue = encrypt(value)
+  }
+
   await prisma.systemSetting.upsert({
     where: { key },
-    update: { value },
-    create: { key, value },
+    update: { value: finalValue },
+    create: { key, value: finalValue },
   })
 
   revalidatePath('/dashboard/settings')

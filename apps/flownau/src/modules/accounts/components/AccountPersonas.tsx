@@ -16,7 +16,7 @@ export default function AccountPersonas({ accountId }: { accountId: string }) {
   const [formData, setFormData] = useState({
     name: '',
     systemPrompt: '',
-    ideasFrameworkPrompt: '',
+    modelSelection: 'GROQ_LLAMA_3_3' as any,
     isDefault: false,
     autoApproveIdeas: false,
     autoApproveCompositions: false,
@@ -67,7 +67,7 @@ export default function AccountPersonas({ accountId }: { accountId: string }) {
       setFormData({
         name: '',
         systemPrompt: '',
-        ideasFrameworkPrompt: '',
+        modelSelection: 'GROQ_LLAMA_3_3',
         isDefault: false,
         autoApproveIdeas: false,
         autoApproveCompositions: false,
@@ -83,7 +83,7 @@ export default function AccountPersonas({ accountId }: { accountId: string }) {
     setFormData({
       name: p.name,
       systemPrompt: p.systemPrompt,
-      ideasFrameworkPrompt: p.ideasFrameworkPrompt,
+      modelSelection: p.modelSelection,
       isDefault: p.isDefault,
       autoApproveIdeas: p.autoApproveIdeas,
       autoApproveCompositions: p.autoApproveCompositions,
@@ -136,19 +136,28 @@ export default function AccountPersonas({ accountId }: { accountId: string }) {
             />
           </div>
           <div className="space-y-1">
-            <label className="text-sm text-gray-400 text-bold block">
-              2. Brainstorming Engine Framework
-            </label>
-            <label className="text-xs text-gray-500 block pb-1">
-              This governs the structure for how the Brainstorm Engine queries topics. (E.g. "Focus
-              strictly on educational SEO myths and fast hooks")
-            </label>
-            <Textarea
-              value={formData.ideasFrameworkPrompt}
-              onChange={(e) => setFormData({ ...formData, ideasFrameworkPrompt: e.target.value })}
-              className="bg-gray-950 border-gray-800 text-white"
-              rows={4}
-            />
+            <label className="text-sm text-gray-400 block">AI Model Selection</label>
+            <select
+              value={formData.modelSelection}
+              onChange={(e) => setFormData({ ...formData, modelSelection: e.target.value })}
+              className="w-full bg-gray-950 border border-gray-800 text-white rounded p-2 text-sm"
+            >
+              <optgroup label="Groq (Fast)">
+                <option value="GROQ_LLAMA_3_3">Llama 3.3 70B (Default)</option>
+                <option value="GROQ_LLAMA_3_1_70B">Llama 3.1 70B</option>
+                <option value="GROQ_LLAMA_3_1_8B">Llama 3.1 8B</option>
+                <option value="GROQ_MIXTRAL_8X7B">Mixtral 8x7B</option>
+                <option value="GROQ_DEEPSEEK_R1_70B">DeepSeek R1 Distill 70B</option>
+              </optgroup>
+              <optgroup label="OpenAI (Smart)">
+                <option value="OPENAI_GPT_4O">GPT-4o ($5.00 / 1M tokens)</option>
+                <option value="OPENAI_GPT_4O_MINI">GPT-4o Mini ($0.15 / 1M tokens)</option>
+                <option value="OPENAI_GPT_4_TURBO">GPT-4 Turbo ($10.00 / 1M tokens)</option>
+                <option value="OPENAI_GPT_4_1">GPT-4.1 ($10.00 / 1M tokens)</option>
+                <option value="OPENAI_O1">O1 Preview ($15.00 / 1M tokens)</option>
+                <option value="OPENAI_O1_MINI">O1 Mini ($3.00 / 1M tokens)</option>
+              </optgroup>
+            </select>
           </div>
 
           <div className="flex flex-wrap gap-4 mt-2">
@@ -231,8 +240,8 @@ export default function AccountPersonas({ accountId }: { accountId: string }) {
             <div className="text-xs text-gray-500 line-clamp-3">
               <strong>System Prompt:</strong> {p.systemPrompt}
             </div>
-            <div className="text-xs text-gray-500 line-clamp-2">
-              <strong>Framework:</strong> {p.ideasFrameworkPrompt}
+            <div className="text-xs text-blue-400 mt-1 uppercase font-bold tracking-tighter">
+              Model: {p.modelSelection}
             </div>
 
             <div className="flex flex-wrap gap-2 mt-2 pt-3 border-t border-gray-800">

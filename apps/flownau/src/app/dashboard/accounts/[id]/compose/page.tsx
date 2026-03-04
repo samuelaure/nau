@@ -23,6 +23,7 @@ export default function ComposePage() {
   const [prompt, setPrompt] = useState('')
   const [format, setFormat] = useState('reel')
   const [loading, setLoading] = useState(false)
+  const [generationStep, setGenerationStep] = useState<'idle' | 'brainstorm' | 'formatting'>('idle')
   const [error, setError] = useState<string | null>(null)
 
   const [schema, setSchema] = useState<DynamicCompositionSchemaType | null>(null)
@@ -32,20 +33,28 @@ export default function ComposePage() {
   const [rendering, setRendering] = useState(false)
   const [renderSuccess, setRenderSuccess] = useState<string | null>(null)
 
-  const handleGenerate = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleGenerate = async (e?: React.FormEvent) => {
+    e?.preventDefault()
     if (!prompt.trim()) return
 
     setLoading(true)
     setError(null)
+    setGenerationStep('brainstorm')
 
     try {
+      // The backend /api/agent/compose now handles the multi-step logic
+      // We simulate the step transition for UI feedback if needed,
+      // but for now we trust the backend's internal sequential logging if exposed.
+      // To keep it simple, we toggle to 'formatting' after 2 seconds or based on a real stream if implemented.
+      const brainstormTimeout = setTimeout(() => setGenerationStep('formatting'), 2500)
+
       const res = await fetch('/api/agent/compose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt, accountId, format }),
       })
 
+      clearTimeout(brainstormTimeout)
       const data = await res.json()
 
       if (!res.ok) {
@@ -62,8 +71,12 @@ export default function ComposePage() {
       setError(msg)
     } finally {
       setLoading(false)
+      setGenerationStep('idle')
     }
   }
+
+  // Same logic as handleGenerate but labeled for Retry
+  const handleRetry = () => handleGenerate()
 
   const handleEditorChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const text = e.target.value
@@ -195,8 +208,18 @@ export default function ComposePage() {
               </div>
 
               {error && (
-                <div className="p-4 bg-error/10 border border-error/50 rounded-md text-error text-sm">
-                  {error}
+                <div className="p-4 bg-error/10 border border-error/50 rounded-md space-y-3">
+                  <p className="text-error text-sm font-medium">Generation Error</p>
+                  <p className="text-error/80 text-xs font-mono break-words">{error}</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRetry}
+                    className="w-full border-error/30 hover:bg-error/10 text-error"
+                  >
+                    Try Again
+                  </Button>
                 </div>
               )}
 
@@ -208,7 +231,9 @@ export default function ComposePage() {
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Thinking & Composing...
+                    {generationStep === 'brainstorm'
+                      ? 'AI is Brainstorming Narrative...'
+                      : 'AI is Formatting Timeline...'}
                   </>
                 ) : (
                   <>

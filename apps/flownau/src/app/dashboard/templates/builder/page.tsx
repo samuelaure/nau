@@ -69,6 +69,7 @@ export default function TemplateBuilderPage() {
   const [description, setDescription] = useState('')
   const [isActive, setIsActive] = useState(true)
   const [autoApprove, setAutoApprove] = useState(false)
+  const [creationPrompt, setCreationPrompt] = useState('')
 
   // Prompting state
   const [chatPrompt, setChatPrompt] = useState('')
@@ -87,7 +88,11 @@ export default function TemplateBuilderPage() {
       const res = await fetch('/api/templates/ai-iterate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ schemaJson, prompt: chatPrompt }),
+        body: JSON.stringify({
+          schemaJson,
+          prompt: chatPrompt,
+          creationPrompt,
+        }),
       })
       const data = await res.json()
 
@@ -145,6 +150,7 @@ export default function TemplateBuilderPage() {
           schemaJson,
           isActive,
           autoApproveCompositions: autoApprove,
+          creationPrompt,
         }),
       })
       if (!res.ok) throw new Error('Could not save template')
@@ -213,6 +219,22 @@ export default function TemplateBuilderPage() {
           <div>
             <h3 className="text-lg font-bold">AI Layout Iterator</h3>
             <p className="text-sm text-gray-400">Describe changes to the JSON structure.</p>
+          </div>
+
+          <div className="space-y-1">
+            <details className="cursor-pointer">
+              <summary className="text-[10px] uppercase font-bold text-gray-500 hover:text-gray-300 transition">
+                Advanced Structural Rules (Temporal)
+              </summary>
+              <div className="pt-2">
+                <Textarea
+                  placeholder="Additional rules for this session (e.g. Always use centered text)..."
+                  value={creationPrompt}
+                  onChange={(e) => setCreationPrompt(e.target.value)}
+                  className="bg-gray-950 border-gray-800 text-[11px] min-h-[60px]"
+                />
+              </div>
+            </details>
           </div>
           <div className="flex flex-col gap-3">
             <Textarea

@@ -2,13 +2,23 @@
 
 import { useState, useTransition } from 'react'
 import { setSetting } from './actions'
-import { Save, Check, Loader2 } from 'lucide-react'
+import { Check, Loader2 } from 'lucide-react'
 
-interface ApifyTokenFormProps {
+interface ApiTokenFormProps {
+  settingKey: string
+  label: string
+  placeholder: string
+  description?: string
   initialToken?: string
 }
 
-export default function ApifyTokenForm({ initialToken }: ApifyTokenFormProps) {
+export default function ApiTokenForm({
+  settingKey,
+  label,
+  placeholder,
+  description,
+  initialToken,
+}: ApiTokenFormProps) {
   const [value, setValue] = useState(initialToken || '')
   const [isPending, startTransition] = useTransition()
   const [success, setSuccess] = useState(false)
@@ -31,19 +41,19 @@ export default function ApifyTokenForm({ initialToken }: ApifyTokenFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-6">
-      <input type="hidden" name="key" value="apify_api_token" />
+    <form onSubmit={handleSubmit} className="grid gap-6 mb-6">
+      <input type="hidden" name="key" value={settingKey} />
 
       <div>
         <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-          Apify API Token
+          {label}
         </label>
         <div className="flex gap-4">
           <input
             name="value"
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder="apify_api_..."
+            placeholder={placeholder}
             type="password"
             className="input flex-1"
           />
@@ -64,9 +74,7 @@ export default function ApifyTokenForm({ initialToken }: ApifyTokenFormProps) {
             )}
           </button>
         </div>
-        <p className="mt-2 text-xs text-[var(--text-secondary)]">
-          Required for Instagram scraping and synchronization.
-        </p>
+        {description && <p className="mt-2 text-xs text-[var(--text-secondary)]">{description}</p>}
       </div>
     </form>
   )

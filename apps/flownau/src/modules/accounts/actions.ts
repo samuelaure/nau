@@ -25,6 +25,8 @@ const AccountUpdateSchema = z.object({
     .optional()
     .or(z.literal(''))
     .transform((val) => val || undefined),
+  directorPrompt: z.string().optional(),
+  creationPrompt: z.string().optional(),
 })
 
 const PrepareUploadSchema = z.object({
@@ -100,17 +102,24 @@ export async function updateAccount(id: string, formData: FormData) {
     username: formData.get('username'),
     platformId: formData.get('platformId'),
     accessToken: formData.get('accessToken'),
+    directorPrompt: formData.get('directorPrompt'),
+    creationPrompt: formData.get('creationPrompt'),
   }
 
-  const { username, platformId, accessToken } = AccountUpdateSchema.parse(rawData)
+  const { username, platformId, accessToken, directorPrompt, creationPrompt } =
+    AccountUpdateSchema.parse(rawData)
 
   const data: {
     username: string
     platformId: string
     accessToken?: string
+    directorPrompt?: string
+    creationPrompt?: string
   } = {
     username,
     platformId,
+    directorPrompt,
+    creationPrompt,
   }
 
   if (accessToken) {

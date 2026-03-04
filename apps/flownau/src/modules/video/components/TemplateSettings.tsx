@@ -12,6 +12,8 @@ interface TemplateWithCount {
   airtableTableId?: string | null
   accountId?: string | null
   useAccountAssets: boolean
+  systemPrompt?: string | null
+  creationPrompt?: string | null
   _count?: {
     assets: number
   }
@@ -112,6 +114,30 @@ export default function TemplateSettings({
               defaultValue={template.airtableTableId || ''}
               className="input-field"
             />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Template system prompt (ONE per Template)</label>
+            <textarea
+              name="systemPrompt"
+              defaultValue={template.systemPrompt || ''}
+              className="input-field min-h-[100px] py-3"
+              placeholder="Instructions specific to this template's mapping..."
+            />
+            <p style={{ marginTop: '8px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+              Used ONLY for content generation along with the Brand Persona.
+            </p>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Creation system prompt (Iteration rules)</label>
+            <textarea
+              name="creationPrompt"
+              defaultValue={template.creationPrompt || ''}
+              className="input-field min-h-[100px] py-3"
+              placeholder="Instructions specific to modifying this template's JSON..."
+            />
+            <p style={{ marginTop: '8px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+              Used during AI iterations to guide structural changes.
+            </p>
           </div>
           <div className="form-group">
             <label className="form-label">Linked Account</label>
