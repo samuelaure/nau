@@ -45,3 +45,4 @@ commit_msg.txt
 UPGRADE_PLAN.md
 docker-compose.override.yml
 /.agent
+/public/cache_assets/
