@@ -161,60 +161,54 @@ export default function AIBuilderTab({
     initialAssets: any[]
 }) {
     // 1. Helpers
-    const getRandomAsset = useCallback((assets: any[], typeMatch: string) => {
-        const filtered = assets.filter(a => {
-            const matchesType = a.type?.startsWith(typeMatch) ||
-                a.mimeType?.startsWith(typeMatch) ||
-                (typeMatch === 'audio' && (a.url?.endsWith('.mp3') || a.url?.endsWith('.wav')))
-            const isOutput = a.r2Key?.includes('/Outputs/') || a.url?.includes('/Outputs/')
-            return matchesType && !isOutput
-        })
-        if (filtered.length === 0) return null
-        return filtered[Math.floor(Math.random() * filtered.length)].url
-    }, [])
-
-    const resolveAutoAssets = useCallback((json: any) => {
+    const applyLibraryAssets = useCallback((json: any) => {
         const next = JSON.parse(JSON.stringify(json))
-        let changed = false
 
-        const isPlaceholder = (url: string) => {
-            if (!url) return true
-            const p = url.toLowerCase()
-            return p === 'auto' || p.includes('placeholder') || p.includes('example.com') || p.includes('sample-video')
+        // Helper to shuffle array
+        const shuffle = <T,>(array: T[]): T[] => {
+            const list = [...array]
+            for (let i = list.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [list[i], list[j]] = [list[j], list[i]]
+            }
+            return list
         }
 
-        if (next.tracks?.media) {
-            next.tracks.media = next.tracks.media.map((t: any) => {
-                if (isPlaceholder(t.assetUrl)) {
-                    const res = getRandomAsset(initialAssets, 'video') || getRandomAsset(initialAssets, 'image')
-                    if (res) {
-                        t.assetUrl = res
-                        changed = true
-                    }
-                }
-                return t
+        const videoLibrary = shuffle(initialAssets.filter(a => {
+            const isMedia = a.type?.startsWith('video') || a.mimeType?.startsWith('video') ||
+                a.type?.startsWith('image') || a.mimeType?.startsWith('image')
+            const isOutput = a.r2Key?.includes('/Outputs/') || a.url?.includes('/Outputs/')
+            return isMedia && !isOutput
+        }))
+
+        const audioLibrary = shuffle(initialAssets.filter(a => {
+            const isAudio = a.type?.startsWith('audio') || a.mimeType?.startsWith('audio') ||
+                a.url?.endsWith('.mp3') || a.url?.endsWith('.wav')
+            const isOutput = a.r2Key?.includes('/Outputs/') || a.url?.includes('/Outputs/')
+            return isAudio && !isOutput
+        }))
+
+        if (next.tracks?.media && videoLibrary.length > 0) {
+            next.tracks.media = next.tracks.media.map((t: any, i: number) => {
+                // Sequential pick from shuffled library to ensure uniqueness up to library size
+                const asset = videoLibrary[i % videoLibrary.length]
+                return { ...t, assetUrl: asset.url }
             })
         }
-        if (next.tracks?.audio) {
-            next.tracks.audio = next.tracks.audio.map((t: any) => {
-                if (isPlaceholder(t.assetUrl)) {
-                    const res = getRandomAsset(initialAssets, 'audio')
-                    if (res) {
-                        t.assetUrl = res
-                        changed = true
-                    }
-                }
-                return t
+        if (next.tracks?.audio && audioLibrary.length > 0) {
+            next.tracks.audio = next.tracks.audio.map((t: any, i: number) => {
+                const asset = audioLibrary[i % audioLibrary.length]
+                return { ...t, assetUrl: asset.url }
             })
         }
-        return { json: next, changed }
-    }, [initialAssets, getRandomAsset])
+
+        return next
+    }, [initialAssets])
 
     // 2. Core State
     const [schemaJson, setSchemaJson] = useState<any>(() => {
         const base = template.schemaJson || DEFAULT_SCHEMA
-        const { json } = resolveAutoAssets(base)
-        return json
+        return applyLibraryAssets(base)
     })
 
     const [jsonText, setJsonText] = useState(() => JSON.stringify(schemaJson, null, 2))
@@ -303,12 +297,25 @@ export default function AIBuilderTab({
 
     // Trigger sync when schema or assets change
     useEffect(() => {
-        // Validation check
-        const requiredMediaSlots = schemaJson?.tracks?.media?.length || 0
-        const videoAssets = initialAssets.filter(
-            (a) => a.type.startsWith('video') || a.mimeType?.startsWith('video'),
-        )
-        setHasSufficientAssets(!(requiredMediaSlots > videoAssets.length && requiredMediaSlots > 0))
+        // Validation check: Only warn if required unique slots exceed library size
+        const mediaSlots = schemaJson?.tracks?.media?.length || 0
+        const audioSlots = schemaJson?.tracks?.audio?.length || 0
+        const videoLibrary = initialAssets.filter(a => {
+            const isMedia = a.type?.startsWith('video') || a.mimeType?.startsWith('video') ||
+                a.type?.startsWith('image') || a.mimeType?.startsWith('image')
+            const isOutput = a.r2Key?.includes('/Outputs/') || a.url?.includes('/Outputs/')
+            return isMedia && !isOutput
+        })
+        const audioLibrary = initialAssets.filter(a => {
+            const isAudio = a.type?.startsWith('audio') || a.mimeType?.startsWith('audio') ||
+                a.url?.endsWith('.mp3') || a.url?.endsWith('.wav')
+            const isOutput = a.r2Key?.includes('/Outputs/') || a.url?.includes('/Outputs/')
+            return isAudio && !isOutput
+        })
+
+        const hasEnoughMedia = mediaSlots <= videoLibrary.length
+        const hasEnoughAudio = audioSlots <= audioLibrary.length
+        setHasSufficientAssets(hasEnoughMedia && hasEnoughAudio)
 
         // Collect URLs that need syncing
         const urlsToSync: string[] = []
@@ -372,12 +379,12 @@ export default function AIBuilderTab({
             const data = await res.json()
             if (!res.ok) throw new Error(data.error || 'Failed to iterate')
 
-            // Resolve any new "auto" or placeholder assets the AI might have added
-            const { json: resolved } = resolveAutoAssets(data.schemaJson)
+            // ALWAYS replace assets with fresh randomized brand assets on new iterations
+            const resolved = applyLibraryAssets(data.schemaJson)
             setSchemaJson(resolved)
             setJsonText(JSON.stringify(resolved, null, 2))
             setChatPrompt('')
-            toast.success('AI updated composition')
+            toast.success('AI updated composition with fresh assets')
         } catch (error: any) {
             toast.error(error.message)
         } finally {
@@ -406,16 +413,12 @@ export default function AIBuilderTab({
         try {
             const parsed = JSON.parse(jsonText)
             if (JSON.stringify(parsed) !== JSON.stringify(schemaJson)) {
-                // Resolve any manual placeholders if present
-                const { json: resolved, changed } = resolveAutoAssets(parsed)
+                // ALWAYS randomize assets from library when JSON is updated
+                const resolved = applyLibraryAssets(parsed)
                 setHistory((prev) => [...prev, JSON.parse(JSON.stringify(schemaJson))])
                 setSchemaJson(resolved)
-                if (changed) {
-                    setJsonText(JSON.stringify(resolved, null, 2))
-                    toast.success('Applied changes and resolved placeholders')
-                } else {
-                    toast.success('Applied manual changes')
-                }
+                setJsonText(JSON.stringify(resolved, null, 2))
+                toast.success('Applied changes and randomized perspective')
             }
         } catch (e) {
             toast.error('Invalid JSON structure - reverting view')
