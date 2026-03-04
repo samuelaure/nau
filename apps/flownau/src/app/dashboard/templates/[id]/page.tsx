@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { ChevronRight, LayoutTemplate, Settings, Video } from 'lucide-react'
 import AssetsManager from '@/modules/shared/components/AssetsManager'
 import TemplateSettings from '@/modules/video/components/TemplateSettings'
+import AIBuilderTab from '@/modules/video/components/AIBuilderTab'
 
 export default async function TemplatePage({
   params,
@@ -31,9 +32,9 @@ export default async function TemplatePage({
       .then((user) =>
         user
           ? prisma.socialAccount.findMany({
-              where: { userId: user.id },
-              select: { id: true, username: true, platform: true },
-            })
+            where: { userId: user.id },
+            select: { id: true, username: true, platform: true },
+          })
           : [],
       )
       .then((accounts) =>
@@ -108,22 +109,12 @@ export default async function TemplatePage({
           marginBottom: '32px',
         }}
       >
-        <Link
-          href={`/editor/${id}`}
-          style={{
-            padding: '12px 24px',
-            textDecoration: 'none',
-            color: 'var(--text-secondary)',
-            borderBottom: '2px solid transparent',
-            marginBottom: '-1px',
-            fontWeight: '400',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-          }}
-        >
-          Editor <ChevronRight size={12} />
-        </Link>
+        <TabLink
+          href={`/dashboard/templates/${id}?tab=builder`}
+          active={activeTab === 'builder'}
+          label="AI Builder"
+        />
+        {/* TODO: The editor feature is meant to serve as a 'create from scratch' process as well as edit current template 'manually' option and as 'create a specific video manually' (full capabilities of a video editor). Just a standard visual template/video editor. */}
         <TabLink
           href={`/dashboard/templates/${id}?tab=overview`}
           active={activeTab === 'overview'}
@@ -143,17 +134,33 @@ export default async function TemplatePage({
       </div>
 
       {/* Content */}
-      {activeTab === 'overview' && (
-        <div>
-          <p>Analysis/Stats placeholder...</p>
-          {/* Reuse render list or similar here later */}
-        </div>
-      )}
+      {
+        activeTab === 'overview' && (
+          <div>
+            <p>Analysis/Stats placeholder...</p>
+            {/* Reuse render list or similar here later */}
+          </div>
+        )
+      }
 
       {activeTab === 'assets' && <TemplateAssets templateId={id} />}
 
       {activeTab === 'settings' && <TemplateSettings template={template} accounts={accounts} />}
-    </div>
+
+      {activeTab === 'builder' && (
+        <AIBuilderTab
+          template={template}
+          initialAssets={await prisma.asset.findMany({
+            where: {
+              OR: [
+                { templateId: template.id },
+                ...(template.useAccountAssets && template.accountId ? [{ accountId: template.accountId }] : [])
+              ]
+            }
+          })}
+        />
+      )}
+    </div >
   )
 }
 
