@@ -15,7 +15,7 @@ export default async function TemplatePage({
 }) {
   const { id } = await params
   const { tab, from } = await searchParams
-  const activeTab = tab || 'overview'
+  const activeTab = tab || 'builder'
 
   const [template, accounts] = await Promise.all([
     prisma.template.findUnique({
@@ -136,9 +136,23 @@ export default async function TemplatePage({
       {/* Content */}
       {
         activeTab === 'overview' && (
-          <div>
-            <p>Analysis/Stats placeholder...</p>
-            {/* Reuse render list or similar here later */}
+          <div style={{
+            maxWidth: '1200px',
+            color: 'var(--text-secondary)',
+            lineHeight: '1.6',
+            fontSize: '16px',
+            background: 'rgba(255,255,255,0.02)',
+            padding: '40px',
+            borderRadius: '24px',
+            border: '1px solid var(--border-color)',
+          }}>
+            <h2 style={{ color: 'white', marginBottom: '16px', fontSize: '24px' }}>Analytics Engine</h2>
+            <p>
+              Here will be the Stats/Analysis (Not implemented yet). Everytime this template is used/posted,
+              we will save the post ID and when the user come here (Overview tab), and clic on sync stats,
+              we will execute an Apify actor to get the actual stats of each post, and sum them to display
+              here, so we can see how much was the total reach, average,... to take decisions.
+            </p>
           </div>
         )
       }
@@ -152,9 +166,21 @@ export default async function TemplatePage({
           template={template}
           initialAssets={await prisma.asset.findMany({
             where: {
-              OR: [
-                { templateId: template.id },
-                ...(template.useAccountAssets && template.accountId ? [{ accountId: template.accountId }] : [])
+              AND: [
+                {
+                  OR: [
+                    { templateId: template.id },
+                    ...(template.useAccountAssets && template.accountId ? [{ accountId: template.accountId }] : [])
+                  ]
+                },
+                {
+                  NOT: {
+                    OR: [
+                      { r2Key: { contains: '/Outputs/' } },
+                      { url: { contains: '/Outputs/' } }
+                    ]
+                  }
+                }
               ]
             }
           })}
