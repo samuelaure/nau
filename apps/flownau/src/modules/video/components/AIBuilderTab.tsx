@@ -30,11 +30,21 @@ const DEFAULT_SCHEMA = {
     width: 1080,
     height: 1920,
     tracks: {
+        overlay: [
+            {
+                id: 'overlay_1',
+                type: 'overlay',
+                color: '#000000',
+                opacity: 0.4,
+                startFrame: 0,
+                durationInFrames: 300
+            }
+        ],
         media: [
             {
-                id: 'bg_1',
+                id: 'media_1',
                 type: 'media',
-                assetUrl: 'placeholder',
+                assetUrl: 'auto',
                 startFrame: 0,
                 durationInFrames: 300,
                 mediaStartAt: 0,
@@ -43,9 +53,9 @@ const DEFAULT_SCHEMA = {
         ],
         text: [
             {
-                id: 'headline_1',
+                id: 'text_1',
                 type: 'text',
-                content: 'Hook/Headline Placeholder',
+                content: '3 Secrets to Viral Growth 🚀',
                 startFrame: 30,
                 durationInFrames: 120,
                 safeZone: 'center-safe',
@@ -56,9 +66,9 @@ const DEFAULT_SCHEMA = {
         ],
         audio: [
             {
-                id: 'bg_music',
+                id: 'audio_1',
                 type: 'audio',
-                assetUrl: 'placeholder_music_url',
+                assetUrl: 'auto',
                 startFrame: 0,
                 durationInFrames: 300,
                 volume: 0.5
@@ -91,6 +101,20 @@ const PlayerWrapper = ({
                 maxHeight: isFocus ? '95vh' : '500px'
             }}
         >
+            {/* Syncing Overlay */}
+            {previewSchema?.assetsSyncing && (
+                <div className="absolute inset-0 z-[30] bg-black/80 flex flex-col items-center justify-center backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="relative">
+                        <div className="w-12 h-12 border-4 border-accent/20 border-t-accent rounded-full animate-spin" />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <Save size={16} className="text-accent animate-pulse" />
+                        </div>
+                    </div>
+                    <p className="mt-4 text-[10px] font-black uppercase tracking-widest text-accent/80 animate-pulse">Syncing Media Cache</p>
+                    <p className="mt-1 text-[8px] text-white/40 italic">Optimizing for smooth playback...</p>
+                </div>
+            )}
+
             {previewSchema ? (
                 <Suspense fallback={<div className="animate-pulse text-accent">Loading Player...</div>}>
                     <RemotionPlayer
@@ -103,6 +127,7 @@ const PlayerWrapper = ({
                         fps={previewSchema.fps || 30}
                         autoPlay
                         controls // ENSURE CONTROLS ARE ON
+                        showMuteButton
                         loop
                         allowFullscreen={false} // We handle fullscreen ourselves
                         spaceKeyToPlayOrPause
@@ -136,8 +161,44 @@ export default function AIBuilderTab({
     initialAssets: any[]
 }) {
     // 1. Core State
-    const [schemaJson, setSchemaJson] = useState<any>(template.schemaJson || DEFAULT_SCHEMA)
-    const [jsonText, setJsonText] = useState(JSON.stringify(template.schemaJson || DEFAULT_SCHEMA, null, 2))
+    const [schemaJson, setSchemaJson] = useState<any>(() => {
+        const base = template.schemaJson || DEFAULT_SCHEMA
+        const initial = JSON.parse(JSON.stringify(base))
+
+        const getRandomAsset = (assets: any[], typeMatch: string) => {
+            const filtered = assets.filter(a => {
+                const matchesType = a.type?.startsWith(typeMatch) ||
+                    a.mimeType?.startsWith(typeMatch) ||
+                    (typeMatch === 'audio' && (a.url?.endsWith('.mp3') || a.url?.endsWith('.wav')))
+
+                const isOutput = a.r2Key?.includes('/Outputs/') || a.url?.includes('/Outputs/')
+                return matchesType && !isOutput
+            })
+            if (filtered.length === 0) return null
+            return filtered[Math.floor(Math.random() * filtered.length)].url
+        }
+
+        // Apply "auto" assets to the initial JSON state
+        if (initial.tracks?.media) {
+            initial.tracks.media = initial.tracks.media.map((t: any) => ({
+                ...t,
+                assetUrl: t.assetUrl === 'auto' || t.assetUrl === 'placeholder'
+                    ? (getRandomAsset(initialAssets, 'video') || getRandomAsset(initialAssets, 'image') || t.assetUrl)
+                    : t.assetUrl
+            }))
+        }
+        if (initial.tracks?.audio) {
+            initial.tracks.audio = initial.tracks.audio.map((t: any) => ({
+                ...t,
+                assetUrl: t.assetUrl === 'auto' || t.assetUrl === 'placeholder_music_url'
+                    ? (getRandomAsset(initialAssets, 'audio') || t.assetUrl)
+                    : t.assetUrl
+            }))
+        }
+        return initial
+    })
+
+    const [jsonText, setJsonText] = useState(() => JSON.stringify(schemaJson, null, 2))
     const [history, setHistory] = useState<any[]>([])
 
     // 2. Interaction State
@@ -146,12 +207,66 @@ export default function AIBuilderTab({
     const [isSaving, setIsSaving] = useState(false)
     const [isFullscreen, setIsFullscreen] = useState(false)
 
-    // 3. Asset Logic
+    // 3. Asset & Cache Logic
     const [hasSufficientAssets, setHasSufficientAssets] = useState(true)
-    const [previewSchema, setPreviewSchema] = useState<any>(null)
+    const [assetMapping, setAssetMapping] = useState<Record<string, string>>({})
+    const [isSyncing, setIsSyncing] = useState(false)
+    const [previewSchema, setPreviewSchema] = useState<any>(schemaJson)
 
     const playerRef = useRef<any>(null)
     const debounceTimer = useRef<NodeJS.Timeout | null>(null)
+
+    // Sync Assets to local cache
+    const syncAssetsToCache = useCallback(async (urls: string[]) => {
+        if (urls.length === 0) return
+        setIsSyncing(true)
+        try {
+            const res = await fetch('/api/assets/sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ urls }),
+            })
+            const data = await res.json()
+            if (data.mapping) {
+                setAssetMapping(prev => ({ ...prev, ...data.mapping }))
+
+                // Update schemaJson and jsonText to reflect cached URLs
+                setSchemaJson((prev: any) => {
+                    const next = JSON.parse(JSON.stringify(prev))
+                    let changed = false
+
+                    if (next.tracks?.media) {
+                        next.tracks.media = next.tracks.media.map((t: any) => {
+                            if (data.mapping[t.assetUrl]) {
+                                t.assetUrl = data.mapping[t.assetUrl]
+                                changed = true
+                            }
+                            return t
+                        })
+                    }
+                    if (next.tracks?.audio) {
+                        next.tracks.audio = next.tracks.audio.map((t: any) => {
+                            if (data.mapping[t.assetUrl]) {
+                                t.assetUrl = data.mapping[t.assetUrl]
+                                changed = true
+                            }
+                            return t
+                        })
+                    }
+
+                    if (changed) {
+                        setJsonText(JSON.stringify(next, null, 2))
+                        return next
+                    }
+                    return prev
+                })
+            }
+        } catch (err) {
+            console.error('[Asset Sync] Error:', err)
+        } finally {
+            setIsSyncing(false)
+        }
+    }, [])
 
     // Memoized validation to prevent unnecessary re-renders
     const validateManualJson = useCallback((text: string) => {
@@ -167,27 +282,55 @@ export default function AIBuilderTab({
         }
     }, [schemaJson])
 
-    // 4. Effects
+    // Trigger sync when schema or assets change
     useEffect(() => {
+        // Validation check
         const requiredMediaSlots = schemaJson?.tracks?.media?.length || 0
         const videoAssets = initialAssets.filter(
             (a) => a.type.startsWith('video') || a.mimeType?.startsWith('video'),
         )
-
         setHasSufficientAssets(!(requiredMediaSlots > videoAssets.length && requiredMediaSlots > 0))
 
-        const newSchema = JSON.parse(JSON.stringify(schemaJson))
-        if (newSchema?.tracks?.media) {
-            newSchema.tracks.media = newSchema.tracks.media.map((track: any) => {
-                if (videoAssets.length > 0) {
-                    const r = videoAssets[Math.floor(Math.random() * videoAssets.length)]
-                    return { ...track, assetUrl: r.url }
-                }
-                return track
-            })
+        // Collect URLs that need syncing
+        const urlsToSync: string[] = []
+        schemaJson?.tracks?.media?.forEach((t: any) => {
+            if (t.assetUrl && !t.assetUrl.startsWith('/cache_assets/') && t.assetUrl !== 'placeholder') {
+                urlsToSync.push(t.assetUrl)
+            }
+        })
+        schemaJson?.tracks?.audio?.forEach((t: any) => {
+            if (t.assetUrl && !t.assetUrl.startsWith('/cache_assets/') && t.assetUrl !== 'placeholder') {
+                urlsToSync.push(t.assetUrl)
+            }
+        })
+
+        const uniqueToSync = Array.from(new Set(urlsToSync))
+        if (uniqueToSync.length > 0) {
+            syncAssetsToCache(uniqueToSync)
         }
-        setPreviewSchema(newSchema)
-    }, [schemaJson, initialAssets])
+    }, [schemaJson, initialAssets, syncAssetsToCache])
+
+    // Inject cached URLs into preview schema
+    useEffect(() => {
+        const newSchema = JSON.parse(JSON.stringify(schemaJson))
+        if (newSchema.tracks?.media) {
+            newSchema.tracks.media = newSchema.tracks.media.map((t: any) => ({
+                ...t,
+                assetUrl: assetMapping[t.assetUrl] || t.assetUrl
+            }))
+        }
+        if (newSchema.tracks?.audio) {
+            newSchema.tracks.audio = newSchema.tracks.audio.map((t: any) => ({
+                ...t,
+                assetUrl: assetMapping[t.assetUrl] || t.assetUrl
+            }))
+        }
+        setPreviewSchema({
+            ...newSchema,
+            assetsSyncing: isSyncing
+        })
+    }, [schemaJson, assetMapping, isSyncing])
+
 
     // 5. Handlers
     const handleIterate = async () => {
@@ -349,20 +492,34 @@ export default function AIBuilderTab({
             <div className="lg:col-span-5 flex flex-col gap-6">
                 <div className="sticky top-8 space-y-6">
 
-                    {/* Preview Context Label */}
-                    <div className="flex items-center justify-between p-2 bg-white/5 border border-white/5 rounded-full px-4">
-                        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-white/30 ml-2">
-                            <Smartphone size={12} />
-                            <span>Preview Mode: {schemaJson.width}x{schemaJson.height}</span>
+                    {/* Conditional Quality Warning (Zero Assets or Insufficient) */}
+                    {initialAssets.length === 0 ? (
+                        <div className="relative group overflow-hidden bg-amber-500/10 border border-amber-500/30 p-6 rounded-3xl backdrop-blur-xl animate-in fade-in slide-in-from-top-4 duration-700">
+                            <div className="absolute top-0 right-0 p-12 -mr-12 -mt-12 bg-amber-500/20 rounded-full blur-3xl group-hover:bg-amber-500/30 transition-all animate-pulse" />
+                            <div className="relative flex items-start gap-4">
+                                <div className="p-3 bg-amber-500/20 rounded-2xl text-amber-500">
+                                    <AlertTriangle size={28} />
+                                </div>
+                                <div>
+                                    <p className="text-base font-black text-amber-500 uppercase tracking-tighter">High-Quality Preview Unavailable</p>
+                                    <p className="text-xs text-amber-500/70 mt-1.5 leading-relaxed font-medium">
+                                        No media assets found in Brand or Template storage. We are using generic placeholders, which prevents an accurate visual audit of your composition.
+                                    </p>
+                                    <Link
+                                        href={`/dashboard/templates/${template.id}?tab=assets`}
+                                        className="text-[10px] mt-5 inline-flex items-center gap-2 px-5 py-2.5 bg-amber-500 text-black font-black uppercase rounded-xl shadow-xl shadow-amber-500/20 hover:bg-amber-400 hover:scale-[1.02] active:scale-95 transition-all"
+                                    >
+                                        Add Content to Library
+                                    </Link>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-
-                    {!hasSufficientAssets && (
-                        <div className="bg-error/10 border border-error/20 p-5 rounded-2xl flex items-start gap-4 backdrop-blur-md">
+                    ) : !hasSufficientAssets ? (
+                        <div className="bg-error/10 border border-error/20 p-5 rounded-2xl flex items-start gap-4 backdrop-blur-md animate-in fade-in duration-500">
                             <AlertTriangle className="text-error mt-0.5" size={24} />
                             <div>
                                 <p className="text-sm font-black text-error uppercase tracking-tight">Production Alert</p>
-                                <p className="text-xs text-error/70 mt-1 leading-relaxed">Structural video slots exceed available library assets. Add content to calibrate this template correctly.</p>
+                                <p className="text-xs text-error/70 mt-1 leading-relaxed">Available assets cover some slots, but you need more videos for a full production test.</p>
                                 <Link
                                     href={`/dashboard/templates/${template.id}?tab=assets`}
                                     className="text-[10px] mt-3 inline-block px-3 py-1.5 bg-error text-white font-black uppercase rounded shadow-lg shadow-error/20"
@@ -371,7 +528,7 @@ export default function AIBuilderTab({
                                 </Link>
                             </div>
                         </div>
-                    )}
+                    ) : null}
 
                     <div className="p-4 bg-white/5 border border-white/5 rounded-[2rem] shadow-2xl flex justify-center items-center min-h-[300px]">
                         <PlayerWrapper
