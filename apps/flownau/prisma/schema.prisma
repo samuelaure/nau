@@ -68,7 +68,7 @@ model Template {
   id               String         @id @default(cuid())
   name             String
   remotionId       String
-  airtableTableId  String?
+
   config           Json?
   accountId        String?
   useAccountAssets Boolean        @default(true)

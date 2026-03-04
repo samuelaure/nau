@@ -10,11 +10,6 @@ import { TemplateSchema } from '@/types/video-schema'
 const TemplateFormSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   remotionId: z.string().min(1, 'Remotion ID is required'),
-  airtableTableId: z
-    .string()
-    .optional()
-    .nullable()
-    .transform((val) => val || null),
   accountId: z
     .string()
     .optional()
@@ -49,7 +44,6 @@ export async function addTemplate(formData: FormData) {
   const rawData = {
     name: formData.get('name'),
     remotionId: formData.get('remotionId'),
-    airtableTableId: formData.get('airtableTableId'),
     accountId: formData.get('accountId'),
   }
 
@@ -83,7 +77,6 @@ export async function updateTemplate(id: string, formData: FormData) {
   const rawData = {
     name: formData.get('name'),
     remotionId: formData.get('remotionId'),
-    airtableTableId: formData.get('airtableTableId'),
     accountId: formData.get('accountId'),
     systemPrompt: formData.get('systemPrompt'),
     creationPrompt: formData.get('creationPrompt'),
@@ -114,7 +107,6 @@ export async function duplicateTemplate(id: string) {
     data: {
       name: `${template.name} (Copy)`,
       remotionId: template.remotionId,
-      airtableTableId: template.airtableTableId,
       account: template.accountId ? { connect: { id: template.accountId } } : undefined,
       useAccountAssets: template.useAccountAssets,
       systemPrompt: (template as any).systemPrompt,
