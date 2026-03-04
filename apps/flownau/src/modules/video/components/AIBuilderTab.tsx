@@ -160,42 +160,61 @@ export default function AIBuilderTab({
     template: any
     initialAssets: any[]
 }) {
-    // 1. Core State
+    // 1. Helpers
+    const getRandomAsset = useCallback((assets: any[], typeMatch: string) => {
+        const filtered = assets.filter(a => {
+            const matchesType = a.type?.startsWith(typeMatch) ||
+                a.mimeType?.startsWith(typeMatch) ||
+                (typeMatch === 'audio' && (a.url?.endsWith('.mp3') || a.url?.endsWith('.wav')))
+            const isOutput = a.r2Key?.includes('/Outputs/') || a.url?.includes('/Outputs/')
+            return matchesType && !isOutput
+        })
+        if (filtered.length === 0) return null
+        return filtered[Math.floor(Math.random() * filtered.length)].url
+    }, [])
+
+    const resolveAutoAssets = useCallback((json: any) => {
+        const next = JSON.parse(JSON.stringify(json))
+        let changed = false
+
+        const isPlaceholder = (url: string) => {
+            if (!url) return true
+            const p = url.toLowerCase()
+            return p === 'auto' || p.includes('placeholder') || p.includes('example.com') || p.includes('sample-video')
+        }
+
+        if (next.tracks?.media) {
+            next.tracks.media = next.tracks.media.map((t: any) => {
+                if (isPlaceholder(t.assetUrl)) {
+                    const res = getRandomAsset(initialAssets, 'video') || getRandomAsset(initialAssets, 'image')
+                    if (res) {
+                        t.assetUrl = res
+                        changed = true
+                    }
+                }
+                return t
+            })
+        }
+        if (next.tracks?.audio) {
+            next.tracks.audio = next.tracks.audio.map((t: any) => {
+                if (isPlaceholder(t.assetUrl)) {
+                    const res = getRandomAsset(initialAssets, 'audio')
+                    if (res) {
+                        t.assetUrl = res
+                        changed = true
+                    }
+                }
+                return t
+            })
+        }
+        return { json: next, changed }
+    }, [initialAssets, getRandomAsset])
+
+    // 2. Core State
     const [schemaJson, setSchemaJson] = useState<any>(() => {
         const base = template.schemaJson || DEFAULT_SCHEMA
-        const initial = JSON.parse(JSON.stringify(base))
-
-        const getRandomAsset = (assets: any[], typeMatch: string) => {
-            const filtered = assets.filter(a => {
-                const matchesType = a.type?.startsWith(typeMatch) ||
-                    a.mimeType?.startsWith(typeMatch) ||
-                    (typeMatch === 'audio' && (a.url?.endsWith('.mp3') || a.url?.endsWith('.wav')))
-
-                const isOutput = a.r2Key?.includes('/Outputs/') || a.url?.includes('/Outputs/')
-                return matchesType && !isOutput
-            })
-            if (filtered.length === 0) return null
-            return filtered[Math.floor(Math.random() * filtered.length)].url
-        }
-
-        // Apply "auto" assets to the initial JSON state
-        if (initial.tracks?.media) {
-            initial.tracks.media = initial.tracks.media.map((t: any) => ({
-                ...t,
-                assetUrl: t.assetUrl === 'auto' || t.assetUrl === 'placeholder'
-                    ? (getRandomAsset(initialAssets, 'video') || getRandomAsset(initialAssets, 'image') || t.assetUrl)
-                    : t.assetUrl
-            }))
-        }
-        if (initial.tracks?.audio) {
-            initial.tracks.audio = initial.tracks.audio.map((t: any) => ({
-                ...t,
-                assetUrl: t.assetUrl === 'auto' || t.assetUrl === 'placeholder_music_url'
-                    ? (getRandomAsset(initialAssets, 'audio') || t.assetUrl)
-                    : t.assetUrl
-            }))
-        }
-        return initial
+        const { json } = resolveAutoAssets(base)
+        return json
     })
 
     const [jsonText, setJsonText] = useState(() => JSON.stringify(schemaJson, null, 2))
@@ -353,8 +372,10 @@ export default function AIBuilderTab({
             const data = await res.json()
             if (!res.ok) throw new Error(data.error || 'Failed to iterate')
 
-            setSchemaJson(data.schemaJson)
-            setJsonText(JSON.stringify(data.schemaJson, null, 2))
+            // Resolve any new "auto" or placeholder assets the AI might have added
+            const { json: resolved } = resolveAutoAssets(data.schemaJson)
+            setSchemaJson(resolved)
+            setJsonText(JSON.stringify(resolved, null, 2))
             setChatPrompt('')
             toast.success('AI updated composition')
         } catch (error: any) {
@@ -385,9 +406,16 @@ export default function AIBuilderTab({
         try {
             const parsed = JSON.parse(jsonText)
             if (JSON.stringify(parsed) !== JSON.stringify(schemaJson)) {
+                // Resolve any manual placeholders if present
+                const { json: resolved, changed } = resolveAutoAssets(parsed)
                 setHistory((prev) => [...prev, JSON.parse(JSON.stringify(schemaJson))])
-                setSchemaJson(parsed)
-                toast.success('Applied manual changes')
+                setSchemaJson(resolved)
+                if (changed) {
+                    setJsonText(JSON.stringify(resolved, null, 2))
+                    toast.success('Applied changes and resolved placeholders')
+                } else {
+                    toast.success('Applied manual changes')
+                }
             }
         } catch (e) {
             toast.error('Invalid JSON structure - reverting view')
