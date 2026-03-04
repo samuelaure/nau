@@ -20,6 +20,16 @@ const TemplateFormSchema = z.object({
     .optional()
     .nullable()
     .transform((val) => val || null),
+  systemPrompt: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((val) => val || null),
+  creationPrompt: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((val) => val || null),
 })
 
 const IdSchema = z.string().min(1)
@@ -43,10 +53,13 @@ export async function addTemplate(formData: FormData) {
     accountId: formData.get('accountId'),
   }
 
-  const data = TemplateFormSchema.parse(rawData)
+  const { accountId, ...templateData } = TemplateFormSchema.parse(rawData)
 
-  await prisma.template.create({
-    data,
+  await (prisma.template.create as any)({
+    data: {
+      ...templateData,
+      account: accountId ? { connect: { id: accountId } } : undefined,
+    },
   })
 
   revalidatePath('/dashboard/templates')
@@ -72,13 +85,18 @@ export async function updateTemplate(id: string, formData: FormData) {
     remotionId: formData.get('remotionId'),
     airtableTableId: formData.get('airtableTableId'),
     accountId: formData.get('accountId'),
+    systemPrompt: formData.get('systemPrompt'),
+    creationPrompt: formData.get('creationPrompt'),
   }
 
-  const data = TemplateFormSchema.parse(rawData)
+  const { accountId, ...templateData } = TemplateFormSchema.parse(rawData)
 
-  await prisma.template.update({
+  await (prisma.template.update as any)({
     where: { id: parsedId },
-    data,
+    data: {
+      ...templateData,
+      account: accountId ? { connect: { id: accountId } } : { disconnect: true },
+    },
   })
 
   revalidatePath('/dashboard/templates')
@@ -92,13 +110,15 @@ export async function duplicateTemplate(id: string) {
   const template = await prisma.template.findUnique({ where: { id: parsedId } })
   if (!template) throw new Error('Template not found')
 
-  await prisma.template.create({
+  await (prisma.template.create as any)({
     data: {
       name: `${template.name} (Copy)`,
       remotionId: template.remotionId,
       airtableTableId: template.airtableTableId,
-      accountId: template.accountId,
+      account: template.accountId ? { connect: { id: template.accountId } } : undefined,
       useAccountAssets: template.useAccountAssets,
+      systemPrompt: (template as any).systemPrompt,
+      creationPrompt: (template as any).creationPrompt,
     },
   })
 

@@ -1,199 +1,275 @@
-import Groq from 'groq-sdk'
 import { prisma } from '@/modules/shared/prisma'
-import { z } from 'zod'
+import { Groq } from 'groq-sdk'
+import OpenAI from 'openai'
+import {
+  DynamicCompositionSchema,
+  DynamicCompositionSchemaType,
+} from '@/modules/rendering/DynamicComposition/schema'
+import { getSetting } from '@/modules/shared/settings'
 
-export const AgentOutputSchema = z.object({
-  _thought: z.string(),
-  templateId: z.string(),
-  textSlots: z.record(z.string(), z.string()),
-  mediaSlots: z.record(z.string(), z.string()),
-})
-
-export type AgentOutputType = z.infer<typeof AgentOutputSchema>
-
+/**
+ * Main AI Agent for Video Composition.
+ * Follows a Multi-Step process:
+ * 1. Director Choice: Pick the best Template (if not provided).
+ * 2. Creative Planning: Brand Persona + Template Prompt -> Narrative Script.
+ * 3. Technical Mapping: Narrative Script -> Valid DynamicComposition JSON.
+ */
 export async function composeVideoWithAgent(
   prompt: string,
   accountId: string,
   format: 'reel' | 'post' | 'story',
-): Promise<AgentOutputType> {
-  // 1. Fetch available brand assets
-  const allAssets = await prisma.asset.findMany({
-    where: {
-      accountId,
-      NOT: {
-        OR: [
-          { r2Key: { contains: 'outputs/', mode: 'insensitive' } },
-          { r2Key: { contains: 'output/', mode: 'insensitive' } },
-        ],
-      },
-    },
-    select: { id: true, type: true, url: true, originalFilename: true, r2Key: true },
-    take: 60,
-  })
+  templateId?: string,
+  personaId?: string,
+): Promise<{ composition: DynamicCompositionSchemaType; templateId: string }> {
+  // 1. Fetch Brand Persona
+  const persona = (
+    personaId
+      ? await prisma.brandPersona.findUnique({ where: { id: personaId } })
+      : (await prisma.brandPersona.findFirst({ where: { accountId, isDefault: true } })) ||
+        (await prisma.brandPersona.findFirst({ where: { accountId } }))
+  ) as any
 
-  const assetsContext =
-    allAssets.length > 0
-      ? allAssets
-          .map((a) => `- ID: ${a.id} URL: ${a.url} (Type: ${a.type}, Name: ${a.originalFilename})`)
-          .join('\n')
-      : 'No brand assets available.'
+  if (!persona) throw new Error('No Brand Persona found.')
 
-  // 2. Fetch Active Sequence Templates
-  const activeTemplates = await prisma.videoTemplate.findMany({
-    where: { isActive: true },
-  })
+  // 2. Decide Template (Director Role)
+  const templates = (await prisma.template.findMany({
+    where: { OR: [{ accountId }, { accountId: null }] },
+  })) as any[]
 
-  if (activeTemplates.length === 0) {
-    throw new Error('No active templates available in the database. Please create one first.')
-  }
+  let targetTemplate = templates.find((t) => t.id === templateId)
 
-  const templatesContext = activeTemplates
-    .map((t) => {
-      const schema = t.schemaJson as any
-      const textSlots = schema?.tracks?.text?.map((n: any) => n.id) || []
-      const mediaSlots = schema?.tracks?.media?.map((n: any) => n.id) || []
-      const audioSlots = schema?.tracks?.audio?.map((n: any) => n.id) || []
+  const model =
+    persona.modelSelection === 'OPENAI_GPT_4O'
+      ? 'gpt-4o'
+      : persona.modelSelection === 'OPENAI_GPT_4O_MINI'
+        ? 'gpt-4o-mini'
+        : persona.modelSelection === 'OPENAI_GPT_4_TURBO'
+          ? 'gpt-4-turbo'
+          : persona.modelSelection === 'OPENAI_GPT_4_1'
+            ? 'gpt-4-turbo'
+            : persona.modelSelection === 'OPENAI_O1'
+              ? 'o1-preview'
+              : persona.modelSelection === 'OPENAI_O1_MINI'
+                ? 'o1-mini'
+                : persona.modelSelection === 'GROQ_LLAMA_3_3'
+                  ? 'llama-3.3-70b-versatile'
+                  : persona.modelSelection === 'GROQ_LLAMA_3_1_70B'
+                    ? 'llama-3.1-70b-versatile'
+                    : persona.modelSelection === 'GROQ_LLAMA_3_1_8B'
+                      ? 'llama3-8b-8192'
+                      : persona.modelSelection === 'GROQ_MIXTRAL_8X7B'
+                        ? 'mixtral-8x7b-32768'
+                        : persona.modelSelection === 'GROQ_DEEPSEEK_R1_70B'
+                          ? 'deepseek-r1-distill-llama-70b'
+                          : 'llama-3.3-70b-versatile'
 
-      return `### TEMPLATE ID: ${t.id}
-Name: ${t.name}
-Description: ${t.description}
-Text Slots Available: [${textSlots.join(', ')}]
-Media Slots Available: [${mediaSlots.join(', ')}]
-Audio Slots Available: [${audioSlots.join(', ')}]`
-    })
-    .join('\n\n')
+  const isGroq = persona.modelSelection.startsWith('GROQ')
+  const groqKey = (await getSetting('groq_api_key')) || process.env.GROQ_API_KEY
+  const openaiKey = (await getSetting('openai_api_key')) || process.env.OPENAI_API_KEY
 
-  if (!process.env.GROQ_API_KEY) {
-    throw new Error('GROQ_API_KEY is not configured in .env')
-  }
+  const client = isGroq ? new Groq({ apiKey: groqKey }) : new OpenAI({ apiKey: openaiKey })
 
-  const groq = new Groq({
-    apiKey: process.env.GROQ_API_KEY,
-  })
+  if (!targetTemplate && templates.length > 0) {
+    const account = (await prisma.socialAccount.findUnique({ where: { id: accountId } })) as any
+    const directorPrompt =
+      account?.directorPrompt || 'Pick the best template for this video concept.'
 
-  try {
-    const chatCompletion = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+    const decision = await (client as any).chat.completions.create({
+      model,
       messages: [
         {
           role: 'system',
-          content: `You are a Senior Creative Director Director. Your task is to select the most appropriate Video Template and assign content to its slots based on the target prompt tone.
-
-AVAILABLE TEMPLATES:
-${templatesContext}
-
-AVAILABLE ASSETS (Use exact URLs returned here):
-${assetsContext}
-
-OUTPUT FORMAT STRICTLY THIS JSON:
-{
-  "_thought": "Explain why you chose this template over others, and why you placed specific assets.",
-  "templateId": "exact string ID from the chosen template above",
-  "textSlots": {
-    "slot_id_1": "Your generated engaging text here",
-    "slot_id_2": "Another text"
-  },
-  "mediaSlots": {
-    "media_slot_1": "exact asset URL from AVAILABLE ASSETS",
-    "audio_slot_1": "exact audio URL from AVAILABLE ASSETS"
-  }
-}
-
-RULES:
-- You MUST select ONE active templateId from the list.
-- Do NOT hallucinate math bounding boxes or durations.
-- For "textSlots": populate every slot ID listed for your chosen template. Keep text concise.
-- For "mediaSlots": populate every media and audio slot ID if applicable, using ONLY valid URLs from the assets provided.
-- Return ONLY valid JSON.`,
+          content: `DIRECTOR ROLE: ${directorPrompt}\nAvailable templates:\n${templates.map((t) => `- ID: ${t.id}, Name: ${t.name}`).join('\n')}\nOutput ONLY the ID of the best template.`,
         },
-        {
-          role: 'user',
-          content: `Generate creative instructions for the following prompt: "${prompt}" - Format: ${format}`,
-        },
+        { role: 'user', content: `Concept: ${prompt}` },
       ],
-      response_format: { type: 'json_object' },
-      temperature: 0.1,
+      temperature: 0,
     })
 
-    const rawContent = chatCompletion.choices[0]?.message?.content
-    if (!rawContent) throw new Error('Groq returned an empty response')
-
-    console.log('[DEBUG] RAW GROQ TARGET RESPONSE:', rawContent)
-
-    const parsed = JSON.parse(rawContent)
-    return AgentOutputSchema.parse(parsed)
-  } catch (error: unknown) {
-    console.error('[GROQ_AGENT_ERROR]', error)
-    const msg = error instanceof Error ? error.message : 'Unknown error'
-    throw new Error(`Groq Agent failed: ${msg}`)
-  }
-}
-
-export async function generateContentIdeas(accountId: string): Promise<string[]> {
-  const defaultPersona = await prisma.brandPersona.findFirst({
-    where: { accountId, isDefault: true },
-  })
-
-  // Fallback to first persona if no default is explicitly marked
-  const persona =
-    defaultPersona ||
-    (await prisma.brandPersona.findFirst({
-      where: { accountId },
-    }))
-
-  if (!persona) {
-    throw new Error('No Brand Persona found. Please create one before generating ideas.')
+    const pickedId = decision.choices[0]?.message?.content?.trim().replace(/['"]/g, '')
+    targetTemplate = templates.find((t) => t.id === pickedId) || templates[0]
   }
 
-  if (!process.env.GROQ_API_KEY) {
-    throw new Error('GROQ_API_KEY is not configured in .env')
-  }
+  if (!targetTemplate) throw new Error('No video templates available.')
 
-  const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
-
-  try {
-    const chatCompletion = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
-      messages: [
-        {
-          role: 'system',
-          content: `You are a Lead Content Strategist. 
-          
-BRAND TONE & PERSONALITY:
+  // 3. Creative Planning
+  const assets = await prisma.asset.findMany({ where: { accountId } })
+  const creativeResponse = await (client as any).chat.completions.create({
+    model,
+    messages: [
+      {
+        role: 'system',
+        content: `You are a Senior Creative Director. Create a high-fidelity Creative Plan.
+        
+BRAND TONE:
 ${persona.systemPrompt}
 
-IDEATION FRAMEWORK:
-${persona.ideasFrameworkPrompt}
+TEMPLATE CONTEXT:
+${targetTemplate.systemPrompt || "Follow the template's vibe."}
 
-Generate exactly 5 distinct, high-performing content ideas following the framework constraints. Focus on the core angle and hook.
+AVAILABLE ASSETS:
+${assets.map((a) => `- ${a.url} (${a.type})`).join('\n')}
 
-OUTPUT STRICTLY THIS JSON FORMAT:
-{
-  "ideas": [
-    "Idea 1 description...",
-    "Idea 2 description..."
-  ]
-}`,
-        },
+Output a numbered plan for the scenes, text overlays, and audio choices.`,
+      },
+      { role: 'user', content: `Prompt: ${prompt}` },
+    ],
+    temperature: 0.7,
+  })
+
+  const creativePlan = creativeResponse.choices[0]?.message?.content
+  if (!creativePlan) throw new Error('Creative planning failed.')
+
+  // 4. Technical Mapping with Self-Correction Loop
+  let technicalPlan = creativePlan
+  let attempts = 0
+  let lastError = ''
+  let targetJson: any = null
+
+  while (attempts < 2) {
+    attempts++
+    const technicalResponse = await (client as any).chat.completions.create({
+      model,
+      messages: [
         {
-          role: 'user',
-          content: `Please generate 5 new content ideas.`,
+          role: 'system',
+          content: `You are a Technical Video Engineer. Map the plan to DynamicComposition JSON.
+        
+### SCHEMA SPEC:
+- Duration: 300-450 frames (10-15s @ 30fps)
+- Tracks: Use absolute URLs from the creative plan.
+- JSON Structure:
+{
+  "format": "${format}",
+  "fps": 30,
+  "durationInFrames": 450,
+  "width": 1080,
+  "height": 1920,
+  "tracks": {
+    "media": [ { "id": "1", "type": "media", "assetUrl": "url", "startFrame": 0, "durationInFrames": 450, "mediaStartAt": 0, "scale": "cover" } ],
+    "text": [ { "id": "2", "type": "text", "content": "TEXT", "startFrame": 30, "durationInFrames": 90, "safeZone": "center-safe", "fontSize": 80, "color": "#FFFFFF", "animation": "fade" } ],
+    "audio": [ { "id": "3", "type": "audio", "assetUrl": "url", "startFrame": 0, "durationInFrames": 450, "volume": 1 } ]
+  }
+}
+
+### CRITICAL RULES:
+- Output ONLY valid JSON. 
+- No comments, no markdown blocks, no triple backticks unless using json mode.
+- Ensure all IDs are unique strings.
+${lastError ? `\n### PREVIOUS ATTEMPT FAILED WITH ERROR:\n${lastError}\nPlease fix this error specifically.` : ''}`,
         },
+        { role: 'user', content: `PLAN: ${technicalPlan}` },
       ],
       response_format: { type: 'json_object' },
-      temperature: 0.8, // Slightly higher for creativity in ideas
+      temperature: 0,
     })
 
-    const rawContent = chatCompletion.choices[0]?.message?.content
-    if (!rawContent) throw new Error('Groq returned an empty response')
+    const rawJson = technicalResponse.choices[0]?.message?.content
+    if (!rawJson) throw new Error('Technical mapping failed.')
 
-    const parsed = JSON.parse(rawContent)
-    if (!parsed.ideas || !Array.isArray(parsed.ideas))
-      throw new Error('Failed to parse ideas array.')
-
-    return parsed.ideas as string[]
-  } catch (error: unknown) {
-    console.error('[IDEA_GENERATION_ERROR]', error)
-    throw new Error('Failed to generate ideas')
+    try {
+      const parsed = JSON.parse(rawJson)
+      targetJson = parsed.tracks ? parsed : parsed.composition || parsed.data || parsed
+      // Validate
+      const validated = DynamicCompositionSchema.parse(targetJson)
+      return {
+        composition: validated,
+        templateId: targetTemplate.id,
+      }
+    } catch (error: any) {
+      console.warn(`[AGENT_TECHNICAL_FAILURE] Attempt ${attempts}:`, error.message)
+      lastError = error.message
+      if (attempts >= 2)
+        throw new Error(`Technical mapping failed after 2 attempts: ${error.message}`)
+    }
   }
+
+  throw new Error('Technical mapping failed unexpectedly.')
+}
+
+/**
+ * Generates content ideas.
+ */
+export async function generateContentIdeas(
+  accountId: string,
+  personaId?: string,
+  frameworkId?: string,
+): Promise<string[]> {
+  const persona = (
+    personaId
+      ? await prisma.brandPersona.findUnique({ where: { id: personaId } })
+      : (await prisma.brandPersona.findFirst({ where: { accountId, isDefault: true } })) ||
+        (await prisma.brandPersona.findFirst({ where: { accountId } }))
+  ) as any
+
+  const framework = (
+    frameworkId
+      ? await (prisma as any).ideasFramework.findUnique({ where: { id: frameworkId } })
+      : (await (prisma as any).ideasFramework.findFirst({
+          where: { accountId, isDefault: true },
+        })) || (await (prisma as any).ideasFramework.findFirst({ where: { accountId } }))
+  ) as any
+
+  if (!persona || !framework) throw new Error('Persona and Framework required.')
+
+  const model =
+    persona.modelSelection === 'OPENAI_GPT_4O'
+      ? 'gpt-4o'
+      : persona.modelSelection === 'OPENAI_GPT_4O_MINI'
+        ? 'gpt-4o-mini'
+        : persona.modelSelection === 'OPENAI_GPT_4_TURBO'
+          ? 'gpt-4-turbo'
+          : persona.modelSelection === 'OPENAI_GPT_4_1'
+            ? 'gpt-4-turbo'
+            : persona.modelSelection === 'OPENAI_O1'
+              ? 'o1-preview'
+              : persona.modelSelection === 'OPENAI_O1_MINI'
+                ? 'o1-mini'
+                : persona.modelSelection === 'GROQ_LLAMA_3_3'
+                  ? 'llama-3.3-70b-versatile'
+                  : persona.modelSelection === 'GROQ_LLAMA_3_1_70B'
+                    ? 'llama-3.1-70b-versatile'
+                    : persona.modelSelection === 'GROQ_LLAMA_3_1_8B'
+                      ? 'llama3-8b-8192'
+                      : persona.modelSelection === 'GROQ_MIXTRAL_8X7B'
+                        ? 'mixtral-8x7b-32768'
+                        : persona.modelSelection === 'GROQ_DEEPSEEK_R1_70B'
+                          ? 'deepseek-r1-distill-llama-70b'
+                          : 'llama-3.3-70b-versatile'
+
+  const isGroq = persona.modelSelection.startsWith('GROQ')
+  const groqKey = (await getSetting('groq_api_key')) || process.env.GROQ_API_KEY
+  const openaiKey = (await getSetting('openai_api_key')) || process.env.OPENAI_API_KEY
+
+  const client = isGroq ? new Groq({ apiKey: groqKey }) : new OpenAI({ apiKey: openaiKey })
+
+  const response = await (client as any).chat.completions.create({
+    model,
+    messages: [
+      {
+        role: 'system',
+        content: `### NATIVE CONTENT STRATEGIST ROLE:
+You are a Content Strategist. Your goal is to generate high-quality content ideas based on the provided TONE and STRATEGY.
+
+### OUTPUT RULES:
+- Return ONLY a JSON object.
+- Structure: { "ideas": ["String 1", "String 2", ...] }
+- Each string in the array must be a complete, self-contained idea.
+- Do NOT include numbering, prefixes like "Idea 1:", or separators like "---" inside the strings unless specifically asked for in the STRATEGY.
+- If the STRATEGY specifies a quantity (e.g., 3 ideas), respect it. Default to 9.
+
+TONE:
+${persona.systemPrompt}
+
+STRATEGY:
+${framework.systemPrompt}`,
+      },
+      { role: 'user', content: 'Generate the ideas now.' },
+    ],
+    response_format: { type: 'json_object' },
+  })
+
+  const content = response.choices[0]?.message?.content
+  if (!content) throw new Error('Failed to generate ideas.')
+  return JSON.parse(content).ideas
 }
