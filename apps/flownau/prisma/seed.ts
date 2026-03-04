@@ -39,7 +39,6 @@ async function main() {
         id: 'sample-template',
         name: 'Instagram Post v1',
         remotionId: 'InstagramPost',
-        airtableTableId: process.env.AIRTABLE_ASFA_T1_TABLE_ID,
       },
     })
 
