@@ -69,25 +69,15 @@ export default function AddTemplateButton({
           <input type="hidden" name="remotionId" value="Universal" />
 
           <div className="form-group">
-            <label className="form-label">Linked Account</label>
+            <label className="form-label">Template Scope</label>
             <select name="accountId" className="input-field" defaultValue={defaultAccountId || ''}>
-              <option value="">No Account (Global)</option>
+              <option value="">Global Template (Available to all)</option>
               {accounts.map((account) => (
                 <option key={account.id} value={account.id}>
-                  {account.username} ({account.platform})
+                  Brand-Scoped: {account.username} ({account.platform})
                 </option>
               ))}
             </select>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Airtable Table ID (Optional)</label>
-            <input
-              name="airtableTableId"
-              type="text"
-              className="input-field"
-              placeholder="tbl..."
-            />
           </div>
 
           {error && (

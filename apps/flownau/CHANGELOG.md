@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.1] - 2026-03-03
+
+### Fixed
+
+- **Infrastructure Stabilization**:
+  - Dismantled the "Drift Detected" crash loop in Docker development by squashing inconsistent migration history into a single clean baseline (`init_stable_v0`).
+  - Fortified `db:bootstrap` script with a non-interactive fallback (db push), preventing container restart loops in non-production environments.
+- **AI Agent Resilience**:
+  - Implemented a **Self-Correction Loop** in the `composeVideoWithAgent` engine. The agent now automatically reflects on and fixes its own JSON validation errors during technical mapping.
+  - Resolved "Hallucination" issues by enforcing stricter system prompts and providing explicit multi-step planning (Director -> Creative -> Technical).
+
+### Added
+
+- **Manual Redo Capability**:
+  - Introduced a **"Redo Composition"** button in the Ideas Backlog, allowing users to manually trigger new AI generations if the initial result is unsatisfactory.
+- **Expanded Model Library**:
+  - Integrated support for DeepSeek R1, GPT-4o, O1, and Llama 3.3 across all persona settings.
+
 ## [0.3.0] - 2026-03-01
 
 ### Added

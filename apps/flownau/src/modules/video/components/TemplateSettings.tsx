@@ -9,7 +9,6 @@ interface TemplateWithCount {
   id: string
   name: string
   remotionId: string
-  airtableTableId?: string | null
   accountId?: string | null
   useAccountAssets: boolean
   systemPrompt?: string | null
@@ -107,14 +106,7 @@ export default function TemplateSettings({
               required
             />
           </div>
-          <div className="form-group">
-            <label className="form-label">Airtable Table ID</label>
-            <input
-              name="airtableTableId"
-              defaultValue={template.airtableTableId || ''}
-              className="input-field"
-            />
-          </div>
+
           <div className="form-group">
             <label className="form-label">Template system prompt (ONE per Template)</label>
             <textarea
@@ -140,16 +132,16 @@ export default function TemplateSettings({
             </p>
           </div>
           <div className="form-group">
-            <label className="form-label">Linked Account</label>
+            <label className="form-label">Template Scope</label>
             <select
               name="accountId"
               defaultValue={template.accountId || ''}
               className="input-field"
             >
-              <option value="">No linked account (Global)</option>
+              <option value="">Global Template (Available to all)</option>
               {accounts?.map((acc) => (
                 <option key={acc.id} value={acc.id}>
-                  {acc.username} ({acc.platform})
+                  Brand-Scoped: {acc.username} ({acc.platform})
                 </option>
               ))}
             </select>

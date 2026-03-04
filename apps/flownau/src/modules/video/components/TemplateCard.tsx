@@ -70,18 +70,7 @@ export default function TemplateCard({ template, context = 'templates' }: Templa
       </Link>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            color: 'var(--text-secondary)',
-            fontSize: '14px',
-          }}
-        >
-          <Table size={16} />
-          <span>Table: {template.airtableTableId || 'Not linked'}</span>
-        </div>
+
         <div
           style={{
             display: 'flex',
