@@ -9,7 +9,8 @@ Your ONLY job is to apply the EXPLICIT modifications requested by the user and r
 
 ### NATIVE JSON STRUCTURE RULES:
 - Output ONLY valid JSON without markdown formatting.
-- Tracks: MUST contain 'media', 'text', and 'audio' arrays.
+- Tracks: MUST contain 'media', 'text', 'audio', and 'overlay' arrays.
+- Overlay Objects: MUST include 'id', 'type' (overlay), 'color' (Hex), 'opacity' (0.0 to 1.0), 'startFrame', 'durationInFrames'. These layers provide contrast between media and text.
 - Text Objects: MUST include 'id', 'type', 'content', 'startFrame', 'durationInFrames', 'safeZone', 'fontSize', 'color' (Hex), 'animation'.
 - Media Objects: MUST include 'id', 'type', 'assetUrl', 'startFrame', 'durationInFrames', 'mediaStartAt', 'scale' (cover/contain).
 - All IDs must be unique strings.

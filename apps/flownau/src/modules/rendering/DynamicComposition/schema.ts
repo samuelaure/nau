@@ -34,6 +34,15 @@ export const AudioNodeSchema = z.object({
   volume: z.number().default(1),
 })
 
+export const OverlayNodeSchema = z.object({
+  id: z.string(),
+  type: z.literal('overlay'),
+  color: z.string().default('#000000'),
+  opacity: z.number().default(0.5),
+  startFrame: z.number().default(0),
+  durationInFrames: z.number(),
+})
+
 export const DynamicCompositionSchema = z.object({
   _thought: z.string().optional(),
   format: z.enum(['reel', 'post', 'story']).default('reel'),
@@ -42,6 +51,7 @@ export const DynamicCompositionSchema = z.object({
   width: z.number().default(1080),
   height: z.number().default(1920),
   tracks: z.object({
+    overlay: z.array(OverlayNodeSchema).optional().default([]),
     media: z.array(MediaNodeSchema).default([]),
     text: z.array(TypographyNodeSchema).default([]),
     audio: z.array(AudioNodeSchema).default([]),

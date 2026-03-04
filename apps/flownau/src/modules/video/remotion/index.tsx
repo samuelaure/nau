@@ -61,6 +61,7 @@ export const RemotionVideo: React.FC = () => {
             width: 1080,
             height: 1920,
             tracks: {
+              overlay: [],
               media: [
                 {
                   id: 'media-1',
