@@ -49,6 +49,7 @@ export async function GET() {
           templateId: 'DynamicTemplateMaster',
           inputProps: { schema: composition.payload },
           renderId: composition.id,
+          projectFolder: schedule.account.username || schedule.account.id,
         })
 
         const bucketRaw = process.env.R2_PUBLIC_URL
@@ -57,15 +58,17 @@ export async function GET() {
 
         const publicVideoUrl = `${bucketRaw}/${renderResultKey}`
 
-        // 4. Extract Caption (Fallback safely)
-        let caption = 'New Reel'
-        const payload: any = composition.payload
-        if (payload?.tracks?.text && payload.tracks.text.length > 0) {
-          caption = payload.tracks.text[0].content || 'New Reel'
+        // 4. Extract Caption (Priority: Composition.caption -> Metadata)
+        let caption = composition.caption || 'New Reel'
+        if (!composition.caption) {
+          const payload: any = composition.payload
+          if (payload?.tracks?.text && payload.tracks.text.length > 0) {
+            caption = payload.tracks.text[0].content || 'New Reel'
+          }
         }
 
         // 5. Post to Instagram
-        const igMediaId = await publishVideoToInstagram({
+        const igResult = await publishVideoToInstagram({
           accessToken: schedule.account.accessToken,
           instagramUserId: schedule.account.platformId,
           videoUrl: publicVideoUrl,
@@ -75,7 +78,12 @@ export async function GET() {
         // 6. Finalize States
         await prisma.composition.update({
           where: { id: composition.id },
-          data: { status: 'PUBLISHED', videoUrl: publicVideoUrl },
+          data: {
+            status: 'PUBLISHED',
+            videoUrl: publicVideoUrl,
+            externalPostId: igResult.id,
+            externalPostUrl: igResult.permalink,
+          },
         })
 
         await prisma.postingSchedule.update({
@@ -87,7 +95,7 @@ export async function GET() {
           accountId: schedule.accountId,
           status: 'success',
           compositionId: composition.id,
-          igMediaId,
+          igMediaId: igResult.id,
         })
       } catch (err: any) {
         console.error(`[WORKER_ERROR_ACCOUNT_${schedule.accountId}]`, err)

@@ -47,7 +47,27 @@ export async function publishVideoToInstagram({
     access_token: accessToken,
   })
 
-  return publishResponse.data.id
+  const mediaId = publishResponse.data.id
+
+  // Step 4: Fetch permalink
+  try {
+    const mediaResponse = await axios.get(`${IG_BASE_URL}/${mediaId}`, {
+      params: {
+        fields: 'permalink',
+        access_token: accessToken,
+      },
+    })
+    return {
+      id: mediaId,
+      permalink: mediaResponse.data.permalink,
+    }
+  } catch (error) {
+    console.warn('[INSTAGRAM_PERMALINK_FETCH_FAILED]', error)
+    return {
+      id: mediaId,
+      permalink: null,
+    }
+  }
 }
 
 export async function getLongLivedToken(shortLivedToken: string) {

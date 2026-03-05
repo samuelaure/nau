@@ -15,10 +15,16 @@ export const POST = auth(async function POST(req) {
   try {
     const template = await prisma.template.findUnique({
       where: { id: templateId },
+      include: { account: true },
     })
 
     if (!template) {
       return NextResponse.json({ error: 'Template not found' }, { status: 404 })
+    }
+
+    let projectFolder = 'templates/global'
+    if (template.account) {
+      projectFolder = template.account.username || template.account.id
     }
 
     // 2. Create Render record
@@ -36,6 +42,7 @@ export const POST = auth(async function POST(req) {
       templateId: template.remotionId,
       inputProps: inputData,
       renderId: render.id,
+      projectFolder,
     })
 
     const fullUrl = `${process.env.R2_PUBLIC_URL}/${r2Path}`
@@ -56,7 +63,7 @@ export const POST = auth(async function POST(req) {
       })
 
       if (account && account.accessToken && account.platformId) {
-        const mediaId = await publishVideoToInstagram({
+        const mediaResult = await publishVideoToInstagram({
           accessToken: decrypt(account.accessToken),
           instagramUserId: account.platformId,
           videoUrl: fullUrl,
@@ -67,7 +74,7 @@ export const POST = auth(async function POST(req) {
           where: { id: render.id },
           data: {
             status: 'PUBLISHED',
-            instagramMediaId: mediaId,
+            instagramMediaId: mediaResult.id,
           },
         })
       }
