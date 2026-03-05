@@ -63,9 +63,11 @@ export async function deleteTemplate(id: string) {
   await checkAuth()
   const parsedId = IdSchema.parse(id)
 
-  await prisma.template.delete({
-    where: { id: parsedId },
-  })
+  // Delete dependants in order before deleting the template
+  await prisma.composition.deleteMany({ where: { templateId: parsedId } })
+  await prisma.render.deleteMany({ where: { templateId: parsedId } })
+  await prisma.asset.deleteMany({ where: { templateId: parsedId } })
+  await prisma.template.delete({ where: { id: parsedId } })
 
   revalidatePath('/dashboard/templates')
 }
