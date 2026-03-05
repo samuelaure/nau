@@ -26,7 +26,7 @@ export async function composeVideoWithAgent(
     personaId
       ? await prisma.brandPersona.findUnique({ where: { id: personaId } })
       : (await prisma.brandPersona.findFirst({ where: { accountId, isDefault: true } })) ||
-        (await prisma.brandPersona.findFirst({ where: { accountId } }))
+      (await prisma.brandPersona.findFirst({ where: { accountId } }))
   ) as any
 
   if (!persona) throw new Error('No Brand Persona found.')
@@ -93,7 +93,19 @@ export async function composeVideoWithAgent(
   if (!targetTemplate) throw new Error('No video templates available.')
 
   // 3. Creative Planning
-  const assets = await prisma.asset.findMany({ where: { accountId } })
+  const assets = await prisma.asset.findMany({
+    where: {
+      accountId,
+      NOT: {
+        OR: [
+          { r2Key: { contains: '/outputs/' } },
+          { r2Key: { contains: '/Outputs/' } },
+          { url: { contains: '/outputs/' } },
+          { url: { contains: '/Outputs/' } }
+        ]
+      }
+    }
+  })
   const creativeResponse = await (client as any).chat.completions.create({
     model,
     messages: [
@@ -107,10 +119,15 @@ ${persona.systemPrompt}
 TEMPLATE CONTEXT:
 ${targetTemplate.systemPrompt || "Follow the template's vibe."}
 
+CAPTION STRATEGY:
+${targetTemplate.captionPrompt || "Generate a compelling, high-converting social media caption that matches the brand tone and video content."}
+
 AVAILABLE ASSETS:
 ${assets.map((a) => `- ${a.url} (${a.type})`).join('\n')}
 
-Output a numbered plan for the scenes, text overlays, and audio choices.`,
+Output:
+1. A numbered plan for the scenes, text overlays, and audio choices.
+2. A compelling social media caption.`,
       },
       { role: 'user', content: `Prompt: ${prompt}` },
     ],
@@ -138,6 +155,7 @@ Output a numbered plan for the scenes, text overlays, and audio choices.`,
 ### SCHEMA SPEC:
 - Duration: 300-450 frames (10-15s @ 30fps)
 - Tracks: Use absolute URLs from the creative plan.
+- Caption: Include the generated caption in the "caption" field.
 - JSON Structure:
 {
   "format": "${format}",
@@ -145,6 +163,7 @@ Output a numbered plan for the scenes, text overlays, and audio choices.`,
   "durationInFrames": 450,
   "width": 1080,
   "height": 1920,
+  "caption": "Your amazing caption here...",
   "tracks": {
     "media": [ { "id": "1", "type": "media", "assetUrl": "url", "startFrame": 0, "durationInFrames": 450, "mediaStartAt": 0, "scale": "cover" } ],
     "text": [ { "id": "2", "type": "text", "content": "TEXT", "startFrame": 30, "durationInFrames": 90, "safeZone": "center-safe", "fontSize": 80, "color": "#FFFFFF", "animation": "fade" } ],
@@ -170,6 +189,30 @@ ${lastError ? `\n### PREVIOUS ATTEMPT FAILED WITH ERROR:\n${lastError}\nPlease f
     try {
       const parsed = JSON.parse(rawJson)
       targetJson = parsed.tracks ? parsed : parsed.composition || parsed.data || parsed
+
+      // Post-process to randomize mediaStartAt based on known true durations
+      const fps = targetJson.fps || 30
+      if (targetJson.tracks?.media) {
+        for (const t of targetJson.tracks.media) {
+          const matchedAsset = assets.find(a => a.url === t.assetUrl) as any
+          if (matchedAsset && matchedAsset.duration) {
+            const requireSec = (t.durationInFrames || 0) / fps
+            const maxStartSec = Math.max(0, matchedAsset.duration - requireSec)
+            t.mediaStartAt = Math.floor((Math.random() * maxStartSec) * fps)
+          }
+        }
+      }
+      if (targetJson.tracks?.audio) {
+        for (const t of targetJson.tracks.audio) {
+          const matchedAsset = assets.find(a => a.url === t.assetUrl) as any
+          if (matchedAsset && matchedAsset.duration) {
+            const requireSec = (t.durationInFrames || 0) / fps
+            const maxStartSec = Math.max(0, matchedAsset.duration - requireSec)
+            t.mediaStartAt = Math.floor((Math.random() * maxStartSec) * fps)
+          }
+        }
+      }
+
       // Validate
       const validated = DynamicCompositionSchema.parse(targetJson)
       return {
@@ -199,15 +242,15 @@ export async function generateContentIdeas(
     personaId
       ? await prisma.brandPersona.findUnique({ where: { id: personaId } })
       : (await prisma.brandPersona.findFirst({ where: { accountId, isDefault: true } })) ||
-        (await prisma.brandPersona.findFirst({ where: { accountId } }))
+      (await prisma.brandPersona.findFirst({ where: { accountId } }))
   ) as any
 
   const framework = (
     frameworkId
       ? await (prisma as any).ideasFramework.findUnique({ where: { id: frameworkId } })
       : (await (prisma as any).ideasFramework.findFirst({
-          where: { accountId, isDefault: true },
-        })) || (await (prisma as any).ideasFramework.findFirst({ where: { accountId } }))
+        where: { accountId, isDefault: true },
+      })) || (await (prisma as any).ideasFramework.findFirst({ where: { accountId } }))
   ) as any
 
   if (!persona || !framework) throw new Error('Persona and Framework required.')

@@ -25,7 +25,9 @@ export async function POST(req: NextRequest) {
     for (const obj of objects) {
       if (!obj.Key || obj.Key.endsWith('/')) continue
 
-      // Determine type from extension
+      // CRITICAL: Never treat content in the outputs/ folder as an asset
+      const lowerKey = obj.Key.toLowerCase()
+      if (lowerKey.includes('/outputs/')) continue
       const ext = obj.Key.split('.').pop()?.toLowerCase()
       let type: 'VID' | 'AUD' | 'IMG' | null = null
       let mimeType = ''
