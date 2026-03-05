@@ -17,7 +17,7 @@ export default async function TemplatePage({
   const { tab, from } = await searchParams
   const activeTab = tab || 'builder'
 
-  const [template, accounts] = await Promise.all([
+  const [template, accounts, combinedAssetsCount] = await Promise.all([
     prisma.template.findUnique({
       where: { id },
       include: {
@@ -43,9 +43,41 @@ export default async function TemplatePage({
           username: acc.username || '',
         })),
       ),
+    prisma.asset.count({
+      where: {
+        OR: [
+          { templateId: id },
+          // We can't use template.accountId here yet in Promise.all, so we'll fetch it after or use a nested query
+        ]
+      }
+    })
   ])
 
+  // Refined approach: fetch asset count after we know template settings
   if (!template) notFound()
+
+  const trueAssetsCount = await prisma.asset.count({
+    where: {
+      AND: [
+        {
+          OR: [
+            { templateId: template.id },
+            ...(template.useAccountAssets && template.accountId ? [{ accountId: template.accountId }] : [])
+          ]
+        },
+        {
+          NOT: {
+            OR: [
+              { r2Key: { contains: '/outputs/' } },
+              { r2Key: { contains: '/Outputs/' } },
+              { url: { contains: '/outputs/' } },
+              { url: { contains: '/Outputs/' } }
+            ]
+          }
+        }
+      ]
+    }
+  })
 
   return (
     <div className="animate-fade-in">
@@ -124,7 +156,7 @@ export default async function TemplatePage({
           href={`/dashboard/templates/${id}?tab=assets`}
           active={activeTab === 'assets'}
           label="Assets"
-          count={template._count.assets}
+          count={trueAssetsCount}
         />
         <TabLink
           href={`/dashboard/templates/${id}?tab=settings`}
@@ -176,7 +208,9 @@ export default async function TemplatePage({
                 {
                   NOT: {
                     OR: [
+                      { r2Key: { contains: '/outputs/' } },
                       { r2Key: { contains: '/Outputs/' } },
+                      { url: { contains: '/outputs/' } },
                       { url: { contains: '/Outputs/' } }
                     ]
                   }
@@ -240,7 +274,26 @@ async function TemplateAssets({ templateId }: { templateId: string }) {
   })
 
   const assets = await prisma.asset.findMany({
-    where: { templateId },
+    where: {
+      AND: [
+        {
+          OR: [
+            { templateId },
+            ...(template?.useAccountAssets && template?.accountId ? [{ accountId: template.accountId }] : [])
+          ]
+        },
+        {
+          NOT: {
+            OR: [
+              { r2Key: { contains: '/outputs/' } },
+              { r2Key: { contains: '/Outputs/' } },
+              { url: { contains: '/outputs/' } },
+              { url: { contains: '/Outputs/' } }
+            ]
+          }
+        }
+      ]
+    },
     orderBy: { createdAt: 'desc' },
   })
 
