@@ -5,11 +5,15 @@ import { PutObjectCommand } from '@aws-sdk/client-s3'
 import {
   compressVideo,
   compressAudio,
+  compressImage,
   getTempPath,
   generateThumbnail,
+  getDuration,
 } from '@/modules/video/ffmpeg'
 import fs from 'fs/promises'
 import { createReadStream } from 'fs'
+
+import { createId } from '@paralleldrive/cuid2'
 
 export async function POST(req: NextRequest) {
   console.log('Starting upload processing...')
@@ -26,6 +30,9 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     )
   }
+
+  // Generate a pre-determined DB ID for the asset
+  const assetId = createId()
 
   // 2. Determine Context & ShortCode
   let contextAccountId = accountId
@@ -102,34 +109,21 @@ export async function POST(req: NextRequest) {
       finalMime = 'audio/mp4'
       outputPath = getTempPath(`optimized_${Date.now()}.m4a`)
       await compressAudio(inputPath, outputPath)
+    } else if (type === 'IMG') {
+      // Force conversion to JPG for optimization if desired, or keep original extension
+      // Fixed: The user wants optimization, JPG is good for size/quality balance.
+      finalExt = 'jpg'
+      finalMime = 'image/jpeg'
+      outputPath = getTempPath(`optimized_${Date.now()}.jpg`)
+      await compressImage(inputPath, outputPath)
     }
 
-    // 6. Naming
-    const prefix = `${shortCode}_${type}_`
-
-    const whereClause: { templateId?: string; accountId?: string } = {}
-    if (templateId) whereClause.templateId = templateId
-    else if (contextAccountId) whereClause.accountId = contextAccountId
-
-    const lastAsset = await prisma.asset.findFirst({
-      where: {
-        ...whereClause,
-        systemFilename: { startsWith: prefix },
-      },
-      orderBy: { systemFilename: 'desc' },
-    })
-
-    let counter = 1
-    if (lastAsset) {
-      const parts = lastAsset.systemFilename.split('_')
-      const numPart = parts.length > 2 ? parts[2].split('.')[0] : null
-      if (numPart && !isNaN(parseInt(numPart))) {
-        counter = parseInt(numPart) + 1
-      }
-    }
-    const systemFilename = `${prefix}${counter.toString().padStart(4, '0')}.${finalExt}`
+    // 6. Naming - Use the generated ID
+    const systemFilename = `${assetId}.${finalExt}`
     const folder = type === 'VID' ? 'videos' : type === 'AUD' ? 'audios' : 'images'
-    const r2Key = `${projectFolder}/${folder}/${systemFilename}`
+
+    // NEW STRUCTURE: [projectFolder]/assets/[videos|audios|images]/[id].[ext]
+    const r2Key = `${projectFolder}/assets/${folder}/${systemFilename}`
 
     // 7. Upload to R2 from Optimized Path
     const fileStream = createReadStream(outputPath)
@@ -150,7 +144,7 @@ export async function POST(req: NextRequest) {
     // Upload thumbnail if exists
     let thumbnailUrl: string | null = null
     if (thumbPath) {
-      const thumbKey = `${projectFolder}/thumbnails/${systemFilename.split('.')[0]}_thumb.jpg`
+      const thumbKey = `${projectFolder}/assets/thumbnails/${systemFilename.split('.')[0]}_thumb.jpg`
       const thumbStream = createReadStream(thumbPath)
       const thumbStats = await fs.stat(thumbPath)
 
@@ -169,6 +163,16 @@ export async function POST(req: NextRequest) {
         : `https://${R2_BUCKET}.r2.cloudflarestorage.com/${thumbKey}`
     }
 
+    // 7.5 Get Duration if applicable
+    let duration: number | undefined = undefined
+    if (type === 'VID' || type === 'AUD') {
+      try {
+        duration = await getDuration(outputPath)
+      } catch (e) {
+        console.error('Failed to get duration', e)
+      }
+    }
+
     // 8. DB Record
     const publicUrl = process.env.R2_PUBLIC_URL
       ? `${process.env.R2_PUBLIC_URL}/${r2Key}`
@@ -176,6 +180,7 @@ export async function POST(req: NextRequest) {
 
     const asset = await prisma.asset.create({
       data: {
+        id: assetId,
         accountId: contextAccountId,
         templateId: templateId || null,
         originalFilename: file.name,
@@ -187,6 +192,7 @@ export async function POST(req: NextRequest) {
         type,
         url: publicUrl,
         thumbnailUrl: thumbnailUrl,
+        duration: duration,
       },
     })
 
@@ -202,7 +208,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, asset })
   } catch (error: unknown) {
     console.error('Processing failed', error)
-    await fs.unlink(inputPath).catch(() => {})
+    await fs.unlink(inputPath).catch(() => { })
     return NextResponse.json({ error: (error as Error).message }, { status: 500 })
   }
 }

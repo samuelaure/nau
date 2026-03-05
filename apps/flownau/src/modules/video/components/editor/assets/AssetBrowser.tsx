@@ -34,6 +34,9 @@ interface Asset {
   type: string
   size: number
   mimeType: string
+  thumbnailUrl?: string | null
+  duration?: number | null
+  description?: string | null
 }
 
 interface AssetBrowserProps {
@@ -263,11 +266,10 @@ export function AssetBrowser({ assets, assetsRoot }: AssetBrowserProps) {
                 <button
                   key={t}
                   onClick={() => setFilterType(t as FilterType)}
-                  className={`px-3 py-1 text-[10px] uppercase font-bold rounded-full border transition-all whitespace-nowrap ${
-                    filterType === t
-                      ? 'bg-accent border-accent text-white'
-                      : 'border-white/10 text-white/40 hover:border-white/20 hover:text-white'
-                  }`}
+                  className={`px-3 py-1 text-[10px] uppercase font-bold rounded-full border transition-all whitespace-nowrap ${filterType === t
+                    ? 'bg-accent border-accent text-white'
+                    : 'border-white/10 text-white/40 hover:border-white/20 hover:text-white'
+                    }`}
                 >
                   {t}
                 </button>
@@ -443,14 +445,35 @@ export function AssetBrowser({ assets, assetsRoot }: AssetBrowserProps) {
                   >
                     {(type === 'image' || type === 'video') && (
                       <div className="w-full h-full relative">
-                        <NextImage
-                          src={url}
-                          alt={name}
-                          fill
-                          className="object-cover opacity-40 group-hover:opacity-80 transition-all duration-500 group-hover:scale-110"
-                          sizes="(max-width: 768px) 50vw, 25vw"
-                          unoptimized // External R2 URLs
-                        />
+                        {type === 'image' ? (
+                          <NextImage
+                            src={url}
+                            alt={name}
+                            fill
+                            className="object-cover opacity-40 group-hover:opacity-80 transition-all duration-500 group-hover:scale-110"
+                            sizes="(max-width: 768px) 50vw, 25vw"
+                            unoptimized // External R2 URLs
+                          />
+                        ) : (
+                          <video
+                            src={url}
+                            poster={isProject ? ((asset as Asset).thumbnailUrl || undefined) : undefined}
+                            className="object-cover w-full h-full opacity-40 group-hover:opacity-80 transition-all duration-500 group-hover:scale-110"
+                            preload="metadata"
+                            muted
+                            loop
+                            playsInline
+                            onMouseEnter={(e) => {
+                              const target = e.currentTarget
+                              target.play().catch(() => { })
+                            }}
+                            onMouseLeave={(e) => {
+                              const target = e.currentTarget
+                              target.pause()
+                              target.currentTime = 0
+                            }}
+                          />
+                        )}
                       </div>
                     )}
 
@@ -492,7 +515,9 @@ export function AssetBrowser({ assets, assetsRoot }: AssetBrowserProps) {
                     </div>
                     <div className="text-[9px] font-bold text-white/20 uppercase tracking-widest mt-0.5 group-hover:text-accent/60 transition-colors">
                       {isProject
-                        ? 'Native'
+                        ? (asset as Asset).duration
+                          ? `${Math.floor((asset as Asset).duration! / 60)}:${Math.floor((asset as Asset).duration! % 60).toString().padStart(2, '0')}`
+                          : 'Native'
                         : asset.size
                           ? `${(asset.size / 1024 / 1024).toFixed(1)} MB`
                           : 'Remote'}

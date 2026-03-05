@@ -9,10 +9,12 @@ export async function renderAndUpload({
   templateId,
   inputProps,
   renderId,
+  projectFolder,
 }: {
   templateId: string
   inputProps: Record<string, unknown>
   renderId: string
+  projectFolder: string
 }) {
   const entry = path.join(process.cwd(), 'src/modules/video/remotion/index.tsx')
   const outputDir = path.join(process.cwd(), 'out')
@@ -44,9 +46,10 @@ export async function renderAndUpload({
 
   console.log('Uploading to R2...')
   const fileStream = fs.createReadStream(outputLocation)
+  const r2Key = `${projectFolder}/outputs/${renderId}.mp4`
   const uploadParams = {
     Bucket: R2_BUCKET,
-    Key: `videos/${renderId}.mp4`,
+    Key: r2Key,
     Body: fileStream,
     ContentType: 'video/mp4',
   }
@@ -56,5 +59,5 @@ export async function renderAndUpload({
   // Cleanup
   fs.unlinkSync(outputLocation)
 
-  return `videos/${renderId}.mp4`
+  return r2Key
 }

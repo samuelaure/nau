@@ -23,27 +23,32 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid schema' }, { status: 400 })
     }
 
-    const compositionCount = await prisma.composition.count({
+    const composition = await prisma.composition.findUnique({
       where: {
         id: compositionId,
-        accountId,
+        accountId: accountId,
         account: {
           userId: session.user.id,
         },
       },
+      include: {
+        account: true,
+      },
     })
 
-    if (compositionCount === 0) {
+    if (!composition || !composition.account) {
       return NextResponse.json({ error: 'Composition not found or unauthorized' }, { status: 404 })
     }
 
     const renderId = `dyn-${compositionId}-${Date.now()}`
+    const projectFolder = composition.account.username || composition.account.id
 
     // Start rendering. Vercel development will allow this to block.
     const videoUrl = await renderAndUpload({
       templateId: 'DynamicTemplateMaster',
       inputProps: { schema: parsedSchema.data },
       renderId,
+      projectFolder,
     })
 
     // Update the schema and the video URL in the db. We assert it as Prisma.InputJsonValue.

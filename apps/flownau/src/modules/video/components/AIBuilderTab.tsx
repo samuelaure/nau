@@ -7,7 +7,7 @@ import { Button } from '@/modules/shared/components/ui/Button'
 import { Textarea } from '@/modules/shared/components/ui/Textarea'
 import { Card } from '@/modules/shared/components/ui/Card'
 import { toast } from 'sonner'
-import { AlertTriangle, Send, Undo2, Save, Maximize2, X, Smartphone } from 'lucide-react'
+import { AlertTriangle, Send, Undo2, Save, Maximize2, X, Smartphone, Shuffle } from 'lucide-react'
 import { cn } from '@/modules/shared/utils'
 
 const RemotionPlayer = dynamic(() => import('@remotion/player').then((mod) => mod.Player), {
@@ -175,16 +175,24 @@ export default function AIBuilderTab({
         }
 
         const videoLibrary = shuffle(initialAssets.filter(a => {
-            const isMedia = a.type?.startsWith('video') || a.mimeType?.startsWith('video') ||
-                a.type?.startsWith('image') || a.mimeType?.startsWith('image')
-            const isOutput = a.r2Key?.includes('/Outputs/') || a.url?.includes('/Outputs/')
+            const t = (a.type || '').toUpperCase()
+            const m = (a.mimeType || '').toLowerCase()
+            const isMedia = t === 'VID' || t === 'IMG' || t.includes('VIDEO') || t.includes('IMAGE') ||
+                m.startsWith('video') || m.startsWith('image')
+            const lowerKey = (a.r2Key || '').toLowerCase()
+            const lowerUrl = (a.url || '').toLowerCase()
+            const isOutput = lowerKey.includes('/outputs/') || lowerUrl.includes('/outputs/')
             return isMedia && !isOutput
         }))
 
         const audioLibrary = shuffle(initialAssets.filter(a => {
-            const isAudio = a.type?.startsWith('audio') || a.mimeType?.startsWith('audio') ||
-                a.url?.endsWith('.mp3') || a.url?.endsWith('.wav')
-            const isOutput = a.r2Key?.includes('/Outputs/') || a.url?.includes('/Outputs/')
+            const t = (a.type || '').toUpperCase()
+            const m = (a.mimeType || '').toLowerCase()
+            const isAudio = t === 'AUD' || t.includes('AUDIO') || m.startsWith('audio') ||
+                a.url?.toLowerCase().endsWith('.mp3') || a.url?.toLowerCase().endsWith('.wav')
+            const lowerKey = (a.r2Key || '').toLowerCase()
+            const lowerUrl = (a.url || '').toLowerCase()
+            const isOutput = lowerKey.includes('/outputs/') || lowerUrl.includes('/outputs/')
             return isAudio && !isOutput
         }))
 
@@ -192,15 +200,70 @@ export default function AIBuilderTab({
             next.tracks.media = next.tracks.media.map((t: any, i: number) => {
                 // Sequential pick from shuffled library to ensure uniqueness up to library size
                 const asset = videoLibrary[i % videoLibrary.length]
-                return { ...t, assetUrl: asset.url }
+
+                // Randomize mediaStartAt based on duration
+                let mediaStartAt = t.mediaStartAt || 0
+                if (asset.duration) {
+                    const fps = next.fps || 30
+                    const requireFrames = t.durationInFrames || 0
+                    const requireSec = requireFrames / fps
+                    const maxStartSec = Math.max(0, asset.duration - requireSec)
+                    if (maxStartSec > 0) {
+                        const randomStartSec = Math.random() * maxStartSec
+                        mediaStartAt = Math.floor(randomStartSec * fps)
+                    }
+                }
+
+                return { ...t, assetUrl: asset.url, mediaStartAt }
             })
         }
         if (next.tracks?.audio && audioLibrary.length > 0) {
             next.tracks.audio = next.tracks.audio.map((t: any, i: number) => {
                 const asset = audioLibrary[i % audioLibrary.length]
-                return { ...t, assetUrl: asset.url }
+
+                let mediaStartAt = t.mediaStartAt || 0
+                if (asset.duration) {
+                    const fps = next.fps || 30
+                    const requireFrames = t.durationInFrames || 0
+                    const requireSec = requireFrames / fps
+                    const maxStartSec = Math.max(0, asset.duration - requireSec)
+                    if (maxStartSec > 0) {
+                        const randomStartSec = Math.random() * maxStartSec
+                        mediaStartAt = Math.floor(randomStartSec * fps)
+                    }
+                }
+
+                return { ...t, assetUrl: asset.url, mediaStartAt }
             })
         }
+
+        return next
+    }, [initialAssets])
+
+    const clampMediaOffsets = useCallback((json: any) => {
+        const next = JSON.parse(JSON.stringify(json))
+        const fps = next.fps || 30
+
+        const processTrack = (track: any) => {
+            const asset = initialAssets.find(a => a.url === track.assetUrl)
+            if (asset && asset.duration) {
+                const requireFrames = track.durationInFrames || 0
+                const requireSec = requireFrames / fps
+                const totalSec = asset.duration
+                const currentStartSec = (track.mediaStartAt || 0) / fps
+
+                // Safety Guard: If start + required duration > total asset duration
+                if (currentStartSec + requireSec > totalSec) {
+                    // Clamp start back so it fits or set to 0 if track is longer than asset
+                    const newStartSec = Math.max(0, totalSec - requireSec)
+                    track.mediaStartAt = Math.floor(newStartSec * fps)
+                }
+            }
+            return track
+        }
+
+        if (next.tracks?.media) next.tracks.media = next.tracks.media.map(processTrack)
+        if (next.tracks?.audio) next.tracks.audio = next.tracks.audio.map(processTrack)
 
         return next
     }, [initialAssets])
@@ -222,6 +285,22 @@ export default function AIBuilderTab({
 
     // 3. Asset & Cache Logic
     const [hasSufficientAssets, setHasSufficientAssets] = useState(true)
+    const [availableVideoCount, setAvailableVideoCount] = useState(initialAssets.filter(a => {
+        const t = (a.type || '').toUpperCase()
+        const m = (a.mimeType || '').toLowerCase()
+        const lowerKey = (a.r2Key || '').toLowerCase()
+        const lowerUrl = (a.url || '').toLowerCase()
+        return (t === 'VID' || t === 'IMG' || t.includes('VIDEO') || t.includes('IMAGE') || m.startsWith('video') || m.startsWith('image')) &&
+            !lowerKey.includes('/outputs/') && !lowerUrl.includes('/outputs/')
+    }).length)
+    const [availableAudioCount, setAvailableAudioCount] = useState(initialAssets.filter(a => {
+        const t = (a.type || '').toUpperCase()
+        const m = (a.mimeType || '').toLowerCase()
+        const lowerKey = (a.r2Key || '').toLowerCase()
+        const lowerUrl = (a.url || '').toLowerCase()
+        return (t === 'AUD' || t.includes('AUDIO') || m.startsWith('audio') || (a.url || '').toLowerCase().endsWith('.mp3') || (a.url || '').toLowerCase().endsWith('.wav')) &&
+            !lowerKey.includes('/outputs/') && !lowerUrl.includes('/outputs/')
+    }).length)
     const [assetMapping, setAssetMapping] = useState<Record<string, string>>({})
     const [isSyncing, setIsSyncing] = useState(false)
     const [previewSchema, setPreviewSchema] = useState<any>(schemaJson)
@@ -286,14 +365,15 @@ export default function AIBuilderTab({
         try {
             const parsed = JSON.parse(text)
             if (JSON.stringify(parsed) !== JSON.stringify(schemaJson)) {
+                const resolved = clampMediaOffsets(parsed)
                 setHistory((prev) => [...prev, JSON.parse(JSON.stringify(schemaJson))])
-                setSchemaJson(parsed)
+                setSchemaJson(resolved)
                 toast.success('Preview updated')
             }
         } catch (e) {
             // Silently wait for valid JSON during typing
         }
-    }, [schemaJson])
+    }, [schemaJson, clampMediaOffsets])
 
     // Trigger sync when schema or assets change
     useEffect(() => {
@@ -301,21 +381,37 @@ export default function AIBuilderTab({
         const mediaSlots = schemaJson?.tracks?.media?.length || 0
         const audioSlots = schemaJson?.tracks?.audio?.length || 0
         const videoLibrary = initialAssets.filter(a => {
-            const isMedia = a.type?.startsWith('video') || a.mimeType?.startsWith('video') ||
-                a.type?.startsWith('image') || a.mimeType?.startsWith('image')
-            const isOutput = a.r2Key?.includes('/Outputs/') || a.url?.includes('/Outputs/')
+            const t = (a.type || '').toUpperCase()
+            const m = (a.mimeType || '').toLowerCase()
+            const isMedia = t === 'VID' || t === 'IMG' || t.includes('VIDEO') || t.includes('IMAGE') ||
+                m.startsWith('video') || m.startsWith('image')
+            const lowerKey = (a.r2Key || '').toLowerCase()
+            const lowerUrl = (a.url || '').toLowerCase()
+            const isOutput = lowerKey.includes('/outputs/') || lowerUrl.includes('/outputs/')
             return isMedia && !isOutput
         })
         const audioLibrary = initialAssets.filter(a => {
-            const isAudio = a.type?.startsWith('audio') || a.mimeType?.startsWith('audio') ||
-                a.url?.endsWith('.mp3') || a.url?.endsWith('.wav')
-            const isOutput = a.r2Key?.includes('/Outputs/') || a.url?.includes('/Outputs/')
+            const t = (a.type || '').toUpperCase()
+            const m = (a.mimeType || '').toLowerCase()
+            const isAudio = t === 'AUD' || t.includes('AUDIO') || m.startsWith('audio') ||
+                a.url?.toLowerCase().endsWith('.mp3') || a.url?.toLowerCase().endsWith('.wav')
+            const lowerKey = (a.r2Key || '').toLowerCase()
+            const lowerUrl = (a.url || '').toLowerCase()
+            const isOutput = lowerKey.includes('/outputs/') || lowerUrl.includes('/outputs/')
             return isAudio && !isOutput
         })
 
-        const hasEnoughMedia = mediaSlots <= videoLibrary.length
-        const hasEnoughAudio = audioSlots <= audioLibrary.length
-        setHasSufficientAssets(hasEnoughMedia && hasEnoughAudio)
+        // Relaxed check: Only warn if we need media but have 0, or need audio but have 0.
+        // Re-using assets is common and allowed.
+        const needsMedia = mediaSlots > 0
+        const needsAudio = audioSlots > 0
+        const hasSomeMedia = videoLibrary.length > 0
+        const hasSomeAudio = audioLibrary.length > 0
+
+        setAvailableVideoCount(videoLibrary.length)
+        setAvailableAudioCount(audioLibrary.length)
+        const hasSufficientAssets = (needsMedia ? hasSomeMedia : true) && (needsAudio ? hasSomeAudio : true)
+        setHasSufficientAssets(hasSufficientAssets)
 
         // Collect URLs that need syncing
         const urlsToSync: string[] = []
@@ -401,6 +497,14 @@ export default function AIBuilderTab({
         toast.info('Undone latest change')
     }
 
+    const handleRemixAssets = () => {
+        setHistory((prev) => [...prev, JSON.parse(JSON.stringify(schemaJson))])
+        const reshuffled = applyLibraryAssets(schemaJson)
+        setSchemaJson(reshuffled)
+        setJsonText(JSON.stringify(reshuffled, null, 2))
+        toast.success('Assets remixed and timing randomized')
+    }
+
     const onJsonChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const val = e.target.value
         setJsonText(val)
@@ -413,8 +517,8 @@ export default function AIBuilderTab({
         try {
             const parsed = JSON.parse(jsonText)
             if (JSON.stringify(parsed) !== JSON.stringify(schemaJson)) {
-                // ALWAYS randomize assets from library when JSON is updated
-                const resolved = applyLibraryAssets(parsed)
+                // Only clamp offsets for manual changes, keep current assets
+                const resolved = clampMediaOffsets(parsed)
                 setHistory((prev) => [...prev, JSON.parse(JSON.stringify(schemaJson))])
                 setSchemaJson(resolved)
                 setJsonText(JSON.stringify(resolved, null, 2))
@@ -492,6 +596,15 @@ export default function AIBuilderTab({
                                 <Undo2 size={14} />
                                 <span className="text-[10px] font-bold">UNDO</span>
                             </Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleRemixAssets}
+                                className="h-8 px-3 text-white/40 hover:text-white hover:bg-white/10 gap-2 border border-white/5 rounded-full transition-all"
+                            >
+                                <Shuffle size={14} />
+                                <span className="text-[10px] font-bold">REMIX ASSETS</span>
+                            </Button>
                         </div>
                         <div className="flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
@@ -523,8 +636,8 @@ export default function AIBuilderTab({
             <div className="lg:col-span-5 flex flex-col gap-6">
                 <div className="sticky top-8 space-y-6">
 
-                    {/* Conditional Quality Warning (Zero Assets or Insufficient) */}
-                    {initialAssets.length === 0 ? (
+                    {/* Conditional Quality Warning */}
+                    {!hasSufficientAssets && (
                         <div className="relative group overflow-hidden bg-amber-500/10 border border-amber-500/30 p-6 rounded-3xl backdrop-blur-xl animate-in fade-in slide-in-from-top-4 duration-700">
                             <div className="absolute top-0 right-0 p-12 -mr-12 -mt-12 bg-amber-500/20 rounded-full blur-3xl group-hover:bg-amber-500/30 transition-all animate-pulse" />
                             <div className="relative flex items-start gap-4">
@@ -532,34 +645,26 @@ export default function AIBuilderTab({
                                     <AlertTriangle size={28} />
                                 </div>
                                 <div>
-                                    <p className="text-base font-black text-amber-500 uppercase tracking-tighter">High-Quality Preview Unavailable</p>
+                                    <p className="text-base font-black text-amber-500 uppercase tracking-tighter">
+                                        {availableVideoCount === 0 && availableAudioCount === 0
+                                            ? 'High-Quality Preview Unavailable'
+                                            : 'Production Alert'}
+                                    </p>
                                     <p className="text-xs text-amber-500/70 mt-1.5 leading-relaxed font-medium">
-                                        No media assets found in Brand or Template storage. We are using generic placeholders, which prevents an accurate visual audit of your composition.
+                                        {availableVideoCount === 0 && availableAudioCount === 0
+                                            ? 'No media assets found in Brand or Template storage. We are using generic placeholders, which prevents an accurate visual audit of your composition.'
+                                            : 'Some required asset slots are empty. Upload more content to your brand library to enable a full production preview.'}
                                     </p>
                                     <Link
                                         href={`/dashboard/templates/${template.id}?tab=assets`}
                                         className="text-[10px] mt-5 inline-flex items-center gap-2 px-5 py-2.5 bg-amber-500 text-black font-black uppercase rounded-xl shadow-xl shadow-amber-500/20 hover:bg-amber-400 hover:scale-[1.02] active:scale-95 transition-all"
                                     >
-                                        Add Content to Library
+                                        Open Assets Manager
                                     </Link>
                                 </div>
                             </div>
                         </div>
-                    ) : !hasSufficientAssets ? (
-                        <div className="bg-error/10 border border-error/20 p-5 rounded-2xl flex items-start gap-4 backdrop-blur-md animate-in fade-in duration-500">
-                            <AlertTriangle className="text-error mt-0.5" size={24} />
-                            <div>
-                                <p className="text-sm font-black text-error uppercase tracking-tight">Production Alert</p>
-                                <p className="text-xs text-error/70 mt-1 leading-relaxed">Available assets cover some slots, but you need more videos for a full production test.</p>
-                                <Link
-                                    href={`/dashboard/templates/${template.id}?tab=assets`}
-                                    className="text-[10px] mt-3 inline-block px-3 py-1.5 bg-error text-white font-black uppercase rounded shadow-lg shadow-error/20"
-                                >
-                                    Open Assets Manager
-                                </Link>
-                            </div>
-                        </div>
-                    ) : null}
+                    )}
 
                     <div className="p-4 bg-white/5 border border-white/5 rounded-[2rem] shadow-2xl flex justify-center items-center min-h-[300px]">
                         <PlayerWrapper

@@ -50,6 +50,7 @@ export const DynamicCompositionSchema = z.object({
   durationInFrames: z.number(),
   width: z.number().default(1080),
   height: z.number().default(1920),
+  caption: z.string().optional(), // NEW: Generated social media caption
   tracks: z.object({
     overlay: z.array(OverlayNodeSchema).optional().default([]),
     media: z.array(MediaNodeSchema).default([]),

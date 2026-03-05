@@ -29,22 +29,24 @@ if (envFfprobe && fs.existsSync(envFfprobe)) {
 }
 
 /**
- * Compresses a video file to H.264, CRF 24, AAC, keeping height <= 1080p.
- * Logic copied from r2-asset-manager.
+ * Compresses a video file.
+ * Ensures dimensions fit within 1080x1920 (portrait) or 1920x1080 (landscape)
+ * depending on original orientation.
  */
 export function compressVideo(inputPath: string, outputPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
     ffmpeg(inputPath)
       .outputOptions([
         '-c:v libx264',
-        '-crf 24',
+        '-crf 22',
         '-preset medium',
         '-c:a aac',
         '-b:a 128k',
         '-pix_fmt yuv420p',
       ])
       .videoFilters([
-        "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease",
+        // If width > height (landscape), target 1920x1080. Otherwise (portrait/square), target 1080x1920.
+        "scale='if(gt(iw,ih),min(1920,iw),min(1080,iw))':'if(gt(iw,ih),min(1080,ih),min(1920,ih))':force_original_aspect_ratio=decrease",
         "pad='ceil(iw/2)*2':'ceil(ih/2)*2'", // Ensures dimensions are even
       ])
       .on('start', (commandLine) => {
@@ -56,6 +58,32 @@ export function compressVideo(inputPath: string, outputPath: string): Promise<vo
       })
       .on('end', () => {
         console.log('Video compression finished')
+        resolve()
+      })
+      .save(outputPath)
+  })
+}
+
+/**
+ * Compresses an image file using ffmpeg.
+ * Resizes to fit 1080x1920 and optimizes quality.
+ */
+export function compressImage(inputPath: string, outputPath: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .outputOptions([
+        '-vframes 1',
+        '-q:v 2', // High quality for JPEG (1-31, lower is better)
+      ])
+      .videoFilters([
+        "scale='if(gt(iw,ih),min(1920,iw),min(1080,iw))':'if(gt(iw,ih),min(1080,ih),min(1920,ih))':force_original_aspect_ratio=decrease",
+      ])
+      .on('error', (err) => {
+        console.error('Image compression error:', err)
+        reject(err)
+      })
+      .on('end', () => {
+        console.log('Image compression finished')
         resolve()
       })
       .save(outputPath)
@@ -104,5 +132,21 @@ export function generateThumbnail(inputPath: string, outputPath: string): Promis
         console.error('Thumbnail generation error:', err)
         reject(err)
       })
+  })
+}
+
+/**
+ * Extracts the duration (in seconds) of a media file via ffprobe.
+ */
+export function getDuration(inputPath: string): Promise<number | undefined> {
+  return new Promise((resolve) => {
+    ffmpeg.ffprobe(inputPath, (err, metadata) => {
+      if (err) {
+        console.error('Error reading duration:', err)
+        resolve(undefined)
+      } else {
+        resolve(metadata.format.duration)
+      }
+    })
   })
 }

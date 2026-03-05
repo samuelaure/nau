@@ -10,6 +10,8 @@ export const AssetSchema = z.object({
   size: z.number(),
   mimeType: z.string(),
   thumbnailUrl: z.string().optional().nullable(),
+  duration: z.number().optional().nullable(),
+  description: z.string().optional().nullable(),
 })
 
 export const ElementStyleSchema = z.object({

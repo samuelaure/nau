@@ -425,28 +425,49 @@ function AssetCard({
 
       {/* Media Preview */}
       <div className="relative aspect-video bg-black/40 flex items-center justify-center overflow-hidden border-b border-white/5">
-        {(isImage || (isVideo && asset.thumbnailUrl)) && (
+        {(isImage || isVideo) && (
           <div className="w-full h-full relative">
-            <NextImage
-              src={isImage ? asset.url : asset.thumbnailUrl!}
-              alt={asset.originalFilename}
-              fill
-              className={`object-cover transition-all duration-500 ${selected ? 'scale-110 opacity-100' : 'opacity-70 group-hover:opacity-100 group-hover:scale-110'}`}
-              sizes="(max-width: 768px) 50vw, 20vw"
-              unoptimized
-            />
+            {isImage ? (
+              <NextImage
+                src={asset.url}
+                alt={asset.originalFilename}
+                fill
+                className={`object-cover transition-all duration-500 ${selected ? 'scale-110 opacity-100' : 'opacity-70 group-hover:opacity-100 group-hover:scale-110'}`}
+                sizes="(max-width: 768px) 50vw, 20vw"
+                unoptimized
+              />
+            ) : (
+              <video
+                src={asset.url}
+                poster={asset.thumbnailUrl || undefined}
+                className={`object-cover w-full h-full transition-all duration-500 ${selected ? 'scale-110 opacity-100' : 'opacity-70 group-hover:opacity-100 group-hover:scale-110'}`}
+                preload="metadata"
+                muted
+                loop
+                playsInline
+                onMouseEnter={(e) => {
+                  const target = e.currentTarget
+                  target.play().catch(() => { })
+                }}
+                onMouseLeave={(e) => {
+                  const target = e.currentTarget
+                  target.pause()
+                  target.currentTime = 0
+                }}
+              />
+            )}
           </div>
         )}
-        {isVideo && asset.thumbnailUrl && (
+        {isVideo && (
           <div className="absolute bottom-2 right-2 z-10 p-1.5 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 text-white/70">
             <Play size={10} fill="currentColor" />
           </div>
         )}
-        {!isImage && (!isVideo || !asset.thumbnailUrl) && (
+        {!isImage && !isVideo && (
           <div
             className={`flex flex-col items-center gap-3 transition-colors ${selected ? 'text-accent' : 'text-zinc-600 group-hover:text-white'}`}
           >
-            {isVideo ? <FileVideo size={32} /> : isAudio ? <FileAudio size={32} /> : <div />}
+            {isAudio ? <FileAudio size={32} /> : <div />}
             <span className="text-[10px] font-bold uppercase tracking-widest opacity-30">
               {asset.mimeType.split('/')[1] || 'Media'}
             </span>
@@ -500,7 +521,7 @@ function AssetCard({
         <div
           className={`flex items-center justify-between text-[9px] font-bold uppercase tracking-widest transition-colors ${selected ? 'text-accent/60' : 'text-text-secondary/40 group-hover:text-accent/60'}`}
         >
-          <span>{(asset.size / 1024 / 1024).toFixed(2)} MB</span>
+          <span>{(asset.size / 1024 / 1024).toFixed(2)} MB {asset.duration ? `| ${Math.floor(asset.duration / 60)}:${Math.floor(asset.duration % 60).toString().padStart(2, '0')}` : ''}</span>
           <span className="opacity-0 group-hover:opacity-100 transition-opacity">Asset Entity</span>
         </div>
       </div>
