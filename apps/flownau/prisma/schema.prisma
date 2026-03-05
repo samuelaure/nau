@@ -60,6 +60,8 @@ model Asset {
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   thumbnailUrl     String?
+  duration         Float?
+  description      String?        @db.Text
   account          SocialAccount? @relation(fields: [accountId], references: [id], onDelete: Cascade)
   template         Template?      @relation(fields: [templateId], references: [id])
 }
@@ -77,6 +79,7 @@ model Template {
   assetsRoot       String?
   systemPrompt     String?        @db.Text // TEMPLATE SPECIFIC: Narrative multiplier
   creationPrompt   String?        @db.Text // NEW: Specific iteration logic for this template
+  captionPrompt    String?        @db.Text // NEW: Specific logic for generating captions
   schemaJson       Json?          // Added for structural mapping
   assets           Asset[]
   renders          Render[]
@@ -159,17 +162,20 @@ model ContentIdea {
 }
 
 model Composition {
-  id          String        @id @default(cuid())
-  accountId   String
-  templateId  String
-  payload     Json          // The mapped content variables the AI outputted (Text strings, Asset IDs)
-  videoUrl    String?
-  status      String        @default("DRAFT") // DRAFT, APPROVED, PUBLISHED
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id              String        @id @default(cuid())
+  accountId       String
+  templateId      String
+  payload         Json          // The mapped content variables the AI outputted (Text strings, Asset IDs)
+  videoUrl        String?
+  caption         String?       @db.Text
+  externalPostId  String?
+  externalPostUrl String?
+  status          String        @default("DRAFT") // DRAFT, APPROVED, PUBLISHED
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
   
-  account     SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  template    Template      @relation(fields: [templateId], references: [id])
+  account         SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  template        Template      @relation(fields: [templateId], references: [id])
 }
 
 model PostingSchedule {
