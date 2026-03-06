@@ -79,10 +79,11 @@ export const ResponsiveTextNode: React.FC<ResponsiveTextNodeProps> = ({ node }) 
         flexDirection: 'column',
         justifyContent,
         alignItems: 'center',
-        paddingLeft: '7.5%', // 7.5% margin on both sides = 85% max width
+        paddingLeft: '7.5%',
         paddingRight: '7.5%',
         paddingTop,
         paddingBottom,
+        isolation: 'isolate',
       }}
     >
       <div
@@ -97,8 +98,8 @@ export const ResponsiveTextNode: React.FC<ResponsiveTextNodeProps> = ({ node }) 
           maxWidth: maxWidthAllowed,
           wordWrap: 'break-word',
           whiteSpace: 'pre-line', // Allow AI to send explicit break lines via \n
-          // Drop shadow to ensure readability on unknown dynamic video backgrounds
-          textShadow: '0px 4px 20px rgba(0, 0, 0, 0.8), 0px 1px 4px rgba(0,0,0,0.5)',
+          // Tight shadow - avoids large dark bloom bleeding across the overlay
+          textShadow: '0px 2px 8px rgba(0, 0, 0, 0.9), 0px 1px 2px rgba(0,0,0,0.7)',
           lineHeight: '1.2',
         }}
       >

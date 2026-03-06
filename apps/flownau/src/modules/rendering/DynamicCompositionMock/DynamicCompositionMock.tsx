@@ -26,21 +26,35 @@ const TextLayer: React.FC<{ node: any }> = ({ node }) => {
     <div
       style={{
         position: 'absolute',
-        top,
-        left: '50%',
-        transform: `translate(-50%, -50%) scale(${scale}) translateY(${translateY}px)`,
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        alignItems: top === '20%' ? 'flex-start' : top === '80%' ? 'flex-end' : 'center',
+        justifyContent: 'center',
+        paddingTop: top === '20%' ? '18%' : undefined,
+        paddingBottom: top === '80%' ? '35%' : undefined,
         opacity,
-        color: node.color || '#FFFFFF',
-        fontSize: node.fontSize || 60,
-        fontWeight: '900',
-        fontFamily: 'Inter, sans-serif',
-        textAlign: 'center',
-        width: '80%',
-        textShadow: '0 4px 20px rgba(0,0,0,0.8)',
-        // Removed background, padding and border for "simple text" look
+        isolation: 'isolate',
       }}
     >
-      {node.content}
+      <div
+        style={{
+          transform: `scale(${scale}) translateY(${translateY}px)`,
+          color: node.color || '#FFFFFF',
+          fontSize: node.fontSize || 60,
+          fontWeight: '900',
+          fontFamily: 'Inter, sans-serif',
+          textAlign: 'center',
+          width: '80%',
+          // Tight shadow - avoids large dark bloom bleeding across the overlay
+          textShadow: '0 2px 8px rgba(0,0,0,0.9), 0 1px 2px rgba(0,0,0,0.7)',
+          whiteSpace: 'pre-line',
+        }}
+      >
+        {node.content}
+      </div>
     </div>
   )
 }
