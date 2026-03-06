@@ -89,20 +89,25 @@ export const DynamicCompositionMock: React.FC<{ schema: DynamicCompositionSchema
       })}
 
       {/* RENDER OVERLAY (Between Background and Text) */}
-      {schema.tracks.overlay?.map((overlayNode) => (
-        <Sequence
-          key={overlayNode.id}
-          from={overlayNode.startFrame}
-          durationInFrames={overlayNode.durationInFrames}
-        >
-          <AbsoluteFill
-            style={{
-              backgroundColor: overlayNode.color,
-              opacity: overlayNode.opacity
-            }}
-          />
-        </Sequence>
-      ))}
+      {schema.tracks.overlay?.map((overlayNode) => {
+        const hex = overlayNode.color || '#000000'
+        const r = parseInt(hex.slice(1, 3), 16)
+        const g = parseInt(hex.slice(3, 5), 16)
+        const b = parseInt(hex.slice(5, 7), 16)
+        return (
+          <Sequence
+            key={overlayNode.id}
+            from={overlayNode.startFrame}
+            durationInFrames={overlayNode.durationInFrames}
+          >
+            <AbsoluteFill
+              style={{
+                backgroundColor: `rgba(${r}, ${g}, ${b}, ${overlayNode.opacity})`,
+              }}
+            />
+          </Sequence>
+        )
+      })}
 
       {/* RENDER AUDIO */}
       {schema.tracks.audio?.map((audioNode) => (
