@@ -3,6 +3,7 @@ import { AbsoluteFill, Sequence, useVideoConfig } from 'remotion'
 import { DynamicCompositionSchemaType } from './schema'
 import { ResponsiveMediaNode } from './primitives/ResponsiveMediaNode'
 import { ResponsiveTextNode } from './primitives/ResponsiveTextNode'
+import { OverlayNode } from './primitives/OverlayNode'
 import { AudioNode } from './primitives/AudioNode'
 
 export type DynamicTemplateMasterProps = {
@@ -14,6 +15,7 @@ export const DynamicTemplateMaster: React.FC<DynamicTemplateMasterProps> = ({ sc
 
   // Gracefully handle undefined tracks if schema is malformed visually
   const mediaTracks = schema.tracks?.media || []
+  const overlayTracks = schema.tracks?.overlay || []
   const textTracks = schema.tracks?.text || []
   const audioTracks = schema.tracks?.audio || []
 
@@ -31,7 +33,19 @@ export const DynamicTemplateMaster: React.FC<DynamicTemplateMasterProps> = ({ sc
         </Sequence>
       ))}
 
-      {/* 2. TYPOGRAPHY TRACK LAYER - Render text over the media payloads */}
+      {/* 2. OVERLAY TRACK LAYER - Provide contrast between media and text */}
+      {overlayTracks.map((node) => (
+        <Sequence
+          key={`Overlay-${node.id}`}
+          from={Math.max(0, node.startFrame)}
+          durationInFrames={Math.max(1, node.durationInFrames)}
+          name={`Overlay-${node.id}`}
+        >
+          <OverlayNode node={node} />
+        </Sequence>
+      ))}
+
+      {/* 3. TYPOGRAPHY TRACK LAYER - Render text over the media payloads */}
       {textTracks.map((node) => (
         <Sequence
           key={`Text-${node.id}`}
@@ -43,7 +57,7 @@ export const DynamicTemplateMaster: React.FC<DynamicTemplateMasterProps> = ({ sc
         </Sequence>
       ))}
 
-      {/* 3. AUDIO TRACK LAYER - Background Audio Logic */}
+      {/* 4. AUDIO TRACK LAYER - Background Audio Logic */}
       {audioTracks.map((node) => (
         <Sequence
           key={`Audio-${node.id}`}
