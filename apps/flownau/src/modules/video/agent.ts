@@ -166,6 +166,7 @@ Output:
   "caption": "Your amazing caption here...",
   "tracks": {
     "media": [ { "id": "1", "type": "media", "assetUrl": "url", "startFrame": 0, "durationInFrames": 450, "mediaStartAt": 0, "scale": "cover" } ],
+    "overlay": [ { "id": "4", "type": "overlay", "color": "#000000", "opacity": 0.4, "startFrame": 0, "durationInFrames": 450 } ],
     "text": [ { "id": "2", "type": "text", "content": "TEXT", "startFrame": 30, "durationInFrames": 90, "safeZone": "center-safe", "fontSize": 80, "color": "#FFFFFF", "animation": "fade" } ],
     "audio": [ { "id": "3", "type": "audio", "assetUrl": "url", "startFrame": 0, "durationInFrames": 450, "volume": 1 } ]
   }
