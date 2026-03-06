@@ -183,7 +183,7 @@ export default function AIBuilderTab({
             const lowerUrl = (a.url || '').toLowerCase()
             const isOutput = lowerKey.includes('/outputs/') || lowerUrl.includes('/outputs/')
             return isMedia && !isOutput
-        }))
+        })).slice(0, 9)
 
         const audioLibrary = shuffle(initialAssets.filter(a => {
             const t = (a.type || '').toUpperCase()
@@ -194,7 +194,7 @@ export default function AIBuilderTab({
             const lowerUrl = (a.url || '').toLowerCase()
             const isOutput = lowerKey.includes('/outputs/') || lowerUrl.includes('/outputs/')
             return isAudio && !isOutput
-        }))
+        })).slice(0, 9)
 
         if (next.tracks?.media && videoLibrary.length > 0) {
             next.tracks.media = next.tracks.media.map((t: any, i: number) => {
@@ -413,15 +413,15 @@ export default function AIBuilderTab({
         const hasSufficientAssets = (needsMedia ? hasSomeMedia : true) && (needsAudio ? hasSomeAudio : true)
         setHasSufficientAssets(hasSufficientAssets)
 
-        // Collect URLs that need syncing
+        // Collect URLs that need syncing (only those not already in cache and not already mapped)
         const urlsToSync: string[] = []
         schemaJson?.tracks?.media?.forEach((t: any) => {
-            if (t.assetUrl && !t.assetUrl.startsWith('/cache_assets/') && t.assetUrl !== 'placeholder') {
+            if (t.assetUrl && !t.assetUrl.startsWith('/cache_assets/') && t.assetUrl !== 'placeholder' && !assetMapping[t.assetUrl]) {
                 urlsToSync.push(t.assetUrl)
             }
         })
         schemaJson?.tracks?.audio?.forEach((t: any) => {
-            if (t.assetUrl && !t.assetUrl.startsWith('/cache_assets/') && t.assetUrl !== 'placeholder') {
+            if (t.assetUrl && !t.assetUrl.startsWith('/cache_assets/') && t.assetUrl !== 'placeholder' && !assetMapping[t.assetUrl]) {
                 urlsToSync.push(t.assetUrl)
             }
         })
@@ -430,7 +430,7 @@ export default function AIBuilderTab({
         if (uniqueToSync.length > 0) {
             syncAssetsToCache(uniqueToSync)
         }
-    }, [schemaJson, initialAssets, syncAssetsToCache])
+    }, [schemaJson, initialAssets, syncAssetsToCache, assetMapping])
 
     // Inject cached URLs into preview schema
     useEffect(() => {
