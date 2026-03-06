@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import axios from 'axios'
 import NextImage from 'next/image'
 import { useDropzone } from 'react-dropzone'
 import {
@@ -40,6 +41,9 @@ export default function AssetsManager({
 }: AssetsManagerProps) {
   const [uploading, setUploading] = useState<boolean>(false)
   const [progress, setProgress] = useState<string>('')
+  const [currentFileIndex, setCurrentFileIndex] = useState(0)
+  const [totalFiles, setTotalFiles] = useState(0)
+  const [uploadPercentage, setUploadPercentage] = useState(0)
   const [currentPath, setCurrentPath] = useState<string[]>([])
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false)
   const [linking, setLinking] = useState(false)
@@ -76,17 +80,22 @@ export default function AssetsManager({
     async (acceptedFiles: File[]) => {
       if (!acceptedFiles?.length) return
       setUploading(true)
+      setTotalFiles(acceptedFiles.length)
 
       try {
-        for (const file of acceptedFiles) {
-          setProgress(`Processing ${file.name}...`)
+        for (let i = 0; i < acceptedFiles.length; i++) {
+          const file = acceptedFiles[i]
+          setCurrentFileIndex(i)
+          setUploadPercentage(0)
+
+          setProgress(`Hashing ${file.name}...`)
 
           const buffer = await file.arrayBuffer()
           const hashBuffer = await crypto.subtle.digest('SHA-256', buffer)
           const hashArray = Array.from(new Uint8Array(hashBuffer))
           const hash = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
 
-          setProgress(`Uploading & Optimizing ${file.name}...`)
+          setProgress(`Uploading ${file.name}...`)
 
           const formData = new FormData()
           formData.append('file', file)
@@ -98,17 +107,29 @@ export default function AssetsManager({
             formData.append('templateId', ownerId)
           }
 
-          const response = await fetch('/api/protected/upload', {
-            method: 'POST',
-            body: formData,
-          })
-
-          if (!response.ok) {
-            const error = await response.json()
-            throw new Error(error.error || 'Upload failed')
+          try {
+            await axios.post('/api/protected/upload', formData, {
+              onUploadProgress: (progressEvent) => {
+                const total = progressEvent.total || 0
+                if (total > 0) {
+                  const percent = Math.round((progressEvent.loaded * 100) / total)
+                  setUploadPercentage(percent)
+                  if (percent === 100) {
+                    setProgress(`Optimizing ${file.name}...`)
+                  }
+                }
+              },
+            })
+          } catch (error: any) {
+            if (error.response?.status === 409) {
+              const msg = error.response.data?.message || 'duplicate detected'
+              toast.warning(`Skipped "${file.name}" — ${msg}`)
+              continue
+            }
+            throw error
           }
         }
-        toast.success('Assets uploaded successfully')
+        toast.success('All assets uploaded successfully')
         window.location.reload()
       } catch (error: unknown) {
         console.error('Upload failed', error)
@@ -116,6 +137,9 @@ export default function AssetsManager({
       } finally {
         setUploading(false)
         setProgress('')
+        setUploadPercentage(0)
+        setCurrentFileIndex(0)
+        setTotalFiles(0)
       }
     },
     [ownerId, ownerType],
@@ -293,7 +317,7 @@ export default function AssetsManager({
           >
             {uploading ? <Loader2 className="animate-spin" size={32} /> : <Upload size={32} />}
           </div>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1 items-center w-full px-4">
             <h3 className="text-sm font-bold text-white uppercase tracking-widest">
               {uploading
                 ? 'System Operating...'
@@ -301,11 +325,43 @@ export default function AssetsManager({
                   ? 'Release to Upload'
                   : 'Deploy Assets'}
             </h3>
-            <p className="text-xs max-w-xs mx-auto leading-relaxed opacity-50 font-medium">
+            <p className="text-xs max-w-sm mx-auto leading-relaxed opacity-50 font-medium overflow-hidden truncate w-full text-center">
               {uploading
                 ? progress
                 : 'Drag & drop media files directly into this target area to initialize processing.'}
             </p>
+
+            {uploading && (
+              <div className="w-full max-w-sm mt-8 space-y-6 px-6 py-6 bg-white/[0.03] rounded-3xl border border-white/5 backdrop-blur-3xl shadow-2xl animate-in fade-in slide-in-from-top-4 duration-700">
+                {/* Global Progress Bar */}
+                <div className="space-y-2">
+                  <div className="flex justify-between text-[9px] font-black uppercase tracking-[0.2em] text-accent">
+                    <span className="opacity-50 text-white">Global Progress</span>
+                    <span>{currentFileIndex + 1} / {totalFiles}</span>
+                  </div>
+                  <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-accent rounded-full transition-all duration-700 ease-out shadow-xl shadow-accent/20"
+                      style={{ width: `${Math.min(100, ((currentFileIndex + (uploadPercentage / 100)) / totalFiles) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* File Progress Bar */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-[9px] font-bold uppercase tracking-[0.2em]">
+                    <span className="text-white/20 truncate max-w-[200px]">{progress}</span>
+                    <span className="text-accent/60">{uploadPercentage}%</span>
+                  </div>
+                  <div className="h-0.5 w-full bg-white/5 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full bg-white/10 transition-all duration-300 ${uploadPercentage === 100 ? 'animate-pulse bg-accent/30' : ''}`}
+                      style={{ width: `${uploadPercentage}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -514,9 +570,9 @@ function AssetCard({
       <div className="p-4 flex flex-col gap-1 min-w-0">
         <h4
           className={`text-[11px] font-bold truncate tracking-tight transition-colors ${selected ? 'text-accent' : 'text-zinc-300 group-hover:text-white'}`}
-          title={asset.originalFilename}
+          title={`Original: ${asset.originalFilename}`}
         >
-          {asset.originalFilename}
+          {asset.systemFilename}
         </h4>
         <div
           className={`flex items-center justify-between text-[9px] font-bold uppercase tracking-widest transition-colors ${selected ? 'text-accent/60' : 'text-text-secondary/40 group-hover:text-accent/60'}`}

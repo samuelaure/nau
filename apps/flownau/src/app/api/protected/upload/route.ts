@@ -70,7 +70,25 @@ export async function POST(req: NextRequest) {
     projectFolder = account.username || account.id
   }
 
-  // 3. Determine Type
+  // 3. Duplicate Detection (content-hash, context-scoped)
+  if (clientHash) {
+    const duplicate = await prisma.asset.findFirst({
+      where: {
+        hash: clientHash,
+        ...(contextAccountId ? { accountId: contextAccountId } : {}),
+        ...(templateId ? { templateId } : {}),
+      },
+    })
+
+    if (duplicate) {
+      return NextResponse.json(
+        { error: 'DUPLICATE', existing: duplicate, message: `This file already exists as "${duplicate.systemFilename}"` },
+        { status: 409 },
+      )
+    }
+  }
+
+  // 4. Determine Type
   let type: 'VID' | 'AUD' | 'IMG' = 'IMG'
   if (file.type.startsWith('video/')) type = 'VID'
   else if (file.type.startsWith('audio/')) type = 'AUD'
@@ -90,11 +108,23 @@ export async function POST(req: NextRequest) {
     let finalMime = file.type
     let thumbPath: string | null = null
 
+    const inputStats = await fs.stat(inputPath)
+
     if (type === 'VID') {
       finalExt = 'mp4'
       finalMime = 'video/mp4'
       outputPath = getTempPath(`optimized_${Date.now()}.mp4`)
       await compressVideo(inputPath, outputPath)
+
+      // Skip re-encode if output is larger than original (already well-compressed)
+      const outputStats = await fs.stat(outputPath)
+      if (outputStats.size > inputStats.size) {
+        console.log(`Skipping re-encode: output (${outputStats.size}) > input (${inputStats.size}). Using original.`)
+        await fs.unlink(outputPath).catch(() => { })
+        outputPath = inputPath
+        finalExt = file.name.split('.').pop() || 'mp4'
+        finalMime = file.type || 'video/mp4'
+      }
 
       // Generate thumbnail
       thumbPath = getTempPath(`thumb_${Date.now()}.jpg`)
@@ -109,13 +139,31 @@ export async function POST(req: NextRequest) {
       finalMime = 'audio/mp4'
       outputPath = getTempPath(`optimized_${Date.now()}.m4a`)
       await compressAudio(inputPath, outputPath)
+
+      // Skip re-encode if output is larger
+      const outputStats = await fs.stat(outputPath)
+      if (outputStats.size > inputStats.size) {
+        console.log(`Skipping audio re-encode: output larger than input. Using original.`)
+        await fs.unlink(outputPath).catch(() => { })
+        outputPath = inputPath
+        finalExt = file.name.split('.').pop() || 'm4a'
+        finalMime = file.type || 'audio/mp4'
+      }
     } else if (type === 'IMG') {
-      // Force conversion to JPG for optimization if desired, or keep original extension
-      // Fixed: The user wants optimization, JPG is good for size/quality balance.
       finalExt = 'jpg'
       finalMime = 'image/jpeg'
       outputPath = getTempPath(`optimized_${Date.now()}.jpg`)
       await compressImage(inputPath, outputPath)
+
+      // Skip re-encode if output is larger
+      const outputStats = await fs.stat(outputPath)
+      if (outputStats.size > inputStats.size) {
+        console.log(`Skipping image re-encode: output larger than input. Using original.`)
+        await fs.unlink(outputPath).catch(() => { })
+        outputPath = inputPath
+        finalExt = file.name.split('.').pop() || 'jpg'
+        finalMime = file.type || 'image/jpeg'
+      }
     }
 
     // 6. Naming - Use the generated ID
