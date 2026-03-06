@@ -10,11 +10,11 @@ const TextLayer: React.FC<{ node: any }> = ({ node }) => {
   let translateY = 0
 
   if (node.animation === 'fade') {
-    opacity = interpolate(frame - node.startFrame, [0, 15], [0, 1], { extrapolateRight: 'clamp' })
+    opacity = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' })
   } else if (node.animation === 'pop') {
-    scale = interpolate(frame - node.startFrame, [0, 10, 15], [0, 1.2, 1], { extrapolateRight: 'clamp' })
+    scale = interpolate(frame, [0, 10, 15], [0, 1.2, 1], { extrapolateRight: 'clamp' })
   } else if (node.animation === 'slide-up') {
-    translateY = interpolate(frame - node.startFrame, [0, 15], [50, 0], { extrapolateRight: 'clamp' })
+    translateY = interpolate(frame, [0, 15], [50, 0], { extrapolateRight: 'clamp' })
   }
 
   // Positioning
