@@ -101,8 +101,7 @@ const PlayerWrapper = ({
                 maxHeight: isFocus ? '95vh' : '500px'
             }}
         >
-            {/* Syncing Overlay */}
-            {previewSchema?.assetsSyncing && (
+            {previewSchema?.assetsSyncing ? (
                 <div className="absolute inset-0 z-[30] bg-black/80 flex flex-col items-center justify-center backdrop-blur-sm animate-in fade-in duration-300">
                     <div className="relative">
                         <div className="w-12 h-12 border-4 border-accent/20 border-t-accent rounded-full animate-spin" />
@@ -113,9 +112,7 @@ const PlayerWrapper = ({
                     <p className="mt-4 text-[10px] font-black uppercase tracking-widest text-accent/80 animate-pulse">Syncing Media Cache</p>
                     <p className="mt-1 text-[8px] text-white/40 italic">Optimizing for smooth playback...</p>
                 </div>
-            )}
-
-            {previewSchema ? (
+            ) : previewSchema ? (
                 <Suspense fallback={<div className="animate-pulse text-accent">Loading Player...</div>}>
                     <RemotionPlayer
                         ref={playerRef}
@@ -126,10 +123,10 @@ const PlayerWrapper = ({
                         compositionHeight={height}
                         fps={previewSchema.fps || 30}
                         autoPlay
-                        controls // ENSURE CONTROLS ARE ON
+                        controls
                         showMuteButton
                         loop
-                        allowFullscreen={false} // We handle fullscreen ourselves
+                        allowFullscreen={false}
                         spaceKeyToPlayOrPause
                         className="w-full h-full"
                         style={{
@@ -302,7 +299,7 @@ export default function AIBuilderTab({
             !lowerKey.includes('/outputs/') && !lowerUrl.includes('/outputs/')
     }).length)
     const [assetMapping, setAssetMapping] = useState<Record<string, string>>({})
-    const [isSyncing, setIsSyncing] = useState(false)
+    const [isSyncing, setIsSyncing] = useState(true)
     const [previewSchema, setPreviewSchema] = useState<any>(schemaJson)
 
     const playerRef = useRef<any>(null)
@@ -429,6 +426,8 @@ export default function AIBuilderTab({
         const uniqueToSync = Array.from(new Set(urlsToSync))
         if (uniqueToSync.length > 0) {
             syncAssetsToCache(uniqueToSync)
+        } else {
+            setIsSyncing(false)
         }
     }, [schemaJson, initialAssets, syncAssetsToCache, assetMapping])
 
