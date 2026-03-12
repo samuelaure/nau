@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2026-03-12
+
+### Added
+
+- **Autonomous Content Engine (Phase 2)**:
+  - **AI Template Builder**: Integrated a chat-first builder interface for iterative template modification via LLM.
+  - **State Stack & Undo**: Implemented a robust React state stack for the builder allowing instant Undo/Redo of AI iterations.
+  - **Dynamic Asset Mapping**: Engineered automatic mapping of R2-synced assets to template slots with real-time availability checks.
+  - **Deficient Asset UI**: Added high-visibility warnings and deep-linking for accounts with insufficient assets for a chosen template.
+  - **Ideation Compiler**: Automated generation of system prompts from final template structures to ensure deterministic AI video generation.
+
+### Fixed
+
+- **Rendering Hygiene**:
+  - Isolated text layer compositing to eliminate color bleed and flickering in overlays.
+  - Transitioned overlay compositing to RGBA color space for consistent visual depth.
+- **Performance & Reliability**:
+  - Implementation of a deferred player mounting strategy to prevent "missing asset" crashes during sync.
+  - Optimized local asset reservoir caching to limit memory footprint while maintaining remix stability.
+  - Enhanced bulk upload progress tracking and management in the Assets dashboard.
+
 ## [0.3.1] - 2026-03-03
 
 ### Fixed
