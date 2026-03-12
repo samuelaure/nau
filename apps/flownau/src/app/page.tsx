@@ -31,8 +31,8 @@ export default function LandingPage() {
         </h1>
 
         <p className="animate-fade-in text-xl text-text-secondary max-w-2xl mb-10 leading-relaxed">
-          Automate the creation and publishing of Reels. Manage multiple accounts,
-          and let Remotion handle the rendering.
+          Automate the creation and publishing of Reels. Manage multiple accounts, and let Remotion
+          handle the rendering.
         </p>
 
         <div className="animate-fade-in flex gap-4">

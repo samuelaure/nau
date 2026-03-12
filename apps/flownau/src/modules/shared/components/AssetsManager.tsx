@@ -337,12 +337,16 @@ export default function AssetsManager({
                 <div className="space-y-2">
                   <div className="flex justify-between text-[9px] font-black uppercase tracking-[0.2em] text-accent">
                     <span className="opacity-50 text-white">Global Progress</span>
-                    <span>{currentFileIndex + 1} / {totalFiles}</span>
+                    <span>
+                      {currentFileIndex + 1} / {totalFiles}
+                    </span>
                   </div>
                   <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-accent rounded-full transition-all duration-700 ease-out shadow-xl shadow-accent/20"
-                      style={{ width: `${Math.min(100, ((currentFileIndex + (uploadPercentage / 100)) / totalFiles) * 100)}%` }}
+                      style={{
+                        width: `${Math.min(100, ((currentFileIndex + uploadPercentage / 100) / totalFiles) * 100)}%`,
+                      }}
                     />
                   </div>
                 </div>
@@ -503,7 +507,7 @@ function AssetCard({
                 playsInline
                 onMouseEnter={(e) => {
                   const target = e.currentTarget
-                  target.play().catch(() => { })
+                  target.play().catch(() => {})
                 }}
                 onMouseLeave={(e) => {
                   const target = e.currentTarget
@@ -577,7 +581,14 @@ function AssetCard({
         <div
           className={`flex items-center justify-between text-[9px] font-bold uppercase tracking-widest transition-colors ${selected ? 'text-accent/60' : 'text-text-secondary/40 group-hover:text-accent/60'}`}
         >
-          <span>{(asset.size / 1024 / 1024).toFixed(2)} MB {asset.duration ? `| ${Math.floor(asset.duration / 60)}:${Math.floor(asset.duration % 60).toString().padStart(2, '0')}` : ''}</span>
+          <span>
+            {(asset.size / 1024 / 1024).toFixed(2)} MB{' '}
+            {asset.duration
+              ? `| ${Math.floor(asset.duration / 60)}:${Math.floor(asset.duration % 60)
+                  .toString()
+                  .padStart(2, '0')}`
+              : ''}
+          </span>
           <span className="opacity-0 group-hover:opacity-100 transition-opacity">Asset Entity</span>
         </div>
       </div>

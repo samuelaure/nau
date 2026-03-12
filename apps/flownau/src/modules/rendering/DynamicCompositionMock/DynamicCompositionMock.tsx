@@ -76,14 +76,16 @@ export const DynamicCompositionMock: React.FC<{ schema: DynamicCompositionSchema
             from={mediaNode.startFrame}
             durationInFrames={mediaNode.durationInFrames}
           >
-            <AbsoluteFill style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <AbsoluteFill
+              style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}
+            >
               {isImage ? (
                 <Img
                   src={mediaNode.assetUrl}
                   style={{
                     width: '100%',
                     height: '100%',
-                    objectFit: mediaNode.scale === 'cover' ? 'cover' : 'contain'
+                    objectFit: mediaNode.scale === 'cover' ? 'cover' : 'contain',
                   }}
                 />
               ) : (
@@ -93,7 +95,7 @@ export const DynamicCompositionMock: React.FC<{ schema: DynamicCompositionSchema
                   style={{
                     width: '100%',
                     height: '100%',
-                    objectFit: mediaNode.scale === 'cover' ? 'cover' : 'contain'
+                    objectFit: mediaNode.scale === 'cover' ? 'cover' : 'contain',
                   }}
                 />
               )}

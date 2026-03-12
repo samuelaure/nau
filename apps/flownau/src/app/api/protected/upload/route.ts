@@ -82,7 +82,11 @@ export async function POST(req: NextRequest) {
 
     if (duplicate) {
       return NextResponse.json(
-        { error: 'DUPLICATE', existing: duplicate, message: `This file already exists as "${duplicate.systemFilename}"` },
+        {
+          error: 'DUPLICATE',
+          existing: duplicate,
+          message: `This file already exists as "${duplicate.systemFilename}"`,
+        },
         { status: 409 },
       )
     }
@@ -119,8 +123,10 @@ export async function POST(req: NextRequest) {
       // Skip re-encode if output is larger than original (already well-compressed)
       const outputStats = await fs.stat(outputPath)
       if (outputStats.size > inputStats.size) {
-        console.log(`Skipping re-encode: output (${outputStats.size}) > input (${inputStats.size}). Using original.`)
-        await fs.unlink(outputPath).catch(() => { })
+        console.log(
+          `Skipping re-encode: output (${outputStats.size}) > input (${inputStats.size}). Using original.`,
+        )
+        await fs.unlink(outputPath).catch(() => {})
         outputPath = inputPath
         finalExt = file.name.split('.').pop() || 'mp4'
         finalMime = file.type || 'video/mp4'
@@ -144,7 +150,7 @@ export async function POST(req: NextRequest) {
       const outputStats = await fs.stat(outputPath)
       if (outputStats.size > inputStats.size) {
         console.log(`Skipping audio re-encode: output larger than input. Using original.`)
-        await fs.unlink(outputPath).catch(() => { })
+        await fs.unlink(outputPath).catch(() => {})
         outputPath = inputPath
         finalExt = file.name.split('.').pop() || 'm4a'
         finalMime = file.type || 'audio/mp4'
@@ -159,7 +165,7 @@ export async function POST(req: NextRequest) {
       const outputStats = await fs.stat(outputPath)
       if (outputStats.size > inputStats.size) {
         console.log(`Skipping image re-encode: output larger than input. Using original.`)
-        await fs.unlink(outputPath).catch(() => { })
+        await fs.unlink(outputPath).catch(() => {})
         outputPath = inputPath
         finalExt = file.name.split('.').pop() || 'jpg'
         finalMime = file.type || 'image/jpeg'
@@ -256,7 +262,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, asset })
   } catch (error: unknown) {
     console.error('Processing failed', error)
-    await fs.unlink(inputPath).catch(() => { })
+    await fs.unlink(inputPath).catch(() => {})
     return NextResponse.json({ error: (error as Error).message }, { status: 500 })
   }
 }

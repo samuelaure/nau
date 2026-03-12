@@ -70,7 +70,6 @@ export default function TemplateCard({ template, context = 'templates' }: Templa
       </Link>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
-
         <div
           style={{
             display: 'flex',

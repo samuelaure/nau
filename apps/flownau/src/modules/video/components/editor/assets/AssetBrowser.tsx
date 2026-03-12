@@ -266,10 +266,11 @@ export function AssetBrowser({ assets, assetsRoot }: AssetBrowserProps) {
                 <button
                   key={t}
                   onClick={() => setFilterType(t as FilterType)}
-                  className={`px-3 py-1 text-[10px] uppercase font-bold rounded-full border transition-all whitespace-nowrap ${filterType === t
-                    ? 'bg-accent border-accent text-white'
-                    : 'border-white/10 text-white/40 hover:border-white/20 hover:text-white'
-                    }`}
+                  className={`px-3 py-1 text-[10px] uppercase font-bold rounded-full border transition-all whitespace-nowrap ${
+                    filterType === t
+                      ? 'bg-accent border-accent text-white'
+                      : 'border-white/10 text-white/40 hover:border-white/20 hover:text-white'
+                  }`}
                 >
                   {t}
                 </button>
@@ -457,7 +458,9 @@ export function AssetBrowser({ assets, assetsRoot }: AssetBrowserProps) {
                         ) : (
                           <video
                             src={url}
-                            poster={isProject ? ((asset as Asset).thumbnailUrl || undefined) : undefined}
+                            poster={
+                              isProject ? (asset as Asset).thumbnailUrl || undefined : undefined
+                            }
                             className="object-cover w-full h-full opacity-40 group-hover:opacity-80 transition-all duration-500 group-hover:scale-110"
                             preload="metadata"
                             muted
@@ -465,7 +468,7 @@ export function AssetBrowser({ assets, assetsRoot }: AssetBrowserProps) {
                             playsInline
                             onMouseEnter={(e) => {
                               const target = e.currentTarget
-                              target.play().catch(() => { })
+                              target.play().catch(() => {})
                             }}
                             onMouseLeave={(e) => {
                               const target = e.currentTarget
@@ -516,7 +519,11 @@ export function AssetBrowser({ assets, assetsRoot }: AssetBrowserProps) {
                     <div className="text-[9px] font-bold text-white/20 uppercase tracking-widest mt-0.5 group-hover:text-accent/60 transition-colors">
                       {isProject
                         ? (asset as Asset).duration
-                          ? `${Math.floor((asset as Asset).duration! / 60)}:${Math.floor((asset as Asset).duration! % 60).toString().padStart(2, '0')}`
+                          ? `${Math.floor((asset as Asset).duration! / 60)}:${Math.floor(
+                              (asset as Asset).duration! % 60,
+                            )
+                              .toString()
+                              .padStart(2, '0')}`
                           : 'Native'
                         : asset.size
                           ? `${(asset.size / 1024 / 1024).toFixed(1)} MB`

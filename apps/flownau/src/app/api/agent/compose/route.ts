@@ -53,7 +53,7 @@ export async function POST(req: Request) {
       personaId
         ? await prisma.brandPersona.findUnique({ where: { id: personaId } })
         : (await prisma.brandPersona.findFirst({ where: { accountId, isDefault: true } })) ||
-        (await prisma.brandPersona.findFirst({ where: { accountId } }))
+          (await prisma.brandPersona.findFirst({ where: { accountId } }))
     ) as any
 
     const template = (await prisma.template.findUnique({ where: { id: templateId } })) as any

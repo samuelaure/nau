@@ -26,7 +26,7 @@ export async function composeVideoWithAgent(
     personaId
       ? await prisma.brandPersona.findUnique({ where: { id: personaId } })
       : (await prisma.brandPersona.findFirst({ where: { accountId, isDefault: true } })) ||
-      (await prisma.brandPersona.findFirst({ where: { accountId } }))
+        (await prisma.brandPersona.findFirst({ where: { accountId } }))
   ) as any
 
   if (!persona) throw new Error('No Brand Persona found.')
@@ -101,10 +101,10 @@ export async function composeVideoWithAgent(
           { r2Key: { contains: '/outputs/' } },
           { r2Key: { contains: '/Outputs/' } },
           { url: { contains: '/outputs/' } },
-          { url: { contains: '/Outputs/' } }
-        ]
-      }
-    }
+          { url: { contains: '/Outputs/' } },
+        ],
+      },
+    },
   })
   const creativeResponse = await (client as any).chat.completions.create({
     model,
@@ -120,7 +120,7 @@ TEMPLATE CONTEXT:
 ${targetTemplate.systemPrompt || "Follow the template's vibe."}
 
 CAPTION STRATEGY:
-${targetTemplate.captionPrompt || "Generate a compelling, high-converting social media caption that matches the brand tone and video content."}
+${targetTemplate.captionPrompt || 'Generate a compelling, high-converting social media caption that matches the brand tone and video content.'}
 
 AVAILABLE ASSETS:
 ${assets.map((a) => `- ${a.url} (${a.type})`).join('\n')}
@@ -195,21 +195,21 @@ ${lastError ? `\n### PREVIOUS ATTEMPT FAILED WITH ERROR:\n${lastError}\nPlease f
       const fps = targetJson.fps || 30
       if (targetJson.tracks?.media) {
         for (const t of targetJson.tracks.media) {
-          const matchedAsset = assets.find(a => a.url === t.assetUrl) as any
+          const matchedAsset = assets.find((a) => a.url === t.assetUrl) as any
           if (matchedAsset && matchedAsset.duration) {
             const requireSec = (t.durationInFrames || 0) / fps
             const maxStartSec = Math.max(0, matchedAsset.duration - requireSec)
-            t.mediaStartAt = Math.floor((Math.random() * maxStartSec) * fps)
+            t.mediaStartAt = Math.floor(Math.random() * maxStartSec * fps)
           }
         }
       }
       if (targetJson.tracks?.audio) {
         for (const t of targetJson.tracks.audio) {
-          const matchedAsset = assets.find(a => a.url === t.assetUrl) as any
+          const matchedAsset = assets.find((a) => a.url === t.assetUrl) as any
           if (matchedAsset && matchedAsset.duration) {
             const requireSec = (t.durationInFrames || 0) / fps
             const maxStartSec = Math.max(0, matchedAsset.duration - requireSec)
-            t.mediaStartAt = Math.floor((Math.random() * maxStartSec) * fps)
+            t.mediaStartAt = Math.floor(Math.random() * maxStartSec * fps)
           }
         }
       }
@@ -243,15 +243,15 @@ export async function generateContentIdeas(
     personaId
       ? await prisma.brandPersona.findUnique({ where: { id: personaId } })
       : (await prisma.brandPersona.findFirst({ where: { accountId, isDefault: true } })) ||
-      (await prisma.brandPersona.findFirst({ where: { accountId } }))
+        (await prisma.brandPersona.findFirst({ where: { accountId } }))
   ) as any
 
   const framework = (
     frameworkId
       ? await (prisma as any).ideasFramework.findUnique({ where: { id: frameworkId } })
       : (await (prisma as any).ideasFramework.findFirst({
-        where: { accountId, isDefault: true },
-      })) || (await (prisma as any).ideasFramework.findFirst({ where: { accountId } }))
+          where: { accountId, isDefault: true },
+        })) || (await (prisma as any).ideasFramework.findFirst({ where: { accountId } }))
   ) as any
 
   if (!persona || !framework) throw new Error('Persona and Framework required.')

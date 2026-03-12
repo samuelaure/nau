@@ -32,9 +32,9 @@ export default async function TemplatePage({
       .then((user) =>
         user
           ? prisma.socialAccount.findMany({
-            where: { userId: user.id },
-            select: { id: true, username: true, platform: true },
-          })
+              where: { userId: user.id },
+              select: { id: true, username: true, platform: true },
+            })
           : [],
       )
       .then((accounts) =>
@@ -48,9 +48,9 @@ export default async function TemplatePage({
         OR: [
           { templateId: id },
           // We can't use template.accountId here yet in Promise.all, so we'll fetch it after or use a nested query
-        ]
-      }
-    })
+        ],
+      },
+    }),
   ])
 
   // Refined approach: fetch asset count after we know template settings
@@ -62,8 +62,10 @@ export default async function TemplatePage({
         {
           OR: [
             { templateId: template.id },
-            ...(template.useAccountAssets && template.accountId ? [{ accountId: template.accountId }] : [])
-          ]
+            ...(template.useAccountAssets && template.accountId
+              ? [{ accountId: template.accountId }]
+              : []),
+          ],
         },
         {
           NOT: {
@@ -71,12 +73,12 @@ export default async function TemplatePage({
               { r2Key: { contains: '/outputs/' } },
               { r2Key: { contains: '/Outputs/' } },
               { url: { contains: '/outputs/' } },
-              { url: { contains: '/Outputs/' } }
-            ]
-          }
-        }
-      ]
-    }
+              { url: { contains: '/Outputs/' } },
+            ],
+          },
+        },
+      ],
+    },
   })
 
   return (
@@ -166,9 +168,9 @@ export default async function TemplatePage({
       </div>
 
       {/* Content */}
-      {
-        activeTab === 'overview' && (
-          <div style={{
+      {activeTab === 'overview' && (
+        <div
+          style={{
             maxWidth: '1200px',
             color: 'var(--text-secondary)',
             lineHeight: '1.6',
@@ -177,17 +179,20 @@ export default async function TemplatePage({
             padding: '40px',
             borderRadius: '24px',
             border: '1px solid var(--border-color)',
-          }}>
-            <h2 style={{ color: 'white', marginBottom: '16px', fontSize: '24px' }}>Analytics Engine</h2>
-            <p>
-              Here will be the Stats/Analysis (Not implemented yet). Everytime this template is used/posted,
-              we will save the post ID and when the user come here (Overview tab), and clic on sync stats,
-              we will execute an Apify actor to get the actual stats of each post, and sum them to display
-              here, so we can see how much was the total reach, average,... to take decisions.
-            </p>
-          </div>
-        )
-      }
+          }}
+        >
+          <h2 style={{ color: 'white', marginBottom: '16px', fontSize: '24px' }}>
+            Analytics Engine
+          </h2>
+          <p>
+            Here will be the Stats/Analysis (Not implemented yet). Everytime this template is
+            used/posted, we will save the post ID and when the user come here (Overview tab), and
+            clic on sync stats, we will execute an Apify actor to get the actual stats of each post,
+            and sum them to display here, so we can see how much was the total reach, average,... to
+            take decisions.
+          </p>
+        </div>
+      )}
 
       {activeTab === 'assets' && <TemplateAssets templateId={id} />}
 
@@ -202,8 +207,10 @@ export default async function TemplatePage({
                 {
                   OR: [
                     { templateId: template.id },
-                    ...(template.useAccountAssets && template.accountId ? [{ accountId: template.accountId }] : [])
-                  ]
+                    ...(template.useAccountAssets && template.accountId
+                      ? [{ accountId: template.accountId }]
+                      : []),
+                  ],
                 },
                 {
                   NOT: {
@@ -211,16 +218,16 @@ export default async function TemplatePage({
                       { r2Key: { contains: '/outputs/' } },
                       { r2Key: { contains: '/Outputs/' } },
                       { url: { contains: '/outputs/' } },
-                      { url: { contains: '/Outputs/' } }
-                    ]
-                  }
-                }
-              ]
-            }
+                      { url: { contains: '/Outputs/' } },
+                    ],
+                  },
+                },
+              ],
+            },
           })}
         />
       )}
-    </div >
+    </div>
   )
 }
 
@@ -279,8 +286,10 @@ async function TemplateAssets({ templateId }: { templateId: string }) {
         {
           OR: [
             { templateId },
-            ...(template?.useAccountAssets && template?.accountId ? [{ accountId: template.accountId }] : [])
-          ]
+            ...(template?.useAccountAssets && template?.accountId
+              ? [{ accountId: template.accountId }]
+              : []),
+          ],
         },
         {
           NOT: {
@@ -288,11 +297,11 @@ async function TemplateAssets({ templateId }: { templateId: string }) {
               { r2Key: { contains: '/outputs/' } },
               { r2Key: { contains: '/Outputs/' } },
               { url: { contains: '/outputs/' } },
-              { url: { contains: '/Outputs/' } }
-            ]
-          }
-        }
-      ]
+              { url: { contains: '/Outputs/' } },
+            ],
+          },
+        },
+      ],
     },
     orderBy: { createdAt: 'desc' },
   })

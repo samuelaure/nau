@@ -18,9 +18,9 @@ export default async function TemplatesPage() {
       .then((user) =>
         user
           ? prisma.socialAccount.findMany({
-            where: { userId: user.id },
-            select: { id: true, username: true, platform: true },
-          })
+              where: { userId: user.id },
+              select: { id: true, username: true, platform: true },
+            })
           : [],
       )
       .then((accounts) =>
@@ -52,7 +52,9 @@ export default async function TemplatesPage() {
       <header className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h1 className="text-3xl font-heading font-semibold mb-2">Video Templates</h1>
-          <p className="text-text-secondary">Automated dynamic video schemas for your content backlog.</p>
+          <p className="text-text-secondary">
+            Automated dynamic video schemas for your content backlog.
+          </p>
         </div>
         <AddTemplateButton label="New Template" accounts={accounts} />
       </header>
