@@ -33,8 +33,6 @@ services:
   app:
     image: ghcr.io/samuelaure/whatsnau-backend:latest
     restart: always
-    ports:
-      - "3000:3000"
     environment:
       # Infrastructure (Required)
       - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?schema=public
