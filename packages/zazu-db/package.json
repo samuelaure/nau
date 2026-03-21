@@ -1,0 +1,17 @@
+{
+  "name": "@zazu/db",
+  "version": "0.0.0",
+  "main": "./index.ts",
+  "private": true,
+  "scripts": {
+    "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push",
+    "prisma:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.0.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.0.0"
+  }
+}

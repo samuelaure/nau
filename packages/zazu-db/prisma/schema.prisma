@@ -1,0 +1,58 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum OnboardingState {
+  AWAITING_NAME
+  COMPLETED
+}
+
+enum Role {
+  USER
+  ASSISTANT
+}
+
+model User {
+  id              String          @id @default(uuid())
+  telegramId      BigInt          @unique
+  firstName       String?
+  lastName        String?
+  username        String?
+  displayName     String?
+  onboardingState OnboardingState @default(AWAITING_NAME)
+  messages        Message[]
+  features        UserFeature[]
+  createdAt       DateTime        @default(now())
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  role      Role
+  content   String
+  metadata  Json?
+  createdAt DateTime @default(now())
+}
+
+model Feature {
+  id          String        @id
+  name        String
+  description String
+  users       UserFeature[]
+}
+
+model UserFeature {
+  userId    String
+  user      User    @relation(fields: [userId], references: [id])
+  featureId String
+  feature   Feature @relation(fields: [featureId], references: [id])
+  config    Json?
+
+  @@id([userId, featureId])
+}
