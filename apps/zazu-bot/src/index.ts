@@ -1,12 +1,13 @@
-import { Telegraf, Context } from 'telegraf';
 import * as dotenv from 'dotenv';
 import path from 'path';
+
+// Load environment variables for local development
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+
+import { Telegraf, Context } from 'telegraf';
 import prisma, { OnboardingState, Role } from '@zazu/db';
 import { persistenceMiddleware } from './middleware/persistence';
 import { llmService } from './llm-service';
-
-// Load environmental variables from root
-dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 
