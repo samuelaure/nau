@@ -19,6 +19,8 @@ import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { getUsers, getChatHistory, sendMessageAsZazu, toggleUserFeature } from './lib/actions';
 
+export const dynamic = "force-dynamic";
+
 export default function Dashboard() {
   const [users, setUsers] = useState<any[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
