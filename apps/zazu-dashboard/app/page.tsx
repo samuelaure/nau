@@ -1,15 +1,13 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import { 
-  Users, 
   Settings, 
   MessageSquare, 
   Send, 
   LogOut, 
-  Plus, 
   User as UserIcon, 
   Search,
   CheckCircle2,
@@ -35,7 +33,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadUsers();
-    const interval = setInterval(loadUsers, 5000); // Poll for new messages every 5s
+    console.log("Dashboard mount with router", !!router);
+    const interval = setInterval(loadUsers, 5000); // Poll for initial messages
     return () => clearInterval(interval);
   }, []);
 
@@ -53,16 +52,16 @@ export default function Dashboard() {
 
   const loadUsers = async () => {
     const data = await getUsers();
-    setUsers(data);
+    setUsers(data as any[]);
     setLoading(false);
   };
 
   const loadChatHistory = async (userId: string) => {
     const data = await getChatHistory(userId);
-    setMessages(data);
+    setMessages(data as any[]);
   };
 
-  const handleSend = async (e: React.FormEvent) => {
+  const handleSend = async (e: FormEvent) => {
     e.preventDefault();
     if (!inputText.trim() || !selectedUser || sending) return;
 
@@ -83,7 +82,7 @@ export default function Dashboard() {
     
     const currentFeatures = (selectedUser.features as string[]) || [];
     const newFeatures = currentFeatures.includes(feature)
-      ? currentFeatures.filter(f => f !== feature)
+      ? currentFeatures.filter((f: string) => f !== feature)
       : [...currentFeatures, feature];
     
     const result = await toggleUserFeature(selectedUser.id, newFeatures);
@@ -103,7 +102,7 @@ export default function Dashboard() {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr 340px', height: '100vh', overflow: 'hidden' }}>
       
-      {/* 1. SIDEBAR: Users List */}
+      {/* 1. SIDEBAR */}
       <div className="glass-card" style={{ borderLeft: 'none', borderTop: 'none', borderBottom: 'none', borderRadius: 0, display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '24px', borderBottom: '1px solid var(--border-glass)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
@@ -119,7 +118,7 @@ export default function Dashboard() {
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          {users.map(user => (
+          {users.map((user: any) => (
             <div 
               key={user.id}
               onClick={() => setSelectedUserId(user.id)}
@@ -148,7 +147,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* 2. MAIN: Chat Window */}
+      {/* 2. MAIN */}
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         {selectedUser ? (
           <>
@@ -165,7 +164,7 @@ export default function Dashboard() {
             </div>
 
             <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '40px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              {messages.map(msg => (
+              {messages.map((msg: any) => (
                 <div key={msg.id} style={{
                   alignSelf: msg.role === 'USER' ? 'flex-start' : 'flex-end',
                   maxWidth: '70%',
@@ -217,7 +216,7 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* 3. SETTINGS: User Panel */}
+      {/* 3. SETTINGS */}
       <div className="glass-card" style={{ borderRight: 'none', borderTop: 'none', borderBottom: 'none', borderRadius: 0, padding: '30px' }}>
         {selectedUser ? (
           <div>
