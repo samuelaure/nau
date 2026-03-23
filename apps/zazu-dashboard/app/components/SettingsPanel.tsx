@@ -1,20 +1,29 @@
 'use client';
 
-import { Settings, User as UserIcon, Zap, Clock, Shield } from 'lucide-react';
+import { Settings, User as UserIcon, Zap, Clock, Shield, X } from 'lucide-react';
+import { format } from 'date-fns';
 
 interface SettingsPanelProps {
   user: any | null;
   onToggleFeature: (featureId: string) => Promise<void>;
+  onClose: () => void;
 }
 
 export default function SettingsPanel({ 
   user, 
-  onToggleFeature 
+  onToggleFeature,
+  onClose
 }: SettingsPanelProps) {
   
   if (!user) {
     return (
-      <div className="glass-card settings-panel" style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)' }}>
+      <div className="glass-card settings-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)', position: 'relative' }}>
+        <button 
+          onClick={onClose}
+          style={{ position: 'absolute', top: '24px', right: '24px', background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}
+        >
+          <X size={20} />
+        </button>
         <Settings size={60} style={{ opacity: 0.1 }} />
       </div>
     );
@@ -27,7 +36,14 @@ export default function SettingsPanel({
   ];
 
   return (
-    <div className="glass-card settings-panel">
+    <div className="glass-card settings-panel" style={{ position: 'relative' }}>
+      <button 
+        onClick={onClose}
+        style={{ position: 'absolute', top: '24px', right: '24px', background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}
+      >
+        <X size={20} />
+      </button>
+
       <h2 className="glow-text" style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '30px' }}>DETALLES DEL SUJETO</h2>
       
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -38,12 +54,15 @@ export default function SettingsPanel({
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.85rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--text-dim)' }}>Telegram ID:</span> 
-              <span>{user.telegramId}</span>
+              <span style={{ color: 'var(--text-dim)' }}>Telegram:</span> 
+              <div style={{ textAlign: 'right' }}>
+                <div>ID: {user.telegramId}</div>
+                {user.username && <div style={{ color: 'var(--primary)', fontSize: '0.75rem' }}>@{user.username}</div>}
+              </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-dim)' }}>Registro:</span> 
-              <span>{new Date(user.createdAt).toLocaleDateString()}</span>
+              <span>{format(new Date(user.createdAt), 'dd/MM/yyyy')}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-dim)' }}>Estado:</span> 
@@ -83,6 +102,9 @@ export default function SettingsPanel({
               );
             })}
           </div>
+          <p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', marginTop: '16px', fontStyle: 'italic' }}>
+            * Los módulos con ID {features.map(f => f.id).join(', ')} están vinculados al motor nuclear de Zazŭ.
+          </p>
         </div>
       </div>
     </div>
