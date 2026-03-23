@@ -23,9 +23,10 @@ export async function getUsers() {
       }
     });
 
-    // Transform to simplify frontend usage (features as string[])
+    // Transform to simplify frontend usage (BigInt to string, features as string[])
     return users.map(user => ({
       ...user,
+      telegramId: user.telegramId.toString(),
       features: user.features.map(f => f.featureId)
     }));
   } catch (error) {
