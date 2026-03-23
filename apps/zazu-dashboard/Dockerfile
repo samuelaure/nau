@@ -3,7 +3,7 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Install system dependencies
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat openssl
 
 # --- BUILD PHASE ---
 COPY package.json package-lock.json tsconfig.json ./
@@ -23,6 +23,7 @@ RUN npm run build --workspace=@zazu/dashboard
 # --- RUNNER PHASE ---
 FROM node:20-alpine AS runner
 WORKDIR /app
+RUN apk add --no-cache openssl
 
 ENV NODE_ENV=production
 ENV PORT=3000
