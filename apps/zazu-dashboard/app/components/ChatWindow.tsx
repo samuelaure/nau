@@ -2,19 +2,22 @@
 
 import { useRef, useEffect, useState, FormEvent } from 'react';
 import { Send, MessageSquare, CheckCircle2, Settings } from 'lucide-react';
+import { format } from 'date-fns';
 
 interface ChatWindowProps {
   user: any | null;
   messages: any[];
   onSendMessage: (content: string) => Promise<void>;
   sending: boolean;
+  onToggleSettings: () => void;
 }
 
 export default function ChatWindow({ 
   user, 
   messages, 
   onSendMessage, 
-  sending 
+  sending,
+  onToggleSettings
 }: ChatWindowProps) {
   const [inputText, setInputText] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -56,7 +59,11 @@ export default function ChatWindow({
             </span>
           </div>
         </div>
-        <button style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}>
+        <button 
+          onClick={onToggleSettings}
+          style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', transition: 'color 0.2s' }}
+          className="hover-glow"
+        >
           <Settings size={20} />
         </button>
       </div>
@@ -68,7 +75,7 @@ export default function ChatWindow({
               <p>{msg.content}</p>
             </div>
             <span className="message-timestamp" style={{ textAlign: msg.role === 'USER' ? 'left' : 'right' }}>
-              {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              {format(new Date(msg.createdAt), 'dd/MM/yyyy HH:mm')}
             </span>
           </div>
         ))}

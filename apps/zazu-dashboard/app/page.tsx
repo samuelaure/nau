@@ -16,6 +16,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(true);
 
   const selectedUser = users.find(u => u.id === selectedUserId);
 
@@ -78,6 +79,10 @@ export default function Dashboard() {
     }
   };
 
+  const onToggleSettings = () => {
+    setSettingsOpen(!settingsOpen);
+  };
+
   if (loading) {
     return (
       <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -87,13 +92,14 @@ export default function Dashboard() {
   }
 
   return (
-    <div className={`dashboard-grid ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+    <div className={`dashboard-grid ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${!settingsOpen ? 'settings-collapsed' : ''}`}>
       <Sidebar 
         users={users}
         selectedUserId={selectedUserId}
         onSelectUser={setSelectedUserId}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+        onToggleSettings={onToggleSettings}
       />
 
       <ChatWindow 
@@ -101,12 +107,16 @@ export default function Dashboard() {
         messages={messages}
         onSendMessage={handleSendMessage}
         sending={sending}
+        onToggleSettings={onToggleSettings}
       />
 
-      <SettingsPanel 
-        user={selectedUser}
-        onToggleFeature={handleToggleFeature}
-      />
+      {settingsOpen && (
+        <SettingsPanel 
+          user={selectedUser}
+          onToggleFeature={handleToggleFeature}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
     </div>
   );
 }

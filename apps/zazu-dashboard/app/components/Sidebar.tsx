@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { LogOut, Search, MessageSquare, ChevronLeft, ChevronRight, Settings } from 'lucide-react';
 import { signOut } from 'next-auth/react';
-import { formatDistanceToNow } from 'date-fns';
+import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 interface SidebarProps {
@@ -12,6 +12,7 @@ interface SidebarProps {
   onSelectUser: (userId: string) => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
+  onToggleSettings: () => void;
 }
 
 export default function Sidebar({ 
@@ -19,14 +20,18 @@ export default function Sidebar({
   selectedUserId, 
   onSelectUser, 
   collapsed, 
-  onToggleCollapse 
+  onToggleCollapse,
+  onToggleSettings
 }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredUsers = users.filter(user => {
     const name = (user.displayName || user.firstName || '').toLowerCase();
     const telegramId = (user.telegramId?.toString() || '').toLowerCase();
-    return name.includes(searchQuery.toLowerCase()) || telegramId.includes(searchQuery.toLowerCase());
+    const username = (user.username || '').toLowerCase();
+    return name.includes(searchQuery.toLowerCase()) || 
+           telegramId.includes(searchQuery.toLowerCase()) ||
+           username.includes(searchQuery.toLowerCase());
   });
 
   return (
@@ -35,13 +40,6 @@ export default function Sidebar({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: collapsed ? '0' : '20px' }}>
           {!collapsed && <h2 className="glow-text" style={{ fontSize: '1.2rem', fontWeight: 800 }}>CHATS</h2>}
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button 
-              onClick={() => signOut()} 
-              title="Cerrar Sesión"
-              style={{ color: 'var(--text-dim)', background: 'none', border: 'none', cursor: 'pointer' }}
-            >
-              <LogOut size={18} />
-            </button>
             <button 
               onClick={onToggleCollapse}
               style={{ color: 'var(--text-dim)', background: 'none', border: 'none', cursor: 'pointer' }}
@@ -84,10 +82,18 @@ export default function Sidebar({
               </span>
               {!collapsed && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>
-                    {user.messages?.[0] && formatDistanceToNow(new Date(user.messages[0].createdAt), { addSuffix: true, locale: es })}
+                  <span style={{ fontSize: '0.65rem', color: 'var(--text-dim)' }}>
+                    {user.messages?.[0] && format(new Date(user.messages[0].createdAt), 'dd/MM/yyyy')}
                   </span>
-                  <Settings size={14} className={selectedUserId === user.id ? 'glow-text' : ''} style={{ opacity: 0.6 }} />
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleSettings();
+                    }}
+                    style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                  >
+                    <Settings size={14} className={selectedUserId === user.id ? 'glow-text' : ''} style={{ opacity: 0.6 }} />
+                  </button>
                 </div>
               )}
             </div>
@@ -104,6 +110,29 @@ export default function Sidebar({
             No se encontraron chats
           </div>
         )}
+      </div>
+
+      {/* Logout at the bottom */}
+      <div style={{ padding: '24px', borderTop: '1px solid var(--border-glass)' }}>
+        <button 
+          onClick={() => signOut()} 
+          title="Cerrar Sesión"
+          style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: collapsed ? 'center' : 'flex-start',
+            gap: '12px',
+            width: '100%',
+            background: 'none', 
+            border: 'none', 
+            color: 'var(--text-dim)', 
+            cursor: 'pointer',
+            padding: '8px 0'
+          }}
+        >
+          <LogOut size={18} />
+          {!collapsed && <span style={{ fontSize: '0.85rem' }}>Cerrar Sesión</span>}
+        </button>
       </div>
     </div>
   );
