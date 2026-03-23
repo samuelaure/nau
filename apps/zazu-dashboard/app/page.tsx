@@ -22,13 +22,15 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadUsers();
-    const interval = setInterval(loadUsers, 5000); // Polling for new chats/messages
+    const interval = setInterval(loadUsers, 5000); 
     return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
     if (selectedUserId) {
       loadChatHistory(selectedUserId);
+      const interval = setInterval(() => loadChatHistory(selectedUserId), 3000);
+      return () => clearInterval(interval);
     }
   }, [selectedUserId]);
 
@@ -45,11 +47,26 @@ export default function Dashboard() {
 
   const handleSendMessage = async (content: string) => {
     if (!selectedUser) return;
+    
+    // Optimistic update
+    const optimisticMessage = {
+      id: `temp-${Date.now()}`,
+      userId: selectedUser.id,
+      role: 'ASSISTANT',
+      content,
+      createdAt: new Date(),
+    };
+    setMessages(prev => [...prev, optimisticMessage]);
+    
     setSending(true);
     const result = await sendMessageAsZazu(selectedUser.id, selectedUser.telegramId, content);
+    
     if (result.success) {
       await loadChatHistory(selectedUser.id);
+      await loadUsers();
     } else {
+      // Remove optimistic message if failed
+      setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id));
       alert(`Error enviando: ${result.error}`);
     }
     setSending(false);

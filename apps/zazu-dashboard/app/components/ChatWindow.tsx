@@ -26,7 +26,7 @@ export default function ChatWindow({
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, user]); // Scroll on user change too
 
   const handleSend = async (e: FormEvent) => {
     e.preventDefault();
@@ -46,8 +46,8 @@ export default function ChatWindow({
   }
 
   return (
-    <div className="chat-area">
-      <div style={{ padding: '20px 40px', borderBottom: '1px solid var(--border-glass)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+    <div className="chat-area" style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ padding: '20px 40px', borderBottom: '1px solid var(--border-glass)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div className="user-avatar">
             {user.displayName?.[0] || user.firstName?.[0]}
@@ -69,6 +69,7 @@ export default function ChatWindow({
       </div>
 
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '40px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div style={{ flexGrow: 1 }} /> {/* Push messages to bottom if few */}
         {messages.map((msg: any) => (
           <div key={msg.id} className={`message-bubble ${msg.role === 'USER' ? 'message-user' : 'message-assistant'}`}>
             <div className="glass-card message-content">
@@ -86,8 +87,8 @@ export default function ChatWindow({
         )}
       </div>
 
-      <form onSubmit={handleSend} style={{ padding: '30px 40px', borderTop: '1px solid var(--border-glass)' }}>
-        <div style={{ position: 'relative' }}>
+      <div style={{ padding: '30px 40px', borderTop: '1px solid var(--border-glass)', flexShrink: 0 }}>
+        <form onSubmit={handleSend} style={{ position: 'relative' }}>
           <input 
             className="input-field" 
             placeholder="Enviar mensaje como Zazŭ..." 
@@ -104,8 +105,8 @@ export default function ChatWindow({
           >
             <Send size={16} /> <span>{sending ? '...' : 'ENVIAR'}</span>
           </button>
-        </div>
-      </form>
+        </form>
+      </div>
     </div>
   );
 }
