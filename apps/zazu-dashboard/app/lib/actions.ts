@@ -4,19 +4,30 @@ import prisma, { OnboardingState, Role } from '@zazu/db';
 import { revalidatePath } from 'next/cache';
 
 /**
- * Fetch all users from the database
+ * Fetch all users from the database with their last message and active features
  */
 export async function getUsers() {
   try {
-    return await prisma.user.findMany({
+    const users = await prisma.user.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
         messages: {
           orderBy: { createdAt: 'desc' },
           take: 1
+        },
+        features: {
+          select: {
+            featureId: true
+          }
         }
       }
     });
+
+    // Transform to simplify frontend usage (features as string[])
+    return users.map(user => ({
+      ...user,
+      features: user.features.map(f => f.featureId)
+    }));
   } catch (error) {
     console.error('Error fetching users:', error);
     return [];
@@ -78,14 +89,32 @@ export async function sendMessageAsZazu(userId: string, telegramId: string, cont
 }
 
 /**
- * Update user features (json field in Prisma)
+ * Toggle a specific feature for a user
  */
-export async function toggleUserFeature(userId: string, features: string[]) {
+export async function toggleUserFeature(userId: string, featureId: string, active: boolean) {
   try {
-    await prisma.user.update({
-      where: { id: userId },
-      data: { features },
-    });
+    if (active) {
+      // Connect/Create relation
+      await prisma.userFeature.upsert({
+        where: {
+          userId_featureId: {
+            userId,
+            featureId
+          }
+        },
+        create: {
+          userId,
+          featureId
+        },
+        update: {} // No changes needed if it exists
+      });
+    } else {
+      // Disconnect
+      await prisma.userFeature.deleteMany({
+        where: { userId, featureId }
+      });
+    }
+    
     revalidatePath('/');
     return { success: true };
   } catch (error) {
