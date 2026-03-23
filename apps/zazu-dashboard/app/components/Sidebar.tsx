@@ -1,13 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { LogOut, Search, MessageSquare, ChevronLeft, ChevronRight, Settings } from 'lucide-react';
+import { LogOut, Search, ChevronLeft, ChevronRight, Settings } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { UserWithFeatures } from '../lib/types';
 
 interface SidebarProps {
-  users: any[];
+  users: UserWithFeatures[];
   selectedUserId: string | null;
   onSelectUser: (userId: string) => void;
   collapsed: boolean;
@@ -64,7 +64,7 @@ export default function Sidebar({
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto' }}>
-        {filteredUsers.map((user: any) => (
+        {filteredUsers.map((user) => (
           <div 
             key={user.id}
             onClick={() => onSelectUser(user.id)}

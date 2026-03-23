@@ -2,9 +2,10 @@
 
 import { Settings, User as UserIcon, Zap, Clock, Shield, X } from 'lucide-react';
 import { format } from 'date-fns';
+import { UserWithFeatures } from '../lib/types';
 
 interface SettingsPanelProps {
-  user: any | null;
+  user: UserWithFeatures | null;
   onToggleFeature: (featureId: string) => Promise<void>;
   onClose: () => void;
 }

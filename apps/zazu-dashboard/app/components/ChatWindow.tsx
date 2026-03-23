@@ -3,10 +3,11 @@
 import { useRef, useEffect, useState, FormEvent } from 'react';
 import { Send, MessageSquare, CheckCircle2, Settings } from 'lucide-react';
 import { format } from 'date-fns';
+import { UserWithFeatures, Message } from '../lib/types';
 
 interface ChatWindowProps {
-  user: any | null;
-  messages: any[];
+  user: UserWithFeatures | null;
+  messages: Message[];
   onSendMessage: (content: string) => Promise<void>;
   sending: boolean;
   onToggleSettings: () => void;
@@ -70,7 +71,7 @@ export default function ChatWindow({
 
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '40px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
         <div style={{ flexGrow: 1 }} /> {/* Push messages to bottom if few */}
-        {messages.map((msg: any) => (
+        {messages.map((msg) => (
           <div key={msg.id} className={`message-bubble ${msg.role === 'USER' ? 'message-user' : 'message-assistant'}`}>
             <div className="glass-card message-content">
               <p>{msg.content}</p>

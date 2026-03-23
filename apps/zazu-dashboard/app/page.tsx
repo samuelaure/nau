@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -6,13 +7,14 @@ import { getUsers, getChatHistory, sendMessageAsZazu, toggleUserFeature } from '
 import Sidebar from './components/Sidebar';
 import ChatWindow from './components/ChatWindow';
 import SettingsPanel from './components/SettingsPanel';
+import { UserWithFeatures, Message } from './lib/types';
 
 export const dynamic = "force-dynamic";
 
 export default function Dashboard() {
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<UserWithFeatures[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -36,20 +38,20 @@ export default function Dashboard() {
 
   const loadUsers = async () => {
     const data = await getUsers();
-    setUsers(data as any[]);
+    setUsers(data as UserWithFeatures[]);
     setLoading(false);
   };
 
   const loadChatHistory = async (userId: string) => {
     const data = await getChatHistory(userId);
-    setMessages(data as any[]);
+    setMessages(data as unknown as Message[]);
   };
 
   const handleSendMessage = async (content: string) => {
     if (!selectedUser) return;
     
     // Optimistic update
-    const optimisticMessage = {
+    const optimisticMessage: Message = {
       id: `temp-${Date.now()}`,
       userId: selectedUser.id,
       role: 'ASSISTANT',
@@ -74,7 +76,7 @@ export default function Dashboard() {
 
   const handleToggleFeature = async (featureId: string) => {
     if (!selectedUser) return;
-    const isCurrentlyActive = (selectedUser.features as string[])?.includes(featureId);
+    const isCurrentlyActive = selectedUser.features?.includes(featureId);
     
     // Optimistic update
     const updatedUsers = users.map(u => {
@@ -120,14 +122,14 @@ export default function Dashboard() {
       />
 
       <ChatWindow 
-        user={selectedUser}
+        user={selectedUser || null}
         messages={messages}
         onSendMessage={handleSendMessage}
         sending={sending}
         onToggleSettings={onToggleSettings}
       />
 
-      {settingsOpen && (
+      {settingsOpen && selectedUser && (
         <SettingsPanel 
           user={selectedUser}
           onToggleFeature={handleToggleFeature}
