@@ -4,10 +4,13 @@ import path from 'path';
 // Load environment variables for local development
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
-import { Telegraf, Context } from 'telegraf';
-import prisma, { OnboardingState, Role } from '@zazu/db';
+import { Telegraf } from 'telegraf';
+import prisma, { OnboardingState } from '@zazu/db';
+import { ZazuContext } from '@zazu/skills-core';
 import { persistenceMiddleware } from './middleware/persistence';
-import { llmService } from './llm-service';
+import { voicePreprocessor } from './middleware/voice-preprocessor';
+import { skillManager } from './skill-manager';
+import { ConversationalSkill } from '@zazu/feature-conversational';
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 
@@ -16,17 +19,17 @@ if (!token) {
   process.exit(1);
 }
 
-// Custom Context interface to include our DB user
-interface ZazuContext extends Context {
-  dbUser: any; // Using any for convenience, but in a full app we'd type it more strictly with Prisma.User
-}
-
 const bot = new Telegraf<ZazuContext>(token);
 
-// 1. Persistence & Logging
-bot.use(persistenceMiddleware);
+// --- 1. Skill Registration ---
+// In a more complex app, we might load these from a config or directory.
+skillManager.register(new ConversationalSkill());
 
-// 2. Start Command
+// --- 2. Middlewares ---
+bot.use(persistenceMiddleware);
+bot.use(voicePreprocessor);
+
+// --- 3. Start Command ---
 bot.start(async (ctx) => {
   const user = ctx.dbUser;
   
@@ -37,43 +40,30 @@ bot.start(async (ctx) => {
   }
 });
 
-// 3. Onboarding & Conversational Logic
-bot.on('text', async (ctx) => {
+// --- 4. Unified Message Dispatcher ---
+bot.on('message', async (ctx) => {
   const user = ctx.dbUser;
-  const message = ctx.message.text;
+  const content = ctx.textContent;
 
   // Handle Onboarding State: AWAITING_NAME
-  if (user.onboardingState === OnboardingState.AWAITING_NAME && !user.displayName) {
+  if (user.onboardingState === OnboardingState.AWAITING_NAME && !user.displayName && content) {
     await prisma.user.update({
       where: { id: user.id },
       data: {
-        displayName: message,
+        displayName: content,
         onboardingState: OnboardingState.COMPLETED,
       },
     });
-    return ctx.reply(`¡Encantado de conocerte, ${message}! Estoy aquí para ayudarte con lo que necesites.`);
+    return ctx.reply(`¡Encantado de conocerte, ${content}! Estoy aquí para ayudarte con lo que necesites.`);
   }
 
-  // Handle Conversational Fallback (If no features are active)
-  if (user.onboardingState === OnboardingState.COMPLETED && (!user.features || user.features.length === 0)) {
-    // Get last few messages for context
-    const recentMessages = await prisma.message.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: 'desc' },
-      take: 6, // Last 3 exchanges
-    });
-
-    const llmMessages = recentMessages
-      .reverse()
-      .map((msg: any) => ({
-        role: (msg.role === Role.USER ? 'user' : 'assistant') as 'user' | 'assistant' | 'system',
-        content: msg.content,
-      }));
-
-    // Generate response
-    const response = await llmService.getConversationalResponse(llmMessages);
-
-    return ctx.reply(response.content);
+  // Handle all other messages through the Skill Orchestrator
+  if (user.onboardingState === OnboardingState.COMPLETED) {
+    const handled = await skillManager.dispatch(ctx);
+    if (!handled) {
+      return ctx.reply('No estoy seguro de cómo ayudarte con eso por ahora. Pronto tendré más habilidades activas.');
+    }
+    return;
   }
 
   // Fallback for unexpected cases
@@ -81,7 +71,7 @@ bot.on('text', async (ctx) => {
 });
 
 bot.launch().then(() => {
-  console.log('✅ Zazŭ Bot is online and listening in Spanish...');
+  console.log('✅ Zazŭ Bot Nucleus is online (Modular Mode)...');
 });
 
 // Enable graceful stop

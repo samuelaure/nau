@@ -9,13 +9,19 @@
   },
   "dependencies": {
     "@zazu/db": "*",
+    "@zazu/feature-conversational": "*",
+    "@zazu/skills-core": "*",
+    "axios": "^1.13.6",
     "dotenv": "^16.3.1",
+    "form-data": "^4.0.5",
     "openai": "^4.0.0",
     "telegraf": "^4.16.3",
     "zod": "^3.0.0"
   },
   "devDependencies": {
     "@types/dotenv": "^6.1.1",
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "^25.5.0",
     "ts-node": "^10.9.1",
     "typescript": "^5.0.0"
   }
