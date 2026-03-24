@@ -75,3 +75,10 @@ model CommentSuggester {
   @@unique([userId, brandName])
   @@index([userId])
 }
+
+model ProcessedPost {
+  id        String   @id @default(uuid())
+  postUrl   String   @unique
+  brandId   String
+  createdAt DateTime @default(now())
+}
