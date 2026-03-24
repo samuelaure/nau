@@ -26,9 +26,10 @@ model User {
   username        String?
   displayName     String?
   onboardingState OnboardingState @default(AWAITING_NAME)
-  messages        Message[]
-  features        UserFeature[]
-  createdAt       DateTime        @default(now())
+  messages         Message[]
+  features         UserFeature[]
+  commentSuggesters CommentSuggester[]
+  createdAt        DateTime        @default(now())
 }
 
 model Message {
@@ -56,4 +57,21 @@ model UserFeature {
   config    Json?
 
   @@id([userId, featureId])
+}
+
+model CommentSuggester {
+  id               String   @id @default(uuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id])
+  brandName        String
+  targetAccounts   String[]
+  systemPrompt     String   @db.Text
+  scheduleInterval Int      @default(15) // minutes
+  activeHours      Json?    // e.g. { "start": "14:00", "end": "20:00" }
+  lastCheckAt      DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([userId, brandName])
+  @@index([userId])
 }
