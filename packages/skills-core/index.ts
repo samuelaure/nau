@@ -12,6 +12,7 @@ export interface ZazuContext extends Context {
    * If text, this will match ctx.message.text.
    */
   textContent?: string;
+  session: any;
 }
 
 /**
