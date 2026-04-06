@@ -28,7 +28,8 @@ model User {
   onboardingState OnboardingState @default(AWAITING_NAME)
   messages         Message[]
   features         UserFeature[]
-  commentSuggesters CommentSuggester[]
+  deliveryWindow   DeliveryWindow?
+  notifications    NotificationQueue[]
   createdAt        DateTime        @default(now())
 }
 
@@ -59,26 +60,25 @@ model UserFeature {
   @@id([userId, featureId])
 }
 
-model CommentSuggester {
-  id               String   @id @default(uuid())
-  userId           String
-  user             User     @relation(fields: [userId], references: [id])
-  brandName        String
-  targetAccounts   String[]
-  systemPrompt     String   @db.Text
-  scheduleInterval Int      @default(15) // minutes
-  activeHours      Json?    // e.g. { "start": "14:00", "end": "20:00" }
-  lastCheckAt      DateTime?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  @@unique([userId, brandName])
-  @@index([userId])
+model DeliveryWindow {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  startHour Int      @default(9)  // 0-23
+  endHour   Int      @default(18) // 0-23
+  timeZone  String   @default("UTC")
 }
 
-model ProcessedPost {
-  id        String   @id @default(uuid())
-  postUrl   String   @unique
-  brandId   String
-  createdAt DateTime @default(now())
+model NotificationQueue {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  brandName      String?
+  payloadJson    Json
+  status         String   @default("PENDING") // PENDING, SENT, FAILED
+  failures       Int      @default(0)
+  createdAt      DateTime @default(now())
+  sentAt         DateTime?
+  
+  @@index([userId, status])
 }
