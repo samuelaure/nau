@@ -1,18 +1,25 @@
 FROM node:20-alpine AS builder
-
 WORKDIR /app
 
-# Install system dependencies
 RUN apk add --no-cache libc6-compat openssl
 
-# --- BUILD PHASE ---
-COPY package.json package-lock.json tsconfig.json ./
-COPY packages/db ./packages/db
-COPY apps/dashboard ./apps/dashboard
+# Copy ALL workspace package manifests first to leverage layer caching
+COPY package*.json tsconfig.json ./
+COPY apps/bot/package.json ./apps/bot/package.json
+COPY apps/worker/package.json ./apps/worker/package.json
+COPY apps/dashboard/package.json ./apps/dashboard/package.json
+COPY packages/db/package.json ./packages/db/package.json
+COPY packages/skills-core/package.json ./packages/skills-core/package.json
+COPY packages/skill-comment-suggester/package.json ./packages/skill-comment-suggester/package.json
+COPY packages/feature-conversational/package.json ./packages/feature-conversational/package.json
+COPY packages/feature-brand-manager/package.json ./packages/feature-brand-manager/package.json
 
 RUN npm install
 
-# Inyectamos variables dummy solo para que el build no falle por validaciones de Auth.js o Prisma
+# Copy all source code
+COPY . .
+
+# Dummy env vars so Next.js build doesn't fail on missing vars at build time
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 ENV AUTH_SECRET="7ef44a4289280436f1e5e709fab0e7d86d3d84b2f91670feacc67f4ee139c077"
 ENV NEXTAUTH_URL="https://zazu.9nau.com"
@@ -29,15 +36,14 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Copy standalone build output
+# Copy Next.js standalone output
 COPY --from=builder /app/apps/dashboard/.next/standalone ./
 COPY --from=builder /app/apps/dashboard/.next/static ./apps/dashboard/.next/static
 COPY --from=builder /app/apps/dashboard/public ./apps/dashboard/public
 
-# REDUNDANCY for Middleware and Static resolution
+# Symlink for static resolution in Next.js standalone mode
 RUN mkdir -p .next && ln -s /app/apps/dashboard/.next/static /app/.next/static
 
 EXPOSE 3000
 
-# Next.js standalone entrypoint
 CMD ["node", "apps/dashboard/server.js"]
