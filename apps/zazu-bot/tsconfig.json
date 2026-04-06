@@ -1,9 +1,8 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "outDir": "../../dist/apps/bot",
-    "rootDir": "src",
-    "baseUrl": "."
+    "outDir": "./dist",
+    "rootDir": "src"
   },
   "include": ["src/**/*"]
 }

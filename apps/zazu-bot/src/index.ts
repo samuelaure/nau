@@ -1,17 +1,18 @@
 import * as dotenv from 'dotenv';
 import path from 'path';
-import http from 'http';
+import { ProactiveDeliverySystem } from './proactive-delivery';
 
 // Load environment variables for local development
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
-import { Telegraf } from 'telegraf';
+import { Telegraf, session } from 'telegraf';
 import prisma, { OnboardingState } from '@zazu/db';
 import { ZazuContext } from '@zazu/skills-core';
 import { persistenceMiddleware } from './middleware/persistence';
 import { voicePreprocessor } from './middleware/voice-preprocessor';
 import { skillManager } from './skill-manager';
 import { ConversationalSkill } from '@zazu/feature-conversational';
+import { BrandManagerSkill } from '@zazu/feature-brand-manager';
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 
@@ -24,9 +25,11 @@ const bot = new Telegraf<ZazuContext>(token);
 
 // --- 1. Skill Registration ---
 // In a more complex app, we might load these from a config or directory.
+skillManager.register(new BrandManagerSkill());
 skillManager.register(new ConversationalSkill());
 
 // --- 2. Middlewares ---
+bot.use(session());
 bot.use(persistenceMiddleware);
 bot.use(voicePreprocessor);
 
@@ -75,59 +78,10 @@ bot.launch().then(() => {
   console.log('✅ Zazŭ Bot Nucleus is online (Modular Mode)...');
 });
 
-// --- 5. Internal Orchestrator Server ---
-// Simple server to listen for proactive notifications from the worker.
-const server = http.createServer((req, res) => {
-  if (req.method === 'POST' && req.url === '/internal/notify') {
-    let body = '';
-    req.on('data', chunk => body += chunk);
-    req.on('end', async () => {
-      try {
-        const data = JSON.parse(body);
-        const secret = process.env.AUTH_SECRET || 'zazu_local_secret';
-
-        if (data.secret !== secret) {
-          res.statusCode = 403;
-          return res.end();
-        }
-
-        // Fetch User and Telegram ID
-        const user = await prisma.user.findUnique({ where: { id: data.userId } });
-        if (user && user.telegramId) {
-          const message = `📝 **Nuevo post de @${data.owner}** en la marca **${data.brandName}**\n\n` +
-                          `💡 **Sugerencia de comentario:**\n` +
-                          `"${data.suggestion}"\n\n` +
-                          `🔗 [Ver en Instagram](${data.postUrl})`;
-          
-          await bot.telegram.sendMessage(user.telegramId.toString(), message, { parse_mode: 'Markdown' });
-          
-          // Log outgoing message in DB
-          await prisma.message.create({
-            data: {
-              userId: user.id,
-              role: 'ASSISTANT', // Using 'ASSISTANT' as the role for the bot
-              content: message,
-            }
-          });
-        }
-        res.statusCode = 200;
-        res.end();
-      } catch (err) {
-        console.error('[Nucleus] Internal notification error:', err);
-        res.statusCode = 500;
-        res.end();
-      }
-    });
-  } else {
-    res.statusCode = 404;
-    res.end();
-  }
-});
-
-const PORT = Number(process.env.INTERNAL_PORT) || 3000;
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`📡 Internal Nucleus Server listening on port ${PORT}`);
-});
+// --- 5. Proactive Delivery Queue ---
+// Replaces the old webhook format with a robust grouped queue that obeys user Delivery Windows
+const deliveryGateway = new ProactiveDeliverySystem(bot);
+deliveryGateway.start();
 
 // Enable graceful stop
 process.once('SIGINT', () => bot.stop('SIGINT'));

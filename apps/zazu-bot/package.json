@@ -8,12 +8,16 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@types/express": "^5.0.6",
     "@zazu/db": "*",
+    "@zazu/feature-brand-manager": "^0.1.0",
     "@zazu/feature-conversational": "*",
     "@zazu/skills-core": "*",
     "axios": "^1.13.6",
     "dotenv": "^16.3.1",
+    "express": "^5.2.1",
     "form-data": "^4.0.5",
+    "node-cron": "^4.2.1",
     "openai": "^4.0.0",
     "telegraf": "^4.16.3",
     "zod": "^3.0.0"
@@ -22,6 +26,7 @@
     "@types/dotenv": "^6.1.1",
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^25.5.0",
+    "@types/node-cron": "^3.0.11",
     "ts-node": "^10.9.1",
     "typescript": "^5.0.0"
   }

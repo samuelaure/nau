@@ -1,47 +1,43 @@
-# Stage 1: Dependency Installation
-FROM node:20-alpine AS deps
+# Stage 1: Build
+FROM node:20-alpine AS builder
 RUN apk add --no-cache openssl
 WORKDIR /app
 
-
-# Copy root package.json and lockfile
-COPY package.json package-lock.json ./
-# Copy app and package manifests
+# Copy ALL workspace package manifests first to leverage layer caching
+COPY package*.json ./
 COPY apps/bot/package.json ./apps/bot/package.json
-COPY packages/db/package.json ./packages/db/package.json
 
-# Install dependencies
+COPY apps/dashboard/package.json ./apps/dashboard/package.json
+COPY packages/db/package.json ./packages/db/package.json
+COPY packages/skills-core/package.json ./packages/skills-core/package.json
+COPY packages/skill-comment-suggester/package.json ./packages/skill-comment-suggester/package.json
+COPY packages/feature-conversational/package.json ./packages/feature-conversational/package.json
+COPY packages/feature-brand-manager/package.json ./packages/feature-brand-manager/package.json
+
 RUN npm install
 
-# Stage 2: Build
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+# Copy all source code
 COPY . .
 
-# Generate Prisma Client and build db package
-RUN cd packages/db && npm run build
+# Build dependency chain sequentially to avoid race conditions
+RUN npm run build --workspace=@zazu/db
+RUN npm run build --workspace=@zazu/skills-core
+RUN npm run build --workspace=@zazu/skill-comment-suggester
+RUN npm run build --workspace=@zazu/feature-conversational
+RUN npm run build --workspace=@zazu/feature-brand-manager
+RUN npm run build --workspace=@zazu/bot
 
-# Build the bot
-RUN npx tsc -p apps/bot/tsconfig.json
-
-
-# Stage 3: Runtime
-FROM node:20-alpine AS runner
+# Stage 2: Runtime
+FROM node:20-alpine
 RUN apk add --no-cache openssl
 WORKDIR /app
-
 
 ENV NODE_ENV=production
 
-# Copy built files and necessary artifacts
-COPY --from=builder /app/dist/apps/bot ./apps/bot/dist
+# Copy the entire built monorepo (node_modules + compiled packages + app)
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/packages ./packages
+COPY --from=builder /app/apps/bot ./apps/bot
 
-# If using Prisma, we need the generated client
-COPY --from=builder /app/packages/db ./packages/db
-
-
-# Command to run the bot with database migrations
 CMD ["sh", "-c", "cd packages/db && npx prisma migrate deploy && cd /app && node apps/bot/dist/index.js"]
