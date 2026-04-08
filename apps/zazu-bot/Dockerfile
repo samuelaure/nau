@@ -10,9 +10,7 @@ COPY apps/bot/package.json ./apps/bot/package.json
 COPY apps/dashboard/package.json ./apps/dashboard/package.json
 COPY packages/db/package.json ./packages/db/package.json
 COPY packages/skills-core/package.json ./packages/skills-core/package.json
-COPY packages/skill-comment-suggester/package.json ./packages/skill-comment-suggester/package.json
 COPY packages/feature-conversational/package.json ./packages/feature-conversational/package.json
-COPY packages/feature-brand-manager/package.json ./packages/feature-brand-manager/package.json
 
 RUN npm install
 
@@ -22,9 +20,7 @@ COPY . .
 # Build dependency chain sequentially to avoid race conditions
 RUN npm run build --workspace=@zazu/db
 RUN npm run build --workspace=@zazu/skills-core
-RUN npm run build --workspace=@zazu/skill-comment-suggester
 RUN npm run build --workspace=@zazu/feature-conversational
-RUN npm run build --workspace=@zazu/feature-brand-manager
 RUN npm run build --workspace=@zazu/bot
 
 # Stage 2: Runtime
