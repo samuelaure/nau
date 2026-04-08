@@ -33,11 +33,18 @@ bot.use(voicePreprocessor);
 // --- 3. Start Command ---
 bot.start(async (ctx) => {
   const user = ctx.dbUser;
+  const domain = process.env.BOT_DOMAIN || 'zazu.9nau.com';
   
+  const keyboard = {
+    reply_markup: {
+      inline_keyboard: [[{ text: '🛠️ Abrir Zazŭ Config', web_app: { url: `https://${domain}/brands` } }]]
+    }
+  };
+
   if (user.onboardingState === OnboardingState.AWAITING_NAME && !user.displayName) {
-    return ctx.reply('¡Hola! Soy Zazŭ. Antes de empezar, ¿cuál es tu nombre?');
+    return ctx.reply('¡Hola! Soy Zazŭ. Antes de empezar, ¿cuál es tu nombre?', keyboard);
   } else {
-    return ctx.reply(`¡Hola de nuevo, ${user.displayName || user.firstName || 'amigo'}! ¿En qué puedo ayudarte hoy?`);
+    return ctx.reply(`¡Hola de nuevo, ${user.displayName || user.firstName || 'amigo'}! ¿En qué puedo ayudarte hoy?`, keyboard);
   }
 });
 
@@ -73,6 +80,20 @@ bot.on('message', async (ctx) => {
 
 bot.launch().then(() => {
   console.log('✅ Zazŭ Bot Nucleus is online (Modular Mode)...');
+  const domain = process.env.BOT_DOMAIN || 'zazu.9nau.com';
+  
+  // Set the default Menu Button
+  fetch(`https://api.telegram.org/bot${token}/setChatMenuButton`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      menu_button: {
+        type: 'web_app',
+        text: '⚙️ Configurar',
+        web_app: { url: `https://${domain}/brands` }
+      }
+    })
+  }).catch(e => console.error('Error setting menu button:', e));
 });
 
 // --- 5. Proactive Delivery Queue ---
