@@ -12,7 +12,6 @@ import { persistenceMiddleware } from './middleware/persistence';
 import { voicePreprocessor } from './middleware/voice-preprocessor';
 import { skillManager } from './skill-manager';
 import { ConversationalSkill } from '@zazu/feature-conversational';
-import { BrandManagerSkill } from '@zazu/feature-brand-manager';
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 
@@ -24,8 +23,6 @@ if (!token) {
 const bot = new Telegraf<ZazuContext>(token);
 
 // --- 1. Skill Registration ---
-// In a more complex app, we might load these from a config or directory.
-skillManager.register(new BrandManagerSkill());
 skillManager.register(new ConversationalSkill());
 
 // --- 2. Middlewares ---
