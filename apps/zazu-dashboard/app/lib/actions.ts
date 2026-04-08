@@ -123,3 +123,101 @@ export async function toggleUserFeature(userId: string, featureId: string, activ
     return { success: false };
   }
 }
+
+/**
+ * Fetch all brands and targets for the admin user from nauthenticity
+ */
+export async function getBrands() {
+  const url = process.env.NAUTHENTICITY_URL || 'http://localhost:3000';
+  const key = process.env.NAU_SERVICE_KEY;
+  // Temporary: we assume a fixed admin user ID for the dashboard
+  const userId = 'admin'; 
+
+  try {
+    const res = await fetch(`${url}/v1/brands?userId=${userId}`, {
+      headers: { Authorization: `Bearer ${key}` },
+      next: { tags: ['brands'], revalidate: 0 }
+    });
+    if (!res.ok) throw new Error('Failed to fetch brands');
+    const brands = await res.json();
+    return brands;
+  } catch (error) {
+    console.error('Error fetching brands:', error);
+    return [];
+  }
+}
+
+/**
+ * Create or update a brand config
+ */
+export async function upsertBrand(payload: any) {
+  const url = process.env.NAUTHENTICITY_URL || 'http://localhost:3000';
+  const key = process.env.NAU_SERVICE_KEY;
+  const userId = 'admin';
+
+  try {
+    const res = await fetch(`${url}/v1/brands`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${key}` 
+      },
+      body: JSON.stringify({ ...payload, userId })
+    });
+    if (!res.ok) throw new Error('Failed to upsert brand');
+    
+    revalidatePath('/brands');
+    return { success: true, data: await res.json() };
+  } catch (error: any) {
+    console.error('Error upserting brand:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Add target usernames to monitor for a brand
+ */
+export async function addBrandTargets(brandId: string, usernames: string[]) {
+  const url = process.env.NAUTHENTICITY_URL || 'http://localhost:3000';
+  const key = process.env.NAU_SERVICE_KEY;
+
+  try {
+    const res = await fetch(`${url}/v1/targets`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${key}` 
+      },
+      body: JSON.stringify({ brandId, usernames })
+    });
+    if (!res.ok) throw new Error('Failed to add brand targets');
+    
+    revalidatePath('/brands');
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Remove a specific target from a brand
+ */
+export async function removeBrandTarget(brandId: string, username: string) {
+  const url = process.env.NAUTHENTICITY_URL || 'http://localhost:3000';
+  const key = process.env.NAU_SERVICE_KEY;
+
+  try {
+    const res = await fetch(`${url}/v1/targets?brandId=${brandId}&username=${username}`, {
+      method: 'DELETE',
+      headers: { 
+        Authorization: `Bearer ${key}` 
+      }
+    });
+    if (!res.ok) throw new Error('Failed to remove brand target');
+    
+    revalidatePath('/brands');
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
