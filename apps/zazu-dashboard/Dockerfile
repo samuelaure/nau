@@ -10,9 +10,7 @@ COPY apps/worker/package.json ./apps/worker/package.json
 COPY apps/dashboard/package.json ./apps/dashboard/package.json
 COPY packages/db/package.json ./packages/db/package.json
 COPY packages/skills-core/package.json ./packages/skills-core/package.json
-COPY packages/skill-comment-suggester/package.json ./packages/skill-comment-suggester/package.json
 COPY packages/feature-conversational/package.json ./packages/feature-conversational/package.json
-COPY packages/feature-brand-manager/package.json ./packages/feature-brand-manager/package.json
 
 RUN npm install
 
