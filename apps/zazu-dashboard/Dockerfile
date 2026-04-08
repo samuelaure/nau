@@ -6,7 +6,6 @@ RUN apk add --no-cache libc6-compat openssl
 # Copy ALL workspace package manifests first to leverage layer caching
 COPY package*.json tsconfig.json ./
 COPY apps/bot/package.json ./apps/bot/package.json
-COPY apps/worker/package.json ./apps/worker/package.json
 COPY apps/dashboard/package.json ./apps/dashboard/package.json
 COPY packages/db/package.json ./packages/db/package.json
 COPY packages/skills-core/package.json ./packages/skills-core/package.json
