@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Zap, Broadcast } from 'lucide-react';
+import { Zap, Radio } from 'lucide-react';
 import { getUsers, getChatHistory, sendMessageAsZazu, toggleUserFeature, sendBroadcast } from '../lib/actions';
 import Sidebar from './Sidebar';
 import ChatWindow from './ChatWindow';
@@ -129,7 +129,7 @@ export default function AdminDashboard() {
       {isBroadcasting ? (
         <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', height: '100%' }}>
           <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)' }}>
-            <Broadcast size={24} /> Transmisión Global (Broadcast)
+            <Radio size={24} /> Transmisión Global (Broadcast)
           </h2>
           <p style={{ color: 'var(--text-dim)', marginBottom: '20px' }}>
             Envía un mensaje a todos los usuarios registrados en Zazŭ.
