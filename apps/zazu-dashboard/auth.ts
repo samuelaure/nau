@@ -1,6 +1,17 @@
-import NextAuth from "next-auth";
+import NextAuth, { type DefaultSession } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import crypto from "crypto";
+
+declare module "next-auth" {
+  interface Session {
+    user: {
+      userId: string;
+      isAdmin: boolean;
+    } & DefaultSession["user"];
+  }
+}
+
+const ADMIN_TELEGRAM_ID = process.env.ADMIN_TELEGRAM_ID || "5109114390";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -49,12 +60,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           if (!userStr) return null;
           const tgUser = JSON.parse(userStr);
 
-          // For Zazu, we treat the authorized Telegram bot owner as Admin
-          // In a multi-tenant app, we would check tgUser.id against our DB
+          const tgUserId = tgUser.id.toString();
+          const isAdmin = tgUserId === ADMIN_TELEGRAM_ID;
+
           return { 
-            id: tgUser.id.toString(), 
+            id: tgUserId, 
             name: tgUser.first_name, 
-            image: tgUser.photo_url 
+            image: tgUser.photo_url,
+            // NextAuth needs this as a string, we will map it in jwt backend
+            isAdminString: isAdmin ? "true" : "false"
           };
         } catch (e) {
           console.error("Telegram Auth Error:", e);
@@ -72,7 +86,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const admin_password = process.env.ADMIN_PASSWORD || "zazu_secure_2026";
         
         if (credentials?.password === admin_password) {
-          return { id: "1", name: "Zazŭ Administrator", email: "admin@zazu.localhost" };
+          return { 
+            id: "1", 
+            name: "Zazŭ Administrator", 
+            email: "admin@zazu.localhost",
+            isAdminString: "true"
+          };
         }
         return null;
       },
@@ -82,6 +101,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     signIn: "/login",
   },
   callbacks: {
+    jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+        token.isAdmin = (user as any).isAdminString === "true";
+      }
+      return token;
+    },
+    session({ session, token }) {
+      if (session.user) {
+        session.user.userId = token.id as string;
+        session.user.isAdmin = !!token.isAdmin;
+      }
+      return session;
+    },
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
       const isLoginPage = nextUrl.pathname === "/login";

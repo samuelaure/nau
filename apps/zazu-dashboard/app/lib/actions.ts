@@ -2,11 +2,17 @@
 
 import prisma, { OnboardingState, Role } from '@zazu/db';
 import { revalidatePath } from 'next/cache';
+import { auth } from '../../auth';
 
 /**
  * Fetch all users from the database with their last message and active features
  */
 export async function getUsers() {
+  const session = await auth();
+  if (!session?.user?.isAdmin) {
+    return [];
+  }
+
   try {
     const users = await prisma.user.findMany({
       orderBy: { createdAt: 'desc' },
@@ -39,6 +45,11 @@ export async function getUsers() {
  * Fetch full chat history for a specific user
  */
 export async function getChatHistory(userId: string) {
+  const session = await auth();
+  if (!session?.user?.isAdmin) {
+    return [];
+  }
+
   try {
     return await prisma.message.findMany({
       where: { userId },
@@ -54,6 +65,9 @@ export async function getChatHistory(userId: string) {
  * Send a message as Zazu (Assistant) through the Telegram API and save to DB
  */
 export async function sendMessageAsZazu(userId: string, telegramId: string, content: string) {
+  const session = await auth();
+  if (!session?.user?.isAdmin) return { success: false, error: 'Unauthorized' };
+
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) throw new Error('Bot token not configured');
 
@@ -90,9 +104,45 @@ export async function sendMessageAsZazu(userId: string, telegramId: string, cont
 }
 
 /**
+ * Send a broadcast message to ALL normal users from Zazŭ
+ */
+export async function sendBroadcast(content: string) {
+  const session = await auth();
+  if (!session?.user?.isAdmin) return { success: false, error: 'Unauthorized' };
+
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return { success: false, error: 'Bot token not configured' };
+
+  try {
+    const users = await prisma.user.findMany({ select: { telegramId: true } });
+    
+    // Fire and forget requests in parallel
+    const promises = users.map(user => 
+      fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: user.telegramId.toString(),
+          text: content,
+        }),
+      }).catch(e => console.error(`Broadcast failed for ${user.telegramId}`, e))
+    );
+
+    await Promise.allSettled(promises);
+    return { success: true };
+  } catch (error: Error | unknown) {
+    console.error('Error sending broadcast:', error);
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/**
  * Toggle a specific feature for a user
  */
 export async function toggleUserFeature(userId: string, featureId: string, active: boolean) {
+  const session = await auth();
+  if (!session?.user?.isAdmin) return { success: false, error: 'Unauthorized' };
+
   try {
     if (active) {
       // Connect/Create relation
