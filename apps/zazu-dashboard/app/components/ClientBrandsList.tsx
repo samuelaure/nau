@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useTelegram } from '../components/TelegramProvider';
-import { Plus, Settings2, Trash2, Globe, ShieldCheck, Zap } from 'lucide-react';
+import { Plus, Settings2, Trash2, Globe, ShieldCheck, Zap, ArrowLeft } from 'lucide-react';
 import { getBrands, upsertBrand, removeBrandTarget, addBrandTargets } from '../lib/actions';
+import Link from 'next/link';
 
 export default function ClientBrandsList({ initialBrands }: { initialBrands: any[] }) {
   const { isReady, user } = useTelegram();
@@ -36,6 +37,9 @@ export default function ClientBrandsList({ initialBrands }: { initialBrands: any
     <div className="p-4 space-y-6 max-w-2xl mx-auto pb-24">
       <header className="flex items-center justify-between mb-8">
         <div>
+          <Link href="/" className="inline-flex items-center gap-2 text-primary hover:text-white mb-4 text-sm font-bold tracking-wide transition-colors">
+            <ArrowLeft size={16} /> VOLVER AL PANEL
+          </Link>
           <h1 className="text-3xl font-extrabold glow-text">Mis Marcas</h1>
           <p className="text-sm text-slate-400">Gestiona tu inteligencia de engagement</p>
         </div>
