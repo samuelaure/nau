@@ -37,7 +37,7 @@ bot.start(async (ctx) => {
   
   const keyboard = {
     reply_markup: {
-      inline_keyboard: [[{ text: '🛠️ Abrir Zazŭ Config', web_app: { url: `https://${domain}/brands` } }]]
+      inline_keyboard: [[{ text: '🛠️ Abrir Panel', web_app: { url: `https://${domain}/brands` } }]]
     }
   };
 
@@ -89,7 +89,7 @@ bot.launch().then(() => {
     body: JSON.stringify({
       menu_button: {
         type: 'web_app',
-        text: '⚙️ Configurar',
+        text: 'Panel',
         web_app: { url: `https://${domain}/brands` }
       }
     })
