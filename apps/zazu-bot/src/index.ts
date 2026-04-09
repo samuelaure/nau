@@ -37,7 +37,7 @@ bot.start(async (ctx) => {
   
   const keyboard = {
     reply_markup: {
-      inline_keyboard: [[{ text: '🛠️ Abrir Panel', web_app: { url: `https://${domain}/brands` } }]]
+      inline_keyboard: [[{ text: '🛠️ Abrir Panel', web_app: { url: `https://${domain}/` } }]]
     }
   };
 
@@ -90,7 +90,7 @@ bot.launch().then(() => {
       menu_button: {
         type: 'web_app',
         text: 'Panel',
-        web_app: { url: `https://${domain}/brands` }
+        web_app: { url: `https://${domain}/` }
       }
     })
   }).catch(e => console.error('Error setting menu button:', e));
