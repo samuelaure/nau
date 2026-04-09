@@ -54,14 +54,71 @@ export class ProactiveDeliverySystem {
       }
     });
 
-    // 4. Handle Callback Actions (Telemetry trigger back to nauthenticity)
-    this.bot.action(/sugsel_.*/, async (ctx) => {
-        const data = ctx.match[0]; // e.g. sugsel_item123_0
-        const [,, itemId, indexStr] = data.split('_'); // We will structure it as sugsel_user_item_index
-        
-        await ctx.answerCbQuery('Opción seleccionada y logueada. 🚀');
-        // A full implementation would take this event and fire a POST to nauthenticity/v1/comment-feedback
-        await ctx.reply('Feedback guardado en el Brain (vía Telemetry).');
+    // 4. Handle Suggestion Selection — sends isSelected feedback to nauthenticity
+    this.bot.action(/^sugsel_(.+)_(\d+)$/, async (ctx) => {
+      try {
+        const [, postId, indexStr] = ctx.match as RegExpMatchArray;
+        const suggestionIndex = parseInt(indexStr, 10);
+
+        // Retrieve the original payload from the notification that generated this message
+        const notification = await prisma.notificationQueue.findFirst({
+          where: {
+            payloadJson: {
+              path: ['localPostId'],
+              equals: postId,
+            },
+            status: 'SENT',
+          },
+          orderBy: { sentAt: 'desc' },
+        });
+
+        if (!notification) {
+          await ctx.answerCbQuery('No se encontró la notificación. ¿Ya fue procesada?');
+          return;
+        }
+
+        const payload = notification.payloadJson as {
+          suggestions: string[];
+          brandId: string;
+          localPostId: string;
+        };
+
+        const selectedComment = payload.suggestions[suggestionIndex];
+        if (!selectedComment) {
+          await ctx.answerCbQuery('Índice inválido.');
+          return;
+        }
+
+        // Submit feedback to nauthenticity
+        const nautUrl = process.env.NAUTHENTICITY_URL || 'http://nauthenticity:3000';
+        const nauKey = process.env.NAU_SERVICE_KEY || '';
+
+        await fetch(`${nautUrl}/api/v1/comment-feedback`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nauKey}` },
+          body: JSON.stringify({
+            commentText: selectedComment,
+            brandId: payload.brandId,
+            sourcePostId: postId,
+            isSelected: true,
+          }),
+        });
+
+        await ctx.answerCbQuery(`✅ Opción ${suggestionIndex + 1} registrada. ¡El Brain aprende!`);
+
+        // Edit the message to show which option was selected
+        const originalText = ctx.callbackQuery.message && 'text' in ctx.callbackQuery.message
+          ? ctx.callbackQuery.message.text
+          : '';
+        await ctx.editMessageText(
+          `${originalText}\n\n✅ *Elegiste la opción ${suggestionIndex + 1}*`,
+          { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [] } },
+        ).catch(() => { /* Message too old or already edited — ignore */ });
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[ProactiveDelivery] sugsel callback error: ${msg}`);
+        await ctx.answerCbQuery('Error al registrar preferencia.');
+      }
     });
   }
 
@@ -115,29 +172,32 @@ export class ProactiveDeliverySystem {
 
         for (const [brand, brandItems] of brandGroups.entries()) {
           for (const item of brandItems) {
-             const payload = item.payloadJson as any;
+             const payload = item.payloadJson as { postUrl: string; targetUsername: string; suggestions: string[]; brandId: string; localPostId: string };
              const url = payload.postUrl;
-             const domain = process.env.BOT_DOMAIN || 'zazu.9nau.com';
 
-             // Formatting for tap-to-copy (monospace)
-             const textMsg = payload.suggestions.map((sug: string, idx: number) => 
-                `**Opción ${idx+1}** (Toca para copiar):\n\`${sug}\``
-             ).join('\n\n---\n\n');
-             
-             const headerMsg = `🏢 **${brand}**\n📝 **Sugerencias para @${payload.targetUsername}**\n\n${textMsg}`;
-             
-             // Construct buttons: [Ver Post], [Editar 1], [Editar 2]
-             const inline_keyboard: any[][] = [
-               [{ text: "📸 Ver Post en Instagram", url: url }]
-             ];
 
-             // Add Edit buttons for each suggestion
-             payload.suggestions.forEach((_: string, idx: number) => {
-               inline_keyboard.push([{ 
-                 text: `✏️ Editar Opción ${idx+1}`, 
-                 web_app: { url: `https://${domain}/edit?brandId=${payload.brandId}&postId=${payload.localPostId}&suggestionIndex=${idx}` } 
-               }]);
-             });
+              // Suggestion text (monospace for easy tap-to-copy)
+              const textMsg = payload.suggestions
+                .map((sug: string, idx: number) =>
+                  `*Opción ${idx + 1}* (toca para copiar):\n\`${sug}\``
+                )
+                .join('\n\n---\n\n');
+
+              const headerMsg = `🏢 *${brand}*\n📝 *Sugerencias para @${payload.targetUsername}*\n\n${textMsg}`;
+
+              // Build inline keyboard:
+              // Row 1: View post on Instagram
+              // Rows N: "Elegir opción N" callback buttons (one per suggestion)
+              const inline_keyboard: { text: string; url?: string; callback_data?: string }[][] = [
+                [{ text: '📸 Ver Post en Instagram', url }],
+              ];
+
+              (payload.suggestions as string[]).forEach((_sug: string, idx: number) => {
+                inline_keyboard.push([{
+                  text: `✅ Elegir opción ${idx + 1}`,
+                  callback_data: `sugsel_${payload.localPostId}_${idx}`,
+                }]);
+              });
 
              await this.bot.telegram.sendMessage(user.telegramId.toString(), headerMsg, {
                parse_mode: 'Markdown',
