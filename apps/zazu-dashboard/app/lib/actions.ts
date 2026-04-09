@@ -184,7 +184,7 @@ export async function getBrands() {
   const userId = 'admin'; 
 
   try {
-    const res = await fetch(`${url}/v1/brands?userId=${userId}`, {
+    const res = await fetch(`${url}/api/v1/brands?userId=${userId}`, {
       headers: { Authorization: `Bearer ${key}` },
       next: { tags: ['brands'], revalidate: 0 }
     });
@@ -206,7 +206,7 @@ export async function upsertBrand(payload: any) {
   const userId = 'admin';
 
   try {
-    const res = await fetch(`${url}/v1/brands`, {
+    const res = await fetch(`${url}/api/v1/brands`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
@@ -232,7 +232,7 @@ export async function addBrandTargets(brandId: string, usernames: string[]) {
   const key = process.env.NAU_SERVICE_KEY;
 
   try {
-    const res = await fetch(`${url}/v1/targets`, {
+    const res = await fetch(`${url}/api/v1/targets`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
@@ -257,7 +257,7 @@ export async function removeBrandTarget(brandId: string, username: string) {
   const key = process.env.NAU_SERVICE_KEY;
 
   try {
-    const res = await fetch(`${url}/v1/targets?brandId=${brandId}&username=${username}`, {
+    const res = await fetch(`${url}/api/v1/targets?brandId=${brandId}&username=${username}`, {
       method: 'DELETE',
       headers: { 
         Authorization: `Bearer ${key}` 
