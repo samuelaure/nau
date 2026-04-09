@@ -33,14 +33,20 @@ export class ProactiveDeliverySystem {
       const windowOpen = await this.isWindowOpen(payload.userId);
       
       try {
-        await prisma.notificationQueue.create({
+        const item = await prisma.notificationQueue.create({
           data: {
             userId: payload.userId,
             brandName: payload.brandName,
             payloadJson: payload,
             status: windowOpen ? 'READY' : 'PENDING',
-          }
+          },
+          include: { user: true }
         });
+        
+        if (windowOpen) {
+          // Trigger immediate delivery attempt without waiting for the next cron cycle
+          setImmediate(() => this.flushQueue());
+        }
         
         return res.status(200).json({ success: true, queued: !windowOpen });
       } catch (err: any) {
@@ -107,28 +113,36 @@ export class ProactiveDeliverySystem {
           continue;
        }
 
-       for (const [brand, brandItems] of brandGroups.entries()) {
-          // Brand Separator Header
-          await this.bot.telegram.sendMessage(user.telegramId.toString(), `🏢 **${brand}** - Tienes ${brandItems.length} comentarios sugeridos pendientes.`);
-          
+        for (const [brand, brandItems] of brandGroups.entries()) {
           for (const item of brandItems) {
              const payload = item.payloadJson as any;
              const url = payload.postUrl;
+             const domain = process.env.BOT_DOMAIN || 'zazu.9nau.com';
 
-             const textMsg = payload.suggestions.map((sug: string, idx: number) => `**Opción ${idx+1}:**\n${sug}`).join('\n\n---\n\n');
-             const headerMsg = `📝 **Sugerencias para el nuevo post de @${payload.targetUsername}**\n\n${textMsg}`;
+             // Formatting for tap-to-copy (monospace)
+             const textMsg = payload.suggestions.map((sug: string, idx: number) => 
+                `**Opción ${idx+1}** (Toca para copiar):\n\`${sug}\``
+             ).join('\n\n---\n\n');
              
-             const buttons = payload.suggestions.map((sug: string, idx: number) => {
-                 return [{ text: `Seleccionar Opción ${idx+1}`, callback_data: `sugsel_${user.id}_${item.id}_${idx}` }];
+             const headerMsg = `🏢 **${brand}**\n📝 **Sugerencias para @${payload.targetUsername}**\n\n${textMsg}`;
+             
+             // Construct buttons: [Ver Post], [Editar 1], [Editar 2]
+             const inline_keyboard: any[][] = [
+               [{ text: "📸 Ver Post en Instagram", url: url }]
+             ];
+
+             // Add Edit buttons for each suggestion
+             payload.suggestions.forEach((_: string, idx: number) => {
+               inline_keyboard.push([{ 
+                 text: `✏️ Editar Opción ${idx+1}`, 
+                 web_app: { url: `https://${domain}/edit?brandId=${payload.brandId}&postId=${payload.localPostId}&suggestionIndex=${idx}` } 
+               }]);
              });
 
              await this.bot.telegram.sendMessage(user.telegramId.toString(), headerMsg, {
                parse_mode: 'Markdown',
                reply_markup: {
-                 inline_keyboard: [
-                   [{ text: "📸 Ver Post en Instagram", url: url }],
-                   ...buttons
-                 ]
+                 inline_keyboard
                }
              });
 
