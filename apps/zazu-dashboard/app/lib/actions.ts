@@ -174,100 +174,256 @@ export async function toggleUserFeature(userId: string, featureId: string, activ
   }
 }
 
+// ---------------------------------------------------------------------------
+// Nauthenticity API helpers
+// ---------------------------------------------------------------------------
+
+const getNautUrl = () => process.env.NAUTHENTICITY_URL || 'http://localhost:3000';
+const getNautHeaders = () => ({
+  'Content-Type': 'application/json',
+  Authorization: `Bearer ${process.env.NAU_SERVICE_KEY}`,
+});
+
+// ---------------------------------------------------------------------------
+// Brand types
+// ---------------------------------------------------------------------------
+
+export interface BrandTarget {
+  username: string;
+  profileStrategy: string | null;
+}
+
+export interface Brand {
+  id: string;
+  userId: string;
+  brandName: string;
+  voicePrompt: string;
+  commentStrategy: string | null;
+  suggestionsCount: number;
+  windowStart: string | null;
+  windowEnd: string | null;
+  timezone: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  targets: BrandTarget[];
+}
+
+export interface BrandCreatePayload {
+  brandName: string;
+  voicePrompt: string;
+  commentStrategy?: string | null;
+  suggestionsCount?: number;
+  windowStart?: string | null;
+  windowEnd?: string | null;
+  timezone?: string;
+  isActive?: boolean;
+}
+
+export type BrandUpdatePayload = Partial<BrandCreatePayload>;
+
+// ---------------------------------------------------------------------------
+// Brand actions
+// ---------------------------------------------------------------------------
+
 /**
- * Fetch all brands and targets for the admin user from nauthenticity
+ * Fetch all brands for the current authenticated user from nauthenticity.
  */
-export async function getBrands() {
-  const url = process.env.NAUTHENTICITY_URL || 'http://localhost:3000';
-  const key = process.env.NAU_SERVICE_KEY;
-  // Temporary: we assume a fixed admin user ID for the dashboard
-  const userId = 'admin'; 
+export async function getBrands(): Promise<Brand[]> {
+  const session = await auth();
+  const userId = session?.user?.userId || 'admin';
 
   try {
-    const res = await fetch(`${url}/api/v1/brands?userId=${userId}`, {
-      headers: { Authorization: `Bearer ${key}` },
-      next: { tags: ['brands'], revalidate: 0 }
-    });
-    if (!res.ok) throw new Error('Failed to fetch brands');
-    const brands = await res.json();
-    return brands;
+    const res = await fetch(
+      `${getNautUrl()}/api/v1/brands?userId=${encodeURIComponent(userId)}`,
+      { headers: getNautHeaders(), next: { tags: ['brands'], revalidate: 0 } },
+    );
+    if (!res.ok) throw new Error(`Failed to fetch brands: ${res.status}`);
+    return (await res.json()) as Brand[];
   } catch (error) {
-    console.error('Error fetching brands:', error);
+    console.error('[actions] getBrands error:', error);
     return [];
   }
 }
 
 /**
- * Create or update a brand config
+ * Create a new brand in nauthenticity.
  */
-export async function upsertBrand(payload: any) {
-  const url = process.env.NAUTHENTICITY_URL || 'http://localhost:3000';
-  const key = process.env.NAU_SERVICE_KEY;
-  const userId = 'admin';
+export async function createBrand(payload: BrandCreatePayload): Promise<{ success: boolean; data?: Brand; error?: string }> {
+  const session = await auth();
+  const userId = session?.user?.userId || 'admin';
 
   try {
-    const res = await fetch(`${url}/api/v1/brands`, {
+    const res = await fetch(`${getNautUrl()}/api/v1/brands`, {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${key}` 
-      },
-      body: JSON.stringify({ ...payload, userId })
+      headers: getNautHeaders(),
+      body: JSON.stringify({ ...payload, userId }),
     });
-    if (!res.ok) throw new Error('Failed to upsert brand');
-    
+    if (!res.ok) throw new Error(await res.text());
     revalidatePath('/brands');
-    return { success: true, data: await res.json() };
-  } catch (error: any) {
-    console.error('Error upserting brand:', error);
-    return { success: false, error: error.message };
+    return { success: true, data: (await res.json()) as Brand };
+  } catch (error: unknown) {
+    console.error('[actions] createBrand error:', error);
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
 
 /**
- * Add target usernames to monitor for a brand
+ * Update an existing brand in nauthenticity.
+ * Also syncs delivery window changes (source of truth: Zazŭ).
  */
-export async function addBrandTargets(brandId: string, usernames: string[]) {
-  const url = process.env.NAUTHENTICITY_URL || 'http://localhost:3000';
-  const key = process.env.NAU_SERVICE_KEY;
-
+export async function updateBrand(brandId: string, payload: BrandUpdatePayload): Promise<{ success: boolean; data?: Brand; error?: string }> {
   try {
-    const res = await fetch(`${url}/api/v1/targets`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${key}` 
-      },
-      body: JSON.stringify({ brandId, usernames })
+    const res = await fetch(`${getNautUrl()}/api/v1/brands/${encodeURIComponent(brandId)}`, {
+      method: 'PUT',
+      headers: getNautHeaders(),
+      body: JSON.stringify(payload),
     });
-    if (!res.ok) throw new Error('Failed to add brand targets');
-    
+    if (!res.ok) throw new Error(await res.text());
     revalidatePath('/brands');
-    return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message };
+    return { success: true, data: (await res.json()) as Brand };
+  } catch (error: unknown) {
+    console.error('[actions] updateBrand error:', error);
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
 
 /**
- * Remove a specific target from a brand
+ * Delete a brand and cascade-delete all its targets.
  */
-export async function removeBrandTarget(brandId: string, username: string) {
-  const url = process.env.NAUTHENTICITY_URL || 'http://localhost:3000';
-  const key = process.env.NAU_SERVICE_KEY;
-
+export async function deleteBrand(brandId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const res = await fetch(`${url}/api/v1/targets?brandId=${brandId}&username=${username}`, {
+    const res = await fetch(`${getNautUrl()}/api/v1/brands/${encodeURIComponent(brandId)}`, {
       method: 'DELETE',
-      headers: { 
-        Authorization: `Bearer ${key}` 
-      }
+      headers: getNautHeaders(),
     });
-    if (!res.ok) throw new Error('Failed to remove brand target');
-    
+    if (!res.ok) throw new Error(await res.text());
     revalidatePath('/brands');
     return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message };
+  } catch (error: unknown) {
+    console.error('[actions] deleteBrand error:', error);
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/**
+ * Deactivate ALL brands for a user (called when Comment Suggester feature is disabled).
+ */
+export async function deactivateBrandsForUser(userId: string): Promise<{ success: boolean; error?: string }> {
+  const brands = await getBrands();
+  const userBrands = brands.filter(b => b.userId === userId);
+
+  const results = await Promise.allSettled(
+    userBrands.map(b => updateBrand(b.id, { isActive: false })),
+  );
+
+  const failed = results.filter(r => r.status === 'rejected');
+  if (failed.length > 0) {
+    return { success: false, error: `${failed.length} brand(s) failed to deactivate` };
+  }
+  return { success: true };
+}
+
+// ---------------------------------------------------------------------------
+// Target (monitored profile) actions
+// ---------------------------------------------------------------------------
+
+export interface TargetAddPayload {
+  brandId: string;
+  usernames: string[];
+  profileStrategy?: string | null;
+}
+
+/**
+ * Add one or more monitored profiles to a brand, with optional profile strategy.
+ */
+export async function addBrandTargets(payload: TargetAddPayload): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${getNautUrl()}/api/v1/targets`, {
+      method: 'POST',
+      headers: getNautHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    revalidatePath('/brands');
+    return { success: true };
+  } catch (error: unknown) {
+    console.error('[actions] addBrandTargets error:', error);
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/**
+ * Update the profile strategy for a specific target.
+ */
+export async function updateBrandTarget(
+  brandId: string,
+  username: string,
+  profileStrategy: string | null,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await fetch(
+      `${getNautUrl()}/api/v1/targets/${encodeURIComponent(brandId)}/${encodeURIComponent(username)}`,
+      {
+        method: 'PUT',
+        headers: getNautHeaders(),
+        body: JSON.stringify({ profileStrategy }),
+      },
+    );
+    if (!res.ok) throw new Error(await res.text());
+    revalidatePath('/brands');
+    return { success: true };
+  } catch (error: unknown) {
+    console.error('[actions] updateBrandTarget error:', error);
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/**
+ * Remove a specific monitored profile from a brand.
+ */
+export async function removeBrandTarget(brandId: string, username: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await fetch(
+      `${getNautUrl()}/api/v1/targets?brandId=${encodeURIComponent(brandId)}&username=${encodeURIComponent(username)}`,
+      { method: 'DELETE', headers: getNautHeaders() },
+    );
+    if (!res.ok) throw new Error(await res.text());
+    revalidatePath('/brands');
+    return { success: true };
+  } catch (error: unknown) {
+    console.error('[actions] removeBrandTarget error:', error);
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Comment Feedback action
+// ---------------------------------------------------------------------------
+
+export interface CommentFeedbackPayload {
+  commentText: string;
+  brandId: string;
+  sourcePostId: string;
+  isSelected: boolean;
+}
+
+/**
+ * Submit comment feedback to nauthenticity.
+ * isSelected=true: the user confirmed this suggestion as their preferred one.
+ * isSelected=false: optimistic dedup record (sent by fanout, not by user).
+ */
+export async function submitCommentFeedback(payload: CommentFeedbackPayload): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${getNautUrl()}/api/v1/comment-feedback`, {
+      method: 'POST',
+      headers: getNautHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return { success: true };
+  } catch (error: unknown) {
+    console.error('[actions] submitCommentFeedback error:', error);
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
