@@ -170,7 +170,10 @@ model Composition {
   caption         String?       @db.Text
   externalPostId  String?
   externalPostUrl String?
-  status          String        @default("DRAFT") // DRAFT, APPROVED, PUBLISHED
+  status          String        @default("DRAFT") // DRAFT, APPROVED, SCHEDULED, PUBLISHED, FAILED
+  scheduledAt     DateTime?
+  publishAttempts Int           @default(0)
+  lastPublishError String?      @db.Text
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   
