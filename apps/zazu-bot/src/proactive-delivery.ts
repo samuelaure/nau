@@ -188,7 +188,7 @@ export class ProactiveDeliverySystem {
               // Build inline keyboard:
               // Row 1: View post on Instagram
               // Rows N: "Elegir opción N" callback buttons (one per suggestion)
-              const inline_keyboard: { text: string; url?: string; callback_data?: string }[][] = [
+              const inline_keyboard: import('telegraf/types').InlineKeyboardButton[][] = [
                 [{ text: '📸 Ver Post en Instagram', url }],
               ];
 
