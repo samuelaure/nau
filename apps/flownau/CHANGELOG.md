@@ -1,4 +1,28 @@
 # Changelog
+ 
+## [0.5.0] - 2026-04-10
+
+### Added
+
+- **Production Readiness & Automation (Phase 1)**:
+  - **Instagram Publishing Pipeline**: Fully integrated Instagram Graph API for automated video publishing. Includes support for "SCHEDULED" posts and auto-posted "APPROVED" drafts based on account-level frequency rules.
+  - **Automation Generator Cron**: New daily cron task that consumes approved ideas, orchestrates the AI creative agent, and prepares compositions for publishing.
+  - **Enhanced Publishing Resilience**: Implemented a 3-attempt automated retry mechanism with error logging and status fallback (Draft -> Scheduled -> Published/Failed).
+  - **Global Feature Inventory**: Integrated with the naŭ platform decentralized documentation protocol for continuous capability tracking.
+
+### Fixed
+
+- **Asset Caching & Performance**:
+  - **Deterministic Caching**: Refactored `AIBuilderTab` to enforce library slicing prior to shuffling. This guarantees stable per-brand asset caches (max 9 videos/audios) and eliminates infinite downloading loops in the live preview.
+  - **Logic Extraction**: Migrated critical media offset and asset mapping logic from components to unit-tested utilities, significantly improving architectural hygiene and stability.
+
+### Infrastructure
+
+- **Standardization**:
+  - Hardened Docker configuration: switched to `nau-network`, enforced `REDIS_PASSWORD`, and capped resource limits (384MB/0.4 CPU) per service tier (S1-S11 compliance).
+  - **CI/CD Pipeline**: Established GitHub Actions deployment workflow with automated GHCR builds, secure secret injection, and zero-downtime database migrations.
+  - **Production Dockerfile**: Authored multi-stage build including all FFmpeg and Chromium headless rendering prerequisites.
+
 
 All notable changes to this project will be documented in this file.
 
