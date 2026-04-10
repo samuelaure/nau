@@ -1,0 +1,80 @@
+name: Deploy flownaŭ
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push App
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository }}/app:latest,ghcr.io/${{ github.repository }}/app:${{ github.ref_name }}
+
+      - name: Deploy to Server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            mkdir -p /root/flownau
+
+            # Login to GHCR to pull private images
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # Write production .env from secrets
+            cat > /root/flownau/.env.tmp << 'ENVEOF'
+            POSTGRES_USER=flownau_user
+            POSTGRES_PASSWORD=${{ secrets.DB_PASSWORD }}
+            POSTGRES_DB=flownau
+            REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+            PUBLIC_DOMAIN=flownau.9nau.com
+            GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            R2_ACCOUNT_ID=${{ secrets.R2_ACCOUNT_ID }}
+            R2_ACCESS_KEY=${{ secrets.R2_ACCESS_KEY }}
+            R2_SECRET_KEY=${{ secrets.R2_SECRET_KEY }}
+            R2_BUCKET_NAME=${{ secrets.R2_BUCKET_NAME }}
+            R2_PUBLIC_URL=${{ secrets.R2_PUBLIC_URL }}
+            FB_APP_ID=${{ secrets.FB_APP_ID }}
+            FB_APP_SECRET=${{ secrets.FB_APP_SECRET }}
+            NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
+            NEXTAUTH_URL=https://flownau.9nau.com
+            TAG=latest
+            ENVEOF
+            tr -d '\r' < /root/flownau/.env.tmp > /root/flownau/.env
+
+            cd /root/flownau
+            docker system prune -f
+            docker compose pull
+
+            # Run pending Prisma migrations before starting the app container
+            docker compose run --rm --no-deps app npx prisma migrate deploy
+
+            docker compose up -d --remove-orphans
