@@ -9,6 +9,11 @@ import { Card } from '@/modules/shared/components/ui/Card'
 import { toast } from 'sonner'
 import { AlertTriangle, Send, Undo2, Save, Maximize2, X, Smartphone, Shuffle } from 'lucide-react'
 import { cn } from '@/modules/shared/utils'
+import {
+  applyLibraryAssets,
+  clampMediaOffsets,
+  getDeterministicLibrary,
+} from '@/modules/video/utils/assets'
 
 const RemotionPlayer = dynamic(() => import('@remotion/player').then((mod) => mod.Player), {
   ssr: false,
@@ -162,136 +167,12 @@ export default function AIBuilderTab({
   initialAssets: any[]
 }) {
   // 1. Helpers
-  const applyLibraryAssets = useCallback(
-    (json: any) => {
-      const next = JSON.parse(JSON.stringify(json))
-
-      // Helper to shuffle array
-      const shuffle = <T,>(array: T[]): T[] => {
-        const list = [...array]
-        for (let i = list.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1))
-          ;[list[i], list[j]] = [list[j], list[i]]
-        }
-        return list
-      }
-
-      const videoLibrary = shuffle(
-        initialAssets.filter((a) => {
-          const t = (a.type || '').toUpperCase()
-          const m = (a.mimeType || '').toLowerCase()
-          const isMedia =
-            t === 'VID' ||
-            t === 'IMG' ||
-            t.includes('VIDEO') ||
-            t.includes('IMAGE') ||
-            m.startsWith('video') ||
-            m.startsWith('image')
-          const lowerKey = (a.r2Key || '').toLowerCase()
-          const lowerUrl = (a.url || '').toLowerCase()
-          const isOutput = lowerKey.includes('/outputs/') || lowerUrl.includes('/outputs/')
-          return isMedia && !isOutput
-        }),
-      ).slice(0, 9)
-
-      const audioLibrary = shuffle(
-        initialAssets.filter((a) => {
-          const t = (a.type || '').toUpperCase()
-          const m = (a.mimeType || '').toLowerCase()
-          const isAudio =
-            t === 'AUD' ||
-            t.includes('AUDIO') ||
-            m.startsWith('audio') ||
-            a.url?.toLowerCase().endsWith('.mp3') ||
-            a.url?.toLowerCase().endsWith('.wav')
-          const lowerKey = (a.r2Key || '').toLowerCase()
-          const lowerUrl = (a.url || '').toLowerCase()
-          const isOutput = lowerKey.includes('/outputs/') || lowerUrl.includes('/outputs/')
-          return isAudio && !isOutput
-        }),
-      ).slice(0, 9)
-
-      if (next.tracks?.media && videoLibrary.length > 0) {
-        next.tracks.media = next.tracks.media.map((t: any, i: number) => {
-          // Sequential pick from shuffled library to ensure uniqueness up to library size
-          const asset = videoLibrary[i % videoLibrary.length]
-
-          // Randomize mediaStartAt based on duration
-          let mediaStartAt = t.mediaStartAt || 0
-          if (asset.duration) {
-            const fps = next.fps || 30
-            const requireFrames = t.durationInFrames || 0
-            const requireSec = requireFrames / fps
-            const maxStartSec = Math.max(0, asset.duration - requireSec)
-            if (maxStartSec > 0) {
-              const randomStartSec = Math.random() * maxStartSec
-              mediaStartAt = Math.floor(randomStartSec * fps)
-            }
-          }
-
-          return { ...t, assetUrl: asset.url, mediaStartAt }
-        })
-      }
-      if (next.tracks?.audio && audioLibrary.length > 0) {
-        next.tracks.audio = next.tracks.audio.map((t: any, i: number) => {
-          const asset = audioLibrary[i % audioLibrary.length]
-
-          let mediaStartAt = t.mediaStartAt || 0
-          if (asset.duration) {
-            const fps = next.fps || 30
-            const requireFrames = t.durationInFrames || 0
-            const requireSec = requireFrames / fps
-            const maxStartSec = Math.max(0, asset.duration - requireSec)
-            if (maxStartSec > 0) {
-              const randomStartSec = Math.random() * maxStartSec
-              mediaStartAt = Math.floor(randomStartSec * fps)
-            }
-          }
-
-          return { ...t, assetUrl: asset.url, mediaStartAt }
-        })
-      }
-
-      return next
-    },
-    [initialAssets],
-  )
-
-  const clampMediaOffsets = useCallback(
-    (json: any) => {
-      const next = JSON.parse(JSON.stringify(json))
-      const fps = next.fps || 30
-
-      const processTrack = (track: any) => {
-        const asset = initialAssets.find((a) => a.url === track.assetUrl)
-        if (asset && asset.duration) {
-          const requireFrames = track.durationInFrames || 0
-          const requireSec = requireFrames / fps
-          const totalSec = asset.duration
-          const currentStartSec = (track.mediaStartAt || 0) / fps
-
-          // Safety Guard: If start + required duration > total asset duration
-          if (currentStartSec + requireSec > totalSec) {
-            // Clamp start back so it fits or set to 0 if track is longer than asset
-            const newStartSec = Math.max(0, totalSec - requireSec)
-            track.mediaStartAt = Math.floor(newStartSec * fps)
-          }
-        }
-        return track
-      }
-
-      if (next.tracks?.media) next.tracks.media = next.tracks.media.map(processTrack)
-      if (next.tracks?.audio) next.tracks.audio = next.tracks.audio.map(processTrack)
-
-      return next
-    },
-    [initialAssets],
-  )
+  // (Helper logic moved to @/modules/video/utils/assets)
 
   // 2. Core State
   const [schemaJson, setSchemaJson] = useState<any>(() => {
     const base = template.schemaJson || DEFAULT_SCHEMA
-    return applyLibraryAssets(base)
+    return applyLibraryAssets(base, initialAssets)
   })
 
   const [jsonText, setJsonText] = useState(() => JSON.stringify(schemaJson, null, 2))
@@ -405,7 +286,7 @@ export default function AIBuilderTab({
       try {
         const parsed = JSON.parse(text)
         if (JSON.stringify(parsed) !== JSON.stringify(schemaJson)) {
-          const resolved = clampMediaOffsets(parsed)
+          const resolved = clampMediaOffsets(parsed, initialAssets)
           setHistory((prev) => [...prev, JSON.parse(JSON.stringify(schemaJson))])
           setSchemaJson(resolved)
           toast.success('Preview updated')
@@ -414,7 +295,7 @@ export default function AIBuilderTab({
         // Silently wait for valid JSON during typing
       }
     },
-    [schemaJson, clampMediaOffsets],
+    [schemaJson, initialAssets],
   )
 
   // Trigger sync when schema or assets change
@@ -422,35 +303,8 @@ export default function AIBuilderTab({
     // Validation check: Only warn if required unique slots exceed library size
     const mediaSlots = schemaJson?.tracks?.media?.length || 0
     const audioSlots = schemaJson?.tracks?.audio?.length || 0
-    const videoLibrary = initialAssets.filter((a) => {
-      const t = (a.type || '').toUpperCase()
-      const m = (a.mimeType || '').toLowerCase()
-      const isMedia =
-        t === 'VID' ||
-        t === 'IMG' ||
-        t.includes('VIDEO') ||
-        t.includes('IMAGE') ||
-        m.startsWith('video') ||
-        m.startsWith('image')
-      const lowerKey = (a.r2Key || '').toLowerCase()
-      const lowerUrl = (a.url || '').toLowerCase()
-      const isOutput = lowerKey.includes('/outputs/') || lowerUrl.includes('/outputs/')
-      return isMedia && !isOutput
-    })
-    const audioLibrary = initialAssets.filter((a) => {
-      const t = (a.type || '').toUpperCase()
-      const m = (a.mimeType || '').toLowerCase()
-      const isAudio =
-        t === 'AUD' ||
-        t.includes('AUDIO') ||
-        m.startsWith('audio') ||
-        a.url?.toLowerCase().endsWith('.mp3') ||
-        a.url?.toLowerCase().endsWith('.wav')
-      const lowerKey = (a.r2Key || '').toLowerCase()
-      const lowerUrl = (a.url || '').toLowerCase()
-      const isOutput = lowerKey.includes('/outputs/') || lowerUrl.includes('/outputs/')
-      return isAudio && !isOutput
-    })
+    const videoLibrary = getDeterministicLibrary(initialAssets, 'video')
+    const audioLibrary = getDeterministicLibrary(initialAssets, 'audio')
 
     // Relaxed check: Only warn if we need media but have 0, or need audio but have 0.
     // Re-using assets is common and allowed.
@@ -465,26 +319,17 @@ export default function AIBuilderTab({
       (needsMedia ? hasSomeMedia : true) && (needsAudio ? hasSomeAudio : true)
     setHasSufficientAssets(hasSufficientAssets)
 
-    // Collect URLs that need syncing (only those not already in cache and not already mapped)
+    // Check all up-to-9 base assets, not just what's in use
     const urlsToSync: string[] = []
-    schemaJson?.tracks?.media?.forEach((t: any) => {
-      if (
-        t.assetUrl &&
-        !t.assetUrl.startsWith('/cache_assets/') &&
-        t.assetUrl !== 'placeholder' &&
-        !assetMapping[t.assetUrl]
-      ) {
-        urlsToSync.push(t.assetUrl)
+
+    videoLibrary.forEach((a) => {
+      if (a.url && !a.url.startsWith('/cache_assets/') && !assetMapping[a.url]) {
+        urlsToSync.push(a.url)
       }
     })
-    schemaJson?.tracks?.audio?.forEach((t: any) => {
-      if (
-        t.assetUrl &&
-        !t.assetUrl.startsWith('/cache_assets/') &&
-        t.assetUrl !== 'placeholder' &&
-        !assetMapping[t.assetUrl]
-      ) {
-        urlsToSync.push(t.assetUrl)
+    audioLibrary.forEach((a) => {
+      if (a.url && !a.url.startsWith('/cache_assets/') && !assetMapping[a.url]) {
+        urlsToSync.push(a.url)
       }
     })
 
@@ -539,7 +384,7 @@ export default function AIBuilderTab({
       if (!res.ok) throw new Error(data.error || 'Failed to iterate')
 
       // ALWAYS replace assets with fresh randomized brand assets on new iterations
-      const resolved = applyLibraryAssets(data.schemaJson)
+      const resolved = applyLibraryAssets(data.schemaJson, initialAssets)
       setSchemaJson(resolved)
       setJsonText(JSON.stringify(resolved, null, 2))
       setChatPrompt('')
@@ -562,7 +407,7 @@ export default function AIBuilderTab({
 
   const handleRemixAssets = () => {
     setHistory((prev) => [...prev, JSON.parse(JSON.stringify(schemaJson))])
-    const reshuffled = applyLibraryAssets(schemaJson)
+    const reshuffled = applyLibraryAssets(schemaJson, initialAssets)
     setSchemaJson(reshuffled)
     setJsonText(JSON.stringify(reshuffled, null, 2))
     toast.success('Assets remixed and timing randomized')
@@ -581,7 +426,7 @@ export default function AIBuilderTab({
       const parsed = JSON.parse(jsonText)
       if (JSON.stringify(parsed) !== JSON.stringify(schemaJson)) {
         // Only clamp offsets for manual changes, keep current assets
-        const resolved = clampMediaOffsets(parsed)
+        const resolved = clampMediaOffsets(parsed, initialAssets)
         setHistory((prev) => [...prev, JSON.parse(JSON.stringify(schemaJson))])
         setSchemaJson(resolved)
         setJsonText(JSON.stringify(resolved, null, 2))
