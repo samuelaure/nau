@@ -1,9 +1,17 @@
+# ============================================================
+# Runtime-only Dockerfile — Next.js is pre-built by GHA
+# ============================================================
+# The build step (npm run build) happens in the GHA runner where
+# a real PostgreSQL service is available. This image only packages
+# the pre-built standalone output with its runtime dependencies.
+# ============================================================
+
 FROM node:20-bookworm-slim
 
-# Install system dependencies
-# ffmpeg: required for Remotion/Video processing
+# Install runtime system dependencies
+# ffmpeg: required for Remotion video processing
 # openssl: required for Prisma
-# Remotion Chromium deps: libnss3, libasound2, etc.
+# Chromium deps: libnss3, libasound2, etc.
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     openssl \
@@ -26,23 +34,27 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Install dependencies
-COPY package.json package-lock.json ./
-RUN npm ci
+# Copy the pre-built standalone server (built in GHA)
+COPY .next/standalone ./
+COPY .next/static ./.next/static
+COPY public ./public
 
-# Download Chromium binary for Remotion
-RUN npx remotion browser install
+# Copy Prisma schema + migrations + config for runtime migrate deploy
+COPY prisma ./prisma
+COPY prisma.config.js ./
 
-# Copy source code
-COPY . .
+# Install prisma locally so `prisma/config` module is resolvable by prisma.config.js
+# This is required by Prisma 7 — the config file imports from 'prisma/config'
+RUN npm install prisma@^7.3.0
 
-# Generate Prisma Client
-RUN npx prisma generate
-
-# Build Next.js
-ENV NODE_ENV=production
-RUN npm run build
+# Install Remotion globally to download the browser.
+# Doing this locally breaks the Next.js standalone node_modules tree (missing `ws`, etc.)
+# because standalone uses a deeply pruned and custom resolution structure.
+RUN npm install -g @remotion/cli @remotion/renderer
+RUN remotion browser install
 
 EXPOSE 3000
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
 
-CMD ["npm", "run", "start"]
+CMD ["node", "server.js"]

@@ -1,5 +1,4 @@
 node_modules
-.next
 .git
 .agent
 npm-debug.log

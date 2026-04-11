@@ -13,9 +13,58 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
+    # Real PostgreSQL available during npm run build — eliminates the
+    # "Failed to collect page data" error that plagued in-Docker builds.
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: builduser
+          POSTGRES_PASSWORD: buildpass
+          POSTGRES_DB: flownau_build
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U builduser -d flownau_build"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+        env:
+          DATABASE_URL: postgresql://builduser:buildpass@localhost:5432/flownau_build
+
+      - name: Push schema to build DB
+        run: npx prisma db push
+        env:
+          DATABASE_URL: postgresql://builduser:buildpass@localhost:5432/flownau_build
+
+      - name: Build Next.js
+        env:
+          DATABASE_URL: postgresql://builduser:buildpass@localhost:5432/flownau_build
+          NEXTAUTH_SECRET: build_time_placeholder_secret_32ch
+          AUTH_SECRET: build_time_placeholder_secret_32ch
+          R2_ENDPOINT: https://placeholder.r2.cloudflarestorage.com
+          R2_ACCESS_KEY_ID: placeholder
+          R2_SECRET_ACCESS_KEY: placeholder
+          R2_BUCKET_NAME: placeholder
+          NODE_ENV: production
+        run: npm run build
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -33,13 +82,23 @@ jobs:
           context: .
           file: Dockerfile
           push: true
+          no-cache: true
           tags: ghcr.io/${{ github.repository }}/app:latest,ghcr.io/${{ github.repository }}/app:${{ github.ref_name }}
+
+      - name: Copy docker-compose.yml to server
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: 'docker-compose.yml'
+          target: '/root/flownau/'
 
       - name: Deploy to Server
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.REMOTE_HOST }}
-          username: ${{ secrets.REMOTE_USER }}
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             set -e
@@ -75,6 +134,6 @@ jobs:
             docker compose pull
 
             # Run pending Prisma migrations before starting the app container
-            docker compose run --rm --no-deps app npx prisma migrate deploy
+            docker compose run --rm --no-deps -e DATABASE_URL="postgresql://flownau_user:${{ secrets.DB_PASSWORD }}@postgres:5432/flownau" app npx prisma migrate deploy
 
             docker compose up -d --remove-orphans
