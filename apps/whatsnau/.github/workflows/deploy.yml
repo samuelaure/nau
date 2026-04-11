@@ -149,10 +149,10 @@ jobs:
             echo "DB_USER=${{ secrets.DB_USER }}" >> .env
             echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
             echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
-            echo "DB_HOST=postgres" >> .env
+            echo "DB_HOST=whatsnau_postgres" >> .env
             
             # Redis
-            echo "REDIS_HOST=redis" >> .env
+            echo "REDIS_HOST=whatsnau_redis" >> .env
             echo "REDIS_PORT=6379" >> .env
             echo "REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD || '' }}" >> .env
             
