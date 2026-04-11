@@ -1,4 +1,5 @@
 import { ZazuContext, ZazuSkill } from '@zazu/skills-core';
+import { logger } from './lib/logger';
 
 /**
  * The SkillManager is the heart of the Zazŭ Nucleus. 
@@ -43,7 +44,7 @@ export class SkillManager {
             return true; // Successfully handled by this skill
           }
         } catch (error) {
-          console.error(`Error in skill [${skill.id} / ${skill.name}]:`, error);
+          logger.error({ err: error, skillId: skill.id, skillName: skill.name }, 'Error in skill handler');
           // If a skill fails, we let the loop continue to the next one (potentially the fallback)
         }
       }

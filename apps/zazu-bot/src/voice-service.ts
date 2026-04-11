@@ -2,6 +2,7 @@ import OpenAI, { toFile } from 'openai';
 import fs from 'fs';
 import axios from 'axios';
 import path from 'path';
+import { logger } from './lib/logger';
 
 /**
  * Service to handle media-to-text transformation.
@@ -43,7 +44,7 @@ export class VoiceService {
 
       return transcription.text;
     } catch (error) {
-      console.error('Error during voice transcription:', error);
+      logger.error({ err: error }, 'Voice transcription failed');
       throw new Error('No pude transcribir tu audio. Revisa mi clave de OpenAI o intenta de nuevo.');
     }
   }

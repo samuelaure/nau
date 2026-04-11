@@ -1,5 +1,6 @@
 import { ZazuSkill, ZazuContext } from '@zazu/skills-core';
 import axios from 'axios';
+import { logger } from './lib/logger';
 
 export class TriageSkill implements ZazuSkill {
   id = 'core-triage';
@@ -93,7 +94,7 @@ export class TriageSkill implements ZazuSkill {
         );
       }
     } catch (error) {
-      console.error('Error contacting triage API:', error);
+      logger.error({ err: error }, 'Error contacting triage API');
       await ctx.telegram.editMessageText(
         ctx.chat?.id,
         waitMsg.message_id,

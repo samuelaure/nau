@@ -10,7 +10,6 @@
   "dependencies": {
     "@types/express": "^5.0.6",
     "@zazu/db": "*",
-    "@zazu/feature-brand-manager": "^0.1.0",
     "@zazu/feature-conversational": "*",
     "@zazu/skills-core": "*",
     "axios": "^1.13.6",
@@ -20,6 +19,8 @@
     "form-data": "^4.0.5",
     "node-cron": "^4.2.1",
     "openai": "^4.0.0",
+    "pino": "^9.0.0",
+    "pino-pretty": "^11.0.0",
     "telegraf": "^4.16.3",
     "zod": "^3.0.0"
   },

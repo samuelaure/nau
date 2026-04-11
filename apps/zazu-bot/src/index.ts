@@ -1,6 +1,7 @@
 import * as dotenv from 'dotenv';
 import path from 'path';
 import { ProactiveDeliverySystem } from './proactive-delivery';
+import { logger } from './lib/logger';
 
 // Load environment variables for local development
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
@@ -16,7 +17,7 @@ import { ConversationalSkill } from '@zazu/feature-conversational';
 const token = process.env.TELEGRAM_BOT_TOKEN;
 
 if (!token) {
-  console.error('TELEGRAM_BOT_TOKEN is not defined in environment variables');
+  logger.fatal('TELEGRAM_BOT_TOKEN is not defined in environment variables');
   process.exit(1);
 }
 
@@ -83,7 +84,7 @@ bot.on('message', async (ctx) => {
 });
 
 bot.launch().then(() => {
-  console.log('✅ Zazŭ Bot Nucleus is online (Modular Mode)...');
+  logger.info('Zazŭ Bot Nucleus is online (Modular Mode)');
   const domain = process.env.BOT_DOMAIN || 'zazu.9nau.com';
   
   // Set the default Menu Button
@@ -97,7 +98,7 @@ bot.launch().then(() => {
         web_app: { url: `https://${domain}/` }
       }
     })
-  }).catch(e => console.error('Error setting menu button:', e));
+  }).catch(e => logger.error({ err: e }, 'Error setting menu button'));
 });
 
 // --- 5. Proactive Delivery Queue ---
@@ -106,5 +107,11 @@ const deliveryGateway = new ProactiveDeliverySystem(bot);
 deliveryGateway.start();
 
 // Enable graceful stop
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
+process.once('SIGINT', () => {
+  logger.info('Received SIGINT, shutting down gracefully...');
+  bot.stop('SIGINT');
+});
+process.once('SIGTERM', () => {
+  logger.info('Received SIGTERM, shutting down gracefully...');
+  bot.stop('SIGTERM');
+});

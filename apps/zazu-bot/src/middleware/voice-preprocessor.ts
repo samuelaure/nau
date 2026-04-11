@@ -1,5 +1,6 @@
 import { ZazuContext } from '@zazu/skills-core';
 import { voiceService } from '../voice-service';
+import { logger } from '../lib/logger';
 
 /**
  * Native middleware for media-to-text transformation.
@@ -27,9 +28,9 @@ export async function voicePreprocessor(ctx: ZazuContext, next: () => Promise<vo
       ctx.textContent = transcription;
 
       // Log transcription for context (optional: in a real app, send typing indicator)
-      console.log(`[Nucleus] Voice Transcribed: "${transcription}"`);
+      logger.info({ transcriptionLength: transcription.length }, 'Voice transcribed');
     } catch (error) {
-      console.error('[Nucleus] Transcription failed:', error);
+      logger.error({ err: error }, 'Voice transcription failed in preprocessor');
       // We still pass to next, but textContent will be missing or skill can decide.
     }
   }

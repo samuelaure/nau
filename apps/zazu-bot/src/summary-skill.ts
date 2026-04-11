@@ -1,6 +1,7 @@
 import { ZazuSkill, ZazuContext } from '@zazu/skills-core';
 import axios from 'axios';
 import dayjs from 'dayjs';
+import { logger } from './lib/logger';
 
 export class SummarySkill implements ZazuSkill {
   id = 'core-summary';
@@ -58,8 +59,9 @@ export class SummarySkill implements ZazuSkill {
         );
       }
 
-    } catch (err: any) {
-      console.error('[SummarySkill] Error:', err.message);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.error({ err: msg }, 'SummarySkill error');
       await ctx.telegram.editMessageText(
         ctx.chat?.id,
         waitMsg.message_id,

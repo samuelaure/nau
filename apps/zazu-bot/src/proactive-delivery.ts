@@ -3,6 +3,7 @@ import cron from 'node-cron';
 import { Telegraf } from 'telegraf';
 import { ZazuContext } from '@zazu/skills-core';
 import prisma from '@zazu/db';
+import { logger } from './lib/logger';
 
 export class ProactiveDeliverySystem {
   private bot: Telegraf<ZazuContext>;
@@ -116,7 +117,7 @@ export class ProactiveDeliverySystem {
         ).catch(() => { /* Message too old or already edited — ignore */ });
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.error(`[ProactiveDelivery] sugsel callback error: ${msg}`);
+        logger.error({ err: msg }, 'ProactiveDelivery sugsel callback error');
         await ctx.answerCbQuery('Error al registrar preferencia.');
       }
     });
@@ -132,7 +133,7 @@ export class ProactiveDeliverySystem {
   }
 
   public async flushQueue() {
-    console.log(`[ProactiveDelivery] Evaluating Queue...`);
+    logger.info('ProactiveDelivery: Evaluating queue...');
     const pendingItems = await prisma.notificationQueue.findMany({
       where: { status: { in: ['PENDING', 'READY'] } },
       include: { user: true }
@@ -255,11 +256,11 @@ export class ProactiveDeliverySystem {
 
   public start() {
     this.app.listen(3000, () => {
-      console.log('✅ Zazŭ Proactive Gateway listening on :3000');
+      logger.info('Zazŭ Proactive Gateway listening on :3000');
     });
 
     cron.schedule('*/5 * * * *', () => this.flushQueue());
-    console.log('✅ Zazŭ Proactive Cron is online.');
+    logger.info('Zazŭ Proactive Cron is online');
     
     // Evaluate instantly on startup
     this.flushQueue();
