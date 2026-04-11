@@ -5,16 +5,16 @@ services:
     env_file: .env
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      - REDIS_HOST=redis
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@flownau_postgres:5432/${POSTGRES_DB}
+      - REDIS_HOST=flownau_redis
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - FFMPEG_PATH=/usr/bin/ffmpeg
       - FFPROBE_PATH=/usr/bin/ffprobe
     depends_on:
-      postgres:
+      flownau_postgres:
         condition: service_healthy
-      redis:
+      flownau_redis:
         condition: service_healthy
     networks:
       - nau-network
@@ -37,7 +37,7 @@ services:
         max-size: '10m'
         max-file: '3'
 
-  postgres:
+  flownau_postgres:
     image: postgres:15-alpine
     container_name: flownau-postgres
     restart: unless-stopped
@@ -60,7 +60,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  redis:
+  flownau_redis:
     image: redis:alpine
     container_name: flownau-redis
     restart: unless-stopped

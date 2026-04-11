@@ -134,6 +134,6 @@ jobs:
             docker compose pull
 
             # Run pending Prisma migrations before starting the app container
-            docker compose run --rm --no-deps -e DATABASE_URL="postgresql://flownau_user:${{ secrets.DB_PASSWORD }}@postgres:5432/flownau" app npx prisma migrate deploy
+            docker compose run --rm -e DATABASE_URL="postgresql://flownau_user:${{ secrets.DB_PASSWORD }}@flownau_postgres:5432/flownau" app npx prisma migrate deploy
 
             docker compose up -d --remove-orphans
