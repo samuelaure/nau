@@ -164,7 +164,11 @@ export class ProactiveDeliverySystem {
 
        // Split items by type to format differently
        const journalItems = items.filter(i => (i.payloadJson as any).type === 'journal_summary');
-       const suggestionItems = items.filter(i => (i.payloadJson as any).type !== 'journal_summary');
+       const briefItems = items.filter(i => (i.payloadJson as any).type === 'content_brief');
+       const suggestionItems = items.filter(i => 
+         (i.payloadJson as any).type !== 'journal_summary' && 
+         (i.payloadJson as any).type !== 'content_brief'
+       );
 
        // 1. Process Journal Summaries
        for (const item of journalItems) {
@@ -173,6 +177,20 @@ export class ProactiveDeliverySystem {
          const textMsg = `📊 *${payload.periodTitle}*\n\n${payload.summaryData}`;
 
          await this.bot.telegram.sendMessage(user.telegramId.toString(), textMsg, {
+           parse_mode: 'Markdown'
+         });
+
+         await prisma.notificationQueue.update({
+            where: { id: item.id },
+            data: { status: 'SENT', sentAt: new Date() }
+         });
+       }
+
+       // 1.5 Process Content Briefs
+       for (const item of briefItems) {
+         const payload = item.payloadJson as { markdown: string; brandName: string };
+         
+         await this.bot.telegram.sendMessage(user.telegramId.toString(), payload.markdown, {
            parse_mode: 'Markdown'
          });
 
