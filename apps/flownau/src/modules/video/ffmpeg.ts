@@ -2,6 +2,7 @@ import ffmpeg from 'fluent-ffmpeg'
 import os from 'os'
 import path from 'path'
 import fs from 'fs'
+import { logger } from '@/lib/logger'
 
 // Helper to determine temp file paths
 export function getTempPath(filename: string) {
@@ -19,12 +20,12 @@ const envFfprobe = isWin
 
 // Only apply custom paths if they actually exist on the current filesystem
 if (envFfmpeg && fs.existsSync(envFfmpeg)) {
-  console.log(`[FFMPEG] Setting custom path: ${envFfmpeg}`)
+  logger.info({ path: envFfmpeg }, 'Setting custom FFMPEG path')
   ffmpeg.setFfmpegPath(envFfmpeg)
 }
 
 if (envFfprobe && fs.existsSync(envFfprobe)) {
-  console.log(`[FFPROBE] Setting custom path: ${envFfprobe}`)
+  logger.info({ path: envFfprobe }, 'Setting custom FFPROBE path')
   ffmpeg.setFfprobePath(envFfprobe)
 }
 
@@ -50,14 +51,14 @@ export function compressVideo(inputPath: string, outputPath: string): Promise<vo
         "pad='ceil(iw/2)*2':'ceil(ih/2)*2'", // Ensures dimensions are even
       ])
       .on('start', (commandLine) => {
-        console.log('Spawned Ffmpeg (video) with command: ' + commandLine)
+        logger.debug({ commandLine }, 'Spawned FFmpeg (video)')
       })
       .on('error', (err) => {
-        console.error('Video compression error:', err)
+        logger.error({ err }, 'Video compression error')
         reject(err)
       })
       .on('end', () => {
-        console.log('Video compression finished')
+        logger.info('Video compression finished')
         resolve()
       })
       .save(outputPath)
@@ -79,11 +80,11 @@ export function compressImage(inputPath: string, outputPath: string): Promise<vo
         "scale='if(gt(iw,ih),min(1920,iw),min(1080,iw))':'if(gt(iw,ih),min(1080,ih),min(1920,ih))':force_original_aspect_ratio=decrease",
       ])
       .on('error', (err) => {
-        console.error('Image compression error:', err)
+        logger.error({ err }, 'Image compression error')
         reject(err)
       })
       .on('end', () => {
-        console.log('Image compression finished')
+        logger.info('Image compression finished')
         resolve()
       })
       .save(outputPath)
@@ -98,14 +99,14 @@ export function compressAudio(inputPath: string, outputPath: string): Promise<vo
     ffmpeg(inputPath)
       .outputOptions(['-c:a aac', '-b:a 128k'])
       .on('start', (commandLine) => {
-        console.log('Spawned Ffmpeg (audio) with command: ' + commandLine)
+        logger.debug({ commandLine }, 'Spawned FFmpeg (audio)')
       })
       .on('error', (err) => {
-        console.error('Audio compression error:', err)
+        logger.error({ err }, 'Audio compression error')
         reject(err)
       })
       .on('end', () => {
-        console.log('Audio compression finished')
+        logger.info('Audio compression finished')
         resolve()
       })
       .save(outputPath)
@@ -125,11 +126,11 @@ export function generateThumbnail(inputPath: string, outputPath: string): Promis
         size: '1280x?',
       })
       .on('end', () => {
-        console.log('Thumbnail generated')
+        logger.info('Thumbnail generated')
         resolve()
       })
       .on('error', (err) => {
-        console.error('Thumbnail generation error:', err)
+        logger.error({ err }, 'Thumbnail generation error')
         reject(err)
       })
   })
@@ -142,7 +143,7 @@ export function getDuration(inputPath: string): Promise<number | undefined> {
   return new Promise((resolve) => {
     ffmpeg.ffprobe(inputPath, (err, metadata) => {
       if (err) {
-        console.error('Error reading duration:', err)
+        logger.error({ err }, 'Error reading media duration')
         resolve(undefined)
       } else {
         resolve(metadata.format.duration)

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/modules/shared/prisma';
+import { logger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   // Auth guard
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest) {
 
     // For now, store in a simple file-based approach or return for client storage
     // In production, this would be a DB table
-    console.log(`[Ideation] Context document received for brand ${brandId}: "${title}"`);
+    logger.info({ brandId, title }, 'Context document received for ideation');
 
     return NextResponse.json({ 
       success: true, 
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
-    console.error('[Ideation] Error storing context:', msg);
+    logger.error({ err: msg }, 'Error storing ideation context');
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

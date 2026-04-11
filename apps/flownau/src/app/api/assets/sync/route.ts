@@ -6,6 +6,7 @@ import fs from 'fs'
 import crypto from 'crypto'
 import { PipelinePromise, pipeline } from 'stream'
 import { promisify } from 'util'
+import { logger } from '@/lib/logger'
 
 const streamPipeline = promisify(pipeline)
 
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
 
         // 3. Download if not already cached
         if (!fs.existsSync(localPath)) {
-          console.log(`[Asset Sync] Downloading: ${url} -> ${filename}`)
+          logger.info({ url, filename }, 'Downloading asset')
           const response = await fetch(url)
           if (!response.ok) throw new Error(`Failed to fetch ${url}: ${response.statusText}`)
           if (!response.body) throw new Error(`No body for ${url}`)
@@ -49,20 +50,21 @@ export async function POST(req: NextRequest) {
           const fileStream = fs.createWriteStream(localPath)
           // Use standard Node.js streaming for large assets
           await streamPipeline(response.body as any, fileStream)
-          console.log(`[Asset Sync] Downloaded: ${filename}`)
+          logger.info({ filename }, 'Asset downloaded')
         } else {
-          console.log(`[Asset Sync] Cache hit: ${filename}`)
+          logger.debug({ filename }, 'Asset cache hit')
         }
 
         mapping[url] = publicUrl
       } catch (err) {
-        console.error(`[Asset Sync] Error processing ${url}:`, err)
+        logger.error({ err, url }, 'Error processing asset sync')
       }
     }
 
     return NextResponse.json({ mapping })
-  } catch (error: any) {
-    console.error('[Asset Sync API Error]:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error)
+    logger.error({ err: msg }, 'Asset Sync API error')
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }

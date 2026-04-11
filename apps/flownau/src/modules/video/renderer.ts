@@ -4,6 +4,7 @@ import path from 'path'
 import { r2, R2_BUCKET } from '@/modules/shared/r2'
 import { PutObjectCommand } from '@aws-sdk/client-s3'
 import fs from 'fs'
+import { logger } from '@/lib/logger'
 
 export async function renderAndUpload({
   templateId,
@@ -25,7 +26,7 @@ export async function renderAndUpload({
 
   const outputLocation = path.join(outputDir, `render-${renderId}.mp4`)
 
-  console.log('Bundling...')
+  logger.info({ renderId, templateId }, 'Bundling Remotion composition...')
   const bundleLocation = await bundle(entry)
 
   const comps = await getCompositions(bundleLocation, { inputProps })
@@ -35,7 +36,7 @@ export async function renderAndUpload({
     throw new Error(`Composition ${templateId} not found`)
   }
 
-  console.log('Rendering...')
+  logger.info({ renderId, templateId }, 'Rendering media...')
   await renderMedia({
     composition,
     serveUrl: bundleLocation,
@@ -44,7 +45,7 @@ export async function renderAndUpload({
     codec: 'h264',
   })
 
-  console.log('Uploading to R2...')
+  logger.info({ renderId, r2Key: `${projectFolder}/outputs/${renderId}.mp4` }, 'Uploading render to R2...')
   const fileStream = fs.createReadStream(outputLocation)
   const r2Key = `${projectFolder}/outputs/${renderId}.mp4`
   const uploadParams = {

@@ -14,11 +14,12 @@ import fs from 'fs/promises'
 import { createReadStream } from 'fs'
 
 import { createId } from '@paralleldrive/cuid2'
+import { logger } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
-  console.log('Starting upload processing...')
+  logger.info('Starting upload processing...')
   // 1. Parse FormData
   const formData = await req.formData()
   const file = formData.get('file') as File
@@ -105,7 +106,7 @@ export async function POST(req: NextRequest) {
   const inputPath = getTempPath(file.name)
   const buffer = Buffer.from(await file.arrayBuffer())
   await fs.writeFile(inputPath, buffer)
-  console.log(`Saved temp file to ${inputPath}`)
+  logger.debug({ inputPath }, 'Saved temp file')
 
   try {
     // 5. Optimize
@@ -125,8 +126,9 @@ export async function POST(req: NextRequest) {
       // Skip re-encode if output is larger than original (already well-compressed)
       const outputStats = await fs.stat(outputPath)
       if (outputStats.size > inputStats.size) {
-        console.log(
-          `Skipping re-encode: output (${outputStats.size}) > input (${inputStats.size}). Using original.`,
+        logger.info(
+          { outputSize: outputStats.size, inputSize: inputStats.size },
+          'Skipping video re-encode: output larger than input',
         )
         await fs.unlink(outputPath).catch(() => {})
         outputPath = inputPath
@@ -139,7 +141,7 @@ export async function POST(req: NextRequest) {
       try {
         await generateThumbnail(outputPath, thumbPath)
       } catch (e) {
-        console.error('Thumbnail generation failed, continuing without it', e)
+        logger.warn({ err: e }, 'Thumbnail generation failed, continuing without it')
         thumbPath = null
       }
     } else if (type === 'AUD') {
@@ -151,7 +153,7 @@ export async function POST(req: NextRequest) {
       // Skip re-encode if output is larger
       const outputStats = await fs.stat(outputPath)
       if (outputStats.size > inputStats.size) {
-        console.log(`Skipping audio re-encode: output larger than input. Using original.`)
+        logger.info('Skipping audio re-encode: output larger than input')
         await fs.unlink(outputPath).catch(() => {})
         outputPath = inputPath
         finalExt = file.name.split('.').pop() || 'm4a'
@@ -166,7 +168,7 @@ export async function POST(req: NextRequest) {
       // Skip re-encode if output is larger
       const outputStats = await fs.stat(outputPath)
       if (outputStats.size > inputStats.size) {
-        console.log(`Skipping image re-encode: output larger than input. Using original.`)
+        logger.info('Skipping image re-encode: output larger than input')
         await fs.unlink(outputPath).catch(() => {})
         outputPath = inputPath
         finalExt = file.name.split('.').pop() || 'jpg'
@@ -185,7 +187,7 @@ export async function POST(req: NextRequest) {
     const fileStream = createReadStream(outputPath)
     const stats = await fs.stat(outputPath)
 
-    console.log(`Uploading ${r2Key} (${stats.size} bytes)`)
+    logger.info({ r2Key, size: stats.size }, 'Uploading asset to R2')
 
     await r2.send(
       new PutObjectCommand({
@@ -225,7 +227,7 @@ export async function POST(req: NextRequest) {
       try {
         duration = await getDuration(outputPath)
       } catch (e) {
-        console.error('Failed to get duration', e)
+        logger.warn({ err: e }, 'Failed to get media duration')
       }
     }
 
@@ -253,17 +255,17 @@ export async function POST(req: NextRequest) {
     })
 
     // 9. Cleanup
-    await fs.unlink(inputPath).catch(console.error)
+    await fs.unlink(inputPath).catch((e) => logger.warn({ err: e }, 'Cleanup failed'))
     if (outputPath !== inputPath) {
-      await fs.unlink(outputPath).catch(console.error)
+      await fs.unlink(outputPath).catch((e) => logger.warn({ err: e }, 'Cleanup failed'))
     }
     if (thumbPath) {
-      await fs.unlink(thumbPath).catch(console.error)
+      await fs.unlink(thumbPath).catch((e) => logger.warn({ err: e }, 'Cleanup failed'))
     }
 
     return NextResponse.json({ success: true, asset })
   } catch (error: unknown) {
-    console.error('Processing failed', error)
+    logger.error({ err: (error as Error).message }, 'Upload processing failed')
     await fs.unlink(inputPath).catch(() => {})
     return NextResponse.json({ error: (error as Error).message }, { status: 500 })
   }
