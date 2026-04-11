@@ -14,6 +14,7 @@
     "@zazu/feature-conversational": "*",
     "@zazu/skills-core": "*",
     "axios": "^1.13.6",
+    "dayjs": "^1.11.20",
     "dotenv": "^16.3.1",
     "express": "^5.2.1",
     "form-data": "^4.0.5",

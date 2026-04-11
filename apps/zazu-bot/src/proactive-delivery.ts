@@ -151,16 +151,8 @@ export class ProactiveDeliverySystem {
       userGroups.set(item.userId, arr);
     }
 
-    // Flush to telegram grouped by brand
+      // Flush to telegram grouped by brand
     for (const [userId, items] of userGroups.entries()) {
-       const brandGroups = new Map<string, any[]>();
-       for (const item of items) {
-          const brand = item.brandName || 'General';
-          const barr = brandGroups.get(brand) || [];
-          barr.push(item);
-          brandGroups.set(brand, barr);
-       }
-
        const user = items[0].user;
        if (!user.telegramId) {
           await prisma.notificationQueue.updateMany({
@@ -170,11 +162,39 @@ export class ProactiveDeliverySystem {
           continue;
        }
 
+       // Split items by type to format differently
+       const journalItems = items.filter(i => (i.payloadJson as any).type === 'journal_summary');
+       const suggestionItems = items.filter(i => (i.payloadJson as any).type !== 'journal_summary');
+
+       // 1. Process Journal Summaries
+       for (const item of journalItems) {
+         const payload = item.payloadJson as { summaryData: string; periodTitle: string };
+         
+         const textMsg = `📊 *${payload.periodTitle}*\n\n${payload.summaryData}`;
+
+         await this.bot.telegram.sendMessage(user.telegramId.toString(), textMsg, {
+           parse_mode: 'Markdown'
+         });
+
+         await prisma.notificationQueue.update({
+            where: { id: item.id },
+            data: { status: 'SENT', sentAt: new Date() }
+         });
+       }
+
+       // 2. Process Suggestion Items (grouped by brand)
+       const brandGroups = new Map<string, any[]>();
+       for (const item of suggestionItems) {
+          const brand = item.brandName || 'General';
+          const barr = brandGroups.get(brand) || [];
+          barr.push(item);
+          brandGroups.set(brand, barr);
+       }
+
         for (const [brand, brandItems] of brandGroups.entries()) {
           for (const item of brandItems) {
              const payload = item.payloadJson as { postUrl: string; targetUsername: string; suggestions: string[]; brandId: string; localPostId: string };
              const url = payload.postUrl;
-
 
               // Suggestion text (monospace for easy tap-to-copy)
               const textMsg = payload.suggestions

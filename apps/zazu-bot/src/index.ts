@@ -24,7 +24,9 @@ const bot = new Telegraf<ZazuContext>(token);
 
 // --- 1. Skill Registration ---
 import { triageSkill } from './triage-skill';
+import { summarySkill } from './summary-skill';
 skillManager.register(triageSkill);
+skillManager.register(summarySkill);
 skillManager.register(new ConversationalSkill());
 
 // --- 2. Middlewares ---
