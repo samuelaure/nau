@@ -4,6 +4,7 @@ import { renderAndUpload } from '@/modules/video/renderer'
 import { publishVideoToInstagram } from '@/modules/accounts/instagram'
 
 // Allow trigger without auth for cron jobs or basic manual hit
+export const dynamic = 'force-dynamic'
 export const maxDuration = 300 // 5 minutes max for rendering timeout
 
 export async function GET() {

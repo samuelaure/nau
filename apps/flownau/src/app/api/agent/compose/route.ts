@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { NextResponse } from 'next/server'
 import { composeVideoWithAgent } from '@/modules/video/agent'
 import { prisma } from '@/modules/shared/prisma'

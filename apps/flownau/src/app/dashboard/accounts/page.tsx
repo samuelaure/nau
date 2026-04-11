@@ -7,6 +7,8 @@ import Link from 'next/link'
 import { Card } from '@/modules/shared/components/ui/Card'
 import type { AccountWithCounts } from '@/types'
 
+export const dynamic = 'force-dynamic'
+
 export default async function AccountsPage() {
   const accounts = await prisma.socialAccount.findMany({
     orderBy: { createdAt: 'desc' },

@@ -15,6 +15,8 @@ import { createReadStream } from 'fs'
 
 import { createId } from '@paralleldrive/cuid2'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(req: NextRequest) {
   console.log('Starting upload processing...')
   // 1. Parse FormData

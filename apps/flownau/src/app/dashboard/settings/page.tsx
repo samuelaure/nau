@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { getSetting } from '@/modules/shared/settings'
 import SyncButton from './SyncButton'
 import ApiTokenForm from './ApiTokenForm'

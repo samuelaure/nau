@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import Link from 'next/link'
 import { ArrowRight, Video, Instagram, Zap, Shield } from 'lucide-react'
 import { Card } from '@/modules/shared/components/ui/Card'

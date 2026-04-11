@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { r2, R2_BUCKET } from '@/modules/shared/r2'
 import { ListObjectsV2Command } from '@aws-sdk/client-s3'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const prefix = searchParams.get('prefix') || ''

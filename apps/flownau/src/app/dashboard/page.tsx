@@ -4,6 +4,8 @@ import { Card } from '@/modules/shared/components/ui/Card'
 import { Button } from '@/modules/shared/components/ui/Button'
 import type { RenderWithTemplate } from '@/types'
 
+export const dynamic = 'force-dynamic'
+
 export default async function DashboardPage() {
   const accountsCount = await prisma.socialAccount.count()
   const templatesCount = await prisma.template.count()

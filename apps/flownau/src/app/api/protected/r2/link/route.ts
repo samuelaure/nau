@@ -3,6 +3,8 @@ import { prisma } from '@/modules/shared/prisma'
 import { r2, R2_BUCKET, R2_PUBLIC_URL } from '@/modules/shared/r2'
 import { ListObjectsV2Command } from '@aws-sdk/client-s3'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(req: NextRequest) {
   try {
     const { prefix, accountId, templateId } = await req.json()

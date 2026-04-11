@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 import { composeVideoWithAgent } from '@/modules/video/agent'
 
+export const dynamic = 'force-dynamic'
 export const maxDuration = 300 // 5 minutes max for AI generation timeout
 
 export async function GET() {

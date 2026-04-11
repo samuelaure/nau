@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { prisma } from '@/modules/shared/prisma'
 import { Video, Globe } from 'lucide-react'
 import AddTemplateButton from '@/modules/video/components/AddTemplateButton'

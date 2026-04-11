@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { auth } from '@/auth'
 import { prisma } from '@/modules/shared/prisma'
 import { NextResponse } from 'next/server'

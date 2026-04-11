@@ -1,5 +1,5 @@
 # Changelog
- 
+
 ## [0.5.0] - 2026-04-10
 
 ### Added
@@ -22,7 +22,6 @@
   - Hardened Docker configuration: switched to `nau-network`, enforced `REDIS_PASSWORD`, and capped resource limits (384MB/0.4 CPU) per service tier (S1-S11 compliance).
   - **CI/CD Pipeline**: Established GitHub Actions deployment workflow with automated GHCR builds, secure secret injection, and zero-downtime database migrations.
   - **Production Dockerfile**: Authored multi-stage build including all FFmpeg and Chromium headless rendering prerequisites.
-
 
 All notable changes to this project will be documented in this file.
 

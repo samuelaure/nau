@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs'
 /**
  * Ensures the system has at least one admin user if the database is fresh.
  * Uses environment variables for initial credentials.
+ * Build-safe: silently no-ops if the database is unreachable (e.g. during Docker image build).
  */
 export async function bootstrapSystem() {
   const adminEmail = process.env.INITIAL_ADMIN_EMAIL
@@ -14,15 +15,19 @@ export async function bootstrapSystem() {
     return
   }
 
-  const hashedPassword = await bcrypt.hash(adminPassword, 10)
+  try {
+    const hashedPassword = await bcrypt.hash(adminPassword, 10)
 
-  await prisma.user.upsert({
-    where: { email: adminEmail },
-    update: {}, // Don't change existing admin
-    create: {
-      email: adminEmail,
-      password: hashedPassword,
-      name: adminName,
-    },
-  })
+    await prisma.user.upsert({
+      where: { email: adminEmail },
+      update: {}, // Don't change existing admin
+      create: {
+        email: adminEmail,
+        password: hashedPassword,
+        name: adminName,
+      },
+    })
+  } catch {
+    // Silently skip during build-time or when DB is not yet available
+  }
 }
