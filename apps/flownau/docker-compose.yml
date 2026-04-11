@@ -22,6 +22,8 @@ services:
       - 'traefik.enable=true'
       - 'traefik.http.routers.flownau.rule=Host(`${PUBLIC_DOMAIN:-flownau.localhost}`)'
       - 'traefik.http.routers.flownau.entrypoints=websecure'
+      - 'traefik.http.routers.flownau.tls=true'
+      - 'traefik.http.routers.flownau.tls.certresolver=letsencrypt'
       - 'traefik.http.services.flownau.loadbalancer.server.port=3000'
       - 'traefik.docker.network=nau-network'
     command: node server.js
