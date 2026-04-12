@@ -129,15 +129,16 @@ jobs:
             INITIAL_ADMIN_EMAIL=${{ secrets.INITIAL_ADMIN_EMAIL }}
             INITIAL_ADMIN_PASSWORD=${{ secrets.INITIAL_ADMIN_PASSWORD }}
             INITIAL_ADMIN_NAME="Samuel Aure"
-            TAG=latest
+            TAG=${{ github.ref_name }}
             ENVEOF
             tr -d '\r' < /root/flownau/.env.tmp > /root/flownau/.env
 
             cd /root/flownau
             docker system prune -f
-            docker compose pull
+            TAG=${{ github.ref_name }} docker compose pull
+            TAG=${{ github.ref_name }} docker compose up -d --remove-orphans
 
-            # Run pending Prisma migrations and seed the database
-            docker compose run --rm -e DATABASE_URL="postgresql://flownau_user:${{ secrets.DB_PASSWORD }}@flownau_postgres:5432/flownau" -e INITIAL_ADMIN_EMAIL=${{ secrets.INITIAL_ADMIN_EMAIL }} -e INITIAL_ADMIN_PASSWORD=${{ secrets.INITIAL_ADMIN_PASSWORD }} app sh -c "npx prisma migrate deploy && npx prisma db seed"
-
-            docker compose up -d --remove-orphans
+            # Run migrations and seeding once the container is up and can reach the DB
+            # Use the app container directly to ensure we use the new code
+            docker exec flownau npx prisma migrate deploy
+            docker exec flownau npx prisma db seed
