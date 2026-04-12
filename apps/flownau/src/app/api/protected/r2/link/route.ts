@@ -13,6 +13,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing prefix or context' }, { status: 400 })
     }
 
+    // Purge existing assets to ensure the new folder is the absolute source of truth
+    if (accountId) {
+      await prisma.asset.deleteMany({ where: { accountId } })
+    } else if (templateId) {
+      await prisma.asset.deleteMany({ where: { templateId } })
+    }
+
     // List all objects in the prefix (recursively by not using delimiter)
     const command = new ListObjectsV2Command({
       Bucket: R2_BUCKET,
