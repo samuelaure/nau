@@ -17,6 +17,7 @@ import {
   Home,
   Sparkles,
   Link as LinkIcon,
+  Unlink,
   Trash2,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -47,6 +48,7 @@ export default function AssetsManager({
   const [currentPath, setCurrentPath] = useState<string[]>([])
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false)
   const [linking, setLinking] = useState(false)
+  const [unlinking, setUnlinking] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   const toggleSelect = useCallback((id: string) => {
@@ -174,6 +176,34 @@ export default function AssetsManager({
     }
   }
 
+  const handleUnlinkFolder = async () => {
+    if (!confirm('Are you sure you want to unlink the R2 folder? This will remove all associated assets from this scope.')) return
+    setUnlinking(true)
+    try {
+      const response = await fetch('/api/protected/r2/unlink', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId: ownerType === 'account' ? ownerId : null,
+          templateId: ownerType === 'template' ? ownerId : null,
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Unlinking failed')
+      }
+
+      toast.success('R2 folder unlinked successfully')
+      window.location.reload()
+    } catch (error: unknown) {
+      console.error('Unlinking failed', error)
+      toast.error(`Unlinking failed: ${(error as Error).message}`)
+    } finally {
+      setUnlinking(false)
+    }
+  }
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
@@ -271,12 +301,24 @@ export default function AssetsManager({
             <Sparkles size={20} className="text-accent" />
             <h2 className="text-xl font-bold text-white tracking-tight">Asset Library</h2>
           </div>
-          <button
-            onClick={() => setIsLinkModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold transition-all"
-          >
-            <LinkIcon size={14} /> Link R2 Folder
-          </button>
+          <div className="flex items-center gap-2">
+            {basePath ? (
+              <button
+                onClick={handleUnlinkFolder}
+                disabled={unlinking}
+                className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-xl text-xs font-bold text-red-500 transition-all disabled:opacity-50"
+              >
+                {unlinking ? <Loader2 size={14} className="animate-spin" /> : <Unlink size={14} />} 
+                {unlinking ? 'Unlinking...' : 'Unlink R2 Folder'}
+              </button>
+            ) : null}
+            <button
+              onClick={() => setIsLinkModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold transition-all"
+            >
+              <LinkIcon size={14} /> Link R2 Folder
+            </button>
+          </div>
         </div>
 
         <nav className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-widest text-text-secondary/50 overflow-x-auto pb-1 custom-scrollbar">
