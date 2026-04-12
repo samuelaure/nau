@@ -45,7 +45,10 @@ export async function renderAndUpload({
     codec: 'h264',
   })
 
-  logger.info({ renderId, r2Key: `${projectFolder}/outputs/${renderId}.mp4` }, 'Uploading render to R2...')
+  logger.info(
+    { renderId, r2Key: `${projectFolder}/outputs/${renderId}.mp4` },
+    'Uploading render to R2...',
+  )
   const fileStream = fs.createReadStream(outputLocation)
   const r2Key = `${projectFolder}/outputs/${renderId}.mp4`
   const uploadParams = {
