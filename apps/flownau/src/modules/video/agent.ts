@@ -106,12 +106,20 @@ export async function composeVideoWithAgent(
       },
     },
   })
+
+  // Pre-select random assets to assist the AI in "systematic" selection
+  const videos = assets.filter((a) => a.type === 'VID')
+  const audios = assets.filter((a) => a.type === 'AUD')
+
+  const randomVideo = videos.length > 0 ? videos[Math.floor(Math.random() * videos.length)] : null
+  const randomAudio = audios.length > 0 ? audios[Math.floor(Math.random() * audios.length)] : null
+
   const creativeResponse = await (client as any).chat.completions.create({
     model,
     messages: [
       {
         role: 'system',
-        content: `You are a Senior Creative Director. Create a high-fidelity Creative Plan.
+        content: `You are a Senior Creative Director. Create a high-fidelity Creative Plan for a short-form video (Reel/TikTok/Short).
         
 BRAND TONE:
 ${persona.systemPrompt}
@@ -119,15 +127,18 @@ ${persona.systemPrompt}
 TEMPLATE CONTEXT:
 ${targetTemplate.systemPrompt || "Follow the template's vibe."}
 
-CAPTION STRATEGY:
-${targetTemplate.captionPrompt || 'Generate a compelling, high-converting social media caption that matches the brand tone and video content.'}
+SELECTED ASSETS (System Chosen):
+${randomVideo ? `- Video: ${randomVideo.url}` : '- No video available (use overlay/text)'}
+${randomAudio ? `- Audio: ${randomAudio.url}` : '- No audio available'}
 
-AVAILABLE ASSETS:
-${assets.map((a) => `- ${a.url} (${a.type})`).join('\n')}
+YOUR TASK:
+1. Focus on the NARRATIVE and TEXT OVERLAYS.
+2. Determine how the text should flow over the selected assets to fulfill the user's idea.
+3. Generate a compelling social media caption.
 
 Output:
-1. A numbered plan for the scenes, text overlays, and audio choices.
-2. A compelling social media caption.`,
+1. A numbered plan for the scenes, specifically focusing on TEXT OVERLAYS and their timing.
+2. A compelling social media caption (max 2000 chars).`,
       },
       { role: 'user', content: `Prompt: ${prompt}` },
     ],
@@ -152,9 +163,16 @@ Output:
           role: 'system',
           content: `You are a Technical Video Engineer. Map the plan to DynamicComposition JSON.
         
+### SELECTED ASSET DATA (MANDATORY):
+${randomVideo ? `- VIDEO_URL: ${randomVideo.url}` : '- NO_VIDEO'}
+${randomAudio ? `- AUDIO_URL: ${randomAudio.url}` : '- NO_AUDIO'}
+
 ### SCHEMA SPEC:
 - Duration: 300-450 frames (10-15s @ 30fps)
-- Tracks: Use absolute URLs from the creative plan.
+- Tracks: 
+  * media: Use VIDEO_URL if provided.
+  * audio: Use AUDIO_URL if provided.
+  * text: Overlay the generated narrative text.
 - Caption: Include the generated caption in the "caption" field.
 - JSON Structure:
 {
@@ -165,10 +183,10 @@ Output:
   "height": 1920,
   "caption": "Your amazing caption here...",
   "tracks": {
-    "media": [ { "id": "1", "type": "media", "assetUrl": "url", "startFrame": 0, "durationInFrames": 450, "mediaStartAt": 0, "scale": "cover" } ],
+    "media": [ { "id": "1", "type": "media", "assetUrl": "VIDEO_URL", "startFrame": 0, "durationInFrames": 450, "mediaStartAt": 0, "scale": "cover" } ],
     "overlay": [ { "id": "4", "type": "overlay", "color": "#000000", "opacity": 0.4, "startFrame": 0, "durationInFrames": 450 } ],
     "text": [ { "id": "2", "type": "text", "content": "TEXT", "startFrame": 30, "durationInFrames": 90, "safeZone": "center-safe", "fontSize": 80, "color": "#FFFFFF", "animation": "fade" } ],
-    "audio": [ { "id": "3", "type": "audio", "assetUrl": "url", "startFrame": 0, "durationInFrames": 450, "volume": 1 } ]
+    "audio": [ { "id": "3", "type": "audio", "assetUrl": "AUDIO_URL", "startFrame": 0, "durationInFrames": 450, "volume": 1 } ]
   }
 }
 
@@ -190,6 +208,21 @@ ${lastError ? `\n### PREVIOUS ATTEMPT FAILED WITH ERROR:\n${lastError}\nPlease f
     try {
       const parsed = JSON.parse(rawJson)
       targetJson = parsed.tracks ? parsed : parsed.composition || parsed.data || parsed
+
+      // Post-process placeholders
+      const finalizeTracks = (trackList: any[], actualUrl: string | null) => {
+        if (!trackList || !actualUrl) return
+        trackList.forEach((t) => {
+          if (t.assetUrl === 'VIDEO_URL' || t.assetUrl === 'AUDIO_URL' || !t.assetUrl || t.assetUrl === 'url') {
+            t.assetUrl = actualUrl
+          }
+        })
+      }
+
+      if (targetJson.tracks) {
+        finalizeTracks(targetJson.tracks.media, randomVideo?.url || null)
+        finalizeTracks(targetJson.tracks.audio, randomAudio?.url || null)
+      }
 
       // Post-process to randomize mediaStartAt based on known true durations
       const fps = targetJson.fps || 30

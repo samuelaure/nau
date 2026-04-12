@@ -12,6 +12,7 @@ const ComposeRequestSchema = z.object({
   format: z.enum(['reel', 'post', 'story']).default('reel'),
   ideaId: z.string().optional(),
   personaId: z.string().optional(),
+  templateId: z.string().optional(),
 })
 
 export async function POST(req: Request) {
@@ -31,7 +32,7 @@ export async function POST(req: Request) {
       )
     }
 
-    const { prompt, accountId, format, ideaId, personaId } = parsed.data
+    const { prompt, accountId, format, ideaId, personaId, templateId } = parsed.data
 
     const account = await prisma.socialAccount.findUnique({
       where: { id: accountId },
@@ -42,11 +43,11 @@ export async function POST(req: Request) {
     }
 
     // 1. Run AI Step (Director -> Creative -> Technical)
-    const { composition, templateId } = await composeVideoWithAgent(
+    const { composition, templateId: finalTemplateId } = await composeVideoWithAgent(
       prompt,
       accountId,
       format,
-      undefined,
+      templateId,
       personaId,
     )
 
@@ -58,7 +59,7 @@ export async function POST(req: Request) {
           (await prisma.brandPersona.findFirst({ where: { accountId } }))
     ) as any
 
-    const template = (await prisma.template.findUnique({ where: { id: templateId } })) as any
+    const template = (await prisma.template.findUnique({ where: { id: finalTemplateId } })) as any
 
     let isApproved = false
     if (persona?.autoApproveCompositions && template?.autoApproveCompositions) {
@@ -69,7 +70,7 @@ export async function POST(req: Request) {
     const newComposition = await prisma.composition.create({
       data: {
         accountId,
-        templateId,
+        templateId: finalTemplateId,
         payload: composition as any,
         caption: (composition as any).caption || null,
         status: isApproved ? 'APPROVED' : 'DRAFT',
