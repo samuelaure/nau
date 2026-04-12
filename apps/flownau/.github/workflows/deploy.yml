@@ -123,8 +123,12 @@ jobs:
             R2_PUBLIC_URL=${{ secrets.R2_PUBLIC_URL }}
             FB_APP_ID=${{ secrets.FB_APP_ID }}
             FB_APP_SECRET=${{ secrets.FB_APP_SECRET }}
-            NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
-            NEXTAUTH_URL=https://flownau.9nau.com
+            AUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
+            AUTH_URL=https://flownau.9nau.com
+            AUTH_TRUST_HOST=true
+            INITIAL_ADMIN_EMAIL=${{ secrets.INITIAL_ADMIN_EMAIL }}
+            INITIAL_ADMIN_PASSWORD=${{ secrets.INITIAL_ADMIN_PASSWORD }}
+            INITIAL_ADMIN_NAME="Samuel Aure"
             TAG=latest
             ENVEOF
             tr -d '\r' < /root/flownau/.env.tmp > /root/flownau/.env
@@ -133,7 +137,7 @@ jobs:
             docker system prune -f
             docker compose pull
 
-            # Run pending Prisma migrations before starting the app container
-            docker compose run --rm -e DATABASE_URL="postgresql://flownau_user:${{ secrets.DB_PASSWORD }}@flownau_postgres:5432/flownau" app npx prisma migrate deploy
+            # Run pending Prisma migrations and seed the database
+            docker compose run --rm -e DATABASE_URL="postgresql://flownau_user:${{ secrets.DB_PASSWORD }}@flownau_postgres:5432/flownau" -e INITIAL_ADMIN_EMAIL=${{ secrets.INITIAL_ADMIN_EMAIL }} -e INITIAL_ADMIN_PASSWORD=${{ secrets.INITIAL_ADMIN_PASSWORD }} app sh -c "npx prisma migrate deploy && npx prisma db seed"
 
             docker compose up -d --remove-orphans
