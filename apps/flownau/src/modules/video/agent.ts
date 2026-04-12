@@ -1,6 +1,7 @@
 import { prisma } from '@/modules/shared/prisma'
 import { Groq } from 'groq-sdk'
 import OpenAI from 'openai'
+import { logError, logger } from '@/modules/shared/logger'
 import {
   DynamicCompositionSchema,
   DynamicCompositionSchemaType,
@@ -210,10 +211,10 @@ ${lastError ? `\n### PREVIOUS ATTEMPT FAILED WITH ERROR:\n${lastError}\nPlease f
       targetJson = parsed.tracks ? parsed : parsed.composition || parsed.data || parsed
 
       // Post-process placeholders
-      const finalizeTracks = (trackList: any[], actualUrl: string | null) => {
-        if (!trackList || !actualUrl) return
+      const finalizeTracks = (trackList: any[] | undefined | null, actualUrl: string | null) => {
+        if (!trackList || !Array.isArray(trackList) || !actualUrl) return
         trackList.forEach((t) => {
-          if (t.assetUrl === 'VIDEO_URL' || t.assetUrl === 'AUDIO_URL' || !t.assetUrl || t.assetUrl === 'url') {
+          if (t && (t.assetUrl === 'VIDEO_URL' || t.assetUrl === 'AUDIO_URL' || !t.assetUrl || t.assetUrl === 'url')) {
             t.assetUrl = actualUrl
           }
         })
@@ -254,7 +255,7 @@ ${lastError ? `\n### PREVIOUS ATTEMPT FAILED WITH ERROR:\n${lastError}\nPlease f
         templateId: targetTemplate.id,
       }
     } catch (error: any) {
-      console.warn(`[AGENT_TECHNICAL_FAILURE] Attempt ${attempts}:`, error.message)
+      logError('AGENT_TECHNICAL_FAILURE', error, { attempt: attempts, accountId })
       lastError = error.message
       if (attempts >= 2)
         throw new Error(`Technical mapping failed after 2 attempts: ${error.message}`)

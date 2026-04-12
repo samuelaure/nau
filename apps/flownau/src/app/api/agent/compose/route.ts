@@ -5,6 +5,7 @@ import { composeVideoWithAgent } from '@/modules/video/agent'
 import { prisma } from '@/modules/shared/prisma'
 import { auth } from '@/auth'
 import { z } from 'zod'
+import { logError, logger } from '@/modules/shared/logger'
 
 const ComposeRequestSchema = z.object({
   prompt: z.string().min(3),
@@ -87,8 +88,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ composition: newComposition }, { status: 200 })
   } catch (error: unknown) {
-    console.error('[AGENT_COMPOSE_ROUTE_ERROR]', error)
+    logError('AGENT_COMPOSE_ROUTE_ERROR', error)
     const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: 'Failed to generate composition', message }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to generate composition', message, details: error }, { status: 500 })
   }
 }
