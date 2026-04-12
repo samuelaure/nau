@@ -138,7 +138,6 @@ jobs:
             TAG=${{ github.ref_name }} docker compose pull
             TAG=${{ github.ref_name }} docker compose up -d --remove-orphans
 
-            # Run migrations and seeding once the container is up and can reach the DB
+            # Run migrations once the container is up and can reach the DB
             # Use the app container directly to ensure we use the new code
             docker exec flownau npx prisma migrate deploy
-            docker exec flownau npx prisma db seed
