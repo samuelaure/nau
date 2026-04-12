@@ -2,6 +2,8 @@ import { PrismaClient } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 import pg from 'pg'
 import bcrypt from 'bcryptjs'
+import fs from 'fs'
+import path from 'path'
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL })
 const adapter = new PrismaPg(pool)
@@ -49,8 +51,6 @@ async function main() {
 
   // Restore VideoTemplates from backup
   try {
-    const fs = require('fs')
-    const path = require('path')
     const backupPath = path.join(process.cwd(), 'backups', 'templates-backup-latest.json')
     if (fs.existsSync(backupPath)) {
       const backupData = fs.readFileSync(backupPath, 'utf8')
