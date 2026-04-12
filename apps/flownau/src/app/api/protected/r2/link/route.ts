@@ -29,8 +29,12 @@ export async function POST(req: NextRequest) {
     const response = await r2.send(command)
     const objects = response.Contents || []
 
-    // 1. Map all objects for quick lookup
-    const objectMap = new Map(objects.map((obj) => [obj.Key, obj]))
+    // 1. Map all objects for quick lookup (filter out undefined keys)
+    const objectMap = new Map(
+      objects
+        .filter((obj) => obj.Key)
+        .map((obj) => [obj.Key!, obj] as [string, (typeof objects)[0]]),
+    )
 
     const createdAssets = []
 
@@ -45,6 +49,7 @@ export async function POST(req: NextRequest) {
     })
 
     for (const obj of filesToProcess) {
+      if (!obj.Key) continue
       const ext = obj.Key.split('.').pop()?.toLowerCase() || ''
       let type: 'VID' | 'AUD' | 'IMG' | null = null
       let mimeType = ''
