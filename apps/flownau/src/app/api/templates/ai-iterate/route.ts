@@ -2,32 +2,19 @@ export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
-import { iterateTemplateWithAgent } from '@/modules/video/builderAgent'
 
+/**
+ * DEPRECATED: Template AI iteration was part of the old free-form JSON pipeline.
+ * Replaced by scene-based composition in v2. This endpoint returns 410 Gone.
+ */
 export async function POST(req: Request) {
-  try {
-    const session = await auth()
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const body = await req.json()
-    const { schemaJson, prompt, accountId, templateId, creationPrompt } = body
-
-    if (!schemaJson || !prompt) {
-      return NextResponse.json({ error: 'Missing schemaJson or prompt' }, { status: 400 })
-    }
-
-    const modifiedJson = await iterateTemplateWithAgent(
-      schemaJson,
-      prompt,
-      accountId,
-      templateId,
-      creationPrompt,
-    )
-    return NextResponse.json({ schemaJson: modifiedJson })
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : 'Iteration failed'
-    return NextResponse.json({ error: msg }, { status: 500 })
+  const session = await auth()
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  return NextResponse.json(
+    { error: 'This endpoint has been deprecated. Use the scene-based composition pipeline.' },
+    { status: 410 },
+  )
 }
