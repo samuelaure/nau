@@ -39,9 +39,7 @@ export const MediaBackground: React.FC<MediaBackgroundProps> = ({
     )
   }
 
-  const isVideo =
-    type === 'video' ||
-    (!type && detectVideoUrl(assetUrl))
+  const isVideo = type === 'video' || (!type && detectVideoUrl(assetUrl))
 
   const style: React.CSSProperties = {
     width: '100%',

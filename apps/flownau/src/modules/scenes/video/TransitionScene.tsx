@@ -12,14 +12,9 @@ export const TransitionScene: React.FC = () => {
   const midpoint = Math.floor(durationInFrames / 2)
 
   // Fade to black, then fade back out
-  const opacity = interpolate(
-    frame,
-    [0, midpoint, durationInFrames],
-    [0, 1, 0],
-    { extrapolateRight: 'clamp' },
-  )
+  const opacity = interpolate(frame, [0, midpoint, durationInFrames], [0, 1, 0], {
+    extrapolateRight: 'clamp',
+  })
 
-  return (
-    <AbsoluteFill style={{ backgroundColor: `rgba(0, 0, 0, ${opacity})` }} />
-  )
+  return <AbsoluteFill style={{ backgroundColor: `rgba(0, 0, 0, ${opacity})` }} />
 }

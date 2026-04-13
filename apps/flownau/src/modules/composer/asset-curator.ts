@@ -102,10 +102,7 @@ export function selectMediaForScene(
  * Selects an audio asset based on mood tag matching.
  * Returns null if no audio assets match (reels without audio are allowed).
  */
-export function selectAudio(
-  assetPool: Asset[],
-  suggestedMood?: string,
-): Asset | null {
+export function selectAudio(assetPool: Asset[], suggestedMood?: string): Asset | null {
   const audioAssets = assetPool.filter(
     (a) => a.type.toUpperCase().startsWith('AUD') && !a.r2Key.includes('/outputs/'),
   )

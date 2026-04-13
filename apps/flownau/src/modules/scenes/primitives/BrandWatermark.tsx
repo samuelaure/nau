@@ -27,9 +27,7 @@ export const BrandWatermark: React.FC<BrandWatermarkProps> = ({
   })
 
   const positionStyle: React.CSSProperties =
-    position === 'bottom-left'
-      ? { bottom: '8%', left: '5%' }
-      : { bottom: '8%', right: '5%' }
+    position === 'bottom-left' ? { bottom: '8%', left: '5%' } : { bottom: '8%', right: '5%' }
 
   return (
     <div

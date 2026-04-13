@@ -155,7 +155,14 @@ describe('Composer Cron (v2 Pipeline)', () => {
       audioAsset: null,
     })
     ;(compileTimeline as ReturnType<typeof vi.fn>).mockReturnValue({
-      schema: { format: 'reel', fps: 30, durationInFrames: 150, width: 1080, height: 1920, tracks: { overlay: [], media: [], text: [], audio: [] } },
+      schema: {
+        format: 'reel',
+        fps: 30,
+        durationInFrames: 150,
+        width: 1080,
+        height: 1920,
+        tracks: { overlay: [], media: [], text: [], audio: [] },
+      },
       resolvedScenes: [],
       audio: null,
     })

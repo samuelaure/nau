@@ -23,11 +23,7 @@ export const TextOverMediaScene: React.FC<TextOverMediaSceneProps> = ({
   return (
     <AbsoluteFill>
       {asset && (
-        <MediaBackground
-          assetUrl={asset.url}
-          mediaStartAt={asset.mediaStartAt}
-          type={asset.type}
-        />
+        <MediaBackground assetUrl={asset.url} mediaStartAt={asset.mediaStartAt} type={asset.type} />
       )}
       <DarkOverlay opacity={0.45} />
       <SafeText

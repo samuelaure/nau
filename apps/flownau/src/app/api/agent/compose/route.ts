@@ -69,8 +69,8 @@ export async function POST(req: Request) {
     // 5. Determine approval state
     const persona = personaId
       ? await prisma.brandPersona.findUnique({ where: { id: personaId } })
-      : (await prisma.brandPersona.findFirst({ where: { accountId, isDefault: true } })) ??
-        (await prisma.brandPersona.findFirst({ where: { accountId } }))
+      : ((await prisma.brandPersona.findFirst({ where: { accountId, isDefault: true } })) ??
+        (await prisma.brandPersona.findFirst({ where: { accountId } })))
 
     const isAutoApprove = persona?.autoApproveCompositions ?? false
 
@@ -101,7 +101,9 @@ export async function POST(req: Request) {
     if (audioAsset) usedAssetIds.push(audioAsset.id)
     await commitAssetUsage(usedAssetIds)
 
-    logger.info(`[DashboardCompose] Created composition ${newComposition.id} (${creative.scenes.length} scenes)`)
+    logger.info(
+      `[DashboardCompose] Created composition ${newComposition.id} (${creative.scenes.length} scenes)`,
+    )
 
     return NextResponse.json({ composition: newComposition }, { status: 200 })
   } catch (error: unknown) {

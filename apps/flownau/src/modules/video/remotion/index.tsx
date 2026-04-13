@@ -36,16 +36,18 @@ export const RemotionVideo: React.FC = () => {
             height: 1920,
           }
         }}
-        defaultProps={{
-          scenes: [],
-          audio: null,
-          brandStyle: {
-            primaryColor: '#6C63FF',
-            accentColor: '#FF6584',
-            fontFamily: 'sans-serif',
-          },
-          handle: undefined,
-        } as any}
+        defaultProps={
+          {
+            scenes: [],
+            audio: null,
+            brandStyle: {
+              primaryColor: '#6C63FF',
+              accentColor: '#FF6584',
+              fontFamily: 'sans-serif',
+            },
+            handle: undefined,
+          } as any
+        }
       />
 
       {/* v1: Legacy track-based composition (backward compat) */}

@@ -74,13 +74,7 @@ export async function GET() {
         }
 
         // 5. TimelineCompiler: Deterministic assembly
-        const { schema } = compileTimeline(
-          creative,
-          sceneAssets,
-          audioAsset,
-          brandStyle,
-          'reel',
-        )
+        const { schema } = compileTimeline(creative, sceneAssets, audioAsset, brandStyle, 'reel')
 
         // 6. Save Composition
         const isAutoApprove = persona?.autoApproveCompositions ?? false
@@ -157,9 +151,6 @@ export async function GET() {
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error)
     logError('[Composer] Fatal error', error)
-    return NextResponse.json(
-      { error: 'Fatal composer failure', details: msg },
-      { status: 500 },
-    )
+    return NextResponse.json({ error: 'Fatal composer failure', details: msg }, { status: 500 })
   }
 }

@@ -177,7 +177,12 @@ export default function AssetsManager({
   }
 
   const handleUnlinkFolder = async () => {
-    if (!confirm('Are you sure you want to unlink the R2 folder? This will remove all associated assets from this scope.')) return
+    if (
+      !confirm(
+        'Are you sure you want to unlink the R2 folder? This will remove all associated assets from this scope.',
+      )
+    )
+      return
     setUnlinking(true)
     try {
       const response = await fetch('/api/protected/r2/unlink', {
@@ -308,7 +313,7 @@ export default function AssetsManager({
                 disabled={unlinking}
                 className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-xl text-xs font-bold text-red-500 transition-all disabled:opacity-50"
               >
-                {unlinking ? <Loader2 size={14} className="animate-spin" /> : <Unlink size={14} />} 
+                {unlinking ? <Loader2 size={14} className="animate-spin" /> : <Unlink size={14} />}
                 {unlinking ? 'Unlinking...' : 'Unlink R2 Folder'}
               </button>
             ) : null}

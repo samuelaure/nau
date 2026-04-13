@@ -24,11 +24,7 @@ function ensureOutputDir(): void {
   }
 }
 
-async function uploadToR2(
-  localPath: string,
-  r2Key: string,
-  contentType: string,
-): Promise<string> {
+async function uploadToR2(localPath: string, r2Key: string, contentType: string): Promise<string> {
   const fileStream = fs.createReadStream(localPath)
   await r2.send(
     new PutObjectCommand({
@@ -55,7 +51,9 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
   const { compositionId } = job.data
   const startTime = Date.now()
 
-  logger.info(`[RenderWorker] Processing job ${job.id} for composition ${compositionId} (attempt ${job.attemptsMade + 1})`)
+  logger.info(
+    `[RenderWorker] Processing job ${job.id} for composition ${compositionId} (attempt ${job.attemptsMade + 1})`,
+  )
 
   // 1. Fetch composition from DB
   const composition = await prisma.composition.findUnique({
@@ -81,7 +79,8 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
       status: 'rendering',
       attempts: 1,
       startedAt: new Date(),
-      outputType: composition.format === 'reel' || composition.format === 'trial_reel' ? 'video' : 'image',
+      outputType:
+        composition.format === 'reel' || composition.format === 'trial_reel' ? 'video' : 'image',
     },
   })
 
@@ -100,7 +99,10 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
       // For now, log the re-selection — full re-compile is a Phase 4+ enhancement.
       logger.info(`[RenderWorker] Re-selected ${sceneAssets.size} assets for retry`)
     } catch (retryErr) {
-      logError('[RenderWorker] Asset re-selection failed, proceeding with original assets', retryErr)
+      logError(
+        '[RenderWorker] Asset re-selection failed, proceeding with original assets',
+        retryErr,
+      )
     }
   }
 
@@ -225,9 +227,7 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
       },
     })
 
-    logger.info(
-      `[RenderWorker] Video render complete: ${compositionId} (${renderTimeMs}ms)`,
-    )
+    logger.info(`[RenderWorker] Video render complete: ${compositionId} (${renderTimeMs}ms)`)
   } else {
     // ─── Still Render (single image or carousel) ─────────────
     const outputPath = path.join(OUTPUT_DIR, `render-${compositionId}.png`)
@@ -270,9 +270,7 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
       },
     })
 
-    logger.info(
-      `[RenderWorker] Still render complete: ${compositionId} (${renderTimeMs}ms)`,
-    )
+    logger.info(`[RenderWorker] Still render complete: ${compositionId} (${renderTimeMs}ms)`)
   }
 
   await job.updateProgress(100)
@@ -303,27 +301,21 @@ function handleFailedJob(job: Job<RenderJobData> | undefined, error: Error): voi
           data: { status: 'failed' },
         }),
       )
-      .catch((dbErr) =>
-        logError('[RenderWorker] Failed to update failed status in DB', dbErr),
-      )
+      .catch((dbErr) => logError('[RenderWorker] Failed to update failed status in DB', dbErr))
   }
 }
 
 // ─── Start Worker ──────────────────────────────────────────────────
 
 export function startRenderWorker(): Worker<RenderJobData> {
-  const worker = new Worker<RenderJobData>(
-    'flownau-render',
-    processRenderJob,
-    {
-      connection: redisConnection,
-      concurrency: 1, // One render at a time (GPU/memory bound)
-      limiter: {
-        max: 5,
-        duration: 60_000, // Max 5 jobs per minute
-      },
+  const worker = new Worker<RenderJobData>('flownau-render', processRenderJob, {
+    connection: redisConnection,
+    concurrency: 1, // One render at a time (GPU/memory bound)
+    limiter: {
+      max: 5,
+      duration: 60_000, // Max 5 jobs per minute
     },
-  )
+  })
 
   worker.on('completed', (job) => {
     logger.info(`[RenderWorker] Job ${job.id} completed successfully`)

@@ -90,18 +90,21 @@ export async function POST(req: NextRequest) {
           // Check thumbnails folder: videos/video.mp4 -> thumbnails/video.jpg
           // This assumes the thumbnails folder is at the same level as the video's parent or in a specific place
           // But based on user description "videos, thumbnails, audios", they are siblings.
-          const thumbnailsFolderKey = obj.Key.replace(/\/[^/]+\/[^/]+$/, `/thumbnails/${baseOnly}.${tExt}`)
+          const thumbnailsFolderKey = obj.Key.replace(
+            /\/[^/]+\/[^/]+$/,
+            `/thumbnails/${baseOnly}.${tExt}`,
+          )
           // Also check a more direct sibling approach: prefix/thumbnails/filename.jpg
-          const directSiblingThumb = prefix.endsWith('/') 
+          const directSiblingThumb = prefix.endsWith('/')
             ? `${prefix}thumbnails/${baseOnly}.${tExt}`
             : `${prefix}/thumbnails/${baseOnly}.${tExt}`
 
-          const thumbKey = objectMap.has(sameFolderKey) 
-            ? sameFolderKey 
-            : objectMap.has(directSiblingThumb) 
-              ? directSiblingThumb 
-              : objectMap.has(thumbnailsFolderKey) 
-                ? thumbnailsFolderKey 
+          const thumbKey = objectMap.has(sameFolderKey)
+            ? sameFolderKey
+            : objectMap.has(directSiblingThumb)
+              ? directSiblingThumb
+              : objectMap.has(thumbnailsFolderKey)
+                ? thumbnailsFolderKey
                 : null
 
           if (thumbKey) {

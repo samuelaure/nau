@@ -20,7 +20,11 @@ export const CTACardScene: React.FC<CTACardSceneProps> = ({ slots, brandStyle, a
     <AbsoluteFill>
       {asset ? (
         <>
-          <MediaBackground assetUrl={asset.url} mediaStartAt={asset.mediaStartAt} type={asset.type} />
+          <MediaBackground
+            assetUrl={asset.url}
+            mediaStartAt={asset.mediaStartAt}
+            type={asset.type}
+          />
           <DarkOverlay opacity={0.6} />
         </>
       ) : (

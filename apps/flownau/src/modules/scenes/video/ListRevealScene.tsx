@@ -32,7 +32,11 @@ export const ListRevealScene: React.FC<ListRevealSceneProps> = ({ slots, brandSt
     <AbsoluteFill>
       {asset ? (
         <>
-          <MediaBackground assetUrl={asset.url} mediaStartAt={asset.mediaStartAt} type={asset.type} />
+          <MediaBackground
+            assetUrl={asset.url}
+            mediaStartAt={asset.mediaStartAt}
+            type={asset.type}
+          />
           <DarkOverlay opacity={0.55} />
         </>
       ) : (

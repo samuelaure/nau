@@ -48,11 +48,7 @@ export const SceneSequenceComposition: React.FC<SceneSequenceCompositionProps> =
       {/* Audio track spans the entire composition */}
       {audio && (
         <Sequence from={0} durationInFrames={audio.durationInFrames}>
-          <AudioTrack
-            assetUrl={audio.url}
-            volume={audio.volume}
-            startFrom={audio.startFrom}
-          />
+          <AudioTrack assetUrl={audio.url} volume={audio.volume} startFrom={audio.startFrom} />
         </Sequence>
       )}
 

@@ -70,9 +70,7 @@ export function compileTimeline(
     let resolvedAsset: ResolvedScene['asset'] = null
     if (asset) {
       const durationSec = durationInFrames / fps
-      const maxStartSec = asset.duration
-        ? Math.max(0, asset.duration - durationSec - 0.5)
-        : 0
+      const maxStartSec = asset.duration ? Math.max(0, asset.duration - durationSec - 0.5) : 0
       const mediaStartAt = Math.floor(Math.random() * maxStartSec * fps)
 
       const isVideo = asset.type.toUpperCase().startsWith('VID')
@@ -256,7 +254,8 @@ function compileToDynamicSchema(
         safeZone: 'center-safe',
         color: '#FFFFFF',
         fontSize: scene.type === 'hook-text' ? 80 : 60,
-        animation: scene.type === 'hook-text' ? 'pop' : scene.type === 'cta-card' ? 'slide-up' : 'fade',
+        animation:
+          scene.type === 'hook-text' ? 'pop' : scene.type === 'cta-card' ? 'slide-up' : 'fade',
         fontFamily: brandStyle.fontFamily,
       })
     }
@@ -306,10 +305,7 @@ function compileToDynamicSchema(
 /**
  * Extracts the primary text content from scene slots for the legacy text track.
  */
-function extractTextContent(
-  type: string,
-  slots: Record<string, unknown>,
-): string | null {
+function extractTextContent(type: string, slots: Record<string, unknown>): string | null {
   switch (type) {
     case 'hook-text':
       return (slots.hook as string) ?? null

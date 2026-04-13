@@ -29,8 +29,8 @@ export const renderQueue = new Queue(QUEUE_NAME, {
       type: 'exponential',
       delay: 30_000, // 30s initial backoff
     },
-    removeOnComplete: { count: 100 },  // Keep last 100 completed
-    removeOnFail: { count: 200 },      // Keep last 200 failed for debugging
+    removeOnComplete: { count: 100 }, // Keep last 100 completed
+    removeOnFail: { count: 200 }, // Keep last 200 failed for debugging
   },
 })
 
@@ -44,22 +44,13 @@ export interface RenderJobData {
  * Enqueue a composition for rendering.
  * Priority: lower number = higher priority (1 = highest).
  */
-export async function addRenderJob(
-  compositionId: string,
-  priority?: number,
-): Promise<string> {
-  const job = await renderQueue.add(
-    'render',
-    { compositionId } satisfies RenderJobData,
-    {
-      jobId: `render:${compositionId}`,
-      priority: priority ?? 10,
-    },
-  )
+export async function addRenderJob(compositionId: string, priority?: number): Promise<string> {
+  const job = await renderQueue.add('render', { compositionId } satisfies RenderJobData, {
+    jobId: `render:${compositionId}`,
+    priority: priority ?? 10,
+  })
 
-  logger.info(
-    `[RenderQueue] Enqueued render job ${job.id} for composition ${compositionId}`,
-  )
+  logger.info(`[RenderQueue] Enqueued render job ${job.id} for composition ${compositionId}`)
 
   return job.id ?? compositionId
 }

@@ -8,10 +8,7 @@ import { validateServiceKey, unauthorizedResponse } from '@/modules/shared/nau-a
  *
  * Phase 5 will implement the full daily plan generation.
  */
-export async function GET(
-  req: Request,
-  { params }: { params: Promise<{ accountId: string }> },
-) {
+export async function GET(req: Request, { params }: { params: Promise<{ accountId: string }> }) {
   if (!validateServiceKey(req)) {
     return unauthorizedResponse()
   }

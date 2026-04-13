@@ -32,12 +32,12 @@ export async function POST(req: Request) {
     // 1. Fetch persona
     const persona = personaId
       ? await prisma.brandPersona.findUnique({ where: { id: personaId } })
-      : (await prisma.brandPersona.findFirst({
+      : ((await prisma.brandPersona.findFirst({
           where: { accountId, isDefault: true },
         })) ??
         (await prisma.brandPersona.findFirst({
           where: { accountId },
-        }))
+        })))
 
     if (!persona) {
       return NextResponse.json({ error: 'No Brand Persona setup yet.' }, { status: 400 })
@@ -69,10 +69,13 @@ export async function POST(req: Request) {
 
     const generatedIdeas = await Promise.all(ops)
 
-    return NextResponse.json({
-      ideas: generatedIdeas,
-      summary: output.briefSummary,
-    }, { status: 200 })
+    return NextResponse.json(
+      {
+        ideas: generatedIdeas,
+        summary: output.briefSummary,
+      },
+      { status: 200 },
+    )
   } catch (error: unknown) {
     logError('IDEA_GENERATION_ROUTE_ERROR', error)
     const message = error instanceof Error ? error.message : 'Unknown error'

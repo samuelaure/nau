@@ -31,7 +31,11 @@ export const QuoteCardScene: React.FC<QuoteCardSceneProps> = ({ slots, brandStyl
     <AbsoluteFill>
       {asset ? (
         <>
-          <MediaBackground assetUrl={asset.url} mediaStartAt={asset.mediaStartAt} type={asset.type} />
+          <MediaBackground
+            assetUrl={asset.url}
+            mediaStartAt={asset.mediaStartAt}
+            type={asset.type}
+          />
           <DarkOverlay opacity={0.6} />
         </>
       ) : (
