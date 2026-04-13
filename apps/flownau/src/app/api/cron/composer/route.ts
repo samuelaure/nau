@@ -4,6 +4,7 @@ import type { Prisma } from '@prisma/client'
 import { compose } from '@/modules/composer/scene-composer'
 import { selectAssetsForCreative, commitAssetUsage } from '@/modules/composer/asset-curator'
 import { compileTimeline } from '@/modules/composer/timeline-compiler'
+import { addRenderJob } from '@/modules/renderer/render-queue'
 import { logError, logger } from '@/modules/shared/logger'
 
 export const dynamic = 'force-dynamic'
@@ -107,6 +108,22 @@ export async function GET() {
         const usedAssetIds = [...sceneAssets.values()].map((a) => a.id)
         if (audioAsset) usedAssetIds.push(audioAsset.id)
         await commitAssetUsage(usedAssetIds)
+
+        // 9. If auto-approved, enqueue for rendering
+        if (isAutoApprove) {
+          await prisma.renderJob.create({
+            data: {
+              compositionId: composition.id,
+              status: 'queued',
+              outputType: 'video',
+            },
+          })
+          await addRenderJob(composition.id)
+          await prisma.composition.update({
+            where: { id: composition.id },
+            data: { status: 'rendering' },
+          })
+        }
 
         results.push({
           ideaId: idea.id,
