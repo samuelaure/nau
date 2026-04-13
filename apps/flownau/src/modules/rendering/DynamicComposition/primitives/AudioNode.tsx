@@ -7,7 +7,7 @@ export const AudioNode: React.FC<{ node: AudioNodeSchemaType }> = ({ node }) => 
     <Audio
       src={node.assetUrl}
       volume={node.volume ?? 1}
-      startFrom={0} // Typically audio starts from 0 unless AI specifies offset
+      startFrom={node.mediaStartAt ?? 0}
     />
   )
 }

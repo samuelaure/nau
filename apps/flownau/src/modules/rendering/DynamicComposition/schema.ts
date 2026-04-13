@@ -31,6 +31,7 @@ export const AudioNodeSchema = z.object({
   assetUrl: z.string(),
   startFrame: z.number(),
   durationInFrames: z.number(),
+  mediaStartAt: z.number().default(0), // Offset in frames from the start of the source audio
   volume: z.number().default(1),
 })
 
