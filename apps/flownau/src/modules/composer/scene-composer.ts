@@ -42,8 +42,8 @@ export async function compose(input: ComposeInput): Promise<ComposeResult> {
   // 1. Fetch Brand Persona
   const persona = personaId
     ? await prisma.brandPersona.findUnique({ where: { id: personaId } })
-    : (await prisma.brandPersona.findFirst({ where: { accountId, isDefault: true } })) ??
-      (await prisma.brandPersona.findFirst({ where: { accountId } }))
+    : ((await prisma.brandPersona.findFirst({ where: { accountId, isDefault: true } })) ??
+      (await prisma.brandPersona.findFirst({ where: { accountId } })))
 
   if (!persona) {
     throw new Error(`[SceneComposer] No Brand Persona found for account ${accountId}`)
@@ -56,9 +56,10 @@ export async function compose(input: ComposeInput): Promise<ComposeResult> {
   })
 
   const uniqueTags = [...new Set(assets.flatMap((a) => a.tags))].filter(Boolean)
-  const assetSummary = uniqueTags.length > 0
-    ? `Available asset tags: ${uniqueTags.join(', ')}`
-    : 'No tagged assets available. Use generic scene moods.'
+  const assetSummary =
+    uniqueTags.length > 0
+      ? `Available asset tags: ${uniqueTags.join(', ')}`
+      : 'No tagged assets available. Use generic scene moods.'
 
   // 3. Resolve AI model
   const { provider, model } = resolveModelId(persona.modelSelection)
@@ -66,27 +67,28 @@ export async function compose(input: ComposeInput): Promise<ComposeResult> {
   const openaiKey = (await getSetting('openai_api_key')) ?? process.env.OPENAI_API_KEY ?? null
 
   // 4. Build system prompt
+  const isImage = format === 'carousel' || format === 'single_image'
+  const sceneFormat = isImage ? 'image' : 'video'
+
   const formatGuide =
     format === 'reel' || format === 'trial_reel'
       ? 'Compose a sequence of 4-7 scenes for a short-form video reel (10-20 seconds total).'
       : format === 'carousel'
-        ? 'Compose 5-10 slides for an Instagram carousel.'
-        : 'Compose a single impactful image.'
+        ? 'Compose 5-10 slides for an Instagram carousel. Start with a cover-slide, end with a cta-slide.'
+        : 'Compose a single impactful image scene (1 scene only).'
 
-  const systemPrompt = `You are a Senior Creative Director for short-form social media content.
-
-BRAND VOICE:
-${persona.systemPrompt}
-
-AVAILABLE SCENE TYPES:
-${formatSceneCatalogForAI()}
-
-${assetSummary}
-
-FORMAT: ${format}
-${formatGuide}
-
-RULES:
+  const formatRules = isImage
+    ? `RULES:
+1. Use ONLY image scene types from the catalog.
+2. For carousel: start with 'cover-slide', end with 'cta-slide'. Middle slides are content-slide, quote-slide, or list-slide.
+3. For single_image: compose exactly 1 scene (cover-slide or content-slide work best).
+4. Fill each scene's text slots. Respect max character limits strictly.
+5. Write a compelling Instagram caption (max 2000 chars). Use line breaks.
+6. Suggest 5-15 relevant hashtags (without the # symbol).
+7. Set coverSceneIndex to 0 (first slide is always the cover).
+8. Write ALL text in the brand's natural language.
+9. Aim for 5-8 slides in a carousel. Quality over quantity.`
+    : `RULES:
 1. Start with a hook scene (hook-text or text-over-media with a hook). End with a cta-card.
 2. Use 'text-over-media' scenes heavily — they work best with B-roll content.
 3. Fill each scene's text slots according to the slot schema. Respect max character limits strictly.
@@ -98,6 +100,21 @@ RULES:
 9. Keep the total under 7 scenes for reels. Quality over quantity.
 10. Use 'media-only' scenes for breathing room between text-heavy scenes.
 11. Use 'transition' scenes sparingly (max 1 per reel).`
+
+  const systemPrompt = `You are a Senior Creative Director for short-form social media content.
+
+BRAND VOICE:
+${persona.systemPrompt}
+
+AVAILABLE SCENE TYPES:
+${formatSceneCatalogForAI(sceneFormat)}
+
+${assetSummary}
+
+FORMAT: ${format}
+${formatGuide}
+
+${formatRules}`
 
   // 5. Make AI call with structured output
   const messages: Array<{ role: 'system' | 'user'; content: string }> = [
@@ -123,7 +140,10 @@ RULES:
       creative = await callAI(provider, model, messages, groqKey, openaiKey)
     } catch (secondError: unknown) {
       const msg = secondError instanceof Error ? secondError.message : String(secondError)
-      logError(`[SceneComposer] Both attempts failed for idea: ${ideaText.slice(0, 100)}`, secondError)
+      logError(
+        `[SceneComposer] Both attempts failed for idea: ${ideaText.slice(0, 100)}`,
+        secondError,
+      )
       throw new Error(`[SceneComposer] Composition failed after 2 attempts: ${msg}`)
     }
   }
@@ -150,11 +170,17 @@ async function callAI(
     if (!openaiKey) throw new Error('OPENAI_API_KEY is not configured')
     const openai = new OpenAI({ apiKey: openaiKey })
 
-    const completion = await (openai.beta as unknown as {
-      chat: { completions: { parse: (params: Record<string, unknown>) => Promise<{
-        choices: Array<{ message: { parsed: unknown } }>
-      }> } }
-    }).chat.completions.parse({
+    const completion = await (
+      openai.beta as unknown as {
+        chat: {
+          completions: {
+            parse: (params: Record<string, unknown>) => Promise<{
+              choices: Array<{ message: { parsed: unknown } }>
+            }>
+          }
+        }
+      }
+    ).chat.completions.parse({
       model,
       temperature: 0.7,
       messages,
@@ -179,7 +205,8 @@ async function callAI(
       ...messages,
       {
         role: 'user',
-        content: 'Respond with ONLY valid JSON matching the CreativeDirection schema. No markdown, no explanation.',
+        content:
+          'Respond with ONLY valid JSON matching the CreativeDirection schema. No markdown, no explanation.',
       },
     ],
   })
@@ -188,7 +215,12 @@ async function callAI(
   if (!raw) throw new Error('Groq returned empty response')
 
   // Extract JSON from potential markdown code blocks
-  const jsonStr = raw.startsWith('{') ? raw : raw.replace(/```json?\n?/g, '').replace(/```/g, '').trim()
+  const jsonStr = raw.startsWith('{')
+    ? raw
+    : raw
+        .replace(/```json?\n?/g, '')
+        .replace(/```/g, '')
+        .trim()
 
   const parsed: unknown = JSON.parse(jsonStr)
   return CreativeDirectionSchema.parse(parsed)
