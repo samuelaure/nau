@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.0.0] - 2026-04-13
+
+### Added
+
+- **Frontend Dashboard Refactoring (Phase 6)**:
+  - **Compositions Workspace**: Created master list and detail views mapping to the v2 `Composition` DB models, fully replacing legacy `Render` patterns.
+  - **Daily Plans Center**: New per-account daily plan UI featuring piece states, script generation outputs, date navigation, and platform alerts.
+  - **Ideas Bank**: New global repository tracking localized InspoItems with inline approval/rejection and compositional bridging.
+  - **Account Health Monitoring**: Extended Account detail headers with automatic `tokenExpiresAt` health pills and native `Compositions` tab.
+
 ## [0.6.2] - 2026-04-13
 
 ### Fixed
