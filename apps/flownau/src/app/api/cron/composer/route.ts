@@ -5,6 +5,7 @@ import { compose } from '@/modules/composer/scene-composer'
 import { selectAssetsForCreative, commitAssetUsage } from '@/modules/composer/asset-curator'
 import { compileTimeline } from '@/modules/composer/timeline-compiler'
 import { addRenderJob } from '@/modules/renderer/render-queue'
+import { generateTopicHash } from '@/modules/planning/daily-plan.service'
 import { logError, logger } from '@/modules/shared/logger'
 
 export const dynamic = 'force-dynamic'
@@ -79,6 +80,9 @@ export async function GET() {
         // 6. Save Composition
         const isAutoApprove = persona?.autoApproveCompositions ?? false
 
+        const sceneTypes = creative.scenes.map((s: { type: string }) => s.type)
+        const topicHash = generateTopicHash(idea.ideaText)
+
         const composition = await prisma.composition.create({
           data: {
             accountId: idea.accountId,
@@ -88,6 +92,8 @@ export async function GET() {
             caption: creative.caption,
             hashtags: creative.hashtags,
             ideaId: idea.id,
+            sceneTypes,
+            topicHash,
             status: isAutoApprove ? 'APPROVED' : 'DRAFT',
           },
         })
