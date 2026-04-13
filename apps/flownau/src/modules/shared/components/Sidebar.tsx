@@ -2,12 +2,24 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Video, Instagram, Settings, LogOut } from 'lucide-react'
+import {
+  LayoutDashboard,
+  Video,
+  Instagram,
+  Settings,
+  LogOut,
+  Clapperboard,
+  CalendarDays,
+  Lightbulb,
+} from 'lucide-react'
 import { signOut } from 'next-auth/react'
 
 const navItems = [
   { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
   { name: 'IG Accounts', href: '/dashboard/accounts', icon: Instagram },
+  { name: 'Compositions', href: '/dashboard/compositions', icon: Clapperboard },
+  { name: 'Daily Plans', href: '/dashboard/plans', icon: CalendarDays },
+  { name: 'Ideas Bank', href: '/dashboard/ideas', icon: Lightbulb },
   { name: 'Templates', href: '/dashboard/templates', icon: Video },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ]
