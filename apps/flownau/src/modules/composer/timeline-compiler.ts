@@ -1,7 +1,7 @@
 import { DynamicCompositionSchema } from '@/modules/rendering/DynamicComposition/schema'
 import type { DynamicCompositionSchemaType } from '@/modules/rendering/DynamicComposition/schema'
-import { getSceneDefaults } from '@/modules/scenes/scene-registry'
-import type { CreativeDirection, ResolvedScene, AudioConfig, BrandStyle } from '@/types/scenes'
+import { getSceneCatalogEntry } from '@/types/scenes'
+import type { CreativeDirection, ResolvedScene, AudioConfig, BrandStyle, AnySceneType } from '@/types/scenes'
 import type { ContentFormat } from '@/types/content'
 import type { Asset } from '@prisma/client'
 
@@ -124,7 +124,7 @@ function distributeSceneDurations(
 
   // Get defaults for each scene
   const defaults = scenes.map((s) => {
-    const d = getSceneDefaults(s.type)
+    const d = getSceneCatalogEntry(s.type as AnySceneType)
     return {
       defaultSec: s.duration ?? d.defaultDurationSec,
       minSec: d.minDurationSec,
