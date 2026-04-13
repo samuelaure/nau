@@ -92,7 +92,9 @@ export async function GET(req: NextRequest) {
         userId: session.user.id, // Transfer ownership if someone else had it, or update current
         accessToken: encrypt(longLivedToken),
         username: igAccount.username,
-        expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000), // ~60 days
+        expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000), // ~60 days (legacy field)
+        tokenExpiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000), // ~60 days (v2 field)
+        tokenRefreshedAt: new Date(),
       },
       create: {
         userId: session.user.id,
@@ -100,7 +102,9 @@ export async function GET(req: NextRequest) {
         platformId: igAccount.id,
         username: igAccount.username,
         accessToken: encrypt(longLivedToken),
-        expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+        expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000), // (legacy field)
+        tokenExpiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000), // (v2 field)
+        tokenRefreshedAt: new Date(),
       },
     })
 
