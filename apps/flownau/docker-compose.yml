@@ -39,6 +39,38 @@ services:
         max-size: '10m'
         max-file: '3'
 
+  renderer:
+    container_name: flownau-renderer
+    image: ghcr.io/samuelaure/flownau/renderer:${TAG:-latest}
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@flownau_postgres:5432/${POSTGRES_DB}
+      - REDIS_HOST=flownau_redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - FFMPEG_PATH=/usr/bin/ffmpeg
+      - FFPROBE_PATH=/usr/bin/ffprobe
+    depends_on:
+      flownau_postgres:
+        condition: service_healthy
+      flownau_redis:
+        condition: service_healthy
+    networks:
+      - nau-network
+    # No Traefik labels — this container has no web traffic
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1536M
+          cpus: '1.0'
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
   flownau_postgres:
     image: postgres:15-alpine
     container_name: flownau-postgres
