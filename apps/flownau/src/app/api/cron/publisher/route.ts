@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
-import { publishVideoToInstagram } from '@/modules/accounts/instagram'
+import { publishComposition } from '@/modules/publisher/publish-orchestrator'
+import { scheduleRenderedCompositions } from '@/modules/publisher/scheduler'
 import { logError, logger } from '@/modules/shared/logger'
 
 export const dynamic = 'force-dynamic'
@@ -9,11 +10,11 @@ export const maxDuration = 120 // 2 minutes — publishing only, no rendering
 /**
  * GET /api/cron/publisher
  *
- * Publish rendered compositions to Instagram.
+ * Publish rendered compositions to Instagram via the unified orchestrator.
  * This cron ONLY handles Instagram API calls — rendering is fully decoupled
  * to the dedicated render worker (BullMQ queue).
  *
- * Part A: Explicitly scheduled compositions (scheduledAt <= now)
+ * Part A: Explicitly scheduled compositions (scheduledAt <= now, status = rendered)
  * Part B: Auto-posted compositions via PostingSchedule
  */
 export async function GET() {
@@ -27,10 +28,15 @@ export async function GET() {
     }> = []
     const now = new Date()
 
-    // --- PART A: Explicitly Scheduled Compositions ---
+    // --- PART A: Assign Scheduled Times ---
+    // This correctly distributes unscheduled, rendered compositions into future time-of-day slots
+    await scheduleRenderedCompositions()
+
+    // --- PART B: Publish Due Compositions ---
+    // Finds scheduled (or manually rendered+scheduled) compositions whose time has come
     const explicitCompositions = await prisma.composition.findMany({
       where: {
-        status: 'rendered',
+        status: { in: ['rendered', 'scheduled'] },
         scheduledAt: { lte: now },
         publishAttempts: { lt: 3 },
       },
@@ -48,18 +54,27 @@ export async function GET() {
         continue
       }
       try {
-        await publishComposition(composition)
-        results.push({ type: 'explicit', compositionId: composition.id, status: 'success' })
+        const result = await publishComposition(composition)
+        if (result.success) {
+          // ALSO update the PostingSchedule lastPostedAt if it exists
+          await prisma.postingSchedule.updateMany({
+            where: { accountId: composition.accountId },
+            data: { lastPostedAt: now },
+          })
+          results.push({ type: 'explicit', compositionId: composition.id, status: 'success' })
+        } else {
+          throw new Error(result.error || 'Unknown publish error')
+        }
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : String(err)
-        logError(`[Publisher] Explicit publish failed for ${composition.id}`, err)
+        logError(`[Publisher] Publish failed for ${composition.id}`, err)
         const attempts = composition.publishAttempts + 1
         await prisma.composition.update({
           where: { id: composition.id },
           data: {
             publishAttempts: attempts,
             lastPublishError: errMsg,
-            status: attempts >= 3 ? 'failed' : 'rendered',
+            status: attempts >= 3 ? 'failed' : composition.status,
           },
         })
         results.push({
@@ -71,122 +86,10 @@ export async function GET() {
       }
     }
 
-    // --- PART B: Auto-Posted Compositions (PostingSchedule) ---
-    const schedules = await prisma.postingSchedule.findMany({
-      include: { account: true },
-    })
-
-    for (const schedule of schedules) {
-      if (!schedule.account || !schedule.account.accessToken || !schedule.account.platformId) {
-        continue
-      }
-      const msInDay = 24 * 60 * 60 * 1000
-      const isDue =
-        !schedule.lastPostedAt ||
-        now.getTime() - new Date(schedule.lastPostedAt).getTime() >=
-          schedule.frequencyDays * msInDay
-
-      if (!isDue) {
-        results.push({ type: 'auto', accountId: schedule.accountId, status: 'skipped_not_due' })
-        continue
-      }
-
-      // Find the oldest rendered composition for this account
-      const composition = await prisma.composition.findFirst({
-        where: { accountId: schedule.accountId, status: 'rendered' },
-        orderBy: { createdAt: 'asc' },
-        include: { account: true },
-      })
-
-      if (!composition) {
-        results.push({ type: 'auto', accountId: schedule.accountId, status: 'skipped_no_rendered' })
-        continue
-      }
-
-      try {
-        await publishComposition(composition)
-        await prisma.postingSchedule.update({
-          where: { id: schedule.id },
-          data: { lastPostedAt: now },
-        })
-        results.push({ type: 'auto', compositionId: composition.id, status: 'success' })
-      } catch (err: unknown) {
-        const errMsg = err instanceof Error ? err.message : String(err)
-        logError(`[Publisher] Auto publish failed for ${composition.id}`, err)
-        const attempts = composition.publishAttempts + 1
-        await prisma.composition.update({
-          where: { id: composition.id },
-          data: {
-            publishAttempts: attempts,
-            lastPublishError: errMsg,
-            status: attempts >= 3 ? 'failed' : 'rendered',
-          },
-        })
-        results.push({
-          type: 'auto',
-          compositionId: composition.id,
-          status: 'failed',
-          error: errMsg,
-        })
-      }
-    }
-
     return NextResponse.json({ message: 'Publisher Execution Finished', results })
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error)
     logError('[Publisher] Fatal error', error)
-    return NextResponse.json(
-      { error: 'Fatal publisher failure', details: msg },
-      { status: 500 },
-    )
+    return NextResponse.json({ error: 'Fatal publisher failure', details: msg }, { status: 500 })
   }
-}
-
-/**
- * Publish a pre-rendered composition to Instagram.
- * No rendering happens here — the videoUrl is already set by the render worker.
- */
-async function publishComposition(composition: {
-  id: string
-  videoUrl: string | null
-  caption: string | null
-  hashtags: string[]
-  account: {
-    accessToken: string
-    platformId: string | null
-  }
-}): Promise<void> {
-  if (!composition.videoUrl) {
-    throw new Error(`Composition ${composition.id} has no rendered videoUrl`)
-  }
-  if (!composition.account.platformId) {
-    throw new Error(`Composition ${composition.id} has no Instagram platformId`)
-  }
-
-  // Build caption with hashtags
-  let caption = composition.caption || 'New content'
-  if (composition.hashtags && composition.hashtags.length > 0) {
-    const hashtagString = composition.hashtags.map((h) => `#${h}`).join(' ')
-    caption = `${caption}\n\n${hashtagString}`
-  }
-
-  logger.info(`[Publisher] Publishing composition ${composition.id} to Instagram`)
-
-  const igResult = await publishVideoToInstagram({
-    accessToken: composition.account.accessToken,
-    instagramUserId: composition.account.platformId,
-    videoUrl: composition.videoUrl,
-    caption,
-  })
-
-  await prisma.composition.update({
-    where: { id: composition.id },
-    data: {
-      status: 'published',
-      externalPostId: igResult.id,
-      externalPostUrl: igResult.permalink,
-    },
-  })
-
-  logger.info(`[Publisher] Successfully published ${composition.id} → ${igResult.permalink}`)
 }
