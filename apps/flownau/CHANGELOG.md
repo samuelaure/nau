@@ -3,11 +3,13 @@
 ## [0.6.2] - 2026-04-13
 
 ### Fixed
+
 - **Deployment Config**: Injected missing `NAU_SERVICE_KEY` and `NAUTHENTICITY_URL` environment variables into `deploy.yml` to allow v1 API authentication and cross-service ideation fetching.
 
 ## [0.6.1] - 2026-04-13
 
 ### Fixed
+
 - **Database Migration Hotfix**: Generated and committed the missing migration file for Phase 5 schema changes (`Composition.sceneTypes`, `Template` fields, `RenderJob`, `ContentPlan`) which caused a `P2022: The column (not available) does not exist` runtime error on production.
 
 ## [0.6.0] - 2026-04-13
