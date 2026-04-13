@@ -1,0 +1,42 @@
+# ============================================================
+# Renderer Dockerfile — Headless Remotion + FFmpeg worker
+# ============================================================
+# Runs as standalone BullMQ worker. No web server.
+# Shares the same codebase but uses tsx to run the worker entry.
+# ============================================================
+
+FROM node:20-bookworm-slim
+
+# Install runtime dependencies for Remotion rendering
+# chromium: headless browser for Remotion
+# ffmpeg: video encoding
+# openssl: Prisma runtime
+RUN apt-get update && apt-get install -y \
+    chromium \
+    ffmpeg \
+    openssl \
+    fonts-noto \
+    fonts-noto-cjk \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Chromium path for Remotion
+ENV CHROME_PATH=/usr/bin/chromium
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV FFMPEG_PATH=/usr/bin/ffmpeg
+ENV FFPROBE_PATH=/usr/bin/ffprobe
+
+WORKDIR /app
+
+# Copy dependency manifests first (layer cache optimization)
+COPY package*.json ./
+RUN npm ci
+
+# Copy full source (worker needs all modules)
+COPY . .
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# No port exposed — this is a worker, not a web server
+
+CMD ["npx", "tsx", "src/modules/renderer/render-worker.ts"]
