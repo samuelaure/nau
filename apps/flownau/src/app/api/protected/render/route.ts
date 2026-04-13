@@ -5,7 +5,7 @@ import { prisma } from '@/modules/shared/prisma'
 import { Prisma } from '@prisma/client'
 
 import { renderAndUpload } from '@/modules/video/renderer'
-import { publishVideoToInstagram } from '@/modules/accounts/instagram'
+import { publishReel } from '@/modules/publisher/instagram-reels'
 import { decrypt } from '@/modules/shared/encryption'
 import { NextResponse } from 'next/server'
 
@@ -65,20 +65,22 @@ export const POST = auth(async function POST(req) {
       })
 
       if (account && account.accessToken && account.platformId) {
-        const mediaResult = await publishVideoToInstagram({
+        const mediaResult = await publishReel({
           accessToken: decrypt(account.accessToken),
-          instagramUserId: account.platformId,
+          igUserId: account.platformId,
           videoUrl: fullUrl,
           caption: (inputData as Record<string, string>).Caption || 'automated post from flownaŭ',
         })
 
-        await prisma.render.update({
-          where: { id: render.id },
-          data: {
-            status: 'PUBLISHED',
-            instagramMediaId: mediaResult.id,
-          },
-        })
+        if (mediaResult.success) {
+          await prisma.render.update({
+            where: { id: render.id },
+            data: {
+              status: 'PUBLISHED',
+              instagramMediaId: mediaResult.externalId ?? null,
+            },
+          })
+        }
       }
     }
 
