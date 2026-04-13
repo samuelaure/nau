@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { GET } from '../route'
 import { prisma } from '@/modules/shared/prisma'
-import { renderAndUpload } from '@/modules/video/renderer'
 import { publishVideoToInstagram } from '@/modules/accounts/instagram'
 
 vi.mock('@/modules/shared/prisma', () => ({
@@ -18,12 +17,13 @@ vi.mock('@/modules/shared/prisma', () => ({
   },
 }))
 
-vi.mock('@/modules/video/renderer', () => ({
-  renderAndUpload: vi.fn(),
-}))
-
 vi.mock('@/modules/accounts/instagram', () => ({
   publishVideoToInstagram: vi.fn(),
+}))
+
+vi.mock('@/modules/shared/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+  logError: vi.fn(),
 }))
 
 describe('Publisher Cron API', () => {
@@ -31,13 +31,15 @@ describe('Publisher Cron API', () => {
     vi.clearAllMocks()
   })
 
-  it('processes SCHEDULED compositions that are due', async () => {
+  it('publishes rendered compositions that are scheduled', async () => {
     const mockComp = {
       id: 'comp1',
-      status: 'SCHEDULED',
+      status: 'rendered',
       scheduledAt: new Date(Date.now() - 1000),
       publishAttempts: 0,
-      payload: {},
+      videoUrl: 'https://r2.example.com/outputs/comp1.mp4',
+      caption: 'Test caption',
+      hashtags: ['test'],
       account: {
         id: 'acc1',
         accessToken: 'token',
@@ -46,10 +48,9 @@ describe('Publisher Cron API', () => {
       },
     }
 
-    ;(prisma.composition.findMany as any).mockResolvedValue([mockComp])
-    ;(prisma.postingSchedule.findMany as any).mockResolvedValue([])
-    ;(renderAndUpload as any).mockResolvedValue('key/path.mp4')
-    ;(publishVideoToInstagram as any).mockResolvedValue({
+    ;(prisma.composition.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([mockComp])
+    ;(prisma.postingSchedule.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([])
+    ;(publishVideoToInstagram as ReturnType<typeof vi.fn>).mockResolvedValue({
       id: 'ig_media_id',
       permalink: 'https://ig.com/p/123',
     })
@@ -60,26 +61,32 @@ describe('Publisher Cron API', () => {
     expect(data.results).toContainEqual(
       expect.objectContaining({ type: 'explicit', status: 'success' }),
     )
-    expect(renderAndUpload).toHaveBeenCalled()
-    expect(publishVideoToInstagram).toHaveBeenCalled()
+    // No renderAndUpload — rendering is decoupled
+    expect(publishVideoToInstagram).toHaveBeenCalledWith({
+      accessToken: 'token',
+      instagramUserId: 'ig123',
+      videoUrl: 'https://r2.example.com/outputs/comp1.mp4',
+      caption: 'Test caption\n\n#test',
+    })
     expect(prisma.composition.update).toHaveBeenCalledWith({
       where: { id: 'comp1' },
       data: {
-        status: 'PUBLISHED',
-        videoUrl: expect.stringContaining('key/path.mp4'),
+        status: 'published',
         externalPostId: 'ig_media_id',
         externalPostUrl: 'https://ig.com/p/123',
       },
     })
   })
 
-  it('increments publishAttempts on failure', async () => {
+  it('increments publishAttempts on IG publish failure', async () => {
     const mockComp = {
       id: 'comp2',
-      status: 'SCHEDULED',
+      status: 'rendered',
       scheduledAt: new Date(Date.now() - 1000),
       publishAttempts: 1,
-      payload: {},
+      videoUrl: 'https://r2.example.com/outputs/comp2.mp4',
+      caption: 'Test',
+      hashtags: [],
       account: {
         id: 'acc1',
         accessToken: 'token',
@@ -87,9 +94,9 @@ describe('Publisher Cron API', () => {
       },
     }
 
-    ;(prisma.composition.findMany as any).mockResolvedValue([mockComp])
-    ;(prisma.postingSchedule.findMany as any).mockResolvedValue([])
-    ;(renderAndUpload as any).mockRejectedValue(new Error('Render failed'))
+    ;(prisma.composition.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([mockComp])
+    ;(prisma.postingSchedule.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([])
+    ;(publishVideoToInstagram as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('IG API timeout'))
 
     const response = await GET()
     const data = await response.json()
@@ -99,19 +106,21 @@ describe('Publisher Cron API', () => {
       where: { id: 'comp2' },
       data: {
         publishAttempts: 2,
-        lastPublishError: 'Render failed',
-        status: 'SCHEDULED',
+        lastPublishError: 'IG API timeout',
+        status: 'rendered',
       },
     })
   })
 
-  it('sets status to FAILED after 3 attempts', async () => {
+  it('sets status to failed after 3 attempts', async () => {
     const mockComp = {
       id: 'comp3',
-      status: 'SCHEDULED',
+      status: 'rendered',
       scheduledAt: new Date(Date.now() - 1000),
       publishAttempts: 2,
-      payload: {},
+      videoUrl: 'https://r2.example.com/outputs/comp3.mp4',
+      caption: 'Test',
+      hashtags: [],
       account: {
         id: 'acc1',
         accessToken: 'token',
@@ -119,9 +128,9 @@ describe('Publisher Cron API', () => {
       },
     }
 
-    ;(prisma.composition.findMany as any).mockResolvedValue([mockComp])
-    ;(prisma.postingSchedule.findMany as any).mockResolvedValue([])
-    ;(renderAndUpload as any).mockRejectedValue(new Error('Persistent error'))
+    ;(prisma.composition.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([mockComp])
+    ;(prisma.postingSchedule.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([])
+    ;(publishVideoToInstagram as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Persistent error'))
 
     await GET()
 
@@ -130,12 +139,12 @@ describe('Publisher Cron API', () => {
       data: {
         publishAttempts: 3,
         lastPublishError: 'Persistent error',
-        status: 'FAILED',
+        status: 'failed',
       },
     })
   })
 
-  it('processes auto-posting for APPROVED compositions when due', async () => {
+  it('auto-posts rendered compositions when schedule is due', async () => {
     const mockSchedule = {
       id: 'sched1',
       accountId: 'acc1',
@@ -149,16 +158,18 @@ describe('Publisher Cron API', () => {
     }
     const mockComp = {
       id: 'comp4',
-      status: 'APPROVED',
-      payload: {},
+      status: 'rendered',
+      videoUrl: 'https://r2.example.com/outputs/comp4.mp4',
+      caption: 'Auto post',
+      hashtags: ['auto'],
+      publishAttempts: 0,
       account: mockSchedule.account,
     }
 
-    ;(prisma.composition.findMany as any).mockResolvedValue([]) // No explicit
-    ;(prisma.postingSchedule.findMany as any).mockResolvedValue([mockSchedule])
-    ;(prisma.composition.findFirst as any).mockResolvedValue(mockComp)
-    ;(renderAndUpload as any).mockResolvedValue('key/path.mp4')
-    ;(publishVideoToInstagram as any).mockResolvedValue({ id: 'ig1', permalink: 'p1' })
+    ;(prisma.composition.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]) // No explicit
+    ;(prisma.postingSchedule.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([mockSchedule])
+    ;(prisma.composition.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(mockComp)
+    ;(publishVideoToInstagram as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'ig1', permalink: 'p1' })
 
     const response = await GET()
     const data = await response.json()
@@ -169,7 +180,7 @@ describe('Publisher Cron API', () => {
     expect(prisma.postingSchedule.update).toHaveBeenCalled()
     expect(prisma.composition.update).toHaveBeenCalledWith({
       where: { id: 'comp4' },
-      data: expect.objectContaining({ status: 'PUBLISHED' }),
+      data: expect.objectContaining({ status: 'published' }),
     })
   })
 })
