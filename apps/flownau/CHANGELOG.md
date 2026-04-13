@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.6.0] - 2026-04-13
+
+### Added
+
+- **Platform Integration & Daily Planning (Phase 5)**:
+  - **Daily Content Plan Engine**: Implemented `generateDailyPlan` service which counts rendered vs scheduled pieces, predicts what is needed based on `PostingSchedule`, and calculates alerts (token expiry, low ideas, exhausted asset pool).
+  - **Head Talk Detection**: Automated detection of face-to-camera concepts. Identifies keywords (e.g. "opinion", "hot take") and automatically extracts recording scripts.
+  - **v1 Universal API**: Standardized cross-service routes protected by `NAU_SERVICE_KEY`:
+    - `POST /api/v1/compose`: Exposes a reactive composition trigger for echonau/triage with an `autoApprove` flag for instant pipeline processing.
+    - `POST /api/v1/ideas/ingest`: Bulk ingestion with duplicate checking (7-day window).
+    - `GET /api/v1/daily-plan/:accountId`: Delivers the plan for Zazŭ (includes a `?reminder=true` compacted form).
+    - `GET /api/v1/compositions`: Poll rendering statuses for orchestration.
+  - **nauthenticity Connection**: Implemented the `InspoItems` source adapter fetching localized context with seamless graceful degradation.
+  - **Diversity Tracking**: Added `sceneTypes` and `topicHash` metrics to schema. Ideation cron now analyzes past 14 days of content sequences to prevent creative repetition.
+
 ## [0.5.0] - 2026-04-10
 
 ### Added
