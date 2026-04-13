@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
 import { validateServiceKey, unauthorizedResponse } from '@/modules/shared/nau-auth'
 import { prisma } from '@/modules/shared/prisma'
+import { logError } from '@/modules/shared/logger'
 
 /**
  * GET /api/v1/compositions — Query compositions by account and status.
  * Called by: Zazŭ (to check rendering/publishing status)
  * Auth: NAU_SERVICE_KEY
  *
- * Query params: accountId, status, format, limit
+ * Query params: accountId (required), status, format, limit
  */
 export async function GET(req: Request) {
   if (!validateServiceKey(req)) {
@@ -19,16 +20,19 @@ export async function GET(req: Request) {
     const accountId = searchParams.get('accountId')
     const status = searchParams.get('status')
     const format = searchParams.get('format')
-    const limit = parseInt(searchParams.get('limit') ?? '20', 10)
+    const limit = Math.min(parseInt(searchParams.get('limit') ?? '20', 10), 100)
 
-    const where: Record<string, unknown> = {}
-    if (accountId) where.accountId = accountId
+    if (!accountId) {
+      return NextResponse.json({ error: 'accountId query param is required' }, { status: 400 })
+    }
+
+    const where: Record<string, unknown> = { accountId }
     if (status) where.status = status
     if (format) where.format = format
 
     const compositions = await prisma.composition.findMany({
       where,
-      take: Math.min(limit, 100),
+      take: limit,
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
@@ -39,6 +43,7 @@ export async function GET(req: Request) {
         hashtags: true,
         videoUrl: true,
         coverUrl: true,
+        sceneTypes: true,
         scheduledAt: true,
         publishAttempts: true,
         createdAt: true,
@@ -48,7 +53,8 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ compositions, count: compositions.length })
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to fetch compositions'
-    return NextResponse.json({ error: message }, { status: 500 })
+    const msg = error instanceof Error ? error.message : 'Failed to fetch compositions'
+    logError('[CompositionsAPI] Query failed', error)
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
