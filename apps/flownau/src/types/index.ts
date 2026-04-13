@@ -14,7 +14,16 @@ export type TemplateWithAccount = Prisma.TemplateGetPayload<{
   }
 }>
 
-// Render with relations
+// Composition with relations
+export type CompositionWithRelations = Prisma.CompositionGetPayload<{
+  include: {
+    account: { select: { id: true; username: true } }
+    renderJob: true
+    idea: { select: { id: true; ideaText: true; source: true; sourceRef: true } }
+  }
+}>
+
+// Render with relations (DEPRECATED — legacy model)
 export type RenderWithTemplate = Prisma.RenderGetPayload<{
   include: { template: true }
 }>
