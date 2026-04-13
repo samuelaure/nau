@@ -138,6 +138,8 @@ jobs:
             INITIAL_ADMIN_EMAIL=${{ secrets.INITIAL_ADMIN_EMAIL }}
             INITIAL_ADMIN_PASSWORD=${{ secrets.INITIAL_ADMIN_PASSWORD }}
             INITIAL_ADMIN_NAME="Samuel Aure"
+            NAU_SERVICE_KEY=${{ secrets.NAU_SERVICE_KEY }}
+            NAUTHENTICITY_URL=https://nauthenticity.9nau.com
             TAG=${{ github.ref_name }}
             ENVEOF
             tr -d '\r' < /root/flownau/.env.tmp > /root/flownau/.env
