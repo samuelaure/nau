@@ -5,7 +5,7 @@ import { auth } from '@/auth'
 import { prisma } from '@/modules/shared/prisma'
 import { encrypt } from '@/modules/shared/encryption'
 import axios from 'axios'
-import { getLongLivedToken } from '@/modules/accounts/instagram'
+import { getLongLivedToken } from '@/modules/publisher/instagram-token'
 
 interface FacebookPage {
   id: string
