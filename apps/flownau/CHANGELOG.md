@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.6.1] - 2026-04-13
+
+### Fixed
+- **Database Migration Hotfix**: Generated and committed the missing migration file for Phase 5 schema changes (`Composition.sceneTypes`, `Template` fields, `RenderJob`, `ContentPlan`) which caused a `P2022: The column (not available) does not exist` runtime error on production.
+
 ## [0.6.0] - 2026-04-13
 
 ### Added
