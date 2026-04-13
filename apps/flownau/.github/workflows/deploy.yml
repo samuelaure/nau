@@ -85,6 +85,15 @@ jobs:
           no-cache: true
           tags: ghcr.io/${{ github.repository }}/app:latest,ghcr.io/${{ github.repository }}/app:${{ github.ref_name }}
 
+      - name: Build and Push Renderer
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.renderer
+          push: true
+          no-cache: true
+          tags: ghcr.io/${{ github.repository }}/renderer:latest,ghcr.io/${{ github.repository }}/renderer:${{ github.ref_name }}
+
       - name: Copy docker-compose.yml to server
         uses: appleboy/scp-action@master
         with:
