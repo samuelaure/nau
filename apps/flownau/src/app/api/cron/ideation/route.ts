@@ -1,59 +1,102 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 import { generateContentIdeas } from '@/modules/ideation/ideation.service'
+import { fetchInspoItems } from '@/modules/ideation/sources/inspo-source'
+import { getBrandDNA } from '@/modules/ideation/sources/brand-dna-source'
+import { detectHeadTalk } from '@/modules/planning/daily-plan.service'
+import { logError, logger } from '@/modules/shared/logger'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300 // 5 minutes max for AI generation timeout
 
 /**
  * GET /api/cron/ideation
- * Runs periodically to generate new content ideas using the ideation service.
+ *
+ * Generates content ideas for each active account using:
+ * 1. InspoItems from nauthenticity (graceful degradation)
+ * 2. Brand DNA as fallback
+ * 3. Recent content history for diversity
+ * 4. Head-talk detection for face-to-camera ideas
  */
 export async function GET() {
   try {
-    const results = []
+    const results: Array<{
+      accountId: string
+      status: string
+      ideasGenerated?: number
+      headTalkDetected?: number
+      summary?: string
+      error?: string
+    }> = []
 
-    // 1. Fetch eligible accounts (ones with default BrandPersona and missing pending ideas)
     const accounts = await prisma.socialAccount.findMany({
-      take: 10, // process batches
+      take: 10,
     })
 
     for (const account of accounts) {
-      // Find the active brand persona
       const persona = await prisma.brandPersona.findFirst({
         where: { accountId: account.id, isDefault: true },
       })
 
       if (!persona) continue
 
-      // See how many pending ideas this account has
+      // Skip if already have plenty of pending ideas
       const pendingIdeasCount = await prisma.contentIdea.count({
         where: { accountId: account.id, status: 'PENDING' },
       })
 
-      // Skip if they already have plenty of pending ideas
       if (pendingIdeasCount >= 10) continue
 
       try {
-        // Generate new ideas via the Ideation Engine.
-        // Nauthenticity integration (inspoItems) is planned for Phase 5.
-        // For now, generate purely based on Brand DNA.
-        const output = await generateContentIdeas({
-          brandName: persona.name,
-          brandDNA: persona.systemPrompt,
-          inspoItems: [],
+        // 1. Fetch InspoItems from nauthenticity (graceful degradation)
+        const inspoItems = await fetchInspoItems(account.id)
+
+        // 2. Get Brand DNA
+        const brandDNA = await getBrandDNA(account.id)
+
+        // 3. Get recent content for diversity tracking
+        const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)
+        const recentCompositions = await prisma.composition.findMany({
+          where: {
+            accountId: account.id,
+            createdAt: { gte: fourteenDaysAgo },
+          },
+          select: { caption: true, sceneTypes: true },
+          take: 30,
         })
 
-        // Insert generated ideas
+        const recentPosts = recentCompositions
+          .filter((c) => c.caption)
+          .map((c) => c.caption!.slice(0, 100))
+
+        // 4. Generate ideas
+        const output = await generateContentIdeas({
+          brandName: persona.name,
+          brandDNA,
+          inspoItems,
+          recentPosts,
+        })
+
+        // 5. Insert ideas with head-talk detection
+        let headTalkCount = 0
+
         for (const idea of output.ideas) {
           const ideaText = `[${idea.format.toUpperCase()}] Hook: ${idea.hook}\nAngle: ${idea.angle}\nScript: ${idea.script}\nCTA: ${idea.cta}`
+
+          const isHeadTalk = detectHeadTalk(ideaText)
+          if (isHeadTalk) headTalkCount++
 
           await prisma.contentIdea.create({
             data: {
               accountId: account.id,
               ideaText,
-              status: persona.autoApproveIdeas ? 'APPROVED' : 'PENDING',
-              source: 'internal', // standard internal generation
+              status: isHeadTalk
+                ? 'PENDING' // Head-talk ideas always require manual approval
+                : persona.autoApproveIdeas
+                  ? 'APPROVED'
+                  : 'PENDING',
+              source: inspoItems.length > 0 ? 'inspo' : 'internal',
+              sourceRef: idea.inspoItemId ?? null,
             },
           })
         }
@@ -62,20 +105,24 @@ export async function GET() {
           accountId: account.id,
           status: 'success',
           ideasGenerated: output.ideas.length,
+          headTalkDetected: headTalkCount,
           summary: output.briefSummary,
         })
-      } catch (err: any) {
-        console.error(`[CRON_IDEATION_ERROR] Account ${account.id}:`, err)
-        results.push({ accountId: account.id, status: 'failed', error: err.message })
+
+        logger.info(
+          `[Ideation] Generated ${output.ideas.length} ideas for ${account.username ?? account.id} (${headTalkCount} head-talk, ${inspoItems.length} inspo items used)`,
+        )
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        logError(`[Ideation] Failed for account ${account.id}`, err)
+        results.push({ accountId: account.id, status: 'failed', error: msg })
       }
     }
 
     return NextResponse.json({ message: 'Ideation Execution Finished', results })
-  } catch (error: any) {
-    console.error('[CRON_IDEATION_FATAL]', error)
-    return NextResponse.json(
-      { error: 'Fatal ideation failure', details: error.message },
-      { status: 500 },
-    )
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error)
+    logError('[Ideation] Fatal error', error)
+    return NextResponse.json({ error: 'Fatal ideation failure', details: msg }, { status: 500 })
   }
 }
