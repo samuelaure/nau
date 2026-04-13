@@ -25,6 +25,45 @@ export const VideoSceneTypeEnum = z.enum([
   'transition',
 ])
 
+/**
+ * Image scene types — building blocks of Carousels and Single Images.
+ * Each maps to a static Remotion component rendered as a still.
+ */
+export type ImageSceneType =
+  | 'cover-slide'
+  | 'content-slide'
+  | 'quote-slide'
+  | 'list-slide'
+  | 'cta-slide'
+
+export const ImageSceneTypeEnum = z.enum([
+  'cover-slide',
+  'content-slide',
+  'quote-slide',
+  'list-slide',
+  'cta-slide',
+])
+
+/**
+ * Union of all scene types (video + image).
+ */
+export type AnySceneType = VideoSceneType | ImageSceneType
+
+export const AnySceneTypeEnum = z.enum([
+  'hook-text',
+  'text-over-media',
+  'quote-card',
+  'list-reveal',
+  'media-only',
+  'cta-card',
+  'transition',
+  'cover-slide',
+  'content-slide',
+  'quote-slide',
+  'list-slide',
+  'cta-slide',
+])
+
 // ─── Slot Schemas ──────────────────────────────────────────────────
 
 export const HookTextSlots = z.object({
@@ -53,6 +92,33 @@ export const CTACardSlots = z.object({
 })
 
 export const TransitionSlots = z.object({})
+
+// ─── Image Slot Schemas ────────────────────────────────────────────
+
+export const CoverSlideSlots = z.object({
+  title: z.string().max(80),
+  subtitle: z.string().max(120).optional(),
+})
+
+export const ContentSlideSlots = z.object({
+  heading: z.string().max(80),
+  body: z.string().max(300),
+})
+
+export const QuoteSlideSlots = z.object({
+  quote: z.string().max(200),
+  attribution: z.string().max(50).optional(),
+})
+
+export const ListSlideSlots = z.object({
+  title: z.string().max(60).optional(),
+  items: z.array(z.string().max(80)).min(2).max(5),
+})
+
+export const CTASlideSlots = z.object({
+  cta: z.string().max(60),
+  handle: z.string().max(30).optional(),
+})
 
 // ─── Scene Definition (one element in the AI's output) ─────────────
 
@@ -110,7 +176,8 @@ export interface AudioConfig {
 // ─── Scene Catalog (context given to the AI) ───────────────────────
 
 export interface SceneCatalogEntry {
-  type: VideoSceneType
+  type: AnySceneType
+  format: 'video' | 'image'
   description: string
   defaultDurationSec: number
   minDurationSec: number
@@ -123,9 +190,12 @@ export interface SceneCatalogEntry {
  * Descriptions are crafted for the LLM to understand purpose and constraints.
  */
 export const SCENE_CATALOG: SceneCatalogEntry[] = [
+  // ─── Video Scenes ──────────────────────────────────────────
   {
     type: 'hook-text',
-    description: 'Bold text on a gradient background. NO B-roll. Used to grab attention in the first 1-2 seconds. Uses brand primary color.',
+    format: 'video',
+    description:
+      'Bold text on a gradient background. NO B-roll. Used to grab attention in the first 1-2 seconds. Uses brand primary color.',
     defaultDurationSec: 2,
     minDurationSec: 1,
     maxDurationSec: 4,
@@ -133,7 +203,9 @@ export const SCENE_CATALOG: SceneCatalogEntry[] = [
   },
   {
     type: 'text-over-media',
-    description: 'Text overlaid on B-roll video. PRIMARY scene type for Reels. Uses dark overlay for readability. Best for delivering key points over engaging footage.',
+    format: 'video',
+    description:
+      'Text overlaid on B-roll video. PRIMARY scene type for Reels. Uses dark overlay for readability. Best for delivering key points over engaging footage.',
     defaultDurationSec: 3,
     minDurationSec: 2,
     maxDurationSec: 6,
@@ -141,7 +213,9 @@ export const SCENE_CATALOG: SceneCatalogEntry[] = [
   },
   {
     type: 'quote-card',
-    description: 'Centered quote with decorative border lines. Optional attribution. Can have dimmed B-roll background. Great for testimonials, stats, or powerful statements.',
+    format: 'video',
+    description:
+      'Centered quote with decorative border lines. Optional attribution. Can have dimmed B-roll background. Great for testimonials, stats, or powerful statements.',
     defaultDurationSec: 3.5,
     minDurationSec: 2.5,
     maxDurationSec: 6,
@@ -149,15 +223,20 @@ export const SCENE_CATALOG: SceneCatalogEntry[] = [
   },
   {
     type: 'list-reveal',
-    description: 'Items appear one by one with staggered animation. Great for tips, steps, or benefits. Each item gets equal screen time within the scene.',
+    format: 'video',
+    description:
+      'Items appear one by one with staggered animation. Great for tips, steps, or benefits. Each item gets equal screen time within the scene.',
     defaultDurationSec: 4,
     minDurationSec: 3,
     maxDurationSec: 8,
-    slotDescription: 'title?: string (max 60 chars), items: string[] (2-5 items, max 80 chars each)',
+    slotDescription:
+      'title?: string (max 60 chars), items: string[] (2-5 items, max 80 chars each)',
   },
   {
     type: 'media-only',
-    description: 'Full-screen B-roll video with NO text. Visual breathing room between text-heavy scenes. Use to showcase products, environments, or create mood.',
+    format: 'video',
+    description:
+      'Full-screen B-roll video with NO text. Visual breathing room between text-heavy scenes. Use to showcase products, environments, or create mood.',
     defaultDurationSec: 2,
     minDurationSec: 1,
     maxDurationSec: 5,
@@ -165,7 +244,9 @@ export const SCENE_CATALOG: SceneCatalogEntry[] = [
   },
   {
     type: 'cta-card',
-    description: 'Call-to-action card. Used as the LAST scene. Brand gradient or dimmed B-roll background. CTA text centered, optional brand handle at bottom.',
+    format: 'video',
+    description:
+      'Call-to-action card. Used as the LAST scene. Brand gradient or dimmed B-roll background. CTA text centered, optional brand handle at bottom.',
     defaultDurationSec: 2.5,
     minDurationSec: 2,
     maxDurationSec: 4,
@@ -173,28 +254,87 @@ export const SCENE_CATALOG: SceneCatalogEntry[] = [
   },
   {
     type: 'transition',
-    description: 'Short fade-to-black visual breather. No content. Used sparingly between major sections. Keep under 1 second.',
+    format: 'video',
+    description:
+      'Short fade-to-black visual breather. No content. Used sparingly between major sections. Keep under 1 second.',
     defaultDurationSec: 0.5,
     minDurationSec: 0.3,
     maxDurationSec: 1.5,
     slotDescription: '(no slots — pure transition)',
   },
+  // ─── Image Scenes (Carousel / Single Image) ────────────────
+  {
+    type: 'cover-slide',
+    format: 'image',
+    description:
+      'First slide of a carousel. Bold title with optional subtitle on brand gradient background. Sets the topic and hooks the swipe.',
+    defaultDurationSec: 0,
+    minDurationSec: 0,
+    maxDurationSec: 0,
+    slotDescription: 'title: string (max 80 chars), subtitle?: string (max 120 chars)',
+  },
+  {
+    type: 'content-slide',
+    format: 'image',
+    description:
+      'Educational content slide. Heading at top, body text in center, accent separator line. Use for explaining points in detail.',
+    defaultDurationSec: 0,
+    minDurationSec: 0,
+    maxDurationSec: 0,
+    slotDescription: 'heading: string (max 80 chars), body: string (max 300 chars)',
+  },
+  {
+    type: 'quote-slide',
+    format: 'image',
+    description:
+      'Stylized quote with decorative quotation marks. Centered text with optional attribution. Great for impactful statements.',
+    defaultDurationSec: 0,
+    minDurationSec: 0,
+    maxDurationSec: 0,
+    slotDescription: 'quote: string (max 200 chars), attribution?: string (max 50 chars)',
+  },
+  {
+    type: 'list-slide',
+    format: 'image',
+    description:
+      'Numbered list with accent-colored numbers. Optional title. Clean spacing. Best for tips, steps, or benefits.',
+    defaultDurationSec: 0,
+    minDurationSec: 0,
+    maxDurationSec: 0,
+    slotDescription:
+      'title?: string (max 60 chars), items: string[] (2-5 items, max 80 chars each)',
+  },
+  {
+    type: 'cta-slide',
+    format: 'image',
+    description:
+      'Final carousel slide. Call-to-action with optional brand handle. Brand gradient background. Always the last slide.',
+    defaultDurationSec: 0,
+    minDurationSec: 0,
+    maxDurationSec: 0,
+    slotDescription: 'cta: string (max 60 chars), handle?: string (max 30 chars)',
+  },
 ]
 
 /**
  * Formats the scene catalog as a string for the AI system prompt.
+ * Filters by format so the AI only sees relevant scenes.
  */
-export function formatSceneCatalogForAI(): string {
-  return SCENE_CATALOG.map(
-    (s) =>
-      `- ${s.type}: ${s.description}\n  Duration: ${s.minDurationSec}-${s.maxDurationSec}s (default: ${s.defaultDurationSec}s)\n  Slots: ${s.slotDescription}`,
-  ).join('\n\n')
+export function formatSceneCatalogForAI(format: 'video' | 'image' = 'video'): string {
+  return SCENE_CATALOG.filter((s) => s.format === format)
+    .map((s) => {
+      if (format === 'video') {
+        return `- ${s.type}: ${s.description}\n  Duration: ${s.minDurationSec}-${s.maxDurationSec}s (default: ${s.defaultDurationSec}s)\n  Slots: ${s.slotDescription}`
+      }
+      return `- ${s.type}: ${s.description}\n  Slots: ${s.slotDescription}`
+    })
+    .join('\n\n')
 }
 
 /**
  * Gets catalog entry for a scene type.
  */
-export function getSceneCatalogEntry(type: VideoSceneType): SceneCatalogEntry {
+export function getSceneCatalogEntry(type: AnySceneType): SceneCatalogEntry {
   const entry = SCENE_CATALOG.find((s) => s.type === type)
   if (!entry) throw new Error(`Unknown scene type: ${type}`)
   return entry
