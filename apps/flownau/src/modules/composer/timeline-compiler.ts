@@ -1,7 +1,13 @@
 import { DynamicCompositionSchema } from '@/modules/rendering/DynamicComposition/schema'
 import type { DynamicCompositionSchemaType } from '@/modules/rendering/DynamicComposition/schema'
 import { getSceneCatalogEntry } from '@/types/scenes'
-import type { CreativeDirection, ResolvedScene, AudioConfig, BrandStyle, AnySceneType } from '@/types/scenes'
+import type {
+  CreativeDirection,
+  ResolvedScene,
+  AudioConfig,
+  BrandStyle,
+  AnySceneType,
+} from '@/types/scenes'
 import type { ContentFormat } from '@/types/content'
 import type { Asset } from '@prisma/client'
 
