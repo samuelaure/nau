@@ -3,7 +3,8 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 import { auth } from '@/auth'
-import { generateContentIdeas } from '@/modules/video/agent'
+import { generateContentIdeas } from '@/modules/ideation/ideation.service'
+import { logError } from '@/modules/shared/logger'
 
 export async function POST(req: Request) {
   try {
@@ -13,7 +14,7 @@ export async function POST(req: Request) {
     }
 
     const json = await req.json()
-    const { accountId, personaId, frameworkId } = json
+    const { accountId, personaId } = json
 
     if (!accountId) {
       return NextResponse.json({ error: 'Missing accountId' }, { status: 400 })
@@ -28,12 +29,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized account access' }, { status: 403 })
     }
 
-    // 1. Fetch persona to check ideation auto-approve state
+    // 1. Fetch persona
     const persona = personaId
       ? await prisma.brandPersona.findUnique({ where: { id: personaId } })
       : (await prisma.brandPersona.findFirst({
           where: { accountId, isDefault: true },
-        })) ||
+        })) ??
         (await prisma.brandPersona.findFirst({
           where: { accountId },
         }))
@@ -42,28 +43,38 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'No Brand Persona setup yet.' }, { status: 400 })
     }
 
-    // 2. Generate Ideas
-    const ideasTextArray = await generateContentIdeas(accountId, personaId, frameworkId)
+    // 2. Generate Ideas using the production ideation service
+    const output = await generateContentIdeas({
+      brandName: persona.name,
+      brandDNA: persona.systemPrompt,
+      inspoItems: [], // nauthenticity integration in Phase 5
+    })
 
-    // 3. Trust Logic Implementation: Determine status
+    // 3. Trust Logic: Determine status
     const initialStatus = persona.autoApproveIdeas ? 'APPROVED' : 'PENDING'
 
     // 4. Save to Database
-    const ops = ideasTextArray.map((idea) => {
+    const ops = output.ideas.map((idea) => {
+      const ideaText = `[${idea.format.toUpperCase()}] Hook: ${idea.hook}\nAngle: ${idea.angle}\nScript: ${idea.script}\nCTA: ${idea.cta}`
+
       return prisma.contentIdea.create({
         data: {
           accountId,
-          ideaText: idea,
+          ideaText,
           status: initialStatus,
+          source: 'internal',
         },
       })
     })
 
     const generatedIdeas = await Promise.all(ops)
 
-    return NextResponse.json({ ideas: generatedIdeas }, { status: 200 })
+    return NextResponse.json({
+      ideas: generatedIdeas,
+      summary: output.briefSummary,
+    }, { status: 200 })
   } catch (error: unknown) {
-    console.error('[IDEA_GENERATION_ROUTE_ERROR]', error)
+    logError('IDEA_GENERATION_ROUTE_ERROR', error)
     const message = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json({ error: 'Failed to generate ideas', message }, { status: 500 })
   }

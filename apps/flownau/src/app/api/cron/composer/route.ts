@@ -1,75 +1,147 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
-import { composeVideoWithAgent } from '@/modules/video/agent'
+import type { Prisma } from '@prisma/client'
+import { compose } from '@/modules/composer/scene-composer'
+import { selectAssetsForCreative, commitAssetUsage } from '@/modules/composer/asset-curator'
+import { compileTimeline } from '@/modules/composer/timeline-compiler'
+import { logError, logger } from '@/modules/shared/logger'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300 // 5 minutes max for AI generation timeout
 
+/**
+ * GET /api/cron/composer
+ *
+ * Processes APPROVED content ideas through the v2 scene-based composition pipeline:
+ * 1. SceneComposer: AI generates CreativeDirection (scene sequence + text slots)
+ * 2. AssetCurator: Selects matching media assets with duration/tag filtering
+ * 3. TimelineCompiler: Deterministic frame math → validated DynamicCompositionSchema
+ * 4. Save Composition with creative direction, compiled payload, and caption
+ */
 export async function GET() {
   try {
-    const results = []
+    const results: Array<{
+      ideaId: string
+      accountId: string
+      status: string
+      compositionId?: string
+      error?: string
+    }> = []
 
-    // 1. Find all APPROVED content ideas that haven't been used yet
+    // 1. Find APPROVED content ideas (batch)
     const approvedIdeas = await prisma.contentIdea.findMany({
       where: { status: 'APPROVED' },
       include: { account: true },
-      take: 20, // Process a batch
+      take: 20,
     })
+
+    if (approvedIdeas.length === 0) {
+      return NextResponse.json({ message: 'No approved ideas to process', results: [] })
+    }
+
+    logger.info(`[Composer] Processing ${approvedIdeas.length} approved ideas`)
 
     for (const idea of approvedIdeas) {
       if (!idea.account) continue
 
-      // Look up persona to see if it allows auto approval of generated compositions
+      // Resolve auto-approve setting
       const persona = await prisma.brandPersona.findFirst({
         where: { accountId: idea.accountId, isDefault: true },
       })
 
       try {
-        // 2. Data-driven content generation: Idea -> Composition Schema
-        const { composition, templateId } = await composeVideoWithAgent(
-          idea.ideaText,
+        // 2. SceneComposer: AI Creative Direction
+        const { creative } = await compose({
+          ideaText: idea.ideaText,
+          accountId: idea.accountId,
+          format: 'reel',
+          personaId: persona?.id,
+        })
+
+        // 3. AssetCurator: Select media + audio
+        const { sceneAssets, audioAsset } = await selectAssetsForCreative(
+          creative,
           idea.accountId,
-          'reel',
-          undefined, // Let the agent pick the best template
-          persona?.id,
+          30, // fps
         )
 
-        // 3. Save Composition
+        // 4. Build brand style from persona
+        const brandStyle = {
+          primaryColor: '#6C63FF',
+          accentColor: '#FF6584',
+          fontFamily: 'sans-serif',
+        }
+
+        // 5. TimelineCompiler: Deterministic assembly
+        const { schema } = compileTimeline(
+          creative,
+          sceneAssets,
+          audioAsset,
+          brandStyle,
+          'reel',
+        )
+
+        // 6. Save Composition
         const isAutoApprove = persona?.autoApproveCompositions ?? false
 
-        await prisma.composition.create({
+        const composition = await prisma.composition.create({
           data: {
             accountId: idea.accountId,
-            templateId: templateId,
-            payload: composition as any,
-            caption: (composition as any).caption || '',
+            format: 'reel',
+            creative: creative as unknown as Prisma.InputJsonValue,
+            payload: schema as unknown as Prisma.InputJsonValue,
+            caption: creative.caption,
+            hashtags: creative.hashtags,
+            ideaId: idea.id,
             status: isAutoApprove ? 'APPROVED' : 'DRAFT',
           },
         })
 
-        // 4. Mark idea as USED
+        // 7. Mark idea as USED
         await prisma.contentIdea.update({
           where: { id: idea.id },
           data: { status: 'USED' },
         })
 
+        // 8. Commit asset usage tracking
+        const usedAssetIds = [...sceneAssets.values()].map((a) => a.id)
+        if (audioAsset) usedAssetIds.push(audioAsset.id)
+        await commitAssetUsage(usedAssetIds)
+
         results.push({
           ideaId: idea.id,
           accountId: idea.accountId,
           status: 'success',
-          action: isAutoApprove ? 'Generated & Approved' : 'Generated as Draft',
+          compositionId: composition.id,
         })
-      } catch (err: any) {
-        console.error(`[CRON_GENERATOR_ERROR] Idea ${idea.id}:`, err)
-        results.push({ ideaId: idea.id, status: 'failed', error: err.message })
+
+        logger.info(
+          `[Composer] Created composition ${composition.id} from idea ${idea.id} (${creative.scenes.length} scenes, ${isAutoApprove ? 'auto-approved' : 'draft'})`,
+        )
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        logError(`[Composer] Failed to compose idea ${idea.id}`, err)
+        results.push({
+          ideaId: idea.id,
+          accountId: idea.accountId,
+          status: 'failed',
+          error: msg,
+        })
       }
     }
 
-    return NextResponse.json({ message: 'Generator Execution Finished', results })
-  } catch (error: any) {
-    console.error('[CRON_GENERATOR_FATAL]', error)
+    return NextResponse.json({
+      message: 'Composer Execution Finished',
+      processed: results.length,
+      succeeded: results.filter((r) => r.status === 'success').length,
+      failed: results.filter((r) => r.status === 'failed').length,
+      results,
+    })
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error)
+    logError('[Composer] Fatal error', error)
     return NextResponse.json(
-      { error: 'Fatal generator failure', details: error.message },
+      { error: 'Fatal composer failure', details: msg },
       { status: 500 },
     )
   }
