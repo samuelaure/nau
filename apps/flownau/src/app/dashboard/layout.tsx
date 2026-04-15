@@ -15,8 +15,19 @@ export default async function DashboardLayout({ children }: { children: React.Re
           padding: '40px',
           width: '100%',
           minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '24px',
         }}
       >
+        <div className="glass px-6 py-4 rounded-xl flex items-center justify-between">
+          <div className="flex items-center gap-4 text-text-secondary text-sm">
+            <div className="font-semibold text-white">Personal Workspace</div>
+            <span>/</span>
+            <div>All Brands</div>
+          </div>
+          <div>{/* Future actions */}</div>
+        </div>
         {children}
       </main>
     </div>

@@ -1,12 +1,24 @@
 export const dynamic = 'force-dynamic'
 
 import { prisma } from '@/modules/shared/prisma'
+import { auth } from '@/auth'
 import { Video, Globe } from 'lucide-react'
 import AddTemplateButton from '@/modules/video/components/AddTemplateButton'
 import TemplateCard from '@/modules/video/components/TemplateCard'
 import { Card } from '@/modules/shared/components/ui/Card'
+import { redirect } from 'next/navigation'
 
 export default async function TemplatesPage() {
+  const session = await auth()
+  if (!session?.user?.id) redirect('/login')
+
+  // Get accounts in the user's workspaces
+  const workspaceUsers = await prisma.workspaceUser.findMany({
+    where: { userId: session.user.id },
+    select: { workspaceId: true },
+  })
+  const workspaceIds = workspaceUsers.map((w) => w.workspaceId)
+
   const [templates, accounts] = await Promise.all([
     prisma.template.findMany({
       orderBy: { createdAt: 'desc' },
@@ -15,22 +27,12 @@ export default async function TemplatesPage() {
         account: { select: { username: true, platform: true } },
       },
     }),
-    prisma.user
-      .findFirst()
-      .then((user) =>
-        user
-          ? prisma.socialAccount.findMany({
-              where: { userId: user.id },
-              select: { id: true, username: true, platform: true },
-            })
-          : [],
-      )
-      .then((accounts) =>
-        accounts.map((acc) => ({
-          ...acc,
-          username: acc.username || '',
-        })),
-      ),
+    prisma.socialAccount
+      .findMany({
+        where: { workspaceId: { in: workspaceIds } },
+        select: { id: true, username: true, platform: true },
+      })
+      .then((accs) => accs.map((acc) => ({ ...acc, username: acc.username || '' }))),
   ])
 
   // Group templates by account

@@ -1,7 +1,8 @@
 export const dynamic = 'force-dynamic'
 
 import { prisma } from '@/modules/shared/prisma'
-import { notFound } from 'next/navigation'
+import { auth } from '@/auth'
+import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronRight, LayoutTemplate, Settings, Video } from 'lucide-react'
 import AssetsManager from '@/modules/shared/components/AssetsManager'
@@ -19,6 +20,15 @@ export default async function TemplatePage({
   const { tab, from } = await searchParams
   const activeTab = tab || 'builder'
 
+  const session = await auth()
+  if (!session?.user?.id) redirect('/login')
+
+  const workspaceUsers = await prisma.workspaceUser.findMany({
+    where: { userId: session.user.id },
+    select: { workspaceId: true },
+  })
+  const workspaceIds = workspaceUsers.map((w) => w.workspaceId)
+
   const [template, accounts, combinedAssetsCount] = await Promise.all([
     prisma.template.findUnique({
       where: { id },
@@ -29,28 +39,15 @@ export default async function TemplatePage({
         },
       },
     }),
-    prisma.user
-      .findFirst()
-      .then((user) =>
-        user
-          ? prisma.socialAccount.findMany({
-              where: { userId: user.id },
-              select: { id: true, username: true, platform: true },
-            })
-          : [],
-      )
-      .then((accounts) =>
-        accounts.map((acc) => ({
-          ...acc,
-          username: acc.username || '',
-        })),
-      ),
+    prisma.socialAccount
+      .findMany({
+        where: { workspaceId: { in: workspaceIds } },
+        select: { id: true, username: true, platform: true },
+      })
+      .then((accs) => accs.map((acc) => ({ ...acc, username: acc.username || '' }))),
     prisma.asset.count({
       where: {
-        OR: [
-          { templateId: id },
-          // We can't use template.accountId here yet in Promise.all, so we'll fetch it after or use a nested query
-        ],
+        OR: [{ templateId: id }],
       },
     }),
   ])

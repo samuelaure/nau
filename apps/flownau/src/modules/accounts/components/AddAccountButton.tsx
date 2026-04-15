@@ -16,9 +16,13 @@ interface SimpleAccount {
 
 interface AddAccountButtonProps {
   existingAccounts?: SimpleAccount[]
+  workspaceId?: string
 }
 
-export default function AddAccountButton({ existingAccounts = [] }: AddAccountButtonProps) {
+export default function AddAccountButton({
+  existingAccounts = [],
+  workspaceId,
+}: AddAccountButtonProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -30,6 +34,7 @@ export default function AddAccountButton({ existingAccounts = [] }: AddAccountBu
 
   const handleSubmit = async (formData: FormData) => {
     setError(null)
+    if (workspaceId) formData.append('workspaceId', workspaceId)
     startTransition(async () => {
       try {
         await addAccount(formData)
