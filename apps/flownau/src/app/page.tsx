@@ -4,8 +4,10 @@ import Link from 'next/link'
 import { ArrowRight, Video, Instagram, Zap, Shield } from 'lucide-react'
 import { Card } from '@/modules/shared/components/ui/Card'
 import { Button } from '@/modules/shared/components/ui/Button'
+import { auth } from '@/auth'
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const session = await auth()
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_right,#1e1b4b,#000)] text-white overflow-hidden">
       {/* Navigation */}
@@ -16,9 +18,25 @@ export default function LandingPage() {
           </div>
           <span className="font-extrabold text-xl font-heading tracking-wide">flownaŭ</span>
         </div>
-        <Link href="/login" className="btn-primary px-6 py-2">
-          Dashboard <ArrowRight size={18} />
-        </Link>
+        <div className="flex items-center gap-4">
+          {!session ? (
+            <>
+              <Link
+                href="/register"
+                className="px-4 py-2 hover:bg-white/10 transition-colors rounded-xl border border-white/20"
+              >
+                Sign up
+              </Link>
+              <Link href="/login" className="btn-primary px-4 py-2">
+                Log in
+              </Link>
+            </>
+          ) : (
+            <Link href="/dashboard" className="btn-primary px-6 py-2">
+              Dashboard <ArrowRight size={18} />
+            </Link>
+          )}
+        </div>
       </nav>
 
       {/* Hero Section */}
@@ -37,13 +55,29 @@ export default function LandingPage() {
           handle the rendering.
         </p>
 
-        <div className="animate-fade-in flex gap-4">
-          <Link href="/login" className="btn-primary px-8 py-4 text-lg">
-            Get Started <ArrowRight size={20} />
-          </Link>
-          <Button variant="outline" size="lg" className="text-lg">
-            Watch Demo
-          </Button>
+        <div className="animate-fade-in flex flex-col gap-4 items-center">
+          <div className="flex gap-4">
+            {!session ? (
+              <Link href="/register" className="btn-primary px-8 py-4 text-lg">
+                Get Started <ArrowRight size={20} />
+              </Link>
+            ) : (
+              <Link href="/dashboard" className="btn-primary px-8 py-4 text-lg">
+                Go to Dashboard <ArrowRight size={20} />
+              </Link>
+            )}
+            <Button variant="outline" size="lg" className="text-lg">
+              Watch Demo
+            </Button>
+          </div>
+          {!session && (
+            <p className="text-text-secondary mt-2">
+              Already have an account?{' '}
+              <Link href="/login" className="text-accent hover:underline">
+                Log in
+              </Link>
+            </p>
+          )}
         </div>
 
         {/* Feature Grid */}

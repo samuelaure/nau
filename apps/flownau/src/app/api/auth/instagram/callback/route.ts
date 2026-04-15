@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
 
     if (error || !code) {
       console.error('Instagram Auth Error Callback:', error)
-      return NextResponse.redirect(new URL('/dashboard/accounts?error=auth_failed', req.url))
+      return NextResponse.redirect(new URL('/dashboard?error=auth_failed', req.url))
     }
 
     const appId = process.env.FB_APP_ID
@@ -66,21 +66,27 @@ export async function GET(req: NextRequest) {
     const connectedPage = pages.find((p) => p.instagram_business_account)
 
     if (!connectedPage) {
-      return NextResponse.redirect(
-        new URL('/dashboard/accounts?error=no_instagram_account', req.url),
-      )
+      return NextResponse.redirect(new URL('/dashboard?error=no_instagram_account', req.url))
     }
 
     const igAccount = connectedPage.instagram_business_account
 
     if (!igAccount) {
-      return NextResponse.redirect(
-        new URL('/dashboard/accounts?error=no_instagram_account', req.url),
-      )
+      return NextResponse.redirect(new URL('/dashboard?error=no_instagram_account', req.url))
     }
 
-    // 4. Save to Database
-    // We use upsert to update if it exists or create if new
+    // 4. Save to Database — attach to the user's primary workspace
+    const workspaceUser = await prisma.workspaceUser.findFirst({
+      where: { userId: session.user.id, role: 'owner' },
+      select: { workspaceId: true },
+    })
+
+    if (!workspaceUser) {
+      console.error('No workspace found for user:', session.user.id)
+      return NextResponse.redirect(new URL('/dashboard?error=no_workspace', req.url))
+    }
+
+    const { workspaceId } = workspaceUser
     await prisma.socialAccount.upsert({
       where: {
         platform_platformId: {
@@ -89,32 +95,32 @@ export async function GET(req: NextRequest) {
         },
       },
       update: {
-        userId: session.user.id, // Transfer ownership if someone else had it, or update current
+        workspaceId, // Transfer to current user's workspace
         accessToken: encrypt(longLivedToken),
         username: igAccount.username,
-        expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000), // ~60 days (legacy field)
-        tokenExpiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000), // ~60 days (v2 field)
+        expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+        tokenExpiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
         tokenRefreshedAt: new Date(),
       },
       create: {
-        userId: session.user.id,
+        workspaceId,
         platform: 'instagram',
         platformId: igAccount.id,
         username: igAccount.username,
         accessToken: encrypt(longLivedToken),
-        expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000), // (legacy field)
-        tokenExpiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000), // (v2 field)
+        expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+        tokenExpiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
         tokenRefreshedAt: new Date(),
       },
     })
 
-    return NextResponse.redirect(new URL('/dashboard/accounts?success=true', req.url))
+    return NextResponse.redirect(new URL('/dashboard?success=true', req.url))
   } catch (err: unknown) {
     if (axios.isAxiosError(err)) {
       console.error('Instagram Auth Error:', err.response?.data || err.message)
     } else {
       console.error('Instagram Auth Error:', (err as Error).message)
     }
-    return NextResponse.redirect(new URL('/dashboard/accounts?error=server_error', req.url))
+    return NextResponse.redirect(new URL('/dashboard?error=server_error', req.url))
   }
 }
