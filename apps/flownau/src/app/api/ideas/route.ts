@@ -2,15 +2,10 @@ export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
-import { auth } from '@/auth'
+import { checkAccountAccess } from '@/modules/shared/actions'
 
 export async function GET(req: Request) {
   try {
-    const session = await auth()
-    if (!session || !session.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const { searchParams } = new URL(req.url)
     const accountId = searchParams.get('accountId')
 
@@ -18,14 +13,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Missing accountId' }, { status: 400 })
     }
 
-    // Verify ownership
-    const account = await prisma.socialAccount.findUnique({
-      where: { id: accountId },
-    })
-
-    if (!account || account.userId !== session.user.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
-    }
+    await checkAccountAccess(accountId)
 
     const ideas = await prisma.contentIdea.findMany({
       where: { accountId },

@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/modules/shared/prisma'
+import { checkAccountAccess } from '@/modules/shared/actions'
 import { renderAndUpload } from '@/modules/video/renderer'
 import { DynamicCompositionSchema } from '@/modules/rendering/DynamicComposition/schema'
 
@@ -25,14 +26,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid schema' }, { status: 400 })
     }
 
+    await checkAccountAccess(accountId)
+
     const composition = await prisma.composition.findUnique({
-      where: {
-        id: compositionId,
-        accountId: accountId,
-        account: {
-          userId: session.user.id,
-        },
-      },
+      where: { id: compositionId, accountId },
       include: {
         account: true,
       },

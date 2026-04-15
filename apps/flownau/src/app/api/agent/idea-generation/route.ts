@@ -2,17 +2,12 @@ export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
-import { auth } from '@/auth'
+import { checkAccountAccess } from '@/modules/shared/actions'
 import { generateContentIdeas } from '@/modules/ideation/ideation.service'
 import { logError } from '@/modules/shared/logger'
 
 export async function POST(req: Request) {
   try {
-    const session = await auth()
-    if (!session || !session.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const json = await req.json()
     const { accountId, personaId } = json
 
@@ -20,14 +15,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing accountId' }, { status: 400 })
     }
 
-    // Verify ownership
-    const account = await prisma.socialAccount.findUnique({
-      where: { id: accountId },
-    })
-
-    if (!account || account.userId !== session.user.id) {
-      return NextResponse.json({ error: 'Unauthorized account access' }, { status: 403 })
-    }
+    await checkAccountAccess(accountId)
 
     // 1. Fetch persona
     const persona = personaId

@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 import type { Prisma } from '@prisma/client'
-import { auth } from '@/auth'
+import { checkAccountAccess } from '@/modules/shared/actions'
 import { z } from 'zod'
 import { logError, logger } from '@/modules/shared/logger'
 import { compose } from '@/modules/composer/scene-composer'
@@ -20,11 +20,6 @@ const ComposeRequestSchema = z.object({
 
 export async function POST(req: Request) {
   try {
-    const session = await auth()
-    if (!session || !session.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const json = await req.json()
     const parsed = ComposeRequestSchema.safeParse(json)
 
@@ -37,13 +32,7 @@ export async function POST(req: Request) {
 
     const { prompt, accountId, format, ideaId, personaId } = parsed.data
 
-    const account = await prisma.socialAccount.findUnique({
-      where: { id: accountId },
-    })
-
-    if (!account || account.userId !== session.user.id) {
-      return NextResponse.json({ error: 'Account not found or unauthorized' }, { status: 403 })
-    }
+    await checkAccountAccess(accountId)
 
     // 1. SceneComposer: AI Creative Direction
     const { creative } = await compose({
