@@ -1,14 +1,17 @@
 # flownaŭ — Documentation
 
 ## Identity
+
 - **Type:** A — Platform Service (headless API + internal dashboard)
 - **Domain:** Content creation, scene-based video/image composition, automated publishing
-- **Status:** Active — Phase 6 Frontend Refactoring in progress (v2 backend deployed, UI catch-up in progress)
+- **Status:** Active — Phase 7 Workspace Architecture complete, ready for Phase 8
 
 ## Purpose
+
 Automated content generation and distribution engine for the naŭ Platform. Converts content ideas into high-quality, brand-aligned social media assets (Reels, Trial Reels, Carousels, Single Images) using scene-based composition with AI-driven creative direction and deterministic assembly. Publishes to Instagram via the Graph API.
 
 ## Tech Stack
+
 - **Framework:** Next.js 15 (App Router)
 - **Video Engine:** Remotion 4 (Headless, dedicated container)
 - **ORM:** Prisma 7
@@ -23,11 +26,13 @@ Automated content generation and distribution engine for the naŭ Platform. Conv
 ## Architecture Overview
 
 ### Core Pipeline
+
 ```
 Ideation → Scene Composition (AI) → Timeline Assembly (Code) → Render (Async) → Publish (IG)
 ```
 
 ### Module Breakdown
+
 - **`composer/`** — Core pipeline: SceneComposer (AI), TimelineCompiler (deterministic), AssetCurator (intelligent selection)
 - **`scenes/`** — Remotion component library: video scenes (HookText, TextOverMedia, QuoteCard, ListReveal, MediaOnly, CTA) + image scenes (Cover, Content, Quote, List, CTA)
 - **`renderer/`** — Dedicated render worker: BullMQ queue, renderMedia (video), renderStill (images), R2 upload
@@ -38,6 +43,7 @@ Ideation → Scene Composition (AI) → Timeline Assembly (Code) → Render (Asy
 - **`shared/`** — Prisma, R2, encryption, logger, NAU_SERVICE_KEY auth
 
 ### Key Design Principles
+
 1. **AI writes, code assembles.** LLM generates creative text + scene sequences. Deterministic code handles layout, timing, frame math, asset resolution.
 2. **Scene-based composition.** Atomic scene components are the creative primitives. The AI has structural creativity (scene selection + ordering) while each scene is a tested Remotion component.
 3. **Audio-first timing.** Audio duration drives all frame calculations.
@@ -46,14 +52,17 @@ Ideation → Scene Composition (AI) → Timeline Assembly (Code) → Render (Asy
 ## Domain Ownership
 
 ### Owns
+
 - Content composition (scene-based video/image generation)
 - Remotion rendering (headless, server-side)
 - Asset management (R2 sync, tagging, intelligent curation)
 - Instagram publishing (Reels, Trial Reels, Carousels, Photos)
 - Content scheduling (posting schedule, time-of-day slots)
 - Content planning (daily plans, recording scripts)
+- Workspace & Brand organization (Multi-tenant hierarchy)
 
 ### Consumes
+
 - **nauthenticity:** InspoItems + Brand DNA for ideation
 - **9naŭ API (triage module):** Voice transcripts ingested as content ideas
 - **9naŭ API:** Reactive content triggers from user's Second Brain
@@ -61,44 +70,48 @@ Ideation → Scene Composition (AI) → Timeline Assembly (Code) → Render (Asy
 ## API Surface
 
 ### Cross-Service (NAU_SERVICE_KEY auth)
-| Method | Endpoint | Purpose |
-|--------|----------|---------|
-| GET | `/api/v1/health` | Health check |
-| POST | `/api/v1/compose` | Trigger reactive composition (creates idea + optional full pipeline) |
-| POST | `/api/v1/ideas/ingest` | Bulk ingest ideas with dedup (up to 50) |
-| GET | `/api/v1/daily-plan/:accountId` | Daily plan with pieces, scripts, alerts, stats |
-| GET | `/api/v1/daily-plan/:accountId?reminder=true` | Condensed plan (pending items only) |
-| GET | `/api/v1/accounts` | List social accounts |
-| GET | `/api/v1/compositions?accountId=X&status=Y` | Query compositions with filters |
+
+| Method | Endpoint                                      | Purpose                                                              |
+| ------ | --------------------------------------------- | -------------------------------------------------------------------- |
+| GET    | `/api/v1/health`                              | Health check                                                         |
+| POST   | `/api/v1/compose`                             | Trigger reactive composition (creates idea + optional full pipeline) |
+| POST   | `/api/v1/ideas/ingest`                        | Bulk ingest ideas with dedup (up to 50)                              |
+| GET    | `/api/v1/daily-plan/:accountId`               | Daily plan with pieces, scripts, alerts, stats                       |
+| GET    | `/api/v1/daily-plan/:accountId?reminder=true` | Condensed plan (pending items only)                                  |
+| GET    | `/api/v1/accounts`                            | List social accounts                                                 |
+| GET    | `/api/v1/compositions?accountId=X&status=Y`   | Query compositions with filters                                      |
 
 ### Crons
-| Endpoint | Purpose |
-|----------|---------|
-| GET `/api/cron/ideation` | Generate content ideas on schedule |
-| GET `/api/cron/composer` | Compose approved ideas into content pieces |
-| GET `/api/cron/publisher` | Publish rendered content per schedule |
-| GET `/api/cron/daily-plan` | Generate daily content plans |
-| GET `/api/cron/token-refresh` | Refresh expiring IG tokens |
+
+| Endpoint                      | Purpose                                    |
+| ----------------------------- | ------------------------------------------ |
+| GET `/api/cron/ideation`      | Generate content ideas on schedule         |
+| GET `/api/cron/composer`      | Compose approved ideas into content pieces |
+| GET `/api/cron/publisher`     | Publish rendered content per schedule      |
+| GET `/api/cron/daily-plan`    | Generate daily content plans               |
+| GET `/api/cron/token-refresh` | Refresh expiring IG tokens                 |
 
 ## Environment Variables
-| Variable | Required | Purpose |
-|----------|----------|---------|
-| DATABASE_URL | Yes | Postgres connection |
-| REDIS_URL | Yes | Redis connection (BullMQ) |
-| REDIS_PASSWORD | Yes | Redis auth |
-| OPENAI_API_KEY | Yes | GPT-4o for composition |
-| GROQ_API_KEY | Yes | Llama 3.3 for ideation |
-| R2_ACCESS_KEY, R2_SECRET_KEY | Yes | Cloudflare R2 storage |
-| R2_BUCKET_NAME, R2_PUBLIC_URL | Yes | R2 bucket config |
-| FB_APP_ID, FB_APP_SECRET | Yes | Instagram Graph API |
-| NAU_SERVICE_KEY | Yes | Cross-service auth |
-| NAUTHENTICITY_URL | Yes | nauthenticity service URL |
-| NEXTAUTH_SECRET, NEXTAUTH_URL | Yes | Dashboard auth |
-| RENDER_CONCURRENCY | No | Frames in parallel (default: 2) |
-| RENDER_MAX_ATTEMPTS | No | Max retry per render job (default: 3) |
-| TOKEN_REFRESH_DAYS_BEFORE_EXPIRY | No | Token refresh buffer (default: 7) |
 
-- **[2026-04-13] Phase 6 — Frontend Dashboard Refactoring (planned)**: New pages for Compositions (`/dashboard/compositions`), Daily Plans (`/dashboard/plans`), and Ideas (`/dashboard/ideas`). Account detail extended with token health pill and new scheduler fields. Overview page refactored to remove legacy `Render` query. Sidebar expanded with new nav links.
+| Variable                         | Required | Purpose                               |
+| -------------------------------- | -------- | ------------------------------------- |
+| DATABASE_URL                     | Yes      | Postgres connection                   |
+| REDIS_URL                        | Yes      | Redis connection (BullMQ)             |
+| REDIS_PASSWORD                   | Yes      | Redis auth                            |
+| OPENAI_API_KEY                   | Yes      | GPT-4o for composition                |
+| GROQ_API_KEY                     | Yes      | Llama 3.3 for ideation                |
+| R2_ACCESS_KEY, R2_SECRET_KEY     | Yes      | Cloudflare R2 storage                 |
+| R2_BUCKET_NAME, R2_PUBLIC_URL    | Yes      | R2 bucket config                      |
+| FB_APP_ID, FB_APP_SECRET         | Yes      | Instagram Graph API                   |
+| NAU_SERVICE_KEY                  | Yes      | Cross-service auth                    |
+| NAUTHENTICITY_URL                | Yes      | nauthenticity service URL             |
+| NEXTAUTH_SECRET, NEXTAUTH_URL    | Yes      | Dashboard auth                        |
+| RENDER_CONCURRENCY               | No       | Frames in parallel (default: 2)       |
+| RENDER_MAX_ATTEMPTS              | No       | Max retry per render job (default: 3) |
+| TOKEN_REFRESH_DAYS_BEFORE_EXPIRY | No       | Token refresh buffer (default: 7)     |
+
+- **[2026-04-15] Phase 7 — Workspace Multi-Tenancy (complete)**: Transformed the app to a multi-tenant Workspace architecture. `SocialAccount` now belongs to `Workspace` (not `User`). Users join workspaces via `WorkspaceUser` join table with roles. New auth flow: `/register` creates user + personal workspace atomically. Dashboard root auto-redirects to the user's workspace. Account detail view now shows posting schedule as the primary tab. All API ownership checks migrated from `account.userId` to `checkAccountAccess()` workspace membership helper.
+- **[2026-04-13] Phase 6 — Frontend Dashboard Refactoring**: New pages for Compositions (`/dashboard/compositions`), Daily Plans (`/dashboard/plans`), and Ideas (`/dashboard/ideas`). Account detail extended with token health pill and new scheduler fields. Overview page refactored to remove legacy `Render` query. Sidebar expanded with new nav links.
 - **[2026-04-13] Content Plan & Platform Integration (Phase 5)**: Implemented daily plan generation with head-talk detection, alerts (token/asset/idea), and Zazŭ delivery contract. Connected nauthenticity InspoItems as ideation source with graceful degradation. All v1 cross-service endpoints now fully functional.
 - **[2026-04-13] Diversity Tracking**: Added `sceneTypes[]` and `topicHash` to Composition model. Ideation cron now queries last 14 days of content to avoid repetition.
 - **[2026-04-13] Reactive Composition Triggers**: `/api/v1/compose` runs the full AI → compile → render pipeline in a single call when `autoApprove=true`.
@@ -115,12 +128,14 @@ Ideation → Scene Composition (AI) → Timeline Assembly (Code) → Render (Asy
 - **[2026-04-07] Exclusive IG Owner**: flownaŭ owns all platform-wide Instagram publishing.
 
 ## Known Limitations
+
 - CX23 server constrains rendering throughput (~5 min per reel at 1.5GB)
 - Instagram API rate limit: 100 posts per 24h per account
 - Long-lived IG tokens expire after 60 days (auto-refresh implemented)
 - Still rendering for carousels is sequential (1 slide at a time in renderer)
 
 ## Deployment Notes
+
 - **Server:** Hetzner CX23 (4GB RAM, 2 vCPU)
 - **Containers:** app (384MB), renderer (1.5GB), postgres (192MB), redis (64MB)
 - **Network:** `nau-network` (external, shared with Traefik)
@@ -128,6 +143,7 @@ Ideation → Scene Composition (AI) → Timeline Assembly (Code) → Render (Asy
 - **CI/CD:** GHA → GHCR → docker compose pull on server
 
 ## naŭ Platform Dependencies
+
 - **nauthenticity** → Provides InspoItems and Brand DNA for ideation
 - **9naŭ API (triage module)** → Sends voice transcript ideas via `/api/v1/ideas/ingest`
 - **9naŭ API** → Triggers reactive composition via `/api/v1/compose`
