@@ -15,6 +15,9 @@ export async function checkAuth() {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
+    include: {
+      workspaces: { select: { workspaceId: true } },
+    },
   })
 
   if (!user) {
@@ -22,6 +25,43 @@ export async function checkAuth() {
   }
 
   return { user }
+}
+
+/**
+ * Verify that the calling user has access to the account via their workspace membership.
+ * Returns the account if authorised, throws if not.
+ */
+export async function checkAccountAccess(accountId: string) {
+  const { user } = await checkAuth()
+  const workspaceIds = user.workspaces.map((w) => w.workspaceId)
+
+  const account = await prisma.socialAccount.findFirst({
+    where: { id: accountId, workspaceId: { in: workspaceIds } },
+  })
+
+  if (!account) {
+    throw new Error('Forbidden')
+  }
+
+  return { account, user }
+}
+
+/**
+ * Return the first workspace owned by the calling user, or throw if none exists.
+ */
+export async function getUserPrimaryWorkspace() {
+  const { user } = await checkAuth()
+
+  const wu = await prisma.workspaceUser.findFirst({
+    where: { userId: user.id, role: 'owner' },
+    select: { workspaceId: true },
+  })
+
+  if (!wu) {
+    throw new Error('No workspace found for user')
+  }
+
+  return { workspaceId: wu.workspaceId, user }
 }
 
 const DeleteAssetSchema = z.string().min(1)

@@ -7,7 +7,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { revalidatePath } from 'next/cache'
 import { ApifyService } from '@/modules/accounts/apify'
 import { downloadAndUploadProfileImage } from '@/modules/accounts/profile-image-service'
-import { checkAuth } from '@/modules/shared/actions'
+import { checkAuth, getUserPrimaryWorkspace } from '@/modules/shared/actions'
 import { z } from 'zod'
 
 // --- HELPER SCHEMAS ---
@@ -59,7 +59,7 @@ const AUDIO_TYPES = ['audio/mpeg', 'audio/wav', 'audio/aac', 'audio/ogg', 'audio
 // --- ACCOUNT ACTIONS ---
 
 export async function addAccount(formData: FormData) {
-  const { user } = await checkAuth()
+  const { workspaceId: primaryWorkspaceId } = await getUserPrimaryWorkspace()
 
   const rawData = {
     username: formData.get('username'),
@@ -68,10 +68,12 @@ export async function addAccount(formData: FormData) {
   }
 
   const data = AccountSchema.parse(rawData)
+  // Use explicitly passed workspaceId if provided (e.g. from workspace overview page)
+  const workspaceId = (formData.get('workspaceId') as string | null) || primaryWorkspaceId
 
   const newAccount = await prisma.socialAccount.create({
     data: {
-      userId: user.id,
+      workspaceId,
       platform: 'instagram',
       username: data.username,
       accessToken: data.accessToken,
@@ -80,7 +82,7 @@ export async function addAccount(formData: FormData) {
   })
 
   await syncAccountProfile(newAccount.id)
-  revalidatePath('/dashboard/accounts')
+  revalidatePath('/dashboard')
 }
 
 export async function deleteAccount(id: string) {
