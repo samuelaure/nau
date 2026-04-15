@@ -145,7 +145,7 @@ jobs:
             tr -d '\r' < /root/flownau/.env.tmp > /root/flownau/.env
 
             cd /root/flownau
-            docker system prune -f
+            docker system prune -a -f
             TAG=${{ github.ref_name }} docker compose pull
             TAG=${{ github.ref_name }} docker compose up -d --remove-orphans
 
