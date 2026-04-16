@@ -54,7 +54,11 @@ export async function ingestExternalIdea(params: ExternalIdeaInput) {
  */
 export async function ingestExternalIdeas(
   accountId: string,
-  ideas: Array<{ text: string; source: 'inspo' | 'user_input' | 'reactive'; sourceRef?: string }>,
+  ideas: Array<{
+    text: string
+    source: 'inspo' | 'user_input' | 'reactive' | 'captured'
+    sourceRef?: string
+  }>,
   autoApprove = false,
 ): Promise<{ created: number; ids: string[] }> {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
@@ -80,7 +84,7 @@ export async function ingestExternalIdeas(
         ideaText: idea.text,
         source: idea.source,
         sourceRef: idea.sourceRef ?? null,
-        status: autoApprove ? 'APPROVED' : 'PENDING',
+        status: autoApprove || idea.source === 'captured' ? 'APPROVED' : 'PENDING',
       },
     })
 
@@ -91,6 +95,19 @@ export async function ingestExternalIdeas(
   logger.info(
     `[ExternalSource] Bulk ingested ${createdIds.length}/${ideas.length} ideas for account ${accountId}`,
   )
+
+  const hasCaptured = ideas.some((i) => i.source === 'captured')
+  if (hasCaptured) {
+    logger.info(
+      `[ExternalSource] Captured idea detected. Triggering immediate composer generation.`,
+    )
+    // Fire and forget cron execution to compile approved ideas
+    // We do this non-blocking
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    fetch(new URL('/api/cron/composer', appUrl).toString(), { method: 'GET' }).catch((e) =>
+      logger.error('[ExternalSource] Failed to trigger immediate composer', e),
+    )
+  }
 
   return { created: createdIds.length, ids: createdIds }
 }

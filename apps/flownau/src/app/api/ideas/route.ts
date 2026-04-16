@@ -26,3 +26,35 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Failed to fetch ideas' }, { status: 500 })
   }
 }
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json()
+    const { accountId, ideaText, source, status } = body
+
+    if (!accountId || !ideaText) {
+      return NextResponse.json({ error: 'Missing accountId or ideaText' }, { status: 400 })
+    }
+
+    await checkAccountAccess(accountId)
+
+    let priority = 3
+    if (source === 'captured') priority = 1
+    if (source === 'manual') priority = 2
+
+    const idea = await prisma.contentIdea.create({
+      data: {
+        accountId,
+        ideaText,
+        source: source || 'manual',
+        status: status || 'PENDING',
+        priority,
+      },
+    })
+
+    return NextResponse.json({ idea }, { status: 201 })
+  } catch (error) {
+    console.error('[POST_IDEAS_ERROR]', error)
+    return NextResponse.json({ error: 'Failed to create idea' }, { status: 500 })
+  }
+}

@@ -141,6 +141,34 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
     }
   }
 
+  const [manualIdeaModalOpen, setManualIdeaModalOpen] = useState(false)
+  const [manualIdeaText, setManualIdeaText] = useState('')
+
+  const handleCreateManualIdea = async () => {
+    if (!manualIdeaText.trim()) return
+    const toastId = toast.loading('Creating manual concept idea...')
+    try {
+      const res = await fetch('/api/ideas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId,
+          ideaText: manualIdeaText,
+          source: 'manual',
+          status: 'APPROVED', // Manual ideas are auto-approved since user wrote them
+        }),
+      })
+
+      if (!res.ok) throw new Error('Failed to create manual idea')
+      toast.success('Idea created!', { id: toastId })
+      setManualIdeaText('')
+      setManualIdeaModalOpen(false)
+      fetchIdeas()
+    } catch (err: any) {
+      toast.error(err.message, { id: toastId })
+    }
+  }
+
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this idea?')) return
     try {
@@ -215,7 +243,7 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
 
         <div className="flex flex-wrap gap-2 items-center">
           <select
-            className="bg-gray-900 border border-gray-800 rounded p-1.5 text-xs text-gray-300"
+            className="bg-gray-900 border border-gray-800 rounded p-1.5 text-xs text-gray-300 w-[120px]"
             value={selectedPersonaId}
             onChange={(e) => setSelectedPersonaId(e.target.value)}
           >
@@ -229,7 +257,7 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
           </select>
 
           <select
-            className="bg-gray-900 border border-gray-800 rounded p-1.5 text-xs text-gray-300"
+            className="bg-gray-900 border border-gray-800 rounded p-1.5 text-xs text-gray-300 w-[120px]"
             value={selectedFrameworkId}
             onChange={(e) => setSelectedFrameworkId(e.target.value)}
           >
@@ -243,11 +271,21 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
           </select>
 
           <Button variant="outline" size="sm" onClick={() => setShowSettings(!showSettings)}>
-            {showSettings ? 'Close Settings' : 'Framework Settings'}
+            {showSettings ? 'Settings' : 'Settings'}
           </Button>
+
+          <Button
+            onClick={() => setManualIdeaModalOpen(true)}
+            size="sm"
+            className="flex gap-2 bg-gray-800 text-white hover:bg-gray-700"
+          >
+            + Manual
+          </Button>
+
           <Button
             onClick={handleGenerate}
             disabled={generating}
+            size="sm"
             className="flex gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
           >
             {generating ? (
@@ -255,7 +293,7 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
             ) : (
               <Wand2 className="w-4 h-4" />
             )}
-            Brainstorm Ideas
+            Brainstorm
           </Button>
         </div>
       </div>
@@ -443,6 +481,42 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
                     <Wand2 className="w-4 h-4 mr-2" /> Start Composition
                   </>
                 )}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {manualIdeaModalOpen && (
+        <Modal isOpen={true} onClose={() => setManualIdeaModalOpen(false)}>
+          <div className="space-y-4">
+            <h2 className="text-xl font-heading font-semibold mb-4">Manual Concept Idea</h2>
+            <p className="text-sm text-gray-400">
+              Record a specific concept idea you have in mind. It will be added as "APPROVED" and
+              ready to compose.
+            </p>
+
+            <div className="space-y-1">
+              <label className="text-xs text-gray-400">Concept Description</label>
+              <textarea
+                autoFocus
+                className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-sm min-h-[120px]"
+                value={manualIdeaText}
+                onChange={(e) => setManualIdeaText(e.target.value)}
+                placeholder="Write the concept format, the hook, the educational value..."
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6">
+              <Button variant="outline" onClick={() => setManualIdeaModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreateManualIdea}
+                className="bg-accent text-white"
+                disabled={!manualIdeaText.trim()}
+              >
+                Save Idea
               </Button>
             </div>
           </div>

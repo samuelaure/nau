@@ -190,10 +190,11 @@ model ContentIdea {
   accountId    String
   ideaText     String        @db.Text
   status       String        @default("PENDING") // PENDING, APPROVED, REJECTED, USED
-  source       String        @default("internal") // v2: internal | inspo | user_input | reactive
-  sourceRef    String?                             // v2: External reference ID (InspoItem ID, block ID, etc.)
+  source       String        @default("automatic") // automatic | manual | captured
+  sourceRef    String?                             // External reference ID
+  priority     Int           @default(3)           // 1: captured, 2: manual, 3: automatic
   createdAt    DateTime      @default(now())
-  compositions Composition[]                       // v2: Back-reference to compositions created from this idea
+  compositions Composition[]                       // Back-reference to compositions created from this idea
   account      SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 }
 

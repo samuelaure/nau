@@ -10,7 +10,7 @@ const IngestRequestSchema = z.object({
     .array(
       z.object({
         text: z.string().min(1),
-        source: z.enum(['inspo', 'user_input', 'reactive']),
+        source: z.enum(['inspo', 'user_input', 'reactive', 'captured']),
         sourceRef: z.string().optional(),
       }),
     )
