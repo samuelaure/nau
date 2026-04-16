@@ -4,14 +4,34 @@ import { getSetting } from '@/modules/shared/settings'
 import SyncButton from './SyncButton'
 import ApiTokenForm from './ApiTokenForm'
 import { Card } from '@/modules/shared/components/ui/Card'
+import { checkAuth } from '@/modules/shared/actions'
+import { prisma } from '@/modules/shared/prisma'
+import WorkspacesManager from '@/modules/workspaces/components/WorkspacesManager'
 
 export default async function SettingsPage() {
+  const { user } = await checkAuth()
+
+  // Fetch workspaces for the current user
+  const workspaces = await prisma.workspace.findMany({
+    where: {
+      users: {
+        some: { userId: user.id },
+      },
+    },
+    include: {
+      users: {
+        include: { user: { select: { id: true, name: true, email: true } } },
+      },
+    },
+    orderBy: { createdAt: 'asc' },
+  })
+
   const apifyToken = await getSetting('apify_api_token')
   const openaiToken = await getSetting('openai_api_key')
   const groqToken = await getSetting('groq_api_key')
 
   return (
-    <div className="animate-fade-in max-w-2xl">
+    <div className="animate-fade-in max-w-4xl">
       <header className="mb-10">
         <h1 className="text-3xl font-heading font-semibold mb-2">System Settings</h1>
         <p className="text-text-secondary">
@@ -19,7 +39,9 @@ export default async function SettingsPage() {
         </p>
       </header>
 
-      <Card className="p-8">
+      <WorkspacesManager workspaces={workspaces} currentUserId={user.id} />
+
+      <Card className="p-8 mt-6">
         <h3 className="text-xl font-heading font-semibold mb-6">Integrations</h3>
 
         <ApiTokenForm
