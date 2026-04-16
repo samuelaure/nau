@@ -22,6 +22,8 @@
     "start": "npm run db:bootstrap && next start",
     "lint": "eslint .",
     "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "test:ci": "vitest --run --coverage",
     "type-check": "tsc --noEmit",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
@@ -33,7 +35,7 @@
     "docker:dev": "docker compose up -d",
     "docker:build": "docker compose build",
     "docker:nuke": "docker compose down -v",
-    "verify": "npm run format && npm run lint && npm run type-check && npm run test"
+    "verify": "npm run format && npm run lint && npm run type-check && npm run test:ci"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.30",

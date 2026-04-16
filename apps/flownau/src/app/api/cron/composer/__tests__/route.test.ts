@@ -171,7 +171,7 @@ describe('Composer Cron (v2 Pipeline)', () => {
     ;(commitAssetUsage as ReturnType<typeof vi.fn>).mockResolvedValue(undefined)
 
     const response = await GET()
-    const data = await response.json()
+    const _data = await response.json()
 
     expect(prisma.composition.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ status: 'APPROVED' }),

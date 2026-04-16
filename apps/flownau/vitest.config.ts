@@ -10,5 +10,25 @@ export default defineConfig({
     alias: {
       '@': resolve(__dirname, './src'),
     },
+    setupFiles: ['src/test-setup.ts'],
+    coverage: {
+      provider: 'v8',
+      include: ['src/modules/**/*.ts', 'src/app/api/**/*.ts'],
+      exclude: [
+        'src/modules/video/remotion/**',
+        'src/modules/rendering/**',
+        'src/modules/scenes/**',
+        '**/*.test.ts',
+        '**/__tests__/**',
+        '**/*.config.*',
+      ],
+      thresholds: {
+        lines: 70,
+        functions: 70,
+        branches: 60,
+        statements: 70,
+      },
+      reporter: ['text', 'html', 'lcov'],
+    },
   },
 })
