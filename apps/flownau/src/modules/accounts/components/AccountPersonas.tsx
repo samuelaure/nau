@@ -28,7 +28,7 @@ export default function AccountPersonas({ accountId }: { accountId: string }) {
       const res = await fetch(`/api/personas?accountId=${accountId}`)
       const data = await res.json()
       setPersonas(data.personas || [])
-    } catch (e) {
+    } catch {
       toast.error('Failed to load personas')
     } finally {
       setLoading(false)

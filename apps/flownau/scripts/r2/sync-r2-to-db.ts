@@ -1,7 +1,6 @@
 import {
   S3Client,
   ListObjectsV2Command,
-  HeadObjectCommand,
   type ListObjectsV2CommandOutput,
 } from '@aws-sdk/client-s3'
 import type { PrismaClient } from '@prisma/client'

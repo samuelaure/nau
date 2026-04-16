@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
         const baseName = obj.Key.substring(0, obj.Key.lastIndexOf('.'))
         const fileOnly = obj.Key.split('/').pop() || ''
         const baseOnly = fileOnly.substring(0, fileOnly.lastIndexOf('.'))
-        const pathOnly = obj.Key.substring(0, obj.Key.lastIndexOf('/'))
+        const _pathOnly = obj.Key.substring(0, obj.Key.lastIndexOf('/'))
 
         const possibleThumbExtensions = ['jpg', 'jpeg', 'png', 'webp']
         for (const tExt of possibleThumbExtensions) {

@@ -1,5 +1,5 @@
 import { prisma } from '@/modules/shared/prisma'
-import { logger, logError } from '@/modules/shared/logger'
+import { logger } from '@/modules/shared/logger'
 import { refreshTokenIfNeeded } from './instagram-token'
 import { publishReel } from './instagram-reels'
 import { publishTrialReel } from './instagram-trial-reels'

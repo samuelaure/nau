@@ -1,8 +1,6 @@
 import React from 'react'
 import { z } from 'zod'
 import type {
-  VideoSceneType,
-  ImageSceneType,
   AnySceneType,
   ResolvedScene,
   BrandStyle,
@@ -20,7 +18,6 @@ import {
   QuoteSlideSlots,
   ListSlideSlots,
   CTASlideSlots,
-  getSceneCatalogEntry,
 } from '@/types/scenes'
 
 import { HookTextScene } from './video/HookTextScene'

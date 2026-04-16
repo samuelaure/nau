@@ -42,7 +42,7 @@ export default function AddAccountButton({
         // Reset form state
         setTokenValue('')
         setSelectedTokenSource('')
-      } catch (e) {
+      } catch {
         setError('Failed to add account. Please check your inputs.')
       }
     })

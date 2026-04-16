@@ -7,8 +7,6 @@ import { useDropzone } from 'react-dropzone'
 import {
   Upload,
   FileAudio,
-  FileVideo,
-  Image as ImageIcon,
   Copy,
   Loader2,
   Play,
@@ -73,7 +71,7 @@ export default function AssetsManager({
       }
       toast.success('Assets deleted successfully', { id: toastId })
       window.location.reload()
-    } catch (error) {
+    } catch {
       toast.error('Bulk delete failed', { id: toastId })
     }
   }
@@ -609,7 +607,7 @@ function AssetCard({
                 await deleteAsset(asset.id)
                 toast.success('Asset deleted')
                 window.location.reload()
-              } catch (e) {
+              } catch {
                 toast.error('Failed to delete asset')
               }
             }}

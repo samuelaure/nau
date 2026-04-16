@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import path from 'path'
 import fs from 'fs'
 import crypto from 'crypto'
-import { PipelinePromise, pipeline } from 'stream'
+import { pipeline } from 'stream'
 import { promisify } from 'util'
 import { logger } from '@/lib/logger'
 

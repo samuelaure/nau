@@ -172,7 +172,7 @@ export async function commitAssetUsage(assetIds: string[]): Promise<void> {
 export async function selectAssetsForCreative(
   creative: CreativeDirection,
   accountId: string,
-  fps: number,
+  _fps: number,
 ): Promise<{
   sceneAssets: Map<number, Asset>
   audioAsset: Asset | null

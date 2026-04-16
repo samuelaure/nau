@@ -12,7 +12,7 @@ async function bootstrap() {
       try {
         // Attempt to run migrate dev.
         execSync('npx prisma migrate dev', { stdio: 'inherit' })
-      } catch (error) {
+      } catch {
         console.warn('Migration drift detected or interactive prompt required.')
         console.warn('Falling back to db push for development unblocking...')
         // db push might change the schema state, so we generate the client to be safe

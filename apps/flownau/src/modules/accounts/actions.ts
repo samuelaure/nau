@@ -2,7 +2,7 @@
 
 import { prisma } from '@/modules/shared/prisma'
 import { r2, R2_BUCKET } from '@/modules/shared/r2'
-import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
+import { PutObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { revalidatePath } from 'next/cache'
 import { ApifyService } from '@/modules/accounts/apify'

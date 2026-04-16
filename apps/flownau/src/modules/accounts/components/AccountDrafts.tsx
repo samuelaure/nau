@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Card } from '@/modules/shared/components/ui/Card'
 import { Button } from '@/modules/shared/components/ui/Button'
 import { toast } from 'sonner'
-import { Loader2, Trash2, CheckCircle2 } from 'lucide-react'
+import { Trash2, CheckCircle2 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
 const DynamicCompositionMock = dynamic(

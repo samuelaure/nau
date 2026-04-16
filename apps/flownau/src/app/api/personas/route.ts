@@ -14,7 +14,7 @@ export async function GET(req: Request) {
       where: whereClause,
     })
     return NextResponse.json({ personas }, { status: 200 })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to fetch personas' }, { status: 500 })
   }
 }
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
       },
     })
     return NextResponse.json({ persona }, { status: 201 })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to create persona' }, { status: 500 })
   }
 }

@@ -8,7 +8,7 @@ export type ResponsiveTextNodeProps = {
 
 export const ResponsiveTextNode: React.FC<ResponsiveTextNodeProps> = ({ node }) => {
   const frame = useCurrentFrame()
-  const { fps, width, height } = useVideoConfig()
+  const { fps, width } = useVideoConfig()
 
   // 1. Safe Margins Enforcement (Instagram Reels / TikTok UI safety boundaries)
   let justifyContent = 'center'

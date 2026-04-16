@@ -46,7 +46,7 @@ export function compileTimeline(
   sceneAssets: Map<number, Asset>,
   audioAsset: Asset | null,
   brandStyle: BrandStyle,
-  format: ContentFormat,
+  _format: ContentFormat,
 ): CompileResult {
   const fps = DEFAULT_FPS
 

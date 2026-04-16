@@ -13,7 +13,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       return NextResponse.json({ error: 'Persona not found' }, { status: 404 })
     }
     return NextResponse.json({ persona }, { status: 200 })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to fetch persona' }, { status: 500 })
   }
 }
@@ -45,7 +45,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       },
     })
     return NextResponse.json({ persona }, { status: 200 })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to update persona' }, { status: 500 })
   }
 }
@@ -57,7 +57,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       where: { id: resolvedParams.id },
     })
     return NextResponse.json({ success: true }, { status: 200 })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to delete persona' }, { status: 500 })
   }
 }

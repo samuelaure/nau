@@ -13,7 +13,7 @@ export async function GET(req: Request) {
       where: { accountId },
     })
     return NextResponse.json({ frameworks }, { status: 200 })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to fetch frameworks' }, { status: 500 })
   }
 }
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
       },
     })
     return NextResponse.json({ framework }, { status: 201 })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to create framework' }, { status: 500 })
   }
 }

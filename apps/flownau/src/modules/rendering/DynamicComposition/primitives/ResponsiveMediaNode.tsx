@@ -1,5 +1,5 @@
 import React from 'react'
-import { Video, Img, OffthreadVideo } from 'remotion'
+import { Img, OffthreadVideo } from 'remotion'
 import { MediaNodeSchemaType } from '../schema'
 
 export type ResponsiveMediaNodeProps = {

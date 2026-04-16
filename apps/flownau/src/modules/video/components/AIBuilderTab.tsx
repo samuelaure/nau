@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, Suspense, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useState, Suspense, useEffect, useRef, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { Button } from '@/modules/shared/components/ui/Button'
 import { Textarea } from '@/modules/shared/components/ui/Textarea'
 import { Card } from '@/modules/shared/components/ui/Card'
 import { toast } from 'sonner'
-import { AlertTriangle, Send, Undo2, Save, Maximize2, X, Smartphone, Shuffle } from 'lucide-react'
+import { AlertTriangle, Send, Undo2, Save, Maximize2, X, Shuffle } from 'lucide-react'
 import { cn } from '@/modules/shared/utils'
 import {
   applyLibraryAssets,

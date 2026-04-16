@@ -9,7 +9,7 @@ export async function GET() {
       orderBy: { updatedAt: 'desc' },
     })
     return NextResponse.json({ templates }, { status: 200 })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to fetch templates' }, { status: 500 })
   }
 }
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
       },
     })
     return NextResponse.json({ template }, { status: 201 })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to create template' }, { status: 500 })
   }
 }

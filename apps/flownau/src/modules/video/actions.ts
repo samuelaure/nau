@@ -29,9 +29,6 @@ const TemplateFormSchema = z.object({
 
 const IdSchema = z.string().min(1)
 
-const SaveConfigSchema = z.object({
-  config: z.unknown(),
-})
 
 const ToggleTemplateAssetsSchema = z.object({
   templateId: z.string().min(1),

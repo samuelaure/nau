@@ -7,7 +7,7 @@ import { logger, logError } from '@/modules/shared/logger'
 // ─── Constants ─────────────────────────────────────────────────────
 
 const ENTRY_POINT = path.join(process.cwd(), 'src/modules/video/remotion/index.tsx')
-const OUTPUT_DIR = path.join(process.cwd(), 'out')
+const _OUTPUT_DIR = path.join(process.cwd(), 'out')
 
 // ─── Types ─────────────────────────────────────────────────────────
 
