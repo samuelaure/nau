@@ -40,8 +40,11 @@ async function uploadToR2(localPath: string, r2Key: string, contentType: string)
 function cleanupFile(filePath: string): void {
   try {
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
-  } catch {
-    // Cleanup is best-effort
+  } catch (err) {
+    // Cleanup is best-effort but log so disk space leaks are visible
+    logger.warn(
+      `[RenderWorker] Failed to clean up temp file ${filePath}: ${err instanceof Error ? err.message : String(err)}`,
+    )
   }
 }
 
@@ -85,12 +88,12 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
   })
 
   // 3. On retry (attempt > 1), re-select assets for variety
-  let payload = composition.payload as Record<string, unknown>
+  const payload = composition.payload as Record<string, unknown>
   if (job.attemptsMade > 0 && composition.creative) {
     logger.info(`[RenderWorker] Retry attempt ${job.attemptsMade + 1} — re-selecting assets`)
     try {
       const creative = composition.creative as Record<string, unknown>
-      const { sceneAssets, audioAsset } = await selectAssetsForCreative(
+      const { sceneAssets, audioAsset: _audioAsset } = await selectAssetsForCreative(
         creative as Parameters<typeof selectAssetsForCreative>[0],
         composition.accountId,
         30,

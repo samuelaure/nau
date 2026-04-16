@@ -18,12 +18,24 @@ const eslintConfig = defineConfig([
   ]),
   {
     rules: {
-      '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-unused-vars': 'off',
-      'react-hooks/exhaustive-deps': 'off',
-      'react/no-unescaped-entities': 'off',
-      'prefer-const': 'off',
-      '@next/next/no-img-element': 'off',
+      // Re-enabled (Pass A): safe mechanical fixes
+      'prefer-const': 'error',
+      'react/no-unescaped-entities': 'warn',
+      '@next/next/no-img-element': 'warn',
+
+      // Re-enabled (Pass B): stricter type safety
+      // Warn (not error) — the OpenAI/Groq SDKs force some `any` usage
+      '@typescript-eslint/no-explicit-any': 'warn',
+      // Unused vars are errors; prefix with _ to intentionally ignore
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+      // Exhaustive deps warns — helps catch stale closure bugs in useEffect
+      'react-hooks/exhaustive-deps': 'warn',
+
+      // Kept off: render-worker.ts uses `require.main === module`
+      // which is a valid Node.js CJS interop pattern in an ESM project
       '@typescript-eslint/no-require-imports': 'off',
     },
   },

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 import { publishComposition } from '@/modules/publisher/publish-orchestrator'
 import { scheduleRenderedCompositions } from '@/modules/publisher/scheduler'
-import { logError, logger } from '@/modules/shared/logger'
+import { logError } from '@/modules/shared/logger'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120 // 2 minutes — publishing only, no rendering

@@ -27,7 +27,15 @@ export async function bootstrapSystem() {
         name: adminName,
       },
     })
-  } catch {
-    // Silently skip during build-time or when DB is not yet available
+  } catch (err) {
+    // Skip during build-time or when DB is not yet available.
+    // Log at warn level so dev environments show this if it happens unexpectedly.
+    // Use console.warn (not pino logger) — pino may not be initialized at build time.
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn(
+        '[Bootstrap] DB unavailable during bootstrap (expected at build time):',
+        err instanceof Error ? err.message : String(err),
+      )
+    }
   }
 }

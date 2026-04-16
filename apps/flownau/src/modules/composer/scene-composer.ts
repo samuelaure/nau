@@ -170,27 +170,20 @@ async function callAI(
     if (!openaiKey) throw new Error('OPENAI_API_KEY is not configured')
     const openai = new OpenAI({ apiKey: openaiKey })
 
-    const completion = await (
-      openai.beta as unknown as {
-        chat: {
-          completions: {
-            parse: (params: Record<string, unknown>) => Promise<{
-              choices: Array<{ message: { parsed: unknown } }>
-            }>
-          }
-        }
-      }
-    ).chat.completions.parse({
+    // The OpenAI SDK types beta.chat.completions.parse as returning any.
+    // We accept that here and validate the parsed value with Zod immediately after.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const completion: any = await openai.beta.chat.completions.parse({
       model,
       temperature: 0.7,
       messages,
       response_format: zodResponseFormat(CreativeDirectionSchema, 'CreativeDirection'),
     })
 
-    const parsed = completion.choices[0]?.message?.parsed
+    const parsed: unknown = completion.choices[0]?.message?.parsed
     if (!parsed) throw new Error('OpenAI returned empty parsed response')
 
-    // Double-validate with Zod
+    // Validate with Zod
     return CreativeDirectionSchema.parse(parsed)
   }
 
@@ -222,6 +215,13 @@ async function callAI(
         .replace(/```/g, '')
         .trim()
 
-  const parsed: unknown = JSON.parse(jsonStr)
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(jsonStr)
+  } catch (parseErr) {
+    throw new Error(
+      `[SceneComposer] Groq returned invalid JSON: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}. Raw: ${jsonStr.slice(0, 200)}`,
+    )
+  }
   return CreativeDirectionSchema.parse(parsed)
 }

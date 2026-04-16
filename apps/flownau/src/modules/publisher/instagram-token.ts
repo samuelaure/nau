@@ -55,8 +55,19 @@ export async function refreshTokenIfNeeded(account: {
       },
     })
 
-    const newToken: string = response.data.access_token
-    const expiresIn: number = response.data.expires_in // seconds
+    const newToken: unknown = response.data?.access_token
+    const expiresIn: unknown = response.data?.expires_in // seconds
+
+    if (typeof newToken !== 'string' || newToken.length === 0) {
+      throw new Error(
+        `[TokenRefresh] Instagram API returned no access_token. Response: ${JSON.stringify(response.data)}`,
+      )
+    }
+    if (typeof expiresIn !== 'number') {
+      throw new Error(
+        `[TokenRefresh] Instagram API returned no expires_in. Response: ${JSON.stringify(response.data)}`,
+      )
+    }
 
     const newExpiresAt = new Date(now.getTime() + expiresIn * 1000)
 
@@ -168,5 +179,12 @@ export async function getLongLivedToken(shortLivedToken: string): Promise<string
       fb_exchange_token: shortLivedToken,
     },
   })
-  return response.data.access_token
+
+  const token: unknown = response.data?.access_token
+  if (typeof token !== 'string' || token.length === 0) {
+    throw new Error(
+      `[getLongLivedToken] Instagram API returned no access_token. Response: ${JSON.stringify(response.data)}`,
+    )
+  }
+  return token
 }
