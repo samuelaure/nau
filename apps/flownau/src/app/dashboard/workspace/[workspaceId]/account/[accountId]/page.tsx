@@ -3,26 +3,26 @@ export const dynamic = 'force-dynamic'
 import { prisma } from '@/modules/shared/prisma'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronRight, Instagram, AlertTriangle, CheckCircle2, Calendar, Clock } from 'lucide-react'
+import { ChevronRight, Instagram, Calendar } from 'lucide-react'
 import AssetsManager from '@/modules/shared/components/AssetsManager'
 import AccountSettings from '@/modules/accounts/components/AccountSettings'
 import AccountPersonas from '@/modules/accounts/components/AccountPersonas'
 import AccountIdeas from '@/modules/accounts/components/AccountIdeas'
 import ExternalAccountLink from '@/modules/accounts/components/ExternalAccountLink'
 import { cn } from '@/modules/shared/utils'
-import { approveComposition } from '@/modules/compositions/actions'
 import { Button } from '@/modules/shared/components/ui/Button'
 import { Card } from '@/modules/shared/components/ui/Card'
+import DailyScheduleView from '@/modules/plans/components/DailyScheduleView'
 
 export default async function WorkspaceAccountPage({
   params,
   searchParams,
 }: {
   params: { workspaceId: string; accountId: string }
-  searchParams: { tab?: string }
+  searchParams: { tab?: string; date?: string }
 }) {
   const { workspaceId, accountId } = await params
-  const { tab } = await searchParams
+  const { tab, date } = await searchParams
   const activeTab = tab || 'schedule'
 
   const account = await prisma.socialAccount.findUnique({
@@ -126,7 +126,9 @@ export default async function WorkspaceAccountPage({
 
       {/* Content Sections */}
       <div className="min-h-[400px]">
-        {activeTab === 'schedule' && <AccountSchedule accountId={accountId} />}
+        {activeTab === 'schedule' && (
+          <AccountSchedule accountId={accountId} workspaceId={workspaceId} dateStr={date} />
+        )}
         {activeTab === 'compositions' && <AccountCompositions accountId={accountId} />}
         {activeTab === 'ideas' && <AccountIdeas accountId={accountId} />}
         {activeTab === 'assets' && <AccountAssets accountId={accountId} />}
@@ -164,81 +166,92 @@ function TabLink({
   )
 }
 
-async function AccountSchedule({ accountId }: { accountId: string }) {
-  // Fetch planned content for today
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+async function AccountSchedule({
+  accountId,
+  workspaceId,
+  dateStr,
+}: {
+  accountId: string
+  workspaceId: string
+  dateStr?: string
+}) {
+  const targetDate = dateStr ? new Date(dateStr) : new Date()
+  targetDate.setHours(0, 0, 0, 0)
 
-  const plan = await prisma.contentPlan.findUnique({
-    where: { accountId_date: { accountId, date: today } },
+  const prevDate = new Date(targetDate)
+  prevDate.setDate(prevDate.getDate() - 1)
+
+  const nextDate = new Date(targetDate)
+  nextDate.setDate(nextDate.getDate() + 1)
+
+  const toDateParam = (d: Date) => d.toISOString().split('T')[0]
+
+  const plan = await prisma.contentPlan.findFirst({
+    where: {
+      accountId,
+      date: {
+        gte: targetDate,
+        lt: new Date(targetDate.getTime() + 24 * 60 * 60 * 1000),
+      },
+    },
+    include: { account: true },
   })
 
-  // Simulated hour-based slots (In a real scenario, we'd map the plan pieces to HH:mm slots)
-  const slots = [
-    { time: '09:00', type: 'Reel', status: 'Scheduled', compositionId: '1' },
-    { time: '12:00', type: 'Trial Reel', status: 'Pending', compositionId: null },
-    { time: '18:00', type: 'Reel', status: 'Ready', compositionId: '2' },
-    { time: '21:00', type: 'Carousel', status: 'Published', compositionId: '3' },
-  ]
+  const account = await prisma.socialAccount.findUnique({ where: { id: accountId } })
+
+  let mappedPlan = null
+  if (plan && account) {
+    const pieces = (plan.pieces as any[]) ?? []
+    const planAlerts = (plan.pieces as any)?.alerts ?? []
+
+    const FORMAT_LABELS: Record<string, string> = {
+      reel: 'Reel',
+      trial_reel: 'Trial Reel',
+      carousel: 'Carousel',
+      single_image: 'Image',
+    }
+
+    const slots = pieces.map((p) => ({
+      time: p.scheduledAt
+        ? new Date(p.scheduledAt).toLocaleTimeString(undefined, {
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        : 'Unassigned',
+      type: FORMAT_LABELS[p.format] || p.format,
+      status: p.status,
+      compositionId: p.id,
+    }))
+
+    mappedPlan = {
+      accountId: plan.accountId,
+      username: account.username || 'Unknown',
+      profileImage: account.profileImage || null,
+      alerts: planAlerts,
+      slots,
+      pieces,
+    }
+  }
+
+  const basePath = `/dashboard/workspace/${workspaceId}/account/${accountId}`
+  const isToday = toDateParam(targetDate) === toDateParam(new Date())
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex justify-between items-center">
-        <h3 className="text-xl font-heading font-semibold">Today's Posting Pipeline</h3>
-        <p className="text-sm text-text-secondary">
-          {new Date().toLocaleDateString(undefined, {
-            weekday: 'long',
-            month: 'long',
-            day: 'numeric',
-          })}
-        </p>
-      </div>
-
-      <div className="grid gap-4">
-        {slots.map((slot, i) => (
-          <Card
-            key={i}
-            className="flex items-center justify-between p-4 hover:bg-white/[0.02] transition-colors border-white/5"
-          >
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2 text-accent bg-accent/10 px-3 py-1.5 rounded-lg">
-                <Clock size={16} />
-                <span className="font-bold font-mono">{slot.time}</span>
-              </div>
-              <div>
-                <span className="text-xs font-bold uppercase tracking-widest text-text-secondary block mb-1">
-                  {slot.type}
-                </span>
-                <p className="font-semibold">
-                  {slot.compositionId ? `Composition #${slot.compositionId}` : 'Unassigned Slot'}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <span
-                className={cn(
-                  'px-2 py-1 rounded text-[10px] font-bold uppercase',
-                  slot.status === 'Published'
-                    ? 'bg-emerald-500/10 text-emerald-400'
-                    : slot.status === 'Scheduled'
-                      ? 'bg-blue-500/10 text-blue-400'
-                      : 'bg-white/5 text-text-secondary',
-                )}
-              >
-                {slot.status}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-accent underline hover:bg-transparent px-0"
-              >
-                Edit Slot
-              </Button>
-            </div>
-          </Card>
-        ))}
-      </div>
-    </div>
+    <DailyScheduleView
+      dateParam={toDateParam(targetDate)}
+      prevDateParam={toDateParam(prevDate)}
+      nextDateParam={toDateParam(nextDate)}
+      formattedDate={targetDate.toLocaleDateString(undefined, {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+      })}
+      isToday={isToday}
+      plans={mappedPlan ? [mappedPlan] : []}
+      context="brand"
+      basePath={basePath}
+    />
   )
 }
 
