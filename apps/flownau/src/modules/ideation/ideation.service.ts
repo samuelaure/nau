@@ -28,12 +28,12 @@ export type IdeationOutput = z.infer<typeof IdeationOutputSchema>
  */
 export interface GenerationRequest {
   brandName: string
-  dna: string            // Brand DNA (persona system prompt)
-  strategy?: string      // Optional IdeasFramework prompt for creative direction
-  count: number          // How many ideas to generate
-  concept?: string       // Source concept driving this generation (captured/manual origin)
-  digest?: { content: string; attachedUrls: string[] }  // Phase 11: mechanical InspoBase digest
-  inspoItems?: InspoItemInput[]  // Legacy: individual InspoItems (used by v1/ideation/cron)
+  dna: string // Brand DNA (persona system prompt)
+  strategy?: string // Optional IdeasFramework prompt for creative direction
+  count: number // How many ideas to generate
+  concept?: string // Source concept driving this generation (captured/manual origin)
+  digest?: { content: string; attachedUrls: string[] } // Phase 11: mechanical InspoBase digest
+  inspoItems?: InspoItemInput[] // Legacy: individual InspoItems (used by v1/ideation/cron)
   recentContent?: string[]
 }
 

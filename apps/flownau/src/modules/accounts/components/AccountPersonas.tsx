@@ -106,7 +106,15 @@ export default function AccountPersonas({ accountId }: { accountId: string }) {
   const field = (key: keyof typeof DEFAULT_FORM) => ({
     value: formData[key] as any,
     onChange: (e: any) =>
-      setFormData({ ...formData, [key]: e.target.type === 'checkbox' ? e.target.checked : e.target.type === 'number' ? Number(e.target.value) : e.target.value }),
+      setFormData({
+        ...formData,
+        [key]:
+          e.target.type === 'checkbox'
+            ? e.target.checked
+            : e.target.type === 'number'
+              ? Number(e.target.value)
+              : e.target.value,
+      }),
   })
 
   return (
@@ -358,12 +366,29 @@ export default function AccountPersonas({ accountId }: { accountId: string }) {
             {/* Ritual summary */}
             <div className="grid grid-cols-3 gap-2 mt-2 pt-3 border-t border-gray-800">
               {[
-                { label: 'Captured', count: p.capturedCount ?? 3, auto: p.capturedAutoApprove ?? false, color: 'text-yellow-400' },
-                { label: 'Manual', count: p.manualCount ?? 5, auto: p.manualAutoApprove ?? false, color: 'text-blue-400' },
-                { label: 'Auto', count: p.automaticCount ?? 5, auto: p.automaticAutoApprove ?? false, color: 'text-purple-400' },
+                {
+                  label: 'Captured',
+                  count: p.capturedCount ?? 3,
+                  auto: p.capturedAutoApprove ?? false,
+                  color: 'text-yellow-400',
+                },
+                {
+                  label: 'Manual',
+                  count: p.manualCount ?? 5,
+                  auto: p.manualAutoApprove ?? false,
+                  color: 'text-blue-400',
+                },
+                {
+                  label: 'Auto',
+                  count: p.automaticCount ?? 5,
+                  auto: p.automaticAutoApprove ?? false,
+                  color: 'text-purple-400',
+                },
               ].map(({ label, count, auto, color }) => (
                 <div key={label} className="text-center bg-gray-950 rounded p-2">
-                  <p className={`text-[10px] font-bold uppercase tracking-widest mb-1 ${color}`}>{label}</p>
+                  <p className={`text-[10px] font-bold uppercase tracking-widest mb-1 ${color}`}>
+                    {label}
+                  </p>
                   <p className="text-sm font-bold">{count}</p>
                   <p className={`text-[10px] mt-0.5 ${auto ? 'text-green-400' : 'text-gray-600'}`}>
                     {auto ? '✓ Auto' : '✗ Manual'}

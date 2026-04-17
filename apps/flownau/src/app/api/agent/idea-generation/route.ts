@@ -9,7 +9,14 @@ import { logError } from '@/modules/shared/logger'
 export async function POST(req: Request) {
   try {
     const json = await req.json()
-    const { accountId, personaId, frameworkId, concept, count: countOverride, source = 'manual' } = json
+    const {
+      accountId,
+      personaId,
+      frameworkId,
+      concept,
+      count: countOverride,
+      source = 'manual',
+    } = json
 
     if (!accountId) {
       return NextResponse.json({ error: 'Missing accountId' }, { status: 400 })
@@ -46,15 +53,20 @@ export async function POST(req: Request) {
     if (source === 'automatic') {
       const { fetchBrandDigest } = await import('@/modules/ideation/sources/inspo-source')
       digest = await fetchBrandDigest(accountId)
-      count = typeof countOverride === 'number' ? countOverride : ((persona as any).automaticCount ?? 5)
+      count =
+        typeof countOverride === 'number' ? countOverride : ((persona as any).automaticCount ?? 5)
       autoApprove = (persona as any).automaticAutoApprove ?? false
       priority = 3
-      sourceRef = digest && digest.attachedUrls.length > 0
-        ? (digest.attachedUrls.length === 1 ? digest.attachedUrls[0] : JSON.stringify(digest.attachedUrls))
-        : null
+      sourceRef =
+        digest && digest.attachedUrls.length > 0
+          ? digest.attachedUrls.length === 1
+            ? digest.attachedUrls[0]
+            : JSON.stringify(digest.attachedUrls)
+          : null
     } else {
       // Manual mode
-      count = typeof countOverride === 'number' ? countOverride : ((persona as any).manualCount ?? 5)
+      count =
+        typeof countOverride === 'number' ? countOverride : ((persona as any).manualCount ?? 5)
       autoApprove = (persona as any).manualAutoApprove ?? false
       priority = 2
     }

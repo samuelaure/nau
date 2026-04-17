@@ -4,12 +4,11 @@
 
 - **Type:** A — Platform Service (headless API + internal dashboard)
 - **Domain:** Content creation, scene-based video/image composition, automated publishing
-- **Status:** Active — Phase 11: Mechanical InspoBase Synthesis & Autonomous Ideation
+- **Status:** Active — Phase 12: Advanced Ideation Controls & Workspace Governance
 
 ## Purpose
 
 Automated content generation and distribution engine for the naŭ Platform. Converts content ideas into high-quality, brand-aligned social media assets (Reels, Trial Reels, Carousels, Single Images) using scene-based composition with AI-driven creative direction and deterministic assembly. Publishes to Instagram via the Graph API.
-
 
 ## Tech Stack
 
@@ -96,22 +95,22 @@ Ideation → Scene Composition (AI) → Timeline Assembly (Code) → Render (Asy
 
 ## Environment Variables
 
-| Variable                         | Required | Purpose                               |
-| -------------------------------- | -------- | ------------------------------------- |
-| DATABASE_URL                     | Yes      | Postgres connection                   |
-| REDIS_URL                        | Yes      | Redis connection (BullMQ)             |
-| REDIS_PASSWORD                   | Yes      | Redis auth                            |
-| OPENAI_API_KEY                   | Yes      | GPT-4o for composition                |
-| GROQ_API_KEY                     | Yes      | Llama 3.3 for ideation                |
-| R2_ACCESS_KEY, R2_SECRET_KEY     | Yes      | Cloudflare R2 storage                 |
-| R2_BUCKET_NAME, R2_PUBLIC_URL    | Yes      | R2 bucket config                      |
-| FB_APP_ID, FB_APP_SECRET         | Yes      | Instagram Graph API                   |
-| NAU_SERVICE_KEY                  | Yes      | Cross-service auth                    |
-| NAUTHENTICITY_URL                | Yes      | nauthenticity service URL             |
-| NEXTAUTH_SECRET, NEXTAUTH_URL    | Yes      | Dashboard auth                        |
-| RENDER_CONCURRENCY               | No       | Frames in parallel (default: 2)       |
-| RENDER_MAX_ATTEMPTS              | No       | Max retry per render job (default: 3) |
-| CRON_SECRET                     | Yes      | Automated flow protection (Bearer)    |
+| Variable                      | Required | Purpose                               |
+| ----------------------------- | -------- | ------------------------------------- |
+| DATABASE_URL                  | Yes      | Postgres connection                   |
+| REDIS_URL                     | Yes      | Redis connection (BullMQ)             |
+| REDIS_PASSWORD                | Yes      | Redis auth                            |
+| OPENAI_API_KEY                | Yes      | GPT-4o for composition                |
+| GROQ_API_KEY                  | Yes      | Llama 3.3 for ideation                |
+| R2_ACCESS_KEY, R2_SECRET_KEY  | Yes      | Cloudflare R2 storage                 |
+| R2_BUCKET_NAME, R2_PUBLIC_URL | Yes      | R2 bucket config                      |
+| FB_APP_ID, FB_APP_SECRET      | Yes      | Instagram Graph API                   |
+| NAU_SERVICE_KEY               | Yes      | Cross-service auth                    |
+| NAUTHENTICITY_URL             | Yes      | nauthenticity service URL             |
+| NEXTAUTH_SECRET, NEXTAUTH_URL | Yes      | Dashboard auth                        |
+| RENDER_CONCURRENCY            | No       | Frames in parallel (default: 2)       |
+| RENDER_MAX_ATTEMPTS           | No       | Max retry per render job (default: 3) |
+| CRON_SECRET                   | Yes      | Automated flow protection (Bearer)    |
 
 - **[2026-04-17] CI/CD & Integration Hardening (Phase 9)**: Implemented Docker BuildKit caching (GHA scope) for rapid deployments. Added safe `df -h` diagnostic logging and sequential container/image pruning to solve persistent disk exhaustion issues. Standardized CRON_SECRET protection and established `docs/integrations.md`.
 - **[2026-04-15] Phase 7 — Workspace Multi-Tenancy (complete)**: Transformed the app to a multi-tenant Workspace architecture. `SocialAccount` now belongs to `Workspace` (not `User`). Users join workspaces via `WorkspaceUser` join table with roles. New auth flow: `/register` creates user + personal workspace atomically. Dashboard root auto-redirects to the user's workspace. Account detail view now shows posting schedule as the primary tab. All API ownership checks migrated from `account.userId` to `checkAccountAccess()` workspace membership helper.
@@ -149,7 +148,7 @@ Ideation → Scene Composition (AI) → Timeline Assembly (Code) → Render (Asy
 
 ## naŭ Platform Dependencies
 
-- **nauthenticity** → Mechanical InspoBase Synthesis engine to provide rolling 'Brand Digest' context 
+- **nauthenticity** → Mechanical InspoBase Synthesis engine to provide rolling 'Brand Digest' context
 - **9naŭ API (triage & sync)** → Pushes captured voice notes and manual ideas via `/api/v1/ideas/ingest`
 - **9naŭ API (reactive)** → Triggers reactive composition via `/api/v1/compose`
 - **Zazŭ** → Consumes daily plan via `/api/v1/daily-plan/:accountId` + triggers composition

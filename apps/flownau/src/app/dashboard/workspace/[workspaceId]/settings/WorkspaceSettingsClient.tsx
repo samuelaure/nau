@@ -150,7 +150,10 @@ export default function WorkspaceSettingsClient({
             disabled={!canManage || savingName}
           />
           {canManage && (
-            <Button onClick={handleSaveName} disabled={savingName || workspaceName.trim() === workspace.name}>
+            <Button
+              onClick={handleSaveName}
+              disabled={savingName || workspaceName.trim() === workspace.name}
+            >
               {savingName ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
             </Button>
           )}
@@ -164,8 +167,7 @@ export default function WorkspaceSettingsClient({
         <div className="flex flex-col gap-2">
           {members.map((m) => {
             const isSelf = m.userId === currentUserId
-            const canRemove =
-              m.role !== 'owner' && (canManage || isSelf)
+            const canRemove = m.role !== 'owner' && (canManage || isSelf)
 
             return (
               <div
@@ -193,9 +195,7 @@ export default function WorkspaceSettingsClient({
                         </span>
                       )}
                     </p>
-                    {m.user.name && (
-                      <p className="text-xs text-gray-500">{m.user.email}</p>
-                    )}
+                    {m.user.name && <p className="text-xs text-gray-500">{m.user.email}</p>}
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -204,8 +204,8 @@ export default function WorkspaceSettingsClient({
                       m.role === 'owner'
                         ? 'bg-accent/20 text-accent'
                         : m.role === 'admin'
-                        ? 'bg-blue-500/20 text-blue-400'
-                        : 'bg-gray-800 text-gray-400'
+                          ? 'bg-blue-500/20 text-blue-400'
+                          : 'bg-gray-800 text-gray-400'
                     }`}
                   >
                     {ROLE_LABELS[m.role] ?? m.role}
@@ -255,7 +255,11 @@ export default function WorkspaceSettingsClient({
                 <option value="admin">Admin</option>
               </select>
               <Button onClick={handleInvite} disabled={inviting || !inviteEmail.trim()}>
-                {inviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                {inviting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <UserPlus className="w-4 h-4" />
+                )}
               </Button>
             </div>
             <p className="text-xs text-gray-500">

@@ -137,7 +137,7 @@ export async function ingestExternalIdeas(
     // Fire and forget — non-blocking
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     const cronSecret = process.env.CRON_SECRET
-    
+
     // Trigger immediate composer generation with cron-secret auth
     fetch(new URL('/api/cron/composer', appUrl).toString(), {
       method: 'GET',

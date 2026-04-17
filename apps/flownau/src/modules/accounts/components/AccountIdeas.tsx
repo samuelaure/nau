@@ -9,23 +9,24 @@ import { Loader2, Wand2, CheckCircle2, Trash2, Zap, User, Bot, Pencil } from 'lu
 import Modal from '@/modules/shared/components/Modal'
 
 // Source badge config
-const SOURCE_CONFIG: Record<string, { label: string; icon: React.ElementType; className: string }> = {
-  captured: {
-    label: 'Captured',
-    icon: Zap,
-    className: 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20',
-  },
-  manual: {
-    label: 'Manual',
-    icon: User,
-    className: 'bg-blue-500/10 text-blue-400 border border-blue-500/20',
-  },
-  automatic: {
-    label: 'Auto',
-    icon: Bot,
-    className: 'bg-purple-500/10 text-purple-400 border border-purple-500/20',
-  },
-}
+const SOURCE_CONFIG: Record<string, { label: string; icon: React.ElementType; className: string }> =
+  {
+    captured: {
+      label: 'Captured',
+      icon: Zap,
+      className: 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20',
+    },
+    manual: {
+      label: 'Manual',
+      icon: User,
+      className: 'bg-blue-500/10 text-blue-400 border border-blue-500/20',
+    },
+    automatic: {
+      label: 'Auto',
+      icon: Bot,
+      className: 'bg-purple-500/10 text-purple-400 border border-purple-500/20',
+    },
+  }
 
 function SourceBadge({ source }: { source: string }) {
   const config = SOURCE_CONFIG[source] ?? SOURCE_CONFIG.automatic
@@ -185,7 +186,7 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
           accountId,
           personaId: selectedPersonaId,
           frameworkId: selectedFrameworkId,
-          concept: brainstormSource === 'manual' ? (concept || undefined) : undefined,
+          concept: brainstormSource === 'manual' ? concept || undefined : undefined,
           count: countOverride || undefined,
           source: brainstormSource,
         }),
@@ -357,7 +358,8 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
         <div>
           <h3 className="text-xl font-heading font-semibold">Content Backlog</h3>
           <p className="text-xs text-gray-500">
-            Captured ideas first, then manual, then automatic. Pick a persona/strategy to brainstorm.
+            Captured ideas first, then manual, then automatic. Pick a persona/strategy to
+            brainstorm.
           </p>
         </div>
 
@@ -402,7 +404,11 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
               onClick={handleClearUsed}
               className="text-gray-500 border-gray-700 hover:border-red-800 hover:text-red-400"
             >
-              {bulkClearing ? <Loader2 className="w-3 h-3 animate-spin" /> : `Clear Used (${usedCount})`}
+              {bulkClearing ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                `Clear Used (${usedCount})`
+              )}
             </Button>
           )}
 
@@ -414,7 +420,11 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
               onClick={handleApproveAll}
               className="text-green-500 border-green-900 hover:bg-green-950"
             >
-              {bulkApproving ? <Loader2 className="w-3 h-3 animate-spin" /> : `Approve All (${pendingCount})`}
+              {bulkApproving ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                `Approve All (${pendingCount})`
+              )}
             </Button>
           )}
 
@@ -602,13 +612,15 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
         <Modal isOpen={true} onClose={() => !generating && setBrainstormModalOpen(false)}>
           <div className="space-y-4">
             <h2 className="text-xl font-heading font-semibold mb-1">Brainstorm Ideas</h2>
-            
+
             <div className="flex bg-gray-900 p-1 rounded-lg border border-gray-800 mb-4">
               <button
                 onClick={() => setBrainstormSource('manual')}
                 className={cn(
-                  "flex-1 py-1.5 text-xs font-bold rounded-md transition-all",
-                  brainstormSource === 'manual' ? "bg-gray-800 text-white shadow-sm" : "text-gray-500 hover:text-gray-300"
+                  'flex-1 py-1.5 text-xs font-bold rounded-md transition-all',
+                  brainstormSource === 'manual'
+                    ? 'bg-gray-800 text-white shadow-sm'
+                    : 'text-gray-500 hover:text-gray-300',
                 )}
               >
                 Manual Concept
@@ -616,8 +628,10 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
               <button
                 onClick={() => setBrainstormSource('automatic')}
                 className={cn(
-                  "flex-1 py-1.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-2",
-                  brainstormSource === 'automatic' ? "bg-gray-800 text-white shadow-sm" : "text-gray-500 hover:text-gray-300"
+                  'flex-1 py-1.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-2',
+                  brainstormSource === 'automatic'
+                    ? 'bg-gray-800 text-white shadow-sm'
+                    : 'text-gray-500 hover:text-gray-300',
                 )}
               >
                 <Bot size={12} />
@@ -642,8 +656,9 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
             ) : (
               <div className="bg-purple-500/5 border border-purple-500/10 rounded-lg p-4">
                 <p className="text-xs text-purple-200/70 leading-relaxed">
-                  The AI will consume the latest <strong>Mechanical Digest</strong> from Nauthenticity's InspoBase. 
-                  It will combine the Global synthesis with recent inspirations to generate non-repetitive ideas.
+                  The AI will consume the latest <strong>Mechanical Digest</strong> from
+                  Nauthenticity's InspoBase. It will combine the Global synthesis with recent
+                  inspirations to generate non-repetitive ideas.
                 </p>
               </div>
             )}
@@ -651,7 +666,9 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
             <div className="space-y-1">
               <label className="text-xs text-gray-400">
                 Number of ideas to spawn{' '}
-                <span className="text-gray-600 font-normal">(leave blank to use persona default)</span>
+                <span className="text-gray-600 font-normal">
+                  (leave blank to use persona default)
+                </span>
               </label>
               <input
                 type="number"

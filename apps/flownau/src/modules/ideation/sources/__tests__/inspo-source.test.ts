@@ -65,10 +65,7 @@ describe('fetchBrandDigest()', () => {
 
     await fetchBrandDigest(brandId)
 
-    expect(axios.get).toHaveBeenCalledWith(
-      `${mockUrl}/api/v1/inspo/digest`,
-      expect.anything(),
-    )
+    expect(axios.get).toHaveBeenCalledWith(`${mockUrl}/api/v1/inspo/digest`, expect.anything())
   })
 
   it('returns null and warns on ECONNREFUSED', async () => {
@@ -78,9 +75,7 @@ describe('fetchBrandDigest()', () => {
 
     const result = await fetchBrandDigest(brandId)
     expect(result).toBeNull()
-    expect(logger.warn).toHaveBeenCalledWith(
-      expect.stringContaining('nauthenticity unreachable'),
-    )
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('nauthenticity unreachable'))
   })
 
   it('returns null and warns on timeout (ECONNABORTED)', async () => {
@@ -90,9 +85,7 @@ describe('fetchBrandDigest()', () => {
 
     const result = await fetchBrandDigest(brandId)
     expect(result).toBeNull()
-    expect(logger.warn).toHaveBeenCalledWith(
-      expect.stringContaining('nauthenticity unreachable'),
-    )
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('nauthenticity unreachable'))
   })
 
   it('returns null when response has unexpected shape (missing content)', async () => {

@@ -4,7 +4,11 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 import { auth } from '@/auth'
 
-async function requireAccess(workspaceId: string, userId: string, requiredRoles = ['owner', 'admin']) {
+async function requireAccess(
+  workspaceId: string,
+  userId: string,
+  requiredRoles = ['owner', 'admin'],
+) {
   const access = await prisma.workspaceUser.findUnique({
     where: { userId_workspaceId: { userId, workspaceId } },
   })

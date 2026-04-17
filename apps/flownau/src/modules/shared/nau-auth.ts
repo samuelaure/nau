@@ -34,7 +34,7 @@ export function unauthorizedResponse(): Response {
 
 /**
  * Validates the CRON_SECRET for internal cron route protection.
- * Supports standard 'Authorization: Bearer <secret>' or the Vercel-style 
+ * Supports standard 'Authorization: Bearer <secret>' or the Vercel-style
  * 'Authorization: Bearer <secret>' automatically.
  */
 export function validateCronSecret(request: Request): boolean {
@@ -58,8 +58,9 @@ export function validateCronSecret(request: Request): boolean {
  */
 export function unauthorizedCronResponse(): Response {
   return new Response(
-    JSON.stringify({ error: 'Unauthorized: invalid or missing Bearer token in Authorization header' }),
+    JSON.stringify({
+      error: 'Unauthorized: invalid or missing Bearer token in Authorization header',
+    }),
     { status: 401, headers: { 'Content-Type': 'application/json' } },
   )
 }
-

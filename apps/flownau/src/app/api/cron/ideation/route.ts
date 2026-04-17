@@ -77,7 +77,8 @@ export async function GET(request: Request) {
 
         // 4. Per-origin settings (with fallback for existing personas without new fields)
         const automaticCount = (persona as any).automaticCount ?? 5
-        const automaticAutoApprove = (persona as any).automaticAutoApprove ?? persona.autoApproveIdeas
+        const automaticAutoApprove =
+          (persona as any).automaticAutoApprove ?? persona.autoApproveIdeas
 
         // 5. Generate ideas using unified GenerationRequest
         const output = await generateContentIdeas({
@@ -93,11 +94,12 @@ export async function GET(request: Request) {
 
         // Lineage: store the primary attached URL (or JSON array) as sourceRef so the
         // user can trace which original posts inspired this batch of generated ideas.
-        const digestSourceRef = digest && digest.attachedUrls.length > 0
-          ? (digest.attachedUrls.length === 1
-            ? digest.attachedUrls[0]
-            : JSON.stringify(digest.attachedUrls))
-          : null
+        const digestSourceRef =
+          digest && digest.attachedUrls.length > 0
+            ? digest.attachedUrls.length === 1
+              ? digest.attachedUrls[0]
+              : JSON.stringify(digest.attachedUrls)
+            : null
 
         for (const idea of output.ideas) {
           const ideaText = `[${idea.format.toUpperCase()}] Hook: ${idea.hook}\nAngle: ${idea.angle}\nScript: ${idea.script}\nCTA: ${idea.cta}`

@@ -149,14 +149,14 @@ jobs:
             cd /root/flownau
             echo "--- Server Disk Space [BEFORE SWAP] ---"
             df -h /
-            
+
             # Prune previous dangling images (older than 2h) to clear runway for pull
             docker image prune -a -f --filter "until=2h" || true
 
             # Pull and deploy the new images
             TAG=${{ github.ref_name }} docker compose pull
             TAG=${{ github.ref_name }} docker compose up -d --remove-orphans
-            
+
             # Now the old app images are totally unused and unattached. Prune them.
             docker image prune -a -f --filter "until=2h" || true
 
