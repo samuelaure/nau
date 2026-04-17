@@ -127,8 +127,7 @@ Return valid JSON matching the schema.`,
       },
     ],
     response_format: zodResponseFormat(IdeationOutputSchema, 'IdeationOutput'),
-    timeout: 60_000,
-  })
+  }, { timeout: 60_000 })
 
   const parsed = completion.choices[0].message.parsed
   if (!parsed) {

@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { Loader2, Wand2, CheckCircle2, Trash2, Zap, User, Bot, Pencil } from 'lucide-react'
 
 import Modal from '@/modules/shared/components/Modal'
+import { cn } from '@/modules/shared/utils'
 
 // Source badge config
 const SOURCE_CONFIG: Record<string, { label: string; icon: React.ElementType; className: string }> =
