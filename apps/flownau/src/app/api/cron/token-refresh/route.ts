@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { checkAllTokens } from '@/modules/publisher/instagram-token'
 import { logError, logger } from '@/modules/shared/logger'
+import { acquireLock, releaseLock } from '@/modules/shared/rate-limit'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,7 +11,16 @@ export const dynamic = 'force-dynamic'
  * Daily cron that proactively refreshes any Instagram token
  * expiring within the configured buffer (default: 7 days).
  */
+const LOCK_KEY = 'cron:token-refresh:lock'
+const LOCK_TTL_MS = 300_000 // 5 minutes
+
 export async function GET() {
+  const acquired = await acquireLock(LOCK_KEY, LOCK_TTL_MS)
+  if (!acquired) {
+    logger.info('[TokenRefresh] Skipped: another instance is already running')
+    return NextResponse.json({ message: 'Skipped: another instance running' })
+  }
+
   try {
     logger.info('[TokenRefresh] Starting token refresh check...')
     const results = await checkAllTokens()
@@ -35,5 +45,7 @@ export async function GET() {
     const msg = error instanceof Error ? error.message : String(error)
     logError('[TokenRefresh] Fatal error', error)
     return NextResponse.json({ error: 'Token refresh failed', details: msg }, { status: 500 })
+  } finally {
+    await releaseLock(LOCK_KEY)
   }
 }

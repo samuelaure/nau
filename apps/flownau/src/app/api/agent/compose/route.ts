@@ -6,6 +6,7 @@ import type { Prisma } from '@prisma/client'
 import { checkAccountAccess } from '@/modules/shared/actions'
 import { z } from 'zod'
 import { logError, logger } from '@/modules/shared/logger'
+import { checkRateLimit } from '@/modules/shared/rate-limit'
 import { compose } from '@/modules/composer/scene-composer'
 import { selectAssetsForCreative, commitAssetUsage } from '@/modules/composer/asset-curator'
 import { compileTimeline } from '@/modules/composer/timeline-compiler'
@@ -31,6 +32,22 @@ export async function POST(req: Request) {
     }
 
     const { prompt, accountId, format, ideaId, personaId } = parsed.data
+
+    // Rate limit: 10 compose requests per minute per account
+    const rateLimit = await checkRateLimit({
+      key: `rate:compose:${accountId}`,
+      maxRequests: 10,
+      windowSeconds: 60,
+    })
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Max 10 compose requests per minute.' },
+        {
+          status: 429,
+          headers: { 'X-RateLimit-Reset': String(rateLimit.resetAt) },
+        },
+      )
+    }
 
     await checkAccountAccess(accountId)
 
