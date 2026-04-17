@@ -6,6 +6,8 @@ const EnvSchema = z
     DATABASE_URL: z.string().url().startsWith('postgres'),
     NEXTAUTH_SECRET: z.string().min(32),
     NEXT_PUBLIC_APP_URL: z.string().url(),
+    NAU_SERVICE_KEY: z.string().min(1),
+    CRON_SECRET: z.string().min(1),
 
     // Storage (R2)
     R2_ACCOUNT_ID: z.string().min(1),

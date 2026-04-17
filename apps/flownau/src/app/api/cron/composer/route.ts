@@ -7,6 +7,7 @@ import { compileTimeline } from '@/modules/composer/timeline-compiler'
 import { addRenderJob } from '@/modules/renderer/render-queue'
 import { generateTopicHash } from '@/modules/planning/daily-plan.service'
 import { logError, logger } from '@/modules/shared/logger'
+import { validateCronSecret, unauthorizedCronResponse } from '@/modules/shared/nau-auth'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300 // 5 minutes max for AI generation timeout
@@ -20,7 +21,11 @@ export const maxDuration = 300 // 5 minutes max for AI generation timeout
  * 3. TimelineCompiler: Deterministic frame math → validated DynamicCompositionSchema
  * 4. Save Composition with creative direction, compiled payload, and caption
  */
-export async function GET() {
+export async function GET(request: Request) {
+  if (!validateCronSecret(request)) {
+    return unauthorizedCronResponse()
+  }
+
   try {
     const results: Array<{
       ideaId: string

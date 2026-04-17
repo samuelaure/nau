@@ -17,7 +17,13 @@ export const maxDuration = 120 // 2 minutes — publishing only, no rendering
  * Part A: Explicitly scheduled compositions (scheduledAt <= now, status = rendered)
  * Part B: Auto-posted compositions via PostingSchedule
  */
-export async function GET() {
+import { validateCronSecret, unauthorizedCronResponse } from '@/modules/shared/nau-auth'
+
+export async function GET(request: Request) {
+  if (!validateCronSecret(request)) {
+    return unauthorizedCronResponse()
+  }
+
   try {
     const results: Array<{
       type: string

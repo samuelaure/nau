@@ -14,7 +14,13 @@ export const dynamic = 'force-dynamic'
 const LOCK_KEY = 'cron:token-refresh:lock'
 const LOCK_TTL_MS = 300_000 // 5 minutes
 
-export async function GET() {
+import { validateCronSecret, unauthorizedCronResponse } from '@/modules/shared/nau-auth'
+
+export async function GET(request: Request) {
+  if (!validateCronSecret(request)) {
+    return unauthorizedCronResponse()
+  }
+
   const acquired = await acquireLock(LOCK_KEY, LOCK_TTL_MS)
   if (!acquired) {
     logger.info('[TokenRefresh] Skipped: another instance is already running')

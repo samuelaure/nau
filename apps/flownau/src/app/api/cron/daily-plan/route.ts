@@ -16,7 +16,13 @@ export const maxDuration = 120
  * 1. Generate tomorrow's content plan (pieces, scripts, alerts)
  * 2. Store in ContentPlan table
  */
-export async function GET() {
+import { validateCronSecret, unauthorizedCronResponse } from '@/modules/shared/nau-auth'
+
+export async function GET(request: Request) {
+  if (!validateCronSecret(request)) {
+    return unauthorizedCronResponse()
+  }
+
   try {
     const results: Array<{
       accountId: string
