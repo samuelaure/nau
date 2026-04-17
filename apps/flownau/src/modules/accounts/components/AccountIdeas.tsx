@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Card } from '@/modules/shared/components/ui/Card'
 import { Button } from '@/modules/shared/components/ui/Button'
 import { toast } from 'sonner'
-import { Loader2, Wand2, CheckCircle2, Trash2, Zap, User, Bot } from 'lucide-react'
+import { Loader2, Wand2, CheckCircle2, Trash2, Zap, User, Bot, Pencil } from 'lucide-react'
 
 import Modal from '@/modules/shared/components/Modal'
 
@@ -65,9 +65,23 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
   const [selectedPersonaId, setSelectedPersonaId] = useState<string>('')
   const [selectedFrameworkId, setSelectedFrameworkId] = useState<string>('')
 
-  // Brainstorm with concept
+  // Brainstorm modal
   const [brainstormModalOpen, setBrainstormModalOpen] = useState(false)
   const [brainstormConcept, setBrainstormConcept] = useState('')
+  const [brainstormCount, setBrainstormCount] = useState<number | ''>('')
+
+  // Manual idea modal
+  const [manualIdeaModalOpen, setManualIdeaModalOpen] = useState(false)
+  const [manualIdeaText, setManualIdeaText] = useState('')
+
+  // Edit idea modal
+  const [editingIdea, setEditingIdea] = useState<any | null>(null)
+  const [editIdeaText, setEditIdeaText] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
+
+  // Bulk actions
+  const [bulkApproving, setBulkApproving] = useState(false)
+  const [bulkClearing, setBulkClearing] = useState(false)
 
   const fetchFrameworks = async () => {
     try {
@@ -124,7 +138,6 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
     try {
       const res = await fetch(`/api/ideas?accountId=${accountId}`)
       const data = await res.json()
-      // Sort by priority asc (1=captured first) then by createdAt desc
       const sorted = (data.ideas || []).sort((a: any, b: any) => {
         if (a.priority !== b.priority) return (a.priority ?? 3) - (b.priority ?? 3)
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -157,7 +170,7 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
     fetchTemplates()
   }, [accountId])
 
-  const handleGenerate = async (concept?: string) => {
+  const handleGenerate = async (concept?: string, countOverride?: number) => {
     setGenerating(true)
     const toastId = toast.loading(
       concept
@@ -173,6 +186,7 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
           personaId: selectedPersonaId,
           frameworkId: selectedFrameworkId,
           concept: concept || undefined,
+          count: countOverride || undefined,
         }),
       })
       const data = await res.json()
@@ -185,11 +199,9 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
       setGenerating(false)
       setBrainstormModalOpen(false)
       setBrainstormConcept('')
+      setBrainstormCount('')
     }
   }
-
-  const [manualIdeaModalOpen, setManualIdeaModalOpen] = useState(false)
-  const [manualIdeaText, setManualIdeaText] = useState('')
 
   const handleCreateManualIdea = async () => {
     if (!manualIdeaText.trim()) return
@@ -203,10 +215,9 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
           ideaText: manualIdeaText,
           source: 'manual',
           priority: 2,
-          status: 'APPROVED', // Manual ideas are auto-approved since user wrote them
+          status: 'PENDING',
         }),
       })
-
       if (!res.ok) throw new Error('Failed to create manual idea')
       toast.success('Idea created!', { id: toastId })
       setManualIdeaText('')
@@ -235,15 +246,74 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'APPROVED' }),
       })
-
       if (!res.ok) throw new Error('Failed to approve')
-
       toast.success('Idea approved!')
       fetchIdeas()
     } catch (err: any) {
       toast.error(err.message)
     } finally {
       setApproving(null)
+    }
+  }
+
+  const handleApproveAll = async () => {
+    const pending = ideas.filter((i) => i.status === 'PENDING')
+    if (pending.length === 0) return toast.info('No pending ideas to approve')
+    setBulkApproving(true)
+    const toastId = toast.loading(`Approving ${pending.length} ideas...`)
+    try {
+      await Promise.all(
+        pending.map((idea) =>
+          fetch(`/api/ideas/${idea.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'APPROVED' }),
+          }),
+        ),
+      )
+      toast.success(`Approved ${pending.length} ideas`, { id: toastId })
+      fetchIdeas()
+    } catch {
+      toast.error('Some approvals failed', { id: toastId })
+    } finally {
+      setBulkApproving(false)
+    }
+  }
+
+  const handleClearUsed = async () => {
+    const used = ideas.filter((i) => i.status === 'USED')
+    if (used.length === 0) return toast.info('No used ideas to clear')
+    if (!confirm(`Delete ${used.length} used ideas?`)) return
+    setBulkClearing(true)
+    const toastId = toast.loading(`Clearing ${used.length} used ideas...`)
+    try {
+      await Promise.all(used.map((idea) => fetch(`/api/ideas/${idea.id}`, { method: 'DELETE' })))
+      toast.success(`Cleared ${used.length} used ideas`, { id: toastId })
+      fetchIdeas()
+    } catch {
+      toast.error('Some deletions failed', { id: toastId })
+    } finally {
+      setBulkClearing(false)
+    }
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingIdea || !editIdeaText.trim()) return
+    setSavingEdit(true)
+    try {
+      const res = await fetch(`/api/ideas/${editingIdea.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ideaText: editIdeaText }),
+      })
+      if (!res.ok) throw new Error('Failed to save edit')
+      toast.success('Idea updated')
+      setEditingIdea(null)
+      fetchIdeas()
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setSavingEdit(false)
     }
   }
 
@@ -265,10 +335,8 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
           templateId: selectedTemplateId || undefined,
         }),
       })
-
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Composition failed')
-
       toast.success('Idea structurally mapped into a Draft Composition!', { id: toastId })
       setComposingIdea(null)
       fetchIdeas()
@@ -278,6 +346,9 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
       setComposing(false)
     }
   }
+
+  const pendingCount = ideas.filter((i) => i.status === 'PENDING').length
+  const usedCount = ideas.filter((i) => i.status === 'USED').length
 
   return (
     <div className="flex flex-col gap-6">
@@ -321,6 +392,30 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
           <Button variant="outline" size="sm" onClick={() => setShowSettings(!showSettings)}>
             Settings
           </Button>
+
+          {usedCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={bulkClearing}
+              onClick={handleClearUsed}
+              className="text-gray-500 border-gray-700 hover:border-red-800 hover:text-red-400"
+            >
+              {bulkClearing ? <Loader2 className="w-3 h-3 animate-spin" /> : `Clear Used (${usedCount})`}
+            </Button>
+          )}
+
+          {pendingCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={bulkApproving}
+              onClick={handleApproveAll}
+              className="text-green-500 border-green-900 hover:bg-green-950"
+            >
+              {bulkApproving ? <Loader2 className="w-3 h-3 animate-spin" /> : `Approve All (${pendingCount})`}
+            </Button>
+          )}
 
           <Button
             onClick={() => setManualIdeaModalOpen(true)}
@@ -454,6 +549,17 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
 
                 <Button
                   variant="outline"
+                  className="border-gray-700 text-gray-400 hover:text-white"
+                  onClick={() => {
+                    setEditingIdea(idea)
+                    setEditIdeaText(idea.ideaText)
+                  }}
+                >
+                  <Pencil className="w-4 h-4" />
+                </Button>
+
+                <Button
+                  variant="outline"
                   className="border-red-900 text-red-500 hover:bg-red-950"
                   onClick={() => handleDelete(idea.id)}
                 >
@@ -490,7 +596,7 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
         })}
       </div>
 
-      {/* Brainstorm Modal — supports optional concept for targeted generation */}
+      {/* Brainstorm Modal */}
       {brainstormModalOpen && (
         <Modal isOpen={true} onClose={() => !generating && setBrainstormModalOpen(false)}>
           <div className="space-y-4">
@@ -502,8 +608,7 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
 
             <div className="space-y-1">
               <label className="text-xs text-gray-400">
-                Source Concept{' '}
-                <span className="text-gray-600 font-normal">(optional)</span>
+                Source Concept <span className="text-gray-600 font-normal">(optional)</span>
               </label>
               <textarea
                 autoFocus
@@ -512,6 +617,25 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
                 onChange={(e) => setBrainstormConcept(e.target.value)}
                 placeholder="e.g. 'How AI is changing content creation' or a trending topic..."
                 disabled={generating}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs text-gray-400">
+                Number of ideas to spawn{' '}
+                <span className="text-gray-600 font-normal">(leave blank to use persona default)</span>
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={brainstormCount}
+                onChange={(e) =>
+                  setBrainstormCount(e.target.value === '' ? '' : Number(e.target.value))
+                }
+                placeholder="e.g. 5"
+                disabled={generating}
+                className="w-24 bg-gray-900 border border-gray-800 text-white rounded p-2 text-sm"
               />
             </div>
 
@@ -525,7 +649,12 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
               </Button>
               <Button
                 disabled={generating}
-                onClick={() => handleGenerate(brainstormConcept.trim() || undefined)}
+                onClick={() =>
+                  handleGenerate(
+                    brainstormConcept.trim() || undefined,
+                    brainstormCount !== '' ? brainstormCount : undefined,
+                  )
+                }
                 className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white"
               >
                 {generating ? (
@@ -600,7 +729,7 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
             <h2 className="text-xl font-heading font-semibold mb-4">Manual Concept Idea</h2>
             <p className="text-sm text-gray-400">
               Record a specific concept idea you have in mind. It will be added as{' '}
-              <span className="text-green-400">APPROVED</span> and ready to compose.
+              <span className="text-orange-400">PENDING</span> for review.
             </p>
 
             <div className="space-y-1">
@@ -624,6 +753,48 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
                 disabled={!manualIdeaText.trim()}
               >
                 Save Idea
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Edit Idea Modal */}
+      {editingIdea && (
+        <Modal isOpen={true} onClose={() => !savingEdit && setEditingIdea(null)}>
+          <div className="space-y-4">
+            <h2 className="text-xl font-heading font-semibold mb-1">Edit Idea</h2>
+            <p className="text-sm text-gray-400">
+              Refine the AI-generated or captured idea text before approving or composing.
+            </p>
+
+            <div className="space-y-1">
+              <label className="text-xs text-gray-400">Idea Text</label>
+              <textarea
+                autoFocus
+                className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-sm min-h-[200px]"
+                value={editIdeaText}
+                onChange={(e) => setEditIdeaText(e.target.value)}
+                disabled={savingEdit}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 mt-4">
+              <Button variant="outline" disabled={savingEdit} onClick={() => setEditingIdea(null)}>
+                Cancel
+              </Button>
+              <Button
+                disabled={savingEdit || !editIdeaText.trim()}
+                onClick={handleSaveEdit}
+                className="bg-accent text-white"
+              >
+                {savingEdit ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" /> Saving...
+                  </>
+                ) : (
+                  'Save Changes'
+                )}
               </Button>
             </div>
           </div>
