@@ -171,9 +171,9 @@ model BrandPersona {
   autoApproveCompositions Boolean  @default(false)
 
   // Per-origin engine settings (Phase 8)
-  capturedAutoApprove     Boolean  @default(true)   // Captured ideas auto-approved (from 9naŭ)
+  capturedAutoApprove     Boolean  @default(false)  // Captured ideas require review by default
   capturedCount           Int      @default(3)       // Ideas spawned per captured concept
-  manualAutoApprove       Boolean  @default(true)    // Manual ideas auto-approved (operator input)
+  manualAutoApprove       Boolean  @default(false)   // Manual ideas require review by default
   manualCount             Int      @default(5)       // Ideas spawned per manual brainstorm session
   automaticAutoApprove    Boolean  @default(false)   // Automatic ideas require review
   automaticCount          Int      @default(5)       // Ideas generated per cron cycle
