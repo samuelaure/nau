@@ -82,8 +82,9 @@ jobs:
           context: .
           file: Dockerfile
           push: true
-          no-cache: true
           tags: ghcr.io/${{ github.repository }}/app:latest,ghcr.io/${{ github.repository }}/app:${{ github.ref_name }}
+          cache-from: type=gha,scope=app
+          cache-to: type=gha,mode=max,scope=app
 
       - name: Build and Push Renderer
         uses: docker/build-push-action@v5
@@ -91,8 +92,9 @@ jobs:
           context: .
           file: Dockerfile.renderer
           push: true
-          no-cache: true
           tags: ghcr.io/${{ github.repository }}/renderer:latest,ghcr.io/${{ github.repository }}/renderer:${{ github.ref_name }}
+          cache-from: type=gha,scope=renderer
+          cache-to: type=gha,mode=max,scope=renderer
 
       - name: Copy docker-compose.yml to server
         uses: appleboy/scp-action@master
@@ -145,9 +147,21 @@ jobs:
             tr -d '\r' < /root/flownau/.env.tmp > /root/flownau/.env
 
             cd /root/flownau
-            docker system prune -a -f
+            echo "--- Server Disk Space [BEFORE SWAP] ---"
+            df -h /
+            
+            # Prune previous dangling images (older than 2h) to clear runway for pull
+            docker image prune -a -f --filter "until=2h" || true
+
+            # Pull and deploy the new images
             TAG=${{ github.ref_name }} docker compose pull
             TAG=${{ github.ref_name }} docker compose up -d --remove-orphans
+            
+            # Now the old app images are totally unused and unattached. Prune them.
+            docker image prune -a -f --filter "until=2h" || true
+
+            echo "--- Server Disk Space [AFTER SWAP] ---"
+            df -h /
 
             # Run migrations once the container is up and can reach the DB
             # Use the app container directly to ensure we use the new code
