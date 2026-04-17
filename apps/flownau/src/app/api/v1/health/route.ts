@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import pkg from '../../../../../package.json'
 
 /**
  * Health check endpoint for the naŭ Platform.
@@ -8,7 +9,8 @@ export async function GET() {
   return NextResponse.json({
     status: 'ok',
     service: 'flownau',
-    version: '1.0.0',
+    version: pkg.version,
     timestamp: Date.now(),
   })
 }
+
