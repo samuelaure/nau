@@ -20,6 +20,23 @@ const IdeationOutputSchema = z.object({
 
 export type IdeationOutput = z.infer<typeof IdeationOutputSchema>
 
+/**
+ * Unified generation request used by all three origins:
+ *   - Origin 1 (Captured): concept = voice transcript / capture text
+ *   - Origin 2 (Manual): concept = operator input
+ *   - Origin 3 (Automatic): digest from nauthenticity synthesis engine; concept omitted
+ */
+export interface GenerationRequest {
+  brandName: string
+  dna: string            // Brand DNA (persona system prompt)
+  strategy?: string      // Optional IdeasFramework prompt for creative direction
+  count: number          // How many ideas to generate
+  concept?: string       // Source concept driving this generation (captured/manual origin)
+  digest?: { content: string; attachedUrls: string[] }  // Phase 11: mechanical InspoBase digest
+  inspoItems?: InspoItemInput[]  // Legacy: individual InspoItems (used by v1/ideation/cron)
+  recentContent?: string[]
+}
+
 interface InspoItemInput {
   id: string
   type: string
@@ -31,15 +48,7 @@ interface InspoItemInput {
   postTranscript?: string | null
 }
 
-interface IdeationContext {
-  brandName: string
-  brandDNA: string
-  inspoItems: InspoItemInput[]
-  injectedDocuments?: string[]
-  recentPosts?: string[]
-}
-
-export async function generateContentIdeas(ctx: IdeationContext): Promise<IdeationOutput> {
+export async function generateContentIdeas(req: GenerationRequest): Promise<IdeationOutput> {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
     throw new Error('OPENAI_API_KEY is not configured. Cannot generate content ideas.')
@@ -47,14 +56,32 @@ export async function generateContentIdeas(ctx: IdeationContext): Promise<Ideati
 
   const openai = new OpenAI({ apiKey })
 
-  // Build context prompt
   let contextBlock = ''
 
-  contextBlock += `## BRAND DNA\n${ctx.brandDNA}\n\n`
+  contextBlock += `## BRAND DNA\n${req.dna}\n\n`
 
-  if (ctx.inspoItems.length > 0) {
-    contextBlock += `## INSPO BASE (${ctx.inspoItems.length} items)\n`
-    ctx.inspoItems.forEach((item, i) => {
+  if (req.strategy) {
+    contextBlock += `## IDEATION STRATEGY\n${req.strategy}\n\n`
+  }
+
+  if (req.concept) {
+    contextBlock += `## SOURCE CONCEPT\nGenerate ideas directly inspired by this concept:\n${req.concept}\n\n`
+  }
+
+  if (req.digest) {
+    contextBlock += `## CREATIVE DIGEST\nThis is the brand's current creative direction synthesized from recent inspiration:\n${req.digest.content}\n\n`
+    if (req.digest.attachedUrls.length > 0) {
+      contextBlock += `Reference posts that shaped this direction:\n`
+      req.digest.attachedUrls.forEach((url) => {
+        contextBlock += `- ${url}\n`
+      })
+      contextBlock += '\n'
+    }
+  }
+
+  if (req.inspoItems && req.inspoItems.length > 0) {
+    contextBlock += `## INSPO BASE (${req.inspoItems.length} items)\n`
+    req.inspoItems.forEach((item, i) => {
       contextBlock += `### Item ${i + 1} (${item.type}) [ID: ${item.id}]\n`
       if (item.note) contextBlock += `User Note: ${item.note}\n`
       if (item.extractedHook) contextBlock += `Hook: ${item.extractedHook}\n`
@@ -66,37 +93,30 @@ export async function generateContentIdeas(ctx: IdeationContext): Promise<Ideati
     })
   }
 
-  if (ctx.injectedDocuments && ctx.injectedDocuments.length > 0) {
-    contextBlock += `## STRATEGY DOCUMENTS\n`
-    ctx.injectedDocuments.forEach((doc, i) => {
-      contextBlock += `### Document ${i + 1}\n${doc}\n\n`
-    })
-  }
-
-  if (ctx.recentPosts && ctx.recentPosts.length > 0) {
+  if (req.recentContent && req.recentContent.length > 0) {
     contextBlock += `## RECENT PUBLISHED CONTENT (avoid repetition)\n`
-    ctx.recentPosts.forEach((p) => {
+    req.recentContent.forEach((p) => {
       contextBlock += `- ${p}\n`
     })
     contextBlock += '\n'
   }
 
-  const completion = await (openai.beta as any).chat.completions.parse({
+  const completion = await openai.chat.completions.parse({
     model: 'gpt-4o',
     temperature: 0.7,
     messages: [
       {
         role: 'system',
-        content: `You are the Content Ideation Engine for "${ctx.brandName}".
-Your job is to generate fresh, high-quality content ideas based on the user's Inspo Base items and Brand DNA.
+        content: `You are the Content Ideation Engine for "${req.brandName}".
+Generate exactly ${req.count} fresh, high-quality content ideas.
 
 RULES:
-1. Generate 3-5 content ideas.
-2. Each idea must have a compelling hook, a unique angle, a full script, and a CTA.
-3. Reference inspoItemIds when an idea is directly inspired by a specific InspoItem.
-4. Recommend the best format (reel, carousel, static_post, story) for each idea.
-5. Avoid repeating topics from "Recent Published Content".
-6. Honor the Brand DNA for tone, voice, and values.
+1. Each idea must have a compelling hook, a unique angle, a full script, and a CTA.
+2. Reference inspoItemIds when an idea is directly inspired by a specific InspoItem.
+3. Recommend the best format (reel, carousel, static_post, story) for each idea.
+4. Avoid repeating topics from "Recent Published Content".
+5. Honor the Brand DNA for tone, voice, and values.
+6. If a Source Concept is provided, all ideas must be directly inspired by it.
 7. Write scripts in the brand's natural language (typically Spanish).
 
 Return valid JSON matching the schema.`,
@@ -107,6 +127,7 @@ Return valid JSON matching the schema.`,
       },
     ],
     response_format: zodResponseFormat(IdeationOutputSchema, 'IdeationOutput'),
+    timeout: 60_000,
   })
 
   const parsed = completion.choices[0].message.parsed

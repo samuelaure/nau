@@ -178,6 +178,7 @@ async function callAI(
       temperature: 0.7,
       messages,
       response_format: zodResponseFormat(CreativeDirectionSchema, 'CreativeDirection'),
+      timeout: 60000,
     })
 
     const parsed: unknown = completion.choices[0]?.message?.parsed
@@ -202,6 +203,7 @@ async function callAI(
           'Respond with ONLY valid JSON matching the CreativeDirection schema. No markdown, no explanation.',
       },
     ],
+    timeout: 30_000,
   })
 
   const raw = completion.choices[0]?.message?.content?.trim()
