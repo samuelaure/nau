@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Card } from '@/modules/shared/components/ui/Card'
-import { Plus, Trash, Edit, Settings } from 'lucide-react'
+import { Plus, Trash } from 'lucide-react'
 import {
   createWorkspace,
   renameWorkspace,

@@ -4,28 +4,26 @@ All notable changes to this project will be documented in this file. See [standa
 
 ## [1.2.0](https://github.com/samuelaure/flownau/compare/v1.1.1...v1.2.0) (2026-04-17)
 
-
 ### Features
 
-* **api:** expand ideation and persona endpoints for granular control ([f0a3f5e](https://github.com/samuelaure/flownau/commit/f0a3f5ee06fd8dc14475f2aa457c4cdc13a73a90))
-* **ci:** implement secure sequential deployment and buildx caching ([19deb0d](https://github.com/samuelaure/flownau/commit/19deb0d11c0764f4f534cfc04086f2439683815b))
-* **ideation:** enhance ideation engine with manual concepts and priority tracking ([e3e76f3](https://github.com/samuelaure/flownau/commit/e3e76f321b5ea9d0fe1b84db1d26823a529207e4))
-* **ideation:** implement manual InspoBase trigger for automatic flow testing ([662072a](https://github.com/samuelaure/flownau/commit/662072a65d4c5b5c8aaca327f1db0bb68a2ba418))
-* **ideation:** implement mechanical brand digest ingestion and autonomous ideation trigger ([c9661ae](https://github.com/samuelaure/flownau/commit/c9661ae8e1daf4dd34a2ba7d77d8a0c6bf92a0ee))
-* **infra:** implement strict environment variable validation ([cd690d3](https://github.com/samuelaure/flownau/commit/cd690d30aa9a0ac5a9405b601fb1ebb48ba0bac9))
-* **persona:** harden ideation defaults to require review ([19b1a44](https://github.com/samuelaure/flownau/commit/19b1a44575aceb7f9bbe850aad0f03e99cdf5eeb))
-* **security:** implement cron secret validation for internal routes ([9da4a03](https://github.com/samuelaure/flownau/commit/9da4a039e41ab6477d67fa729038db2eff507b2d))
-* **shared:** implement distributed locking and slide-window rate limiting ([b0df939](https://github.com/samuelaure/flownau/commit/b0df93912d2ae877597e81118a37cab116830386))
-* **ui:** implement full idea lifecycle management with manual text editing ([addd464](https://github.com/samuelaure/flownau/commit/addd464b03ccc6ee4975fc816c32a02c26ec7586))
-* **ui:** implement granular generation rituals in persona dashboard ([b56faf8](https://github.com/samuelaure/flownau/commit/b56faf832ac06fe75120c89fc54d3e872e4b3fab))
-* **workspace:** implement governance UI for brand settings and user management ([f2bbec0](https://github.com/samuelaure/flownau/commit/f2bbec0591f77a91c888de68842454b7ba769f63))
-* **workspaces:** implement workspace management and member settings ([764a1fd](https://github.com/samuelaure/flownau/commit/764a1fdb41d42aecc3293d95d259a824ac87dacf))
-
+- **api:** expand ideation and persona endpoints for granular control ([f0a3f5e](https://github.com/samuelaure/flownau/commit/f0a3f5ee06fd8dc14475f2aa457c4cdc13a73a90))
+- **ci:** implement secure sequential deployment and buildx caching ([19deb0d](https://github.com/samuelaure/flownau/commit/19deb0d11c0764f4f534cfc04086f2439683815b))
+- **ideation:** enhance ideation engine with manual concepts and priority tracking ([e3e76f3](https://github.com/samuelaure/flownau/commit/e3e76f321b5ea9d0fe1b84db1d26823a529207e4))
+- **ideation:** implement manual InspoBase trigger for automatic flow testing ([662072a](https://github.com/samuelaure/flownau/commit/662072a65d4c5b5c8aaca327f1db0bb68a2ba418))
+- **ideation:** implement mechanical brand digest ingestion and autonomous ideation trigger ([c9661ae](https://github.com/samuelaure/flownau/commit/c9661ae8e1daf4dd34a2ba7d77d8a0c6bf92a0ee))
+- **infra:** implement strict environment variable validation ([cd690d3](https://github.com/samuelaure/flownau/commit/cd690d30aa9a0ac5a9405b601fb1ebb48ba0bac9))
+- **persona:** harden ideation defaults to require review ([19b1a44](https://github.com/samuelaure/flownau/commit/19b1a44575aceb7f9bbe850aad0f03e99cdf5eeb))
+- **security:** implement cron secret validation for internal routes ([9da4a03](https://github.com/samuelaure/flownau/commit/9da4a039e41ab6477d67fa729038db2eff507b2d))
+- **shared:** implement distributed locking and slide-window rate limiting ([b0df939](https://github.com/samuelaure/flownau/commit/b0df93912d2ae877597e81118a37cab116830386))
+- **ui:** implement full idea lifecycle management with manual text editing ([addd464](https://github.com/samuelaure/flownau/commit/addd464b03ccc6ee4975fc816c32a02c26ec7586))
+- **ui:** implement granular generation rituals in persona dashboard ([b56faf8](https://github.com/samuelaure/flownau/commit/b56faf832ac06fe75120c89fc54d3e872e4b3fab))
+- **workspace:** implement governance UI for brand settings and user management ([f2bbec0](https://github.com/samuelaure/flownau/commit/f2bbec0591f77a91c888de68842454b7ba769f63))
+- **workspaces:** implement workspace management and member settings ([764a1fd](https://github.com/samuelaure/flownau/commit/764a1fdb41d42aecc3293d95d259a824ac87dacf))
 
 ### Bug Fixes
 
-* **core:** improve error handling, response validation, and infra reliability ([e3b1e8f](https://github.com/samuelaure/flownau/commit/e3b1e8fbff6ade01e5a2360286c864f42dce06a5))
-* **infra:** add timeouts and error resilience to external AI calls ([d90b39f](https://github.com/samuelaure/flownau/commit/d90b39fe68a0b710f15f0b2424d022dc36f51a5f))
+- **core:** improve error handling, response validation, and infra reliability ([e3b1e8f](https://github.com/samuelaure/flownau/commit/e3b1e8fbff6ade01e5a2360286c864f42dce06a5))
+- **infra:** add timeouts and error resilience to external AI calls ([d90b39f](https://github.com/samuelaure/flownau/commit/d90b39fe68a0b710f15f0b2424d022dc36f51a5f))
 
 ## [1.0.0] - 2026-04-13
 

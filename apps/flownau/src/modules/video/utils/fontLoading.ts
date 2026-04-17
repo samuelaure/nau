@@ -44,7 +44,7 @@ export async function loadFonts(fonts: FontDescriptor[]): Promise<Map<string, Fo
     try {
       const loaded = await checkFontLoaded(font)
       results.set(key, loaded ? 'loaded' : 'error')
-    } catch (error) {
+    } catch {
       results.set(key, 'error')
     }
   })

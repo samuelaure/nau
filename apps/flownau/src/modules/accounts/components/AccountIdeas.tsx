@@ -70,6 +70,7 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
   const [brainstormModalOpen, setBrainstormModalOpen] = useState(false)
   const [brainstormConcept, setBrainstormConcept] = useState('')
   const [brainstormCount, setBrainstormCount] = useState<number | ''>('')
+  const [brainstormSource, setBrainstormSource] = useState<'manual' | 'automatic'>('manual')
 
   // Manual idea modal
   const [manualIdeaModalOpen, setManualIdeaModalOpen] = useState(false)

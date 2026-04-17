@@ -1,6 +1,6 @@
 import { useEditorStore } from '../store/useEditorStore'
 import { Command } from '../store/useHistoryStore'
-import { VideoElement, ElementStyle, VideoTemplate } from '@/types/video-schema'
+import { VideoElement, ElementStyle } from '@/types/video-schema'
 
 /**
  * AddElementCommand
@@ -16,7 +16,7 @@ export class AddElementCommand implements Command {
   }
 
   execute() {
-    const { setTemplate } = useEditorStore.getState()
+    // useEditorStore.getState() call removed as variables weren't used
     useEditorStore.setState((state) => ({
       template: {
         ...state.template,
@@ -56,7 +56,7 @@ export class UpdateElementCommand implements Command {
   }
 
   execute() {
-    const { updateElement } = useEditorStore.getState()
+    // useEditorStore.getState() call removed as variables weren't used
     // We use setState directly to avoid recursion if we wrap the store action later
     useEditorStore.setState((state) => ({
       template: {
@@ -192,7 +192,7 @@ export class SplitElementCommand implements Command {
   execute() {
     if (!this.originalElement) return
 
-    const { template } = useEditorStore.getState()
+    // useEditorStore.getState() call removed as variables weren't used
     const element = this.originalElement
 
     const splitOffset = this.splitFrame - element.startFrame
@@ -249,7 +249,7 @@ export class ReorderElementCommand implements Command {
   }
 
   execute() {
-    const { reorderElement } = useEditorStore.getState()
+    // useEditorStore.getState() call removed as variables weren't used
     // We can't use the store's action directly because it doesn't give us the new state easily
     // So we replicate the logic or use a helper
     useEditorStore.setState((state) => {
