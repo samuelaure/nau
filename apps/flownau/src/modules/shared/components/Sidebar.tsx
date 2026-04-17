@@ -2,10 +2,10 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Video, Settings, LogOut, CalendarDays } from 'lucide-react'
+import { LayoutDashboard, Video, Settings, LogOut, CalendarDays, Users } from 'lucide-react'
 import { signOut } from 'next-auth/react'
 
-const navItems = [
+const globalNavItems = [
   { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Daily Plans', href: '/dashboard/plans', icon: CalendarDays },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
@@ -13,6 +13,21 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname()
+
+  // Extract workspaceId from /dashboard/workspace/[workspaceId]/...
+  const workspaceMatch = pathname.match(/^\/dashboard\/workspace\/([^/]+)/)
+  const workspaceId = workspaceMatch?.[1] ?? null
+
+  const navItems = workspaceId
+    ? [
+        ...globalNavItems,
+        {
+          name: 'Workspace',
+          href: `/dashboard/workspace/${workspaceId}/settings`,
+          icon: Users,
+        },
+      ]
+    : globalNavItems
 
   return (
     <div
