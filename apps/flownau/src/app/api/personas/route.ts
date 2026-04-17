@@ -40,6 +40,12 @@ export async function POST(req: Request) {
         isDefault: body.isDefault ?? false,
         autoApproveIdeas: body.autoApproveIdeas ?? false,
         autoApproveCompositions: body.autoApproveCompositions ?? false,
+        capturedCount: body.capturedCount ?? 3,
+        capturedAutoApprove: body.capturedAutoApprove ?? false,
+        manualCount: body.manualCount ?? 5,
+        manualAutoApprove: body.manualAutoApprove ?? false,
+        automaticCount: body.automaticCount ?? 5,
+        automaticAutoApprove: body.automaticAutoApprove ?? false,
       },
     })
     return NextResponse.json({ persona }, { status: 201 })

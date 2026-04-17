@@ -14,10 +14,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const { id } = await params
     const body = await req.json()
 
-    // Status updates
+    const updateData: Record<string, unknown> = {}
+    if (body.status !== undefined) updateData.status = body.status
+    if (body.ideaText !== undefined) updateData.ideaText = body.ideaText
+
     const idea = await prisma.contentIdea.update({
       where: { id },
-      data: { status: body.status },
+      data: updateData,
     })
 
     return NextResponse.json({ idea }, { status: 200 })
