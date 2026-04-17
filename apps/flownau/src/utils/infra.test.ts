@@ -1,4 +1,13 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+
+// daily-plan.service imports prisma at module level; mock it to prevent DB connection
+vi.mock('@/modules/shared/prisma', () => ({
+  prisma: {
+    contentIdea: { findMany: vi.fn(), update: vi.fn() },
+    brandPersona: { findFirst: vi.fn() },
+  },
+}))
+
 import { resolveModelId } from '@/modules/composer/model-resolver'
 import { detectHeadTalk, generateTopicHash } from '@/modules/planning/daily-plan.service'
 

@@ -1,20 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// Mock all external dependencies
+// Use vi.hoisted() so these refs are accessible inside the hoisted vi.mock() factories
+const { mockGroqCreate, mockOpenAIParse } = vi.hoisted(() => ({
+  mockGroqCreate: vi.fn(),
+  mockOpenAIParse: vi.fn(),
+}))
+
 vi.mock('openai', () => {
-  const mockParse = vi.fn()
-  return {
-    default: vi.fn().mockImplementation(() => ({
-      beta: {
-        chat: {
-          completions: {
-            parse: mockParse,
-          },
-        },
-      },
-    })),
-    __mockParse: mockParse,
+  function MockOpenAI() {
+    return { beta: { chat: { completions: { parse: mockOpenAIParse } } } }
   }
+  return { default: MockOpenAI }
 })
 
 vi.mock('openai/helpers/zod', () => ({
@@ -22,17 +18,10 @@ vi.mock('openai/helpers/zod', () => ({
 }))
 
 vi.mock('groq-sdk', () => {
-  const mockCreate = vi.fn()
-  return {
-    Groq: vi.fn().mockImplementation(() => ({
-      chat: {
-        completions: {
-          create: mockCreate,
-        },
-      },
-    })),
-    __mockCreate: mockCreate,
+  function MockGroq() {
+    return { chat: { completions: { create: mockGroqCreate } } }
   }
+  return { Groq: MockGroq }
 })
 
 vi.mock('@/modules/shared/prisma', () => ({
@@ -58,7 +47,6 @@ vi.mock('@/modules/composer/model-resolver', () => ({
 import { compose } from '../scene-composer'
 import { prisma } from '@/modules/shared/prisma'
 import { resolveModelId } from '@/modules/composer/model-resolver'
-import { Groq } from 'groq-sdk'
 
 // ─── Helpers ──────────────────────────────────────────────────────
 
@@ -121,20 +109,9 @@ describe('compose()', () => {
     ;(prisma.brandPersona.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(mockPersona)
     vi.stubEnv('GROQ_API_KEY', 'test-groq-key')
 
-    // Groq is instantiated after compose() is called, so we need to intercept after mock setup
-    // We'll use module-level mock factory approach
-    const mockCreate = vi.fn().mockResolvedValue({
-      choices: [
-        {
-          message: {
-            content: JSON.stringify(validCreativeDirection),
-          },
-        },
-      ],
+    mockGroqCreate.mockResolvedValue({
+      choices: [{ message: { content: JSON.stringify(validCreativeDirection) } }],
     })
-    ;(Groq as ReturnType<typeof vi.fn>).mockImplementation(() => ({
-      chat: { completions: { create: mockCreate } },
-    }))
 
     const result = await compose({
       ideaText: 'test idea',
@@ -152,16 +129,13 @@ describe('compose()', () => {
     vi.stubEnv('GROQ_API_KEY', 'test-groq-key')
 
     let callCount = 0
-    const mockCreate = vi.fn().mockImplementation(() => {
+    mockGroqCreate.mockImplementation(() => {
       callCount++
       if (callCount === 1) throw new Error('Groq timeout')
       return Promise.resolve({
         choices: [{ message: { content: JSON.stringify(validCreativeDirection) } }],
       })
     })
-    ;(Groq as ReturnType<typeof vi.fn>).mockImplementation(() => ({
-      chat: { completions: { create: mockCreate } },
-    }))
 
     const result = await compose({
       ideaText: 'retry test idea',
@@ -177,10 +151,7 @@ describe('compose()', () => {
     ;(prisma.brandPersona.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(mockPersona)
     vi.stubEnv('GROQ_API_KEY', 'test-groq-key')
 
-    const mockCreate = vi.fn().mockRejectedValue(new Error('Groq always fails'))
-    ;(Groq as ReturnType<typeof vi.fn>).mockImplementation(() => ({
-      chat: { completions: { create: mockCreate } },
-    }))
+    mockGroqCreate.mockRejectedValue(new Error('Groq always fails'))
 
     await expect(
       compose({ ideaText: 'failing idea', accountId: 'account-1', format: 'reel' }),
@@ -191,17 +162,11 @@ describe('compose()', () => {
     ;(prisma.brandPersona.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(mockPersona)
     vi.stubEnv('GROQ_API_KEY', 'test-groq-key')
 
-    const outOfRangeCreative = {
-      ...validCreativeDirection,
-      coverSceneIndex: 99, // Way out of range for 2 scenes
-    }
-
-    const mockCreate = vi.fn().mockResolvedValue({
-      choices: [{ message: { content: JSON.stringify(outOfRangeCreative) } }],
+    mockGroqCreate.mockResolvedValue({
+      choices: [
+        { message: { content: JSON.stringify({ ...validCreativeDirection, coverSceneIndex: 99 }) } },
+      ],
     })
-    ;(Groq as ReturnType<typeof vi.fn>).mockImplementation(() => ({
-      chat: { completions: { create: mockCreate } },
-    }))
 
     const result = await compose({
       ideaText: 'cover index test',
@@ -231,12 +196,9 @@ describe('compose()', () => {
     ;(prisma.brandPersona.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(mockPersona)
     vi.stubEnv('GROQ_API_KEY', 'test-groq-key')
 
-    const mockCreate = vi.fn().mockResolvedValue({
+    mockGroqCreate.mockResolvedValue({
       choices: [{ message: { content: JSON.stringify(validCreativeDirection) } }],
     })
-    ;(Groq as ReturnType<typeof vi.fn>).mockImplementation(() => ({
-      chat: { completions: { create: mockCreate } },
-    }))
 
     const result = await compose({
       ideaText: 'json parse test',
@@ -248,27 +210,18 @@ describe('compose()', () => {
     expect(result.creative.hashtags).toContain('test')
   })
 
-  /**
-   * This test documents the missing try-catch around JSON.parse in the Groq path.
-   * It WILL FAIL until Phase 2.1 fix is applied to scene-composer.ts.
-   * After the fix, the error message should contain "[SceneComposer] Groq returned invalid JSON".
-   */
-  it('Groq path: throws readable error when response is invalid JSON (pre-fix: raw SyntaxError, post-fix: descriptive error)', async () => {
+  it('Groq path: throws readable error when response is invalid JSON', async () => {
     ;(prisma.brandPersona.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(mockPersona)
     vi.stubEnv('GROQ_API_KEY', 'test-groq-key')
 
-    const mockCreate = vi.fn().mockResolvedValue({
+    mockGroqCreate.mockResolvedValue({
       choices: [{ message: { content: 'NOT VALID JSON {{{' } }],
     })
-    ;(Groq as ReturnType<typeof vi.fn>).mockImplementation(() => ({
-      chat: { completions: { create: mockCreate } },
-    }))
 
-    // After Phase 2.1 fix: error will contain "[SceneComposer] Groq returned invalid JSON"
-    // Before fix: raw SyntaxError from JSON.parse bubbles up (still throws, just unhelpfully)
+    // After Phase 2.1 fix: error contains "[SceneComposer] Groq returned invalid JSON"
     await expect(
       compose({ ideaText: 'bad json test', accountId: 'account-1', format: 'reel' }),
-    ).rejects.toThrow()
+    ).rejects.toThrow(/Groq returned invalid JSON|after 2 attempts/)
   })
 
   it('Groq path: strips markdown code fences before parsing JSON', async () => {
@@ -277,12 +230,9 @@ describe('compose()', () => {
 
     const markdownWrapped = `\`\`\`json\n${JSON.stringify(validCreativeDirection)}\n\`\`\``
 
-    const mockCreate = vi.fn().mockResolvedValue({
+    mockGroqCreate.mockResolvedValue({
       choices: [{ message: { content: markdownWrapped } }],
     })
-    ;(Groq as ReturnType<typeof vi.fn>).mockImplementation(() => ({
-      chat: { completions: { create: mockCreate } },
-    }))
 
     const result = await compose({
       ideaText: 'markdown wrapped test',

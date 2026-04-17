@@ -1,26 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
+// Use vi.hoisted() so the mock parse ref is accessible inside the hoisted vi.mock() factory
+const { mockParse } = vi.hoisted(() => ({ mockParse: vi.fn() }))
+
 vi.mock('openai', () => {
-  const mockParse = vi.fn()
-  return {
-    default: vi.fn().mockImplementation(() => ({
-      beta: {
-        chat: {
-          completions: {
-            parse: mockParse,
-          },
-        },
-      },
-    })),
-    __mockParse: mockParse,
+  function MockOpenAI() {
+    return { beta: { chat: { completions: { parse: mockParse } } } }
   }
+  return { default: MockOpenAI }
 })
 
 vi.mock('openai/helpers/zod', () => ({
   zodResponseFormat: vi.fn().mockReturnValue({ type: 'json_schema' }),
 }))
 
-import OpenAI from 'openai'
 import { generateContentIdeas } from '../ideation.service'
 
 // ─── Helpers ──────────────────────────────────────────────────────
@@ -68,17 +61,9 @@ describe('generateContentIdeas()', () => {
   })
 
   it('returns IdeationOutput on successful API call', async () => {
-    ;(OpenAI as ReturnType<typeof vi.fn>).mockImplementation(() => ({
-      beta: {
-        chat: {
-          completions: {
-            parse: vi.fn().mockResolvedValue({
-              choices: [{ message: { parsed: validIdeationOutput } }],
-            }),
-          },
-        },
-      },
-    }))
+    mockParse.mockResolvedValue({
+      choices: [{ message: { parsed: validIdeationOutput } }],
+    })
 
     const result = await generateContentIdeas(baseContext)
 
@@ -89,20 +74,10 @@ describe('generateContentIdeas()', () => {
 
   it('includes brand DNA in the messages sent to OpenAI', async () => {
     let capturedMessages: unknown[] = []
-    ;(OpenAI as ReturnType<typeof vi.fn>).mockImplementation(() => ({
-      beta: {
-        chat: {
-          completions: {
-            parse: vi.fn().mockImplementation((params: { messages: unknown[] }) => {
-              capturedMessages = params.messages
-              return Promise.resolve({
-                choices: [{ message: { parsed: validIdeationOutput } }],
-              })
-            }),
-          },
-        },
-      },
-    }))
+    mockParse.mockImplementation((params: { messages: unknown[] }) => {
+      capturedMessages = params.messages
+      return Promise.resolve({ choices: [{ message: { parsed: validIdeationOutput } }] })
+    })
 
     await generateContentIdeas({
       ...baseContext,
@@ -119,20 +94,10 @@ describe('generateContentIdeas()', () => {
 
   it('includes inspo items in the prompt when provided', async () => {
     let capturedMessages: unknown[] = []
-    ;(OpenAI as ReturnType<typeof vi.fn>).mockImplementation(() => ({
-      beta: {
-        chat: {
-          completions: {
-            parse: vi.fn().mockImplementation((params: { messages: unknown[] }) => {
-              capturedMessages = params.messages
-              return Promise.resolve({
-                choices: [{ message: { parsed: validIdeationOutput } }],
-              })
-            }),
-          },
-        },
-      },
-    }))
+    mockParse.mockImplementation((params: { messages: unknown[] }) => {
+      capturedMessages = params.messages
+      return Promise.resolve({ choices: [{ message: { parsed: validIdeationOutput } }] })
+    })
 
     await generateContentIdeas({
       ...baseContext,
@@ -158,40 +123,20 @@ describe('generateContentIdeas()', () => {
   })
 
   it('works correctly with an empty inspo items array', async () => {
-    ;(OpenAI as ReturnType<typeof vi.fn>).mockImplementation(() => ({
-      beta: {
-        chat: {
-          completions: {
-            parse: vi.fn().mockResolvedValue({
-              choices: [{ message: { parsed: validIdeationOutput } }],
-            }),
-          },
-        },
-      },
-    }))
-
-    const result = await generateContentIdeas({
-      ...baseContext,
-      inspoItems: [],
+    mockParse.mockResolvedValue({
+      choices: [{ message: { parsed: validIdeationOutput } }],
     })
 
-    // Should succeed with empty inspo items
+    const result = await generateContentIdeas({ ...baseContext, inspoItems: [] })
+
     expect(result.ideas).toBeDefined()
     expect(result.ideas.length).toBeGreaterThan(0)
   })
 
   it('throws when API returns no parsed content', async () => {
-    ;(OpenAI as ReturnType<typeof vi.fn>).mockImplementation(() => ({
-      beta: {
-        chat: {
-          completions: {
-            parse: vi.fn().mockResolvedValue({
-              choices: [{ message: { parsed: null } }],
-            }),
-          },
-        },
-      },
-    }))
+    mockParse.mockResolvedValue({
+      choices: [{ message: { parsed: null } }],
+    })
 
     await expect(generateContentIdeas(baseContext)).rejects.toThrow(
       /Failed to parse ideation AI response/,

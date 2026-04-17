@@ -1,17 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// Mock BullMQ Queue before importing the module under test
-const mockAdd = vi.fn()
-const mockGetJob = vi.fn()
-
-vi.mock('bullmq', () => ({
-  Queue: vi.fn().mockImplementation(() => ({
-    add: mockAdd,
-    getJob: mockGetJob,
-  })),
+// Use vi.hoisted() so refs are accessible inside the hoisted vi.mock() factory
+const { mockAdd, mockGetJob } = vi.hoisted(() => ({
+  mockAdd: vi.fn(),
+  mockGetJob: vi.fn(),
 }))
 
-// Mock Redis connection (no live Redis in unit tests)
+vi.mock('bullmq', () => {
+  // Use a regular function (not arrow function) so `new Queue()` works
+  function MockQueue() {
+    return { add: mockAdd, getJob: mockGetJob }
+  }
+  return { Queue: MockQueue, ConnectionOptions: {} }
+})
+
 vi.mock('@/modules/shared/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
   logError: vi.fn(),
@@ -110,7 +112,7 @@ describe('getRenderJobStatus()', () => {
   it('returns progress 0 when job.progress is not a number', async () => {
     mockGetJob.mockResolvedValue({
       getState: vi.fn().mockResolvedValue('waiting'),
-      progress: { percent: 30 }, // Object instead of number
+      progress: { percent: 30 },
       failedReason: undefined,
     })
 
