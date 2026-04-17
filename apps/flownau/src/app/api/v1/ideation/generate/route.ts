@@ -11,21 +11,22 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { brandName, brandDNA, inspoItems, injectedDocuments, recentPosts } = body
+    const { brandName, dna, brandDNA, inspoItems, recentContent, recentPosts } = body
 
-    if (!brandName || !brandDNA) {
+    const resolvedDna = dna || brandDNA
+    if (!brandName || !resolvedDna) {
       return NextResponse.json(
-        { error: 'Missing required fields: brandName, brandDNA' },
+        { error: 'Missing required fields: brandName, dna' },
         { status: 400 },
       )
     }
 
     const result = await generateContentIdeas({
       brandName,
-      brandDNA,
+      dna: resolvedDna,
+      count: body.count ?? 5,
       inspoItems: inspoItems || [],
-      injectedDocuments: injectedDocuments || [],
-      recentPosts: recentPosts || [],
+      recentContent: recentContent || recentPosts || [],
     })
 
     return NextResponse.json({ success: true, ...result })

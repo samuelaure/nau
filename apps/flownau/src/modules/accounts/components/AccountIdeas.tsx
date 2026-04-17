@@ -4,11 +4,42 @@ import { useState, useEffect } from 'react'
 import { Card } from '@/modules/shared/components/ui/Card'
 import { Button } from '@/modules/shared/components/ui/Button'
 import { toast } from 'sonner'
-import { Loader2, Wand2, CheckCircle2, Trash2 } from 'lucide-react'
+import { Loader2, Wand2, CheckCircle2, Trash2, Zap, User, Bot } from 'lucide-react'
 
 import Modal from '@/modules/shared/components/Modal'
 
-// Simple helper to load available templates to pass to compose (UI feedback)
+// Source badge config
+const SOURCE_CONFIG: Record<string, { label: string; icon: React.ElementType; className: string }> = {
+  captured: {
+    label: 'Captured',
+    icon: Zap,
+    className: 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20',
+  },
+  manual: {
+    label: 'Manual',
+    icon: User,
+    className: 'bg-blue-500/10 text-blue-400 border border-blue-500/20',
+  },
+  automatic: {
+    label: 'Auto',
+    icon: Bot,
+    className: 'bg-purple-500/10 text-purple-400 border border-purple-500/20',
+  },
+}
+
+function SourceBadge({ source }: { source: string }) {
+  const config = SOURCE_CONFIG[source] ?? SOURCE_CONFIG.automatic
+  const Icon = config.icon
+  return (
+    <span
+      className={`inline-flex items-center gap-1 text-[10px] font-bold tracking-widest px-2 py-0.5 rounded-full uppercase ${config.className}`}
+    >
+      <Icon size={10} />
+      {config.label}
+    </span>
+  )
+}
+
 export default function AccountIdeas({ accountId }: { accountId: string }) {
   const [ideas, setIdeas] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -29,10 +60,14 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
     isDefault: true,
   })
 
-  // Manual Selection State
+  // Persona & Framework selection
   const [personas, setPersonas] = useState<any[]>([])
   const [selectedPersonaId, setSelectedPersonaId] = useState<string>('')
   const [selectedFrameworkId, setSelectedFrameworkId] = useState<string>('')
+
+  // Brainstorm with concept
+  const [brainstormModalOpen, setBrainstormModalOpen] = useState(false)
+  const [brainstormConcept, setBrainstormConcept] = useState('')
 
   const fetchFrameworks = async () => {
     try {
@@ -89,7 +124,12 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
     try {
       const res = await fetch(`/api/ideas?accountId=${accountId}`)
       const data = await res.json()
-      setIdeas(data.ideas || [])
+      // Sort by priority asc (1=captured first) then by createdAt desc
+      const sorted = (data.ideas || []).sort((a: any, b: any) => {
+        if (a.priority !== b.priority) return (a.priority ?? 3) - (b.priority ?? 3)
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      })
+      setIdeas(sorted)
     } catch {
       toast.error('Failed to load ideas')
     } finally {
@@ -117,9 +157,13 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
     fetchTemplates()
   }, [accountId])
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (concept?: string) => {
     setGenerating(true)
-    const toastId = toast.loading('Consulting Brand Persona & generating 5 ideas...')
+    const toastId = toast.loading(
+      concept
+        ? `Generating ideas from concept: "${concept.slice(0, 40)}..."`
+        : 'Consulting Brand Persona & generating ideas...',
+    )
     try {
       const res = await fetch('/api/agent/idea-generation', {
         method: 'POST',
@@ -128,16 +172,19 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
           accountId,
           personaId: selectedPersonaId,
           frameworkId: selectedFrameworkId,
+          concept: concept || undefined,
         }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed')
-      toast.success('Generated new ideas!', { id: toastId })
+      toast.success(`Generated ${data.ideas?.length ?? 0} new ideas!`, { id: toastId })
       fetchIdeas()
     } catch (err: any) {
       toast.error(err.message, { id: toastId })
     } finally {
       setGenerating(false)
+      setBrainstormModalOpen(false)
+      setBrainstormConcept('')
     }
   }
 
@@ -155,6 +202,7 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
           accountId,
           ideaText: manualIdeaText,
           source: 'manual',
+          priority: 2,
           status: 'APPROVED', // Manual ideas are auto-approved since user wrote them
         }),
       })
@@ -237,7 +285,7 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
         <div>
           <h3 className="text-xl font-heading font-semibold">Content Backlog</h3>
           <p className="text-xs text-gray-500">
-            Pick specific personas/strategies for manual brainstorming.
+            Captured ideas first, then manual, then automatic. Pick a persona/strategy to brainstorm.
           </p>
         </div>
 
@@ -271,7 +319,7 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
           </select>
 
           <Button variant="outline" size="sm" onClick={() => setShowSettings(!showSettings)}>
-            {showSettings ? 'Settings' : 'Settings'}
+            Settings
           </Button>
 
           <Button
@@ -283,7 +331,7 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
           </Button>
 
           <Button
-            onClick={handleGenerate}
+            onClick={() => setBrainstormModalOpen(true)}
             disabled={generating}
             size="sm"
             className="flex gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
@@ -386,12 +434,13 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
               className={`p-4 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between border ${isUsed ? 'border-gray-800 opacity-50 text-gray-400 bg-gray-950' : 'border-gray-700 bg-gray-900'}`}
             >
               <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
                   <span
                     className={`text-[10px] font-bold tracking-widest px-2 py-0.5 rounded-full uppercase ${isUsed ? 'bg-gray-800 text-gray-500' : isApproved ? 'bg-green-900 text-green-400' : 'bg-orange-900 text-orange-400'}`}
                   >
                     {idea.status}
                   </span>
+                  {idea.source && <SourceBadge source={idea.source} />}
                 </div>
                 <p className="text-sm whitespace-pre-wrap">{idea.ideaText}</p>
               </div>
@@ -441,14 +490,71 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
         })}
       </div>
 
+      {/* Brainstorm Modal — supports optional concept for targeted generation */}
+      {brainstormModalOpen && (
+        <Modal isOpen={true} onClose={() => !generating && setBrainstormModalOpen(false)}>
+          <div className="space-y-4">
+            <h2 className="text-xl font-heading font-semibold mb-1">Brainstorm Ideas</h2>
+            <p className="text-sm text-gray-400">
+              Optionally provide a source concept to focus the generation, or leave blank to let the
+              Brand Persona and Strategy guide the AI freely.
+            </p>
+
+            <div className="space-y-1">
+              <label className="text-xs text-gray-400">
+                Source Concept{' '}
+                <span className="text-gray-600 font-normal">(optional)</span>
+              </label>
+              <textarea
+                autoFocus
+                className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-sm min-h-[100px]"
+                value={brainstormConcept}
+                onChange={(e) => setBrainstormConcept(e.target.value)}
+                placeholder="e.g. 'How AI is changing content creation' or a trending topic..."
+                disabled={generating}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 mt-4">
+              <Button
+                variant="outline"
+                disabled={generating}
+                onClick={() => setBrainstormModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={generating}
+                onClick={() => handleGenerate(brainstormConcept.trim() || undefined)}
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white"
+              >
+                {generating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" /> Generating...
+                  </>
+                ) : (
+                  <>
+                    <Wand2 className="w-4 h-4 mr-2" /> Generate Ideas
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Compose Modal */}
       {composingIdea && (
         <Modal isOpen={true} onClose={() => !composing && setComposingIdea(null)}>
           <div className="space-y-4">
-            <h2 className="text-xl font-heading font-semibold mb-4">Compose Idea</h2>
-            <p className="text-sm text-gray-400">
-              Select a template to use, or let the Director automatically determine the best
-              template.
-            </p>
+            <div className="flex items-center gap-2 mb-1">
+              <h2 className="text-xl font-heading font-semibold">Compose Reel</h2>
+              {composingIdea.source && <SourceBadge source={composingIdea.source} />}
+            </div>
+
+            <div className="bg-gray-900 rounded-lg p-3 border border-gray-800 max-h-[120px] overflow-y-auto">
+              <p className="text-xs text-gray-400 whitespace-pre-wrap">{composingIdea.ideaText}</p>
+            </div>
 
             <div className="space-y-1">
               <label className="text-xs text-gray-400">Target Template</label>
@@ -487,13 +593,14 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
         </Modal>
       )}
 
+      {/* Manual Idea Modal */}
       {manualIdeaModalOpen && (
         <Modal isOpen={true} onClose={() => setManualIdeaModalOpen(false)}>
           <div className="space-y-4">
             <h2 className="text-xl font-heading font-semibold mb-4">Manual Concept Idea</h2>
             <p className="text-sm text-gray-400">
-              Record a specific concept idea you have in mind. It will be added as "APPROVED" and
-              ready to compose.
+              Record a specific concept idea you have in mind. It will be added as{' '}
+              <span className="text-green-400">APPROVED</span> and ready to compose.
             </p>
 
             <div className="space-y-1">

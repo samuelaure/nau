@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 import { generateContentIdeas } from '@/modules/ideation/ideation.service'
-import { fetchInspoItems } from '@/modules/ideation/sources/inspo-source'
+import { fetchBrandDigest } from '@/modules/ideation/sources/inspo-source'
 import { getBrandDNA } from '@/modules/ideation/sources/brand-dna-source'
 import { detectHeadTalk } from '@/modules/planning/daily-plan.service'
 import { logError, logger } from '@/modules/shared/logger'
@@ -18,7 +18,13 @@ export const maxDuration = 300 // 5 minutes max for AI generation timeout
  * 3. Recent content history for diversity
  * 4. Head-talk detection for face-to-camera ideas
  */
-export async function GET() {
+import { validateCronSecret, unauthorizedCronResponse } from '@/modules/shared/nau-auth'
+
+export async function GET(request: Request) {
+  if (!validateCronSecret(request)) {
+    return unauthorizedCronResponse()
+  }
+
   try {
     const results: Array<{
       accountId: string
@@ -40,16 +46,16 @@ export async function GET() {
 
       if (!persona) continue
 
-      // Skip if already have plenty of pending ideas
+      // Skip if there are any pending ideas — only generate when the pipeline is exhausted
       const pendingIdeasCount = await prisma.contentIdea.count({
         where: { accountId: account.id, status: 'PENDING' },
       })
 
-      if (pendingIdeasCount >= 10) continue
+      if (pendingIdeasCount > 0) continue
 
       try {
-        // 1. Fetch InspoItems from nauthenticity (graceful degradation)
-        const inspoItems = await fetchInspoItems(account.id)
+        // 1. Fetch mechanical InspoBase Digest from nauthenticity (graceful degradation)
+        const digest = await fetchBrandDigest(account.id)
 
         // 2. Get Brand DNA
         const brandDNA = await getBrandDNA(account.id)
@@ -69,16 +75,29 @@ export async function GET() {
           .filter((c) => c.caption)
           .map((c) => c.caption!.slice(0, 100))
 
-        // 4. Generate ideas
+        // 4. Per-origin settings (with fallback for existing personas without new fields)
+        const automaticCount = (persona as any).automaticCount ?? 5
+        const automaticAutoApprove = (persona as any).automaticAutoApprove ?? persona.autoApproveIdeas
+
+        // 5. Generate ideas using unified GenerationRequest
         const output = await generateContentIdeas({
           brandName: persona.name,
-          brandDNA,
-          inspoItems,
-          recentPosts,
+          dna: brandDNA,
+          count: automaticCount,
+          digest: digest ?? undefined,
+          recentContent: recentPosts,
         })
 
-        // 5. Insert ideas with head-talk detection
+        // 6. Insert ideas with head-talk detection and lineage tracking
         let headTalkCount = 0
+
+        // Lineage: store the primary attached URL (or JSON array) as sourceRef so the
+        // user can trace which original posts inspired this batch of generated ideas.
+        const digestSourceRef = digest && digest.attachedUrls.length > 0
+          ? (digest.attachedUrls.length === 1
+            ? digest.attachedUrls[0]
+            : JSON.stringify(digest.attachedUrls))
+          : null
 
         for (const idea of output.ideas) {
           const ideaText = `[${idea.format.toUpperCase()}] Hook: ${idea.hook}\nAngle: ${idea.angle}\nScript: ${idea.script}\nCTA: ${idea.cta}`
@@ -92,11 +111,12 @@ export async function GET() {
               ideaText,
               status: isHeadTalk
                 ? 'PENDING' // Head-talk ideas always require manual approval
-                : persona.autoApproveIdeas
+                : automaticAutoApprove
                   ? 'APPROVED'
                   : 'PENDING',
-              source: inspoItems.length > 0 ? 'inspo' : 'internal',
-              sourceRef: idea.inspoItemId ?? null,
+              source: 'automatic',
+              priority: 3,
+              sourceRef: digestSourceRef,
             },
           })
         }
@@ -110,7 +130,7 @@ export async function GET() {
         })
 
         logger.info(
-          `[Ideation] Generated ${output.ideas.length} ideas for ${account.username ?? account.id} (${headTalkCount} head-talk, ${inspoItems.length} inspo items used)`,
+          `[Ideation] Generated ${output.ideas.length} ideas for ${account.username ?? account.id} (${headTalkCount} head-talk, digest: ${digest ? 'yes' : 'none'})`,
         )
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)

@@ -167,9 +167,17 @@ model BrandPersona {
   systemPrompt            String   @db.Text // Tone, Voice, Personality
   modelSelection          AIModel  @default(GROQ_LLAMA_3_3)
   isDefault               Boolean  @default(false)
-  autoApproveIdeas        Boolean  @default(false) 
-  autoApproveCompositions Boolean  @default(false) 
-  
+  autoApproveIdeas        Boolean  @default(false)
+  autoApproveCompositions Boolean  @default(false)
+
+  // Per-origin engine settings (Phase 8)
+  capturedAutoApprove     Boolean  @default(true)   // Captured ideas auto-approved (from 9naŭ)
+  capturedCount           Int      @default(3)       // Ideas spawned per captured concept
+  manualAutoApprove       Boolean  @default(true)    // Manual ideas auto-approved (operator input)
+  manualCount             Int      @default(5)       // Ideas spawned per manual brainstorm session
+  automaticAutoApprove    Boolean  @default(false)   // Automatic ideas require review
+  automaticCount          Int      @default(5)       // Ideas generated per cron cycle
+
   account                 SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 }
 

@@ -1,19 +1,48 @@
 import { prisma } from '@/modules/shared/prisma'
 import { logger } from '@/modules/shared/logger'
 
+// Canonical source values as stored in the DB
+type IdeaSource = 'automatic' | 'manual' | 'captured'
+
+// Priority by source — captured ideas are highest priority
+const SOURCE_PRIORITY: Record<IdeaSource, number> = {
+  captured: 1,
+  manual: 2,
+  automatic: 3,
+}
+
+// Legacy source values accepted from external callers (ingest API backward compat)
+type LegacySource = 'inspo' | 'user_input' | 'reactive' | 'captured'
+
+function normalizeLegacySource(source: LegacySource | IdeaSource): IdeaSource {
+  switch (source) {
+    case 'captured':
+    case 'reactive': // reactive = user-triggered capture, same priority
+      return 'captured'
+    case 'user_input':
+    case 'manual':
+      return 'manual'
+    case 'inspo':
+    case 'automatic':
+    default:
+      return 'automatic'
+  }
+}
+
 interface ExternalIdeaInput {
   accountId: string
   text: string
-  source: 'inspo' | 'user_input' | 'reactive'
+  source: LegacySource | IdeaSource
   sourceRef?: string
 }
 
 /**
- * Ingests an external idea into the ContentIdea table.
+ * Ingests a single external idea into the ContentIdea table.
  * Prevents duplicates by checking for similar ideaText within the last 7 days.
  */
 export async function ingestExternalIdea(params: ExternalIdeaInput) {
-  const { accountId, text, source, sourceRef } = params
+  const { accountId, text, sourceRef } = params
+  const source = normalizeLegacySource(params.source)
 
   // Check for near-duplicates in last 7 days
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
@@ -38,13 +67,14 @@ export async function ingestExternalIdea(params: ExternalIdeaInput) {
       accountId,
       ideaText: text,
       source,
+      priority: SOURCE_PRIORITY[source],
       sourceRef: sourceRef ?? null,
-      status: 'PENDING',
+      status: source === 'captured' ? 'APPROVED' : 'PENDING',
     },
   })
 
   logger.info(
-    `[ExternalSource] Ingested idea ${idea.id} for account ${accountId} (source: ${source})`,
+    `[ExternalSource] Ingested idea ${idea.id} for account ${accountId} (source: ${source}, priority: ${SOURCE_PRIORITY[source]})`,
   )
   return idea
 }
@@ -56,7 +86,7 @@ export async function ingestExternalIdeas(
   accountId: string,
   ideas: Array<{
     text: string
-    source: 'inspo' | 'user_input' | 'reactive' | 'captured'
+    source: LegacySource | IdeaSource
     sourceRef?: string
   }>,
   autoApprove = false,
@@ -78,13 +108,16 @@ export async function ingestExternalIdeas(
       continue
     }
 
+    const source = normalizeLegacySource(idea.source)
+
     const created = await prisma.contentIdea.create({
       data: {
         accountId,
         ideaText: idea.text,
-        source: idea.source,
+        source,
+        priority: SOURCE_PRIORITY[source],
         sourceRef: idea.sourceRef ?? null,
-        status: autoApprove || idea.source === 'captured' ? 'APPROVED' : 'PENDING',
+        status: autoApprove || source === 'captured' ? 'APPROVED' : 'PENDING',
       },
     })
 
@@ -96,17 +129,22 @@ export async function ingestExternalIdeas(
     `[ExternalSource] Bulk ingested ${createdIds.length}/${ideas.length} ideas for account ${accountId}`,
   )
 
-  const hasCaptured = ideas.some((i) => i.source === 'captured')
+  const hasCaptured = ideas.some((i) => normalizeLegacySource(i.source) === 'captured')
   if (hasCaptured) {
     logger.info(
       `[ExternalSource] Captured idea detected. Triggering immediate composer generation.`,
     )
-    // Fire and forget cron execution to compile approved ideas
-    // We do this non-blocking
+    // Fire and forget — non-blocking
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    fetch(new URL('/api/cron/composer', appUrl).toString(), { method: 'GET' }).catch((e) =>
-      logger.error('[ExternalSource] Failed to trigger immediate composer', e),
-    )
+    const cronSecret = process.env.CRON_SECRET
+    
+    // Trigger immediate composer generation with cron-secret auth
+    fetch(new URL('/api/cron/composer', appUrl).toString(), {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${cronSecret}`,
+      },
+    }).catch((e) => logger.error('[ExternalSource] Failed to trigger immediate composer', e))
   }
 
   return { created: createdIds.length, ids: createdIds }

@@ -9,7 +9,7 @@ import { logError } from '@/modules/shared/logger'
 export async function POST(req: Request) {
   try {
     const json = await req.json()
-    const { accountId, personaId } = json
+    const { accountId, personaId, frameworkId, concept } = json
 
     if (!accountId) {
       return NextResponse.json({ error: 'Missing accountId' }, { status: 400 })
@@ -31,17 +31,26 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'No Brand Persona setup yet.' }, { status: 400 })
     }
 
-    // 2. Generate Ideas using the production ideation service
+    // 2. Optionally fetch strategy framework
+    const framework = frameworkId
+      ? await prisma.ideasFramework.findUnique({ where: { id: frameworkId } })
+      : await prisma.ideasFramework.findFirst({ where: { accountId, isDefault: true } })
+
+    // 3. Per-origin settings (with fallback for existing personas without new fields)
+    const count = (persona as any).manualCount ?? 5
+    const autoApprove = (persona as any).manualAutoApprove ?? persona.autoApproveIdeas
+
+    // 4. Generate ideas
     const output = await generateContentIdeas({
       brandName: persona.name,
-      brandDNA: persona.systemPrompt,
-      inspoItems: [], // nauthenticity integration in Phase 5
+      dna: persona.systemPrompt,
+      strategy: framework?.systemPrompt,
+      concept: concept ?? undefined,
+      count,
+      inspoItems: [],
     })
 
-    // 3. Trust Logic: Determine status
-    const initialStatus = persona.autoApproveIdeas ? 'APPROVED' : 'PENDING'
-
-    // 4. Save to Database
+    // 5. Save ideas with correct source/priority
     const ops = output.ideas.map((idea) => {
       const ideaText = `[${idea.format.toUpperCase()}] Hook: ${idea.hook}\nAngle: ${idea.angle}\nScript: ${idea.script}\nCTA: ${idea.cta}`
 
@@ -49,8 +58,9 @@ export async function POST(req: Request) {
         data: {
           accountId,
           ideaText,
-          status: initialStatus,
-          source: 'internal',
+          status: autoApprove ? 'APPROVED' : 'PENDING',
+          source: 'manual',
+          priority: 2,
         },
       })
     })

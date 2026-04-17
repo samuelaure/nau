@@ -46,7 +46,8 @@ export async function POST(request: NextRequest) {
     // 3. Generate Ideation Brief
     const result = await generateContentIdeas({
       brandName: brandData.brandName,
-      brandDNA: brandData.voicePrompt,
+      dna: brandData.voicePrompt,
+      count: 5,
       inspoItems: inspoData.map((item) => ({
         id: item.id,
         type: item.type,
@@ -57,8 +58,7 @@ export async function POST(request: NextRequest) {
         postCaption: item.post?.caption,
         postTranscript: item.post?.transcripts?.[0]?.text,
       })),
-      injectedDocuments,
-      recentPosts: [], // TBD: fetch from nauthenticity Post table where status = published
+      recentContent: [], // TBD: fetch from nauthenticity Post table where status = published
     })
 
     // 4. Mark items as processed in nauthenticity
