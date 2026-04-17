@@ -9,7 +9,7 @@ import { logError } from '@/modules/shared/logger'
 export async function POST(req: Request) {
   try {
     const json = await req.json()
-    const { accountId, personaId, frameworkId, concept } = json
+    const { accountId, personaId, frameworkId, concept, count: countOverride, source = 'manual' } = json
 
     if (!accountId) {
       return NextResponse.json({ error: 'Missing accountId' }, { status: 400 })
@@ -31,14 +31,33 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'No Brand Persona setup yet.' }, { status: 400 })
     }
 
-    // 2. Optionally fetch strategy framework
+    // 2. Optionally fetch strategy framework (Strategy prompts are prioritized over Persona prompts for ideation)
     const framework = frameworkId
       ? await prisma.ideasFramework.findUnique({ where: { id: frameworkId } })
       : await prisma.ideasFramework.findFirst({ where: { accountId, isDefault: true } })
 
-    // 3. Per-origin settings (with fallback for existing personas without new fields)
-    const count = (persona as any).manualCount ?? 5
-    const autoApprove = (persona as any).manualAutoApprove ?? persona.autoApproveIdeas
+    // 3. Setup Context Based on Source
+    let digest = undefined
+    let sourceRef = null
+    let count = 5
+    let autoApprove = false
+    let priority = 2
+
+    if (source === 'automatic') {
+      const { fetchBrandDigest } = await import('@/modules/ideation/sources/inspo-source')
+      digest = await fetchBrandDigest(accountId)
+      count = typeof countOverride === 'number' ? countOverride : ((persona as any).automaticCount ?? 5)
+      autoApprove = (persona as any).automaticAutoApprove ?? false
+      priority = 3
+      sourceRef = digest && digest.attachedUrls.length > 0
+        ? (digest.attachedUrls.length === 1 ? digest.attachedUrls[0] : JSON.stringify(digest.attachedUrls))
+        : null
+    } else {
+      // Manual mode
+      count = typeof countOverride === 'number' ? countOverride : ((persona as any).manualCount ?? 5)
+      autoApprove = (persona as any).manualAutoApprove ?? false
+      priority = 2
+    }
 
     // 4. Generate ideas
     const output = await generateContentIdeas({
@@ -47,7 +66,7 @@ export async function POST(req: Request) {
       strategy: framework?.systemPrompt,
       concept: concept ?? undefined,
       count,
-      inspoItems: [],
+      digest: digest ?? undefined,
     })
 
     // 5. Save ideas with correct source/priority
@@ -59,8 +78,9 @@ export async function POST(req: Request) {
           accountId,
           ideaText,
           status: autoApprove ? 'APPROVED' : 'PENDING',
-          source: 'manual',
-          priority: 2,
+          source,
+          priority,
+          sourceRef,
         },
       })
     })

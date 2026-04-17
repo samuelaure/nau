@@ -185,8 +185,9 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
           accountId,
           personaId: selectedPersonaId,
           frameworkId: selectedFrameworkId,
-          concept: concept || undefined,
+          concept: brainstormSource === 'manual' ? (concept || undefined) : undefined,
           count: countOverride || undefined,
+          source: brainstormSource,
         }),
       })
       const data = await res.json()
@@ -596,29 +597,56 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
         })}
       </div>
 
-      {/* Brainstorm Modal */}
+      {/* Brainstorm Modal — supports optional concept for targeted generation or InspoBase flow */}
       {brainstormModalOpen && (
         <Modal isOpen={true} onClose={() => !generating && setBrainstormModalOpen(false)}>
           <div className="space-y-4">
             <h2 className="text-xl font-heading font-semibold mb-1">Brainstorm Ideas</h2>
-            <p className="text-sm text-gray-400">
-              Optionally provide a source concept to focus the generation, or leave blank to let the
-              Brand Persona and Strategy guide the AI freely.
-            </p>
-
-            <div className="space-y-1">
-              <label className="text-xs text-gray-400">
-                Source Concept <span className="text-gray-600 font-normal">(optional)</span>
-              </label>
-              <textarea
-                autoFocus
-                className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-sm min-h-[100px]"
-                value={brainstormConcept}
-                onChange={(e) => setBrainstormConcept(e.target.value)}
-                placeholder="e.g. 'How AI is changing content creation' or a trending topic..."
-                disabled={generating}
-              />
+            
+            <div className="flex bg-gray-900 p-1 rounded-lg border border-gray-800 mb-4">
+              <button
+                onClick={() => setBrainstormSource('manual')}
+                className={cn(
+                  "flex-1 py-1.5 text-xs font-bold rounded-md transition-all",
+                  brainstormSource === 'manual' ? "bg-gray-800 text-white shadow-sm" : "text-gray-500 hover:text-gray-300"
+                )}
+              >
+                Manual Concept
+              </button>
+              <button
+                onClick={() => setBrainstormSource('automatic')}
+                className={cn(
+                  "flex-1 py-1.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-2",
+                  brainstormSource === 'automatic' ? "bg-gray-800 text-white shadow-sm" : "text-gray-500 hover:text-gray-300"
+                )}
+              >
+                <Bot size={12} />
+                InspoBase
+              </button>
             </div>
+
+            {brainstormSource === 'manual' ? (
+              <div className="space-y-1">
+                <label className="text-xs text-gray-400">
+                  Concept Prompt <span className="text-gray-600 font-normal">(optional)</span>
+                </label>
+                <textarea
+                  autoFocus
+                  className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-sm min-h-[100px]"
+                  value={brainstormConcept}
+                  onChange={(e) => setBrainstormConcept(e.target.value)}
+                  placeholder="e.g. 'How AI is changing content creation' or a trending topic..."
+                  disabled={generating}
+                />
+              </div>
+            ) : (
+              <div className="bg-purple-500/5 border border-purple-500/10 rounded-lg p-4">
+                <p className="text-xs text-purple-200/70 leading-relaxed">
+                  The AI will consume the latest <strong>Mechanical Digest</strong> from Nauthenticity's InspoBase. 
+                  It will combine the Global synthesis with recent inspirations to generate non-repetitive ideas.
+                </p>
+              </div>
+            )}
 
             <div className="space-y-1">
               <label className="text-xs text-gray-400">
