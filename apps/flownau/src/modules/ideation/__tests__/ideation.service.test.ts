@@ -5,7 +5,7 @@ const { mockParse } = vi.hoisted(() => ({ mockParse: vi.fn() }))
 
 vi.mock('openai', () => {
   function MockOpenAI() {
-    return { beta: { chat: { completions: { parse: mockParse } } } }
+    return { chat: { completions: { parse: mockParse } } }
   }
   return { default: MockOpenAI }
 })
@@ -40,7 +40,8 @@ const validIdeationOutput = {
 
 const baseContext = {
   brandName: 'TestBrand',
-  brandDNA: 'We help entrepreneurs build better systems.',
+  dna: 'We help entrepreneurs build better systems.',
+  count: 2,
   inspoItems: [],
 }
 
@@ -81,7 +82,7 @@ describe('generateContentIdeas()', () => {
 
     await generateContentIdeas({
       ...baseContext,
-      brandDNA: 'Unique brand DNA content for testing',
+      dna: 'Unique brand DNA content for testing',
     })
 
     const userMessage = capturedMessages.find((m: unknown) => {
