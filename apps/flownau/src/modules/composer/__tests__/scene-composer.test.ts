@@ -164,7 +164,9 @@ describe('compose()', () => {
 
     mockGroqCreate.mockResolvedValue({
       choices: [
-        { message: { content: JSON.stringify({ ...validCreativeDirection, coverSceneIndex: 99 }) } },
+        {
+          message: { content: JSON.stringify({ ...validCreativeDirection, coverSceneIndex: 99 }) },
+        },
       ],
     })
 

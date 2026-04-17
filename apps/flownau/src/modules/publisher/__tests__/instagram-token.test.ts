@@ -19,11 +19,7 @@ vi.mock('@/modules/shared/prisma', () => ({
 
 import axios from 'axios'
 import { prisma } from '@/modules/shared/prisma'
-import {
-  refreshTokenIfNeeded,
-  getLongLivedToken,
-  checkAllTokens,
-} from '../instagram-token'
+import { refreshTokenIfNeeded, getLongLivedToken, checkAllTokens } from '../instagram-token'
 
 // ─── Helpers ──────────────────────────────────────────────────────
 

@@ -1,8 +1,4 @@
-import {
-  S3Client,
-  ListObjectsV2Command,
-  type ListObjectsV2CommandOutput,
-} from '@aws-sdk/client-s3'
+import { S3Client, ListObjectsV2Command, type ListObjectsV2CommandOutput } from '@aws-sdk/client-s3'
 import type { PrismaClient } from '@prisma/client'
 // @ts-expect-error - External module
 import * as dotenv from 'dotenv'

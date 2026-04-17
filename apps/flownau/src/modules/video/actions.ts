@@ -29,7 +29,6 @@ const TemplateFormSchema = z.object({
 
 const IdSchema = z.string().min(1)
 
-
 const ToggleTemplateAssetsSchema = z.object({
   templateId: z.string().min(1),
   useAccountAssets: z.boolean(),

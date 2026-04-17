@@ -1,50 +1,59 @@
 import { z } from 'zod'
 
-const EnvSchema = z.object({
-  // Infrastructure
-  DATABASE_URL: z.string().url().startsWith('postgres'),
-  NEXTAUTH_SECRET: z.string().min(32),
-  NEXT_PUBLIC_APP_URL: z.string().url(),
-  
-  // Storage (R2)
-  R2_ACCOUNT_ID: z.string().min(1),
-  R2_ACCESS_KEY_ID: z.string().min(1),
-  R2_SECRET_ACCESS_KEY: z.string().min(1),
-  R2_BUCKET_NAME: z.string().min(1),
-  R2_PUBLIC_DOMAIN: z.string().url(),
+const EnvSchema = z
+  .object({
+    // Infrastructure
+    DATABASE_URL: z.string().url().startsWith('postgres'),
+    NEXTAUTH_SECRET: z.string().min(32),
+    NEXT_PUBLIC_APP_URL: z.string().url(),
 
-  // AI Providers
-  OPENAI_API_KEY: z.string().optional(),
-  GROQ_API_KEY: z.string().optional(),
+    // Storage (R2)
+    R2_ACCOUNT_ID: z.string().min(1),
+    R2_ACCESS_KEY_ID: z.string().min(1),
+    R2_SECRET_ACCESS_KEY: z.string().min(1),
+    R2_BUCKET_NAME: z.string().min(1),
+    R2_PUBLIC_DOMAIN: z.string().url(),
 
-  // Redis
-  REDIS_URL: z.string().optional(),
-  REDIS_HOST: z.string().optional(),
-  REDIS_PORT: z.string().transform((v) => parseInt(v, 10)).optional().default(6379),
-  REDIS_PASSWORD: z.string().optional(),
+    // AI Providers
+    OPENAI_API_KEY: z.string().optional(),
+    GROQ_API_KEY: z.string().optional(),
 
-  // Parameters
-  LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
-  RENDER_CONCURRENCY: z.string().transform((v) => parseInt(v, 10)).default(2),
-}).superRefine((data, ctx) => {
-  // At least one AI provider required
-  if (!data.OPENAI_API_KEY && !data.GROQ_API_KEY) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'At least one of OPENAI_API_KEY or GROQ_API_KEY must be set.',
-      path: ['AI_PROVIDERS'],
-    })
-  }
+    // Redis
+    REDIS_URL: z.string().optional(),
+    REDIS_HOST: z.string().optional(),
+    REDIS_PORT: z
+      .string()
+      .transform((v) => parseInt(v, 10))
+      .optional()
+      .default(6379),
+    REDIS_PASSWORD: z.string().optional(),
 
-  // At least one Redis config style required
-  if (!data.REDIS_URL && !data.REDIS_HOST) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'At least one of REDIS_URL or REDIS_HOST must be set.',
-      path: ['REDIS'],
-    })
-  }
-})
+    // Parameters
+    LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+    RENDER_CONCURRENCY: z
+      .string()
+      .transform((v) => parseInt(v, 10))
+      .default(2),
+  })
+  .superRefine((data, ctx) => {
+    // At least one AI provider required
+    if (!data.OPENAI_API_KEY && !data.GROQ_API_KEY) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'At least one of OPENAI_API_KEY or GROQ_API_KEY must be set.',
+        path: ['AI_PROVIDERS'],
+      })
+    }
+
+    // At least one Redis config style required
+    if (!data.REDIS_URL && !data.REDIS_HOST) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'At least one of REDIS_URL or REDIS_HOST must be set.',
+        path: ['REDIS'],
+      })
+    }
+  })
 
 export type Env = z.infer<typeof EnvSchema>
 

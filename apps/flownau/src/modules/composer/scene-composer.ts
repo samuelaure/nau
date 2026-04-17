@@ -173,7 +173,7 @@ async function callAI(
     // The OpenAI SDK types beta.chat.completions.parse as returning any.
     // We accept that here and validate the parsed value with Zod immediately after.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const completion: any = await openai.beta.chat.completions.parse({
+    const completion: any = await openai.chat.completions.parse({
       model,
       temperature: 0.7,
       messages,

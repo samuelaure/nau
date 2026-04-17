@@ -5,7 +5,6 @@ import DailyScheduleView from '@/modules/plans/components/DailyScheduleView'
 
 export const dynamic = 'force-dynamic'
 
-
 const FORMAT_LABELS: Record<string, string> = {
   reel: 'Reel',
   trial_reel: 'Trial Reel',
@@ -21,7 +20,6 @@ interface PlanPiece {
   caption: string | null
   sceneSummary?: string
 }
-
 
 interface PlanAlert {
   type: string

@@ -1,10 +1,6 @@
 import React from 'react'
 import { z } from 'zod'
-import type {
-  AnySceneType,
-  ResolvedScene,
-  BrandStyle,
-} from '@/types/scenes'
+import type { AnySceneType, ResolvedScene, BrandStyle } from '@/types/scenes'
 import {
   HookTextSlots,
   TextOverMediaSlots,
