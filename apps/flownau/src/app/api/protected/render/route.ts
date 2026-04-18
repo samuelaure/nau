@@ -1,16 +1,16 @@
 export const dynamic = 'force-dynamic'
 
-import { auth } from '@/auth'
+import { getAuthUser } from '@/lib/auth'
 import { prisma } from '@/modules/shared/prisma'
 import { Prisma } from '@prisma/client'
-
 import { renderAndUpload } from '@/modules/video/renderer'
 import { publishReel } from '@/modules/publisher/instagram-reels'
 import { decrypt } from '@/modules/shared/encryption'
 import { NextResponse } from 'next/server'
 
-export const POST = auth(async function POST(req) {
-  if (!req.auth) return NextResponse.json({ error: 'Not authorized' }, { status: 401 })
+export async function POST(req: Request) {
+  const user = await getAuthUser()
+  if (!user) return NextResponse.json({ error: 'Not authorized' }, { status: 401 })
 
   const { templateId, instagramAccountId, publish = false, inputData = {} } = await req.json()
 
@@ -29,7 +29,6 @@ export const POST = auth(async function POST(req) {
       projectFolder = template.account.username || template.account.id
     }
 
-    // 2. Create Render record
     const render = await prisma.render.create({
       data: {
         templateId: template.id,
@@ -38,8 +37,6 @@ export const POST = auth(async function POST(req) {
       },
     })
 
-    // 3. Render and Upload
-    // We pass the row data as inputProps to Remotion
     const r2Path = await renderAndUpload({
       templateId: template.remotionId,
       inputProps: inputData,
@@ -49,20 +46,13 @@ export const POST = auth(async function POST(req) {
 
     const fullUrl = `${process.env.R2_PUBLIC_URL}/${r2Path}`
 
-    // 4. Update Render
     await prisma.render.update({
       where: { id: render.id },
-      data: {
-        status: publish ? 'QUEUED_IG' : 'COMPLETED',
-        r2Url: fullUrl,
-      },
+      data: { status: publish ? 'QUEUED_IG' : 'COMPLETED', r2Url: fullUrl },
     })
 
-    // 5. Publish to Instagram if requested
     if (publish && instagramAccountId) {
-      const account = await prisma.socialAccount.findUnique({
-        where: { id: instagramAccountId },
-      })
+      const account = await prisma.socialAccount.findUnique({ where: { id: instagramAccountId } })
 
       if (account && account.accessToken && account.platformId) {
         const mediaResult = await publishReel({
@@ -75,10 +65,7 @@ export const POST = auth(async function POST(req) {
         if (mediaResult.success) {
           await prisma.render.update({
             where: { id: render.id },
-            data: {
-              status: 'PUBLISHED',
-              instagramMediaId: mediaResult.externalId ?? null,
-            },
+            data: { status: 'PUBLISHED', instagramMediaId: mediaResult.externalId ?? null },
           })
         }
       }
@@ -89,4 +76,4 @@ export const POST = auth(async function POST(req) {
     console.error('Render failed:', error)
     return NextResponse.json({ error: (error as Error).message }, { status: 500 })
   }
-})
+}

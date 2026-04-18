@@ -12,6 +12,7 @@ const IngestRequestSchema = z.object({
         text: z.string().min(1),
         source: z.enum(['inspo', 'user_input', 'reactive', 'captured']),
         sourceRef: z.string().optional(),
+        aiLinked: z.boolean().optional(),
       }),
     )
     .min(1)

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Card } from '@/modules/shared/components/ui/Card'
 import { Button } from '@/modules/shared/components/ui/Button'
 import { toast } from 'sonner'
-import { Loader2, Wand2, CheckCircle2, Trash2, Zap, User, Bot, Pencil } from 'lucide-react'
+import { Loader2, Wand2, CheckCircle2, Trash2, Zap, User, Bot, Pencil, Brain } from 'lucide-react'
 
 import Modal from '@/modules/shared/components/Modal'
 import { cn } from '@/modules/shared/utils'
@@ -38,6 +38,15 @@ function SourceBadge({ source }: { source: string }) {
     >
       <Icon size={10} />
       {config.label}
+    </span>
+  )
+}
+
+function AiLinkedBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] font-bold tracking-widest px-2 py-0.5 rounded-full uppercase bg-rose-500/10 text-rose-400 border border-rose-500/20">
+      <Brain size={10} />
+      AI-Linked
     </span>
   )
 }
@@ -549,6 +558,7 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
                     {idea.status}
                   </span>
                   {idea.source && <SourceBadge source={idea.source} />}
+                  {idea.aiLinked && <AiLinkedBadge />}
                 </div>
                 <p className="text-sm whitespace-pre-wrap">{idea.ideaText}</p>
               </div>

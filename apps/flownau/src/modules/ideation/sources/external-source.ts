@@ -34,6 +34,7 @@ interface ExternalIdeaInput {
   text: string
   source: LegacySource | IdeaSource
   sourceRef?: string
+  aiLinked?: boolean
 }
 
 /**
@@ -41,7 +42,7 @@ interface ExternalIdeaInput {
  * Prevents duplicates by checking for similar ideaText within the last 7 days.
  */
 export async function ingestExternalIdea(params: ExternalIdeaInput) {
-  const { accountId, text, sourceRef } = params
+  const { accountId, text, sourceRef, aiLinked = false } = params
   const source = normalizeLegacySource(params.source)
 
   // Check for near-duplicates in last 7 days
@@ -62,6 +63,9 @@ export async function ingestExternalIdea(params: ExternalIdeaInput) {
     return existingIdea
   }
 
+  // AI-linked ideas always require human review regardless of source or autoApprove settings
+  const status = aiLinked ? 'PENDING' : source === 'captured' ? 'APPROVED' : 'PENDING'
+
   const idea = await prisma.contentIdea.create({
     data: {
       accountId,
@@ -69,7 +73,8 @@ export async function ingestExternalIdea(params: ExternalIdeaInput) {
       source,
       priority: SOURCE_PRIORITY[source],
       sourceRef: sourceRef ?? null,
-      status: source === 'captured' ? 'APPROVED' : 'PENDING',
+      aiLinked,
+      status,
     },
   })
 
@@ -88,6 +93,7 @@ export async function ingestExternalIdeas(
     text: string
     source: LegacySource | IdeaSource
     sourceRef?: string
+    aiLinked?: boolean
   }>,
   autoApprove = false,
 ): Promise<{ created: number; ids: string[] }> {
@@ -109,6 +115,10 @@ export async function ingestExternalIdeas(
     }
 
     const source = normalizeLegacySource(idea.source)
+    const isAiLinked = idea.aiLinked ?? false
+
+    // AI-linked ideas always require human review — bypass autoApprove and captured auto-approve
+    const status = isAiLinked ? 'PENDING' : autoApprove || source === 'captured' ? 'APPROVED' : 'PENDING'
 
     const created = await prisma.contentIdea.create({
       data: {
@@ -117,7 +127,8 @@ export async function ingestExternalIdeas(
         source,
         priority: SOURCE_PRIORITY[source],
         sourceRef: idea.sourceRef ?? null,
-        status: autoApprove || source === 'captured' ? 'APPROVED' : 'PENDING',
+        aiLinked: isAiLinked,
+        status,
       },
     })
 

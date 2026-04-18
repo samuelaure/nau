@@ -2,12 +2,12 @@ export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
-import { auth } from '@/auth'
+import { requireAuth, getAuthUser } from '@/lib/auth'
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await auth()
-    if (!session || !session.user) {
+    const user = await getAuthUser()
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -32,8 +32,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await auth()
-    if (!session || !session.user) {
+    const user = await getAuthUser()
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
