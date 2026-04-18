@@ -163,6 +163,9 @@ jobs:
             echo "--- Server Disk Space [AFTER SWAP] ---"
             df -h /
 
+            # Give the database a moment to fully initialize after recreation
+            sleep 5
+
             # Run migrations once the container is up and can reach the DB
             # Use the app container directly to ensure we use the new code
             docker exec flownau npx prisma migrate deploy
