@@ -6,39 +6,28 @@ datasource db {
   provider = "postgresql"
 }
 
-model User {
-  id        String          @id @default(cuid())
-  name      String?
-  email     String?         @unique
-  password  String?
-  image     String?
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
-  workspaces WorkspaceUser[]
-}
-
 model Workspace {
-  id        String          @id @default(cuid())
-  name      String
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
-  
+  id                   String          @id @default(cuid())
+  name                 String
+  platformWorkspaceId  String?         // 9naŭ Workspace.id reference
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
   users     WorkspaceUser[]
   accounts  SocialAccount[]
 }
 
 model WorkspaceUser {
-  id          String    @id @default(cuid())
-  userId      String
-  workspaceId String
-  role        String    @default("owner") // owner, admin, member
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id               String    @id @default(cuid())
+  platformUserId   String    // 9naŭ User.id (replaces local userId)
+  workspaceId      String
+  role             String    @default("owner")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, workspaceId])
+  @@unique([platformUserId, workspaceId])
 }
 
 model SocialAccount {
@@ -51,8 +40,9 @@ model SocialAccount {
   accessToken  String
   refreshToken String?
   expiresAt    DateTime?
-  directorPrompt String?     @db.Text // ONE: Selection logic for idea-template fit
-  creationPrompt String?     @db.Text // NEW: Native iteration instructions for template building
+  brandId        String?               // nauthenticity Brand.id reference
+  directorPrompt String?     @db.Text
+  creationPrompt String?     @db.Text
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   shortCode    String?
@@ -201,6 +191,7 @@ model ContentIdea {
   source       String        @default("automatic") // automatic | manual | captured
   sourceRef    String?                             // External reference ID
   priority     Int           @default(3)           // 1: captured, 2: manual, 3: automatic
+  aiLinked     Boolean       @default(false)       // true = routed by AI brand detection; requires human review
   createdAt    DateTime      @default(now())
   compositions Composition[]                       // Back-reference to compositions created from this idea
   account      SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)

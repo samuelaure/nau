@@ -1,2 +1,0 @@
--- AlterEnum
-ALTER TYPE "AIModel" ADD VALUE 'OPENAI_GPT_4_1';

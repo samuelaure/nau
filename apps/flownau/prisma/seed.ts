@@ -1,5 +1,4 @@
 import { PrismaClient } from '@prisma/client'
-import bcrypt from 'bcryptjs'
 import fs from 'fs'
 import path from 'path'
 
@@ -10,22 +9,9 @@ async function main() {
   const adminPassword = process.env.INITIAL_ADMIN_PASSWORD
 
   if (!adminEmail || !adminPassword) {
-    console.error(
-      '❌ Skipping admin creation: INITIAL_ADMIN_EMAIL or INITIAL_ADMIN_PASSWORD not set in .env',
-    )
+    console.log('ℹ️ Skipping admin creation: INITIAL_ADMIN_EMAIL or INITIAL_ADMIN_PASSWORD not set. Use 9naŭ API to create users.')
   } else {
-    const hashedPassword = await bcrypt.hash(adminPassword, 10)
-
-    const admin = await prisma.user.upsert({
-      where: { email: adminEmail },
-      update: {},
-      create: {
-        email: adminEmail,
-        name: process.env.INITIAL_ADMIN_NAME || 'Admin',
-        password: hashedPassword,
-      },
-    })
-    console.log('✅ Admin user ensured:', admin.email)
+    console.log('ℹ️ Admin users are now managed by 9naŭ API. Register via POST /api/auth/register on the 9naŭ service.')
   }
 
   // Add a sample template
