@@ -83,7 +83,7 @@ Ideation → Scene Composition (AI) → Timeline Assembly (Code) → Render (Asy
 | GET    | `/api/v1/daily-plan/:accountId`               | Daily plan with pieces, scripts, alerts, stats                       |
 | GET    | `/api/v1/daily-plan/:accountId?reminder=true` | Condensed plan (pending items only)                                  |
 | GET    | `/api/v1/accounts`                            | List social accounts                                                 |
-| GET    | `/api/v1/accounts/by-nau-brand/:brandId`      | Lookup accountId by nauthenticity brand ID *(Phase 14)*              |
+| GET    | `/api/v1/accounts/by-nau-brand/:brandId`      | Lookup accountId by nauthenticity brand ID _(Phase 14)_              |
 | GET    | `/api/v1/compositions?accountId=X&status=Y`   | Query compositions with filters                                      |
 
 ### Crons
