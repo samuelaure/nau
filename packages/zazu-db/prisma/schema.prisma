@@ -26,6 +26,7 @@ model User {
   username        String?
   displayName     String?
   onboardingState OnboardingState @default(AWAITING_NAME)
+  nauUserId        String?         // 9naŭ User.id once linked
   messages         Message[]
   features         UserFeature[]
   deliveryWindow   DeliveryWindow?
