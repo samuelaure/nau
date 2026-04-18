@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.4.1](https://github.com/samuelaure/flownau/compare/v1.4.0...v1.4.1) (2026-04-18)
+
+
+### Bug Fixes
+
+* **deploy:** force base image build by removing conditional logic ([b7ededc](https://github.com/samuelaure/flownau/commit/b7ededcbb4206f40a14eae6b1a8ef1de2fb549bd))
+
 ## [1.4.0](https://github.com/samuelaure/flownau/compare/v1.3.0...v1.4.0) (2026-04-18)
 
 
