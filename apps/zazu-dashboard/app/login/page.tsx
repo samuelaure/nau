@@ -3,51 +3,40 @@
 import { signIn, useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Lock, ShieldCheck, Terminal, Loader2 } from 'lucide-react';
+import { ShieldCheck, Terminal, Loader2 } from 'lucide-react';
+
+const ACCOUNTS_URL = process.env.NEXT_PUBLIC_ACCOUNTS_URL ?? 'https://accounts.9nau.com';
+const DASHBOARD_URL = process.env.NEXT_PUBLIC_DASHBOARD_URL ?? 'https://zazu.9nau.com';
 
 export default function LoginPage() {
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
   const [autoLoggingIn, setAutoLoggingIn] = useState(false);
   const router = useRouter();
   const { data: session } = useSession();
 
   useEffect(() => {
-    // 1. Check if we have a session already
     if (session) {
       router.push('/');
       return;
     }
 
-    // 2. Try Telegram Auto-Login
     const attemptTelegramLogin = async () => {
-      // Small delay to ensure WebApp is injected
       await new Promise(r => setTimeout(r, 500));
-      
+
       if (typeof window !== 'undefined') {
         const WebApp = require('@twa-dev/sdk').default;
         const initData = WebApp.initData;
 
         if (initData) {
-          console.log('Zazŭ: Attempting Telegram auto-login...');
           setAutoLoggingIn(true);
           try {
-            const result = await signIn('telegram-login', {
-              initData,
-              redirect: false,
-            });
-
+            const result = await signIn('telegram-login', { initData, redirect: false });
             if (result?.ok) {
-              console.log('Zazŭ: Telegram auth successful.');
               router.push('/');
               router.refresh();
             } else {
-              console.warn('Zazŭ: Telegram auth failed, falling back to password.');
               setAutoLoggingIn(false);
             }
-          } catch (err) {
-            console.error('Zazŭ: Auto-login exception', err);
+          } catch {
             setAutoLoggingIn(false);
           }
         }
@@ -57,28 +46,9 @@ export default function LoginPage() {
     attemptTelegramLogin();
   }, [session, router]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-
-    try {
-      const result = await signIn('credentials', {
-        password,
-        redirect: false,
-      });
-
-      if (result?.error) {
-        setError('Acceso denegado. Llave de seguridad incorrecta.');
-      } else {
-        router.push('/');
-        router.refresh();
-      }
-    } catch (err) {
-      setError('Error inesperado. Inténtalo de nuevo.');
-    } finally {
-      setLoading(false);
-    }
+  const handleNauLogin = () => {
+    const callbackUrl = `${DASHBOARD_URL}/auth/callback`;
+    window.location.href = `${ACCOUNTS_URL}/login?continue=${encodeURIComponent(callbackUrl)}`;
   };
 
   return (
@@ -119,36 +89,18 @@ export default function LoginPage() {
             <p style={{ fontSize: '0.85rem', color: 'var(--primary)', fontWeight: 600 }}>Iniciando sesión segura via Telegram...</p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div style={{ textAlign: 'left' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-dim)', marginBottom: '8px' }}>
-                LLAVE DE SEGURIDAD
-              </label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type="password"
-                  className="input-field"
-                  placeholder="••••••••"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  style={{ paddingLeft: '40px' }}
-                />
-                <Lock size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
-              </div>
-            </div>
-
-            {error && <p style={{ color: '#ff4444', fontSize: '0.8rem', fontWeight: 600 }}>{error}</p>}
-
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <p style={{ color: 'var(--text-dim)', fontSize: '0.85rem' }}>
+              Accede con tu cuenta naŭ para continuar.
+            </p>
             <button
-              type="submit"
+              onClick={handleNauLogin}
               className="btn-primary"
-              disabled={loading}
-              style={{ width: '100%', marginTop: '10px' }}
+              style={{ width: '100%' }}
             >
-              {loading ? 'AUTENTICANDO...' : 'ACCEDER AL NÚCLEO'}
+              Iniciar sesión con naŭ
             </button>
-          </form>
+          </div>
         )}
 
         <div style={{ marginTop: '30px', paddingTop: '20px', borderTop: '1px solid var(--border-glass)' }}>
