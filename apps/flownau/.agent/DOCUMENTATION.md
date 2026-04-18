@@ -4,7 +4,7 @@
 
 - **Type:** A — Platform Service (headless API + internal dashboard)
 - **Domain:** Content creation, scene-based video/image composition, automated publishing
-- **Status:** Active — Phase 12: Advanced Ideation Controls & Workspace Governance
+- **Status:** Active — Phase 13: Platform Brand Registry & Ideation Pipeline Fix
 
 ## Purpose
 
@@ -50,6 +50,7 @@ Ideation → Scene Composition (AI) → Timeline Assembly (Code) → Render (Asy
 3. **Audio-first timing.** Audio duration drives all frame calculations.
 4. **Rendering is isolated.** Dedicated container, async BullMQ queue.
 5. **Fail-safe boundaries.** All external API calls (AI/Naŭ) use timeouts and graceful degradation.
+6. **Brand identity is external.** Brand DNA lives in nauthenticity (canonical). flownaŭ links via `brandId` on `SocialAccount` and fetches DNA on demand with local `BrandPersona` as fallback. Workspace links via `platformWorkspaceId`.
 
 ## Domain Ownership
 
@@ -65,8 +66,9 @@ Ideation → Scene Composition (AI) → Timeline Assembly (Code) → Render (Asy
 
 ### Consumes
 
-- **nauthenticity:** InspoItems + Brand DNA for ideation
-- **9naŭ API (triage module):** Voice transcripts ingested as content ideas
+- **nauthenticity:** Brand DNA (full) via `GET /api/v1/brands/:id/dna`, InspoBase digest via `GET /api/v1/inspo/digest?brandId=`. Brand referenced by `brandId` (= nauthenticity `Brand.id`).
+- **9naŭ API (IdP):** Validates all dashboard user sessions via JWT (NextAuth is gone).
+- **9naŭ API (triage module):** Voice transcripts forwarded as content ideas via `/api/v1/ideas/ingest`
 - **9naŭ API:** Reactive content triggers from user's Second Brain
 
 ## API Surface
@@ -81,6 +83,7 @@ Ideation → Scene Composition (AI) → Timeline Assembly (Code) → Render (Asy
 | GET    | `/api/v1/daily-plan/:accountId`               | Daily plan with pieces, scripts, alerts, stats                       |
 | GET    | `/api/v1/daily-plan/:accountId?reminder=true` | Condensed plan (pending items only)                                  |
 | GET    | `/api/v1/accounts`                            | List social accounts                                                 |
+| GET    | `/api/v1/accounts/by-nau-brand/:brandId`      | Lookup accountId by nauthenticity brand ID *(Phase 14)*              |
 | GET    | `/api/v1/compositions?accountId=X&status=Y`   | Query compositions with filters                                      |
 
 ### Crons
@@ -107,13 +110,15 @@ Ideation → Scene Composition (AI) → Timeline Assembly (Code) → Render (Asy
 | FB_APP_ID, FB_APP_SECRET      | Yes      | Instagram Graph API                   |
 | NAU_SERVICE_KEY               | Yes      | Cross-service auth                    |
 | NAUTHENTICITY_URL             | Yes      | nauthenticity service URL             |
-| NEXTAUTH_SECRET, NEXTAUTH_URL | Yes      | Dashboard auth                        |
+| NINE_NAU_URL                  | Yes      | 9naŭ API URL (for SSO validation)     |
 | RENDER_CONCURRENCY            | No       | Frames in parallel (default: 2)       |
 | RENDER_MAX_ATTEMPTS           | No       | Max retry per render job (default: 3) |
 | CRON_SECRET                   | Yes      | Automated flow protection (Bearer)    |
 
+- **[2026-04-18] SSO via 9naŭ (Phase 13)**: Dropped NextAuth. Dashboard routes and internal APIs validate JWTs signed by 9naŭ API. `userId` in flownaŭ maps strictly to 9naŭ `User.id`.
+- **[2026-04-18] Brand Linking Canonical Naming (Phase 13)**: `SocialAccount` stores `brandId` referencing nauthenticity's `Brand.id`. Ideation pipeline uses this ID. `Workspace` stores `platformWorkspaceId` referencing 9naŭ `Workspace.id`.
 - **[2026-04-17] CI/CD & Integration Hardening (Phase 9)**: Implemented Docker BuildKit caching (GHA scope) for rapid deployments. Added safe `df -h` diagnostic logging and sequential container/image pruning to solve persistent disk exhaustion issues. Standardized CRON_SECRET protection and established `docs/integrations.md`.
-- **[2026-04-15] Phase 7 — Workspace Multi-Tenancy (complete)**: Transformed the app to a multi-tenant Workspace architecture. `SocialAccount` now belongs to `Workspace` (not `User`). Users join workspaces via `WorkspaceUser` join table with roles. New auth flow: `/register` creates user + personal workspace atomically. Dashboard root auto-redirects to the user's workspace. Account detail view now shows posting schedule as the primary tab. All API ownership checks migrated from `account.userId` to `checkAccountAccess()` workspace membership helper.
+- **[2026-04-15] Phase 7 — Workspace Multi-Tenancy (complete)**: Transformed the app to a multi-tenant Workspace architecture. `SocialAccount` now belongs to `Workspace` (not `User`). All API ownership checks migrated from `account.userId` to `checkAccountAccess()` workspace membership helper.
 - **[2026-04-13] Phase 6 — Frontend Dashboard Refactoring**: New pages for Compositions (`/dashboard/compositions`), Daily Plans (`/dashboard/plans`), and Ideas (`/dashboard/ideas`). Account detail extended with token health pill and new scheduler fields. Overview page refactored to remove legacy `Render` query. Sidebar expanded with new nav links.
 - **[2026-04-17] Brand Scope Unification (Phase 8)**: Unified all legacy dashboard routes into a single canonical brand experience via Workspace multi-tenancy. Consolidated the Daily Plan/Schedule UI and enforced strict content idea origin priority tracking (Captured > Manual > Automatic).
 - **[2026-04-13] Content Plan & Platform Integration (Phase 5)**: Implemented daily plan generation with head-talk detection, alerts (token/asset/idea), and Zazŭ delivery contract. Connected nauthenticity InspoItems as ideation source with graceful degradation. All v1 cross-service endpoints now fully functional.
@@ -148,7 +153,10 @@ Ideation → Scene Composition (AI) → Timeline Assembly (Code) → Render (Asy
 
 ## naŭ Platform Dependencies
 
-- **nauthenticity** → Mechanical InspoBase Synthesis engine to provide rolling 'Brand Digest' context
+- **nauthenticity** → Brand DNA via `GET /api/v1/brands/:id/dna` (full, fetched by `brandId`)
+- **nauthenticity** → InspoBase Digest via `GET /api/v1/inspo/digest?brandId=`
+- **nauthenticity** → Brand listing via `GET /api/v1/brands?workspaceId=` (for UI link)
+- **9naŭ API (IdP)** → Validates JWT for dashboard operator sessions
 - **9naŭ API (triage & sync)** → Pushes captured voice notes and manual ideas via `/api/v1/ideas/ingest`
 - **9naŭ API (reactive)** → Triggers reactive composition via `/api/v1/compose`
 - **Zazŭ** → Consumes daily plan via `/api/v1/daily-plan/:accountId` + triggers composition
