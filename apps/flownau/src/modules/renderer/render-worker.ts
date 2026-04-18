@@ -341,7 +341,10 @@ export function startRenderWorker(): Worker<RenderJobData> {
 // When run directly (e.g., in the renderer container):
 //   npx tsx src/modules/renderer/render-worker.ts
 
-if (require.main === module) {
+import { fileURLToPath } from 'node:url'
+const isMain = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])
+
+if (isMain) {
   logger.info('[RenderWorker] Starting standalone render worker...')
   startRenderWorker()
 }
