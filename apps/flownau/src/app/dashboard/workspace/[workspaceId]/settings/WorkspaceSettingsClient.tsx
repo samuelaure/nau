@@ -179,14 +179,14 @@ export default function WorkspaceSettingsClient({
                   </div>
                   <div>
                     <p className="text-sm font-medium">
-                      {m.platformUserId || ""}
+                      {m.platformUserId || ''}
                       {isSelf && (
                         <span className="ml-2 text-[10px] text-accent font-bold uppercase tracking-widest">
                           You
                         </span>
                       )}
                     </p>
-                    {m.platformUserId && <p className="text-xs text-gray-500">{""}</p>}
+                    {m.platformUserId && <p className="text-xs text-gray-500">{''}</p>}
                   </div>
                 </div>
                 <div className="flex items-center gap-3">

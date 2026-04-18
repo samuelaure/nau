@@ -4,7 +4,11 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 import { getAuthUser } from '@/lib/auth'
 
-async function requireAccess(workspaceId: string, platformUserId: string, requiredRoles = ['owner', 'admin']) {
+async function requireAccess(
+  workspaceId: string,
+  platformUserId: string,
+  requiredRoles = ['owner', 'admin'],
+) {
   const access = await prisma.workspaceUser.findUnique({
     where: { platformUserId_workspaceId: { platformUserId, workspaceId } },
   })
@@ -42,7 +46,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ workspa
     if (!access) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     const { platformUserId: inviteePlatformUserId, role = 'member' } = await req.json()
-    if (!inviteePlatformUserId) return NextResponse.json({ error: 'Missing platformUserId' }, { status: 400 })
+    if (!inviteePlatformUserId)
+      return NextResponse.json({ error: 'Missing platformUserId' }, { status: 400 })
 
     const existing = await prisma.workspaceUser.findUnique({
       where: { platformUserId_workspaceId: { platformUserId: inviteePlatformUserId, workspaceId } },

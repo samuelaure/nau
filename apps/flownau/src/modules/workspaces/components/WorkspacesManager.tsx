@@ -36,7 +36,9 @@ export default function WorkspacesManager({
   const [isInviting, setIsInviting] = useState(false)
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId)
-  const currentUserRole = activeWorkspace?.users.find((u) => u.platformUserId === currentUserId)?.role
+  const currentUserRole = activeWorkspace?.users.find(
+    (u) => u.platformUserId === currentUserId,
+  )?.role
 
   // ... (UI to follow in iterations or as one block)
   return (
@@ -198,7 +200,7 @@ export default function WorkspacesManager({
                   >
                     <div>
                       <div className="font-medium text-sm">{wu.platformUserId || 'Unnamed'}</div>
-                      <div className="text-xs text-text-secondary">{""}</div>
+                      <div className="text-xs text-text-secondary">{''}</div>
                     </div>
                     <div className="flex items-center gap-4">
                       <span className="text-xs px-2 py-1 bg-white/10 rounded uppercase">
