@@ -3,7 +3,6 @@
 export const dynamic = 'force-dynamic'
 
 import { useState } from 'react'
-import { signIn } from 'next-auth/react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Rocket } from 'lucide-react'
@@ -14,22 +13,31 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setLoading(true)
 
-    const result = await signIn('credentials', {
-      email,
-      password,
-      redirect: false,
-    })
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
 
-    if (result?.error) {
-      setError('Invalid credentials')
-    } else {
-      router.push('/dashboard')
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        setError((body as { message?: string }).message ?? 'Invalid credentials')
+      } else {
+        router.push('/dashboard')
+      }
+    } catch {
+      setError('Network error. Please try again.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -41,14 +49,14 @@ export default function LoginPage() {
             <Rocket size={32} color="white" />
           </div>
           <h1 className="text-3xl font-heading font-bold mb-2 lowercase">flownaŭ</h1>
-          <p className="text-text-secondary">Welcome back, administrator.</p>
+          <p className="text-text-secondary">Welcome back.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           <Input
             label="Email Address"
             type="email"
-            placeholder="admin@example.com"
+            placeholder="you@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -66,15 +74,13 @@ export default function LoginPage() {
 
           {error && <p className="text-error text-sm">{error}</p>}
 
-          <Button type="submit" className="w-full h-12 justify-center mt-3">
-            Sign In
+          <Button type="submit" className="w-full h-12 justify-center mt-3" disabled={loading}>
+            {loading ? 'Signing in…' : 'Sign In'}
           </Button>
 
           <p className="text-center text-text-secondary text-sm mt-4">
-            Don't have an account?{' '}
-            <Link href="/register" className="text-accent hover:underline">
-              Register
-            </Link>
+            Don&apos;t have an account?{' '}
+            <Link href="/register" className="text-accent hover:underline">Register</Link>
           </p>
         </form>
       </div>

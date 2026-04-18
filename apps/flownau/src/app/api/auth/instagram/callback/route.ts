@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/auth'
+import { requireAuth, getAuthUser } from '@/lib/auth'
 import { prisma } from '@/modules/shared/prisma'
 import { encrypt } from '@/modules/shared/encryption'
 import axios from 'axios'
@@ -19,8 +19,8 @@ interface FacebookPage {
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
+    const user = await getAuthUser()
+    if (!user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -77,12 +77,12 @@ export async function GET(req: NextRequest) {
 
     // 4. Save to Database — attach to the user's primary workspace
     const workspaceUser = await prisma.workspaceUser.findFirst({
-      where: { userId: session.user.id, role: 'owner' },
+      where: { platformUserId: user!.id, role: 'owner' },
       select: { workspaceId: true },
     })
 
     if (!workspaceUser) {
-      console.error('No workspace found for user:', session.user.id)
+      console.error('No workspace found for user:', user!.id)
       return NextResponse.redirect(new URL('/dashboard?error=no_workspace', req.url))
     }
 

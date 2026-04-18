@@ -4,10 +4,10 @@ import Link from 'next/link'
 import { ArrowRight, Video, Instagram, Zap, Shield } from 'lucide-react'
 import { Card } from '@/modules/shared/components/ui/Card'
 import { Button } from '@/modules/shared/components/ui/Button'
-import { auth } from '@/auth'
+import { requireAuth, getAuthUser } from '@/lib/auth'
 
 export default async function LandingPage() {
-  const session = await auth()
+  const user = await getAuthUser()
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_right,#1e1b4b,#000)] text-white overflow-hidden">
       {/* Navigation */}
@@ -19,7 +19,7 @@ export default async function LandingPage() {
           <span className="font-extrabold text-xl font-heading tracking-wide">flownaŭ</span>
         </div>
         <div className="flex items-center gap-4">
-          {!session ? (
+          {!user ? (
             <>
               <Link
                 href="/register"
@@ -57,7 +57,7 @@ export default async function LandingPage() {
 
         <div className="animate-fade-in flex flex-col gap-4 items-center">
           <div className="flex gap-4">
-            {!session ? (
+            {!user ? (
               <Link href="/register" className="btn-primary px-8 py-4 text-lg">
                 Get Started <ArrowRight size={20} />
               </Link>
@@ -70,7 +70,7 @@ export default async function LandingPage() {
               Watch Demo
             </Button>
           </div>
-          {!session && (
+          {!user && (
             <p className="text-text-secondary mt-2">
               Already have an account?{' '}
               <Link href="/login" className="text-accent hover:underline">

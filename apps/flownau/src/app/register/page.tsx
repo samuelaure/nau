@@ -3,7 +3,6 @@
 export const dynamic = 'force-dynamic'
 
 import { useState } from 'react'
-import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Rocket } from 'lucide-react'
@@ -35,18 +34,8 @@ export default function RegisterPage() {
         throw new Error(data.message || 'Registration failed')
       }
 
-      // Automatically log in
-      const result = await signIn('credentials', {
-        email,
-        password,
-        redirect: false,
-      })
-
-      if (result?.error) {
-        setError('Login failed after registration')
-      } else {
-        router.push('/dashboard')
-      }
+      // Registration now returns cookies directly — redirect to dashboard
+      router.push('/dashboard')
     } catch (err: any) {
       setError(err.message)
     } finally {
