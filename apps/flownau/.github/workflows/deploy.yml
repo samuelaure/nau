@@ -120,9 +120,9 @@ jobs:
 
             # Write production .env from secrets
             cat > /root/flownau/.env.tmp << 'ENVEOF'
-            POSTGRES_USER=flownau_user
-            POSTGRES_PASSWORD=${{ secrets.DATABASE_PASSWORD }}
-            POSTGRES_DB=flownau
+            DATABASE_USER=flownau_user
+            DATABASE_PASSWORD=${{ secrets.DATABASE_PASSWORD }}
+            DATABASE_NAME=flownau
             REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
             PUBLIC_DOMAIN=flownau.9nau.com
             GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}
