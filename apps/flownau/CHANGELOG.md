@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.4.0](https://github.com/samuelaure/flownau/compare/v1.3.0...v1.4.0) (2026-04-18)
+
+
+### Features
+
+* **flownau:** add shared base image with system deps for app and renderer ([466cf77](https://github.com/samuelaure/flownau/commit/466cf77373005da1d36d569350c984e41deb22a5))
+
 ## [1.3.0](https://github.com/samuelaure/flownau/compare/v1.2.8...v1.3.0) (2026-04-18)
 
 
