@@ -1,6 +1,7 @@
 import NextAuth, { type DefaultSession } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import crypto from "crypto";
+import { jwtVerify } from "jose";
 
 declare module "next-auth" {
   interface Session {
@@ -12,6 +13,7 @@ declare module "next-auth" {
 }
 
 const ADMIN_TELEGRAM_ID = process.env.ADMIN_TELEGRAM_ID || "5109114390";
+const JWT_SECRET = process.env.JWT_SECRET ?? "changeme";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -28,13 +30,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const token = process.env.TELEGRAM_BOT_TOKEN;
         if (!token) return null;
 
-        // 1. Verify Telegram InitData Hash
         try {
           const urlParams = new URLSearchParams(initData);
           const hash = urlParams.get("hash");
           urlParams.delete("hash");
 
-          // Sort alphabetic
           const params = Array.from(urlParams.entries())
             .map(([key, value]) => `${key}=${value}`)
             .sort()
@@ -55,7 +55,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             return null;
           }
 
-          // 2. Extract user info
           const userStr = urlParams.get("user");
           if (!userStr) return null;
           const tgUser = JSON.parse(userStr);
@@ -63,12 +62,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           const tgUserId = tgUser.id.toString();
           const isAdmin = tgUserId === ADMIN_TELEGRAM_ID;
 
-          return { 
-            id: tgUserId, 
-            name: tgUser.first_name, 
+          return {
+            id: tgUserId,
+            name: tgUser.first_name,
             image: tgUser.photo_url,
-            // NextAuth needs this as a string, we will map it in jwt backend
-            isAdminString: isAdmin ? "true" : "false"
+            isAdminString: isAdmin ? "true" : "false",
           };
         } catch (e) {
           console.error("Telegram Auth Error:", e);
@@ -77,23 +75,29 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
     Credentials({
-      id: "credentials",
-      name: "Zazŭ Access",
+      id: "nau-sso",
+      name: "naŭ SSO",
       credentials: {
-        password: { label: "Security Key", type: "password" },
+        token: { label: "JWT Token", type: "text" },
       },
       async authorize(credentials) {
-        const admin_password = process.env.ADMIN_PASSWORD || "zazu_secure_2026";
-        
-        if (credentials?.password === admin_password) {
-          return { 
-            id: "1", 
-            name: "Zazŭ Administrator", 
-            email: "admin@zazu.localhost",
-            isAdminString: "true"
+        const jwtToken = credentials?.token as string;
+        if (!jwtToken) return null;
+
+        try {
+          const secret = new TextEncoder().encode(JWT_SECRET);
+          const { payload } = await jwtVerify(jwtToken, secret);
+          if (!payload.sub) return null;
+
+          return {
+            id: payload.sub,
+            name: (payload.name as string) ?? "naŭ User",
+            email: payload.email as string | undefined,
+            isAdminString: "true",
           };
+        } catch {
+          return null;
         }
-        return null;
       },
     }),
   ],
@@ -117,14 +121,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
-      const isLoginPage = nextUrl.pathname === "/login";
-      
-      if (isLoginPage) {
-        if (isLoggedIn) return Response.redirect(new URL("/", nextUrl));
-        return true; // Allow access to login page
+      const isAuthRoute =
+        nextUrl.pathname === "/login" ||
+        nextUrl.pathname.startsWith("/auth/callback");
+
+      if (isAuthRoute) {
+        if (isLoggedIn && nextUrl.pathname === "/login")
+          return Response.redirect(new URL("/", nextUrl));
+        return true;
       }
-      
-      return isLoggedIn; // Require login for all other pages
+
+      return isLoggedIn;
     },
   },
 });
