@@ -101,13 +101,14 @@ export async function generateContentIdeas(req: GenerationRequest): Promise<Idea
     contextBlock += '\n'
   }
 
-  const completion = await openai.chat.completions.parse({
-    model: 'gpt-4o',
-    temperature: 0.7,
-    messages: [
-      {
-        role: 'system',
-        content: `You are the Content Ideation Engine for "${req.brandName}".
+  const completion = await openai.chat.completions.parse(
+    {
+      model: 'gpt-4o',
+      temperature: 0.7,
+      messages: [
+        {
+          role: 'system',
+          content: `You are the Content Ideation Engine for "${req.brandName}".
 Generate exactly ${req.count} fresh, high-quality content ideas.
 
 RULES:
@@ -120,14 +121,16 @@ RULES:
 7. Write scripts in the brand's natural language (typically Spanish).
 
 Return valid JSON matching the schema.`,
-      },
-      {
-        role: 'user',
-        content: contextBlock,
-      },
-    ],
-    response_format: zodResponseFormat(IdeationOutputSchema, 'IdeationOutput'),
-  }, { timeout: 60_000 })
+        },
+        {
+          role: 'user',
+          content: contextBlock,
+        },
+      ],
+      response_format: zodResponseFormat(IdeationOutputSchema, 'IdeationOutput'),
+    },
+    { timeout: 60_000 },
+  )
 
   const parsed = completion.choices[0].message.parsed
   if (!parsed) {

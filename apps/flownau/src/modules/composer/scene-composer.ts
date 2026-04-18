@@ -173,12 +173,15 @@ async function callAI(
     // The OpenAI SDK types beta.chat.completions.parse as returning any.
     // We accept that here and validate the parsed value with Zod immediately after.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const completion: any = await openai.chat.completions.parse({
-      model,
-      temperature: 0.7,
-      messages,
-      response_format: zodResponseFormat(CreativeDirectionSchema, 'CreativeDirection'),
-    }, { timeout: 60000 })
+    const completion: any = await openai.chat.completions.parse(
+      {
+        model,
+        temperature: 0.7,
+        messages,
+        response_format: zodResponseFormat(CreativeDirectionSchema, 'CreativeDirection'),
+      },
+      { timeout: 60000 },
+    )
 
     const parsed: unknown = completion.choices[0]?.message?.parsed
     if (!parsed) throw new Error('OpenAI returned empty parsed response')
@@ -191,18 +194,21 @@ async function callAI(
   if (!groqKey) throw new Error('GROQ_API_KEY is not configured')
   const groq = new Groq({ apiKey: groqKey })
 
-  const completion = await groq.chat.completions.create({
-    model,
-    temperature: 0.7,
-    messages: [
-      ...messages,
-      {
-        role: 'user',
-        content:
-          'Respond with ONLY valid JSON matching the CreativeDirection schema. No markdown, no explanation.',
-      },
-    ],
-  }, { timeout: 30_000 })
+  const completion = await groq.chat.completions.create(
+    {
+      model,
+      temperature: 0.7,
+      messages: [
+        ...messages,
+        {
+          role: 'user',
+          content:
+            'Respond with ONLY valid JSON matching the CreativeDirection schema. No markdown, no explanation.',
+        },
+      ],
+    },
+    { timeout: 30_000 },
+  )
 
   const raw = completion.choices[0]?.message?.content?.trim()
   if (!raw) throw new Error('Groq returned empty response')

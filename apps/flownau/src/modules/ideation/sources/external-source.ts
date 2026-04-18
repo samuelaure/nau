@@ -118,7 +118,11 @@ export async function ingestExternalIdeas(
     const isAiLinked = idea.aiLinked ?? false
 
     // AI-linked ideas always require human review — bypass autoApprove and captured auto-approve
-    const status = isAiLinked ? 'PENDING' : autoApprove || source === 'captured' ? 'APPROVED' : 'PENDING'
+    const status = isAiLinked
+      ? 'PENDING'
+      : autoApprove || source === 'captured'
+        ? 'APPROVED'
+        : 'PENDING'
 
     const created = await prisma.contentIdea.create({
       data: {

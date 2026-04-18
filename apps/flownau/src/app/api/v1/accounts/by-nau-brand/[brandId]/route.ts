@@ -8,10 +8,7 @@ import { prisma } from '@/modules/shared/prisma'
  * Called by: 9naŭ API (triage module) to find the correct accountId before ingesting ideas.
  * Auth: NAU_SERVICE_KEY
  */
-export async function GET(
-  req: Request,
-  { params }: { params: Promise<{ brandId: string }> },
-) {
+export async function GET(req: Request, { params }: { params: Promise<{ brandId: string }> }) {
   if (!validateServiceKey(req)) {
     return unauthorizedResponse()
   }
