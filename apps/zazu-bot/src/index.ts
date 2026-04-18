@@ -39,7 +39,29 @@ bot.use(voicePreprocessor);
 bot.start(async (ctx) => {
   const user = ctx.dbUser;
   const domain = process.env.BOT_DOMAIN || 'zazu.9nau.com';
-  
+
+  // Attempt to link this Telegram user to their 9naŭ account (best-effort)
+  if (!user.nauUserId) {
+    try {
+      const nauApiUrl = process.env.NAU_API_URL ?? 'http://9nau-api:3000';
+      const nauServiceKey = process.env.NAU_SERVICE_KEY ?? '';
+      const resp = await fetch(`${nauApiUrl}/api/auth/by-telegram/${user.telegramId}`, {
+        headers: { Authorization: `Bearer ${nauServiceKey}` },
+      });
+      if (resp.ok) {
+        const data = await resp.json() as { found: boolean; user?: { id: string } };
+        if (data.found && data.user?.id) {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { nauUserId: data.user.id },
+          });
+        }
+      }
+    } catch {
+      // Non-critical — log silently
+    }
+  }
+
   const keyboard = {
     reply_markup: {
       inline_keyboard: [[{ text: '🛠️ Abrir Panel', web_app: { url: `https://${domain}/` } }]]
@@ -53,7 +75,36 @@ bot.start(async (ctx) => {
   }
 });
 
-// --- 4. Unified Message Dispatcher ---
+// --- 4. Brand Selection Callback Handler ---
+bot.on('callback_query', async (ctx) => {
+  if (!ctx.callbackQuery || !('data' in ctx.callbackQuery)) return;
+
+  const data = ctx.callbackQuery.data;
+  if (!data?.startsWith('triage_brand:')) return;
+
+  await ctx.answerCbQuery();
+
+  const brandToken = data.replace('triage_brand:', '');
+  const brandId = brandToken === 'auto' ? null : brandToken;
+
+  const text: string | undefined = ctx.session?.pendingTriageText;
+
+  if (!text) {
+    await ctx.editMessageText('⚠️ No encontré el texto pendiente. Envía el mensaje de voz de nuevo.');
+    return;
+  }
+
+  // Clear pending session state
+  ctx.session.pendingTriageText = undefined;
+  ctx.session.pendingTriageUserId = undefined;
+
+  const label = brandId ? `marca seleccionada` : `auto-detección de marca`;
+  await ctx.editMessageText(`⏳ Procesando con ${label}...`);
+
+  await triageSkill.runTriage(ctx as any, text, brandId);
+});
+
+// --- 5. Unified Message Dispatcher ---
 bot.on('message', async (ctx) => {
   const user = ctx.dbUser;
   const content = ctx.textContent;
@@ -101,7 +152,7 @@ bot.launch().then(() => {
   }).catch(e => logger.error({ err: e }, 'Error setting menu button'));
 });
 
-// --- 5. Proactive Delivery Queue ---
+// --- 6. Proactive Delivery Queue ---
 // Replaces the old webhook format with a robust grouped queue that obeys user Delivery Windows
 const deliveryGateway = new ProactiveDeliverySystem(bot);
 deliveryGateway.start();
