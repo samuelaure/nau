@@ -2,23 +2,23 @@ export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
-import { auth } from '@/auth'
+import { requireAuth, getAuthUser } from '@/lib/auth'
 
-async function getWorkspaceAccess(workspaceId: string, userId: string) {
+async function getWorkspaceAccess(workspaceId: string, platformUserId: string) {
   return prisma.workspaceUser.findUnique({
-    where: { userId_workspaceId: { userId, workspaceId } },
+    where: { platformUserId_workspaceId: { platformUserId, workspaceId } },
   })
 }
 
 export async function PUT(req: Request, { params }: { params: Promise<{ workspaceId: string }> }) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
+    const user = await getAuthUser()
+    if (!user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const { workspaceId } = await params
-    const access = await getWorkspaceAccess(workspaceId, session.user.id)
+    const access = await getWorkspaceAccess(workspaceId, user!.id)
     if (!access || !['owner', 'admin'].includes(access.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
@@ -40,13 +40,13 @@ export async function DELETE(
   { params }: { params: Promise<{ workspaceId: string }> },
 ) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
+    const user = await getAuthUser()
+    if (!user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const { workspaceId } = await params
-    const access = await getWorkspaceAccess(workspaceId, session.user.id)
+    const access = await getWorkspaceAccess(workspaceId, user!.id)
     if (!access || access.role !== 'owner') {
       return NextResponse.json({ error: 'Only owners can delete a workspace' }, { status: 403 })
     }

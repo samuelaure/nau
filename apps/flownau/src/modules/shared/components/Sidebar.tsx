@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { LayoutDashboard, Video, Settings, LogOut, CalendarDays, Users } from 'lucide-react'
-import { signOut } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 
 const globalNavItems = [
   { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
@@ -12,6 +12,12 @@ const globalNavItems = [
 ]
 
 export default function Sidebar() {
+  const router = useRouter()
+
+  const handleSignOut = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' })
+    router.push('/login')
+  }
   const pathname = usePathname()
 
   // Extract workspaceId from /dashboard/workspace/[workspaceId]/...
@@ -93,7 +99,7 @@ export default function Sidebar() {
       </nav>
 
       <button
-        onClick={() => signOut()}
+        onClick={handleSignOut}
         style={{
           display: 'flex',
           alignItems: 'center',

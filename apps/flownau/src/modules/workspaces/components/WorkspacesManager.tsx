@@ -14,11 +14,7 @@ import {
 type WorkspaceUser = {
   id: string
   role: string
-  user: {
-    id: string
-    name: string | null
-    email: string | null
-  }
+  platformUserId: string
 }
 
 type Workspace = {
@@ -40,7 +36,7 @@ export default function WorkspacesManager({
   const [isInviting, setIsInviting] = useState(false)
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId)
-  const currentUserRole = activeWorkspace?.users.find((u) => u.user.id === currentUserId)?.role
+  const currentUserRole = activeWorkspace?.users.find((u) => u.platformUserId === currentUserId)?.role
 
   // ... (UI to follow in iterations or as one block)
   return (
@@ -71,7 +67,7 @@ export default function WorkspacesManager({
             >
               <div className="font-medium truncate">{w.name}</div>
               <div className="text-xs text-text-secondary capitalize tracking-wide">
-                {w.users.find((u) => u.user.id === currentUserId)?.role}
+                {w.users.find((u) => u.platformUserId === currentUserId)?.role}
               </div>
             </div>
           ))}
@@ -201,8 +197,8 @@ export default function WorkspacesManager({
                     className="p-3 border-b border-white/5 last:border-0 flex justify-between items-center"
                   >
                     <div>
-                      <div className="font-medium text-sm">{wu.user.name || 'Unnamed'}</div>
-                      <div className="text-xs text-text-secondary">{wu.user.email}</div>
+                      <div className="font-medium text-sm">{wu.platformUserId || 'Unnamed'}</div>
+                      <div className="text-xs text-text-secondary">{""}</div>
                     </div>
                     <div className="flex items-center gap-4">
                       <span className="text-xs px-2 py-1 bg-white/10 rounded uppercase">
@@ -211,11 +207,11 @@ export default function WorkspacesManager({
 
                       {/* Can remove if owner/admin, or if it's yourself (leave) */}
                       {(['owner', 'admin'].includes(currentUserRole || '') ||
-                        wu.user.id === currentUserId) && (
+                        wu.platformUserId === currentUserId) && (
                         <button
                           onClick={async () => {
                             if (confirm('Remove user from workspace?')) {
-                              await removeUserFromWorkspace(activeWorkspace.id, wu.user.id)
+                              await removeUserFromWorkspace(activeWorkspace.id, wu.platformUserId)
                             }
                           }}
                           className="text-text-secondary hover:text-error"

@@ -3,7 +3,7 @@
 import { prisma } from '@/modules/shared/prisma'
 import { revalidatePath } from 'next/cache'
 import { syncR2Assets } from '@/modules/video/r2-sync-service'
-import { auth } from '@/auth'
+import { requireAuth, getAuthUser } from '@/lib/auth'
 import { z } from 'zod'
 
 const SettingSchema = z.object({
@@ -12,8 +12,8 @@ const SettingSchema = z.object({
 })
 
 async function checkAuth() {
-  const session = await auth()
-  if (!session?.user) {
+  const user = await getAuthUser()
+  if (!user) {
     throw new Error('Unauthorized')
   }
 }

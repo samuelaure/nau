@@ -25,7 +25,7 @@ export async function createWorkspace(formData: FormData) {
       name,
       users: {
         create: {
-          userId: user.id,
+          platformUserId: user.id,
           role: 'owner',
         },
       },
@@ -47,7 +47,7 @@ export async function renameWorkspace(formData: FormData) {
 
   // Verify ownership
   const wu = await prisma.workspaceUser.findUnique({
-    where: { userId_workspaceId: { userId: user.id, workspaceId } },
+    where: { platformUserId_workspaceId: { platformUserId: user.id, workspaceId } },
   })
 
   if (!wu || wu.role !== 'owner') {
@@ -68,7 +68,7 @@ export async function deleteWorkspace(workspaceId: string) {
 
   // Verify ownership
   const wu = await prisma.workspaceUser.findUnique({
-    where: { userId_workspaceId: { userId: user.id, workspaceId } },
+    where: { platformUserId_workspaceId: { platformUserId: user.id, workspaceId } },
   })
 
   if (!wu || wu.role !== 'owner') {
@@ -104,22 +104,25 @@ export async function inviteUserToWorkspace(formData: FormData) {
 
   // Verify current user is owner or admin
   const wu = await prisma.workspaceUser.findUnique({
-    where: { userId_workspaceId: { userId: currentUser.id, workspaceId } },
+    where: { platformUserId_workspaceId: { platformUserId: currentUser.id, workspaceId } },
   })
 
   if (!wu || !['owner', 'admin'].includes(wu.role)) {
     throw new Error('Forbidden: Insufficient permissions to invite users')
   }
 
-  // Find target user by email
-  const targetUser = await prisma.user.findUnique({ where: { email } })
-  if (!targetUser) {
-    throw new Error('User not found. They must register first.')
+  // Look up platformUserId from 9naŭ API by email
+  const nauApiUrl = process.env.NAU_API_URL ?? 'http://9nau-api:3000'
+  const userResp = await fetch(`${nauApiUrl}/api/auth/lookup?email=${encodeURIComponent(email)}`, {
+    headers: { Authorization: `Bearer ${process.env.NAU_SERVICE_KEY}` },
+  })
+  if (!userResp.ok) {
+    throw new Error('User not found. They must register on 9naŭ first.')
   }
+  const { id: platformUserId } = (await userResp.json()) as { id: string }
 
-  // Check if they are already in the workspace
   const existingWu = await prisma.workspaceUser.findUnique({
-    where: { userId_workspaceId: { userId: targetUser.id, workspaceId } },
+    where: { platformUserId_workspaceId: { platformUserId, workspaceId } },
   })
 
   if (existingWu) {
@@ -127,11 +130,7 @@ export async function inviteUserToWorkspace(formData: FormData) {
   }
 
   await prisma.workspaceUser.create({
-    data: {
-      userId: targetUser.id,
-      workspaceId,
-      role,
-    },
+    data: { platformUserId, workspaceId, role },
   })
 
   revalidatePath('/dashboard/settings')
@@ -143,7 +142,7 @@ export async function removeUserFromWorkspace(workspaceId: string, userIdTarget:
   if (currentUser.id === userIdTarget) {
     // User is leaving the workspace
     const wu = await prisma.workspaceUser.findUnique({
-      where: { userId_workspaceId: { userId: currentUser.id, workspaceId } },
+      where: { platformUserId_workspaceId: { platformUserId: currentUser.id, workspaceId } },
     })
     if (wu?.role === 'owner') {
       const ownerCount = await prisma.workspaceUser.count({ where: { workspaceId, role: 'owner' } })
@@ -156,7 +155,7 @@ export async function removeUserFromWorkspace(workspaceId: string, userIdTarget:
   } else {
     // Current user is kicking someone else
     const wu = await prisma.workspaceUser.findUnique({
-      where: { userId_workspaceId: { userId: currentUser.id, workspaceId } },
+      where: { platformUserId_workspaceId: { platformUserId: currentUser.id, workspaceId } },
     })
 
     if (!wu || !['owner', 'admin'].includes(wu.role)) {
@@ -165,7 +164,7 @@ export async function removeUserFromWorkspace(workspaceId: string, userIdTarget:
   }
 
   await prisma.workspaceUser.delete({
-    where: { userId_workspaceId: { userId: userIdTarget, workspaceId } },
+    where: { platformUserId_workspaceId: { platformUserId: userIdTarget, workspaceId } },
   })
 
   revalidatePath('/dashboard/settings')

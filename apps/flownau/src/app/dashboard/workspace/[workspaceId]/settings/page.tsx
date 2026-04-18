@@ -1,4 +1,4 @@
-import { auth } from '@/auth'
+import { requireAuth, getAuthUser } from '@/lib/auth'
 import { prisma } from '@/modules/shared/prisma'
 import { redirect } from 'next/navigation'
 import WorkspaceSettingsClient from './WorkspaceSettingsClient'
@@ -11,11 +11,11 @@ export default async function WorkspaceSettingsPage({
   params: { workspaceId: string }
 }) {
   const { workspaceId } = await params
-  const session = await auth()
-  if (!session?.user?.id) redirect('/login')
+  const user = await getAuthUser()
+  if (!user?.id) redirect('/login')
 
   const workspaceUser = await prisma.workspaceUser.findUnique({
-    where: { userId_workspaceId: { userId: session.user.id, workspaceId } },
+    where: { platformUserId_workspaceId: { platformUserId: user!.id, workspaceId } },
   })
 
   if (!workspaceUser) redirect('/dashboard')
@@ -25,20 +25,18 @@ export default async function WorkspaceSettingsPage({
 
   const members = await prisma.workspaceUser.findMany({
     where: { workspaceId },
-    include: { user: { select: { id: true, name: true, email: true, image: true } } },
     orderBy: { createdAt: 'asc' },
   })
 
   return (
     <WorkspaceSettingsClient
       workspace={{ id: workspace.id, name: workspace.name }}
-      currentUserId={session.user.id}
+      currentUserId={user!.id}
       currentUserRole={workspaceUser.role}
       initialMembers={members.map((m) => ({
         id: m.id,
-        userId: m.userId,
+        platformUserId: m.platformUserId,
         role: m.role,
-        user: m.user,
       }))}
     />
   )

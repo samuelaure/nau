@@ -11,17 +11,14 @@ import WorkspacesManager from '@/modules/workspaces/components/WorkspacesManager
 export default async function SettingsPage() {
   const { user } = await checkAuth()
 
-  // Fetch workspaces for the current user
   const workspaces = await prisma.workspace.findMany({
     where: {
       users: {
-        some: { userId: user.id },
+        some: { platformUserId: user.id },
       },
     },
     include: {
-      users: {
-        include: { user: { select: { id: true, name: true, email: true } } },
-      },
+      users: true,
     },
     orderBy: { createdAt: 'asc' },
   })

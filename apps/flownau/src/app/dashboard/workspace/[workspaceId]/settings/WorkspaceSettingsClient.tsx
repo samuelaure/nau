@@ -10,9 +10,8 @@ import { Loader2, Trash2, UserPlus, LogOut } from 'lucide-react'
 
 interface Member {
   id: string
-  userId: string
+  platformUserId: string
   role: string
-  user: { id: string; name: string | null; email: string | null; image: string | null }
 }
 
 interface Props {
@@ -102,7 +101,7 @@ export default function WorkspaceSettingsClient({
         method: 'DELETE',
       })
       if (!res.ok) throw new Error()
-      setMembers(members.filter((m) => m.userId !== userId))
+      setMembers(members.filter((m) => m.platformUserId !== userId))
       toast.success('Collaborator removed')
     } catch {
       toast.error('Failed to remove collaborator')
@@ -166,7 +165,7 @@ export default function WorkspaceSettingsClient({
 
         <div className="flex flex-col gap-2">
           {members.map((m) => {
-            const isSelf = m.userId === currentUserId
+            const isSelf = m.platformUserId === currentUserId
             const canRemove = m.role !== 'owner' && (canManage || isSelf)
 
             return (
@@ -175,27 +174,19 @@ export default function WorkspaceSettingsClient({
                 className="flex items-center justify-between py-2 border-b border-gray-800 last:border-0"
               >
                 <div className="flex items-center gap-3">
-                  {m.user.image ? (
-                    <img
-                      src={m.user.image}
-                      alt={m.user.name || ''}
-                      className="w-8 h-8 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-xs font-bold">
-                      {(m.user.name || m.user.email || '?')[0].toUpperCase()}
-                    </div>
-                  )}
+                  <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-xs font-bold">
+                    {(m.platformUserId[0] ?? '?').toUpperCase()}
+                  </div>
                   <div>
                     <p className="text-sm font-medium">
-                      {m.user.name || m.user.email}
+                      {m.platformUserId || ""}
                       {isSelf && (
                         <span className="ml-2 text-[10px] text-accent font-bold uppercase tracking-widest">
                           You
                         </span>
                       )}
                     </p>
-                    {m.user.name && <p className="text-xs text-gray-500">{m.user.email}</p>}
+                    {m.platformUserId && <p className="text-xs text-gray-500">{""}</p>}
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -212,12 +203,12 @@ export default function WorkspaceSettingsClient({
                   </span>
                   {canRemove && (
                     <button
-                      onClick={() => handleRemoveMember(m.userId)}
-                      disabled={removingId === m.userId}
+                      onClick={() => handleRemoveMember(m.platformUserId)}
+                      disabled={removingId === m.platformUserId}
                       className="text-gray-600 hover:text-red-400 transition"
                       title={isSelf ? 'Leave workspace' : 'Remove member'}
                     >
-                      {removingId === m.userId ? (
+                      {removingId === m.platformUserId ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : isSelf ? (
                         <LogOut className="w-4 h-4" />
