@@ -57,7 +57,7 @@ vi.mock('./core/config.js', () => ({
     TELEGRAM_SYSTEM_CHAT_ID: 'test-system-chat-id',
 
     // Security
-    JWT_SECRET: 'test-jwt-secret',
+    AUTH_SECRET: 'test-jwt-secret',
     JWT_EXPIRES_IN: '7d',
 
     // Redis
@@ -68,3 +68,4 @@ vi.mock('./core/config.js', () => ({
     WHATSAPP_PROVIDER: 'meta' as const,
   },
 }));
+

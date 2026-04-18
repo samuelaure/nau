@@ -10,7 +10,7 @@ export class AuthService {
    * Generates a JWT for a user.
    */
   static generateToken(userId: string, tenantId: string) {
-    return jwt.sign({ id: userId, tenantId }, config.JWT_SECRET, {
+    return jwt.sign({ id: userId, tenantId }, config.AUTH_SECRET, {
       expiresIn: config.JWT_EXPIRES_IN as any,
     });
   }
@@ -20,7 +20,7 @@ export class AuthService {
    */
   static verifyToken(token: string) {
     try {
-      return jwt.verify(token, config.JWT_SECRET) as { id: string; tenantId: string };
+      return jwt.verify(token, config.AUTH_SECRET) as { id: string; tenantId: string };
     } catch (error) {
       throw new AppError('Invalid or expired token', 401);
     }
@@ -127,3 +127,4 @@ export class AuthService {
     };
   }
 }
+

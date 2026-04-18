@@ -9,7 +9,7 @@ vi.mock('./core/config.js', () => ({
     LOG_LEVEL: 'info',
     OPENAI_API_KEY: 'sk-test',
     WHATSAPP_ACCESS_TOKEN: 'EAA-test',
-    JWT_SECRET: 'test',
+    AUTH_SECRET: 'test',
   },
 }));
 
@@ -43,3 +43,4 @@ describe('API Integration Tests', () => {
     });
   });
 });
+

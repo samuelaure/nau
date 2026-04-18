@@ -146,9 +146,9 @@ jobs:
             echo "INITIAL_ADMIN_PASSWORD=${{ secrets.INITIAL_ADMIN_PASSWORD || 'admin123' }}" >> .env
             
             # Database
-            echo "DB_USER=${{ secrets.DB_USER }}" >> .env
-            echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
-            echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
+            echo "DATABASE_USER=${{ secrets.DATABASE_USER }}" >> .env
+            echo "DATABASE_PASSWORD=${{ secrets.DATABASE_PASSWORD }}" >> .env
+            echo "DATABASE_NAME=${{ secrets.DATABASE_NAME }}" >> .env
             echo "DB_HOST=whatsnau_postgres" >> .env
             
             # Redis
@@ -157,7 +157,7 @@ jobs:
             echo "REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD || '' }}" >> .env
             
             # Security
-            echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
+            echo "AUTH_SECRET=${{ secrets.AUTH_SECRET }}" >> .env
             echo "JWT_EXPIRES_IN=7d" >> .env
             
             # Telegram (System-level - Required)
@@ -243,3 +243,4 @@ jobs:
           draft: false
           prerelease: false
           token: ${{ secrets.GITHUB_TOKEN }}
+

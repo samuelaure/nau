@@ -38,7 +38,7 @@ const configSchema = z
     TELEGRAM_CHAT_ID: z.string().optional(), // Deprecated, for backward compatibility
 
     // Auth
-    JWT_SECRET: z.string().default('super-secret-change-me-in-production'),
+    AUTH_SECRET: z.string().default('super-secret-change-me-in-production'),
     JWT_EXPIRES_IN: z.string().default('7d'),
 
     // Redis
@@ -52,10 +52,10 @@ const configSchema = z
   })
   .refine(
     (data) =>
-      data.NODE_ENV !== 'production' || data.JWT_SECRET !== 'super-secret-change-me-in-production',
+      data.NODE_ENV !== 'production' || data.AUTH_SECRET !== 'super-secret-change-me-in-production',
     {
-      message: 'JWT_SECRET must be changed in production',
-      path: ['JWT_SECRET'],
+      message: 'AUTH_SECRET must be changed in production',
+      path: ['AUTH_SECRET'],
     }
   );
 
@@ -69,3 +69,4 @@ if (!parsed.success && !isTest) {
 }
 
 export const config = parsed.success ? parsed.data : configSchema.parse({});
+

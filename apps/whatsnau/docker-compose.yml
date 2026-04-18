@@ -13,11 +13,11 @@ services:
           cpus: '0.35'
           memory: 192M
     environment:
-      - POSTGRES_USER=${DB_USER}
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DATABASE_USER}
+      - POSTGRES_PASSWORD=${DATABASE_PASSWORD}
+      - POSTGRES_DB=${DATABASE_NAME}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER} -d ${DATABASE_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -65,13 +65,13 @@ services:
           memory: 384M
     environment:
       # Infrastructure (Required)
-      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@whatsnau_postgres:5432/${DB_NAME}?schema=public
+      - DATABASE_URL=postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@whatsnau_postgres:5432/${DATABASE_NAME}?schema=public
       - REDIS_HOST=whatsnau_redis
       - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}
       
       # Security (Required)
-      - JWT_SECRET=${JWT_SECRET}
+      - AUTH_SECRET=${AUTH_SECRET}
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
       
@@ -131,13 +131,13 @@ services:
           memory: 384M
     environment:
       # Infrastructure (Required)
-      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@whatsnau_postgres:5432/${DB_NAME}?schema=public
+      - DATABASE_URL=postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@whatsnau_postgres:5432/${DATABASE_NAME}?schema=public
       - REDIS_HOST=whatsnau_redis
       - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}
       
       # Security (Required)
-      - JWT_SECRET=${JWT_SECRET}
+      - AUTH_SECRET=${AUTH_SECRET}
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
       
@@ -186,3 +186,4 @@ networks:
 
 volumes:
   postgres_data:
+

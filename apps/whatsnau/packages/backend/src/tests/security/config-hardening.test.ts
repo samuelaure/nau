@@ -14,7 +14,7 @@ describe('Config Hardening', () => {
     // We explicitly set the FORBIDDEN default secret to trigger the validation error
     // New required fields added: TELEGRAM_BOT_TOKEN, TELEGRAM_SYSTEM_CHAT_ID, DASHBOARD_URL, ALLOWED_ORIGINS
     // Optional fields removed: WHATSAPP_*, META_APP_*, OPENAI_API_KEY
-    const cmd = `npx cross-env NODE_ENV=production REDIS_PASSWORD=secure JWT_SECRET=super-secret-change-me-in-production TELEGRAM_BOT_TOKEN=test-token TELEGRAM_SYSTEM_CHAT_ID=123 DASHBOARD_URL=http://localhost:5173 ALLOWED_ORIGINS=http://localhost:5173 npx tsx "${runnerScript}"`;
+    const cmd = `npx cross-env NODE_ENV=production REDIS_PASSWORD=secure AUTH_SECRET=super-secret-change-me-in-production TELEGRAM_BOT_TOKEN=test-token TELEGRAM_SYSTEM_CHAT_ID=123 DASHBOARD_URL=http://localhost:5173 ALLOWED_ORIGINS=http://localhost:5173 npx tsx "${runnerScript}"`;
 
     try {
       await execAsync(cmd);
@@ -23,14 +23,15 @@ describe('Config Hardening', () => {
       if (error.message === 'Process should have failed') {
         throw error;
       }
-      expect(error.stderr).toContain('JWT_SECRET must be changed in production');
+      expect(error.stderr).toContain('AUTH_SECRET must be changed in production');
     }
   }, 20000);
 
   it('should pass in production with proper secrets', async () => {
     // Valid production config without optional tenant credentials
-    const cmd = `npx cross-env NODE_ENV=production REDIS_PASSWORD=secure JWT_SECRET=really-secure-key-12345 TELEGRAM_BOT_TOKEN=test-token TELEGRAM_SYSTEM_CHAT_ID=123 DASHBOARD_URL=http://localhost:5173 ALLOWED_ORIGINS=http://localhost:5173 npx tsx "${runnerScript}"`;
+    const cmd = `npx cross-env NODE_ENV=production REDIS_PASSWORD=secure AUTH_SECRET=really-secure-key-12345 TELEGRAM_BOT_TOKEN=test-token TELEGRAM_SYSTEM_CHAT_ID=123 DASHBOARD_URL=http://localhost:5173 ALLOWED_ORIGINS=http://localhost:5173 npx tsx "${runnerScript}"`;
 
     await execAsync(cmd);
   }, 20000);
 });
+
