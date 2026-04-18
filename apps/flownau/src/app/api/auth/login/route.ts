@@ -16,14 +16,28 @@ export async function POST(req: Request) {
 
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}))
-      return NextResponse.json({ message: (err as { message?: string }).message ?? 'Invalid credentials' }, { status: resp.status })
+      return NextResponse.json(
+        { message: (err as { message?: string }).message ?? 'Invalid credentials' },
+        { status: resp.status },
+      )
     }
 
-    const { accessToken, refreshToken } = (await resp.json()) as { accessToken: string; refreshToken: string }
+    const { accessToken, refreshToken } = (await resp.json()) as {
+      accessToken: string
+      refreshToken: string
+    }
 
     const response = NextResponse.json({ message: 'Login successful' })
-    response.cookies.set('nau_access_token', accessToken, { httpOnly: true, path: '/', maxAge: 60 * 15 })
-    response.cookies.set('nau_refresh_token', refreshToken, { httpOnly: true, path: '/', maxAge: 60 * 60 * 24 * 7 })
+    response.cookies.set('nau_access_token', accessToken, {
+      httpOnly: true,
+      path: '/',
+      maxAge: 60 * 15,
+    })
+    response.cookies.set('nau_refresh_token', refreshToken, {
+      httpOnly: true,
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7,
+    })
     return response
   } catch (error: unknown) {
     console.error('Login Error:', error)

@@ -21,7 +21,9 @@ export default async function DashboardRoot() {
       <div className="flex flex-col items-center justify-center pt-20 animate-fade-in">
         <h2 className="text-2xl font-bold mb-4">No Workspaces Found</h2>
         <p className="text-text-secondary mb-8">You are not a member of any workspace.</p>
-        <Link href="/" className="btn-primary px-6 py-2">Return Home</Link>
+        <Link href="/" className="btn-primary px-6 py-2">
+          Return Home
+        </Link>
       </div>
     )
   }

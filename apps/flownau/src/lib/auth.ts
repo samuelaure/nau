@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 export interface AuthUser {
-  id: string    // 9naŭ User.id (JWT sub)
+  id: string // 9naŭ User.id (JWT sub)
   email: string
 }
 
