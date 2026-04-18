@@ -1,0 +1,5 @@
+.git
+.agent
+npm-debug.log
+.env
+src

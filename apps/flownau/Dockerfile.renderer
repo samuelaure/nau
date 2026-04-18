@@ -1,42 +1,30 @@
 # ============================================================
-# Renderer Dockerfile — Headless Remotion + FFmpeg worker
+# Renderer Dockerfile — Headless Remotion + FFmpeg BullMQ worker
 # ============================================================
-# Runs as standalone BullMQ worker. No web server.
-# Shares the same codebase but uses tsx to run the worker entry.
+# Inherits from ghcr.io/samuelaure/flownau/base which includes:
+#   - Chromium (system), ffmpeg, fonts — pre-cached in base layer
+# node_modules are COPIED from the GHA runner (already npm ci'd)
+# so we skip a full npm install here — saves ~3 minutes per deploy.
 # ============================================================
 
-FROM node:20-bookworm-slim
-
-# Install runtime dependencies for Remotion rendering
-# chromium: headless browser for Remotion
-# ffmpeg: video encoding
-# openssl: Prisma runtime
-RUN apt-get update && apt-get install -y \
-    chromium \
-    ffmpeg \
-    openssl \
-    fonts-noto \
-    fonts-noto-cjk \
-    && rm -rf /var/lib/apt/lists/*
-
-# Set Chromium path for Remotion
-ENV CHROME_PATH=/usr/bin/chromium
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-ENV FFMPEG_PATH=/usr/bin/ffmpeg
-ENV FFPROBE_PATH=/usr/bin/ffprobe
+ARG REPO=samuelaure/flownau
+FROM ghcr.io/$REPO/base:latest
 
 WORKDIR /app
 
-# Copy dependency manifests first (layer cache optimization)
+# Copy dependency manifests for documentation/auditing purposes
 COPY package*.json ./
-RUN npm ci
 
-# Copy full source (worker needs all modules)
+# Copy node_modules pre-built by the GHA runner (npm ci already ran there)
+# This is the key optimization: avoids re-running npm ci inside Docker
+COPY node_modules ./node_modules
+
+# Copy full source (worker needs all modules at runtime)
 COPY . .
 
-# Generate Prisma client
+# Generate Prisma client (still needed — points at the copied schema)
 RUN npx prisma generate
 
 # No port exposed — this is a worker, not a web server
-
 CMD ["npx", "tsx", "src/modules/renderer/render-worker.ts"]
+
