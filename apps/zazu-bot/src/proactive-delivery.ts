@@ -30,13 +30,22 @@ export class ProactiveDeliverySystem {
       const payload = req.body; 
       if (!payload.userId) return res.status(400).json({ error: 'Missing userId' });
 
-      // 3. Evaluate Time Window
-      const windowOpen = await this.isWindowOpen(payload.userId);
-      
+      // 3. Resolve Internal User (Telegram ID -> UUID)
       try {
+        const tgId = BigInt(payload.userId);
+        let user = await prisma.user.findUnique({ where: { telegramId: tgId } });
+        
+        if (!user) {
+          logger.info(`[ProactiveGateway] Creating placeholder user for Telegram ID: ${payload.userId}`);
+          user = await prisma.user.create({ data: { telegramId: tgId } });
+        }
+
+        // 4. Evaluate Time Window
+        const windowOpen = await this.isWindowOpen(user.id);
+        
         const item = await prisma.notificationQueue.create({
           data: {
-            userId: payload.userId,
+            userId: user.id,
             brandName: payload.brandName,
             payloadJson: payload,
             status: windowOpen ? 'READY' : 'PENDING',
