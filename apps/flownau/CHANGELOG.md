@@ -2,28 +2,32 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.3.0](https://github.com/samuelaure/flownau/compare/v1.2.8...v1.3.0) (2026-04-18)
+
+
+### Features
+
+* **flownau:** implement sso redirection and callback handler ([c5ccb5f](https://github.com/samuelaure/flownau/commit/c5ccb5fc9d8d0c462b967bb220b8bc5d7db1270b))
+
 ### [1.2.4](https://github.com/samuelaure/flownau/compare/v1.2.3...v1.2.4) (2026-04-18)
 
 ### [1.2.3](https://github.com/samuelaure/flownau/compare/v1.2.2...v1.2.3) (2026-04-18)
 
-
 ### Bug Fixes
 
-* **renderer:** resolve require is not defined error in ESM render-worker ([c735300](https://github.com/samuelaure/flownau/commit/c735300d0e7a0d13a6d090576dd9a3f39211e76e))
+- **renderer:** resolve require is not defined error in ESM render-worker ([c735300](https://github.com/samuelaure/flownau/commit/c735300d0e7a0d13a6d090576dd9a3f39211e76e))
 
 ### [1.2.2](https://github.com/samuelaure/flownau/compare/v1.2.1...v1.2.2) (2026-04-17)
 
-
 ### Bug Fixes
 
-* **composer:** move timeout to RequestOptions in OpenAI/Groq calls and fix missing cn import ([5661553](https://github.com/samuelaure/flownau/commit/5661553f41e4fd623cc7ad46510c3a0eaa671df8))
+- **composer:** move timeout to RequestOptions in OpenAI/Groq calls and fix missing cn import ([5661553](https://github.com/samuelaure/flownau/commit/5661553f41e4fd623cc7ad46510c3a0eaa671df8))
 
 ### [1.2.1](https://github.com/samuelaure/flownau/compare/v1.2.0...v1.2.1) (2026-04-17)
 
-
 ### Bug Fixes
 
-* **ideation:** fix variable scoping in AccountIdeas and resolve critical lint errors blocking build ([8150e45](https://github.com/samuelaure/flownau/commit/8150e45dd68675d4f451857567af664eb1ddd9b4))
+- **ideation:** fix variable scoping in AccountIdeas and resolve critical lint errors blocking build ([8150e45](https://github.com/samuelaure/flownau/commit/8150e45dd68675d4f451857567af664eb1ddd9b4))
 
 ## [1.2.0](https://github.com/samuelaure/flownau/compare/v1.1.1...v1.2.0) (2026-04-17)
 
