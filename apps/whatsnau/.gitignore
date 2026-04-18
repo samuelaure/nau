@@ -39,3 +39,4 @@ coverage/
 .next/
 out/
 UPGRADE_PLAN.md
+.env.production
