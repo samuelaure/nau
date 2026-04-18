@@ -2,14 +2,15 @@ import { jwtVerify } from 'jose'
 import { NextRequest, NextResponse } from 'next/server'
 
 const JWT_SECRET = process.env.JWT_SECRET ?? 'changeme'
+const ACCOUNTS_URL = process.env.NEXT_PUBLIC_ACCOUNTS_URL ?? 'https://accounts.9nau.com'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://flownau.9nau.com'
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   const isProtected = pathname.startsWith('/dashboard')
-  const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/register')
 
-  const token = request.cookies.get('nau_access_token')?.value
+  const token = request.cookies.get('nau_token')?.value
 
   let isAuthenticated = false
   if (token) {
@@ -23,16 +24,15 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isProtected && !isAuthenticated) {
-    return NextResponse.redirect(new URL('/login', request.url))
-  }
-
-  if (isAuthPage && isAuthenticated) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    const callbackUrl = `${APP_URL}/auth/callback`
+    const loginUrl = new URL('/login', ACCOUNTS_URL)
+    loginUrl.searchParams.set('continue', callbackUrl)
+    return NextResponse.redirect(loginUrl)
   }
 
   return NextResponse.next()
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|.*\\.png$).*)'],
+  matcher: ['/((?!api|_next/static|_next/image|auth/callback|.*\\.png$).*)'],
 }

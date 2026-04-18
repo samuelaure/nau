@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { ArrowRight, Video, Instagram, Zap, Shield } from 'lucide-react'
 import { Card } from '@/modules/shared/components/ui/Card'
 import { Button } from '@/modules/shared/components/ui/Button'
-import { requireAuth, getAuthUser } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth'
 
 export default async function LandingPage() {
   const user = await getAuthUser()
@@ -20,17 +20,12 @@ export default async function LandingPage() {
         </div>
         <div className="flex items-center gap-4">
           {!user ? (
-            <>
-              <Link
-                href="/register"
-                className="px-4 py-2 hover:bg-white/10 transition-colors rounded-xl border border-white/20"
-              >
-                Sign up
-              </Link>
-              <Link href="/login" className="btn-primary px-4 py-2">
-                Log in
-              </Link>
-            </>
+            <a
+              href={`${process.env.NEXT_PUBLIC_ACCOUNTS_URL ?? 'https://accounts.9nau.com'}/login?continue=${encodeURIComponent(`${process.env.NEXT_PUBLIC_APP_URL ?? 'https://flownau.9nau.com'}/auth/callback`)}`}
+              className="btn-primary px-4 py-2"
+            >
+              Log in with naŭ
+            </a>
           ) : (
             <Link href="/dashboard" className="btn-primary px-6 py-2">
               Dashboard <ArrowRight size={18} />
@@ -58,9 +53,12 @@ export default async function LandingPage() {
         <div className="animate-fade-in flex flex-col gap-4 items-center">
           <div className="flex gap-4">
             {!user ? (
-              <Link href="/register" className="btn-primary px-8 py-4 text-lg">
+              <a
+                href={`${process.env.NEXT_PUBLIC_ACCOUNTS_URL ?? 'https://accounts.9nau.com'}/login?continue=${encodeURIComponent(`${process.env.NEXT_PUBLIC_APP_URL ?? 'https://flownau.9nau.com'}/auth/callback`)}`}
+                className="btn-primary px-8 py-4 text-lg inline-flex items-center gap-2"
+              >
                 Get Started <ArrowRight size={20} />
-              </Link>
+              </a>
             ) : (
               <Link href="/dashboard" className="btn-primary px-8 py-4 text-lg">
                 Go to Dashboard <ArrowRight size={20} />
@@ -70,14 +68,6 @@ export default async function LandingPage() {
               Watch Demo
             </Button>
           </div>
-          {!user && (
-            <p className="text-text-secondary mt-2">
-              Already have an account?{' '}
-              <Link href="/login" className="text-accent hover:underline">
-                Log in
-              </Link>
-            </p>
-          )}
         </div>
 
         {/* Feature Grid */}
