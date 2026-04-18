@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.2.3](https://github.com/samuelaure/flownau/compare/v1.2.2...v1.2.3) (2026-04-18)
+
+
+### Bug Fixes
+
+* **renderer:** resolve require is not defined error in ESM render-worker ([c735300](https://github.com/samuelaure/flownau/commit/c735300d0e7a0d13a6d090576dd9a3f39211e76e))
+
 ### [1.2.2](https://github.com/samuelaure/flownau/compare/v1.2.1...v1.2.2) (2026-04-17)
 
 
