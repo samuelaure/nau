@@ -48,3 +48,5 @@ docker-compose.override.yml
 !.agent/DOCUMENTATION.md
 !.agent/history/
 /public/cache_assets/
+
+.env.production
