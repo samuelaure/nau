@@ -10,7 +10,7 @@ import { prisma } from '@/modules/shared/prisma'
  */
 export async function GET(
   req: Request,
-  { params }: { params: { brandId: string } },
+  { params }: { params: Promise<{ brandId: string }> },
 ) {
   if (!validateServiceKey(req)) {
     return unauthorizedResponse()
