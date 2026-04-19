@@ -88,10 +88,15 @@ const FORMAT_CONFIG: Record<string, { label: string; icon: React.ElementType; cl
       icon: LayoutGrid,
       className: 'bg-blue-500/10 text-blue-400 border border-blue-500/20',
     },
-    single_image: {
-      label: 'Image',
+    static_post: {
+      label: 'Static Post',
       icon: ImageIcon,
       className: 'bg-gray-500/10 text-gray-400 border border-gray-500/20',
+    },
+    story: {
+      label: 'Story',
+      icon: Play,
+      className: 'bg-violet-500/10 text-violet-400 border border-violet-500/20',
     },
   }
 
@@ -400,7 +405,7 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
         body: JSON.stringify({
           accountId,
           prompt: composingIdea.ideaText,
-          format: composingIdea.format === 'head_talk' ? 'reel' : composingIdea.format || 'reel',
+          format: composingIdea.format || 'reel',
           ideaId: composingIdea.id,
           personaId: selectedPersonaId,
           templateId: selectedTemplateId || undefined,

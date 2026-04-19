@@ -14,7 +14,7 @@ const DEFAULT_FORM = {
   isDefault: false,
   autoApproveIdeas: false,
   autoApproveCompositions: false,
-  engine_autoApproveIdeas: false,
+  engine_autoApprovePool: false,
   capturedCount: 3,
   capturedAutoApprove: false,
   manualCount: 5,
@@ -83,7 +83,7 @@ export default function AccountPersonas({ accountId }: { accountId: string }) {
       isDefault: p.isDefault,
       autoApproveIdeas: p.autoApproveIdeas,
       autoApproveCompositions: p.autoApproveCompositions,
-      engine_autoApproveIdeas: p.engine_autoApproveIdeas ?? false,
+      engine_autoApprovePool: p.engine_autoApprovePool ?? false,
       capturedCount: p.capturedCount ?? 3,
       capturedAutoApprove: p.capturedAutoApprove ?? false,
       manualCount: p.manualCount ?? 5,
@@ -314,13 +314,22 @@ export default function AccountPersonas({ accountId }: { accountId: string }) {
             <label className="flex items-center gap-2 cursor-pointer text-sm text-amber-400">
               <input
                 type="checkbox"
-                checked={formData.engine_autoApproveIdeas}
+                checked={formData.autoApproveIdeas}
+                onChange={(e) => setFormData({ ...formData, autoApproveIdeas: e.target.checked })}
+                className="rounded bg-gray-800 border-gray-700"
+              />
+              Engine: Auto-Compose Approved Ideas → Draft Pool
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer text-sm text-cyan-400">
+              <input
+                type="checkbox"
+                checked={formData.engine_autoApprovePool}
                 onChange={(e) =>
-                  setFormData({ ...formData, engine_autoApproveIdeas: e.target.checked })
+                  setFormData({ ...formData, engine_autoApprovePool: e.target.checked })
                 }
                 className="rounded bg-gray-800 border-gray-700"
               />
-              Engine: Auto-Compose Ideas → Draft Pool (Phase 14)
+              Engine: Auto-Approve Pool Drafts → Scheduling
             </label>
           </div>
 
@@ -416,10 +425,15 @@ export default function AccountPersonas({ accountId }: { accountId: string }) {
               ) : (
                 <span className="text-[10px] text-gray-600">✗ Manual Drafts Review</span>
               )}
-              {p.engine_autoApproveIdeas ? (
+              {p.autoApproveIdeas ? (
                 <span className="text-[10px] text-amber-400">✓ Engine: Auto-Compose Ideas</span>
               ) : (
                 <span className="text-[10px] text-gray-600">✗ Engine: Manual Compose</span>
+              )}
+              {p.engine_autoApprovePool ? (
+                <span className="text-[10px] text-cyan-400">✓ Engine: Auto-Approve Pool</span>
+              ) : (
+                <span className="text-[10px] text-gray-600">✗ Engine: Manual Pool Review</span>
               )}
             </div>
           </Card>

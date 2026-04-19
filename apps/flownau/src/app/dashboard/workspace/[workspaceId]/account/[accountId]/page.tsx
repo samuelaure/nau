@@ -8,6 +8,7 @@ import AssetsManager from '@/modules/shared/components/AssetsManager'
 import AccountSettings from '@/modules/accounts/components/AccountSettings'
 import AccountPersonas from '@/modules/accounts/components/AccountPersonas'
 import AccountIdeas from '@/modules/accounts/components/AccountIdeas'
+import AccountPool from '@/modules/accounts/components/AccountPool'
 import ExternalAccountLink from '@/modules/accounts/components/ExternalAccountLink'
 import { cn } from '@/modules/shared/utils'
 import { Button } from '@/modules/shared/components/ui/Button'
@@ -129,7 +130,7 @@ export default async function WorkspaceAccountPage({
         {activeTab === 'schedule' && (
           <AccountSchedule accountId={accountId} workspaceId={workspaceId} dateStr={date} />
         )}
-        {activeTab === 'compositions' && <AccountCompositions accountId={accountId} />}
+        {activeTab === 'compositions' && <AccountPool accountId={accountId} />}
         {activeTab === 'ideas' && <AccountIdeas accountId={accountId} />}
         {activeTab === 'assets' && <AccountAssets accountId={accountId} />}
         {activeTab === 'personas' && <AccountPersonas accountId={accountId} />}
@@ -255,53 +256,6 @@ async function AccountSchedule({
   )
 }
 
-// Re-using existing components logic but styled for the new layout
-async function AccountCompositions({ accountId }: { accountId: string }) {
-  const compositions = await prisma.composition.findMany({
-    where: { accountId },
-    orderBy: { createdAt: 'desc' },
-    take: 10,
-    include: { renderJob: true },
-  })
-
-  return (
-    <Card className="p-0 overflow-hidden border-white/5">
-      <table className="w-full text-left text-sm">
-        <thead className="bg-white/5 text-text-secondary">
-          <tr>
-            <th className="p-4 font-heading">Format</th>
-            <th className="p-4 font-heading">Status</th>
-            <th className="p-4 font-heading">Created</th>
-            <th className="p-4 text-right">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {compositions.map((c) => (
-            <tr key={c.id} className="border-t border-white/5">
-              <td className="p-4 capitalize">{c.format.replace('_', ' ')}</td>
-              <td className="p-4">
-                <span className="px-2 py-0.5 rounded bg-white/5 text-[10px] font-bold uppercase">
-                  {c.status}
-                </span>
-              </td>
-              <td className="p-4 text-text-secondary">
-                {new Date(c.createdAt).toLocaleDateString()}
-              </td>
-              <td className="p-4 text-right">
-                <Link
-                  href={`/dashboard/compositions/${c.id}`}
-                  className="text-accent hover:underline"
-                >
-                  View
-                </Link>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </Card>
-  )
-}
 
 async function AccountAssets({ accountId }: { accountId: string }) {
   const assets = await prisma.asset.findMany({

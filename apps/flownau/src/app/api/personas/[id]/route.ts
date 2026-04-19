@@ -43,7 +43,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         isDefault: body.isDefault,
         autoApproveIdeas: body.autoApproveIdeas,
         autoApproveCompositions: body.autoApproveCompositions,
-        engine_autoApproveIdeas: body.engine_autoApproveIdeas,
+        engine_autoApprovePool: body.engine_autoApprovePool,
         capturedCount: body.capturedCount,
         capturedAutoApprove: body.capturedAutoApprove,
         manualCount: body.manualCount,
