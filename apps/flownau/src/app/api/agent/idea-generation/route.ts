@@ -82,7 +82,7 @@ export async function POST(req: Request) {
       digest: digest ?? undefined,
     })
 
-    const engineAutoApproveIdeas = (persona as any).autoApproveIdeas ?? false
+    const isAutoApproveIdeas = persona?.autoApproveIdeas ?? false
 
     // 5. Save ideas with correct source/priority/format
     const ops = output.ideas.map((idea) => {
@@ -103,8 +103,8 @@ export async function POST(req: Request) {
 
     const generatedIdeas = await Promise.all(ops)
 
-    // 6. Auto-compose: if engine_autoApproveIdeas is ON and ideas are approved, create Draft Compositions
-    if (autoApprove && engineAutoApproveIdeas) {
+    // 6. Auto-compose: if autoApproveIdeas is ON and ideas are approved, create Draft Compositions
+    if (autoApprove && isAutoApproveIdeas) {
       const { compose } = await import('@/modules/composer/scene-composer')
       const { selectAssetsForCreative, commitAssetUsage } =
         await import('@/modules/composer/asset-curator')
@@ -172,7 +172,7 @@ export async function POST(req: Request) {
       {
         ideas: generatedIdeas,
         summary: output.briefSummary,
-        autoComposed: autoApprove && engineAutoApproveIdeas,
+        autoComposed: autoApprove && isAutoApproveIdeas,
       },
       { status: 200 },
     )

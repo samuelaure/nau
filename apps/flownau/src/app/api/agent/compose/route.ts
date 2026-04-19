@@ -61,7 +61,7 @@ export async function POST(req: Request) {
         (await prisma.brandPersona.findFirst({ where: { accountId } })))
 
     const isAutoApproveCompositions = persona?.autoApproveCompositions ?? false
-    const isAutoApprovePool = (persona as any)?.engine_autoApprovePool ?? false
+    const isAutoApprovePool = (persona as any)?.autoApprovePool ?? false
 
     const finalStatus = isAutoApproveCompositions || isAutoApprovePool ? 'APPROVED' : 'DRAFT'
 

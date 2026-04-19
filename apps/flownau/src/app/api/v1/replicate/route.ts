@@ -62,7 +62,7 @@ export async function POST(req: Request) {
         where: { accountId, isDefault: true },
       })) ?? (await prisma.brandPersona.findFirst({ where: { accountId } }))
 
-    const autoApprovePool = (persona as any)?.engine_autoApprovePool ?? false
+    const autoApprovePool = (persona as any)?.autoApprovePool ?? false
 
     const payload: Record<string, unknown> = {
       type: 'replicate',
