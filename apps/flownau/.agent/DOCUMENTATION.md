@@ -4,7 +4,7 @@
 
 - **Type:** A — Platform Service (headless API + internal dashboard)
 - **Domain:** Content creation, scene-based video/image composition, automated publishing
-- **Status:** Active — Phase 15: Content Pool & Auto-Development
+- **Status:** Active — Phase 16: Suggested Scheduling & Autonomous Calendar
 
 ## Purpose
 
@@ -115,6 +115,7 @@ Ideation (Format, Text) → Content Pool (Creative Development, Review) → Sche
 | RENDER_MAX_ATTEMPTS           | No       | Max retry per render job (default: 3) |
 | CRON_SECRET                   | Yes      | Automated flow protection (Bearer)    |
 
+- **[2026-04-19] Phase 16 — Suggested Scheduling & Autonomous Calendar (complete)**: Implemented the `SchedulingService` to automatically assign approved compositions to the next available posting slots. Introduced the `autoApproveSchedule` gate: trusted accounts bypass human confirmation for scheduling, authorizing advance rendering. Added a weekly Content Calendar UI for manual confirmation and rescheduling.
 - **[2026-04-19] Phase 15 — Content Pool & Auto-Development (complete)**: Implemented the Content Pool review dashboard. Added `autoApprovePool` flag to bypass human review for trusted pipelines. Added mobile ingestion via `/api/v1/replicate` to enable captures from 9naŭ to land directly in the development pool.
 - **[2026-04-19] Phase 14 — Ideation Formats & Autonomous Ideas (complete)**: Enhanced ideation engine with format support (Head Talk, Carousel, etc.). Implemented first "Auto-Approve" gate (`autoApproveIdeas`) to automatically move ideas into the development pool. Standardized gate naming by removing legacy `engine_` prefixes.
 - **[2026-04-18] SSO via 9naŭ (Phase 13)**: Dropped NextAuth. Dashboard routes and internal APIs validate JWTs signed by 9naŭ API. `userId` in flownaŭ maps strictly to 9naŭ `User.id`.
