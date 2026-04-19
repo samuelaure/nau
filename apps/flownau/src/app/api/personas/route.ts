@@ -40,7 +40,7 @@ export async function POST(req: Request) {
         isDefault: body.isDefault ?? false,
         autoApproveIdeas: body.autoApproveIdeas ?? false,
         autoApproveCompositions: body.autoApproveCompositions ?? false,
-        engine_autoApprovePool: body.engine_autoApprovePool ?? false,
+        autoApprovePool: body.autoApprovePool ?? false,
         capturedCount: body.capturedCount ?? 3,
         capturedAutoApprove: body.capturedAutoApprove ?? false,
         manualCount: body.manualCount ?? 5,
