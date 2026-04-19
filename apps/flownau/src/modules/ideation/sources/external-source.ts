@@ -1,5 +1,6 @@
 import { prisma } from '@/modules/shared/prisma'
 import { logger } from '@/modules/shared/logger'
+import { resolveProvenance } from '@/modules/ideation/provenance'
 
 // Canonical source values as stored in the DB
 type IdeaSource = 'automatic' | 'manual' | 'captured'
@@ -66,6 +67,8 @@ export async function ingestExternalIdea(params: ExternalIdeaInput) {
   // AI-linked ideas always require human review regardless of source or autoApprove settings
   const status = aiLinked ? 'PENDING' : source === 'captured' ? 'APPROVED' : 'PENDING'
 
+  const provenance = await resolveProvenance(accountId)
+
   const idea = await prisma.contentIdea.create({
     data: {
       accountId,
@@ -75,6 +78,9 @@ export async function ingestExternalIdea(params: ExternalIdeaInput) {
       sourceRef: sourceRef ?? null,
       aiLinked,
       status,
+      brandPersonaId: provenance.brandPersonaId,
+      ideasFrameworkId: provenance.ideasFrameworkId,
+      contentPrinciplesId: provenance.contentPrinciplesId,
     },
   })
 
@@ -106,6 +112,8 @@ export async function ingestExternalIdeas(
   })
   const recentTexts = new Set(recentIdeas.map((i) => i.ideaText))
 
+  const provenance = await resolveProvenance(accountId)
+
   const createdIds: string[] = []
 
   for (const idea of ideas) {
@@ -133,6 +141,9 @@ export async function ingestExternalIdeas(
         sourceRef: idea.sourceRef ?? null,
         aiLinked: isAiLinked,
         status,
+        brandPersonaId: provenance.brandPersonaId,
+        ideasFrameworkId: provenance.ideasFrameworkId,
+        contentPrinciplesId: provenance.contentPrinciplesId,
       },
     })
 

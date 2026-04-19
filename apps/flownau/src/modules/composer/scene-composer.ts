@@ -17,6 +17,11 @@ interface ComposeInput {
   accountId: string
   format: ContentFormat
   personaId?: string
+  // Phase 18: explicit provenance inputs (set by composer cron from ContentIdea)
+  frameworkPrompt?: string | null
+  principlesPrompt?: string | null
+  templateContentSchema?: unknown | null
+  templateSystemPrompt?: string | null
 }
 
 interface ComposeResult {
@@ -37,7 +42,16 @@ interface ComposeResult {
  * and selects scene types from the catalog.
  */
 export async function compose(input: ComposeInput): Promise<ComposeResult> {
-  const { ideaText, accountId, format, personaId } = input
+  const {
+    ideaText,
+    accountId,
+    format,
+    personaId,
+    frameworkPrompt,
+    principlesPrompt,
+    templateContentSchema,
+    templateSystemPrompt,
+  } = input
 
   // 1. Fetch Brand Persona
   const persona = personaId
@@ -67,7 +81,7 @@ export async function compose(input: ComposeInput): Promise<ComposeResult> {
   const openaiKey = (await getSetting('openai_api_key')) ?? process.env.OPENAI_API_KEY ?? null
 
   // 4. Build system prompt
-  const isImage = format === 'carousel' || format === 'single_image'
+  const isImage = format === 'carousel' || format === 'static_post'
   const sceneFormat = isImage ? 'image' : 'video'
 
   const formatGuide =
@@ -101,10 +115,23 @@ export async function compose(input: ComposeInput): Promise<ComposeResult> {
 10. Use 'media-only' scenes for breathing room between text-heavy scenes.
 11. Use 'transition' scenes sparingly (max 1 per reel).`
 
+  const strategyBlock = frameworkPrompt
+    ? `\n\nIDEATION STRATEGY (carry forward from ideation):\n${frameworkPrompt}`
+    : ''
+  const principlesBlock = principlesPrompt
+    ? `\n\nCONTENT CREATION PRINCIPLES (engagement/virality best practices):\n${principlesPrompt}`
+    : ''
+  const templatePromptBlock = templateSystemPrompt
+    ? `\n\nTEMPLATE NARRATIVE GUIDANCE:\n${templateSystemPrompt}`
+    : ''
+  const contentSchemaBlock = templateContentSchema
+    ? `\n\nTEMPLATE CONTENT SCHEMA (text-slot specs — follow exactly):\n${JSON.stringify(templateContentSchema, null, 2)}`
+    : ''
+
   const systemPrompt = `You are a Senior Creative Director for short-form social media content.
 
 BRAND VOICE:
-${persona.systemPrompt}
+${persona.systemPrompt}${strategyBlock}${principlesBlock}${templatePromptBlock}${contentSchemaBlock}
 
 AVAILABLE SCENE TYPES:
 ${formatSceneCatalogForAI(sceneFormat)}

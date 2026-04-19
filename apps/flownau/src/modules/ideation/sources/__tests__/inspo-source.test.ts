@@ -55,7 +55,7 @@ describe('fetchBrandDigest()', () => {
       expect.stringContaining('/api/v1/inspo/digest'),
       expect.objectContaining({
         params: { brandId },
-        headers: { Authorization: `Bearer ${mockKey}` },
+        headers: { 'x-nau-service-key': mockKey },
       }),
     )
   })

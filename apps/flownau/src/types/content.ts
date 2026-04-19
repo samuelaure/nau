@@ -9,6 +9,7 @@ export type ContentFormat =
   | 'carousel'
   | 'static_post'
   | 'story'
+  | 'replicate' // Phase 18: captured post replicated from 9naŭ (user-managed)
 
 /**
  * Composition status flow:

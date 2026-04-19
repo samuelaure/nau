@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 import { checkAccountAccess } from '@/modules/shared/actions'
+import { resolveProvenance } from '@/modules/ideation/provenance'
 
 export async function GET(req: Request) {
   try {
@@ -42,6 +43,8 @@ export async function POST(req: Request) {
     if (source === 'captured') priority = 1
     if (source === 'manual') priority = 2
 
+    const provenance = await resolveProvenance(accountId)
+
     const idea = await prisma.contentIdea.create({
       data: {
         accountId,
@@ -50,6 +53,9 @@ export async function POST(req: Request) {
         source: source || 'manual',
         status: status || 'PENDING',
         priority,
+        brandPersonaId: provenance.brandPersonaId,
+        ideasFrameworkId: provenance.ideasFrameworkId,
+        contentPrinciplesId: provenance.contentPrinciplesId,
       },
     })
 

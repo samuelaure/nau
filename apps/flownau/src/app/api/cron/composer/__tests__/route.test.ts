@@ -34,9 +34,22 @@ vi.mock('@/modules/composer/timeline-compiler', () => ({
   compileTimeline: vi.fn(),
 }))
 
+vi.mock('@/modules/composer/template-selector', () => ({
+  selectTemplateForIdea: vi.fn(),
+}))
+
+vi.mock('@/modules/renderer/render-queue', () => ({
+  addRenderJob: vi.fn(),
+}))
+
 vi.mock('@/modules/shared/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
   logError: vi.fn(),
+}))
+
+vi.mock('@/modules/shared/nau-auth', () => ({
+  validateCronSecret: vi.fn(() => true),
+  unauthorizedCronResponse: vi.fn(),
 }))
 
 import { prisma } from '@/modules/shared/prisma'
@@ -52,7 +65,7 @@ describe('Composer Cron (v2 Pipeline)', () => {
   it('returns early when no approved ideas exist', async () => {
     ;(prisma.contentIdea.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([])
 
-    const response = await GET()
+    const response = await GET(new Request('http://localhost/api/cron/composer'))
     const data = await response.json()
 
     expect(data.message).toBe('No approved ideas to process')
@@ -60,13 +73,14 @@ describe('Composer Cron (v2 Pipeline)', () => {
   })
 
   it('processes approved ideas through the full v2 pipeline', async () => {
+    const mockPersona = { id: 'per1', autoApprovePool: false }
     const mockIdea = {
       id: 'idea1',
       ideaText: 'A video about nature',
       accountId: 'acc1',
       account: { id: 'acc1' },
+      brandPersona: mockPersona,
     }
-    const mockPersona = { id: 'per1', autoApproveCompositions: false }
     const mockCreative = {
       scenes: [
         { type: 'hook-text', slots: { hook: 'Amazing nature' }, mood: 'calm' },
@@ -107,7 +121,7 @@ describe('Composer Cron (v2 Pipeline)', () => {
     ;(prisma.contentIdea.update as ReturnType<typeof vi.fn>).mockResolvedValue({})
     ;(commitAssetUsage as ReturnType<typeof vi.fn>).mockResolvedValue(undefined)
 
-    const response = await GET()
+    const response = await GET(new Request('http://localhost/api/cron/composer'))
     const data = await response.json()
 
     expect(data.succeeded).toBe(1)
@@ -131,13 +145,14 @@ describe('Composer Cron (v2 Pipeline)', () => {
   })
 
   it('auto-approves when persona allows it', async () => {
+    const mockPersona = { id: 'per1', autoApprovePool: true }
     const mockIdea = {
       id: 'idea2',
       ideaText: 'Cooking tips',
       accountId: 'acc1',
       account: { id: 'acc1' },
+      brandPersona: mockPersona,
     }
-    const mockPersona = { id: 'per1', autoApproveCompositions: true }
 
     ;(prisma.contentIdea.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([mockIdea])
     ;(prisma.brandPersona.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(mockPersona)
@@ -170,7 +185,7 @@ describe('Composer Cron (v2 Pipeline)', () => {
     ;(prisma.contentIdea.update as ReturnType<typeof vi.fn>).mockResolvedValue({})
     ;(commitAssetUsage as ReturnType<typeof vi.fn>).mockResolvedValue(undefined)
 
-    const response = await GET()
+    const response = await GET(new Request('http://localhost/api/cron/composer'))
     const _data = await response.json()
 
     expect(prisma.composition.create).toHaveBeenCalledWith({
@@ -179,18 +194,19 @@ describe('Composer Cron (v2 Pipeline)', () => {
   })
 
   it('handles composition failure gracefully without crashing the batch', async () => {
+    const mockPersona = { id: 'per1', autoApprovePool: false }
     const mockIdea = {
       id: 'idea3',
       ideaText: 'Broken idea',
       accountId: 'acc1',
       account: { id: 'acc1' },
+      brandPersona: mockPersona,
     }
 
     ;(prisma.contentIdea.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([mockIdea])
-    ;(prisma.brandPersona.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'per1' })
     ;(compose as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('AI failed'))
 
-    const response = await GET()
+    const response = await GET(new Request('http://localhost/api/cron/composer'))
     const data = await response.json()
 
     expect(data.succeeded).toBe(0)

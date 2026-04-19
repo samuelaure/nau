@@ -3,6 +3,7 @@ import { prisma } from '@/modules/shared/prisma'
 import { generateContentIdeas } from '@/modules/ideation/ideation.service'
 import { fetchBrandDigest } from '@/modules/ideation/sources/inspo-source'
 import { getBrandDNA } from '@/modules/ideation/sources/brand-dna-source'
+import { resolveProvenance } from '@/modules/ideation/provenance'
 import { detectHeadTalk } from '@/modules/planning/daily-plan.service'
 import { logError, logger } from '@/modules/shared/logger'
 
@@ -40,10 +41,13 @@ export async function GET(request: Request) {
     })
 
     for (const account of accounts) {
-      const persona = await prisma.brandPersona.findFirst({
-        where: { accountId: account.id, isDefault: true },
-      })
+      // Phase 18: resolve provenance (persona + framework + principles) once per account
+      const provenance = await resolveProvenance(account.id)
+      if (!provenance.brandPersonaId) continue
 
+      const persona = await prisma.brandPersona.findUnique({
+        where: { id: provenance.brandPersonaId },
+      })
       if (!persona) continue
 
       // Skip if there are any pending ideas — only generate when the pipeline is exhausted
@@ -75,15 +79,15 @@ export async function GET(request: Request) {
           .filter((c) => c.caption)
           .map((c) => c.caption!.slice(0, 100))
 
-        // 4. Per-origin settings (with fallback for existing personas without new fields)
-        const automaticCount = (persona as any).automaticCount ?? 5
-        const automaticAutoApprove =
-          (persona as any).automaticAutoApprove ?? persona.autoApproveIdeas
+        // 4. Per-origin settings
+        const automaticCount = persona.automaticCount ?? 5
+        const automaticAutoApprove = persona.automaticAutoApprove ?? persona.autoApproveIdeas
 
-        // 5. Generate ideas using unified GenerationRequest
+        // 5. Generate ideas — Phase 18: includes framework as "strategy"
         const output = await generateContentIdeas({
           brandName: persona.name,
           dna: brandDNA,
+          strategy: provenance.frameworkSystemPrompt ?? undefined,
           count: automaticCount,
           digest: digest ?? undefined,
           recentContent: recentPosts,
@@ -111,6 +115,7 @@ export async function GET(request: Request) {
             data: {
               accountId: account.id,
               ideaText,
+              format: idea.format,
               status: isHeadTalk
                 ? 'PENDING' // Head-talk ideas always require manual approval
                 : automaticAutoApprove
@@ -119,6 +124,9 @@ export async function GET(request: Request) {
               source: 'automatic',
               priority: 3,
               sourceRef: digestSourceRef,
+              brandPersonaId: provenance.brandPersonaId,
+              ideasFrameworkId: provenance.ideasFrameworkId,
+              contentPrinciplesId: provenance.contentPrinciplesId,
             },
           })
         }

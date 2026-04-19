@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { validateServiceKey, unauthorizedResponse } from '@/modules/shared/nau-auth'
 import { prisma } from '@/modules/shared/prisma'
 import { logError, logger } from '@/modules/shared/logger'
+import { resolveProvenance } from '@/modules/ideation/provenance'
 import type { Prisma } from '@prisma/client'
 
 const ReplicateRequestSchema = z.object({
@@ -52,17 +53,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 })
     }
 
-    // Determine composition format from media type
-    const format =
-      mediaType === 'image' ? 'static_post' : mediaType === 'carousel' ? 'carousel' : 'reel'
+    // Phase 18: replicate is its own first-class format. The mediaUrl is treated as
+    // user-supplied so the renderer packages it rather than running the composer.
+    const format = 'replicate'
 
-    // Check persona pool auto-approve setting
-    const persona =
-      (await prisma.brandPersona.findFirst({
-        where: { accountId, isDefault: true },
-      })) ?? (await prisma.brandPersona.findFirst({ where: { accountId } }))
+    // Resolve provenance (captured for audit — there's no idea for replicate flow)
+    const provenance = await resolveProvenance(accountId)
 
-    const autoApprovePool = (persona as any)?.autoApprovePool ?? false
+    const persona = provenance.brandPersonaId
+      ? await prisma.brandPersona.findUnique({ where: { id: provenance.brandPersonaId } })
+      : null
+    const autoApprovePool = persona?.autoApprovePool ?? false
 
     const payload: Record<string, unknown> = {
       type: 'replicate',
@@ -81,8 +82,11 @@ export async function POST(req: Request) {
         caption,
         externalPostId: externalPostId ?? null,
         externalPostUrl: externalPostUrl ?? null,
-        videoUrl: mediaType === 'video' && mediaUrl ? mediaUrl : null,
+        userUploadedMediaUrl: mediaUrl ?? null,
         status: autoApprovePool ? 'APPROVED' : 'DRAFT',
+        brandPersonaId: provenance.brandPersonaId,
+        ideasFrameworkId: provenance.ideasFrameworkId,
+        contentPrinciplesId: provenance.contentPrinciplesId,
       },
     })
 

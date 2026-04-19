@@ -39,7 +39,7 @@ describe('nau-auth', () => {
   describe('validateServiceKey()', () => {
     it('returns true for valid x-service-key header', () => {
       const req = new Request('http://localhost', {
-        headers: { 'x-service-key': 'super-secret-service' },
+        headers: { 'x-nau-service-key': 'super-secret-service' },
       })
       expect(validateServiceKey(req)).toBe(true)
     })

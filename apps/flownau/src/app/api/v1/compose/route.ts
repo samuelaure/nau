@@ -14,7 +14,7 @@ import type { ContentFormat } from '@/types/content'
 const ComposeRequestSchema = z.object({
   accountId: z.string().min(1),
   prompt: z.string().min(1),
-  format: z.enum(['reel', 'trial_reel', 'carousel', 'single_image']).default('reel'),
+  format: z.enum(['reel', 'trial_reel', 'carousel', 'static_post']).default('reel'),
   source: z.string().optional(),
   sourceRef: z.string().optional(),
   autoApprove: z.boolean().default(false),
@@ -118,7 +118,7 @@ export async function POST(req: Request) {
         compositionId: composition.id,
         status: 'queued',
         outputType:
-          input.format === 'carousel' || input.format === 'single_image' ? 'image' : 'video',
+          input.format === 'carousel' || input.format === 'static_post' ? 'image' : 'video',
       },
     })
     await addRenderJob(composition.id)
