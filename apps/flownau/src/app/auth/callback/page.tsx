@@ -16,9 +16,11 @@ function CallbackHandler() {
       return
     }
 
-    // Set the nau_token cookie (30-day expiry)
+    // Set the nau_token cookie (30-day expiry) shared across all 9nau.com subdomains
     const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString()
-    document.cookie = `nau_token=${token}; expires=${expires}; path=/; SameSite=Lax`
+    const isProduction = window.location.hostname.endsWith('.9nau.com')
+    const domainPart = isProduction ? '; domain=.9nau.com' : ''
+    document.cookie = `nau_token=${token}; expires=${expires}; path=/${domainPart}; SameSite=Lax`
 
     window.location.href = '/dashboard'
   }, [searchParams])

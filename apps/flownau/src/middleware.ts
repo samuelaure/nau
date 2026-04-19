@@ -24,9 +24,8 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isProtected && !isAuthenticated) {
-    const callbackUrl = `${APP_URL}/auth/callback`
     const loginUrl = new URL('/login', ACCOUNTS_URL)
-    loginUrl.searchParams.set('continue', callbackUrl)
+    loginUrl.searchParams.set('continue', `${APP_URL}${pathname}`)
     return NextResponse.redirect(loginUrl)
   }
 
