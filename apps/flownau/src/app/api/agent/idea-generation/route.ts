@@ -5,6 +5,7 @@ import { prisma } from '@/modules/shared/prisma'
 import { checkAccountAccess } from '@/modules/shared/actions'
 import { generateContentIdeas } from '@/modules/ideation/ideation.service'
 import { logError } from '@/modules/shared/logger'
+import type { Prisma } from '@prisma/client'
 
 export async function POST(req: Request) {
   try {
@@ -81,7 +82,9 @@ export async function POST(req: Request) {
       digest: digest ?? undefined,
     })
 
-    // 5. Save ideas with correct source/priority
+    const engineAutoApproveIdeas = (persona as any).engine_autoApproveIdeas ?? false
+
+    // 5. Save ideas with correct source/priority/format
     const ops = output.ideas.map((idea) => {
       const ideaText = `[${idea.format.toUpperCase()}] Hook: ${idea.hook}\nAngle: ${idea.angle}\nScript: ${idea.script}\nCTA: ${idea.cta}`
 
@@ -89,6 +92,7 @@ export async function POST(req: Request) {
         data: {
           accountId,
           ideaText,
+          format: idea.format,
           status: autoApprove ? 'APPROVED' : 'PENDING',
           source,
           priority,
@@ -99,10 +103,76 @@ export async function POST(req: Request) {
 
     const generatedIdeas = await Promise.all(ops)
 
+    // 6. Auto-compose: if engine_autoApproveIdeas is ON and ideas are approved, create Draft Compositions
+    if (autoApprove && engineAutoApproveIdeas) {
+      const { compose } = await import('@/modules/composer/scene-composer')
+      const { selectAssetsForCreative, commitAssetUsage } =
+        await import('@/modules/composer/asset-curator')
+      const { compileTimeline } = await import('@/modules/composer/timeline-compiler')
+
+      const brandStyle = {
+        primaryColor: '#6C63FF',
+        accentColor: '#FF6584',
+        fontFamily: 'sans-serif',
+      }
+
+      const isAutoApproveCompositions = persona?.autoApproveCompositions ?? false
+
+      await Promise.allSettled(
+        generatedIdeas.map(async (savedIdea, idx) => {
+          const idea = output.ideas[idx]
+          const format = (idea.format as any) === 'head_talk' ? 'reel' : (idea.format as any)
+          try {
+            const { creative } = await compose({
+              ideaText: savedIdea.ideaText,
+              accountId,
+              format,
+              personaId: persona.id,
+            })
+            const { sceneAssets, audioAsset } = await selectAssetsForCreative(
+              creative,
+              accountId,
+              30,
+            )
+            const { schema } = compileTimeline(
+              creative,
+              sceneAssets,
+              audioAsset,
+              brandStyle,
+              format,
+            )
+            const newComposition = await prisma.composition.create({
+              data: {
+                accountId,
+                format,
+                creative: creative as unknown as Prisma.InputJsonValue,
+                payload: schema as unknown as Prisma.InputJsonValue,
+                caption: creative.caption,
+                hashtags: creative.hashtags,
+                ideaId: savedIdea.id,
+                status: isAutoApproveCompositions ? 'APPROVED' : 'DRAFT',
+              },
+            })
+            await prisma.contentIdea.update({
+              where: { id: savedIdea.id },
+              data: { status: 'USED' },
+            })
+            const usedAssetIds = [...sceneAssets.values()].map((a) => a.id)
+            if (audioAsset) usedAssetIds.push(audioAsset.id)
+            await commitAssetUsage(usedAssetIds)
+            return newComposition
+          } catch (e) {
+            logError('AUTO_COMPOSE_ERROR', e)
+          }
+        }),
+      )
+    }
+
     return NextResponse.json(
       {
         ideas: generatedIdeas,
         summary: output.briefSummary,
+        autoComposed: autoApprove && engineAutoApproveIdeas,
       },
       { status: 200 },
     )
