@@ -18,12 +18,11 @@ export class ProactiveDeliverySystem {
 
   private setupRoutes() {
     this.app.post('/api/internal/notify', async (req, res) => {
-      // 1. Auth Guard
-      const authHeader = req.headers.authorization;
+      const serviceKey = req.headers['x-nau-service-key'];
       const expectedKey = process.env.NAU_SERVICE_KEY || 'development_key';
       
-      if (!authHeader || authHeader !== `Bearer ${expectedKey}`) {
-        return res.status(401).json({ error: 'Unauthorized. Invalid Platform Key.' });
+      if (!serviceKey || serviceKey !== expectedKey) {
+        return res.status(401).json({ error: 'Unauthorized. Invalid x-nau-service-key.' });
       }
 
       // 2. Parse Payload
@@ -105,7 +104,7 @@ export class ProactiveDeliverySystem {
 
         await fetch(`${nautUrl}/api/v1/comment-feedback`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nauKey}` },
+          headers: { 'Content-Type': 'application/json', 'x-nau-service-key': nauKey },
           body: JSON.stringify({
             commentText: selectedComment,
             brandId: payload.brandId,

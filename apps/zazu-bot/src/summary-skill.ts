@@ -39,7 +39,7 @@ export class SummarySkill implements ZazuSkill {
         startDate,
         endDate
       }, {
-        headers: { Authorization: `Bearer ${nauKey}` }
+        headers: { 'x-nau-service-key': nauKey }
       });
 
       if (response.data && response.data.success) {

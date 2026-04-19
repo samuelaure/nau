@@ -6,7 +6,7 @@ const NAU_API_URL = process.env.NAU_API_URL || 'http://localhost:3000';
 const NAUTHENTICITY_URL = process.env.NAUTHENTICITY_URL || 'http://nauthenticity:4000';
 const NAU_SERVICE_KEY = process.env.NAU_SERVICE_KEY || '';
 
-const SERVICE_HEADERS = { Authorization: `Bearer ${NAU_SERVICE_KEY}` };
+const SERVICE_HEADERS = { 'x-nau-service-key': NAU_SERVICE_KEY };
 
 async function fetchUserBrandsForTriage(nauUserId: string): Promise<Array<{ id: string; brandName: string }>> {
   // Ask 9naŭ API which brands belong to this user (it resolves workspace internally)

@@ -51,7 +51,7 @@ bot.start(async (ctx) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${nauServiceKey}`,
+          'x-nau-service-key': nauServiceKey,
         },
         body: JSON.stringify({ token: linkToken, telegramId: user.telegramId.toString() }),
       });
@@ -60,7 +60,7 @@ bot.start(async (ctx) => {
         if (data.ok) {
           // Persist nauUserId locally from the API lookup
           const userResp = await fetch(`${nauApiUrl}/api/auth/by-telegram/${user.telegramId}`, {
-            headers: { Authorization: `Bearer ${nauServiceKey}` },
+            headers: { 'x-nau-service-key': nauServiceKey },
           });
           if (userResp.ok) {
             const found = await userResp.json() as { found: boolean; user?: { id: string } };
@@ -81,7 +81,7 @@ bot.start(async (ctx) => {
   if (!user.nauUserId) {
     try {
       const resp = await fetch(`${nauApiUrl}/api/auth/by-telegram/${user.telegramId}`, {
-        headers: { Authorization: `Bearer ${nauServiceKey}` },
+        headers: { 'x-nau-service-key': nauServiceKey },
       });
       if (resp.ok) {
         const data = await resp.json() as { found: boolean; user?: { id: string } };
