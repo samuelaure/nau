@@ -39,22 +39,54 @@ bot.use(voicePreprocessor);
 bot.start(async (ctx) => {
   const user = ctx.dbUser;
   const domain = process.env.BOT_DOMAIN || 'zazu.9nau.com';
+  const nauApiUrl = process.env.NAU_API_URL ?? 'http://9nau-api:3000';
+  const nauServiceKey = process.env.NAU_SERVICE_KEY ?? '';
 
-  // Attempt to link this Telegram user to their 9naŭ account (best-effort)
+  // Handle OTT account-linking handshake: /start link-{token}
+  const startParam: string = (ctx as any).startPayload ?? '';
+  if (startParam.startsWith('link-')) {
+    const linkToken = startParam.slice('link-'.length);
+    try {
+      const resp = await fetch(`${nauApiUrl}/api/auth/link-token/verify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${nauServiceKey}`,
+        },
+        body: JSON.stringify({ token: linkToken, telegramId: user.telegramId.toString() }),
+      });
+      if (resp.ok) {
+        const data = await resp.json() as { ok: boolean };
+        if (data.ok) {
+          // Persist nauUserId locally from the API lookup
+          const userResp = await fetch(`${nauApiUrl}/api/auth/by-telegram/${user.telegramId}`, {
+            headers: { Authorization: `Bearer ${nauServiceKey}` },
+          });
+          if (userResp.ok) {
+            const found = await userResp.json() as { found: boolean; user?: { id: string } };
+            if (found.found && found.user?.id) {
+              await prisma.user.update({ where: { id: user.id }, data: { nauUserId: found.user.id } });
+            }
+          }
+          return ctx.reply('✅ ¡Tu cuenta naŭ ha sido vinculada exitosamente con Zazŭ!');
+        }
+      }
+      return ctx.reply('❌ El enlace de vinculación no es válido o ha expirado. Intenta de nuevo desde la app.');
+    } catch {
+      return ctx.reply('❌ Ocurrió un error al vincular tu cuenta. Por favor intenta de nuevo.');
+    }
+  }
+
+  // Attempt to link this Telegram user to their 9naŭ account (best-effort, passive)
   if (!user.nauUserId) {
     try {
-      const nauApiUrl = process.env.NAU_API_URL ?? 'http://9nau-api:3000';
-      const nauServiceKey = process.env.NAU_SERVICE_KEY ?? '';
       const resp = await fetch(`${nauApiUrl}/api/auth/by-telegram/${user.telegramId}`, {
         headers: { Authorization: `Bearer ${nauServiceKey}` },
       });
       if (resp.ok) {
         const data = await resp.json() as { found: boolean; user?: { id: string } };
         if (data.found && data.user?.id) {
-          await prisma.user.update({
-            where: { id: user.id },
-            data: { nauUserId: data.user.id },
-          });
+          await prisma.user.update({ where: { id: user.id }, data: { nauUserId: data.user.id } });
         }
       }
     } catch {
