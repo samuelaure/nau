@@ -15,8 +15,6 @@ const DEFAULT_FORM = {
   autoApproveIdeas: false,
   autoApproveCompositions: false,
   autoApprovePool: false,
-  autoApproveSchedule: false,
-  autoApprovePost: false,
   capturedCount: 3,
   capturedAutoApprove: false,
   manualCount: 5,
@@ -86,8 +84,6 @@ export default function AccountPersonas({ accountId }: { accountId: string }) {
       autoApproveIdeas: p.autoApproveIdeas,
       autoApproveCompositions: p.autoApproveCompositions,
       autoApprovePool: p.autoApprovePool ?? false,
-      autoApproveSchedule: p.autoApproveSchedule ?? false,
-      autoApprovePost: p.autoApprovePost ?? false,
       capturedCount: p.capturedCount ?? 3,
       capturedAutoApprove: p.capturedAutoApprove ?? false,
       manualCount: p.manualCount ?? 5,
@@ -333,26 +329,6 @@ export default function AccountPersonas({ accountId }: { accountId: string }) {
               />
               Engine: Auto-Approve Pool Drafts → Scheduling
             </label>
-            <label className="flex items-center gap-2 cursor-pointer text-sm text-purple-400">
-              <input
-                type="checkbox"
-                checked={formData.autoApproveSchedule}
-                onChange={(e) =>
-                  setFormData({ ...formData, autoApproveSchedule: e.target.checked })
-                }
-                className="rounded bg-gray-800 border-gray-700"
-              />
-              Engine: Auto-Schedule Approved → Ready for Render
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer text-sm text-green-400">
-              <input
-                type="checkbox"
-                checked={formData.autoApprovePost}
-                onChange={(e) => setFormData({ ...formData, autoApprovePost: e.target.checked })}
-                className="rounded bg-gray-800 border-gray-700"
-              />
-              Engine: Auto-Post Rendered → Publish (no human review)
-            </label>
           </div>
 
           <div className="flex gap-2 justify-end mt-4">
@@ -453,19 +429,9 @@ export default function AccountPersonas({ accountId }: { accountId: string }) {
                 <span className="text-[10px] text-gray-600">✗ Engine: Manual Compose</span>
               )}
               {p.autoApprovePool ? (
-                <span className="text-[10px] text-cyan-400">✓ Engine: Auto-Approve Pool</span>
+                <span className="text-[10px] text-blue-400">✓ Pool: Auto-Approve</span>
               ) : (
-                <span className="text-[10px] text-gray-600">✗ Engine: Manual Pool Review</span>
-              )}
-              {p.autoApproveSchedule ? (
-                <span className="text-[10px] text-purple-400">✓ Engine: Auto-Schedule</span>
-              ) : (
-                <span className="text-[10px] text-gray-600">✗ Engine: Suggested Slots</span>
-              )}
-              {p.autoApprovePost ? (
-                <span className="text-[10px] text-green-400">✓ Engine: Auto-Post</span>
-              ) : (
-                <span className="text-[10px] text-gray-600">✗ Engine: Final Review Required</span>
+                <span className="text-[10px] text-gray-600">✗ Pool: Manual Review</span>
               )}
             </div>
           </Card>

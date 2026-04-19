@@ -11,6 +11,9 @@ import AccountIdeas from '@/modules/accounts/components/AccountIdeas'
 import AccountPool from '@/modules/accounts/components/AccountPool'
 import AccountCalendar from '@/modules/accounts/components/AccountCalendar'
 import AccountFinalReview from '@/modules/accounts/components/AccountFinalReview'
+import AccountPlanners from '@/modules/accounts/components/AccountPlanners'
+import AccountContentPrinciples from '@/modules/accounts/components/AccountContentPrinciples'
+import AccountTemplates from '@/modules/accounts/components/AccountTemplates'
 import ExternalAccountLink from '@/modules/accounts/components/ExternalAccountLink'
 import { cn } from '@/modules/shared/utils'
 import { Button } from '@/modules/shared/components/ui/Button'
@@ -33,9 +36,11 @@ export default async function WorkspaceAccountPage({
       _count: {
         select: { templates: true, assets: true },
       },
-      postingSchedule: true,
+      contentPlanners: { where: { isDefault: true }, take: 1 },
     },
   })
+
+  const defaultPlanner = account?.contentPlanners?.[0] ?? null
 
   if (!account || account.workspaceId !== workspaceId) {
     notFound()
@@ -95,7 +100,7 @@ export default async function WorkspaceAccountPage({
               )}
             </div>
             <p className="text-text-secondary text-sm">
-              Targeting {account.postingSchedule?.reelsPerDay || 0} reels / day
+              Targeting {defaultPlanner?.reelsPerDay || 0} reels / day
             </p>
           </div>
         </div>
@@ -129,6 +134,9 @@ export default async function WorkspaceAccountPage({
           label="Final Review"
         />
         <TabLink href={`?tab=personas`} active={activeTab === 'personas'} label="Personas" />
+        <TabLink href={`?tab=principles`} active={activeTab === 'principles'} label="Principles" />
+        <TabLink href={`?tab=planner`} active={activeTab === 'planner'} label="Planner" />
+        <TabLink href={`?tab=templates`} active={activeTab === 'templates'} label="Templates" />
         <TabLink href={`?tab=settings`} active={activeTab === 'settings'} label="Settings" />
       </div>
 
@@ -143,6 +151,9 @@ export default async function WorkspaceAccountPage({
         {activeTab === 'assets' && <AccountAssets accountId={accountId} />}
         {activeTab === 'final-review' && <AccountFinalReview accountId={accountId} />}
         {activeTab === 'personas' && <AccountPersonas accountId={accountId} />}
+        {activeTab === 'principles' && <AccountContentPrinciples accountId={accountId} />}
+        {activeTab === 'planner' && <AccountPlanners accountId={accountId} />}
+        {activeTab === 'templates' && <AccountTemplates accountId={accountId} />}
         {activeTab === 'settings' && <AccountSettings account={account} />}
       </div>
     </div>

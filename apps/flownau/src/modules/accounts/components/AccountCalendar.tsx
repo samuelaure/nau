@@ -44,6 +44,8 @@ type CalendarComposition = {
   scheduledAt: string | null
   caption: string | null
   createdAt: string
+  userUploadedMediaUrl?: string | null
+  userPostedManually?: boolean
 }
 
 function startOfWeek(date: Date): Date {
@@ -350,6 +352,56 @@ export default function AccountCalendar({ accountId }: { accountId: string }) {
                               Reschedule
                             </button>
                           )}
+                          {/* Phase 18: user-managed format actions */}
+                          {['head_talk', 'replicate'].includes(comp.format) &&
+                            isScheduled &&
+                            !comp.userUploadedMediaUrl && (
+                              <>
+                                <label className="text-[9px] text-amber-400 hover:text-amber-300 cursor-pointer transition">
+                                  Upload media
+                                  <input
+                                    type="file"
+                                    accept="video/*,image/*"
+                                    className="hidden"
+                                    onChange={async (e) => {
+                                      const file = e.target.files?.[0]
+                                      if (!file) return
+                                      const fd = new FormData()
+                                      fd.append('file', file)
+                                      fd.append('compositionId', comp.id)
+                                      fd.append('accountId', accountId)
+                                      const res = await fetch(
+                                        '/api/compositions/upload-recording',
+                                        { method: 'POST', body: fd },
+                                      )
+                                      if (res.ok) {
+                                        toast.success('Media uploaded')
+                                        fetchCompositions()
+                                      } else toast.error('Upload failed')
+                                    }}
+                                  />
+                                </label>
+                                <button
+                                  onClick={async () => {
+                                    const res = await fetch(
+                                      `/api/compositions/${comp.id}/mark-posted`,
+                                      {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({}),
+                                      },
+                                    )
+                                    if (res.ok) {
+                                      toast.success('Marked as manually posted')
+                                      fetchCompositions()
+                                    } else toast.error('Failed')
+                                  }}
+                                  className="text-[9px] text-gray-500 hover:text-white transition"
+                                >
+                                  Mark as posted
+                                </button>
+                              </>
+                            )}
                         </div>
                       </div>
                     )

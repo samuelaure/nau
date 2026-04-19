@@ -62,7 +62,7 @@ export default async function PlansPage({
     const pieces = (plan.pieces as unknown as PlanPiece[]) ?? []
     const planAlerts = (plan.pieces as unknown as { alerts?: PlanAlert[] })?.alerts ?? []
 
-    // Simulated or derived slots based on pieces or the brand's postingSchedule
+    // Simulated or derived slots based on pieces or the brand's ContentPlanner
     const slots = pieces.map((p) => ({
       time: p.scheduledAt
         ? new Date(p.scheduledAt).toLocaleTimeString(undefined, {
