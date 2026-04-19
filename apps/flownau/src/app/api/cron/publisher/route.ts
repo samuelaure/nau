@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 import { publishComposition } from '@/modules/publisher/publish-orchestrator'
-import { scheduleRenderedCompositions } from '@/modules/publisher/scheduler'
 import { logError } from '@/modules/shared/logger'
 
 export const dynamic = 'force-dynamic'
@@ -11,11 +10,10 @@ export const maxDuration = 120 // 2 minutes — publishing only, no rendering
  * GET /api/cron/publisher
  *
  * Publish rendered compositions to Instagram via the unified orchestrator.
- * This cron ONLY handles Instagram API calls — rendering is fully decoupled
- * to the dedicated render worker (BullMQ queue).
+ * This cron ONLY handles Instagram API calls — rendering is decoupled (BullMQ)
+ * and slot assignment is handled by /api/cron/scheduler.
  *
- * Part A: Explicitly scheduled compositions (scheduledAt <= now, status = rendered)
- * Part B: Auto-posted compositions via PostingSchedule
+ * Phase 18: gate reads AccountTemplateConfig.autoApprovePost for (accountId, templateId).
  */
 import { validateCronSecret, unauthorizedCronResponse } from '@/modules/shared/nau-auth'
 
@@ -34,33 +32,24 @@ export async function GET(request: Request) {
     }> = []
     const now = new Date()
 
-    // --- PART A: Assign Scheduled Times ---
-    // This correctly distributes unscheduled, rendered compositions into future time-of-day slots
-    await scheduleRenderedCompositions()
-
-    // --- PART B: Publish Due Compositions ---
-    // Finds RENDERED compositions whose scheduledAt has arrived.
-    // Phase 17: only auto-publish if the account's default persona has autoApprovePost=true.
-    // If false, the composition waits for manual approval via the Final Review UI.
-    const explicitCompositions = await prisma.composition.findMany({
+    // Find RENDERED compositions whose scheduledAt has arrived.
+    const dueCompositions = await prisma.composition.findMany({
       where: {
         status: { in: ['RENDERED', 'rendered', 'PUBLISHING'] },
         scheduledAt: { lte: now },
         publishAttempts: { lt: 3 },
       },
       include: {
-        account: {
+        account: true,
+        template: {
           include: {
-            brandPersonas: {
-              where: { isDefault: true },
-              take: 1,
-            },
+            accountConfigs: true,
           },
         },
       },
     })
 
-    for (const composition of explicitCompositions) {
+    for (const composition of dueCompositions) {
       if (
         !composition.account ||
         !composition.account.accessToken ||
@@ -69,18 +58,23 @@ export async function GET(request: Request) {
         continue
       }
 
-      // Phase 17 gate: skip if autoApprovePost is off and not already PUBLISHING (manual approval)
-      const defaultPersona = composition.account.brandPersonas?.[0]
-      const autoApprovePost = defaultPersona?.autoApprovePost ?? false
+      // Phase 18 gate: resolve AccountTemplateConfig.autoApprovePost for (accountId, templateId).
+      // Fallback to false (manual Final Review) if no config row or no template.
+      const templateConfig = composition.template?.accountConfigs?.find(
+        (c) => c.accountId === composition.accountId,
+      )
+      const autoApprovePost = templateConfig?.autoApprovePost ?? false
+
+      // PUBLISHING was set by the manual Final Review endpoint; always proceed.
       if (!autoApprovePost && composition.status !== 'PUBLISHING') {
         continue
       }
+
       try {
         const result = await publishComposition(composition)
         if (result.success) {
-          // ALSO update the PostingSchedule lastPostedAt if it exists
-          await prisma.postingSchedule.updateMany({
-            where: { accountId: composition.accountId },
+          await prisma.contentPlanner.updateMany({
+            where: { accountId: composition.accountId, isDefault: true },
             data: { lastPostedAt: now },
           })
           results.push({ type: 'explicit', compositionId: composition.id, status: 'success' })

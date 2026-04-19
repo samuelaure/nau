@@ -8,10 +8,14 @@ import { getAuthUser } from '@/lib/auth'
 import { logError } from '@/modules/shared/logger'
 import { createId } from '@paralleldrive/cuid2'
 
+const USER_MANAGED_FORMATS = new Set(['head_talk', 'replicate'])
+
 /**
  * POST /api/compositions/upload-recording
- * Accepts a recorded video for a head_talk composition.
- * Uploads to R2, updates videoUrl, moves status to RENDERED.
+ *
+ * Phase 18: Accepts user-supplied media for head_talk or replicate compositions.
+ * Uploads to R2, sets userUploadedMediaUrl, moves status to RENDERED so the
+ * renderer worker can do a passthrough and the publisher can publish it.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -34,9 +38,9 @@ export async function POST(req: NextRequest) {
     if (!composition || composition.accountId !== accountId) {
       return NextResponse.json({ error: 'Composition not found' }, { status: 404 })
     }
-    if (composition.format !== 'head_talk') {
+    if (!USER_MANAGED_FORMATS.has(composition.format)) {
       return NextResponse.json(
-        { error: 'Only head_talk compositions accept recording uploads' },
+        { error: 'Only head_talk and replicate compositions accept media uploads' },
         { status: 400 },
       )
     }
@@ -57,14 +61,20 @@ export async function POST(req: NextRequest) {
     )
 
     const r2PublicUrl = process.env.R2_PUBLIC_URL
-    const videoUrl = r2PublicUrl ? `${r2PublicUrl}/${key}` : key
+    const mediaUrl = r2PublicUrl ? `${r2PublicUrl}/${key}` : key
 
+    // Phase 18: set userUploadedMediaUrl — renderer will do a passthrough job.
+    // Also update videoUrl for backward compatibility with playback.
     await prisma.composition.update({
       where: { id: compositionId },
-      data: { videoUrl, status: 'RENDERED' },
+      data: {
+        userUploadedMediaUrl: mediaUrl,
+        videoUrl: mediaUrl,
+        status: 'RENDERED',
+      },
     })
 
-    return NextResponse.json({ videoUrl, status: 'RENDERED' }, { status: 200 })
+    return NextResponse.json({ videoUrl: mediaUrl, status: 'RENDERED' }, { status: 200 })
   } catch (error) {
     logError('UPLOAD_RECORDING_ERROR', error)
     const message = error instanceof Error ? error.message : 'Upload failed'

@@ -7,12 +7,18 @@ import { validateCronSecret, unauthorizedCronResponse } from '@/modules/shared/n
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
+// Phase 18: user-managed formats never run through the Remotion renderer.
+// They sit in SCHEDULED until the user uploads media (→ RENDERED) or marks as posted.
+const USER_MANAGED_FORMATS = new Set(['head_talk', 'replicate'])
+
 /**
  * GET /api/cron/renderer
  *
- * Phase 17: Advance Render Trigger.
- * Scans for SCHEDULED compositions whose scheduledAt falls within the next 48 hours
- * and enqueues them for rendering if not already queued/rendering.
+ * Phase 18: Advance Render Trigger.
+ * Scans for SCHEDULED compositions whose scheduledAt falls within the next 48 hours.
+ * - head_talk / replicate with no userUploadedMediaUrl → skipped (awaiting user action).
+ * - head_talk / replicate with userUploadedMediaUrl → enqueued as a passthrough job.
+ * - All other formats → enqueued for full Remotion render.
  */
 export async function GET(request: Request) {
   if (!validateCronSecret(request)) {
@@ -34,6 +40,12 @@ export async function GET(request: Request) {
     const results: Array<{ compositionId: string; status: string; jobId?: string }> = []
 
     for (const comp of scheduled) {
+      // Phase 18: skip user-managed formats that have no uploaded media yet.
+      if (USER_MANAGED_FORMATS.has(comp.format) && !comp.userUploadedMediaUrl) {
+        results.push({ compositionId: comp.id, status: 'awaiting_user_media' })
+        continue
+      }
+
       // Skip if already queued or rendering
       if (
         comp.renderJob &&
@@ -50,7 +62,7 @@ export async function GET(request: Request) {
           data: { status: 'RENDERING' },
         })
         logger.info(
-          `[Renderer Cron] Enqueued ${comp.id} (scheduledAt=${comp.scheduledAt?.toISOString()})`,
+          `[Renderer Cron] Enqueued ${comp.id} (format=${comp.format}, scheduledAt=${comp.scheduledAt?.toISOString()})`,
         )
         results.push({ compositionId: comp.id, status: 'enqueued', jobId })
       } catch (err) {

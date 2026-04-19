@@ -111,6 +111,34 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
 
   await job.updateProgress(10)
 
+  // Phase 18: passthrough branch for user-managed formats (head_talk / replicate).
+  // If the user already supplied the media, skip Remotion — just mark as rendered.
+  const USER_MANAGED_FORMATS = new Set(['head_talk', 'replicate'])
+  if (USER_MANAGED_FORMATS.has(composition.format) && composition.userUploadedMediaUrl) {
+    const renderTimeMs = Date.now() - startTime
+    await prisma.renderJob.update({
+      where: { id: renderJob.id },
+      data: {
+        status: 'done',
+        progress: 100,
+        outputUrl: composition.userUploadedMediaUrl,
+        outputType: 'video',
+        completedAt: new Date(),
+        renderTimeMs,
+      },
+    })
+    await prisma.composition.update({
+      where: { id: compositionId },
+      data: {
+        videoUrl: composition.userUploadedMediaUrl,
+        status: 'rendered',
+      },
+    })
+    await job.updateProgress(100)
+    logger.info(`[RenderWorker] Passthrough complete for ${compositionId} (${composition.format})`)
+    return
+  }
+
   // 4. Determine render type
   const format = composition.format || 'reel'
   const isVideo = format === 'reel' || format === 'trial_reel'
