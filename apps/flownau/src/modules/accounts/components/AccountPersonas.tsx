@@ -15,6 +15,7 @@ const DEFAULT_FORM = {
   autoApproveIdeas: false,
   autoApproveCompositions: false,
   autoApprovePool: false,
+  autoApproveSchedule: false,
   capturedCount: 3,
   capturedAutoApprove: false,
   manualCount: 5,
@@ -84,6 +85,7 @@ export default function AccountPersonas({ accountId }: { accountId: string }) {
       autoApproveIdeas: p.autoApproveIdeas,
       autoApproveCompositions: p.autoApproveCompositions,
       autoApprovePool: p.autoApprovePool ?? false,
+      autoApproveSchedule: p.autoApproveSchedule ?? false,
       capturedCount: p.capturedCount ?? 3,
       capturedAutoApprove: p.capturedAutoApprove ?? false,
       manualCount: p.manualCount ?? 5,
@@ -329,6 +331,17 @@ export default function AccountPersonas({ accountId }: { accountId: string }) {
               />
               Engine: Auto-Approve Pool Drafts → Scheduling
             </label>
+            <label className="flex items-center gap-2 cursor-pointer text-sm text-purple-400">
+              <input
+                type="checkbox"
+                checked={formData.autoApproveSchedule}
+                onChange={(e) =>
+                  setFormData({ ...formData, autoApproveSchedule: e.target.checked })
+                }
+                className="rounded bg-gray-800 border-gray-700"
+              />
+              Engine: Auto-Schedule Approved → Ready for Render
+            </label>
           </div>
 
           <div className="flex gap-2 justify-end mt-4">
@@ -432,6 +445,11 @@ export default function AccountPersonas({ accountId }: { accountId: string }) {
                 <span className="text-[10px] text-cyan-400">✓ Engine: Auto-Approve Pool</span>
               ) : (
                 <span className="text-[10px] text-gray-600">✗ Engine: Manual Pool Review</span>
+              )}
+              {p.autoApproveSchedule ? (
+                <span className="text-[10px] text-purple-400">✓ Engine: Auto-Schedule</span>
+              ) : (
+                <span className="text-[10px] text-gray-600">✗ Engine: Suggested Slots</span>
               )}
             </div>
           </Card>
