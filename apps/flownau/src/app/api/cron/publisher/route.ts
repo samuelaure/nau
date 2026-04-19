@@ -39,15 +39,24 @@ export async function GET(request: Request) {
     await scheduleRenderedCompositions()
 
     // --- PART B: Publish Due Compositions ---
-    // Finds scheduled (or manually rendered+scheduled) compositions whose time has come
+    // Finds RENDERED compositions whose scheduledAt has arrived.
+    // Phase 17: only auto-publish if the account's default persona has autoApprovePost=true.
+    // If false, the composition waits for manual approval via the Final Review UI.
     const explicitCompositions = await prisma.composition.findMany({
       where: {
-        status: { in: ['rendered', 'scheduled'] },
+        status: { in: ['RENDERED', 'rendered', 'PUBLISHING'] },
         scheduledAt: { lte: now },
         publishAttempts: { lt: 3 },
       },
       include: {
-        account: true,
+        account: {
+          include: {
+            brandPersonas: {
+              where: { isDefault: true },
+              take: 1,
+            },
+          },
+        },
       },
     })
 
@@ -57,6 +66,13 @@ export async function GET(request: Request) {
         !composition.account.accessToken ||
         !composition.account.platformId
       ) {
+        continue
+      }
+
+      // Phase 17 gate: skip if autoApprovePost is off and not already PUBLISHING (manual approval)
+      const defaultPersona = composition.account.brandPersonas?.[0]
+      const autoApprovePost = defaultPersona?.autoApprovePost ?? false
+      if (!autoApprovePost && composition.status !== 'PUBLISHING') {
         continue
       }
       try {
