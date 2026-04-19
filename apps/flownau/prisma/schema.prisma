@@ -161,6 +161,7 @@ model BrandPersona {
   autoApproveCompositions Boolean  @default(false)
   autoApprovePool         Boolean  @default(false) // Phase 15: auto-move Draft→APPROVED in Content Pool
   autoApproveSchedule     Boolean  @default(false) // Phase 16: auto-slot APPROVED → SCHEDULED (authorizes rendering)
+  autoApprovePost         Boolean  @default(false) // Phase 17: auto-publish RENDERED → PUBLISHING when scheduledAt arrives
 
   // Per-origin engine settings (Phase 8)
   capturedAutoApprove     Boolean  @default(false)  // Captured ideas require review by default
