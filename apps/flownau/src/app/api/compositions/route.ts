@@ -15,9 +15,18 @@ export async function GET(req: Request) {
 
     await checkAccountAccess(accountId)
 
+    const isCalendar = searchParams.get('calendar') === '1'
+
+    const whereClause = isCalendar
+      ? {
+          accountId,
+          status: { in: ['APPROVED', 'SCHEDULED', 'RENDERING', 'RENDERED'] },
+        }
+      : { accountId }
+
     const compositions = await prisma.composition.findMany({
-      where: { accountId },
-      orderBy: { createdAt: 'desc' },
+      where: whereClause,
+      orderBy: isCalendar ? { scheduledAt: 'asc' } : { createdAt: 'desc' },
       include: {
         template: {
           select: { name: true },

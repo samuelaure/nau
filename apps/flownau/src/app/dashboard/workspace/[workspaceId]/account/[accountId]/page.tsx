@@ -9,10 +9,10 @@ import AccountSettings from '@/modules/accounts/components/AccountSettings'
 import AccountPersonas from '@/modules/accounts/components/AccountPersonas'
 import AccountIdeas from '@/modules/accounts/components/AccountIdeas'
 import AccountPool from '@/modules/accounts/components/AccountPool'
+import AccountCalendar from '@/modules/accounts/components/AccountCalendar'
 import ExternalAccountLink from '@/modules/accounts/components/ExternalAccountLink'
 import { cn } from '@/modules/shared/utils'
 import { Button } from '@/modules/shared/components/ui/Button'
-import { Card } from '@/modules/shared/components/ui/Card'
 import DailyScheduleView from '@/modules/plans/components/DailyScheduleView'
 
 export default async function WorkspaceAccountPage({
@@ -24,7 +24,7 @@ export default async function WorkspaceAccountPage({
 }) {
   const { workspaceId, accountId } = await params
   const { tab, date } = await searchParams
-  const activeTab = tab || 'schedule'
+  const activeTab = tab || 'calendar'
 
   const account = await prisma.socialAccount.findUnique({
     where: { id: accountId },
@@ -108,6 +108,7 @@ export default async function WorkspaceAccountPage({
 
       {/* Modern Tabs */}
       <div className="flex border-b border-white/5 mb-8 overflow-x-auto no-scrollbar">
+        <TabLink href={`?tab=calendar`} active={activeTab === 'calendar'} label="Calendar" />
         <TabLink href={`?tab=schedule`} active={activeTab === 'schedule'} label="Daily Schedule" />
         <TabLink
           href={`?tab=compositions`}
@@ -127,6 +128,7 @@ export default async function WorkspaceAccountPage({
 
       {/* Content Sections */}
       <div className="min-h-[400px]">
+        {activeTab === 'calendar' && <AccountCalendar accountId={accountId} />}
         {activeTab === 'schedule' && (
           <AccountSchedule accountId={accountId} workspaceId={workspaceId} dateStr={date} />
         )}
