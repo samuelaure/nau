@@ -45,6 +45,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         autoApproveCompositions: body.autoApproveCompositions,
         autoApprovePool: body.autoApprovePool,
         autoApproveSchedule: body.autoApproveSchedule,
+        autoApprovePost: body.autoApprovePost,
         capturedCount: body.capturedCount,
         capturedAutoApprove: body.capturedAutoApprove,
         manualCount: body.manualCount,
