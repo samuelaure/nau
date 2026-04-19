@@ -14,7 +14,7 @@ export function validateServiceKey(request: Request): boolean {
     return false
   }
 
-  const providedKey = request.headers.get('x-service-key')
+  const providedKey = request.headers.get('x-nau-service-key')
   if (!providedKey) {
     return false
   }
