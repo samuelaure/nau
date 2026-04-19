@@ -4,7 +4,7 @@
 
 - **Type:** A — Platform Service (headless API + internal dashboard)
 - **Domain:** Content creation, scene-based video/image composition, automated publishing
-- **Status:** Active — Phase 17: Advance Rendering & Verified/Auto Posting
+- **Status:** Active — Phase 18: Decouple Pipeline Gates + Canonical Flow Refactor
 
 ## Purpose
 
@@ -25,10 +25,52 @@ Automated content generation and distribution engine for the naŭ Platform. Conv
 
 ## Architecture Overview
 
-### Core Pipeline
+### Core Pipeline (Canonical — Phase 18)
+
+**Ideation → Content Development → Scheduling → Rendering → Publishing**, with explicit gate owners at each stage:
+
+1. **Ideation** (`ContentIdea` creation) — Gate: `BrandPersona.autoApproveIdeas`
+   - Triggers: `captured` (9naŭ/zazŭ), `manual` (flownaŭ UI), `automatic` (cron from nauthenticity InspoBase).
+   - AI inputs: concept + `BrandPersona` (voice) + `IdeasFramework` (strategy) + format list + schema.
+   - Every `ContentIdea` persists `brandPersonaId`, `ideasFrameworkId`, `contentPrinciplesId` (provenance).
+
+2. **Content Development** (`ContentIdea` → `Composition` in Content Pool) — Gate: `BrandPersona.autoApprovePool`
+   - Template selected usage-weighted-randomly from account's enabled templates matching the idea's format.
+   - AI inputs: idea + same persona/framework as ideation + `ContentCreationPrinciples` + `Template.contentSchema`.
+   - Special format `replicate`: bypasses ideation; lands directly in Pool for quick review.
+
+3. **Scheduling** (Content Pool → Calendar) — Gate: `ContentPlanner.autoApproveSchedule`
+   - AI planner-strategist (`planner-strategist.ts`) orders compositions by strategist prompt (token-economic: only `{ideaText, format}` per piece).
+   - Rule-based slot calculator maps ordered list to real HH:MM UTC slots from `ContentPlanner`.
+
+4. **Rendering** (Calendar → RENDERED) — 48h advance window
+   - Normal formats: SceneComposer + TimelineCompiler + Remotion produces final media.
+   - **`head_talk` / `replicate`** (user-managed): renderer **skips** if `userUploadedMediaUrl` is null. User either:
+     - Uploads media → composition advances to `RENDERED` → publisher posts it normally.
+     - Marks as manually posted → status `PUBLISHED`, flownaŭ takes no further action.
+
+5. **Publishing** (RENDERED → PUBLISHED) — Gate: `AccountTemplateConfig.autoApprovePost`
+   - Publisher cron consumes `RENDERED` items whose `scheduledAt <= now`.
+   - Per-account post gate: join table `AccountTemplateConfig` allows workspace-shared templates to have per-account settings.
 
 ```
-Ideation (Format, Text) → Content Pool (Creative Development, Review) → Scheduling (Calendar) → Rendering (Async) → Final Review → Publish (IG)
+ContentIdea ──[autoApproveIdeas]──► Composition (DRAFT)
+                                         │
+                                  [autoApprovePool]
+                                         │
+                                    APPROVED (Pool)
+                                         │
+                                [autoApproveSchedule]
+                                         │
+                                    SCHEDULED (Calendar)
+                                         │
+                              Renderer (skips user-managed)
+                                         │
+                                      RENDERED
+                                         │
+                                 [autoApprovePost]
+                                         │
+                                      PUBLISHED
 ```
 
 ### Module Breakdown
@@ -86,6 +128,25 @@ Ideation (Format, Text) → Content Pool (Creative Development, Review) → Sche
 | GET    | `/api/v1/accounts/by-nau-brand/:brandId`      | Lookup accountId by nauthenticity brand ID _(Phase 14)_              |
 | GET    | `/api/v1/compositions?accountId=X&status=Y`   | Query compositions with filters                                      |
 
+### Dashboard API (session auth)
+
+| Method         | Endpoint                             | Purpose                                                          |
+| -------------- | ------------------------------------ | ---------------------------------------------------------------- |
+| GET            | `/api/planners?accountId=`           | List ContentPlanners for account                                 |
+| POST           | `/api/planners`                      | Create ContentPlanner                                            |
+| GET/PUT/DELETE | `/api/planners/[id]`                 | Read/update/delete ContentPlanner                                |
+| GET            | `/api/content-principles?accountId=` | List ContentCreationPrinciples for account                       |
+| POST           | `/api/content-principles`            | Create ContentCreationPrinciples                                 |
+| GET/PUT/DELETE | `/api/content-principles/[id]`       | Read/update/delete principles                                    |
+| GET            | `/api/account-templates?accountId=`  | List templates visible to account (own + workspace) with configs |
+| PUT            | `/api/account-templates`             | Upsert AccountTemplateConfig (toggle autoApprovePost / enabled)  |
+| POST           | `/api/account-templates`             | Enable a workspace-scoped template for an account                |
+| GET            | `/api/templates?accountId=`          | List templates for account + workspace-visible                   |
+| POST           | `/api/templates`                     | Create Template (accountId required)                             |
+| GET/PUT/DELETE | `/api/templates/[id]`                | Read/update/delete Template (supports scope, contentSchema)      |
+| POST           | `/api/compositions/[id]/mark-posted` | Mark head_talk/replicate as manually posted (→ PUBLISHED)        |
+| POST           | `/api/compositions/upload-recording` | Upload media for head_talk or replicate (→ RENDERED)             |
+
 ### Crons
 
 | Endpoint                      | Purpose                                              |
@@ -116,6 +177,7 @@ Ideation (Format, Text) → Content Pool (Creative Development, Review) → Sche
 | RENDER_MAX_ATTEMPTS           | No       | Max retry per render job (default: 3) |
 | CRON_SECRET                   | Yes      | Automated flow protection (Bearer)    |
 
+- **[2026-04-19] Phase 18 — Decouple Pipeline Gates + Canonical Flow Refactor (complete)**: Clean-break refactor of the autonomous pipeline. Introduced `ContentCreationPrinciples` model (creative best practices fed to composer AI). Moved `autoApprovePost` from Template to new join table `AccountTemplateConfig` (per-account post gate on shared workspace templates). Deleted `PostingSchedule` — `ContentPlanner` is now the sole scheduling source of truth. Composer now selects templates usage-weighted-randomly and passes full provenance context (persona + framework + principles + template.contentSchema) to the AI. Added AI planner-strategist (`runPlannerStrategist`) to order content by strategic prompt before slot assignment. Renderer now skips `head_talk`/`replicate` formats unless user has uploaded media; user can mark-as-posted manually. Every `ContentIdea` and `Composition` now tracks full provenance FKs (`brandPersonaId`, `ideasFrameworkId`, `contentPrinciplesId`, `templateId`). New UI components: `AccountPlanners`, `AccountContentPrinciples`, `AccountTemplates`. New tabs on account page. Removed `AccountSchedulerSettings`.
 - **[2026-04-19] Phase 17 — Advance Rendering & Verified/Auto Posting (complete)**: Finalized the autonomous loop by implementing the `renderer` cron for advance rendering of scheduled compositions. Introduced the `autoApprovePost` gate: trusted accounts can now go from AI idea generation to live Instagram post with zero human clicks. Added the "Final Review" dashboard for manual verification of final renders.
 - **[2026-04-19] Phase 16 — Suggested Scheduling & Autonomous Calendar (complete)**: Implemented the `SchedulingService` to automatically assign approved compositions to the next available posting slots. Introduced the `autoApproveSchedule` gate: trusted accounts bypass human confirmation for scheduling, authorizing advance rendering. Added a weekly Content Calendar UI for manual confirmation and rescheduling.
 - **[2026-04-19] Phase 15 — Content Pool & Auto-Development (complete)**: Implemented the Content Pool review dashboard. Added `autoApprovePool` flag to bypass human review for trusted pipelines. Added mobile ingestion via `/api/v1/replicate` to enable captures from 9naŭ to land directly in the development pool.

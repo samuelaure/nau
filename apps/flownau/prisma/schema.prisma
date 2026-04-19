@@ -49,15 +49,17 @@ model SocialAccount {
   assetsRoot   String?
   tokenExpiresAt   DateTime?   // v2: Track IG token expiry (60-day lifecycle)
   tokenRefreshedAt DateTime?   // v2: Last token refresh timestamp
-  assets          Asset[]
-  compositions    Composition[]
-  brandPersonas   BrandPersona[]
-  contentIdeas    ContentIdea[]
-  ideasFrameworks IdeasFramework[]
-  postingSchedule PostingSchedule?
-  contentPlans    ContentPlan[]
-  workspace       Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  templates       Template[]
+  assets                  Asset[]
+  compositions            Composition[]
+  brandPersonas           BrandPersona[]
+  contentIdeas            ContentIdea[]
+  ideasFrameworks         IdeasFramework[]
+  contentPrinciples       ContentCreationPrinciples[]
+  contentPlanners         ContentPlanner[]
+  contentPlans            ContentPlan[]
+  accountTemplateConfigs  AccountTemplateConfig[]
+  workspace               Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  templates               Template[]
 
   @@unique([platform, platformId])
 }
@@ -92,7 +94,8 @@ model Template {
   remotionId       String
 
   config           Json?
-  accountId        String?
+  accountId        String                           // Phase 18: required; templates are account-scoped
+  scope            String         @default("account") // account | workspace — workspace = visible to sibling accounts
   useAccountAssets Boolean        @default(true)
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
@@ -100,15 +103,34 @@ model Template {
   systemPrompt     String?        @db.Text // TEMPLATE SPECIFIC: Narrative multiplier
   creationPrompt   String?        @db.Text // Specific iteration logic for this template
   captionPrompt    String?        @db.Text // Specific logic for generating captions
-  schemaJson       Json?          // Structural schema for reference
-  // v2: Scene blueprint fields (Phase 2 will use these)
+  schemaJson       Json?          // Structural schema for reference (visual structure)
+  contentSchema    Json?          // Phase 18: text-slot specs fed to composer AI (text count/length/intent/caption specs)
+  // v2: Scene blueprint fields
   sceneType        String?        // Maps to a VideoSceneType or ImageSceneType
   slotSchema       Json?          // Typed slot definitions for this scene blueprint
   styleConfig      Json?          // Visual style overrides
   renders          Render[]        // DEPRECATED (v2): Use RenderJob instead. Kept for backward compat.
   assets           Asset[]
   compositions     Composition[]
-  account          SocialAccount? @relation(fields: [accountId], references: [id])
+  accountConfigs   AccountTemplateConfig[]
+  account          SocialAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+}
+
+/// Phase 18: per-account settings for Templates (required so workspace-shared templates
+/// can be gated and toggled independently per account).
+model AccountTemplateConfig {
+  id              String   @id @default(cuid())
+  accountId       String
+  templateId      String
+  autoApprovePost Boolean  @default(false)
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  account         SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  template        Template      @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, templateId])
 }
 
 /// DEPRECATED: Legacy render tracking. Will be removed in Phase 3 when RenderJob fully replaces it.
@@ -157,21 +179,21 @@ model BrandPersona {
   systemPrompt            String   @db.Text // Tone, Voice, Personality
   modelSelection          AIModel  @default(GROQ_LLAMA_3_3)
   isDefault               Boolean  @default(false)
-  autoApproveIdeas        Boolean  @default(false) // Phase 14: auto-create Draft Composition when idea is approved
-  autoApproveCompositions Boolean  @default(false)
-  autoApprovePool         Boolean  @default(false) // Phase 15: auto-move Draft→APPROVED in Content Pool
-  autoApproveSchedule     Boolean  @default(false) // Phase 16: auto-slot APPROVED → SCHEDULED (authorizes rendering)
-  autoApprovePost         Boolean  @default(false) // Phase 17: auto-publish RENDERED → PUBLISHING when scheduledAt arrives
+  autoApproveIdeas        Boolean  @default(false) // Gate: Ideation (PENDING → APPROVED)
+  autoApproveCompositions Boolean  @default(false) // Gate: legacy compositions auto-advance
+  autoApprovePool         Boolean  @default(false) // Gate: Content Pool (DRAFT → APPROVED)
 
-  // Per-origin engine settings (Phase 8)
-  capturedAutoApprove     Boolean  @default(false)  // Captured ideas require review by default
-  capturedCount           Int      @default(3)       // Ideas spawned per captured concept
-  manualAutoApprove       Boolean  @default(false)   // Manual ideas require review by default
-  manualCount             Int      @default(5)       // Ideas spawned per manual brainstorm session
-  automaticAutoApprove    Boolean  @default(false)   // Automatic ideas require review
-  automaticCount          Int      @default(5)       // Ideas generated per cron cycle
+  // Per-origin engine settings
+  capturedAutoApprove     Boolean  @default(false)
+  capturedCount           Int      @default(3)
+  manualAutoApprove       Boolean  @default(false)
+  manualCount             Int      @default(5)
+  automaticAutoApprove    Boolean  @default(false)
+  automaticCount          Int      @default(5)
 
   account                 SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  ideas                   ContentIdea[]
+  compositions            Composition[]
 }
 
 model IdeasFramework {
@@ -184,51 +206,90 @@ model IdeasFramework {
   updatedAt               DateTime @updatedAt
 
   account                 SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  ideas                   ContentIdea[]
+  compositions            Composition[]
+}
+
+/// Phase 18: creative best-practices / engagement principles used by the composer AI
+/// during Content Development. Shaped like IdeasFramework but scoped to content creation.
+model ContentCreationPrinciples {
+  id           String   @id @default(cuid())
+  accountId    String
+  name         String
+  systemPrompt String   @db.Text
+  isDefault    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  account      SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  ideas        ContentIdea[]
+  compositions Composition[]
 }
 
 model ContentIdea {
-  id           String        @id @default(cuid())
-  accountId    String
-  ideaText     String        @db.Text
-  format       String?                             // reel | trial_reel | head_talk | carousel | static_post | story
-  status       String        @default("PENDING") // PENDING, APPROVED, REJECTED, USED
-  source       String        @default("automatic") // automatic | manual | captured
-  sourceRef    String?                             // External reference ID
-  priority     Int           @default(3)           // 1: captured, 2: manual, 3: automatic
-  aiLinked     Boolean       @default(false)       // true = routed by AI brand detection; requires human review
-  createdAt    DateTime      @default(now())
-  compositions Composition[]                       // Back-reference to compositions created from this idea
-  account      SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  id                   String        @id @default(cuid())
+  accountId            String
+  ideaText             String        @db.Text
+  format               String?                             // reel | trial_reel | head_talk | carousel | static_post | story
+  status               String        @default("PENDING") // PENDING, APPROVED, REJECTED, USED
+  source               String        @default("automatic") // automatic | manual | captured
+  sourceRef            String?                             // External reference ID
+  priority             Int           @default(3)           // 1: captured, 2: manual, 3: automatic
+  aiLinked             Boolean       @default(false)       // true = routed by AI brand detection; requires human review
+  createdAt            DateTime      @default(now())
+
+  // Phase 18: provenance — remembered from generation so content dev honours the same voice/strategy
+  brandPersonaId       String?
+  ideasFrameworkId     String?
+  contentPrinciplesId  String?
+
+  compositions         Composition[]                       // Back-reference to compositions created from this idea
+  account              SocialAccount             @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  brandPersona         BrandPersona?             @relation(fields: [brandPersonaId], references: [id])
+  ideasFramework       IdeasFramework?           @relation(fields: [ideasFrameworkId], references: [id])
+  contentPrinciples    ContentCreationPrinciples? @relation(fields: [contentPrinciplesId], references: [id])
 }
 
 model Composition {
-  id               String        @id @default(cuid())
-  accountId        String
-  templateId       String?                          // v2: Now optional — scene-based compositions don't require a template
-  format           String        @default("reel")   // v2: reel | trial_reel | carousel | single_image
-  creative         Json?                            // v2: AI CreativeDirection output (scene sequence + slots)
-  payload          Json                             // The compiled composition schema (DynamicCompositionSchema)
-  videoUrl         String?
-  coverUrl         String?                          // v2: Cover image URL for reel thumbnails
-  caption          String?       @db.Text
-  hashtags         String[]      @default([])       // v2: Generated hashtags
-  externalPostId   String?
-  externalPostUrl  String?
-  source           String        @default("composed") // composed | replicate
-  status           String        @default("DRAFT")  // DRAFT, APPROVED, RENDERING, RENDERED, SCHEDULED, PUBLISHING, PUBLISHED, FAILED
-  scheduledAt      DateTime?
-  publishAttempts  Int           @default(0)
-  lastPublishError String?      @db.Text
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-  ideaId           String?                          // v2: Back-reference to the source idea
-  sceneTypes       String[]      @default([])       // v2: Scene types used (for diversity tracking)
-  topicHash        String?                          // v2: Hash of main topic (for dedup)
-  
-  account          SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  template         Template?     @relation(fields: [templateId], references: [id])
-  idea             ContentIdea?  @relation(fields: [ideaId], references: [id])
-  renderJob        RenderJob?                       // v2: Async render job
+  id                   String        @id @default(cuid())
+  accountId            String
+  templateId           String?                          // nullable only for `replicate` format; everything else must link
+  format               String        @default("reel")   // reel | trial_reel | carousel | single_image | head_talk | replicate
+  creative             Json?                            // v2: AI CreativeDirection output (scene sequence + slots)
+  payload              Json                             // The compiled composition schema (DynamicCompositionSchema)
+  videoUrl             String?
+  coverUrl             String?                          // v2: Cover image URL for reel thumbnails
+  caption              String?       @db.Text
+  hashtags             String[]      @default([])       // v2: Generated hashtags
+  externalPostId       String?
+  externalPostUrl      String?
+  source               String        @default("composed") // composed | replicate
+  status               String        @default("DRAFT")  // DRAFT, APPROVED, RENDERING, RENDERED, SCHEDULED, PUBLISHING, PUBLISHED, FAILED
+  scheduledAt          DateTime?
+  publishAttempts      Int           @default(0)
+  lastPublishError     String?       @db.Text
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  ideaId               String?                          // Back-reference to the source idea
+  sceneTypes           String[]      @default([])       // Scene types used (for diversity tracking)
+  topicHash            String?                          // Hash of main topic (for dedup)
+
+  // Phase 18: provenance (copied from idea at creation for audit & re-runs)
+  brandPersonaId       String?
+  ideasFrameworkId     String?
+  contentPrinciplesId  String?
+
+  // Phase 18: user-managed media (head_talk / replicate formats)
+  userUploadedMediaUrl String?
+  userPostedManually   Boolean       @default(false)
+
+  account              SocialAccount             @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  template             Template?                 @relation(fields: [templateId], references: [id])
+  idea                 ContentIdea?              @relation(fields: [ideaId], references: [id])
+  brandPersona         BrandPersona?             @relation(fields: [brandPersonaId], references: [id])
+  ideasFramework       IdeasFramework?           @relation(fields: [ideasFrameworkId], references: [id])
+  contentPrinciples    ContentCreationPrinciples? @relation(fields: [contentPrinciplesId], references: [id])
+  renderJob            RenderJob?                       // v2: Async render job
 }
 
 /// v2: Async render job queue — tracks render status for compositions
@@ -247,7 +308,7 @@ model RenderJob {
   renderTimeMs  Int?                              // Performance tracking
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
-  
+
   composition   Composition @relation(fields: [compositionId], references: [id], onDelete: Cascade)
 }
 
@@ -262,22 +323,30 @@ model ContentPlan {
   deliveredAt DateTime?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
-  
+
   account     SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@unique([accountId, date])
 }
 
-model PostingSchedule {
-  id            String        @id @default(cuid())
-  accountId     String        @unique
-  frequencyDays Int           @default(1) // E.g., post every X days
-  reelsPerDay   Int           @default(5)          // v2: Target reels per day
-  trialReelsPerDay Int        @default(5)          // v2: Target trial reels per day
-  postingTimes  Json          @default("[]")       // v2: Array of HH:MM strings for posting
-  trialPostingTimes Json     @default("[]")       // v2: Separate times for trial reels
-  timezone      String        @default("Europe/Madrid") // v2: Account timezone
-  lastPostedAt  DateTime?
-  
-  account       SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+model ContentPlanner {
+  id                  String        @id @default(cuid())
+  accountId           String
+  name                String        // e.g. "Conservative Daily", "Aggressive Growth"
+  isDefault           Boolean       @default(false)
+  autoApproveSchedule Boolean       @default(false)
+  strategistPrompt    String?       @db.Text             // Phase 18: AI strategist system prompt
+  daysToPlan          Int           @default(7)           // Phase 18: planning horizon
+
+  frequencyDays       Int           @default(1) // E.g., post every X days
+  reelsPerDay         Int           @default(5)
+  trialReelsPerDay    Int           @default(5)
+  postingTimes        Json          @default("[]")        // Array of HH:MM strings
+  trialPostingTimes   Json          @default("[]")
+  timezone            String        @default("Europe/Madrid")
+  lastPostedAt        DateTime?
+
+  account             SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, name])
 }
