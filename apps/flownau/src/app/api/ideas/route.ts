@@ -30,7 +30,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { accountId, ideaText, source, status } = body
+    const { accountId, ideaText, source, status, format } = body
 
     if (!accountId || !ideaText) {
       return NextResponse.json({ error: 'Missing accountId or ideaText' }, { status: 400 })
@@ -46,6 +46,7 @@ export async function POST(req: Request) {
       data: {
         accountId,
         ideaText,
+        format: format ?? null,
         source: source || 'manual',
         status: status || 'PENDING',
         priority,

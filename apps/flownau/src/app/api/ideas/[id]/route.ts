@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
-import { requireAuth, getAuthUser } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth'
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -17,6 +17,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const updateData: Record<string, unknown> = {}
     if (body.status !== undefined) updateData.status = body.status
     if (body.ideaText !== undefined) updateData.ideaText = body.ideaText
+    if (body.format !== undefined) updateData.format = body.format
 
     const idea = await prisma.contentIdea.update({
       where: { id },
