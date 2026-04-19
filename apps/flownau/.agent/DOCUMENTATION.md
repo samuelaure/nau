@@ -4,7 +4,7 @@
 
 - **Type:** A — Platform Service (headless API + internal dashboard)
 - **Domain:** Content creation, scene-based video/image composition, automated publishing
-- **Status:** Active — Phase 13: Platform Brand Registry & Ideation Pipeline Fix
+- **Status:** Active — Phase 15: Content Pool & Auto-Development
 
 ## Purpose
 
@@ -115,6 +115,8 @@ Ideation (Format, Text) → Content Pool (Creative Development, Review) → Sche
 | RENDER_MAX_ATTEMPTS           | No       | Max retry per render job (default: 3) |
 | CRON_SECRET                   | Yes      | Automated flow protection (Bearer)    |
 
+- **[2026-04-19] Phase 15 — Content Pool & Auto-Development (complete)**: Implemented the Content Pool review dashboard. Added `autoApprovePool` flag to bypass human review for trusted pipelines. Added mobile ingestion via `/api/v1/replicate` to enable captures from 9naŭ to land directly in the development pool.
+- **[2026-04-19] Phase 14 — Ideation Formats & Autonomous Ideas (complete)**: Enhanced ideation engine with format support (Head Talk, Carousel, etc.). Implemented first "Auto-Approve" gate (`autoApproveIdeas`) to automatically move ideas into the development pool. Standardized gate naming by removing legacy `engine_` prefixes.
 - **[2026-04-18] SSO via 9naŭ (Phase 13)**: Dropped NextAuth. Dashboard routes and internal APIs validate JWTs signed by 9naŭ API. `userId` in flownaŭ maps strictly to 9naŭ `User.id`.
 - **[2026-04-18] Brand Linking Canonical Naming (Phase 13)**: `SocialAccount` stores `brandId` referencing nauthenticity's `Brand.id`. Ideation pipeline uses this ID. `Workspace` stores `platformWorkspaceId` referencing 9naŭ `Workspace.id`.
 - **[2026-04-17] CI/CD & Integration Hardening (Phase 9)**: Implemented Docker BuildKit caching (GHA scope) for rapid deployments. Added safe `df -h` diagnostic logging and sequential container/image pruning to solve persistent disk exhaustion issues. Standardized CRON_SECRET protection and established `docs/integrations.md`.
