@@ -113,11 +113,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     signIn: "/login",
   },
   callbacks: {
-    jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id;
         token.isAdmin = (user as any).isAdminString === "true";
         token.nauUserId = (user as any).nauUserId ?? null;
+      }
+      // Re-sync nauUserId from DB when the session is explicitly updated
+      if (trigger === "update" && token.id) {
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { telegramId: BigInt(token.id as string) },
+            select: { nauUserId: true },
+          });
+          token.nauUserId = dbUser?.nauUserId ?? null;
+        } catch {
+          // Non-critical
+        }
       }
       return token;
     },

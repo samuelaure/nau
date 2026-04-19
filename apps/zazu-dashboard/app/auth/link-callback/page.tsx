@@ -4,12 +4,14 @@ export const dynamic = 'force-dynamic';
 
 import { useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { linkTelegramAccount } from '../../lib/link-account';
 import { Loader2 } from 'lucide-react';
 
 function LinkCallbackHandler() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { update } = useSession();
 
   useEffect(() => {
     const token = searchParams.get('token');
@@ -18,16 +20,17 @@ function LinkCallbackHandler() {
       return;
     }
 
-    linkTelegramAccount(token).then((result) => {
+    linkTelegramAccount(token).then(async (result) => {
       if (result.success) {
+        // Force the JWT to re-sync nauUserId from DB before navigating
+        await update();
         router.replace('/');
-        router.refresh();
       } else {
         console.error('Link failed:', result.error);
         router.replace('/');
       }
     });
-  }, [searchParams, router]);
+  }, [searchParams, router, update]);
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px' }}>
