@@ -8,7 +8,7 @@
 
 ## Purpose
 
-Automated content generation and distribution engine for the naŭ Platform. Converts content ideas into high-quality, brand-aligned social media assets (Reels, Trial Reels, Carousels, Single Images) using scene-based composition with AI-driven creative direction and deterministic assembly. Publishes to Instagram via the Graph API.
+Automated content generation and distribution engine for the naŭ Platform. Converts content ideas into high-quality, brand-aligned social media assets (Reels, Trial Reels, Head Talk, Carousels, Single Images) using scene-based composition with AI-driven creative direction and deterministic assembly. Publishes to Instagram via the Graph API.
 
 ## Tech Stack
 
@@ -28,7 +28,7 @@ Automated content generation and distribution engine for the naŭ Platform. Conv
 ### Core Pipeline
 
 ```
-Ideation → Scene Composition (AI) → Timeline Assembly (Code) → Render (Async) → Publish (IG)
+Ideation (Format, Text) → Content Pool (Creative Development, Review) → Scheduling (Calendar) → Rendering (Async) → Final Review → Publish (IG)
 ```
 
 ### Module Breakdown
