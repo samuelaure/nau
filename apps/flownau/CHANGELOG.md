@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.5.1](https://github.com/samuelaure/flownau/compare/v1.5.0...v1.5.1) (2026-04-19)
+
+
+### Bug Fixes
+
+* **ideation:** allow nullable inspoItemId and update nauthenticity auth ([315dca6](https://github.com/samuelaure/flownau/commit/315dca6733d443bdca5686b82b85e5e1d9efe66d))
+
 ## [1.5.0](https://github.com/samuelaure/flownau/compare/v1.4.1...v1.5.0) (2026-04-19)
 
 
