@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Loader2, MonitorSmartphone, ShieldAlert } from 'lucide-react';
 import AdminDashboard from './components/AdminDashboard';
 import UserDashboard from './components/UserDashboard';
+import LinkAccountPrompt from './components/auth/link-account-prompt';
 
 export const dynamic = "force-dynamic";
 
@@ -23,9 +24,11 @@ export default function Dashboard() {
 
   const isAdmin = session?.user?.isAdmin === true;
   const isActuallyShowingAdmin = isAdmin && viewMode === 'admin';
+  const needsLink = status === 'authenticated' && !session?.user?.nauUserId;
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      {needsLink && <LinkAccountPrompt />}
       {/* Global View Switcher for Admins */}
       {isAdmin && (
         <div style={{ 

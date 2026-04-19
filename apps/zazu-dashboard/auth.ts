@@ -2,12 +2,14 @@ import NextAuth, { type DefaultSession } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import crypto from "crypto";
 import { jwtVerify } from "jose";
+import prisma from "@zazu/db";
 
 declare module "next-auth" {
   interface Session {
     user: {
       userId: string;
       isAdmin: boolean;
+      nauUserId: string | null;
     } & DefaultSession["user"];
   }
 }
@@ -62,11 +64,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           const tgUserId = tgUser.id.toString();
           const isAdmin = tgUserId === ADMIN_TELEGRAM_ID;
 
+          const dbUser = await prisma.user.findUnique({
+            where: { telegramId: BigInt(tgUser.id) },
+            select: { nauUserId: true },
+          });
+
           return {
             id: tgUserId,
             name: tgUser.first_name,
             image: tgUser.photo_url,
             isAdminString: isAdmin ? "true" : "false",
+            nauUserId: dbUser?.nauUserId ?? null,
           };
         } catch (e) {
           console.error("Telegram Auth Error:", e);
@@ -109,6 +117,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (user) {
         token.id = user.id;
         token.isAdmin = (user as any).isAdminString === "true";
+        token.nauUserId = (user as any).nauUserId ?? null;
       }
       return token;
     },
@@ -116,6 +125,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (session.user) {
         session.user.userId = token.id as string;
         session.user.isAdmin = !!token.isAdmin;
+        session.user.nauUserId = (token.nauUserId as string | null) ?? null;
       }
       return session;
     },
@@ -123,7 +133,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       const isLoggedIn = !!auth?.user;
       const isAuthRoute =
         nextUrl.pathname === "/login" ||
-        nextUrl.pathname.startsWith("/auth/callback");
+        nextUrl.pathname.startsWith("/auth/callback") ||
+        nextUrl.pathname.startsWith("/auth/link-callback");
 
       if (isAuthRoute) {
         if (isLoggedIn && nextUrl.pathname === "/login")
