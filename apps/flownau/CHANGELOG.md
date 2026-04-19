@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.5.0](https://github.com/samuelaure/flownau/compare/v1.4.1...v1.5.0) (2026-04-19)
+
+
+### Features
+
+* **auth:** align with platform SSO via shared cookie middleware ([d50bff4](https://github.com/samuelaure/flownau/commit/d50bff4f3eaddd7ef2155dd0b13c458b37f2fe63))
+
 ### [1.4.1](https://github.com/samuelaure/flownau/compare/v1.4.0...v1.4.1) (2026-04-18)
 
 
