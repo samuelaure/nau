@@ -10,7 +10,7 @@ const IdeationOutputSchema = z.object({
       script: z.string().describe('A full content script or narrative, ready for recording.'),
       cta: z.string().describe('A call-to-action suggestion.'),
       format: z
-        .enum(['reel', 'trial_reel', 'head_talk', 'carousel', 'single_image'])
+        .enum(['reel', 'trial_reel', 'head_talk', 'carousel', 'static_post', 'story'])
         .describe('Recommended content format.'),
       inspoItemId: z
         .string()
@@ -118,7 +118,7 @@ Generate exactly ${req.count} fresh, high-quality content ideas.
 RULES:
 1. Each idea must have a compelling hook, a unique angle, a full script, and a CTA.
 2. Reference inspoItemIds when an idea is directly inspired by a specific InspoItem.
-3. Recommend the best format for each idea: reel (short video), trial_reel (test/experimental reel), head_talk (talking-head recording), carousel (swipeable slides), single_image (static post).
+3. Recommend the best format for each idea: reel (short video), trial_reel (test/experimental reel), head_talk (talking-head script — no video assets, user records themselves), carousel (swipeable slides), static_post (single image), story (Instagram/TikTok story).
 4. Avoid repeating topics from "Recent Published Content".
 5. Honor the Brand DNA for tone, voice, and values.
 6. If a Source Concept is provided, all ideas must be directly inspired by it.

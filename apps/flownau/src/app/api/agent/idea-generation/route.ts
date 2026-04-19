@@ -82,7 +82,7 @@ export async function POST(req: Request) {
       digest: digest ?? undefined,
     })
 
-    const engineAutoApproveIdeas = (persona as any).engine_autoApproveIdeas ?? false
+    const engineAutoApproveIdeas = (persona as any).autoApproveIdeas ?? false
 
     // 5. Save ideas with correct source/priority/format
     const ops = output.ideas.map((idea) => {
@@ -121,7 +121,7 @@ export async function POST(req: Request) {
       await Promise.allSettled(
         generatedIdeas.map(async (savedIdea, idx) => {
           const idea = output.ideas[idx]
-          const format = (idea.format as any) === 'head_talk' ? 'reel' : (idea.format as any)
+          const format = idea.format as any
           try {
             const { creative } = await compose({
               ideaText: savedIdea.ideaText,

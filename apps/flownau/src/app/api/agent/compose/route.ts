@@ -8,13 +8,16 @@ import { z } from 'zod'
 import { logError, logger } from '@/modules/shared/logger'
 import { checkRateLimit } from '@/modules/shared/rate-limit'
 import { compose } from '@/modules/composer/scene-composer'
+import { composeHeadTalk } from '@/modules/composer/head-talk-composer'
 import { selectAssetsForCreative, commitAssetUsage } from '@/modules/composer/asset-curator'
 import { compileTimeline } from '@/modules/composer/timeline-compiler'
 
 const ComposeRequestSchema = z.object({
   prompt: z.string().min(3),
   accountId: z.string(),
-  format: z.enum(['reel', 'trial_reel', 'carousel', 'single_image']).default('reel'),
+  format: z
+    .enum(['reel', 'trial_reel', 'head_talk', 'carousel', 'static_post', 'story'])
+    .default('reel'),
   ideaId: z.string().optional(),
   personaId: z.string().optional(),
 })
@@ -51,65 +54,82 @@ export async function POST(req: Request) {
 
     await checkAccountAccess(accountId)
 
-    // 1. SceneComposer: AI Creative Direction
-    const { creative } = await compose({
-      ideaText: prompt,
-      accountId,
-      format,
-      personaId,
-    })
-
-    // 2. AssetCurator: Select media + audio
-    const { sceneAssets, audioAsset } = await selectAssetsForCreative(creative, accountId, 30)
-
-    // 3. Build brand style
-    const brandStyle = {
-      primaryColor: '#6C63FF',
-      accentColor: '#FF6584',
-      fontFamily: 'sans-serif',
-    }
-
-    // 4. TimelineCompiler: Deterministic assembly
-    const { schema } = compileTimeline(creative, sceneAssets, audioAsset, brandStyle, format)
-
-    // 5. Determine approval state
+    // Fetch persona for auto-approve flags
     const persona = personaId
       ? await prisma.brandPersona.findUnique({ where: { id: personaId } })
       : ((await prisma.brandPersona.findFirst({ where: { accountId, isDefault: true } })) ??
         (await prisma.brandPersona.findFirst({ where: { accountId } })))
 
-    const isAutoApprove = persona?.autoApproveCompositions ?? false
+    const isAutoApproveCompositions = persona?.autoApproveCompositions ?? false
+    const isAutoApprovePool = (persona as any)?.engine_autoApprovePool ?? false
 
-    // 6. Save Composition
-    const newComposition = await prisma.composition.create({
-      data: {
-        accountId,
-        format,
-        creative: creative as unknown as Prisma.InputJsonValue,
-        payload: schema as unknown as Prisma.InputJsonValue,
-        caption: creative.caption,
-        hashtags: creative.hashtags,
-        ideaId: ideaId ?? null,
-        status: isAutoApprove ? 'APPROVED' : 'DRAFT',
-      },
-    })
+    const finalStatus = isAutoApproveCompositions || isAutoApprovePool ? 'APPROVED' : 'DRAFT'
 
-    // 7. Consume idea if provided
+    let newComposition
+
+    if (format === 'head_talk') {
+      // Head Talk: AI generates script + caption + hashtags only. No video/image assets.
+      const result = await composeHeadTalk({ ideaText: prompt, accountId, personaId })
+
+      newComposition = await prisma.composition.create({
+        data: {
+          accountId,
+          format,
+          source: 'composed',
+          payload: { type: 'head_talk', script: result.script } as unknown as Prisma.InputJsonValue,
+          caption: result.caption,
+          hashtags: result.hashtags,
+          ideaId: ideaId ?? null,
+          status: finalStatus,
+        },
+      })
+
+      logger.info(`[HeadTalkCompose] Created script composition ${newComposition.id}`)
+    } else {
+      // Standard scene-based compose pipeline
+      const { creative } = await compose({ ideaText: prompt, accountId, format, personaId })
+
+      const { sceneAssets, audioAsset } = await selectAssetsForCreative(creative, accountId, 30)
+
+      const brandStyle = {
+        primaryColor: '#6C63FF',
+        accentColor: '#FF6584',
+        fontFamily: 'sans-serif',
+      }
+
+      const { schema } = compileTimeline(creative, sceneAssets, audioAsset, brandStyle, format)
+
+      newComposition = await prisma.composition.create({
+        data: {
+          accountId,
+          format,
+          source: 'composed',
+          creative: creative as unknown as Prisma.InputJsonValue,
+          payload: schema as unknown as Prisma.InputJsonValue,
+          caption: creative.caption,
+          hashtags: creative.hashtags,
+          ideaId: ideaId ?? null,
+          status: finalStatus,
+        },
+      })
+
+      // Track asset usage
+      const usedAssetIds = [...sceneAssets.values()].map((a) => a.id)
+      if (audioAsset) usedAssetIds.push(audioAsset.id)
+      await commitAssetUsage(usedAssetIds)
+
+      logger.info(
+        `[DashboardCompose] Created composition ${newComposition.id} (${creative.scenes.length} scenes)`,
+      )
+    }
+
+    // Mark idea as USED after successful compose
     if (ideaId) {
       await prisma.contentIdea.update({
         where: { id: ideaId },
         data: { status: 'USED' },
       })
     }
-
-    // 8. Track asset usage
-    const usedAssetIds = [...sceneAssets.values()].map((a) => a.id)
-    if (audioAsset) usedAssetIds.push(audioAsset.id)
-    await commitAssetUsage(usedAssetIds)
-
-    logger.info(
-      `[DashboardCompose] Created composition ${newComposition.id} (${creative.scenes.length} scenes)`,
-    )
 
     return NextResponse.json({ composition: newComposition }, { status: 200 })
   } catch (error: unknown) {
