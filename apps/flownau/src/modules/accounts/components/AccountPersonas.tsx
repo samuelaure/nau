@@ -14,6 +14,7 @@ const DEFAULT_FORM = {
   isDefault: false,
   autoApproveIdeas: false,
   autoApproveCompositions: false,
+  engine_autoApproveIdeas: false,
   capturedCount: 3,
   capturedAutoApprove: false,
   manualCount: 5,
@@ -82,6 +83,7 @@ export default function AccountPersonas({ accountId }: { accountId: string }) {
       isDefault: p.isDefault,
       autoApproveIdeas: p.autoApproveIdeas,
       autoApproveCompositions: p.autoApproveCompositions,
+      engine_autoApproveIdeas: p.engine_autoApproveIdeas ?? false,
       capturedCount: p.capturedCount ?? 3,
       capturedAutoApprove: p.capturedAutoApprove ?? false,
       manualCount: p.manualCount ?? 5,
@@ -309,6 +311,17 @@ export default function AccountPersonas({ accountId }: { accountId: string }) {
               />
               Auto-Approve Final Compositions (Trusted Mode)
             </label>
+            <label className="flex items-center gap-2 cursor-pointer text-sm text-amber-400">
+              <input
+                type="checkbox"
+                checked={formData.engine_autoApproveIdeas}
+                onChange={(e) =>
+                  setFormData({ ...formData, engine_autoApproveIdeas: e.target.checked })
+                }
+                className="rounded bg-gray-800 border-gray-700"
+              />
+              Engine: Auto-Compose Ideas → Draft Pool (Phase 14)
+            </label>
           </div>
 
           <div className="flex gap-2 justify-end mt-4">
@@ -402,6 +415,11 @@ export default function AccountPersonas({ accountId }: { accountId: string }) {
                 <span className="text-[10px] text-red-400">✓ Auto-Publish Drafts</span>
               ) : (
                 <span className="text-[10px] text-gray-600">✗ Manual Drafts Review</span>
+              )}
+              {p.engine_autoApproveIdeas ? (
+                <span className="text-[10px] text-amber-400">✓ Engine: Auto-Compose Ideas</span>
+              ) : (
+                <span className="text-[10px] text-gray-600">✗ Engine: Manual Compose</span>
               )}
             </div>
           </Card>

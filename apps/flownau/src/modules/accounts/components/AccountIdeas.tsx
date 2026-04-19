@@ -4,7 +4,22 @@ import { useState, useEffect } from 'react'
 import { Card } from '@/modules/shared/components/ui/Card'
 import { Button } from '@/modules/shared/components/ui/Button'
 import { toast } from 'sonner'
-import { Loader2, Wand2, CheckCircle2, Trash2, Zap, User, Bot, Pencil, Brain } from 'lucide-react'
+import {
+  Loader2,
+  Wand2,
+  CheckCircle2,
+  Trash2,
+  Zap,
+  User,
+  Bot,
+  Pencil,
+  Brain,
+  Film,
+  ImageIcon,
+  LayoutGrid,
+  Mic,
+  Play,
+} from 'lucide-react'
 
 import Modal from '@/modules/shared/components/Modal'
 import { cn } from '@/modules/shared/utils'
@@ -47,6 +62,49 @@ function AiLinkedBadge() {
     <span className="inline-flex items-center gap-1 text-[10px] font-bold tracking-widest px-2 py-0.5 rounded-full uppercase bg-rose-500/10 text-rose-400 border border-rose-500/20">
       <Brain size={10} />
       AI-Linked
+    </span>
+  )
+}
+
+const FORMAT_CONFIG: Record<string, { label: string; icon: React.ElementType; className: string }> =
+  {
+    reel: {
+      label: 'Reel',
+      icon: Film,
+      className: 'bg-pink-500/10 text-pink-400 border border-pink-500/20',
+    },
+    trial_reel: {
+      label: 'Trial Reel',
+      icon: Play,
+      className: 'bg-orange-500/10 text-orange-400 border border-orange-500/20',
+    },
+    head_talk: {
+      label: 'Head Talk',
+      icon: Mic,
+      className: 'bg-teal-500/10 text-teal-400 border border-teal-500/20',
+    },
+    carousel: {
+      label: 'Carousel',
+      icon: LayoutGrid,
+      className: 'bg-blue-500/10 text-blue-400 border border-blue-500/20',
+    },
+    single_image: {
+      label: 'Image',
+      icon: ImageIcon,
+      className: 'bg-gray-500/10 text-gray-400 border border-gray-500/20',
+    },
+  }
+
+function FormatBadge({ format }: { format: string }) {
+  const config = FORMAT_CONFIG[format]
+  if (!config) return null
+  const Icon = config.icon
+  return (
+    <span
+      className={`inline-flex items-center gap-1 text-[10px] font-bold tracking-widest px-2 py-0.5 rounded-full uppercase ${config.className}`}
+    >
+      <Icon size={10} />
+      {config.label}
     </span>
   )
 }
@@ -342,7 +400,7 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
         body: JSON.stringify({
           accountId,
           prompt: composingIdea.ideaText,
-          format: 'reel',
+          format: composingIdea.format === 'head_talk' ? 'reel' : composingIdea.format || 'reel',
           ideaId: composingIdea.id,
           personaId: selectedPersonaId,
           templateId: selectedTemplateId || undefined,
@@ -558,6 +616,7 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
                     {idea.status}
                   </span>
                   {idea.source && <SourceBadge source={idea.source} />}
+                  {idea.format && <FormatBadge format={idea.format} />}
                   {idea.aiLinked && <AiLinkedBadge />}
                 </div>
                 <p className="text-sm whitespace-pre-wrap">{idea.ideaText}</p>
@@ -734,8 +793,9 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
         <Modal isOpen={true} onClose={() => !composing && setComposingIdea(null)}>
           <div className="space-y-4">
             <div className="flex items-center gap-2 mb-1">
-              <h2 className="text-xl font-heading font-semibold">Compose Reel</h2>
+              <h2 className="text-xl font-heading font-semibold">Compose</h2>
               {composingIdea.source && <SourceBadge source={composingIdea.source} />}
+              {composingIdea.format && <FormatBadge format={composingIdea.format} />}
             </div>
 
             <div className="bg-gray-900 rounded-lg p-3 border border-gray-800 max-h-[120px] overflow-y-auto">
