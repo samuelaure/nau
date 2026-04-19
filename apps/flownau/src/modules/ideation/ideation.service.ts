@@ -12,7 +12,7 @@ const IdeationOutputSchema = z.object({
       format: z
         .enum(['reel', 'carousel', 'static_post', 'story'])
         .describe('Recommended content format.'),
-      inspoItemId: z.string().optional().describe('ID of the InspoItem that inspired this idea.'),
+      inspoItemId: z.string().nullable().optional().describe('ID of the InspoItem that inspired this idea.'),
     }),
   ),
   briefSummary: z.string().describe('A brief meta-summary of the ideation session.'),

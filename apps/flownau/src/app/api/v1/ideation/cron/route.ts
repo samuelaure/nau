@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateContentIdeas } from '@/modules/ideation/ideation.service'
+import { prisma } from '@/modules/shared/prisma'
 
 export async function POST(request: NextRequest) {
   // Auth guard
@@ -67,6 +68,27 @@ export async function POST(request: NextRequest) {
         method: 'POST',
         headers: { Authorization: `Bearer ${expectedKey}` },
       })
+    }
+
+    // 4.5 Persist ideas as ContentIdea records in flownau
+    try {
+      const account = await prisma.socialAccount.findFirst({ where: { brandId } })
+      if (account) {
+        const persona = await prisma.brandPersona.findFirst({ where: { accountId: account.id } })
+        const autoApprove = persona?.automaticAutoApprove ?? false
+        await prisma.contentIdea.createMany({
+          data: result.ideas.map((idea) => ({
+            accountId: account.id,
+            ideaText: `Hook: ${idea.hook}\nAngle: ${idea.angle}\nFormat: ${idea.format}\nScript: ${idea.script}\nCTA: ${idea.cta}`,
+            source: 'automatic',
+            status: autoApprove ? 'APPROVED' : 'PENDING',
+            priority: 3,
+          })),
+          skipDuplicates: true,
+        })
+      }
+    } catch (e) {
+      console.warn('[Ideation Cron] Warning: Could not persist ContentIdea records', e)
     }
 
     // 5. Format the Brief as Markdown

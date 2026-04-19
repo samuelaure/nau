@@ -33,7 +33,7 @@ export async function fetchBrandDigest(brandId: string): Promise<BrandDigest | n
   try {
     const response = await axios.get<BrandDigest>(`${baseUrl}/api/v1/inspo/digest`, {
       params: { brandId },
-      headers: { Authorization: `Bearer ${serviceKey}` },
+      headers: { 'x-nau-service-key': serviceKey },
       timeout: NAUTHENTICITY_TIMEOUT_MS,
     })
 
