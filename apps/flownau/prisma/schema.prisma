@@ -160,6 +160,7 @@ model BrandPersona {
   autoApproveIdeas        Boolean  @default(false) // Phase 14: auto-create Draft Composition when idea is approved
   autoApproveCompositions Boolean  @default(false)
   autoApprovePool         Boolean  @default(false) // Phase 15: auto-move Draft→APPROVED in Content Pool
+  autoApproveSchedule     Boolean  @default(false) // Phase 16: auto-slot APPROVED → SCHEDULED (authorizes rendering)
 
   // Per-origin engine settings (Phase 8)
   capturedAutoApprove     Boolean  @default(false)  // Captured ideas require review by default
