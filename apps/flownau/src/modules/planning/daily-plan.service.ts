@@ -92,7 +92,6 @@ export async function generateDailyPlan(accountId: string, date: Date): Promise<
   // 1. Fetch account info
   const account = await prisma.socialAccount.findUnique({
     where: { id: accountId },
-    include: { postingSchedule: true },
   })
 
   if (!account) {

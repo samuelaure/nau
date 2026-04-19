@@ -27,9 +27,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       data: {
         name: body.name,
         remotionId: body.remotionId,
+        scope: body.scope,
         schemaJson: body.schemaJson,
+        contentSchema: body.contentSchema,
         systemPrompt: body.systemPrompt,
         creationPrompt: body.creationPrompt,
+        captionPrompt: body.captionPrompt,
+        sceneType: body.sceneType,
       },
     })
     return NextResponse.json({ template }, { status: 200 })

@@ -1,16 +1,22 @@
 import { prisma } from '@/modules/shared/prisma'
 import { logger } from '@/modules/shared/logger'
+import { runPlannerStrategist } from '@/modules/scheduling/planner-strategist'
 
 /**
- * Scans for APPROVED compositions and assigns them to next matching PostingSchedule slots.
- * If the account's default persona has autoApproveSchedule=true, moves them to SCHEDULED.
- * Otherwise, they retain APPROVED status but receive a `scheduledAt` (suggested slot).
+ * Phase 18: AI planner-strategist orders APPROVED compositions, then a
+ * rule-based slot calculator assigns each to the next matching HH:MM slot
+ * from the account's default ContentPlanner.
+ *
+ * Gate: ContentPlanner.autoApproveSchedule
+ *   true  → composition moves to SCHEDULED (authorises advance rendering)
+ *   false → composition keeps APPROVED status but receives a scheduledAt suggestion
  */
 export async function runAutonomousScheduler(): Promise<{
   slotted: number
   autoScheduled: number
 }> {
-  const schedules = await prisma.postingSchedule.findMany({
+  const planners = await prisma.contentPlanner.findMany({
+    where: { isDefault: true },
     include: { account: true },
   })
 
@@ -18,42 +24,70 @@ export async function runAutonomousScheduler(): Promise<{
   let autoScheduled = 0
   const now = new Date()
 
-  for (const schedule of schedules) {
-    if (!schedule.account) continue
+  for (const planner of planners) {
+    if (!planner.account) continue
 
-    const postingTimes: string[] = Array.isArray(schedule.postingTimes)
-      ? (schedule.postingTimes as string[])
-      : JSON.parse((schedule.postingTimes as string) || '[]')
+    const postingTimes: string[] = Array.isArray(planner.postingTimes)
+      ? (planner.postingTimes as string[])
+      : JSON.parse((planner.postingTimes as string) || '[]')
 
-    const trialPostingTimes: string[] = Array.isArray(schedule.trialPostingTimes)
-      ? (schedule.trialPostingTimes as string[])
-      : JSON.parse((schedule.trialPostingTimes as string) || '[]')
+    const trialPostingTimes: string[] = Array.isArray(planner.trialPostingTimes)
+      ? (planner.trialPostingTimes as string[])
+      : JSON.parse((planner.trialPostingTimes as string) || '[]')
 
     const hasSlots = postingTimes.length > 0 || trialPostingTimes.length > 0
     if (!hasSlots) continue
 
-    // Resolve autoApproveSchedule from default persona
-    const persona = await prisma.brandPersona.findFirst({
-      where: { accountId: schedule.accountId, isDefault: true },
-    })
-    const autoApprove = persona?.autoApproveSchedule ?? false
+    const autoApprove = planner.autoApproveSchedule
 
-    // Find APPROVED compositions without a scheduled slot
     const approved = await prisma.composition.findMany({
       where: {
-        accountId: schedule.accountId,
+        accountId: planner.accountId,
         status: 'APPROVED',
         scheduledAt: null,
       },
+      select: { id: true, format: true, ideaId: true },
       orderBy: { createdAt: 'asc' },
     })
 
     if (approved.length === 0) continue
 
+    // Fetch idea text for the AI strategist (minimal payload — token-economic)
+    const ideaIds = approved.map((c) => c.ideaId).filter(Boolean) as string[]
+    const ideas = await prisma.contentIdea.findMany({
+      where: { id: { in: ideaIds } },
+      select: { id: true, ideaText: true },
+    })
+    const ideaTextMap = new Map(ideas.map((i) => [i.id, i.ideaText]))
+
+    const pieces = approved.map((c) => ({
+      id: c.id,
+      format: c.format,
+      ideaText: c.ideaId ? (ideaTextMap.get(c.ideaId) ?? '') : '',
+    }))
+
+    // AI strategist: returns ordered composition IDs
+    let orderedIds = pieces.map((p) => p.id)
+    if (planner.strategistPrompt) {
+      orderedIds = await runPlannerStrategist({
+        strategistPrompt: planner.strategistPrompt,
+        pieces,
+        reelsPerDay: planner.reelsPerDay,
+        trialReelsPerDay: planner.trialReelsPerDay,
+        daysToPlan: planner.daysToPlan,
+      })
+    }
+
+    // Rebuild ordered list (AI may reorder)
+    const compositionMap = new Map(approved.map((c) => [c.id, c]))
+    const orderedComps = orderedIds
+      .map((id) => compositionMap.get(id))
+      .filter((c): c is NonNullable<typeof c> => Boolean(c))
+
     // Baseline: latest already-assigned slot in the future, or now
     const latestSlotted = await prisma.composition.findFirst({
       where: {
-        accountId: schedule.accountId,
+        accountId: planner.accountId,
         scheduledAt: { not: null },
         status: { in: ['APPROVED', 'SCHEDULED', 'RENDERING', 'RENDERED', 'PUBLISHING'] },
       },
@@ -66,11 +100,11 @@ export async function runAutonomousScheduler(): Promise<{
         ? new Date(latestSlotted.scheduledAt)
         : new Date(now)
 
-    for (const comp of approved) {
+    for (const comp of orderedComps) {
       const timesToUse = comp.format === 'trial_reel' ? trialPostingTimes : postingTimes
       if (timesToUse.length === 0) continue
 
-      const nextSlot = calculateNextSlot(baseline, timesToUse, schedule.timezone)
+      const nextSlot = calculateNextSlot(baseline, timesToUse, planner.timezone)
 
       await prisma.composition.update({
         where: { id: comp.id },
@@ -86,7 +120,7 @@ export async function runAutonomousScheduler(): Promise<{
     }
 
     logger.info(
-      `[Scheduler] ${schedule.accountId}: slotted ${approved.length} compositions (autoApprove=${autoApprove})`,
+      `[Scheduler] ${planner.accountId}: slotted ${orderedComps.length} compositions (autoApprove=${autoApprove}, strategist=${Boolean(planner.strategistPrompt)})`,
     )
   }
 
