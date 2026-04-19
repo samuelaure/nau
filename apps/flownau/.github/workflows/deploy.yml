@@ -45,7 +45,6 @@ jobs:
           cache-from: type=gha,scope=base
           cache-to: type=gha,mode=max,scope=base
 
-
   # ---------------------------------------------------------------
   # Job 2: Build Next.js on the GHA runner (needs real Postgres to
   # collect page data), then build + push App and Renderer images
@@ -223,4 +222,3 @@ jobs:
 
             # Run migrations using the freshly deployed container
             docker exec flownau npx prisma migrate deploy
-

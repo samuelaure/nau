@@ -4,38 +4,33 @@ All notable changes to this project will be documented in this file. See [standa
 
 ### [1.5.1](https://github.com/samuelaure/flownau/compare/v1.5.0...v1.5.1) (2026-04-19)
 
-
 ### Bug Fixes
 
-* **ideation:** allow nullable inspoItemId and update nauthenticity auth ([315dca6](https://github.com/samuelaure/flownau/commit/315dca6733d443bdca5686b82b85e5e1d9efe66d))
+- **ideation:** allow nullable inspoItemId and update nauthenticity auth ([315dca6](https://github.com/samuelaure/flownau/commit/315dca6733d443bdca5686b82b85e5e1d9efe66d))
 
 ## [1.5.0](https://github.com/samuelaure/flownau/compare/v1.4.1...v1.5.0) (2026-04-19)
 
-
 ### Features
 
-* **auth:** align with platform SSO via shared cookie middleware ([d50bff4](https://github.com/samuelaure/flownau/commit/d50bff4f3eaddd7ef2155dd0b13c458b37f2fe63))
+- **auth:** align with platform SSO via shared cookie middleware ([d50bff4](https://github.com/samuelaure/flownau/commit/d50bff4f3eaddd7ef2155dd0b13c458b37f2fe63))
 
 ### [1.4.1](https://github.com/samuelaure/flownau/compare/v1.4.0...v1.4.1) (2026-04-18)
 
-
 ### Bug Fixes
 
-* **deploy:** force base image build by removing conditional logic ([b7ededc](https://github.com/samuelaure/flownau/commit/b7ededcbb4206f40a14eae6b1a8ef1de2fb549bd))
+- **deploy:** force base image build by removing conditional logic ([b7ededc](https://github.com/samuelaure/flownau/commit/b7ededcbb4206f40a14eae6b1a8ef1de2fb549bd))
 
 ## [1.4.0](https://github.com/samuelaure/flownau/compare/v1.3.0...v1.4.0) (2026-04-18)
 
-
 ### Features
 
-* **flownau:** add shared base image with system deps for app and renderer ([466cf77](https://github.com/samuelaure/flownau/commit/466cf77373005da1d36d569350c984e41deb22a5))
+- **flownau:** add shared base image with system deps for app and renderer ([466cf77](https://github.com/samuelaure/flownau/commit/466cf77373005da1d36d569350c984e41deb22a5))
 
 ## [1.3.0](https://github.com/samuelaure/flownau/compare/v1.2.8...v1.3.0) (2026-04-18)
 
-
 ### Features
 
-* **flownau:** implement sso redirection and callback handler ([c5ccb5f](https://github.com/samuelaure/flownau/commit/c5ccb5fc9d8d0c462b967bb220b8bc5d7db1270b))
+- **flownau:** implement sso redirection and callback handler ([c5ccb5f](https://github.com/samuelaure/flownau/commit/c5ccb5fc9d8d0c462b967bb220b8bc5d7db1270b))
 
 ### [1.2.4](https://github.com/samuelaure/flownau/compare/v1.2.3...v1.2.4) (2026-04-18)
 
