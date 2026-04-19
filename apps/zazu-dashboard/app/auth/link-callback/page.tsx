@@ -21,13 +21,18 @@ function LinkCallbackHandler() {
       return;
     }
 
-    // Pass initData as a fallback in case the session cookie was dropped
-    // during the cross-domain redirect to accounts.9nau.com
+    // Resolve initData in priority order:
+    // 1. URL param (embedded by link-account-prompt before the cross-domain redirect)
+    // 2. Live SDK value (works when the callback stays in the Mini App WebView)
     let initData: string | undefined;
-    try {
-      const WebApp = require('@twa-dev/sdk').default;
-      initData = WebApp.initData || undefined;
-    } catch { /* not in Mini App context */ }
+    initData = searchParams.get('initData') || undefined;
+    if (!initData) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const WebApp = require('@twa-dev/sdk').default;
+        initData = WebApp.initData || undefined;
+      } catch { /* not in Mini App context */ }
+    }
 
     linkTelegramAccount(token, initData).then(async (result) => {
       if (result.success) {

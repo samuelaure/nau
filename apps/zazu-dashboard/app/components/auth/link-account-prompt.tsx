@@ -12,8 +12,19 @@ export default function LinkAccountPrompt() {
   const [error, setError] = useState<string | null>(null);
 
   const handleLink = () => {
-    const callbackUrl = `${DASHBOARD_URL}/auth/link-callback`;
-    window.location.href = `${ACCOUNTS_URL}/login?continue=${encodeURIComponent(callbackUrl)}`;
+    let initData: string | undefined;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const WebApp = require('@twa-dev/sdk').default;
+      initData = WebApp.initData || undefined;
+    } catch { /* not in Mini App context */ }
+
+    // Embed initData in the callback URL so it survives cross-domain redirects
+    // (Telegram may open the accounts service in an external browser, losing
+    // the Mini App WebView context and its session cookie on the way back).
+    const callbackUrl = new URL(`${DASHBOARD_URL}/auth/link-callback`);
+    if (initData) callbackUrl.searchParams.set('initData', initData);
+    window.location.href = `${ACCOUNTS_URL}/login?continue=${encodeURIComponent(callbackUrl.toString())}`;
   };
 
   return (
