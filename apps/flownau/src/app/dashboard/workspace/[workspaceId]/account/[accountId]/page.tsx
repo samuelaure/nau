@@ -256,7 +256,6 @@ async function AccountSchedule({
   )
 }
 
-
 async function AccountAssets({ accountId }: { accountId: string }) {
   const assets = await prisma.asset.findMany({
     where: { accountId },
