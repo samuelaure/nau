@@ -2,7 +2,13 @@
  * Content format types supported by flownaŭ v2.
  * Determines rendering method and publishing API.
  */
-export type ContentFormat = 'reel' | 'trial_reel' | 'head_talk' | 'carousel' | 'single_image'
+export type ContentFormat =
+  | 'reel'
+  | 'trial_reel'
+  | 'head_talk'
+  | 'carousel'
+  | 'static_post'
+  | 'story'
 
 /**
  * Composition status flow:

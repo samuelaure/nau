@@ -157,9 +157,9 @@ model BrandPersona {
   systemPrompt            String   @db.Text // Tone, Voice, Personality
   modelSelection          AIModel  @default(GROQ_LLAMA_3_3)
   isDefault               Boolean  @default(false)
-  autoApproveIdeas          Boolean  @default(false)
-  autoApproveCompositions   Boolean  @default(false)
-  engine_autoApproveIdeas   Boolean  @default(false) // Phase 14: auto-create Draft Composition when idea is approved
+  autoApproveIdeas        Boolean  @default(false) // Phase 14: auto-create Draft Composition when idea is approved
+  autoApproveCompositions Boolean  @default(false)
+  engine_autoApprovePool  Boolean  @default(false) // Phase 15: auto-move Draft→APPROVED in Content Pool
 
   // Per-origin engine settings (Phase 8)
   capturedAutoApprove     Boolean  @default(false)  // Captured ideas require review by default
@@ -188,7 +188,7 @@ model ContentIdea {
   id           String        @id @default(cuid())
   accountId    String
   ideaText     String        @db.Text
-  format       String?                             // reel | trial_reel | head_talk | carousel | single_image
+  format       String?                             // reel | trial_reel | head_talk | carousel | static_post | story
   status       String        @default("PENDING") // PENDING, APPROVED, REJECTED, USED
   source       String        @default("automatic") // automatic | manual | captured
   sourceRef    String?                             // External reference ID
@@ -212,6 +212,7 @@ model Composition {
   hashtags         String[]      @default([])       // v2: Generated hashtags
   externalPostId   String?
   externalPostUrl  String?
+  source           String        @default("composed") // composed | replicate
   status           String        @default("DRAFT")  // DRAFT, APPROVED, RENDERING, RENDERED, SCHEDULED, PUBLISHING, PUBLISHED, FAILED
   scheduledAt      DateTime?
   publishAttempts  Int           @default(0)
