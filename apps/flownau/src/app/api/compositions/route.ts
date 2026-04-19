@@ -16,13 +16,16 @@ export async function GET(req: Request) {
     await checkAccountAccess(accountId)
 
     const isCalendar = searchParams.get('calendar') === '1'
+    const statusFilter = searchParams.get('status')
 
     const whereClause = isCalendar
       ? {
           accountId,
           status: { in: ['APPROVED', 'SCHEDULED', 'RENDERING', 'RENDERED'] },
         }
-      : { accountId }
+      : statusFilter
+        ? { accountId, status: statusFilter }
+        : { accountId }
 
     const compositions = await prisma.composition.findMany({
       where: whereClause,
@@ -30,6 +33,9 @@ export async function GET(req: Request) {
       include: {
         template: {
           select: { name: true },
+        },
+        renderJob: {
+          select: { outputUrl: true, outputType: true, status: true },
         },
       },
     })

@@ -10,6 +10,7 @@ import AccountPersonas from '@/modules/accounts/components/AccountPersonas'
 import AccountIdeas from '@/modules/accounts/components/AccountIdeas'
 import AccountPool from '@/modules/accounts/components/AccountPool'
 import AccountCalendar from '@/modules/accounts/components/AccountCalendar'
+import AccountFinalReview from '@/modules/accounts/components/AccountFinalReview'
 import ExternalAccountLink from '@/modules/accounts/components/ExternalAccountLink'
 import { cn } from '@/modules/shared/utils'
 import { Button } from '@/modules/shared/components/ui/Button'
@@ -122,6 +123,11 @@ export default async function WorkspaceAccountPage({
           label="Assets"
           count={account._count.assets}
         />
+        <TabLink
+          href={`?tab=final-review`}
+          active={activeTab === 'final-review'}
+          label="Final Review"
+        />
         <TabLink href={`?tab=personas`} active={activeTab === 'personas'} label="Personas" />
         <TabLink href={`?tab=settings`} active={activeTab === 'settings'} label="Settings" />
       </div>
@@ -135,6 +141,7 @@ export default async function WorkspaceAccountPage({
         {activeTab === 'compositions' && <AccountPool accountId={accountId} />}
         {activeTab === 'ideas' && <AccountIdeas accountId={accountId} />}
         {activeTab === 'assets' && <AccountAssets accountId={accountId} />}
+        {activeTab === 'final-review' && <AccountFinalReview accountId={accountId} />}
         {activeTab === 'personas' && <AccountPersonas accountId={accountId} />}
         {activeTab === 'settings' && <AccountSettings account={account} />}
       </div>
