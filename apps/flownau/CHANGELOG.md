@@ -2,20 +2,26 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
-### [1.6.8](https://github.com/samuelaure/flownau/compare/v1.6.7...v1.6.8) (2026-04-20)
+### [1.6.9](https://github.com/samuelaure/flownau/compare/v1.6.8...v1.6.9) (2026-04-20)
 
 
 ### Bug Fixes
 
-* **composer:** correctly handle null suggestedAudioMood in asset curator ([30741a3](https://github.com/samuelaure/flownau/commit/30741a309d313d3ebf8a23e0ab3bbc287f2345b4))
+* **config:** standardize environment variables and harden validation schema ([5919d83](https://github.com/samuelaure/flownau/commit/5919d83db344e08e1ca2ad0efd127d18e05e0066))
+* **test:** align BullMQ jobId format with implementation ([27ccc27](https://github.com/samuelaure/flownau/commit/27ccc2729817680468a4f6de542b791b3bb4c706))
+
+### [1.6.8](https://github.com/samuelaure/flownau/compare/v1.6.7...v1.6.8) (2026-04-20)
+
+### Bug Fixes
+
+- **composer:** correctly handle null suggestedAudioMood in asset curator ([30741a3](https://github.com/samuelaure/flownau/commit/30741a309d313d3ebf8a23e0ab3bbc287f2345b4))
 
 ### [1.6.6](https://github.com/samuelaure/flownau/compare/v1.6.5...v1.6.6) (2026-04-20)
 
-
 ### Bug Fixes
 
-* **auth:** enforce platform SSO and standardize AUTH_SECRET ([b1f5c5c](https://github.com/samuelaure/flownau/commit/b1f5c5c2b485a72895abeeb27a2e4f711189fd73))
-* **renderer:** remove src from dockerignore to allow typescript execution ([9709f4e](https://github.com/samuelaure/flownau/commit/9709f4ec68169da98241bb72a3c7d02938361e8e))
+- **auth:** enforce platform SSO and standardize AUTH_SECRET ([b1f5c5c](https://github.com/samuelaure/flownau/commit/b1f5c5c2b485a72895abeeb27a2e4f711189fd73))
+- **renderer:** remove src from dockerignore to allow typescript execution ([9709f4e](https://github.com/samuelaure/flownau/commit/9709f4ec68169da98241bb72a3c7d02938361e8e))
 
 ### [1.6.5](https://github.com/samuelaure/flownau/compare/v1.6.4...v1.6.5) (2026-04-20)
 
