@@ -23,11 +23,11 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { accountId, name, systemPrompt, isDefault } = body
+    const { accountId, brandId, workspaceId, name, systemPrompt, isDefault } = body
 
-    if (!accountId || !name || !systemPrompt) {
+    if (!accountId || !brandId || !workspaceId || !name || !systemPrompt) {
       return NextResponse.json(
-        { error: 'Missing accountId, name, or systemPrompt' },
+        { error: 'Missing accountId, brandId, workspaceId, name, or systemPrompt' },
         { status: 400 },
       )
     }
@@ -40,7 +40,14 @@ export async function POST(req: Request) {
     }
 
     const principles = await prisma.contentCreationPrinciples.create({
-      data: { accountId, name, systemPrompt, isDefault: isDefault ?? false },
+      data: {
+        accountId,
+        brandId,
+        workspaceId,
+        name,
+        systemPrompt,
+        isDefault: isDefault ?? false,
+      },
     })
 
     return NextResponse.json({ principles }, { status: 201 })
