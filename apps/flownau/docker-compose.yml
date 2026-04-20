@@ -91,6 +91,11 @@ services:
       options:
         max-size: '10m'
         max-file: '3'
+    deploy:
+      resources:
+        limits:
+          memory: 192M
+          cpus: '0.35'
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -111,6 +116,11 @@ services:
       options:
         max-size: '10m'
         max-file: '3'
+    deploy:
+      resources:
+        limits:
+          memory: 192M
+          cpus: '0.35'
     volumes:
       - redis_data:/data
 
