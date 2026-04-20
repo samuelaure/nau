@@ -6,7 +6,7 @@
 
 BACKUP_DIR="./backups"
 # Find the postgres container dynamically
-DB_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E "postgres" | head -n 1)
+DB_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E "whatsnau[-_]postgres" | head -n 1)
 DB_NAME=${DB_NAME:-whatsnau}
 LATEST_BACKUP="${BACKUP_DIR}/${DB_NAME}_latest.sql"
 

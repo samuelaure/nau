@@ -9,7 +9,7 @@
 TIMESTAMP=$(date +%Y%m%d%H%M%S)
 BACKUP_DIR="./backups"
 # Find the postgres container dynamically
-DB_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E "postgres" | head -n 1)
+DB_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E "whatsnau[-_]postgres" | head -n 1)
 DB_NAME=${DB_NAME:-whatsnau}
 BACKUP_FILE="${BACKUP_DIR}/${DB_NAME}_${TIMESTAMP}.sql"
 
