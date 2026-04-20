@@ -195,18 +195,27 @@ export interface BrandTarget {
 
 export interface Brand {
   id: string;
-  userId: string;
-  brandName: string;
-  voicePrompt: string;
-  commentStrategy: string | null;
-  suggestionsCount: number;
-  windowStart: string | null;
-  windowEnd: string | null;
-  timezone: string;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-  targets: BrandTarget[];
+  brandId?: string; // BrandIntelligence uses brandId as PK
+  userId?: string;
+  brandName?: string;
+  name?: string; // 9naŭ Brand.name
+  voicePrompt?: string;
+  commentStrategy?: string | null;
+  suggestionsCount?: number;
+  windowStart?: string | null;
+  windowEnd?: string | null;
+  timezone?: string;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  targets?: BrandTarget[];
+}
+
+export interface NauWorkspace {
+  id: string;
+  name: string;
+  role: string;
+  brands: { id: string; name: string; timezone: string }[];
 }
 
 export interface BrandCreatePayload {
@@ -227,23 +236,37 @@ export type BrandUpdatePayload = Partial<BrandCreatePayload>;
 // ---------------------------------------------------------------------------
 
 /**
- * Fetch all brands for the current authenticated user from nauthenticity.
+ * Fetch all workspaces (with brands) for the current user from 9naŭ API.
  */
-export async function getBrands(): Promise<Brand[]> {
+export async function getWorkspaces(): Promise<NauWorkspace[]> {
+  const nauApiUrl = process.env.NAU_API_URL ?? 'http://9nau-api:3000';
+  const nauServiceKey = process.env.NAU_SERVICE_KEY ?? '';
+
   const session = await auth();
-  const userId = session?.user?.userId || 'admin';
+  const nauUserId = session?.user?.nauUserId;
+  if (!nauUserId) return [];
 
   try {
-    const res = await fetch(
-      `${getNautUrl()}/api/v1/brands?userId=${encodeURIComponent(userId)}`,
-      { headers: getNautHeaders(), next: { tags: ['brands'], revalidate: 0 } },
-    );
-    if (!res.ok) throw new Error(`Failed to fetch brands: ${res.status}`);
-    return (await res.json()) as Brand[];
-  } catch (error) {
-    console.error('[actions] getBrands error:', error);
+    const res = await fetch(`${nauApiUrl}/api/workspaces`, {
+      headers: { 'x-nau-service-key': nauServiceKey, 'x-nau-user-id': nauUserId },
+      next: { revalidate: 0 },
+    });
+    if (!res.ok) return [];
+    return (await res.json()) as NauWorkspace[];
+  } catch {
     return [];
   }
+}
+
+/**
+ * Fetch all brands for the current user.
+ * Now pulls from 9naŭ (source of truth) instead of nauthenticity.
+ */
+export async function getBrands(): Promise<Brand[]> {
+  const workspaces = await getWorkspaces();
+  return workspaces.flatMap((ws) =>
+    ws.brands.map((b) => ({ id: b.id, name: b.name, timezone: b.timezone })),
+  );
 }
 
 /**
