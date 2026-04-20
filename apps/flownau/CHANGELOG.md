@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.7.0](https://github.com/samuelaure/flownau/compare/v1.6.10...v1.7.0) (2026-04-20)
+
+
+### Features
+
+* **cron:** add POST /api/cron/approve-renders bulk-approval endpoint ([630f5b0](https://github.com/samuelaure/flownau/commit/630f5b06d6c76670ba4f0a2b8ee1bb62c9f3f429))
+
+
+### Bug Fixes
+
+* **renderer:** inform bundler of @ path alias to fix production render failures ([5bf4afe](https://github.com/samuelaure/flownau/commit/5bf4afeaeaf90f456f872f77e4d17eb944e0f003))
+
 ### [1.6.10](https://github.com/samuelaure/flownau/compare/v1.6.9...v1.6.10) (2026-04-20)
 
 ### [1.6.9](https://github.com/samuelaure/flownau/compare/v1.6.8...v1.6.9) (2026-04-20)
