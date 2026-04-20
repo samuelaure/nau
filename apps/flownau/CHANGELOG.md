@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.6.8](https://github.com/samuelaure/flownau/compare/v1.6.7...v1.6.8) (2026-04-20)
+
+
+### Bug Fixes
+
+* **composer:** correctly handle null suggestedAudioMood in asset curator ([30741a3](https://github.com/samuelaure/flownau/commit/30741a309d313d3ebf8a23e0ab3bbc287f2345b4))
+
 ### [1.6.6](https://github.com/samuelaure/flownau/compare/v1.6.5...v1.6.6) (2026-04-20)
 
 
