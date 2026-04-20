@@ -148,7 +148,20 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
 
   // 5. Bundle Remotion entry
   logger.info(`[RenderWorker] Bundling Remotion composition...`)
-  const bundleLocation = await bundle(ENTRY_POINT)
+  const bundleLocation = await bundle(ENTRY_POINT, {
+    webpackOverride: (config) => {
+      return {
+        ...config,
+        resolve: {
+          ...config.resolve,
+          alias: {
+            ...config.resolve?.alias,
+            '@': path.resolve(process.cwd(), 'src'),
+          },
+        },
+      }
+    },
+  })
   await job.updateProgress(30)
 
   // 6. Resolve composition from bundle
