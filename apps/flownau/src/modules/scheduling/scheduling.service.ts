@@ -42,7 +42,7 @@ export async function runAutonomousScheduler(): Promise<{
 
     const approved = await prisma.composition.findMany({
       where: {
-        accountId: planner.accountId,
+        accountId: planner.account.id,
         status: 'APPROVED',
         scheduledAt: null,
       },
@@ -87,7 +87,7 @@ export async function runAutonomousScheduler(): Promise<{
     // Baseline: latest already-assigned slot in the future, or now
     const latestSlotted = await prisma.composition.findFirst({
       where: {
-        accountId: planner.accountId,
+        accountId: planner.account.id,
         scheduledAt: { not: null },
         status: { in: ['APPROVED', 'SCHEDULED', 'RENDERING', 'RENDERED', 'PUBLISHING'] },
       },
@@ -120,7 +120,7 @@ export async function runAutonomousScheduler(): Promise<{
     }
 
     logger.info(
-      `[Scheduler] ${planner.accountId}: slotted ${orderedComps.length} compositions (autoApprove=${autoApprove}, strategist=${Boolean(planner.strategistPrompt)})`,
+      `[Scheduler] ${planner.account.id}: slotted ${orderedComps.length} compositions (autoApprove=${autoApprove}, strategist=${Boolean(planner.strategistPrompt)})`,
     )
   }
 
