@@ -76,11 +76,11 @@ export const TextOverMediaSlots = z.object({
 
 export const QuoteCardSlots = z.object({
   quote: z.string().max(200),
-  attribution: z.string().max(50).optional(),
+  attribution: z.string().max(50).optional().nullable(),
 })
 
 export const ListRevealSlots = z.object({
-  title: z.string().max(60).optional(),
+  title: z.string().max(60).optional().nullable(),
   items: z.array(z.string().max(80)).min(2).max(5),
 })
 
@@ -88,7 +88,7 @@ export const MediaOnlySlots = z.object({})
 
 export const CTACardSlots = z.object({
   cta: z.string().max(60),
-  handle: z.string().max(30).optional(),
+  handle: z.string().max(30).optional().nullable(),
 })
 
 export const TransitionSlots = z.object({})
@@ -97,7 +97,7 @@ export const TransitionSlots = z.object({})
 
 export const CoverSlideSlots = z.object({
   title: z.string().max(80),
-  subtitle: z.string().max(120).optional(),
+  subtitle: z.string().max(120).optional().nullable(),
 })
 
 export const ContentSlideSlots = z.object({
@@ -107,17 +107,17 @@ export const ContentSlideSlots = z.object({
 
 export const QuoteSlideSlots = z.object({
   quote: z.string().max(200),
-  attribution: z.string().max(50).optional(),
+  attribution: z.string().max(50).optional().nullable(),
 })
 
 export const ListSlideSlots = z.object({
-  title: z.string().max(60).optional(),
+  title: z.string().max(60).optional().nullable(),
   items: z.array(z.string().max(80)).min(2).max(5),
 })
 
 export const CTASlideSlots = z.object({
   cta: z.string().max(60),
-  handle: z.string().max(30).optional(),
+  handle: z.string().max(30).optional().nullable(),
 })
 
 // ─── Scene Definition (one element in the AI's output) ─────────────
@@ -125,9 +125,9 @@ export const CTASlideSlots = z.object({
 export const SceneDefinitionSchema = z.object({
   type: VideoSceneTypeEnum,
   slots: z.record(z.string(), z.unknown()),
-  mood: z.string().max(40).optional(),
-  assetHint: z.string().max(80).optional(),
-  duration: z.number().min(0.3).max(30).optional(),
+  mood: z.string().max(40).optional().nullable(),
+  assetHint: z.string().max(80).optional().nullable(),
+  duration: z.number().min(0.3).max(30).optional().nullable(),
 })
 
 export type SceneDefinition = z.infer<typeof SceneDefinitionSchema>
@@ -139,7 +139,7 @@ export const CreativeDirectionSchema = z.object({
   caption: z.string().max(2200),
   hashtags: z.array(z.string().max(60)).min(1).max(20),
   coverSceneIndex: z.number().int().min(0),
-  suggestedAudioMood: z.string().max(40).optional(),
+  suggestedAudioMood: z.string().max(40).optional().nullable(),
 })
 
 export type CreativeDirection = z.infer<typeof CreativeDirectionSchema>

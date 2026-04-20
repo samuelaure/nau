@@ -46,7 +46,7 @@ export interface RenderJobData {
  */
 export async function addRenderJob(compositionId: string, priority?: number): Promise<string> {
   const job = await renderQueue.add('render', { compositionId } satisfies RenderJobData, {
-    jobId: `render:${compositionId}`,
+    jobId: `render-${compositionId}`,
     priority: priority ?? 10,
   })
 
@@ -63,7 +63,7 @@ export async function getRenderJobStatus(compositionId: string): Promise<{
   progress: number
   failedReason?: string
 }> {
-  const job = await renderQueue.getJob(`render:${compositionId}`)
+  const job = await renderQueue.getJob(`render-${compositionId}`)
 
   if (!job) {
     return { state: 'unknown', progress: 0 }

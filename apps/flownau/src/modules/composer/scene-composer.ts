@@ -241,12 +241,10 @@ async function callAI(
   if (!raw) throw new Error('Groq returned empty response')
 
   // Extract JSON from potential markdown code blocks
-  const jsonStr = raw.startsWith('{')
-    ? raw
-    : raw
-        .replace(/```json?\n?/g, '')
-        .replace(/```/g, '')
-        .trim()
+  const jsonStr = raw
+    .replace(/```json?\n?/g, '')
+    .replace(/```/g, '')
+    .trim()
 
   let parsed: unknown
   try {
@@ -256,5 +254,22 @@ async function callAI(
       `[SceneComposer] Groq returned invalid JSON: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}. Raw: ${jsonStr.slice(0, 200)}`,
     )
   }
+
+  // Normalize: unwrap array wrapper if the model returned [{...}] instead of {...}
+  if (Array.isArray(parsed)) {
+    parsed = parsed[0]
+  }
+
+  // Normalize: unwrap nested keys the model may use (e.g. { creative_direction: {...} })
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    const obj = parsed as Record<string, unknown>
+    if (!obj.scenes && !obj.caption) {
+      const firstVal = Object.values(obj)[0]
+      if (firstVal && typeof firstVal === 'object' && !Array.isArray(firstVal)) {
+        parsed = firstVal
+      }
+    }
+  }
+
   return CreativeDirectionSchema.parse(parsed)
 }
