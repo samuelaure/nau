@@ -3,7 +3,7 @@
 import { prisma } from '@/modules/shared/prisma'
 import { revalidatePath } from 'next/cache'
 import { syncR2Assets } from '@/modules/video/r2-sync-service'
-import { requireAuth, getAuthUser } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth'
 import { z } from 'zod'
 
 const SettingSchema = z.object({

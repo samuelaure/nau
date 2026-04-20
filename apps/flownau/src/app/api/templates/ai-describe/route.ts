@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
-import { requireAuth, getAuthUser } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth'
 
 /**
  * DEPRECATED: Template AI description was part of the old free-form JSON pipeline.

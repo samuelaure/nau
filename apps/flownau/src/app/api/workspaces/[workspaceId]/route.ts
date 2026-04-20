@@ -1,59 +1,20 @@
 export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
-import { prisma } from '@/modules/shared/prisma'
-import { requireAuth, getAuthUser } from '@/lib/auth'
 
-async function getWorkspaceAccess(workspaceId: string, platformUserId: string) {
-  return prisma.workspaceUser.findUnique({
-    where: { platformUserId_workspaceId: { platformUserId, workspaceId } },
-  })
+
+// Workspace CRUD is now owned exclusively by 9naŭ (9nau-api).
+// These endpoints are kept for backwards-compatibility but return 410 Gone.
+export async function PUT() {
+  return NextResponse.json(
+    { error: 'Workspace management has moved to the 9naŭ Platform. Use PUT /api/workspaces/:id on the 9naŭ API.' },
+    { status: 410 },
+  )
 }
 
-export async function PUT(req: Request, { params }: { params: Promise<{ workspaceId: string }> }) {
-  try {
-    const user = await getAuthUser()
-    if (!user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { workspaceId } = await params
-    const access = await getWorkspaceAccess(workspaceId, user!.id)
-    if (!access || !['owner', 'admin'].includes(access.role)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
-    const body = await req.json()
-    const workspace = await prisma.workspace.update({
-      where: { id: workspaceId },
-      data: { name: body.name },
-    })
-
-    return NextResponse.json({ workspace })
-  } catch {
-    return NextResponse.json({ error: 'Failed to update workspace' }, { status: 500 })
-  }
-}
-
-export async function DELETE(
-  req: Request,
-  { params }: { params: Promise<{ workspaceId: string }> },
-) {
-  try {
-    const user = await getAuthUser()
-    if (!user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { workspaceId } = await params
-    const access = await getWorkspaceAccess(workspaceId, user!.id)
-    if (!access || access.role !== 'owner') {
-      return NextResponse.json({ error: 'Only owners can delete a workspace' }, { status: 403 })
-    }
-
-    await prisma.workspace.delete({ where: { id: workspaceId } })
-    return NextResponse.json({ success: true })
-  } catch {
-    return NextResponse.json({ error: 'Failed to delete workspace' }, { status: 500 })
-  }
+export async function DELETE() {
+  return NextResponse.json(
+    { error: 'Workspace management has moved to the 9naŭ Platform. Use DELETE /api/workspaces/:id on the 9naŭ API.' },
+    { status: 410 },
+  )
 }

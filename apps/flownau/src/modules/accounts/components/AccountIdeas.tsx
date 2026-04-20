@@ -733,7 +733,7 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
               <div className="bg-purple-500/5 border border-purple-500/10 rounded-lg p-4">
                 <p className="text-xs text-purple-200/70 leading-relaxed">
                   The AI will consume the latest <strong>Mechanical Digest</strong> from
-                  Nauthenticity's InspoBase. It will combine the Global synthesis with recent
+                  Nauthenticity&apos;s InspoBase. It will combine the Global synthesis with recent
                   inspirations to generate non-repetitive ideas.
                 </p>
               </div>

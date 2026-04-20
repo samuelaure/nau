@@ -7,7 +7,7 @@ import { usePlaybackStore } from '@/modules/video/store/usePlaybackStore'
 import { useCanvasStore } from '@/modules/video/store/useCanvasStore'
 import { UniversalComposition } from '@/modules/video/remotion/UniversalComposition'
 import { TransformOverlay } from './TransformOverlay'
-import { ZoomIn, ZoomOut, Maximize, MousePointer2 } from 'lucide-react'
+import { ZoomIn, ZoomOut, Maximize } from 'lucide-react'
 import { Tooltip } from '@/modules/video/components/ui/Tooltip'
 
 export function EditorCanvas() {
@@ -26,7 +26,6 @@ export function EditorCanvas() {
   const zoom = useCanvasStore((state) => state.zoom)
   const setZoom = useCanvasStore((state) => state.setZoom)
   const [fitScale, setFitScale] = React.useState(1)
-  const [containerSize, setContainerSize] = React.useState({ width: 0, height: 0 })
 
   // Sync Store -> Player (seeking)
   useEffect(() => {
@@ -100,7 +99,6 @@ export function EditorCanvas() {
       const newFitScale = Math.min(scaleX, scaleY)
 
       setFitScale(newFitScale)
-      setContainerSize({ width, height })
     })
 
     observer.observe(containerRef.current)

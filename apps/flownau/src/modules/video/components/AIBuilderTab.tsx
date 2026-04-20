@@ -85,7 +85,7 @@ const DEFAULT_SCHEMA = {
 // Sub-components defined OUTSIDE to prevent re-mounting focus issues
 const PlayerWrapper = ({
   previewSchema,
-  isFullscreen,
+  isFullscreen: _isFullscreen,
   setIsFullscreen,
   playerRef,
   isFocus = false,
@@ -291,7 +291,7 @@ export default function AIBuilderTab({
           setSchemaJson(resolved)
           toast.success('Preview updated')
         }
-      } catch (e) {
+      } catch {
         // Silently wait for valid JSON during typing
       }
     },
@@ -432,7 +432,7 @@ export default function AIBuilderTab({
         setJsonText(JSON.stringify(resolved, null, 2))
         toast.success('Applied changes and randomized perspective')
       }
-    } catch (e) {
+    } catch {
       toast.error('Invalid JSON structure - reverting view')
       setJsonText(JSON.stringify(schemaJson, null, 2))
     }

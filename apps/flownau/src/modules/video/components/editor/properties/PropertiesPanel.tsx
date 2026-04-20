@@ -8,7 +8,6 @@ import { toast } from 'sonner'
 import {
   validateNumber,
   validateFrame,
-  validateDimension,
   validatePosition,
 } from '@/modules/video/utils/validation'
 

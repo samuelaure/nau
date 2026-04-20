@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useRef, useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useEditorStore } from '@/modules/video/store/useEditorStore'
 import { ElementStyle } from '@/types/video-schema'
 

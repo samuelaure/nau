@@ -1,4 +1,4 @@
-import { Asset } from '@prisma/client'
+// No Prisma import needed — functions operate on plain asset shape objects passed from the UI.
 
 /**
  * Shuffles an array in place.

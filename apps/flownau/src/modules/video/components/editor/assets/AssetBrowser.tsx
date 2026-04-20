@@ -3,9 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import NextImage from 'next/image'
 import {
-  Video as VideoIcon,
   Image as ImageIcon,
-  Music as MusicIcon,
   Grid3X3,
   List as ListIcon,
   LayoutGrid,

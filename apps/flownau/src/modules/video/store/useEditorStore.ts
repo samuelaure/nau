@@ -116,7 +116,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   deleteSelectedElements: () => {
-    const { selectedElementIds, template } = get()
+    const { selectedElementIds } = get()
     if (selectedElementIds.size === 0) return
 
     // Record deletion for undo/redo

@@ -20,7 +20,6 @@ const eslintConfig = defineConfig([
     rules: {
       // Re-enabled (Pass A): safe mechanical fixes
       'prefer-const': 'error',
-      'react/no-unescaped-entities': 'warn',
       '@next/next/no-img-element': 'warn',
 
       // Re-enabled (Pass B): stricter type safety
@@ -31,8 +30,7 @@ const eslintConfig = defineConfig([
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
-      // Exhaustive deps warns — helps catch stale closure bugs in useEffect
-      'react-hooks/exhaustive-deps': 'warn',
+      // react-hooks/exhaustive-deps is already configured by eslint-config-next.
 
       // Kept off: render-worker.ts uses `require.main === module`
       // which is a valid Node.js CJS interop pattern in an ESM project

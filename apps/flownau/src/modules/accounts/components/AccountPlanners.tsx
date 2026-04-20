@@ -228,7 +228,7 @@ export default function AccountPlanners({ accountId }: { accountId: string }) {
             <label className="form-label mb-1 block">
               AI Strategist Prompt
               <span className="text-xs font-normal ml-2 opacity-70">
-                Guides AI ordering (e.g. "prioritise educational before promotional")
+                Guides AI ordering (e.g. &quot;prioritise educational before promotional&quot;)
               </span>
             </label>
             <Textarea

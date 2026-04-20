@@ -30,7 +30,7 @@ export default function AddTemplateButton({
       try {
         await addTemplate(formData)
         setIsOpen(false)
-      } catch (e) {
+      } catch {
         setError('Failed to create template. Please check your inputs.')
       }
     })

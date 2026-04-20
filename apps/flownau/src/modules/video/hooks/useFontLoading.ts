@@ -30,7 +30,7 @@ export function useFontLoading(fonts: FontDescriptor[]) {
         try {
           const loaded = await checkFontLoaded(font)
           states.set(key, loaded ? 'loaded' : 'error')
-        } catch (error) {
+        } catch {
           states.set(key, 'error')
         }
       })

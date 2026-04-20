@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
-import { requireAuth, getAuthUser } from '@/lib/auth'
+import { getAuthUser } from '@/lib/auth'
 import { prisma } from '@/modules/shared/prisma'
 import { checkAccountAccess } from '@/modules/shared/actions'
 import { renderAndUpload } from '@/modules/video/renderer'

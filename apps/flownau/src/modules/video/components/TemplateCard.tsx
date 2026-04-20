@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Video, Table, CheckCircle, Play, ExternalLink } from 'lucide-react'
+import { Video, CheckCircle, Play, ExternalLink } from 'lucide-react'
 import ActionMenu from '@/modules/shared/components/ActionMenu'
 import { deleteTemplate, duplicateTemplate } from '@/modules/video/actions'
 import type { TemplateWithRelations } from '@/types'

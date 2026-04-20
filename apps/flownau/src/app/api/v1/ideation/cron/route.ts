@@ -40,9 +40,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, message: 'No pending InspoItems to process.' })
     }
 
-    // 2. Fetch external injected strategy docs (mocked DB fetch)
-    // Normally we'd fetch from Prisma ideation_context table
-    const injectedDocuments: string[] = []
+    // 2. External strategy docs injected into the ideation context
+    // TBD: fetch from dedicated ideation_context table when implemented.
 
     // 3. Generate Ideation Brief
     const result = await generateContentIdeas({

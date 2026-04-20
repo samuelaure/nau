@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useTransition } from 'react'
 import { toggleTemplateAssets } from '@/modules/video/actions'
 import { updateTemplate, duplicateTemplate } from '@/modules/video/actions'
 import { Info, Lock, Copy } from 'lucide-react'

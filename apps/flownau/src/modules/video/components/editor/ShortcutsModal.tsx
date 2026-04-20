@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { X, Command, Keyboard, Zap, Scissors, Copy, Layers, Grid } from 'lucide-react'
+import { X, Command, Keyboard, Zap, Scissors, Copy, Layers } from 'lucide-react'
 
 interface ShortcutCategory {
   name: string

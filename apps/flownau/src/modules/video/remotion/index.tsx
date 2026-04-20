@@ -3,7 +3,6 @@ import { registerRoot, Composition } from 'remotion'
 import { DynamicTemplateMaster } from '../../rendering/DynamicComposition'
 import type { DynamicCompositionSchemaType } from '../../rendering/DynamicComposition/schema'
 import { SceneSequenceComposition } from '../../scenes/SceneSequenceComposition'
-import type { SceneSequenceCompositionProps } from '../../scenes/SceneSequenceComposition'
 
 /**
  * Remotion entry point for flownaŭ.
