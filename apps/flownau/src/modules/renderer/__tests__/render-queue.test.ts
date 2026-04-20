@@ -29,7 +29,7 @@ describe('addRenderJob()', () => {
   })
 
   it('calls queue.add with correct job name, data, and jobId', async () => {
-    const fakeJobId = 'render:comp-abc-123'
+    const fakeJobId = 'render-comp-abc-123'
     mockAdd.mockResolvedValue({ id: fakeJobId })
 
     await addRenderJob('comp-abc-123')
@@ -37,12 +37,12 @@ describe('addRenderJob()', () => {
     expect(mockAdd).toHaveBeenCalledWith(
       'render',
       { compositionId: 'comp-abc-123' },
-      expect.objectContaining({ jobId: 'render:comp-abc-123' }),
+      expect.objectContaining({ jobId: 'render-comp-abc-123' }),
     )
   })
 
   it('uses default priority of 10 when no priority is provided', async () => {
-    mockAdd.mockResolvedValue({ id: 'render:comp-1' })
+    mockAdd.mockResolvedValue({ id: 'render-comp-1' })
 
     await addRenderJob('comp-1')
 
@@ -54,7 +54,7 @@ describe('addRenderJob()', () => {
   })
 
   it('uses the provided custom priority when specified', async () => {
-    mockAdd.mockResolvedValue({ id: 'render:comp-2' })
+    mockAdd.mockResolvedValue({ id: 'render-comp-2' })
 
     await addRenderJob('comp-2', 1)
 
@@ -66,11 +66,11 @@ describe('addRenderJob()', () => {
   })
 
   it('returns the job id when queue.add resolves', async () => {
-    mockAdd.mockResolvedValue({ id: 'render:comp-xyz' })
+    mockAdd.mockResolvedValue({ id: 'render-comp-xyz' })
 
     const result = await addRenderJob('comp-xyz')
 
-    expect(result).toBe('render:comp-xyz')
+    expect(result).toBe('render-comp-xyz')
   })
 
   it('falls back to compositionId when job.id is undefined', async () => {
@@ -134,11 +134,11 @@ describe('getRenderJobStatus()', () => {
     expect(result.failedReason).toBe('Remotion render crashed: out of memory')
   })
 
-  it('uses jobId format render:${compositionId} for lookup', async () => {
+  it('uses jobId format render-${compositionId} for lookup', async () => {
     mockGetJob.mockResolvedValue(null)
 
     await getRenderJobStatus('comp-lookup-test')
 
-    expect(mockGetJob).toHaveBeenCalledWith('render:comp-lookup-test')
+    expect(mockGetJob).toHaveBeenCalledWith('render-comp-lookup-test')
   })
 })
