@@ -1,35 +1,57 @@
 import { requireAuth } from '@/lib/auth'
-import { prisma } from '@/modules/shared/prisma'
 import { redirect } from 'next/navigation'
 import { Card } from '@/modules/shared/components/ui/Card'
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
+import { cookies } from 'next/headers'
 
 export const dynamic = 'force-dynamic'
 
-export default async function DashboardRoot() {
-  const authUser = await requireAuth()
+type NauWorkspace = { id: string; name: string; role: string }
 
-  const workspaces = await prisma.workspaceUser.findMany({
-    where: { platformUserId: authUser.id },
-    include: { workspace: true },
-    orderBy: { createdAt: 'asc' },
-  })
+async function getWorkspacesFromNau(token: string): Promise<NauWorkspace[]> {
+  const nauApiUrl = process.env.NAU_API_URL ?? 'http://9nau-api:3000'
+  try {
+    const res = await fetch(`${nauApiUrl}/api/workspaces`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    })
+    if (!res.ok) return []
+    return res.json()
+  } catch {
+    return []
+  }
+}
+
+export default async function DashboardRoot() {
+  await requireAuth()
+
+  const cookieStore = await cookies()
+  const token = cookieStore.get('nau_token')?.value ?? ''
+  const workspaces = await getWorkspacesFromNau(token)
 
   if (workspaces.length === 0) {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.9nau.com'
     return (
       <div className="flex flex-col items-center justify-center pt-20 animate-fade-in">
         <h2 className="text-2xl font-bold mb-4">No Workspaces Found</h2>
-        <p className="text-text-secondary mb-8">You are not a member of any workspace.</p>
-        <Link href="/" className="btn-primary px-6 py-2">
-          Return Home
-        </Link>
+        <p className="text-text-secondary mb-8">
+          Create a workspace in the 9naŭ Platform to get started.
+        </p>
+        <a
+          href={`${appUrl}/settings`}
+          target="_blank"
+          rel="noreferrer"
+          className="btn-primary px-6 py-2"
+        >
+          Open 9naŭ Settings
+        </a>
       </div>
     )
   }
 
   if (workspaces.length === 1) {
-    redirect(`/dashboard/workspace/${workspaces[0].workspaceId}`)
+    redirect(`/dashboard/workspace/${workspaces[0].id}`)
   }
 
   return (
@@ -40,14 +62,14 @@ export default async function DashboardRoot() {
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {workspaces.map((wu) => (
-          <Link key={wu.workspace.id} href={`/dashboard/workspace/${wu.workspace.id}`}>
+        {workspaces.map((ws) => (
+          <Link key={ws.id} href={`/dashboard/workspace/${ws.id}`}>
             <Card className="flex items-center justify-between p-6 hover:border-accent/50 transition-colors cursor-pointer group">
               <div>
                 <h3 className="text-xl font-heading font-semibold mb-1 group-hover:text-accent transition-colors">
-                  {wu.workspace.name}
+                  {ws.name}
                 </h3>
-                <p className="text-sm text-text-secondary capitalize">{wu.role} Role</p>
+                <p className="text-sm text-text-secondary capitalize">{ws.role} Role</p>
               </div>
               <ArrowRight className="text-text-secondary group-hover:text-accent transition-colors" />
             </Card>

@@ -1,10 +1,10 @@
 import Sidebar from '@/modules/shared/components/Sidebar'
 import { bootstrapSystem } from '@/modules/shared/bootstrap'
+import { BrandSwitcher } from '@/modules/shared/components/BrandSwitcher'
 
 export const dynamic = 'force-dynamic'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  // Run on every dashboard request at runtime (never at build time due to force-dynamic)
   await bootstrapSystem()
   return (
     <div style={{ display: 'flex' }}>
@@ -21,11 +21,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         }}
       >
         <div className="glass px-6 py-4 rounded-xl flex items-center justify-between">
-          <div className="flex items-center gap-4 text-text-secondary text-sm">
-            <div className="font-semibold text-white">Personal Workspace</div>
-            <span>/</span>
-            <div>All Brands</div>
-          </div>
+          <BrandSwitcher />
           <div>{/* Future actions */}</div>
         </div>
         {children}
