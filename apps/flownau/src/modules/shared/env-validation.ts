@@ -5,14 +5,21 @@ const EnvSchema = z
     // Infrastructure
     DATABASE_URL: z.string().url().startsWith('postgres'),
     AUTH_SECRET: z.string().min(32),
-    NEXT_PUBLIC_APP_URL: z.string().url(),
+    PUBLIC_DOMAIN: z.string().min(1),
     NAU_SERVICE_KEY: z.string().min(1),
+    NAUTHENTICITY_URL: z.string().url(),
     CRON_SECRET: z.string().min(1),
+    NAU_API_URL: z.string().url(),
+    NEXT_PUBLIC_APP_URL: z.string().url(),
+    NEXT_PUBLIC_ACCOUNTS_URL: z.string().url(),
+    AUTH_URL: z.string().url().optional(),
+    AUTH_TRUST_HOST: z.string().optional(),
 
     // Storage (R2)
     R2_ACCOUNT_ID: z.string().min(1),
     R2_ACCESS_KEY_ID: z.string().min(1),
     R2_SECRET_ACCESS_KEY: z.string().min(1),
+    R2_ENDPOINT: z.string().url(),
     R2_BUCKET_NAME: z.string().min(1),
     R2_PUBLIC_URL: z.string().url(),
 
