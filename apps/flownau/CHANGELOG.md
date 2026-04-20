@@ -2,48 +2,54 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
-### [1.8.1](https://github.com/samuelaure/flownau/compare/v1.8.0...v1.8.1) (2026-04-20)
+## [1.9.0](https://github.com/samuelaure/flownau/compare/v1.8.1...v1.9.0) (2026-04-20)
+
+
+### Features
+
+* **phase-19:** implement zero-configuration onboarding and graceful fallbacks ([2510417](https://github.com/samuelaure/flownau/commit/251041728807f9fbd461942c370bd3eeb6805e91))
 
 
 ### Bug Fixes
 
-* **auth:** fix SSO callback to handle cookie-based flow from accounts.9nau.com ([2f5872f](https://github.com/samuelaure/flownau/commit/2f5872fe0d6ac291201be0ea8d9d1e8590a143b4))
+* **auth,sso:** resolve all redirect loops on login and workspace navigation ([5191cee](https://github.com/samuelaure/flownau/commit/5191cee3a7dccdea492bfb3b08d3b1fad03a191a))
+
+### [1.8.1](https://github.com/samuelaure/flownau/compare/v1.8.0...v1.8.1) (2026-04-20)
+
+### Bug Fixes
+
+- **auth:** fix SSO callback to handle cookie-based flow from accounts.9nau.com ([2f5872f](https://github.com/samuelaure/flownau/commit/2f5872fe0d6ac291201be0ea8d9d1e8590a143b4))
 
 ## [1.8.0](https://github.com/samuelaure/flownau/compare/v1.7.1...v1.8.0) (2026-04-20)
 
-
 ### Features
 
-* **cron:** add GET|POST /api/cron/reset-renders admin endpoint ([b9e3318](https://github.com/samuelaure/flownau/commit/b9e3318ac16120e139edf101abbfa1da9d26d675))
+- **cron:** add GET|POST /api/cron/reset-renders admin endpoint ([b9e3318](https://github.com/samuelaure/flownau/commit/b9e3318ac16120e139edf101abbfa1da9d26d675))
 
 ### [1.7.1](https://github.com/samuelaure/flownau/compare/v1.7.0...v1.7.1) (2026-04-20)
 
-
 ### Bug Fixes
 
-* **renderer:** correct bundle signature for Remotion 4.x compat ([0351e4f](https://github.com/samuelaure/flownau/commit/0351e4fee5176a156aa10ce4a3d1aa33cff9f85e))
+- **renderer:** correct bundle signature for Remotion 4.x compat ([0351e4f](https://github.com/samuelaure/flownau/commit/0351e4fee5176a156aa10ce4a3d1aa33cff9f85e))
 
 ## [1.7.0](https://github.com/samuelaure/flownau/compare/v1.6.10...v1.7.0) (2026-04-20)
 
-
 ### Features
 
-* **cron:** add POST /api/cron/approve-renders bulk-approval endpoint ([630f5b0](https://github.com/samuelaure/flownau/commit/630f5b06d6c76670ba4f0a2b8ee1bb62c9f3f429))
-
+- **cron:** add POST /api/cron/approve-renders bulk-approval endpoint ([630f5b0](https://github.com/samuelaure/flownau/commit/630f5b06d6c76670ba4f0a2b8ee1bb62c9f3f429))
 
 ### Bug Fixes
 
-* **renderer:** inform bundler of @ path alias to fix production render failures ([5bf4afe](https://github.com/samuelaure/flownau/commit/5bf4afeaeaf90f456f872f77e4d17eb944e0f003))
+- **renderer:** inform bundler of @ path alias to fix production render failures ([5bf4afe](https://github.com/samuelaure/flownau/commit/5bf4afeaeaf90f456f872f77e4d17eb944e0f003))
 
 ### [1.6.10](https://github.com/samuelaure/flownau/compare/v1.6.9...v1.6.10) (2026-04-20)
 
 ### [1.6.9](https://github.com/samuelaure/flownau/compare/v1.6.8...v1.6.9) (2026-04-20)
 
-
 ### Bug Fixes
 
-* **config:** standardize environment variables and harden validation schema ([5919d83](https://github.com/samuelaure/flownau/commit/5919d83db344e08e1ca2ad0efd127d18e05e0066))
-* **test:** align BullMQ jobId format with implementation ([27ccc27](https://github.com/samuelaure/flownau/commit/27ccc2729817680468a4f6de542b791b3bb4c706))
+- **config:** standardize environment variables and harden validation schema ([5919d83](https://github.com/samuelaure/flownau/commit/5919d83db344e08e1ca2ad0efd127d18e05e0066))
+- **test:** align BullMQ jobId format with implementation ([27ccc27](https://github.com/samuelaure/flownau/commit/27ccc2729817680468a4f6de542b791b3bb4c706))
 
 ### [1.6.8](https://github.com/samuelaure/flownau/compare/v1.6.7...v1.6.8) (2026-04-20)
 
