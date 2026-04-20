@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.4](https://github.com/samuelaure/whatsnau/compare/v0.1.3...v0.1.4) (2026-04-20)
+
+
+### Bug Fixes
+
+* **deploy:** fix ambiguous database container discovery in scripts ([8438c0e](https://github.com/samuelaure/whatsnau/commit/8438c0e051871d045cbbb21d239d2dcff5a27595))
+
 ### [0.1.3](https://github.com/samuelaure/whatsnau/compare/v0.1.2...v0.1.3) (2026-04-20)
 
 
