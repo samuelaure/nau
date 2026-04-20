@@ -4,25 +4,9 @@ import { getSetting } from '@/modules/shared/settings'
 import SyncButton from './SyncButton'
 import ApiTokenForm from './ApiTokenForm'
 import { Card } from '@/modules/shared/components/ui/Card'
-import { checkAuth } from '@/modules/shared/actions'
-import { prisma } from '@/modules/shared/prisma'
 import WorkspacesManager from '@/modules/workspaces/components/WorkspacesManager'
 
 export default async function SettingsPage() {
-  const { user } = await checkAuth()
-
-  const workspaces = await prisma.workspace.findMany({
-    where: {
-      users: {
-        some: { platformUserId: user.id },
-      },
-    },
-    include: {
-      users: true,
-    },
-    orderBy: { createdAt: 'asc' },
-  })
-
   const apifyToken = await getSetting('apify_api_token')
   const openaiToken = await getSetting('openai_api_key')
   const groqToken = await getSetting('groq_api_key')
@@ -36,7 +20,7 @@ export default async function SettingsPage() {
         </p>
       </header>
 
-      <WorkspacesManager workspaces={workspaces} currentUserId={user.id} />
+      <WorkspacesManager />
 
       <Card className="p-8 mt-6">
         <h3 className="text-xl font-heading font-semibold mb-6">Integrations</h3>
