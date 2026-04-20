@@ -80,7 +80,7 @@ export async function GET(req: NextRequest) {
     // via JWT claims once the cross-service SSO propagation is complete.
     // Until then, read from the env fallback set during account onboarding.
     const workspaceId =
-      ((user as unknown) as Record<string, unknown>).activeWorkspaceId as string ||
+      ((user as unknown as Record<string, unknown>).activeWorkspaceId as string) ||
       process.env.FLOWNAU_DEFAULT_WORKSPACE_ID
 
     if (!workspaceId) {

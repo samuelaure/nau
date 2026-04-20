@@ -17,8 +17,8 @@ export default function WorkspacesManager() {
           <h3 className="text-xl font-heading font-semibold mb-1">Workspaces & Brands</h3>
           <p className="text-text-secondary text-sm mb-4">
             Workspace and Brand management has been centralized in the{' '}
-            <strong>9naŭ Platform</strong>. Create workspaces, invite members, and register
-            brands from there — flownaŭ reads context directly from your active session.
+            <strong>9naŭ Platform</strong>. Create workspaces, invite members, and register brands
+            from there — flownaŭ reads context directly from your active session.
           </p>
           <a
             href={`${NAU_SETTINGS_URL}/settings`}

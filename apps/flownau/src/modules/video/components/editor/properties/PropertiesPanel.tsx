@@ -5,11 +5,7 @@ import { Settings, Maximize2, Type, Box } from 'lucide-react'
 import { useEditorStore } from '@/modules/video/store/useEditorStore'
 import { Tooltip } from '@/modules/video/components/ui/Tooltip'
 import { toast } from 'sonner'
-import {
-  validateNumber,
-  validateFrame,
-  validatePosition,
-} from '@/modules/video/utils/validation'
+import { validateNumber, validateFrame, validatePosition } from '@/modules/video/utils/validation'
 
 export function PropertiesPanel() {
   const template = useEditorStore((state) => state.template)

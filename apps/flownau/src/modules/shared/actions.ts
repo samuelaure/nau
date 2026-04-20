@@ -26,7 +26,9 @@ export async function getNauWorkspaces() {
       cache: 'no-store',
     })
     if (!res.ok) return []
-    return res.json() as Promise<{ id: string; name: string; role: string; brands: { id: string; name: string }[] }[]>
+    return res.json() as Promise<
+      { id: string; name: string; role: string; brands: { id: string; name: string }[] }[]
+    >
   } catch {
     return []
   }
