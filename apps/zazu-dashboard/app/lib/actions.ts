@@ -220,7 +220,7 @@ export interface NauWorkspace {
 
 export interface BrandCreatePayload {
   brandName: string;
-  voicePrompt: string;
+  voicePrompt?: string;
   commentStrategy?: string | null;
   suggestionsCount?: number;
   windowStart?: string | null;

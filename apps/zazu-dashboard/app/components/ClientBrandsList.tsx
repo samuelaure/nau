@@ -80,10 +80,11 @@ function BrandForm({ initial, onSave, onCancel }: BrandFormProps) {
   const [timezone, setTimezone] = useState(initial?.timezone ?? 'UTC');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(!!initial);
 
   const handleSubmit = async () => {
-    if (!name.trim() || !voicePrompt.trim()) {
-      setError('El nombre y la voz de marca son obligatorios.');
+    if (!name.trim()) {
+      setError('El nombre de la marca es obligatorio.');
       return;
     }
     setIsLoading(true);
@@ -91,7 +92,7 @@ function BrandForm({ initial, onSave, onCancel }: BrandFormProps) {
 
     const payload: BrandCreatePayload = {
       brandName: name.trim(),
-      voicePrompt: voicePrompt.trim(),
+      voicePrompt: voicePrompt.trim() || undefined,
       commentStrategy: commentStrategy.trim() || null,
       suggestionsCount,
       windowStart: windowStart || null,
@@ -123,119 +124,136 @@ function BrandForm({ initial, onSave, onCancel }: BrandFormProps) {
       </h2>
 
       <div style={sectionStyle}>
-        {/* Name */}
+        {/* Name — always visible */}
         <div>
           <label style={labelStyle}>Nombre de la marca *</label>
           <input className="input-field" placeholder="Ej: Samuel Aure Personal" value={name} onChange={e => setName(e.target.value)} />
         </div>
 
-        {/* Voice Prompt */}
-        <div>
-          <label style={labelStyle}>
-            <Brain size={11} style={{ display: 'inline', marginRight: '4px' }} />
-            Brand DNA — Voz &amp; Personalidad *
-          </label>
-          <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginBottom: '8px' }}>
-            Define el tono, personalidad y forma de expresarse de esta marca. Este prompt es el ADN de la marca para todo el ecosistema.
-          </p>
-          <textarea
-            className="input-field"
-            style={{ minHeight: '130px', resize: 'vertical' }}
-            placeholder="Ej: Eres una marca enfocada en emprendimiento digital. Tono auténtico, cercano y motivador. Usas emojis con moderación. Evitas el lenguaje corporativo..."
-            value={voicePrompt}
-            onChange={e => setVoicePrompt(e.target.value)}
-          />
-        </div>
+        {/* Advanced toggle */}
+        {!initial && (
+          <button
+            type="button"
+            onClick={() => setShowAdvanced(v => !v)}
+            style={{ background: 'transparent', border: 'none', color: 'var(--primary)', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', textAlign: 'left', padding: 0, display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <ChevronDown size={14} style={{ transform: showAdvanced ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+            {showAdvanced ? 'Ocultar configuración avanzada' : 'Configuración avanzada (opcional)'}
+          </button>
+        )}
 
-        {/* Comment Strategy */}
-        <div>
-          <label style={labelStyle}>
-            <MessageSquare size={11} style={{ display: 'inline', marginRight: '4px' }} />
-            Estrategia de Comentarios (período actual)
-          </label>
-          <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginBottom: '8px' }}>
-            ¿Cuál es la intención general de los comentarios en este período? (crear autoridad, ganar alcance, generar curiosidad...)
-          </p>
-          <textarea
-            className="input-field"
-            style={{ minHeight: '90px', resize: 'vertical' }}
-            placeholder="Ej: Queremos ganar presencia y autoridad en la comunidad de fitness. Comentarios que aporten valor y generen curiosidad hacia nuestro perfil."
-            value={commentStrategy}
-            onChange={e => setCommentStrategy(e.target.value)}
-          />
-        </div>
-
-        {/* Suggestions Count */}
-        <div>
-          <label style={labelStyle}>
-            <Hash size={11} style={{ display: 'inline', marginRight: '4px' }} />
-            Sugerencias por post
-          </label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <input
-              type="range"
-              min={1}
-              max={5}
-              value={suggestionsCount}
-              onChange={e => setSuggestionsCount(Number(e.target.value))}
-              style={{ flex: 1, accentColor: 'var(--primary)' }}
-            />
-            <span style={{
-              minWidth: '36px',
-              textAlign: 'center',
-              fontWeight: 800,
-              fontSize: '1.2rem',
-              color: 'var(--primary)',
-            }}>
-              {suggestionsCount}
-            </span>
-          </div>
-        </div>
-
-        {/* Delivery Window */}
-        <div>
-          <label style={labelStyle}>
-            <Clock size={11} style={{ display: 'inline', marginRight: '4px' }} />
-            Ventana de actividad
-          </label>
-          <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginBottom: '8px' }}>
-            Dentro de esta ventana, los perfiles se monitorean cada 15 min. Fuera, cada hora.
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+        {/* Advanced fields */}
+        {showAdvanced && (
+          <>
+            {/* Voice Prompt */}
             <div>
-              <label style={{ ...labelStyle, fontSize: '0.65rem' }}>Inicio</label>
-              <input
-                type="time"
+              <label style={labelStyle}>
+                <Brain size={11} style={{ display: 'inline', marginRight: '4px' }} />
+                Brand DNA — Voz &amp; Personalidad
+              </label>
+              <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginBottom: '8px' }}>
+                Define el tono, personalidad y forma de expresarse de esta marca. Si lo dejas vacío, se usará una voz genérica de plataforma.
+              </p>
+              <textarea
                 className="input-field"
-                value={windowStart}
-                onChange={e => setWindowStart(e.target.value)}
+                style={{ minHeight: '130px', resize: 'vertical' }}
+                placeholder="Ej: Eres una marca enfocada en emprendimiento digital. Tono auténtico, cercano y motivador. Usas emojis con moderación. Evitas el lenguaje corporativo..."
+                value={voicePrompt}
+                onChange={e => setVoicePrompt(e.target.value)}
               />
             </div>
+
+            {/* Comment Strategy */}
             <div>
-              <label style={{ ...labelStyle, fontSize: '0.65rem' }}>Fin</label>
-              <input
-                type="time"
+              <label style={labelStyle}>
+                <MessageSquare size={11} style={{ display: 'inline', marginRight: '4px' }} />
+                Estrategia de Comentarios (período actual)
+              </label>
+              <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginBottom: '8px' }}>
+                ¿Cuál es la intención general de los comentarios en este período? (crear autoridad, ganar alcance, generar curiosidad...)
+              </p>
+              <textarea
                 className="input-field"
-                value={windowEnd}
-                onChange={e => setWindowEnd(e.target.value)}
+                style={{ minHeight: '90px', resize: 'vertical' }}
+                placeholder="Ej: Queremos ganar presencia y autoridad en la comunidad de fitness. Comentarios que aporten valor y generen curiosidad hacia nuestro perfil."
+                value={commentStrategy}
+                onChange={e => setCommentStrategy(e.target.value)}
               />
             </div>
-          </div>
 
-          <div style={{ marginTop: '12px' }}>
-            <label style={{ ...labelStyle, fontSize: '0.65rem' }}>Zona horaria</label>
-            <select
-              className="input-field"
-              value={timezone}
-              onChange={e => setTimezone(e.target.value)}
-              style={{ cursor: 'pointer' }}
-            >
-              {TIMEZONES.map(tz => (
-                <option key={tz} value={tz}>{tz}</option>
-              ))}
-            </select>
-          </div>
-        </div>
+            {/* Suggestions Count */}
+            <div>
+              <label style={labelStyle}>
+                <Hash size={11} style={{ display: 'inline', marginRight: '4px' }} />
+                Sugerencias por post
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <input
+                  type="range"
+                  min={1}
+                  max={5}
+                  value={suggestionsCount}
+                  onChange={e => setSuggestionsCount(Number(e.target.value))}
+                  style={{ flex: 1, accentColor: 'var(--primary)' }}
+                />
+                <span style={{
+                  minWidth: '36px',
+                  textAlign: 'center',
+                  fontWeight: 800,
+                  fontSize: '1.2rem',
+                  color: 'var(--primary)',
+                }}>
+                  {suggestionsCount}
+                </span>
+              </div>
+            </div>
+
+            {/* Delivery Window */}
+            <div>
+              <label style={labelStyle}>
+                <Clock size={11} style={{ display: 'inline', marginRight: '4px' }} />
+                Ventana de actividad
+              </label>
+              <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginBottom: '8px' }}>
+                Dentro de esta ventana, los perfiles se monitorean cada 15 min. Fuera, cada hora.
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ ...labelStyle, fontSize: '0.65rem' }}>Inicio</label>
+                  <input
+                    type="time"
+                    className="input-field"
+                    value={windowStart}
+                    onChange={e => setWindowStart(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label style={{ ...labelStyle, fontSize: '0.65rem' }}>Fin</label>
+                  <input
+                    type="time"
+                    className="input-field"
+                    value={windowEnd}
+                    onChange={e => setWindowEnd(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginTop: '12px' }}>
+                <label style={{ ...labelStyle, fontSize: '0.65rem' }}>Zona horaria</label>
+                <select
+                  className="input-field"
+                  value={timezone}
+                  onChange={e => setTimezone(e.target.value)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  {TIMEZONES.map(tz => (
+                    <option key={tz} value={tz}>{tz}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </>
+        )}
 
         {error && (
           <p style={{ color: '#ff4444', fontSize: '0.8rem', background: 'rgba(255,68,68,0.1)', padding: '10px', borderRadius: '8px' }}>
