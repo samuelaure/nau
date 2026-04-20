@@ -25,8 +25,20 @@ export async function middleware(request: NextRequest) {
 
   if (isProtected && !isAuthenticated) {
     const loginUrl = new URL('/login', ACCOUNTS_URL)
-    loginUrl.searchParams.set('continue', `${APP_URL}${pathname}`)
-    return NextResponse.redirect(loginUrl)
+    // Always redirect back to /auth/callback so the callback page can
+    // set/refresh the cookie properly before entering the dashboard.
+    loginUrl.searchParams.set('continue', `${APP_URL}/auth/callback`)
+    const response = NextResponse.redirect(loginUrl)
+    // Clear any stale/invalid nau_token cookie so accounts.9nau.com does not
+    // see it and auto-redirect back here, creating an infinite redirect loop.
+    if (token) {
+      response.cookies.set('nau_token', '', {
+        maxAge: 0,
+        path: '/',
+        domain: APP_URL.includes('.9nau.com') ? '.9nau.com' : undefined,
+      })
+    }
+    return response
   }
 
   return NextResponse.next()

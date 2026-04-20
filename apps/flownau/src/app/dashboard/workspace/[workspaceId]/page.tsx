@@ -19,13 +19,21 @@ export default async function WorkspaceOverviewPage({
   // Workspace details are now fetched from the 9naŭ Platform Service
   const nauApiUrl = process.env.NAU_API_URL || 'http://9nau-api:3000'
   const workspaceResp = await fetch(`${nauApiUrl}/api/workspaces/${workspaceId}/service`, {
-    headers: { Authorization: `Bearer ${process.env.NAU_SERVICE_KEY}` },
-    next: { revalidate: 3600 }, // Cache for 1h
+    headers: { 'x-nau-service-key': process.env.NAU_SERVICE_KEY ?? '' },
+    cache: 'no-store',
   })
 
   if (!workspaceResp.ok) {
-    console.error(`[WORKSPACES] Failed to fetch workspace ${workspaceId} from 9naŭ Platform`)
-    redirect('/dashboard')
+    console.error(`[WORKSPACES] Failed to fetch workspace ${workspaceId}: ${workspaceResp.status}`)
+    return (
+      <div className="flex flex-col items-center justify-center pt-20 animate-fade-in">
+        <h2 className="text-2xl font-bold mb-4">Workspace Unavailable</h2>
+        <p className="text-text-secondary mb-8">
+          Could not load this workspace. Please try again.
+        </p>
+        <a href="/dashboard" className="btn-primary px-6 py-2">Back to Dashboard</a>
+      </div>
+    )
   }
 
   const { workspace } = (await workspaceResp.json()) as { workspace: { name: string } }
