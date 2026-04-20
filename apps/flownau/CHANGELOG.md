@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.6.4](https://github.com/samuelaure/flownau/compare/v1.6.3...v1.6.4) (2026-04-20)
+
+
+### Bug Fixes
+
+* **dashboard:** remove obsolete WorkspacesManager and fetch workspace from 9nau API ([03f6375](https://github.com/samuelaure/flownau/commit/03f6375ffd523d1bf4d08c761810c12dea7ef349))
+
 ### [1.6.3](https://github.com/samuelaure/flownau/compare/v1.6.2...v1.6.3) (2026-04-20)
 
 
