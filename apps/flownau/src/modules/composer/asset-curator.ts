@@ -200,7 +200,7 @@ export async function selectAssetsForCreative(
   }
 
   // Select audio
-  const audioAsset = selectAudio(assetPool, creative.suggestedAudioMood)
+  const audioAsset = selectAudio(assetPool, creative.suggestedAudioMood ?? undefined)
 
   return { sceneAssets, audioAsset }
 }
