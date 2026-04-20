@@ -5,7 +5,7 @@ import { jwtVerify } from "jose";
 import prisma from "@zazu/db";
 import { auth } from "../../auth";
 
-const JWT_SECRET = process.env.JWT_SECRET ?? "changeme";
+const AUTH_SECRET = process.env.AUTH_SECRET ?? "changeme";
 const NAU_API_URL = process.env.NAU_API_URL ?? "https://api.9nau.com";
 const NAU_SERVICE_KEY = process.env.NAU_SERVICE_KEY ?? "";
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? "";
@@ -76,7 +76,7 @@ export async function linkTelegramAccount(
   // 3. Verify the naŭ JWT and extract nauUserId
   let nauUserId: string;
   try {
-    const secret = new TextEncoder().encode(JWT_SECRET);
+    const secret = new TextEncoder().encode(AUTH_SECRET);
     const { payload } = await jwtVerify(jwt, secret);
     if (!payload.sub) return { success: false, error: "Invalid token" };
     nauUserId = payload.sub;
