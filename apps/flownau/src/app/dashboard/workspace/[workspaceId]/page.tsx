@@ -16,14 +16,19 @@ export default async function WorkspaceOverviewPage({
   params: { workspaceId: string }
 }) {
   const { workspaceId } = await params
-
-  const workspace = await prisma.workspace.findUnique({
-    where: { id: workspaceId },
+  // Workspace details are now fetched from the 9naŭ Platform Service
+  const nauApiUrl = process.env.NAU_API_URL || 'http://9nau-api:3000'
+  const workspaceResp = await fetch(`${nauApiUrl}/api/workspaces/${workspaceId}`, {
+    headers: { Authorization: `Bearer ${process.env.NAU_SERVICE_KEY}` },
+    next: { revalidate: 3600 }, // Cache for 1h
   })
 
-  if (!workspace) {
+  if (!workspaceResp.ok) {
+    console.error(`[WORKSPACES] Failed to fetch workspace ${workspaceId} from 9naŭ Platform`)
     redirect('/dashboard')
   }
+
+  const { workspace } = (await workspaceResp.json()) as { workspace: { name: string } }
 
   const accounts = await prisma.socialAccount.findMany({
     where: { workspaceId },

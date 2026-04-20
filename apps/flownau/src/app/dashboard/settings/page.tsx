@@ -4,7 +4,6 @@ import { getSetting } from '@/modules/shared/settings'
 import SyncButton from './SyncButton'
 import ApiTokenForm from './ApiTokenForm'
 import { Card } from '@/modules/shared/components/ui/Card'
-import WorkspacesManager from '@/modules/workspaces/components/WorkspacesManager'
 
 export default async function SettingsPage() {
   const apifyToken = await getSetting('apify_api_token')
@@ -20,7 +19,6 @@ export default async function SettingsPage() {
         </p>
       </header>
 
-      <WorkspacesManager />
 
       <Card className="p-8 mt-6">
         <h3 className="text-xl font-heading font-semibold mb-6">Integrations</h3>
