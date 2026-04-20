@@ -18,7 +18,7 @@ export default async function WorkspaceOverviewPage({
   const { workspaceId } = await params
   // Workspace details are now fetched from the 9naŭ Platform Service
   const nauApiUrl = process.env.NAU_API_URL || 'http://9nau-api:3000'
-  const workspaceResp = await fetch(`${nauApiUrl}/api/workspaces/${workspaceId}`, {
+  const workspaceResp = await fetch(`${nauApiUrl}/api/workspaces/${workspaceId}/service`, {
     headers: { Authorization: `Bearer ${process.env.NAU_SERVICE_KEY}` },
     next: { revalidate: 3600 }, // Cache for 1h
   })

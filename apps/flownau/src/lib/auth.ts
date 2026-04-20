@@ -7,7 +7,7 @@ export interface AuthUser {
   email: string
 }
 
-const JWT_SECRET = process.env.JWT_SECRET ?? 'changeme'
+const AUTH_SECRET = process.env.AUTH_SECRET ?? 'changeme'
 const ACCOUNTS_URL = process.env.NEXT_PUBLIC_ACCOUNTS_URL ?? 'https://accounts.9nau.com'
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://flownau.9nau.com'
 
@@ -17,7 +17,7 @@ export async function getAuthUser(): Promise<AuthUser | null> {
   if (!token) return null
 
   try {
-    const secret = new TextEncoder().encode(JWT_SECRET)
+    const secret = new TextEncoder().encode(AUTH_SECRET)
     const { payload } = await jwtVerify(token, secret)
     if (!payload.sub || !payload.email) return null
     return { id: payload.sub, email: payload.email as string }

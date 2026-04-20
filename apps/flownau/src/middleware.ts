@@ -1,7 +1,7 @@
 import { jwtVerify } from 'jose'
 import { NextRequest, NextResponse } from 'next/server'
 
-const JWT_SECRET = process.env.JWT_SECRET ?? 'changeme'
+const AUTH_SECRET = process.env.AUTH_SECRET ?? 'changeme'
 const ACCOUNTS_URL = process.env.NEXT_PUBLIC_ACCOUNTS_URL ?? 'https://accounts.9nau.com'
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://flownau.9nau.com'
 
@@ -15,7 +15,7 @@ export async function middleware(request: NextRequest) {
   let isAuthenticated = false
   if (token) {
     try {
-      const secret = new TextEncoder().encode(JWT_SECRET)
+      const secret = new TextEncoder().encode(AUTH_SECRET)
       await jwtVerify(token, secret)
       isAuthenticated = true
     } catch {

@@ -4,76 +4,69 @@ All notable changes to this project will be documented in this file. See [standa
 
 ### [1.6.5](https://github.com/samuelaure/flownau/compare/v1.6.4...v1.6.5) (2026-04-20)
 
-
 ### Bug Fixes
 
-* **scheduling:** fix type error with nullable accountId in autonomous scheduler ([ee48c45](https://github.com/samuelaure/flownau/commit/ee48c45))
-* **infra:** add resource limits to postgres and redis containers ([154ca8b](https://github.com/samuelaure/flownau/commit/154ca8b))
+- **scheduling:** fix type error with nullable accountId in autonomous scheduler ([ee48c45](https://github.com/samuelaure/flownau/commit/ee48c45))
+- **infra:** add resource limits to postgres and redis containers ([154ca8b](https://github.com/samuelaure/flownau/commit/154ca8b))
 
 ### [1.6.4](https://github.com/samuelaure/flownau/compare/v1.6.3...v1.6.4) (2026-04-20)
 
-
 ### Bug Fixes
 
-* **dashboard:** remove obsolete WorkspacesManager and fetch workspace from 9nau API ([03f6375](https://github.com/samuelaure/flownau/commit/03f6375ffd523d1bf4d08c761810c12dea7ef349))
+- **dashboard:** remove obsolete WorkspacesManager and fetch workspace from 9nau API ([03f6375](https://github.com/samuelaure/flownau/commit/03f6375ffd523d1bf4d08c761810c12dea7ef349))
 
 ### [1.6.3](https://github.com/samuelaure/flownau/compare/v1.6.2...v1.6.3) (2026-04-20)
 
-
 ### Bug Fixes
 
-* **flownau:** fix Brand/Workspace ID requirement in config APIs ([b7ef795](https://github.com/samuelaure/flownau/commit/b7ef7953ace76d0e293f738787a30e75d1444cc4))
+- **flownau:** fix Brand/Workspace ID requirement in config APIs ([b7ef795](https://github.com/samuelaure/flownau/commit/b7ef7953ace76d0e293f738787a30e75d1444cc4))
 
 ### [1.6.2](https://github.com/samuelaure/flownau/compare/v1.6.1...v1.6.2) (2026-04-20)
 
-
 ### Bug Fixes
 
-* **flownau:** include brandId/workspaceId in content principles create ([e3961f9](https://github.com/samuelaure/flownau/commit/e3961f9e15de7cb35d38170c37d479cf078acb59))
+- **flownau:** include brandId/workspaceId in content principles create ([e3961f9](https://github.com/samuelaure/flownau/commit/e3961f9e15de7cb35d38170c37d479cf078acb59))
 
 ### [1.6.1](https://github.com/samuelaure/flownau/compare/v1.6.0...v1.6.1) (2026-04-20)
 
-
 ### Bug Fixes
 
-* **flownau:** align code formatting and type casts for v1.6.x ([08c1361](https://github.com/samuelaure/flownau/commit/08c13616e84055372591f5f86f2a17dd57805664))
+- **flownau:** align code formatting and type casts for v1.6.x ([08c1361](https://github.com/samuelaure/flownau/commit/08c13616e84055372591f5f86f2a17dd57805664))
 
 ## [1.6.0](https://github.com/samuelaure/flownau/compare/v1.5.1...v1.6.0) (2026-04-20)
 
-
 ### Features
 
-* **agent:** implement automatic idea-to-composition pipeline (Phase 14) ([9df37fe](https://github.com/samuelaure/flownau/commit/9df37fe9a4b371682082b74b93baf64448a3ff8b))
-* **api:** decouple composer and restructure content ideas provenance ([cf1dcc7](https://github.com/samuelaure/flownau/commit/cf1dcc7688e22372f928524b1476a8cd138a1e8d))
-* **api:** implement /api/v1/replicate for direct mobile ingestion to Pool ([48732c7](https://github.com/samuelaure/flownau/commit/48732c7405889410be5fb57370bb3933f66d3f18))
-* **api:** implement idea format support and update ideation service logic ([3218f0c](https://github.com/samuelaure/flownau/commit/3218f0c793cfcdc45c5ddd34bd56163bdf43c826))
-* **api:** migrate renderer and publisher to template gates ([8d6e88d](https://github.com/samuelaure/flownau/commit/8d6e88d6a3aef0c69c275c0d67ad68479ccedede))
-* **api:** replace legacy posting schedule with planner strategist ([7d5f884](https://github.com/samuelaure/flownau/commit/7d5f88446da24895c55b20e9ca43744863b98218))
-* **api:** support engine_autoApproveIdeas in persona creation and updates ([dda5a6e](https://github.com/samuelaure/flownau/commit/dda5a6e39489797c54f8f9988740c5c10244253c))
-* **cron:** implement advance render agent for scheduled compositions ([fd84b2c](https://github.com/samuelaure/flownau/commit/fd84b2cf6663b68441e182dfdb2f96cff87d7119))
-* **db:** add autoApprovePost to BrandPersona ([aa070a8](https://github.com/samuelaure/flownau/commit/aa070a8599237911ad4c66d5c6dbff052c681a65))
-* **db:** add autoApproveSchedule to BrandPersona ([51c97cc](https://github.com/samuelaure/flownau/commit/51c97ccde3d08eb3218e9515cc6f4523ba155d7e))
-* **db:** add engine_autoApproveIdeas to BrandPersona and format to ContentIdea ([c0e8d4b](https://github.com/samuelaure/flownau/commit/c0e8d4b8eb593786d171ac71e48b55434969f6ba))
-* **db:** add engine_autoApprovePool to BrandPersona and source to Composition ([5ab1f4c](https://github.com/samuelaure/flownau/commit/5ab1f4c19c39b00a3c850650de83c70979496bc5))
-* **db:** fresh init migration based on canonical v2 schema ([2817206](https://github.com/samuelaure/flownau/commit/28172069c7841f38c908367c8d4e65e781a3157f))
-* **db:** implement phase 18 schema for pipeline gate decoupling ([2798dda](https://github.com/samuelaure/flownau/commit/2798ddac02643ce637ecba583b293be2dd9887bc))
-* **engine:** implement Pool Auto-Approve logic and Head Talk composer support ([3cb0a16](https://github.com/samuelaure/flownau/commit/3cb0a16424e452c4cb73ad2541791a242f792786))
-* **personas:** add autoApprovePost toggle to brand settings ([c5d31aa](https://github.com/samuelaure/flownau/commit/c5d31aad3836b0498572b25f427492d3bfa8f840))
-* **personas:** add autoApproveSchedule toggle to brand settings ([90a2fef](https://github.com/samuelaure/flownau/commit/90a2fef4256ef9c0c00621b4196edb316849db9e))
-* **publisher:** implement autoApprovePost gate for autonomous publishing ([1b9a2e0](https://github.com/samuelaure/flownau/commit/1b9a2e0733499eb40018b6c06ba0d97d7850c604))
-* **scheduler:** implement autonomous slot assignment and auto-approve gate ([7646354](https://github.com/samuelaure/flownau/commit/76463544dde9ca79cd5e8dc99b6a15f96a3aa83a))
-* **ui:** add calendar tab and update compositions API for scheduling ([d6e93f9](https://github.com/samuelaure/flownau/commit/d6e93f9fe941bfabbc899e69007fc43f67d24603))
-* **ui:** implement Account Pool dashboard and persona engine settings ([061bfe9](https://github.com/samuelaure/flownau/commit/061bfe91750e00c262131fb1ca07473cc548e9ac))
-* **ui:** implement cross-platform brand switcher and 9nau workspace integration ([0c5ec4f](https://github.com/samuelaure/flownau/commit/0c5ec4feeadc6c33e4cb613782ad66583f0c9cd2))
-* **ui:** implement final review dashboard for human verification of renders ([727d68b](https://github.com/samuelaure/flownau/commit/727d68bc7fa544dc6e2a7743a8248b1e35c105cb))
-* **ui:** implement weekly content calendar with slot confirmation and rescheduling ([530253f](https://github.com/samuelaure/flownau/commit/530253f6c741d68f197ea86cbc7a55bcf28da592))
-* **ui:** integrate planner, principles, and template gates into dashboard ([e843d3d](https://github.com/samuelaure/flownau/commit/e843d3d6d025cba302b3607aed2d150135da9701))
-* **ui:** update account dashboard with persona settings and structured ideation pool ([05cec9e](https://github.com/samuelaure/flownau/commit/05cec9e1998bbb5a1a51c1809ee86a91e0c3f99a))
-
+- **agent:** implement automatic idea-to-composition pipeline (Phase 14) ([9df37fe](https://github.com/samuelaure/flownau/commit/9df37fe9a4b371682082b74b93baf64448a3ff8b))
+- **api:** decouple composer and restructure content ideas provenance ([cf1dcc7](https://github.com/samuelaure/flownau/commit/cf1dcc7688e22372f928524b1476a8cd138a1e8d))
+- **api:** implement /api/v1/replicate for direct mobile ingestion to Pool ([48732c7](https://github.com/samuelaure/flownau/commit/48732c7405889410be5fb57370bb3933f66d3f18))
+- **api:** implement idea format support and update ideation service logic ([3218f0c](https://github.com/samuelaure/flownau/commit/3218f0c793cfcdc45c5ddd34bd56163bdf43c826))
+- **api:** migrate renderer and publisher to template gates ([8d6e88d](https://github.com/samuelaure/flownau/commit/8d6e88d6a3aef0c69c275c0d67ad68479ccedede))
+- **api:** replace legacy posting schedule with planner strategist ([7d5f884](https://github.com/samuelaure/flownau/commit/7d5f88446da24895c55b20e9ca43744863b98218))
+- **api:** support engine_autoApproveIdeas in persona creation and updates ([dda5a6e](https://github.com/samuelaure/flownau/commit/dda5a6e39489797c54f8f9988740c5c10244253c))
+- **cron:** implement advance render agent for scheduled compositions ([fd84b2c](https://github.com/samuelaure/flownau/commit/fd84b2cf6663b68441e182dfdb2f96cff87d7119))
+- **db:** add autoApprovePost to BrandPersona ([aa070a8](https://github.com/samuelaure/flownau/commit/aa070a8599237911ad4c66d5c6dbff052c681a65))
+- **db:** add autoApproveSchedule to BrandPersona ([51c97cc](https://github.com/samuelaure/flownau/commit/51c97ccde3d08eb3218e9515cc6f4523ba155d7e))
+- **db:** add engine_autoApproveIdeas to BrandPersona and format to ContentIdea ([c0e8d4b](https://github.com/samuelaure/flownau/commit/c0e8d4b8eb593786d171ac71e48b55434969f6ba))
+- **db:** add engine_autoApprovePool to BrandPersona and source to Composition ([5ab1f4c](https://github.com/samuelaure/flownau/commit/5ab1f4c19c39b00a3c850650de83c70979496bc5))
+- **db:** fresh init migration based on canonical v2 schema ([2817206](https://github.com/samuelaure/flownau/commit/28172069c7841f38c908367c8d4e65e781a3157f))
+- **db:** implement phase 18 schema for pipeline gate decoupling ([2798dda](https://github.com/samuelaure/flownau/commit/2798ddac02643ce637ecba583b293be2dd9887bc))
+- **engine:** implement Pool Auto-Approve logic and Head Talk composer support ([3cb0a16](https://github.com/samuelaure/flownau/commit/3cb0a16424e452c4cb73ad2541791a242f792786))
+- **personas:** add autoApprovePost toggle to brand settings ([c5d31aa](https://github.com/samuelaure/flownau/commit/c5d31aad3836b0498572b25f427492d3bfa8f840))
+- **personas:** add autoApproveSchedule toggle to brand settings ([90a2fef](https://github.com/samuelaure/flownau/commit/90a2fef4256ef9c0c00621b4196edb316849db9e))
+- **publisher:** implement autoApprovePost gate for autonomous publishing ([1b9a2e0](https://github.com/samuelaure/flownau/commit/1b9a2e0733499eb40018b6c06ba0d97d7850c604))
+- **scheduler:** implement autonomous slot assignment and auto-approve gate ([7646354](https://github.com/samuelaure/flownau/commit/76463544dde9ca79cd5e8dc99b6a15f96a3aa83a))
+- **ui:** add calendar tab and update compositions API for scheduling ([d6e93f9](https://github.com/samuelaure/flownau/commit/d6e93f9fe941bfabbc899e69007fc43f67d24603))
+- **ui:** implement Account Pool dashboard and persona engine settings ([061bfe9](https://github.com/samuelaure/flownau/commit/061bfe91750e00c262131fb1ca07473cc548e9ac))
+- **ui:** implement cross-platform brand switcher and 9nau workspace integration ([0c5ec4f](https://github.com/samuelaure/flownau/commit/0c5ec4feeadc6c33e4cb613782ad66583f0c9cd2))
+- **ui:** implement final review dashboard for human verification of renders ([727d68b](https://github.com/samuelaure/flownau/commit/727d68bc7fa544dc6e2a7743a8248b1e35c105cb))
+- **ui:** implement weekly content calendar with slot confirmation and rescheduling ([530253f](https://github.com/samuelaure/flownau/commit/530253f6c741d68f197ea86cbc7a55bcf28da592))
+- **ui:** integrate planner, principles, and template gates into dashboard ([e843d3d](https://github.com/samuelaure/flownau/commit/e843d3d6d025cba302b3607aed2d150135da9701))
+- **ui:** update account dashboard with persona settings and structured ideation pool ([05cec9e](https://github.com/samuelaure/flownau/commit/05cec9e1998bbb5a1a51c1809ee86a91e0c3f99a))
 
 ### Bug Fixes
 
-* **flownau:** final lint resolution and type-safety fixes for workspace architecture migration ([de6a353](https://github.com/samuelaure/flownau/commit/de6a3530d25e21f66416597e803216a7d9e49fb0))
+- **flownau:** final lint resolution and type-safety fixes for workspace architecture migration ([de6a353](https://github.com/samuelaure/flownau/commit/de6a3530d25e21f66416597e803216a7d9e49fb0))
 
 ### [1.5.1](https://github.com/samuelaure/flownau/compare/v1.5.0...v1.5.1) (2026-04-19)
 

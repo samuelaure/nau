@@ -19,7 +19,6 @@ export default async function SettingsPage() {
         </p>
       </header>
 
-
       <Card className="p-8 mt-6">
         <h3 className="text-xl font-heading font-semibold mb-6">Integrations</h3>
 
