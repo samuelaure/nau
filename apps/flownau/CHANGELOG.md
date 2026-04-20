@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.9.1](https://github.com/samuelaure/flownau/compare/v1.9.0...v1.9.1) (2026-04-20)
+
+
+### Features
+
+* **onboarding:** implement minimalist brand setup and platform fallbacks ([6103ee0](https://github.com/samuelaure/flownau/commit/6103ee0d1f738cd75c65c52499a71490e187107a))
+
 ## [1.9.0](https://github.com/samuelaure/flownau/compare/v1.8.1...v1.9.0) (2026-04-20)
 
 
