@@ -11,18 +11,31 @@ function CallbackHandler() {
 
   useEffect(() => {
     const token = searchParams.get('token')
-    if (!token) {
-      window.location.href = '/'
+    const isProduction = window.location.hostname.endsWith('.9nau.com')
+    const domainPart = isProduction ? '; domain=.9nau.com' : ''
+    const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString()
+
+    if (token) {
+      // Flow A: accounts.9nau.com appended ?token= to continueUrl
+      document.cookie = `nau_token=${token}; expires=${expires}; path=/${domainPart}; SameSite=Lax`
+      window.location.href = '/dashboard'
       return
     }
 
-    // Set the nau_token cookie (30-day expiry) shared across all 9nau.com subdomains
-    const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString()
-    const isProduction = window.location.hostname.endsWith('.9nau.com')
-    const domainPart = isProduction ? '; domain=.9nau.com' : ''
-    document.cookie = `nau_token=${token}; expires=${expires}; path=/${domainPart}; SameSite=Lax`
+    // Flow B: accounts.9nau.com set cookie on .9nau.com domain and redirected
+    // here without a token param — check if the cookie is already present.
+    const existingToken = document.cookie
+      .split('; ')
+      .find((row) => row.startsWith('nau_token='))
+      ?.split('=')[1]
 
-    window.location.href = '/dashboard'
+    if (existingToken) {
+      window.location.href = '/dashboard'
+      return
+    }
+
+    // No token anywhere — send back to home
+    window.location.href = '/'
   }, [searchParams])
 
   return (
