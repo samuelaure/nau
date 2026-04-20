@@ -1,21 +1,23 @@
 import { ZazuSkill, ZazuContext } from '@zazu/skills-core';
 import axios from 'axios';
 import { logger } from './lib/logger';
+import { getCachedBrand, setCachedBrand } from './lib/brand-context-cache';
 
 const NAU_API_URL = process.env.NAU_API_URL || 'http://localhost:3000';
-const NAUTHENTICITY_URL = process.env.NAUTHENTICITY_URL || 'http://nauthenticity:4000';
 const NAU_SERVICE_KEY = process.env.NAU_SERVICE_KEY || '';
 
 const SERVICE_HEADERS = { 'x-nau-service-key': NAU_SERVICE_KEY };
 
-async function fetchUserBrandsForTriage(nauUserId: string): Promise<Array<{ id: string; brandName: string }>> {
-  // Ask 9naŭ API which brands belong to this user (it resolves workspace internally)
+type NauBrand = { id: string; name: string };
+type NauWorkspace = { id: string; name: string; brands: NauBrand[] };
+
+/** Fetch all brands the user has access to via 9naŭ workspaces API. */
+async function fetchUserBrands(nauUserId: string): Promise<NauBrand[]> {
   try {
-    const res = await axios.get(`${NAU_API_URL}/api/triage/brands`, {
-      params: { userId: nauUserId },
-      headers: SERVICE_HEADERS,
+    const res = await axios.get<NauWorkspace[]>(`${NAU_API_URL}/api/workspaces`, {
+      headers: { ...SERVICE_HEADERS, 'x-nau-user-id': nauUserId },
     });
-    return res.data?.brands || [];
+    return (res.data ?? []).flatMap((ws) => ws.brands ?? []);
   } catch {
     return [];
   }
@@ -47,24 +49,41 @@ export class TriageSkill implements ZazuSkill {
     if (!ctx.textContent) return;
 
     const user = ctx.dbUser;
-    const nauUserId: string | undefined = user?.nauUserId;
+    const nauUserId: string | undefined = user?.nauUserId ?? undefined;
 
-    // Fetch brands from 9naŭ (it resolves workspace internally)
-    const brands = nauUserId ? await fetchUserBrandsForTriage(nauUserId) : [];
-
-    if (brands.length === 0) {
-      // No brands configured — triage without brand context
+    if (!nauUserId) {
+      // Not linked — triage without brand context
       await this.runTriage(ctx, ctx.textContent, null);
       return;
     }
 
-    // Store transcription in session so the callback handler can access it
+    // Check contextual cache first — skip prompt if user just selected a brand
+    const cachedBrandId = getCachedBrand(nauUserId);
+    if (cachedBrandId) {
+      await this.runTriage(ctx, ctx.textContent, cachedBrandId);
+      return;
+    }
+
+    const brands = await fetchUserBrands(nauUserId);
+
+    if (brands.length === 0) {
+      await this.runTriage(ctx, ctx.textContent, null);
+      return;
+    }
+
+    // Single brand — auto-route silently
+    if (brands.length === 1) {
+      setCachedBrand(nauUserId, brands[0].id);
+      await this.runTriage(ctx, ctx.textContent, brands[0].id);
+      return;
+    }
+
+    // Multiple brands — prompt user via inline keyboard
     ctx.session.pendingTriageText = ctx.textContent;
     ctx.session.pendingTriageUserId = nauUserId;
 
-    // Build inline keyboard: one button per brand + Auto-detect option
-    const brandButtons = brands.map(b => ([{
-      text: `🏷️ ${b.brandName}`,
+    const brandButtons = brands.map((b) => ([{
+      text: `🏷️ ${b.name}`,
       callback_data: `triage_brand:${b.id}`,
     }]));
 
@@ -84,6 +103,11 @@ export class TriageSkill implements ZazuSkill {
   async runTriage(ctx: ZazuContext, text: string, brandId: string | null) {
     const user = ctx.dbUser;
     const userId = user?.nauUserId || user?.telegramId?.toString() || user?.id?.toString() || 'default_user';
+
+    // Cache the chosen brand for this user session
+    if (brandId && user?.nauUserId) {
+      setCachedBrand(user.nauUserId, brandId);
+    }
 
     const waitMsg = await ctx.reply('⏳ Procesando y enviando a tu Segunda Base (9naŭ)...');
 
