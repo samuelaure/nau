@@ -3,21 +3,17 @@ export const dynamic = 'force-dynamic'
 import { prisma } from '@/modules/shared/prisma'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronRight, Instagram, Calendar } from 'lucide-react'
+import { ChevronRight, Instagram } from 'lucide-react'
 import AssetsManager from '@/modules/shared/components/AssetsManager'
 import AccountSettings from '@/modules/accounts/components/AccountSettings'
-import AccountPersonas from '@/modules/accounts/components/AccountPersonas'
+import AccountSettingsTabs from '@/modules/accounts/components/AccountSettingsTabs'
 import AccountIdeas from '@/modules/accounts/components/AccountIdeas'
 import AccountPool from '@/modules/accounts/components/AccountPool'
 import AccountCalendar from '@/modules/accounts/components/AccountCalendar'
-import AccountFinalReview from '@/modules/accounts/components/AccountFinalReview'
-import AccountPlanners from '@/modules/accounts/components/AccountPlanners'
-import AccountContentPrinciples from '@/modules/accounts/components/AccountContentPrinciples'
 import AccountTemplates from '@/modules/accounts/components/AccountTemplates'
 import ExternalAccountLink from '@/modules/accounts/components/ExternalAccountLink'
+import BrandBreadcrumb from '@/modules/accounts/components/BrandBreadcrumb'
 import { cn } from '@/modules/shared/utils'
-import { Button } from '@/modules/shared/components/ui/Button'
-import DailyScheduleView from '@/modules/plans/components/DailyScheduleView'
 
 export default async function WorkspaceAccountPage({
   params,
@@ -60,10 +56,14 @@ export default async function WorkspaceAccountPage({
           href={`/dashboard/workspace/${workspaceId}`}
           className="hover:text-white transition-colors"
         >
-          Workspace Overview
+          Overview
         </Link>
         <ChevronRight size={16} />
-        <span className="text-white">@{account.username}</span>
+        <BrandBreadcrumb
+          workspaceId={workspaceId}
+          activeAccountId={accountId}
+          activeUsername={account.username ?? accountId}
+        />
       </div>
 
       {/* Header */}
@@ -105,56 +105,36 @@ export default async function WorkspaceAccountPage({
           </div>
         </div>
 
-        <div className="flex gap-3">
-          <Button variant="outline" size="sm" className="gap-2">
-            <Calendar size={16} /> Monthly View
-          </Button>
-        </div>
       </header>
 
-      {/* Modern Tabs */}
+      {/* Tabs */}
       <div className="flex border-b border-white/5 mb-8 overflow-x-auto no-scrollbar">
         <TabLink href={`?tab=calendar`} active={activeTab === 'calendar'} label="Calendar" />
-        <TabLink href={`?tab=schedule`} active={activeTab === 'schedule'} label="Daily Schedule" />
-        <TabLink
-          href={`?tab=compositions`}
-          active={activeTab === 'compositions'}
-          label="Compositions"
-        />
         <TabLink href={`?tab=ideas`} active={activeTab === 'ideas'} label="Ideas" />
+        <TabLink href={`?tab=pool`} active={activeTab === 'pool'} label="Content Pool" />
+        <TabLink href={`?tab=templates`} active={activeTab === 'templates'} label="Templates" />
         <TabLink
           href={`?tab=assets`}
           active={activeTab === 'assets'}
           label="Assets"
           count={account._count.assets}
         />
-        <TabLink
-          href={`?tab=final-review`}
-          active={activeTab === 'final-review'}
-          label="Final Review"
-        />
-        <TabLink href={`?tab=personas`} active={activeTab === 'personas'} label="Personas" />
-        <TabLink href={`?tab=principles`} active={activeTab === 'principles'} label="Principles" />
-        <TabLink href={`?tab=planner`} active={activeTab === 'planner'} label="Planner" />
-        <TabLink href={`?tab=templates`} active={activeTab === 'templates'} label="Templates" />
         <TabLink href={`?tab=settings`} active={activeTab === 'settings'} label="Settings" />
       </div>
 
       {/* Content Sections */}
       <div className="min-h-[400px]">
         {activeTab === 'calendar' && <AccountCalendar accountId={accountId} />}
-        {activeTab === 'schedule' && (
-          <AccountSchedule accountId={accountId} workspaceId={workspaceId} dateStr={date} />
-        )}
-        {activeTab === 'compositions' && <AccountPool accountId={accountId} />}
         {activeTab === 'ideas' && <AccountIdeas accountId={accountId} />}
+        {activeTab === 'pool' && <AccountPool accountId={accountId} />}
         {activeTab === 'assets' && <AccountAssets accountId={accountId} />}
-        {activeTab === 'final-review' && <AccountFinalReview accountId={accountId} />}
-        {activeTab === 'personas' && <AccountPersonas accountId={accountId} />}
-        {activeTab === 'principles' && <AccountContentPrinciples accountId={accountId} />}
-        {activeTab === 'planner' && <AccountPlanners accountId={accountId} />}
         {activeTab === 'templates' && <AccountTemplates accountId={accountId} />}
-        {activeTab === 'settings' && <AccountSettings account={account} />}
+        {activeTab === 'settings' && (
+          <AccountSettingsTabs
+            accountId={accountId}
+            accountForm={<AccountSettings account={account} />}
+          />
+        )}
       </div>
     </div>
   )
@@ -184,95 +164,6 @@ function TabLink({
       {label}
       {count !== undefined && <span className="opacity-50 text-xs">({count})</span>}
     </Link>
-  )
-}
-
-async function AccountSchedule({
-  accountId,
-  workspaceId,
-  dateStr,
-}: {
-  accountId: string
-  workspaceId: string
-  dateStr?: string
-}) {
-  const targetDate = dateStr ? new Date(dateStr) : new Date()
-  targetDate.setHours(0, 0, 0, 0)
-
-  const prevDate = new Date(targetDate)
-  prevDate.setDate(prevDate.getDate() - 1)
-
-  const nextDate = new Date(targetDate)
-  nextDate.setDate(nextDate.getDate() + 1)
-
-  const toDateParam = (d: Date) => d.toISOString().split('T')[0]
-
-  const plan = await prisma.contentPlan.findFirst({
-    where: {
-      accountId,
-      date: {
-        gte: targetDate,
-        lt: new Date(targetDate.getTime() + 24 * 60 * 60 * 1000),
-      },
-    },
-    include: { account: true },
-  })
-
-  const account = await prisma.socialAccount.findUnique({ where: { id: accountId } })
-
-  let mappedPlan = null
-  if (plan && account) {
-    const pieces = (plan.pieces as any[]) ?? []
-    const planAlerts = (plan.pieces as any)?.alerts ?? []
-
-    const FORMAT_LABELS: Record<string, string> = {
-      reel: 'Reel',
-      trial_reel: 'Trial Reel',
-      carousel: 'Carousel',
-      single_image: 'Image',
-    }
-
-    const slots = pieces.map((p) => ({
-      time: p.scheduledAt
-        ? new Date(p.scheduledAt).toLocaleTimeString(undefined, {
-            hour: '2-digit',
-            minute: '2-digit',
-          })
-        : 'Unassigned',
-      type: FORMAT_LABELS[p.format] || p.format,
-      status: p.status,
-      compositionId: p.id,
-    }))
-
-    mappedPlan = {
-      accountId: plan.accountId,
-      username: account.username || 'Unknown',
-      profileImage: account.profileImage || null,
-      alerts: planAlerts,
-      slots,
-      pieces,
-    }
-  }
-
-  const basePath = `/dashboard/workspace/${workspaceId}/account/${accountId}`
-  const isToday = toDateParam(targetDate) === toDateParam(new Date())
-
-  return (
-    <DailyScheduleView
-      dateParam={toDateParam(targetDate)}
-      prevDateParam={toDateParam(prevDate)}
-      nextDateParam={toDateParam(nextDate)}
-      formattedDate={targetDate.toLocaleDateString(undefined, {
-        weekday: 'long',
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric',
-      })}
-      isToday={isToday}
-      plans={mappedPlan ? [mappedPlan] : []}
-      context="brand"
-      basePath={basePath}
-    />
   )
 }
 

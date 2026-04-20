@@ -7,18 +7,64 @@ import { toast } from 'sonner'
 import {
   ChevronLeft,
   ChevronRight,
-  CheckCircle2,
-  Clock,
   Film,
   Play,
   Mic,
   LayoutGrid,
   ImageIcon,
   Loader2,
-  Calendar,
-  CalendarCheck,
+  X,
+  Clock,
+  CheckCircle2,
+  Send,
+  AlertCircle,
+  Pencil,
 } from 'lucide-react'
 import { cn } from '@/modules/shared/utils'
+
+// ─── Status config ────────────────────────────────────────────────────────────
+
+// Four primary display statuses shown inside the calendar
+type DisplayStatus = 'Draft' | 'Composed' | 'Published' | 'Error'
+
+function getDisplayStatus(dbStatus: string): DisplayStatus {
+  if (dbStatus === 'PUBLISHED') return 'Published'
+  if (dbStatus === 'FAILED') return 'Error'
+  if (dbStatus === 'RENDERED' || dbStatus === 'PUBLISHING') return 'Composed'
+  // DRAFT, APPROVED, SCHEDULED, RENDERING → still "in progress" from user POV
+  return 'Draft'
+}
+
+// Secondary tag shown alongside Draft for formats that require user action
+type SecondaryTag = 'Replicate' | 'Record' | null
+
+function getSecondaryTag(format: string, display: DisplayStatus): SecondaryTag {
+  if (display !== 'Draft') return null
+  if (format === 'replicate') return 'Replicate'
+  if (format === 'head_talk') return 'Record'
+  return null
+}
+
+const DISPLAY_COLOR: Record<DisplayStatus, string> = {
+  Draft: 'bg-gray-700/50 border-gray-600/50 text-gray-300',
+  Composed: 'bg-purple-500/15 border-purple-500/30 text-purple-300',
+  Published: 'bg-green-500/15 border-green-500/30 text-green-300',
+  Error: 'bg-red-500/15 border-red-500/30 text-red-400',
+}
+
+const DISPLAY_DOT: Record<DisplayStatus, string> = {
+  Draft: 'bg-gray-500',
+  Composed: 'bg-purple-400',
+  Published: 'bg-green-400',
+  Error: 'bg-red-400',
+}
+
+const TAG_COLOR: Record<NonNullable<SecondaryTag>, string> = {
+  Replicate: 'bg-amber-500/15 border-amber-500/30 text-amber-300',
+  Record: 'bg-sky-500/15 border-sky-500/30 text-sky-300',
+}
+
+// ─── Format config ────────────────────────────────────────────────────────────
 
 const FORMAT_ICON: Record<string, React.ElementType> = {
   reel: Film,
@@ -35,9 +81,12 @@ const FORMAT_LABEL: Record<string, string> = {
   head_talk: 'Head Talk',
   carousel: 'Carousel',
   static_post: 'Image',
+  story: 'Story',
 }
 
-type CalendarComposition = {
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type Composition = {
   id: string
   format: string
   status: string
@@ -46,12 +95,16 @@ type CalendarComposition = {
   createdAt: string
   userUploadedMediaUrl?: string | null
   userPostedManually?: boolean
+  renderedVideoUrl?: string | null
 }
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 function startOfWeek(date: Date): Date {
   const d = new Date(date)
-  const day = d.getDay()
-  d.setDate(d.getDate() - day)
+  d.setDate(d.getDate() - d.getDay())
   d.setHours(0, 0, 0, 0)
   return d
 }
@@ -70,19 +123,334 @@ function isSameDay(a: Date, b: Date): boolean {
   )
 }
 
-const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+function fmtTime(iso: string) {
+  return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+}
+
+function fmtDateTime(iso: string) {
+  return new Date(iso).toLocaleString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+// ─── Composition detail modal ─────────────────────────────────────────────────
+
+function CompositionModal({
+  comp,
+  accountId,
+  onClose,
+  onRefresh,
+}: {
+  comp: Composition
+  accountId: string
+  onClose: () => void
+  onRefresh: () => void
+}) {
+  const [actioning, setActioning] = useState(false)
+  const [rescheduling, setRescheduling] = useState(false)
+  const [newDatetime, setNewDatetime] = useState(
+    comp.scheduledAt ? comp.scheduledAt.slice(0, 16) : '',
+  )
+
+  const FormatIcon = FORMAT_ICON[comp.format] ?? Film
+
+  const handleConfirm = async () => {
+    setActioning(true)
+    try {
+      const res = await fetch(`/api/compositions/${comp.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'SCHEDULED' }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success('Composition scheduled for rendering.')
+      onRefresh()
+      onClose()
+    } catch {
+      toast.error('Failed to confirm')
+    } finally {
+      setActioning(false)
+    }
+  }
+
+  const handleReschedule = async () => {
+    if (!newDatetime) return
+    setActioning(true)
+    try {
+      const res = await fetch(`/api/compositions/${comp.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scheduledAt: new Date(newDatetime).toISOString() }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success('Rescheduled.')
+      setRescheduling(false)
+      onRefresh()
+      onClose()
+    } catch {
+      toast.error('Failed to reschedule')
+    } finally {
+      setActioning(false)
+    }
+  }
+
+  const handleMarkPosted = async () => {
+    setActioning(true)
+    try {
+      const res = await fetch(`/api/compositions/${comp.id}/mark-posted`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      if (!res.ok) throw new Error()
+      toast.success('Marked as manually posted.')
+      onRefresh()
+      onClose()
+    } catch {
+      toast.error('Failed')
+    } finally {
+      setActioning(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="bg-panel border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-white/5">
+              <FormatIcon size={18} className="text-accent" />
+            </div>
+            <div>
+              <p className="font-semibold">{FORMAT_LABEL[comp.format] ?? comp.format}</p>
+              <p className="text-xs text-text-secondary">
+                Created {new Date(comp.createdAt).toLocaleDateString()}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            {(() => {
+              const display = getDisplayStatus(comp.status)
+              const tag = getSecondaryTag(comp.format, display)
+              return (
+                <div className="flex items-center gap-1.5">
+                  <span className={cn('flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border', DISPLAY_COLOR[display])}>
+                    <span className={cn('w-1.5 h-1.5 rounded-full', DISPLAY_DOT[display])} />
+                    {display}
+                  </span>
+                  {tag && (
+                    <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full border', TAG_COLOR[tag])}>
+                      {tag}
+                    </span>
+                  )}
+                </div>
+              )
+            })()}
+            <button
+              onClick={onClose}
+              className="text-text-secondary hover:text-white transition-colors"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5 flex flex-col gap-4">
+          {/* Scheduled time */}
+          <div className="flex items-start gap-3">
+            <Clock size={15} className="text-text-secondary mt-0.5 shrink-0" />
+            <div>
+              <p className="text-xs text-text-secondary uppercase tracking-wider mb-0.5">
+                Scheduled for
+              </p>
+              <p className="text-sm text-white">
+                {comp.scheduledAt ? fmtDateTime(comp.scheduledAt) : 'Not scheduled'}
+              </p>
+            </div>
+          </div>
+
+          {/* Caption */}
+          {comp.caption && (
+            <div className="flex items-start gap-3">
+              <Pencil size={15} className="text-text-secondary mt-0.5 shrink-0" />
+              <div>
+                <p className="text-xs text-text-secondary uppercase tracking-wider mb-0.5">
+                  Caption
+                </p>
+                <p className="text-sm text-white leading-relaxed line-clamp-4">{comp.caption}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Rendered video */}
+          {comp.renderedVideoUrl && (
+            <a
+              href={comp.renderedVideoUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-2 text-sm text-accent hover:underline"
+            >
+              <Play size={14} /> View rendered video
+            </a>
+          )}
+
+          {/* Reschedule form */}
+          {rescheduling && (
+            <div className="flex flex-col gap-2 p-3 bg-white/5 rounded-lg">
+              <p className="text-xs text-text-secondary font-medium">New date & time</p>
+              <input
+                type="datetime-local"
+                value={newDatetime}
+                onChange={(e) => setNewDatetime(e.target.value)}
+                className="bg-gray-950 border border-gray-800 text-white rounded px-3 py-2 text-sm"
+              />
+              <div className="flex gap-2 justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setRescheduling(false)}
+                >
+                  Cancel
+                </Button>
+                <Button size="sm" disabled={!newDatetime || actioning} onClick={handleReschedule}>
+                  {actioning ? <Loader2 size={13} className="animate-spin" /> : 'Save'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer actions */}
+        {(() => {
+          const display = getDisplayStatus(comp.status)
+          const tag = getSecondaryTag(comp.format, display)
+          const needsUpload = tag !== null && !comp.userUploadedMediaUrl
+          return (
+            <div className="flex flex-wrap gap-2 px-6 py-4 border-t border-white/5">
+              {comp.scheduledAt && !rescheduling && (
+                <Button variant="outline" size="sm" onClick={() => setRescheduling(true)} className="gap-1.5">
+                  <Clock size={13} /> Reschedule
+                </Button>
+              )}
+              {/* Replicate / Record: upload media → becomes Composed and will be auto-posted */}
+              {needsUpload && (
+                <label className="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border border-amber-400/30 text-amber-300 hover:bg-amber-400/10 transition-colors">
+                  <AlertCircle size={13} />
+                  {tag === 'Record' ? 'Upload recording' : 'Upload media'}
+                  <input
+                    type="file"
+                    accept="video/*,image/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      const fd = new FormData()
+                      fd.append('file', file)
+                      fd.append('compositionId', comp.id)
+                      fd.append('accountId', accountId)
+                      const res = await fetch('/api/compositions/upload-recording', {
+                        method: 'POST',
+                        body: fd,
+                      })
+                      if (res.ok) {
+                        toast.success('Media uploaded — will be posted at scheduled time.')
+                        onRefresh()
+                        onClose()
+                      } else toast.error('Upload failed')
+                    }}
+                  />
+                </label>
+              )}
+              {/* Mark as published manually (user posted it themselves) */}
+              {tag !== null && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleMarkPosted}
+                  disabled={actioning}
+                  className="gap-1.5"
+                >
+                  {actioning ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                  Mark as published
+                </Button>
+              )}
+              {display === 'Error' && (
+                <Button size="sm" onClick={handleConfirm} disabled={actioning} className="gap-1.5">
+                  {actioning ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
+                  Retry
+                </Button>
+              )}
+            </div>
+          )
+        })()}
+      </div>
+    </div>
+  )
+}
+
+// ─── Mini composition card (inside calendar day) ──────────────────────────────
+
+function CompositionChip({
+  comp,
+  onClick,
+}: {
+  comp: Composition
+  onClick: () => void
+}) {
+  const FormatIcon = FORMAT_ICON[comp.format] ?? Film
+  const display = getDisplayStatus(comp.status)
+  const tag = getSecondaryTag(comp.format, display)
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'w-full text-left rounded p-1.5 flex flex-col gap-0.5 text-[10px] border transition-opacity hover:opacity-80',
+        DISPLAY_COLOR[display],
+      )}
+    >
+      <div className="flex items-center gap-1">
+        <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', DISPLAY_DOT[display])} />
+        <FormatIcon size={9} className="shrink-0" />
+        <span className="font-bold truncate">{FORMAT_LABEL[comp.format] ?? comp.format}</span>
+      </div>
+      {comp.scheduledAt && (
+        <span className="text-[9px] opacity-60 pl-3">{fmtTime(comp.scheduledAt)}</span>
+      )}
+      <div className="flex items-center gap-1 pl-3">
+        <span className="text-[9px] opacity-70">{display}</span>
+        {tag && (
+          <span className={cn('text-[8px] font-bold px-1 rounded border', TAG_COLOR[tag])}>
+            {tag}
+          </span>
+        )}
+      </div>
+    </button>
+  )
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export default function AccountCalendar({ accountId }: { accountId: string }) {
-  const [compositions, setCompositions] = useState<CalendarComposition[]>([])
+  const [compositions, setCompositions] = useState<Composition[]>([])
   const [loading, setLoading] = useState(true)
-  const [actioningId, setActioningId] = useState<string | null>(null)
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()))
-  const [rescheduling, setRescheduling] = useState<{ id: string; current: string } | null>(null)
-  const [newDatetime, setNewDatetime] = useState('')
+  const [selected, setSelected] = useState<Composition | null>(null)
 
   const fetchCompositions = useCallback(async () => {
     try {
-      const res = await fetch(`/api/compositions?accountId=${accountId}&calendar=1`)
+      const res = await fetch(`/api/compositions?accountId=${accountId}`)
       const data = await res.json()
       setCompositions(data.compositions || [])
     } catch {
@@ -96,59 +464,15 @@ export default function AccountCalendar({ accountId }: { accountId: string }) {
     fetchCompositions()
   }, [fetchCompositions])
 
-  const handleConfirm = async (id: string) => {
-    setActioningId(id)
-    try {
-      const res = await fetch(`/api/compositions/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'SCHEDULED' }),
-      })
-      if (!res.ok) throw new Error()
-      toast.success('Slot confirmed — composition is now scheduled for rendering.')
-      fetchCompositions()
-    } catch {
-      toast.error('Failed to confirm slot')
-    } finally {
-      setActioningId(null)
-    }
-  }
-
-  const handleReschedule = async () => {
-    if (!rescheduling || !newDatetime) return
-    setActioningId(rescheduling.id)
-    try {
-      const res = await fetch(`/api/compositions/${rescheduling.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scheduledAt: new Date(newDatetime).toISOString() }),
-      })
-      if (!res.ok) throw new Error()
-      toast.success('Slot rescheduled.')
-      setRescheduling(null)
-      setNewDatetime('')
-      fetchCompositions()
-    } catch {
-      toast.error('Failed to reschedule')
-    } finally {
-      setActioningId(null)
-    }
-  }
-
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
-
-  const compositionsForDay = (day: Date) =>
-    compositions.filter((c) => c.scheduledAt && isSameDay(new Date(c.scheduledAt), day))
-
-  const unslotted = compositions.filter((c) => !c.scheduledAt && c.status === 'APPROVED')
-
-  const prevWeek = () => setWeekStart((d) => addDays(d, -7))
-  const nextWeek = () => setWeekStart((d) => addDays(d, 7))
-  const goToday = () => setWeekStart(startOfWeek(new Date()))
-
   const today = new Date()
 
-  const suggestedCount = compositions.filter((c) => c.status === 'APPROVED' && c.scheduledAt).length
+  const forDay = (day: Date) =>
+    compositions
+      .filter((c) => c.scheduledAt && isSameDay(new Date(c.scheduledAt), day))
+      .sort((a, b) => (a.scheduledAt! < b.scheduledAt! ? -1 : 1))
+
+  const unscheduled = compositions.filter((c) => !c.scheduledAt)
 
   return (
     <div className="flex flex-col gap-6">
@@ -156,15 +480,15 @@ export default function AccountCalendar({ accountId }: { accountId: string }) {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <h3 className="text-xl font-heading font-semibold">Content Calendar</h3>
-          <p className="text-xs text-gray-500">
-            Suggested slots require confirmation before rendering begins.
+          <p className="text-xs text-text-secondary">
+            Click any composition to view details or take action.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={goToday} className="text-xs">
+          <Button variant="outline" size="sm" onClick={() => setWeekStart(startOfWeek(new Date()))} className="text-xs">
             Today
           </Button>
-          <Button variant="outline" size="sm" onClick={prevWeek} className="px-2">
+          <Button variant="outline" size="sm" onClick={() => setWeekStart((d) => addDays(d, -7))} className="px-2">
             <ChevronLeft size={16} />
           </Button>
           <span className="text-sm text-white min-w-[160px] text-center">
@@ -175,101 +499,49 @@ export default function AccountCalendar({ accountId }: { accountId: string }) {
               year: 'numeric',
             })}
           </span>
-          <Button variant="outline" size="sm" onClick={nextWeek} className="px-2">
+          <Button variant="outline" size="sm" onClick={() => setWeekStart((d) => addDays(d, 7))} className="px-2">
             <ChevronRight size={16} />
           </Button>
         </div>
       </div>
 
-      {/* Banners */}
-      {suggestedCount > 0 && (
-        <div className="flex items-center gap-3 bg-purple-500/10 border border-purple-500/20 rounded-lg px-4 py-3">
-          <Clock className="w-4 h-4 text-purple-400 shrink-0" />
-          <p className="text-sm text-purple-300">
-            <strong>{suggestedCount}</strong> suggested {suggestedCount === 1 ? 'slot' : 'slots'}{' '}
-            awaiting confirmation before rendering begins.
-          </p>
-        </div>
-      )}
-      {unslotted.length > 0 && (
-        <div className="flex items-center gap-3 bg-orange-500/10 border border-orange-500/20 rounded-lg px-4 py-3">
-          <Calendar className="w-4 h-4 text-orange-400 shrink-0" />
-          <p className="text-sm text-orange-300">
-            <strong>{unslotted.length}</strong> approved{' '}
-            {unslotted.length === 1 ? 'composition' : 'compositions'} not yet assigned to a slot.
-            Run the scheduler cron or set up Auto-Schedule in Personas.
-          </p>
-        </div>
-      )}
-
-      {/* Reschedule modal */}
-      {rescheduling && (
-        <Card className="bg-gray-900 border border-purple-500/30 p-4 flex flex-col gap-3">
-          <p className="text-sm font-semibold text-white">Reschedule Composition</p>
-          <p className="text-xs text-gray-500">
-            Current slot:{' '}
-            {new Date(rescheduling.current).toLocaleString(undefined, {
-              weekday: 'short',
-              month: 'short',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          </p>
-          <input
-            type="datetime-local"
-            value={newDatetime}
-            onChange={(e) => setNewDatetime(e.target.value)}
-            className="bg-gray-950 border border-gray-800 text-white rounded px-3 py-2 text-sm"
-          />
-          <div className="flex gap-2 justify-end">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setRescheduling(null)
-                setNewDatetime('')
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              disabled={!newDatetime || actioningId === rescheduling.id}
-              onClick={handleReschedule}
-            >
-              {actioningId === rescheduling.id ? (
-                <Loader2 className="w-3 h-3 animate-spin" />
-              ) : (
-                'Confirm Reschedule'
-              )}
-            </Button>
-          </div>
-        </Card>
-      )}
+      {/* Status legend */}
+      <div className="flex flex-wrap gap-4">
+        {(Object.entries(DISPLAY_DOT) as [DisplayStatus, string][]).map(([status, dot]) => (
+          <span key={status} className="flex items-center gap-1.5 text-[11px] text-text-secondary">
+            <span className={cn('w-2 h-2 rounded-full', dot)} />
+            {status}
+          </span>
+        ))}
+        <span className="flex items-center gap-1.5 text-[11px] text-text-secondary">
+          <span className="w-2 h-2 rounded-full bg-amber-400" />
+          Replicate / Record
+        </span>
+      </div>
 
       {/* Weekly grid */}
       {loading ? (
-        <div className="flex items-center justify-center py-16 text-gray-500">
+        <div className="flex items-center justify-center py-16 text-text-secondary">
           <Loader2 className="animate-spin w-5 h-5 mr-2" />
-          Loading calendar...
+          Loading...
         </div>
       ) : (
-        <div className="grid grid-cols-7 gap-1 min-h-[400px]">
+        <div className="grid grid-cols-7 gap-1 min-h-[480px]">
           {weekDays.map((day) => {
             const isToday = isSameDay(day, today)
-            const dayComps = compositionsForDay(day)
+            const dayComps = forDay(day)
             return (
               <div
                 key={day.toISOString()}
                 className={cn(
                   'flex flex-col gap-1 rounded-lg p-2 border',
-                  isToday ? 'border-accent/50 bg-accent/5' : 'border-gray-800 bg-gray-900/40',
+                  isToday
+                    ? 'border-accent/50 bg-accent/5'
+                    : 'border-white/5 bg-white/2',
                 )}
               >
-                {/* Day header */}
                 <div className="text-center mb-1">
-                  <p className="text-[10px] text-gray-500 uppercase tracking-widest">
+                  <p className="text-[10px] text-text-secondary uppercase tracking-widest">
                     {DAY_LABELS[day.getDay()]}
                   </p>
                   <p className={cn('text-sm font-bold', isToday ? 'text-accent' : 'text-white')}>
@@ -277,135 +549,20 @@ export default function AccountCalendar({ accountId }: { accountId: string }) {
                   </p>
                 </div>
 
-                {/* Slots */}
                 {dayComps.length === 0 ? (
                   <div className="flex-1 flex items-center justify-center">
                     <span className="text-[10px] text-gray-700">—</span>
                   </div>
                 ) : (
-                  dayComps.map((comp) => {
-                    const isSuggested = comp.status === 'APPROVED'
-                    const isScheduled = comp.status === 'SCHEDULED'
-                    const FormatIcon = FORMAT_ICON[comp.format] ?? Film
-                    const busy = actioningId === comp.id
-                    const timeStr = comp.scheduledAt
-                      ? new Date(comp.scheduledAt).toLocaleTimeString(undefined, {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })
-                      : ''
-
-                    return (
-                      <div
+                  <div className="flex flex-col gap-1">
+                    {dayComps.map((comp) => (
+                      <CompositionChip
                         key={comp.id}
-                        className={cn(
-                          'rounded p-1.5 flex flex-col gap-1 text-[10px] border',
-                          isSuggested
-                            ? 'bg-purple-500/10 border-purple-500/30 text-purple-300'
-                            : isScheduled
-                              ? 'bg-green-500/10 border-green-500/30 text-green-300'
-                              : 'bg-gray-800 border-gray-700 text-gray-400',
-                        )}
-                      >
-                        <div className="flex items-center gap-1">
-                          <FormatIcon size={9} className="shrink-0" />
-                          <span className="font-bold truncate">
-                            {FORMAT_LABEL[comp.format] ?? comp.format}
-                          </span>
-                        </div>
-                        <span className="text-[9px] opacity-60">{timeStr}</span>
-                        {isSuggested && (
-                          <span className="text-[9px] text-purple-400 font-bold uppercase tracking-wider">
-                            Suggested
-                          </span>
-                        )}
-                        {isScheduled && (
-                          <span className="text-[9px] text-green-400 font-bold uppercase tracking-wider flex items-center gap-0.5">
-                            <CalendarCheck size={8} />
-                            Scheduled
-                          </span>
-                        )}
-
-                        {/* Actions */}
-                        <div className="flex flex-col gap-0.5 mt-0.5">
-                          {isSuggested && (
-                            <button
-                              disabled={busy}
-                              onClick={() => handleConfirm(comp.id)}
-                              className="flex items-center gap-0.5 text-[9px] text-green-400 hover:text-green-300 disabled:opacity-40 transition"
-                            >
-                              {busy ? (
-                                <Loader2 size={8} className="animate-spin" />
-                              ) : (
-                                <CheckCircle2 size={8} />
-                              )}
-                              Confirm
-                            </button>
-                          )}
-                          {comp.scheduledAt && (
-                            <button
-                              onClick={() =>
-                                setRescheduling({ id: comp.id, current: comp.scheduledAt! })
-                              }
-                              className="text-[9px] text-gray-500 hover:text-white transition"
-                            >
-                              Reschedule
-                            </button>
-                          )}
-                          {/* Phase 18: user-managed format actions */}
-                          {['head_talk', 'replicate'].includes(comp.format) &&
-                            isScheduled &&
-                            !comp.userUploadedMediaUrl && (
-                              <>
-                                <label className="text-[9px] text-amber-400 hover:text-amber-300 cursor-pointer transition">
-                                  Upload media
-                                  <input
-                                    type="file"
-                                    accept="video/*,image/*"
-                                    className="hidden"
-                                    onChange={async (e) => {
-                                      const file = e.target.files?.[0]
-                                      if (!file) return
-                                      const fd = new FormData()
-                                      fd.append('file', file)
-                                      fd.append('compositionId', comp.id)
-                                      fd.append('accountId', accountId)
-                                      const res = await fetch(
-                                        '/api/compositions/upload-recording',
-                                        { method: 'POST', body: fd },
-                                      )
-                                      if (res.ok) {
-                                        toast.success('Media uploaded')
-                                        fetchCompositions()
-                                      } else toast.error('Upload failed')
-                                    }}
-                                  />
-                                </label>
-                                <button
-                                  onClick={async () => {
-                                    const res = await fetch(
-                                      `/api/compositions/${comp.id}/mark-posted`,
-                                      {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({}),
-                                      },
-                                    )
-                                    if (res.ok) {
-                                      toast.success('Marked as manually posted')
-                                      fetchCompositions()
-                                    } else toast.error('Failed')
-                                  }}
-                                  className="text-[9px] text-gray-500 hover:text-white transition"
-                                >
-                                  Mark as posted
-                                </button>
-                              </>
-                            )}
-                        </div>
-                      </div>
-                    )
-                  })
+                        comp={comp}
+                        onClick={() => setSelected(comp)}
+                      />
+                    ))}
+                  </div>
                 )}
               </div>
             )
@@ -413,30 +570,50 @@ export default function AccountCalendar({ accountId }: { accountId: string }) {
         </div>
       )}
 
-      {/* Unslotted APPROVED compositions */}
-      {!loading && unslotted.length > 0 && (
+      {/* Unscheduled compositions */}
+      {!loading && unscheduled.length > 0 && (
         <div>
-          <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mb-3">
-            Unslotted Approved Compositions
+          <p className="text-xs text-text-secondary font-bold uppercase tracking-widest mb-3">
+            Unscheduled
           </p>
           <div className="flex flex-wrap gap-2">
-            {unslotted.map((comp) => {
+            {unscheduled.map((comp) => {
               const FormatIcon = FORMAT_ICON[comp.format] ?? Film
+              const display = getDisplayStatus(comp.status)
+              const tag = getSecondaryTag(comp.format, display)
               return (
-                <div
+                <button
                   key={comp.id}
-                  className="flex items-center gap-2 bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-400"
+                  onClick={() => setSelected(comp)}
+                  className={cn(
+                    'flex items-center gap-2 rounded-lg px-3 py-2 text-xs border transition-opacity hover:opacity-80',
+                    DISPLAY_COLOR[display],
+                  )}
                 >
+                  <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', DISPLAY_DOT[display])} />
                   <FormatIcon size={12} />
                   <span>{FORMAT_LABEL[comp.format] ?? comp.format}</span>
-                  <span className="text-gray-600">
-                    {new Date(comp.createdAt).toLocaleDateString()}
-                  </span>
-                </div>
+                  <span className="opacity-60">{display}</span>
+                  {tag && (
+                    <span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded border', TAG_COLOR[tag])}>
+                      {tag}
+                    </span>
+                  )}
+                </button>
               )
             })}
           </div>
         </div>
+      )}
+
+      {/* Detail modal */}
+      {selected && (
+        <CompositionModal
+          comp={selected}
+          accountId={accountId}
+          onClose={() => setSelected(null)}
+          onRefresh={fetchCompositions}
+        />
       )}
     </div>
   )
