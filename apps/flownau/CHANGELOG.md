@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.8.1](https://github.com/samuelaure/flownau/compare/v1.8.0...v1.8.1) (2026-04-20)
+
+
+### Bug Fixes
+
+* **auth:** fix SSO callback to handle cookie-based flow from accounts.9nau.com ([2f5872f](https://github.com/samuelaure/flownau/commit/2f5872fe0d6ac291201be0ea8d9d1e8590a143b4))
+
 ## [1.8.0](https://github.com/samuelaure/flownau/compare/v1.7.1...v1.8.0) (2026-04-20)
 
 
