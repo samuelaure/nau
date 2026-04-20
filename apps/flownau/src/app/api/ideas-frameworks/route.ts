@@ -21,19 +21,30 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    if (body.isDefault && body.accountId) {
+    const { accountId, brandId, workspaceId, name, systemPrompt, isDefault } = body
+
+    if (!accountId || !brandId || !workspaceId || !name || !systemPrompt) {
+      return NextResponse.json(
+        { error: 'Missing accountId, brandId, workspaceId, name, or systemPrompt' },
+        { status: 400 },
+      )
+    }
+
+    if (isDefault && accountId) {
       await prisma.ideasFramework.updateMany({
-        where: { accountId: body.accountId },
+        where: { accountId },
         data: { isDefault: false },
       })
     }
 
     const framework = await prisma.ideasFramework.create({
       data: {
-        accountId: body.accountId,
-        name: body.name,
-        systemPrompt: body.systemPrompt,
-        isDefault: body.isDefault ?? false,
+        accountId,
+        brandId,
+        workspaceId,
+        name,
+        systemPrompt,
+        isDefault: isDefault ?? false,
       },
     })
     return NextResponse.json({ framework }, { status: 201 })

@@ -22,31 +22,41 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json()
+    const { accountId, brandId, workspaceId, name, systemPrompt, ...rest } = body
+
+    if (!accountId || !brandId || !workspaceId || !name || !systemPrompt) {
+      return NextResponse.json(
+        { error: 'Missing accountId, brandId, workspaceId, name, or systemPrompt' },
+        { status: 400 },
+      )
+    }
 
     // If setting to default, clear others
-    if (body.isDefault && body.accountId) {
+    if (rest.isDefault && accountId) {
       await prisma.brandPersona.updateMany({
-        where: { accountId: body.accountId },
+        where: { accountId },
         data: { isDefault: false },
       })
     }
 
     const persona = await prisma.brandPersona.create({
       data: {
-        accountId: body.accountId,
-        name: body.name,
-        systemPrompt: body.systemPrompt,
-        modelSelection: body.modelSelection ?? 'GROQ_LLAMA_3_3',
-        isDefault: body.isDefault ?? false,
-        autoApproveIdeas: body.autoApproveIdeas ?? false,
-        autoApproveCompositions: body.autoApproveCompositions ?? false,
-        autoApprovePool: body.autoApprovePool ?? false,
-        capturedCount: body.capturedCount ?? 3,
-        capturedAutoApprove: body.capturedAutoApprove ?? false,
-        manualCount: body.manualCount ?? 5,
-        manualAutoApprove: body.manualAutoApprove ?? false,
-        automaticCount: body.automaticCount ?? 5,
-        automaticAutoApprove: body.automaticAutoApprove ?? false,
+        accountId,
+        brandId,
+        workspaceId,
+        name,
+        systemPrompt,
+        modelSelection: rest.modelSelection ?? 'GROQ_LLAMA_3_3',
+        isDefault: rest.isDefault ?? false,
+        autoApproveIdeas: rest.autoApproveIdeas ?? false,
+        autoApproveCompositions: rest.autoApproveCompositions ?? false,
+        autoApprovePool: rest.autoApprovePool ?? false,
+        capturedCount: rest.capturedCount ?? 3,
+        capturedAutoApprove: rest.capturedAutoApprove ?? false,
+        manualCount: rest.manualCount ?? 5,
+        manualAutoApprove: rest.manualAutoApprove ?? false,
+        automaticCount: rest.automaticCount ?? 5,
+        automaticAutoApprove: rest.automaticAutoApprove ?? false,
       },
     })
     return NextResponse.json({ persona }, { status: 201 })

@@ -23,10 +23,13 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { accountId, name, ...rest } = body
+    const { accountId, brandId, workspaceId, name, ...rest } = body
 
-    if (!accountId || !name) {
-      return NextResponse.json({ error: 'Missing accountId or name' }, { status: 400 })
+    if (!accountId || !brandId || !workspaceId || !name) {
+      return NextResponse.json(
+        { error: 'Missing accountId, brandId, workspaceId, or name' },
+        { status: 400 },
+      )
     }
 
     if (rest.isDefault) {
@@ -37,7 +40,7 @@ export async function POST(req: Request) {
     }
 
     const planner = await prisma.contentPlanner.create({
-      data: { accountId, name, ...rest },
+      data: { accountId, brandId, workspaceId, name, ...rest },
     })
 
     return NextResponse.json({ planner }, { status: 201 })
