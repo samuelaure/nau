@@ -2,6 +2,8 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.6.10](https://github.com/samuelaure/flownau/compare/v1.6.9...v1.6.10) (2026-04-20)
+
 ### [1.6.9](https://github.com/samuelaure/flownau/compare/v1.6.8...v1.6.9) (2026-04-20)
 
 
