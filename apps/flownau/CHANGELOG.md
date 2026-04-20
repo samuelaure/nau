@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.7.1](https://github.com/samuelaure/flownau/compare/v1.7.0...v1.7.1) (2026-04-20)
+
+
+### Bug Fixes
+
+* **renderer:** correct bundle signature for Remotion 4.x compat ([0351e4f](https://github.com/samuelaure/flownau/commit/0351e4fee5176a156aa10ce4a3d1aa33cff9f85e))
+
 ## [1.7.0](https://github.com/samuelaure/flownau/compare/v1.6.10...v1.7.0) (2026-04-20)
 
 
