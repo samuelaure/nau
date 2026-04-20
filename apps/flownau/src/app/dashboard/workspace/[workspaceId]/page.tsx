@@ -6,7 +6,6 @@ import ActionMenu from '@/modules/shared/components/ActionMenu'
 import Link from 'next/link'
 import { Card } from '@/modules/shared/components/ui/Card'
 import type { AccountWithCounts } from '@/types'
-import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,10 +27,10 @@ export default async function WorkspaceOverviewPage({
     return (
       <div className="flex flex-col items-center justify-center pt-20 animate-fade-in">
         <h2 className="text-2xl font-bold mb-4">Workspace Unavailable</h2>
-        <p className="text-text-secondary mb-8">
-          Could not load this workspace. Please try again.
-        </p>
-        <a href="/dashboard" className="btn-primary px-6 py-2">Back to Dashboard</a>
+        <p className="text-text-secondary mb-8">Could not load this workspace. Please try again.</p>
+        <a href="/dashboard" className="btn-primary px-6 py-2">
+          Back to Dashboard
+        </a>
       </div>
     )
   }

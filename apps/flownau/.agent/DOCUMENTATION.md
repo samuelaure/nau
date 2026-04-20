@@ -4,7 +4,7 @@
 
 - **Type:** A — Platform Service (headless API + internal dashboard)
 - **Domain:** Content creation, scene-based video/image composition, automated publishing
-- **Status:** Active — Phase 18: Decouple Pipeline Gates + Canonical Flow Refactor
+- **Status:** Active — Phase 19: Zero-Configuration Onboarding (Minimalist Path)
 
 ## Purpose
 
@@ -149,39 +149,40 @@ ContentIdea ──[autoApproveIdeas]──► Composition (DRAFT)
 
 ### Crons
 
-| Endpoint                               | Purpose                                                    |
-| -------------------------------------- | ---------------------------------------------------------- |
-| GET `/api/cron/ideation`               | Generate content ideas on schedule                         |
-| GET `/api/cron/composer`               | Compose approved ideas into content pieces                 |
-| GET `/api/cron/publisher`              | Publish rendered content per schedule                      |
-| GET `/api/cron/daily-plan`             | Generate daily content plans                               |
-| GET `/api/cron/renderer`               | Advance render trigger: enqueue SCHEDULED within 48h       |
-| GET `/api/cron/token-refresh`          | Refresh expiring IG tokens                                 |
-| POST `/api/cron/approve-renders`       | Bulk-move RENDERED → PUBLISHING (admin / override gate)    |
-| GET\|POST `/api/cron/reset-renders`    | GET: composition status counts. POST: reset RENDERING/FAILED → SCHEDULED (ops recovery) |
+| Endpoint                            | Purpose                                                                                 |
+| ----------------------------------- | --------------------------------------------------------------------------------------- |
+| GET `/api/cron/ideation`            | Generate content ideas on schedule                                                      |
+| GET `/api/cron/composer`            | Compose approved ideas into content pieces                                              |
+| GET `/api/cron/publisher`           | Publish rendered content per schedule                                                   |
+| GET `/api/cron/daily-plan`          | Generate daily content plans                                                            |
+| GET `/api/cron/renderer`            | Advance render trigger: enqueue SCHEDULED within 48h                                    |
+| GET `/api/cron/token-refresh`       | Refresh expiring IG tokens                                                              |
+| POST `/api/cron/approve-renders`    | Bulk-move RENDERED → PUBLISHING (admin / override gate)                                 |
+| GET\|POST `/api/cron/reset-renders` | GET: composition status counts. POST: reset RENDERING/FAILED → SCHEDULED (ops recovery) |
 
 ## Environment Variables
 
-| Variable                         | Required | Purpose                                              |
-| -------------------------------- | -------- | ---------------------------------------------------- |
-| DATABASE_URL                     | Yes      | Postgres connection                                  |
-| REDIS_URL or REDIS_HOST          | Yes      | Redis connection (BullMQ). URL takes precedence.     |
-| REDIS_PASSWORD                   | Yes      | Redis auth                                           |
-| OPENAI_API_KEY                   | Yes      | GPT-4o for composition                               |
-| GROQ_API_KEY                     | Yes      | Llama 3.3 for ideation                               |
-| R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY | Yes | Cloudflare R2 storage                          |
-| R2_BUCKET_NAME, R2_PUBLIC_URL    | Yes      | R2 bucket config                                     |
-| R2_ENDPOINT                      | Yes      | R2 endpoint URL                                      |
-| NAU_SERVICE_KEY                  | Yes      | Cross-service auth                                   |
-| NAUTHENTICITY_URL                | Yes      | nauthenticity service URL                            |
-| NAU_API_URL                      | Yes      | 9naŭ API URL (workspace service endpoint)            |
-| AUTH_SECRET                      | Yes      | **Must match 9nau API AUTH_SECRET exactly** — used to verify nau_token JWTs |
-| AUTH_URL                         | Yes      | Public URL of this app (e.g. https://flownau.9nau.com) |
-| CRON_SECRET                      | Yes      | Automated flow protection (Bearer)                   |
-| NEXT_PUBLIC_ACCOUNTS_URL         | Yes      | accounts.9nau.com URL for SSO redirect               |
-| NEXT_PUBLIC_APP_URL              | Yes      | Public URL of this app (used in SSO continue param)  |
-| RENDER_CONCURRENCY               | No       | Frames in parallel (default: 1)                      |
+| Variable                               | Required | Purpose                                                                     |
+| -------------------------------------- | -------- | --------------------------------------------------------------------------- |
+| DATABASE_URL                           | Yes      | Postgres connection                                                         |
+| REDIS_URL or REDIS_HOST                | Yes      | Redis connection (BullMQ). URL takes precedence.                            |
+| REDIS_PASSWORD                         | Yes      | Redis auth                                                                  |
+| OPENAI_API_KEY                         | Yes      | GPT-4o for composition                                                      |
+| GROQ_API_KEY                           | Yes      | Llama 3.3 for ideation                                                      |
+| R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY | Yes      | Cloudflare R2 storage                                                       |
+| R2_BUCKET_NAME, R2_PUBLIC_URL          | Yes      | R2 bucket config                                                            |
+| R2_ENDPOINT                            | Yes      | R2 endpoint URL                                                             |
+| NAU_SERVICE_KEY                        | Yes      | Cross-service auth                                                          |
+| NAUTHENTICITY_URL                      | Yes      | nauthenticity service URL                                                   |
+| NAU_API_URL                            | Yes      | 9naŭ API URL (workspace service endpoint)                                   |
+| AUTH_SECRET                            | Yes      | **Must match 9nau API AUTH_SECRET exactly** — used to verify nau_token JWTs |
+| AUTH_URL                               | Yes      | Public URL of this app (e.g. https://flownau.9nau.com)                      |
+| CRON_SECRET                            | Yes      | Automated flow protection (Bearer)                                          |
+| NEXT_PUBLIC_ACCOUNTS_URL               | Yes      | accounts.9nau.com URL for SSO redirect                                      |
+| NEXT_PUBLIC_APP_URL                    | Yes      | Public URL of this app (used in SSO continue param)                         |
+| RENDER_CONCURRENCY                     | No       | Frames in parallel (default: 1)                                             |
 
+- **[2026-04-20] Phase 19 — Zero-Configuration Onboarding (complete)**: Implemented the "Minimalist Path" for brand creation and AI composition. Added `PLATFORM_DEFAULT_CREATIVE_PERSONA` as a graceful fallback in `SceneComposer`, allowing compositions to proceed even for brands without a configured persona. Introduced the `Quick Setup` flow in the dashboard, enabling users to create a brand via 9naŭ API with just a name.
 - **[2026-04-20] E2E Pipeline Validation & SSO Fix (v1.6.7–v1.8.1)**: Full end-to-end test validated all 3 ideation flows (automatic, manual, captured/Zazŭ), composition, scheduling, rendering, and Instagram publishing. Six bugs fixed: Bug #6 Groq malformed JSON normalization in scene-composer; Bug #7 OpenAI structured output required `.optional().nullable()` on all optional fields in `scenes.ts`; Bug #8 BullMQ rejects `:` in custom job IDs (changed `render:id` → `render-id`); Bug #9 Remotion bundler couldn't resolve `@/` path alias — added `webpackOverride` with explicit alias in `render-worker.ts`; Bug #10 BullMQ deduplicates on jobId for failed jobs — must flush Redis before re-enqueue. SSO Bug #11: `AUTH_SECRET` in flownau `.env` did not match 9nau API signing secret, causing all JWT verifications to fail. SSO Bug #12: `/auth/callback` redirected to `/` when no `?token=` param, breaking the accounts.9nau.com cookie-based flow. Added admin cron endpoints: `POST /api/cron/approve-renders` (bulk RENDERED→PUBLISHING) and `GET|POST /api/cron/reset-renders` (ops recovery). **First Instagram post published successfully.**
 - **[2026-04-20] Phase 18.1 — Deployment Stabilization (v1.6.5)**: Fixed a critical TypeScript build error in `SchedulingService` where a potentially null `accountId` from `ContentPlanner` was passed to a required Prisma filter. Hardened infrastructure by enforcing Tier 3 resource limits (192MB/0.35 CPU) on Postgres and Redis containers in `docker-compose.yml`. Verified build with local `npm run verify`.
 - **[2026-04-19] Phase 18 — Decouple Pipeline Gates + Canonical Flow Refactor (complete)**: Clean-break refactor of the autonomous pipeline. Introduced `ContentCreationPrinciples` model (creative best practices fed to composer AI). Moved `autoApprovePost` from Template to new join table `AccountTemplateConfig` (per-account post gate on shared workspace templates). Deleted `PostingSchedule` — `ContentPlanner` is now the sole scheduling source of truth. Composer now selects templates usage-weighted-randomly and passes full provenance context (persona + framework + principles + template.contentSchema) to the AI. Added AI planner-strategist (`runPlannerStrategist`) to order content by strategic prompt before slot assignment. Renderer now skips `head_talk`/`replicate` formats unless user has uploaded media; user can mark-as-posted manually. Every `ContentIdea` and `Composition` now tracks full provenance FKs (`brandPersonaId`, `ideasFrameworkId`, `contentPrinciplesId`, `templateId`). New UI components: `AccountPlanners`, `AccountContentPrinciples`, `AccountTemplates`. New tabs on account page. Removed `AccountSchedulerSettings`.

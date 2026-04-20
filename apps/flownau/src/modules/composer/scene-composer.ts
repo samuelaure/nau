@@ -12,6 +12,12 @@ import {
 } from '@/types/scenes'
 import type { ContentFormat } from '@/types/content'
 
+const PLATFORM_DEFAULT_CREATIVE_PERSONA = {
+  name: 'Platform Default',
+  systemPrompt: `You are a versatile, professional content creator. Communicate clearly and engagingly. Use compelling storytelling and vivid, descriptive language. Keep content professional yet approachable, and always lead with value for the audience. Adapt tone to the subject matter — educational, inspirational, or entertaining as needed.`,
+  modelSelection: 'GROQ_LLAMA_3_3' as const,
+}
+
 interface ComposeInput {
   ideaText: string
   accountId: string
@@ -59,13 +65,11 @@ export async function compose(input: ComposeInput): Promise<ComposeResult> {
     : ((await prisma.brandPersona.findFirst({ where: { accountId, isDefault: true } })) ??
       (await prisma.brandPersona.findFirst({ where: { accountId } })))
 
-  if (!persona) {
-    throw new Error(`[SceneComposer] No Brand Persona found for account ${accountId}`)
-  }
+  const effectivePersona = persona ?? PLATFORM_DEFAULT_CREATIVE_PERSONA
 
   // 2. Fetch asset tag summary for context (not URLs, just metadata)
   const assets = await prisma.asset.findMany({
-    where: { accountId },
+    where: { accountId: accountId },
     select: { tags: true, type: true },
   })
 
@@ -76,7 +80,7 @@ export async function compose(input: ComposeInput): Promise<ComposeResult> {
       : 'No tagged assets available. Use generic scene moods.'
 
   // 3. Resolve AI model
-  const { provider, model } = resolveModelId(persona.modelSelection)
+  const { provider, model } = resolveModelId(effectivePersona.modelSelection)
   const groqKey = (await getSetting('groq_api_key')) ?? process.env.GROQ_API_KEY ?? null
   const openaiKey = (await getSetting('openai_api_key')) ?? process.env.OPENAI_API_KEY ?? null
 
@@ -131,7 +135,7 @@ export async function compose(input: ComposeInput): Promise<ComposeResult> {
   const systemPrompt = `You are a Senior Creative Director for short-form social media content.
 
 BRAND VOICE:
-${persona.systemPrompt}${strategyBlock}${principlesBlock}${templatePromptBlock}${contentSchemaBlock}
+${effectivePersona.systemPrompt}${strategyBlock}${principlesBlock}${templatePromptBlock}${contentSchemaBlock}
 
 AVAILABLE SCENE TYPES:
 ${formatSceneCatalogForAI(sceneFormat)}
@@ -180,7 +184,7 @@ ${formatRules}`
     creative.coverSceneIndex = 0
   }
 
-  return { creative, personaName: persona.name }
+  return { creative, personaName: effectivePersona.name }
 }
 
 /**

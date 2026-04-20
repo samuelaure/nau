@@ -58,6 +58,30 @@ const AUDIO_TYPES = ['audio/mpeg', 'audio/wav', 'audio/aac', 'audio/ogg', 'audio
 
 // --- ACCOUNT ACTIONS ---
 
+/** Quick Setup: create a named brand in 9naŭ without requiring an Instagram connection. */
+export async function addBrand(formData: FormData) {
+  const { workspaceId } = await getUserPrimaryWorkspace()
+  const name = (formData.get('brandName') as string | null)?.trim()
+  if (!name) throw new Error('Brand name is required')
+
+  const cookieStore = await import('next/headers').then((m) => m.cookies())
+  const token = cookieStore.get('nau_token')?.value
+  const nauApiUrl = process.env.NAU_API_URL ?? 'http://9nau-api:3000'
+
+  const res = await fetch(`${nauApiUrl}/api/workspaces/${workspaceId}/brands`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ name }),
+  })
+
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`Failed to create brand: ${text}`)
+  }
+
+  revalidatePath('/dashboard')
+}
+
 export async function addAccount(formData: FormData) {
   const { workspaceId: primaryWorkspaceId } = await getUserPrimaryWorkspace()
 
