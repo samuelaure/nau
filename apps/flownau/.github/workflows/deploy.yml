@@ -184,6 +184,7 @@ jobs:
             R2_ACCESS_KEY_ID=${{ secrets.R2_ACCESS_KEY_ID }}
             R2_SECRET_ACCESS_KEY=${{ secrets.R2_SECRET_ACCESS_KEY }}
             R2_ENDPOINT=https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+            R2_ACCOUNT_ID=${{ secrets.R2_ACCOUNT_ID }}
             R2_BUCKET_NAME=${{ secrets.R2_BUCKET_NAME }}
             R2_PUBLIC_URL=${{ secrets.R2_PUBLIC_URL }}
             FB_APP_ID=${{ secrets.FB_APP_ID }}
@@ -196,6 +197,10 @@ jobs:
             INITIAL_ADMIN_NAME="Samuel Aure"
             NAU_SERVICE_KEY=${{ secrets.NAU_SERVICE_KEY }}
             NAUTHENTICITY_URL=https://nauthenticity.9nau.com
+            CRON_SECRET=${{ secrets.CRON_SECRET }}
+            NAU_API_URL=${{ secrets.NAU_API_URL }}
+            NEXT_PUBLIC_APP_URL=${{ secrets.NEXT_PUBLIC_APP_URL }}
+            NEXT_PUBLIC_ACCOUNTS_URL=${{ secrets.NEXT_PUBLIC_ACCOUNTS_URL }}
             TAG=${{ github.ref_name }}
             ENVEOF
             tr -d '\r' < /root/flownau/.env.tmp > /root/flownau/.env
@@ -209,7 +214,7 @@ jobs:
 
             # Pull and deploy the new images
             TAG=${{ github.ref_name }} docker compose pull
-            TAG=${{ github.ref_name }} docker compose up -d --remove-orphans
+            TAG=${{ github.ref_name }} docker compose up -d --force-recreate --remove-orphans
 
             # Prune old images now that new ones are running
             docker image prune -a -f --filter "until=2h" || true
