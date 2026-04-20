@@ -6,19 +6,45 @@ import { DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { revalidatePath } from 'next/cache'
 import { requireAuth } from '@/lib/auth'
 import { z } from 'zod'
+import { cookies } from 'next/headers'
 
 export async function checkAuth() {
   const user = await requireAuth()
-  const workspaces = await prisma.workspaceUser.findMany({
-    where: { platformUserId: user.id },
-    select: { workspaceId: true },
-  })
-  return { user: { ...user, workspaces } }
+  return { user }
+}
+
+/** Fetch the user's workspaces from 9nau-api using the session JWT. */
+export async function getNauWorkspaces() {
+  const cookieStore = await cookies()
+  const token = cookieStore.get('nau_token')?.value
+  if (!token) return []
+
+  const nauApiUrl = process.env.NAU_API_URL ?? 'http://9nau-api:3000'
+  try {
+    const res = await fetch(`${nauApiUrl}/api/workspaces`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    })
+    if (!res.ok) return []
+    return res.json() as Promise<{ id: string; name: string; role: string; brands: { id: string; name: string }[] }[]>
+  } catch {
+    return []
+  }
+}
+
+/** Returns the first workspace the user owns from 9nau-api. */
+export async function getUserPrimaryWorkspace() {
+  const { user } = await checkAuth()
+  const workspaces = await getNauWorkspaces()
+  const primary = workspaces.find((w) => w.role === 'owner') ?? workspaces[0]
+  if (!primary) throw new Error('No workspace found for user')
+  return { workspaceId: primary.id, user }
 }
 
 export async function checkAccountAccess(accountId: string) {
   const { user } = await checkAuth()
-  const workspaceIds = user.workspaces.map((w) => w.workspaceId)
+  const workspaces = await getNauWorkspaces()
+  const workspaceIds = workspaces.map((w) => w.id)
 
   const account = await prisma.socialAccount.findFirst({
     where: { id: accountId, workspaceId: { in: workspaceIds } },
@@ -27,19 +53,6 @@ export async function checkAccountAccess(accountId: string) {
   if (!account) throw new Error('Forbidden')
 
   return { account, user }
-}
-
-export async function getUserPrimaryWorkspace() {
-  const { user } = await checkAuth()
-
-  const wu = await prisma.workspaceUser.findFirst({
-    where: { platformUserId: user.id, role: 'owner' },
-    select: { workspaceId: true },
-  })
-
-  if (!wu) throw new Error('No workspace found for user')
-
-  return { workspaceId: wu.workspaceId, user }
 }
 
 const DeleteAssetSchema = z.string().min(1)
