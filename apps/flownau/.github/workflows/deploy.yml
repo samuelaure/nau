@@ -5,6 +5,19 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Image tag to deploy (e.g. v1.6.9)'
+        required: false
+        default: 'latest'
+      force_recreate:
+        description: 'Force recreate containers'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 permissions:
   contents: read
@@ -201,7 +214,7 @@ jobs:
             NAU_API_URL=${{ secrets.NAU_API_URL }}
             NEXT_PUBLIC_APP_URL=${{ secrets.NEXT_PUBLIC_APP_URL }}
             NEXT_PUBLIC_ACCOUNTS_URL=${{ secrets.NEXT_PUBLIC_ACCOUNTS_URL }}
-            TAG=${{ github.ref_name }}
+            TAG=${{ github.event.inputs.tag || github.ref_name }}
             ENVEOF
             tr -d '\r' < /root/flownau/.env.tmp > /root/flownau/.env
 
@@ -213,8 +226,8 @@ jobs:
             docker image prune -a -f --filter "until=2h" || true
 
             # Pull and deploy the new images
-            TAG=${{ github.ref_name }} docker compose pull
-            TAG=${{ github.ref_name }} docker compose up -d --force-recreate --remove-orphans
+            TAG=${{ github.event.inputs.tag || github.ref_name }} docker compose pull
+            TAG=${{ github.event.inputs.tag || github.ref_name }} docker compose up -d ${{ (github.event.inputs.force_recreate == 'true') && '--force-recreate' || '' }} --remove-orphans
 
             # Prune old images now that new ones are running
             docker image prune -a -f --filter "until=2h" || true
