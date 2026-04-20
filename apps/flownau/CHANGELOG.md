@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.6.6](https://github.com/samuelaure/flownau/compare/v1.6.5...v1.6.6) (2026-04-20)
+
+
+### Bug Fixes
+
+* **auth:** enforce platform SSO and standardize AUTH_SECRET ([b1f5c5c](https://github.com/samuelaure/flownau/commit/b1f5c5c2b485a72895abeeb27a2e4f711189fd73))
+* **renderer:** remove src from dockerignore to allow typescript execution ([9709f4e](https://github.com/samuelaure/flownau/commit/9709f4ec68169da98241bb72a3c7d02938361e8e))
+
 ### [1.6.5](https://github.com/samuelaure/flownau/compare/v1.6.4...v1.6.5) (2026-04-20)
 
 ### Bug Fixes
