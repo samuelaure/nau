@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.6.2](https://github.com/samuelaure/flownau/compare/v1.6.1...v1.6.2) (2026-04-20)
+
+
+### Bug Fixes
+
+* **flownau:** include brandId/workspaceId in content principles create ([e3961f9](https://github.com/samuelaure/flownau/commit/e3961f9e15de7cb35d38170c37d479cf078acb59))
+
 ### [1.6.1](https://github.com/samuelaure/flownau/compare/v1.6.0...v1.6.1) (2026-04-20)
 
 
