@@ -7,6 +7,7 @@ import { Loader2, MonitorSmartphone, ShieldAlert } from 'lucide-react';
 import AdminDashboard from './components/AdminDashboard';
 import UserDashboard from './components/UserDashboard';
 import LinkAccountPrompt from './components/auth/link-account-prompt';
+import WorkspaceContextPanel from './components/WorkspaceContextPanel';
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,19 @@ export default function Dashboard() {
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       {needsLink && <LinkAccountPrompt />}
+      {/* Workspace / Brand Context Selector */}
+      {status === 'authenticated' && session?.user?.nauUserId && (
+        <div style={{
+          background: 'var(--surface)',
+          borderBottom: '1px solid var(--border-glass)',
+          padding: '8px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+        }}>
+          <WorkspaceContextPanel />
+        </div>
+      )}
       {/* Global View Switcher for Admins */}
       {isAdmin && (
         <div style={{ 
