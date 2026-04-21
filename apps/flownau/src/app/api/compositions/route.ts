@@ -51,8 +51,6 @@ export async function GET(req: Request) {
       ...c,
       renderedVideoUrl: c.renderJob?.outputUrl ?? null,
     }))
-      },
-    })
 
     return NextResponse.json({ compositions: mapped }, { status: 200 })
   } catch (error) {
