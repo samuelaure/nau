@@ -330,4 +330,3 @@ async function getNextSystemFilename(
 
   return `${prefix}${counter.toString().padStart(4, '0')}.${ext}`
 }
-

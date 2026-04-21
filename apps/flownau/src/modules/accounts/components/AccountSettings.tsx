@@ -1,6 +1,7 @@
 'use client'
 
 import { useTransition, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { updateAccount, moveAccountToWorkspace } from '@/modules/accounts/actions'
 import RefreshProfileButton from '@/modules/accounts/components/RefreshProfileButton'
 import { Card } from '@/modules/shared/components/ui/Card'
@@ -10,6 +11,7 @@ import { Textarea } from '@/modules/shared/components/ui/Textarea'
 import type { SocialAccount } from '@prisma/client'
 
 export default function AccountSettings({ account }: { account: SocialAccount }) {
+  const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [movePending, startMoveTransition] = useTransition()
   const [workspaces, setWorkspaces] = useState<{ id: string; name: string }[]>([])
@@ -128,6 +130,7 @@ export default function AccountSettings({ account }: { account: SocialAccount })
               onClick={() => {
                 startMoveTransition(async () => {
                   await moveAccountToWorkspace(account.id, targetWs)
+                  router.push(`/dashboard/workspace/${targetWs}`)
                 })
               }}
             >
@@ -135,7 +138,8 @@ export default function AccountSettings({ account }: { account: SocialAccount })
             </Button>
           </div>
           <p className="text-xs text-text-secondary mt-2">
-            Current workspace: {workspaces.find((w) => w.id === (account as any).workspaceId)?.name ?? 'Unknown'}
+            Current workspace:{' '}
+            {workspaces.find((w) => w.id === (account as any).workspaceId)?.name ?? 'Unknown'}
           </p>
         </Card>
       )}

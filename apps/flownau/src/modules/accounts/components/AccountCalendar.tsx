@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Card } from '@/modules/shared/components/ui/Card'
 import { Button } from '@/modules/shared/components/ui/Button'
 import { toast } from 'sonner'
 import {
@@ -18,7 +17,6 @@ import {
   CheckCircle2,
   Send,
   AlertCircle,
-  Pencil,
 } from 'lucide-react'
 import { cn } from '@/modules/shared/utils'
 
@@ -291,12 +289,22 @@ function CompositionModal({
               const tag = getSecondaryTag(comp.format, display)
               return (
                 <div className="flex items-center gap-1.5">
-                  <span className={cn('flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border', DISPLAY_COLOR[display])}>
+                  <span
+                    className={cn(
+                      'flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border',
+                      DISPLAY_COLOR[display],
+                    )}
+                  >
                     <span className={cn('w-1.5 h-1.5 rounded-full', DISPLAY_DOT[display])} />
                     {display}
                   </span>
                   {tag && (
-                    <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full border', TAG_COLOR[tag])}>
+                    <span
+                      className={cn(
+                        'text-xs font-semibold px-2 py-0.5 rounded-full border',
+                        TAG_COLOR[tag],
+                      )}
+                    >
                       {tag}
                     </span>
                   )}
@@ -361,14 +369,18 @@ function CompositionModal({
                     className="bg-gray-950 border border-gray-800 text-white rounded px-3 py-2 text-sm resize-none w-full"
                   />
                   <div className="flex gap-2 justify-end">
-                    <Button variant="outline" size="sm" onClick={() => setEditingScript(false)}>Cancel</Button>
+                    <Button variant="outline" size="sm" onClick={() => setEditingScript(false)}>
+                      Cancel
+                    </Button>
                     <Button size="sm" disabled={actioning} onClick={handleSaveScript}>
                       {actioning ? <Loader2 size={12} className="animate-spin" /> : 'Save'}
                     </Button>
                   </div>
                 </>
               ) : scriptDraft ? (
-                <p className="text-sm text-white leading-relaxed whitespace-pre-wrap line-clamp-6">{scriptDraft}</p>
+                <p className="text-sm text-white leading-relaxed whitespace-pre-wrap line-clamp-6">
+                  {scriptDraft}
+                </p>
               ) : (
                 <p className="text-sm text-text-secondary italic">No script yet.</p>
               )}
@@ -397,7 +409,9 @@ function CompositionModal({
                   className="bg-gray-950 border border-gray-800 text-white rounded px-3 py-2 text-sm resize-none w-full"
                 />
                 <div className="flex gap-2 justify-end">
-                  <Button variant="outline" size="sm" onClick={() => setEditingCaption(false)}>Cancel</Button>
+                  <Button variant="outline" size="sm" onClick={() => setEditingCaption(false)}>
+                    Cancel
+                  </Button>
                   <Button size="sm" disabled={actioning} onClick={handleSaveCaption}>
                     {actioning ? <Loader2 size={12} className="animate-spin" /> : 'Save'}
                   </Button>
@@ -421,11 +435,7 @@ function CompositionModal({
                 className="bg-gray-950 border border-gray-800 text-white rounded px-3 py-2 text-sm"
               />
               <div className="flex gap-2 justify-end">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setRescheduling(false)}
-                >
+                <Button variant="outline" size="sm" onClick={() => setRescheduling(false)}>
                   Cancel
                 </Button>
                 <Button size="sm" disabled={!newDatetime || actioning} onClick={handleReschedule}>
@@ -444,7 +454,12 @@ function CompositionModal({
           return (
             <div className="flex flex-wrap gap-2 px-6 py-4 border-t border-white/5">
               {comp.scheduledAt && !rescheduling && (
-                <Button variant="outline" size="sm" onClick={() => setRescheduling(true)} className="gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setRescheduling(true)}
+                  className="gap-1.5"
+                >
                   <Clock size={13} /> Reschedule
                 </Button>
               )}
@@ -492,7 +507,11 @@ function CompositionModal({
               )}
               {display === 'Error' && (
                 <Button size="sm" onClick={handleConfirm} disabled={actioning} className="gap-1.5">
-                  {actioning ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
+                  {actioning ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : (
+                    <CheckCircle2 size={13} />
+                  )}
                   Retry
                 </Button>
               )}
@@ -506,13 +525,7 @@ function CompositionModal({
 
 // ─── Mini composition card (inside calendar day) ──────────────────────────────
 
-function CompositionChip({
-  comp,
-  onClick,
-}: {
-  comp: Composition
-  onClick: () => void
-}) {
+function CompositionChip({ comp, onClick }: { comp: Composition; onClick: () => void }) {
   const FormatIcon = FORMAT_ICON[comp.format] ?? Film
   const display = getDisplayStatus(comp.status)
   const tag = getSecondaryTag(comp.format, display)
@@ -589,10 +602,20 @@ export default function AccountCalendar({ accountId }: { accountId: string }) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setWeekStart(startOfWeek(new Date()))} className="text-xs">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setWeekStart(startOfWeek(new Date()))}
+            className="text-xs"
+          >
             Today
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setWeekStart((d) => addDays(d, -7))} className="px-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setWeekStart((d) => addDays(d, -7))}
+            className="px-2"
+          >
             <ChevronLeft size={16} />
           </Button>
           <span className="text-sm text-white min-w-[160px] text-center">
@@ -603,7 +626,12 @@ export default function AccountCalendar({ accountId }: { accountId: string }) {
               year: 'numeric',
             })}
           </span>
-          <Button variant="outline" size="sm" onClick={() => setWeekStart((d) => addDays(d, 7))} className="px-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setWeekStart((d) => addDays(d, 7))}
+            className="px-2"
+          >
             <ChevronRight size={16} />
           </Button>
         </div>
@@ -639,9 +667,7 @@ export default function AccountCalendar({ accountId }: { accountId: string }) {
                 key={day.toISOString()}
                 className={cn(
                   'flex flex-col gap-1 rounded-lg p-2 border',
-                  isToday
-                    ? 'border-accent/50 bg-accent/5'
-                    : 'border-white/5 bg-white/2',
+                  isToday ? 'border-accent/50 bg-accent/5' : 'border-white/5 bg-white/2',
                 )}
               >
                 <div className="text-center mb-1">
@@ -699,7 +725,12 @@ export default function AccountCalendar({ accountId }: { accountId: string }) {
                   <span>{FORMAT_LABEL[comp.format] ?? comp.format}</span>
                   <span className="opacity-60">{display}</span>
                   {tag && (
-                    <span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded border', TAG_COLOR[tag])}>
+                    <span
+                      className={cn(
+                        'text-[10px] font-bold px-1.5 py-0.5 rounded border',
+                        TAG_COLOR[tag],
+                      )}
+                    >
                       {tag}
                     </span>
                   )}

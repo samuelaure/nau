@@ -4,43 +4,37 @@ All notable changes to this project will be documented in this file. See [standa
 
 ### [1.9.4](https://github.com/samuelaure/flownau/compare/v1.9.3...v1.9.4) (2026-04-21)
 
-
 ### Bug Fixes
 
-* **compositions:** resolve InputJsonValue type error in update route ([4d6a5b1](https://github.com/samuelaure/flownau/commit/4d6a5b1e337a68d06531da2a2fd1a6c5a072b365))
+- **compositions:** resolve InputJsonValue type error in update route ([4d6a5b1](https://github.com/samuelaure/flownau/commit/4d6a5b1e337a68d06531da2a2fd1a6c5a072b365))
 
 ### [1.9.3](https://github.com/samuelaure/flownau/compare/v1.9.2...v1.9.3) (2026-04-21)
 
-
 ### Bug Fixes
 
-* **api:** fix syntax error in compositions route ([498eb0c](https://github.com/samuelaure/flownau/commit/498eb0cd7002d15169086cf2031d8121b83546b6))
+- **api:** fix syntax error in compositions route ([498eb0c](https://github.com/samuelaure/flownau/commit/498eb0cd7002d15169086cf2031d8121b83546b6))
 
 ### [1.9.2](https://github.com/samuelaure/flownau/compare/v1.9.1...v1.9.2) (2026-04-21)
 
-
 ### Features
 
-* implement move brand, content pool filter, and calendar enhancements ([c3c2cb7](https://github.com/samuelaure/flownau/commit/c3c2cb7192aae7839adbec9ec540af1ce76bd140))
+- implement move brand, content pool filter, and calendar enhancements ([c3c2cb7](https://github.com/samuelaure/flownau/commit/c3c2cb7192aae7839adbec9ec540af1ce76bd140))
 
 ### [1.9.1](https://github.com/samuelaure/flownau/compare/v1.9.0...v1.9.1) (2026-04-20)
 
-
 ### Features
 
-* **onboarding:** implement minimalist brand setup and platform fallbacks ([6103ee0](https://github.com/samuelaure/flownau/commit/6103ee0d1f738cd75c65c52499a71490e187107a))
+- **onboarding:** implement minimalist brand setup and platform fallbacks ([6103ee0](https://github.com/samuelaure/flownau/commit/6103ee0d1f738cd75c65c52499a71490e187107a))
 
 ## [1.9.0](https://github.com/samuelaure/flownau/compare/v1.8.1...v1.9.0) (2026-04-20)
 
-
 ### Features
 
-* **phase-19:** implement zero-configuration onboarding and graceful fallbacks ([2510417](https://github.com/samuelaure/flownau/commit/251041728807f9fbd461942c370bd3eeb6805e91))
-
+- **phase-19:** implement zero-configuration onboarding and graceful fallbacks ([2510417](https://github.com/samuelaure/flownau/commit/251041728807f9fbd461942c370bd3eeb6805e91))
 
 ### Bug Fixes
 
-* **auth,sso:** resolve all redirect loops on login and workspace navigation ([5191cee](https://github.com/samuelaure/flownau/commit/5191cee3a7dccdea492bfb3b08d3b1fad03a191a))
+- **auth,sso:** resolve all redirect loops on login and workspace navigation ([5191cee](https://github.com/samuelaure/flownau/commit/5191cee3a7dccdea492bfb3b08d3b1fad03a191a))
 
 ### [1.8.1](https://github.com/samuelaure/flownau/compare/v1.8.0...v1.8.1) (2026-04-20)
 

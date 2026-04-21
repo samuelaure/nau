@@ -1,0 +1,21 @@
+export const dynamic = 'force-dynamic'
+
+import { NextRequest, NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
+
+const NAU_API_URL = process.env.NAU_API_URL ?? 'http://9nau-api:3000'
+
+async function getToken() {
+  const cookieStore = await cookies()
+  return cookieStore.get('nau_token')?.value ?? ''
+}
+
+export async function GET(_req: NextRequest, { params }: { params: { workspaceId: string } }) {
+  const token = await getToken()
+  const res = await fetch(`${NAU_API_URL}/api/workspaces/${params.workspaceId}/members`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  })
+  const data = await res.json().catch(() => [])
+  return NextResponse.json(data, { status: res.status })
+}

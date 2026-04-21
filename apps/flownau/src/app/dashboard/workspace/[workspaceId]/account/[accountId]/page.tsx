@@ -23,7 +23,7 @@ export default async function WorkspaceAccountPage({
   searchParams: { tab?: string; date?: string }
 }) {
   const { workspaceId, accountId } = await params
-  const { tab, date } = await searchParams
+  const { tab } = await searchParams
   const activeTab = tab || 'calendar'
 
   const account = await prisma.socialAccount.findUnique({
@@ -104,7 +104,6 @@ export default async function WorkspaceAccountPage({
             </p>
           </div>
         </div>
-
       </header>
 
       {/* Tabs */}

@@ -44,7 +44,9 @@ export default function WorkspaceNameEditor({
         label="Workspace name"
         value={name}
         onChange={(e) => setName(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter') handleSave() }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') handleSave()
+        }}
       />
       <div className="flex justify-end">
         <Button

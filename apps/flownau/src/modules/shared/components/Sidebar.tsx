@@ -138,8 +138,12 @@ function WorkspaceSelector() {
                 textAlign: 'left',
                 fontWeight: ws.id === activeWorkspaceId ? 600 : 400,
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.05)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent'
+              }}
             >
               <span className="truncate">{ws.name}</span>
               {ws.id === activeWorkspaceId && (
@@ -150,12 +154,22 @@ function WorkspaceSelector() {
 
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', padding: '4px 0' }}>
             {creating ? (
-              <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div
+                style={{
+                  padding: '10px 12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                }}
+              >
                 <input
                   autoFocus
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') setCreating(false) }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleCreate()
+                    if (e.key === 'Escape') setCreating(false)
+                  }}
                   placeholder="Workspace name"
                   style={{
                     background: 'rgba(255,255,255,0.07)',
@@ -170,15 +184,38 @@ function WorkspaceSelector() {
                 />
                 <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
                   <button
-                    onClick={() => { setCreating(false); setNewName('') }}
-                    style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}
+                    onClick={() => {
+                      setCreating(false)
+                      setNewName('')
+                    }}
+                    style={{
+                      padding: '4px 8px',
+                      borderRadius: '6px',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      background: 'transparent',
+                      color: 'var(--text-secondary)',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                    }}
                   >
                     <X size={12} />
                   </button>
                   <button
                     onClick={handleCreate}
                     disabled={saving || !newName.trim()}
-                    style={{ padding: '4px 10px', borderRadius: '6px', background: 'var(--accent-color)', border: 'none', color: 'white', fontSize: '12px', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '4px' }}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      background: 'var(--accent-color)',
+                      border: 'none',
+                      color: 'white',
+                      fontSize: '12px',
+                      cursor: saving ? 'not-allowed' : 'pointer',
+                      opacity: saving ? 0.6 : 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
                   >
                     {saving ? <Loader2 size={11} className="animate-spin" /> : 'Create'}
                   </button>
@@ -200,8 +237,12 @@ function WorkspaceSelector() {
                   cursor: 'pointer',
                   textAlign: 'left',
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.05)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent'
+                }}
               >
                 <Plus size={14} />
                 Create a new workspace
@@ -232,6 +273,9 @@ export default function Sidebar() {
   const resolvedItems = navItems.map((item) => {
     if (item.name === 'Overview' && workspaceId) {
       return { ...item, href: `/dashboard/workspace/${workspaceId}` }
+    }
+    if (item.name === 'Settings' && workspaceId) {
+      return { ...item, href: `/dashboard/workspace/${workspaceId}/settings` }
     }
     return item
   })
