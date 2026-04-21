@@ -35,7 +35,7 @@ export async function GET(request: Request) {
     // Find RENDERED compositions whose scheduledAt has arrived.
     const dueCompositions = await prisma.composition.findMany({
       where: {
-        status: { in: ['RENDERED', 'rendered', 'PUBLISHING'] },
+        status: { in: ['RENDERED', 'rendered', 'PUBLISHING', 'SCHEDULED'] },
         scheduledAt: { lte: now },
         publishAttempts: { lt: 3 },
       },

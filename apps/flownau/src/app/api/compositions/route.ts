@@ -16,6 +16,7 @@ export async function GET(req: Request) {
     await checkAccountAccess(accountId)
 
     const isCalendar = searchParams.get('calendar') === '1'
+    const isPool = searchParams.get('pool') === '1'
     const statusFilter = searchParams.get('status')
 
     const whereClause = isCalendar
@@ -23,9 +24,15 @@ export async function GET(req: Request) {
           accountId,
           status: { in: ['APPROVED', 'SCHEDULED', 'RENDERING', 'RENDERED'] },
         }
-      : statusFilter
-        ? { accountId, status: statusFilter }
-        : { accountId }
+      : isPool
+        ? {
+            accountId,
+            status: { in: ['DRAFT', 'APPROVED'] },
+            scheduledAt: null,
+          }
+        : statusFilter
+          ? { accountId, status: statusFilter }
+          : { accountId }
 
     const compositions = await prisma.composition.findMany({
       where: whereClause,
@@ -40,7 +47,14 @@ export async function GET(req: Request) {
       },
     })
 
-    return NextResponse.json({ compositions }, { status: 200 })
+    const mapped = compositions.map((c) => ({
+      ...c,
+      renderedVideoUrl: c.renderJob?.outputUrl ?? null,
+    }))
+      },
+    })
+
+    return NextResponse.json({ compositions: mapped }, { status: 200 })
   } catch (error) {
     console.error('[GET_COMPOSITIONS_ERROR]', error)
     return NextResponse.json({ error: 'Failed to fetch compositions' }, { status: 500 })

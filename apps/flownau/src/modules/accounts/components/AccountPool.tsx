@@ -65,7 +65,7 @@ export default function AccountPool({ accountId }: { accountId: string }) {
 
   const fetchCompositions = async () => {
     try {
-      const res = await fetch(`/api/compositions?accountId=${accountId}`)
+      const res = await fetch(`/api/compositions?accountId=${accountId}&pool=1`)
       const data = await res.json()
       setCompositions(data.compositions || [])
     } catch {

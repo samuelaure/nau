@@ -127,7 +127,7 @@ export async function publishComposition(
     await prisma.composition.update({
       where: { id: composition.id },
       data: {
-        status: 'published',
+        status: 'PUBLISHED',
         externalPostId: result.externalId ?? null,
         externalPostUrl: result.permalink ?? null,
       },

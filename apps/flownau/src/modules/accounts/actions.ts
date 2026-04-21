@@ -163,6 +163,19 @@ export async function updateAccount(id: string, formData: FormData) {
   revalidatePath(`/dashboard/accounts/${parsedId}`)
 }
 
+export async function moveAccountToWorkspace(accountId: string, targetWorkspaceId: string) {
+  await checkAuth()
+  const parsedId = IdSchema.parse(accountId)
+  const parsedWsId = IdSchema.parse(targetWorkspaceId)
+
+  await prisma.socialAccount.update({
+    where: { id: parsedId },
+    data: { workspaceId: parsedWsId },
+  })
+
+  revalidatePath('/dashboard')
+}
+
 export async function syncAccountProfile(id: string) {
   await checkAuth()
   const parsedId = IdSchema.parse(id)
@@ -317,3 +330,4 @@ async function getNextSystemFilename(
 
   return `${prefix}${counter.toString().padStart(4, '0')}.${ext}`
 }
+

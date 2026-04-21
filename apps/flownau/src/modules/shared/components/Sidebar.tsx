@@ -15,9 +15,6 @@ import {
 } from 'lucide-react'
 import { useEffect, useState, useRef } from 'react'
 
-const NAU_API_URL =
-  (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_NAU_API_URL) || 'https://api.9nau.com'
-
 type NauWorkspace = { id: string; name: string }
 
 // ─── Workspace selector ───────────────────────────────────────────────────────
@@ -38,7 +35,7 @@ function WorkspaceSelector() {
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId)
 
   useEffect(() => {
-    fetch(`${NAU_API_URL}/api/workspaces`, { credentials: 'include' })
+    fetch('/api/workspaces')
       .then((r) => (r.ok ? r.json() : []))
       .then((data: NauWorkspace[]) => setWorkspaces(data))
       .catch(() => {})
@@ -59,9 +56,8 @@ function WorkspaceSelector() {
     if (!newName.trim()) return
     setSaving(true)
     try {
-      const res = await fetch(`${NAU_API_URL}/api/workspaces`, {
+      const res = await fetch('/api/workspaces', {
         method: 'POST',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newName.trim() }),
       })

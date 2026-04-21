@@ -96,6 +96,7 @@ type Composition = {
   userUploadedMediaUrl?: string | null
   userPostedManually?: boolean
   renderedVideoUrl?: string | null
+  payload?: Record<string, unknown> | null
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -154,6 +155,12 @@ function CompositionModal({
   const [rescheduling, setRescheduling] = useState(false)
   const [newDatetime, setNewDatetime] = useState(
     comp.scheduledAt ? comp.scheduledAt.slice(0, 16) : '',
+  )
+  const [editingCaption, setEditingCaption] = useState(false)
+  const [captionDraft, setCaptionDraft] = useState(comp.caption ?? '')
+  const [editingScript, setEditingScript] = useState(false)
+  const [scriptDraft, setScriptDraft] = useState(
+    (comp.payload as { script?: string } | null)?.script ?? '',
   )
 
   const FormatIcon = FORMAT_ICON[comp.format] ?? Film
@@ -217,13 +224,52 @@ function CompositionModal({
     }
   }
 
+  const handleSaveCaption = async () => {
+    setActioning(true)
+    try {
+      const res = await fetch(`/api/compositions/${comp.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ caption: captionDraft }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success('Caption updated.')
+      setEditingCaption(false)
+      onRefresh()
+    } catch {
+      toast.error('Failed to save caption')
+    } finally {
+      setActioning(false)
+    }
+  }
+
+  const handleSaveScript = async () => {
+    setActioning(true)
+    try {
+      const newPayload = { ...(comp.payload ?? {}), script: scriptDraft }
+      const res = await fetch(`/api/compositions/${comp.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payload: newPayload }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success('Script updated.')
+      setEditingScript(false)
+      onRefresh()
+    } catch {
+      toast.error('Failed to save script')
+    } finally {
+      setActioning(false)
+    }
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="bg-panel border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden"
+        className="bg-panel border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -267,7 +313,7 @@ function CompositionModal({
         </div>
 
         {/* Body */}
-        <div className="px-6 py-5 flex flex-col gap-4">
+        <div className="px-6 py-5 flex flex-col gap-4 overflow-y-auto">
           {/* Scheduled time */}
           <div className="flex items-start gap-3">
             <Clock size={15} className="text-text-secondary mt-0.5 shrink-0" />
@@ -281,30 +327,88 @@ function CompositionModal({
             </div>
           </div>
 
-          {/* Caption */}
-          {comp.caption && (
-            <div className="flex items-start gap-3">
-              <Pencil size={15} className="text-text-secondary mt-0.5 shrink-0" />
-              <div>
-                <p className="text-xs text-text-secondary uppercase tracking-wider mb-0.5">
-                  Caption
-                </p>
-                <p className="text-sm text-white leading-relaxed line-clamp-4">{comp.caption}</p>
-              </div>
+          {/* Rendered video — show inline player when Composed */}
+          {comp.renderedVideoUrl && (
+            <div className="rounded-lg overflow-hidden bg-black">
+              <video
+                src={comp.renderedVideoUrl}
+                controls
+                className="w-full max-h-72 object-contain"
+              />
             </div>
           )}
 
-          {/* Rendered video */}
-          {comp.renderedVideoUrl && (
-            <a
-              href={comp.renderedVideoUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-2 text-sm text-accent hover:underline"
-            >
-              <Play size={14} /> View rendered video
-            </a>
+          {/* Draft script editor (head_talk) */}
+          {getDisplayStatus(comp.status) === 'Draft' && comp.format === 'head_talk' && (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-text-secondary uppercase tracking-wider">Script</p>
+                {!editingScript && (
+                  <button
+                    onClick={() => setEditingScript(true)}
+                    className="text-xs text-accent hover:underline"
+                  >
+                    Edit
+                  </button>
+                )}
+              </div>
+              {editingScript ? (
+                <>
+                  <textarea
+                    value={scriptDraft}
+                    onChange={(e) => setScriptDraft(e.target.value)}
+                    rows={6}
+                    className="bg-gray-950 border border-gray-800 text-white rounded px-3 py-2 text-sm resize-none w-full"
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="outline" size="sm" onClick={() => setEditingScript(false)}>Cancel</Button>
+                    <Button size="sm" disabled={actioning} onClick={handleSaveScript}>
+                      {actioning ? <Loader2 size={12} className="animate-spin" /> : 'Save'}
+                    </Button>
+                  </div>
+                </>
+              ) : scriptDraft ? (
+                <p className="text-sm text-white leading-relaxed whitespace-pre-wrap line-clamp-6">{scriptDraft}</p>
+              ) : (
+                <p className="text-sm text-text-secondary italic">No script yet.</p>
+              )}
+            </div>
           )}
+
+          {/* Caption */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-text-secondary uppercase tracking-wider">Caption</p>
+              {!editingCaption && (
+                <button
+                  onClick={() => setEditingCaption(true)}
+                  className="text-xs text-accent hover:underline"
+                >
+                  Edit
+                </button>
+              )}
+            </div>
+            {editingCaption ? (
+              <>
+                <textarea
+                  value={captionDraft}
+                  onChange={(e) => setCaptionDraft(e.target.value)}
+                  rows={4}
+                  className="bg-gray-950 border border-gray-800 text-white rounded px-3 py-2 text-sm resize-none w-full"
+                />
+                <div className="flex gap-2 justify-end">
+                  <Button variant="outline" size="sm" onClick={() => setEditingCaption(false)}>Cancel</Button>
+                  <Button size="sm" disabled={actioning} onClick={handleSaveCaption}>
+                    {actioning ? <Loader2 size={12} className="animate-spin" /> : 'Save'}
+                  </Button>
+                </div>
+              </>
+            ) : captionDraft ? (
+              <p className="text-sm text-white leading-relaxed line-clamp-4">{captionDraft}</p>
+            ) : (
+              <p className="text-sm text-text-secondary italic">No caption yet.</p>
+            )}
+          </div>
 
           {/* Reschedule form */}
           {rescheduling && (
