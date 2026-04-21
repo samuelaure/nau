@@ -14,7 +14,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const { id } = await params
     const body = await req.json()
 
-    const updateData: { status?: string; scheduledAt?: Date | null; caption?: string; payload?: unknown } = {}
+    const updateData: { status?: string; scheduledAt?: Date | null; caption?: string; payload?: any } = {}
     if (body.status !== undefined) updateData.status = body.status
     if (body.scheduledAt !== undefined)
       updateData.scheduledAt = body.scheduledAt ? new Date(body.scheduledAt) : null
