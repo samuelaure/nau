@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.9.2](https://github.com/samuelaure/flownau/compare/v1.9.1...v1.9.2) (2026-04-21)
+
+
+### Features
+
+* implement move brand, content pool filter, and calendar enhancements ([c3c2cb7](https://github.com/samuelaure/flownau/commit/c3c2cb7192aae7839adbec9ec540af1ce76bd140))
+
 ### [1.9.1](https://github.com/samuelaure/flownau/compare/v1.9.0...v1.9.1) (2026-04-20)
 
 
