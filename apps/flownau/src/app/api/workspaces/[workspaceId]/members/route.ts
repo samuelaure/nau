@@ -10,9 +10,10 @@ async function getToken() {
   return cookieStore.get('nau_token')?.value ?? ''
 }
 
-export async function GET(_req: NextRequest, { params }: { params: { workspaceId: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ workspaceId: string }> }) {
+  const { workspaceId } = await params
   const token = await getToken()
-  const res = await fetch(`${NAU_API_URL}/api/workspaces/${params.workspaceId}/members`, {
+  const res = await fetch(`${NAU_API_URL}/api/workspaces/${workspaceId}/members`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
   })

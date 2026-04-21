@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic'
 export default async function WorkspaceOverviewPage({
   params,
 }: {
-  params: { workspaceId: string }
+  params: Promise<{ workspaceId: string }>
 }) {
   const { workspaceId } = await params
   // Workspace details are now fetched from the 9naŭ Platform Service

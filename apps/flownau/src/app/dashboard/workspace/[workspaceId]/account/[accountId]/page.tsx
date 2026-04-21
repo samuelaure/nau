@@ -19,8 +19,8 @@ export default async function WorkspaceAccountPage({
   params,
   searchParams,
 }: {
-  params: { workspaceId: string; accountId: string }
-  searchParams: { tab?: string; date?: string }
+  params: Promise<{ workspaceId: string; accountId: string }>
+  searchParams: Promise<{ tab?: string; date?: string }>
 }) {
   const { workspaceId, accountId } = await params
   const { tab } = await searchParams

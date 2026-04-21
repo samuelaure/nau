@@ -10,10 +10,11 @@ async function getToken() {
   return cookieStore.get('nau_token')?.value ?? ''
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { workspaceId: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ workspaceId: string }> }) {
+  const { workspaceId } = await params
   const token = await getToken()
   const body = await req.json()
-  const res = await fetch(`${NAU_API_URL}/api/workspaces/${params.workspaceId}`, {
+  const res = await fetch(`${NAU_API_URL}/api/workspaces/${workspaceId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
