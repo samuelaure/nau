@@ -44,9 +44,7 @@ next-env.d.ts
 commit_msg.txt
 UPGRADE_PLAN.md
 docker-compose.override.yml
-.agent/*
-!.agent/DOCUMENTATION.md
-!.agent/history/
+.agent/
 /public/cache_assets/
 
 .env.production
