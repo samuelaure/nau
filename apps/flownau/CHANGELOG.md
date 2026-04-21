@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.9.4](https://github.com/samuelaure/flownau/compare/v1.9.3...v1.9.4) (2026-04-21)
+
+
+### Bug Fixes
+
+* **compositions:** resolve InputJsonValue type error in update route ([4d6a5b1](https://github.com/samuelaure/flownau/commit/4d6a5b1e337a68d06531da2a2fd1a6c5a072b365))
+
 ### [1.9.3](https://github.com/samuelaure/flownau/compare/v1.9.2...v1.9.3) (2026-04-21)
 
 
