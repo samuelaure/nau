@@ -4,10 +4,9 @@ All notable changes to this project will be documented in this file. See [standa
 
 ## [1.10.0](https://github.com/samuelaure/flownau/compare/v1.9.4...v1.10.0) (2026-04-21)
 
-
 ### Features
 
-* **workspaces:** standardize workspace management and fix linting errors ([2f4c0bb](https://github.com/samuelaure/flownau/commit/2f4c0bb71e1db5bc3691700e4bfe59bf8c467278))
+- **workspaces:** standardize workspace management and fix linting errors ([2f4c0bb](https://github.com/samuelaure/flownau/commit/2f4c0bb71e1db5bc3691700e4bfe59bf8c467278))
 
 ### [1.9.4](https://github.com/samuelaure/flownau/compare/v1.9.3...v1.9.4) (2026-04-21)
 

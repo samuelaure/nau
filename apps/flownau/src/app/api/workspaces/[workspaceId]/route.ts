@@ -10,7 +10,10 @@ async function getToken() {
   return cookieStore.get('nau_token')?.value ?? ''
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ workspaceId: string }> }) {
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ workspaceId: string }> },
+) {
   const { workspaceId } = await params
   const token = await getToken()
   const body = await req.json()

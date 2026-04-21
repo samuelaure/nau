@@ -80,7 +80,9 @@ export default function WorkspaceSettingsPage() {
     <div className="animate-fade-in max-w-2xl">
       <header className="mb-10">
         <h1 className="text-3xl font-heading font-semibold mb-2">Workspace Settings</h1>
-        <p className="text-text-secondary text-sm">Manage this workspace&apos;s name and members.</p>
+        <p className="text-text-secondary text-sm">
+          Manage this workspace&apos;s name and members.
+        </p>
       </header>
 
       {/* Name */}
