@@ -94,7 +94,7 @@ export async function linkTelegramAccount(
 
   // 5. Notify 9nau API (best-effort)
   try {
-    await fetch(`${NAU_API_URL}/api/auth/link-telegram`, {
+    await fetch(`${NAU_API_URL}/auth/link-telegram`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

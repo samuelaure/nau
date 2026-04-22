@@ -247,7 +247,7 @@ export async function getWorkspaces(): Promise<NauWorkspace[]> {
   if (!nauUserId) return [];
 
   try {
-    const res = await fetch(`${nauApiUrl}/api/workspaces`, {
+    const res = await fetch(`${nauApiUrl}/workspaces`, {
       headers: { 'x-nau-service-key': nauServiceKey, 'x-nau-user-id': nauUserId },
       next: { revalidate: 0 },
     });
