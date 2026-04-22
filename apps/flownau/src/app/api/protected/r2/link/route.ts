@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
-import { r2, R2_BUCKET, R2_PUBLIC_URL } from '@/modules/shared/r2'
-import { ListObjectsV2Command } from '@aws-sdk/client-s3'
+import { storage } from '@/modules/shared/r2'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,44 +12,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing prefix or context' }, { status: 400 })
     }
 
-    // Purge existing assets to ensure the new folder is the absolute source of truth
+    // Purge existing assets so the new folder is the absolute source of truth
     if (accountId) {
       await prisma.asset.deleteMany({ where: { accountId } })
     } else if (templateId) {
       await prisma.asset.deleteMany({ where: { templateId } })
     }
 
-    // List all objects in the prefix (recursively by not using delimiter)
-    const command = new ListObjectsV2Command({
-      Bucket: R2_BUCKET,
-      Prefix: prefix,
-    })
+    // List all objects in the prefix recursively
+    const objects = await storage.listAll(prefix)
 
-    const response = await r2.send(command)
-    const objects = response.Contents || []
-
-    // 1. Map all objects for quick lookup (filter out undefined keys)
-    const objectMap = new Map(
-      objects
-        .filter((obj) => obj.Key)
-        .map((obj) => [obj.Key!, obj] as [string, (typeof objects)[0]]),
-    )
+    // Map all keys for quick thumbnail lookup
+    const keySet = new Set(objects.map((o) => o.key))
 
     const createdAssets = []
 
-    // 2. Filter out objects and classify
     const filesToProcess = objects.filter((obj) => {
-      if (!obj.Key || obj.Key.endsWith('/')) return false
-      const lowerKey = obj.Key.toLowerCase()
-      if (lowerKey.includes('/outputs/')) return false
-      // Skip thumbnails from being standalone assets if they are in a thumbnails folder
-      if (lowerKey.includes('/thumbnails/')) return false
+      if (obj.key.endsWith('/')) return false
+      const lower = obj.key.toLowerCase()
+      if (lower.includes('/outputs/')) return false
+      if (lower.includes('/thumbnails/')) return false
       return true
     })
 
     for (const obj of filesToProcess) {
-      if (!obj.Key) continue
-      const ext = obj.Key.split('.').pop()?.toLowerCase() || ''
+      const ext = obj.key.split('.').pop()?.toLowerCase() || ''
       let type: 'VID' | 'AUD' | 'IMG' | null = null
       let mimeType = ''
 
@@ -61,13 +47,10 @@ export async function POST(req: NextRequest) {
         type = 'AUD'
         mimeType = `audio/${ext === 'm4a' ? 'mp4' : ext}`
       } else if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
-        // Only treat as standalone image if it doesn't look like a thumbnail for a video
-        // We'll check this by seeing if a corresponding video exists
-        const baseName = obj.Key.substring(0, obj.Key.lastIndexOf('.'))
-        const hasMatchingVideo = ['mp4', 'mov', 'webm'].some((vExt) =>
-          objectMap.has(`${baseName}.${vExt}`),
-        )
-        if (hasMatchingVideo) continue // Skip as it's likely a thumbnail
+        // Skip if a matching video exists (it's a thumbnail)
+        const baseName = obj.key.substring(0, obj.key.lastIndexOf('.'))
+        const hasMatchingVideo = ['mp4', 'mov', 'webm'].some((vExt) => keySet.has(`${baseName}.${vExt}`))
+        if (hasMatchingVideo) continue
 
         type = 'IMG'
         mimeType = `image/${ext === 'jpg' ? 'jpeg' : ext}`
@@ -75,52 +58,30 @@ export async function POST(req: NextRequest) {
 
       if (!type) continue
 
-      // Look for a potential thumbnail for videos
+      // Look for a thumbnail for videos
       let thumbnailUrl: string | null = null
       if (type === 'VID') {
-        const baseName = obj.Key.substring(0, obj.Key.lastIndexOf('.'))
-        const fileOnly = obj.Key.split('/').pop() || ''
+        const baseName = obj.key.substring(0, obj.key.lastIndexOf('.'))
+        const fileOnly = obj.key.split('/').pop() || ''
         const baseOnly = fileOnly.substring(0, fileOnly.lastIndexOf('.'))
-        const _pathOnly = obj.Key.substring(0, obj.Key.lastIndexOf('/'))
+        const thumbInSiblingFolder = prefix.endsWith('/')
+          ? `${prefix}thumbnails/${baseOnly}.jpg`
+          : `${prefix}/thumbnails/${baseOnly}.jpg`
+        const thumbSameFolder = `${baseName}.jpg`
 
-        const possibleThumbExtensions = ['jpg', 'jpeg', 'png', 'webp']
-        for (const tExt of possibleThumbExtensions) {
-          // Check same folder: video.mp4 -> video.jpg
-          const sameFolderKey = `${baseName}.${tExt}`
-          // Check thumbnails folder: videos/video.mp4 -> thumbnails/video.jpg
-          // This assumes the thumbnails folder is at the same level as the video's parent or in a specific place
-          // But based on user description "videos, thumbnails, audios", they are siblings.
-          const thumbnailsFolderKey = obj.Key.replace(
-            /\/[^/]+\/[^/]+$/,
-            `/thumbnails/${baseOnly}.${tExt}`,
-          )
-          // Also check a more direct sibling approach: prefix/thumbnails/filename.jpg
-          const directSiblingThumb = prefix.endsWith('/')
-            ? `${prefix}thumbnails/${baseOnly}.${tExt}`
-            : `${prefix}/thumbnails/${baseOnly}.${tExt}`
+        const thumbKey = keySet.has(thumbSameFolder)
+          ? thumbSameFolder
+          : keySet.has(thumbInSiblingFolder)
+            ? thumbInSiblingFolder
+            : null
 
-          const thumbKey = objectMap.has(sameFolderKey)
-            ? sameFolderKey
-            : objectMap.has(directSiblingThumb)
-              ? directSiblingThumb
-              : objectMap.has(thumbnailsFolderKey)
-                ? thumbnailsFolderKey
-                : null
-
-          if (thumbKey) {
-            thumbnailUrl = R2_PUBLIC_URL
-              ? `${R2_PUBLIC_URL}/${thumbKey}`
-              : `https://${R2_BUCKET}.r2.cloudflarestorage.com/${thumbKey}`
-            break
-          }
+        if (thumbKey) {
+          thumbnailUrl = storage.cdnUrl(thumbKey)
         }
       }
 
-      const publicUrl = R2_PUBLIC_URL
-        ? `${R2_PUBLIC_URL}/${obj.Key}`
-        : `https://${R2_BUCKET}.r2.cloudflarestorage.com/${obj.Key}`
-
-      const filename = obj.Key.split('/').pop() || obj.Key
+      const publicUrl = storage.cdnUrl(obj.key)
+      const filename = obj.key.split('/').pop() || obj.key
 
       const asset = await prisma.asset.create({
         data: {
@@ -128,8 +89,8 @@ export async function POST(req: NextRequest) {
           templateId: templateId || null,
           originalFilename: filename,
           systemFilename: filename,
-          r2Key: obj.Key,
-          size: obj.Size || 0,
+          r2Key: obj.key,
+          size: obj.size,
           mimeType,
           type,
           url: publicUrl,
@@ -139,7 +100,7 @@ export async function POST(req: NextRequest) {
       createdAssets.push(asset)
     }
 
-    // 9. Update Context with assetsRoot
+    // Update context with assetsRoot
     if (accountId) {
       await prisma.socialAccount.update({
         where: { id: accountId },

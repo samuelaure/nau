@@ -1,8 +1,7 @@
 import { bundle } from '@remotion/bundler'
 import { renderMedia, getCompositions } from '@remotion/renderer'
 import path from 'path'
-import { r2, R2_BUCKET } from '@/modules/shared/r2'
-import { PutObjectCommand } from '@aws-sdk/client-s3'
+import { storage } from '@/modules/shared/r2'
 import fs from 'fs'
 import { logger } from '@/lib/logger'
 
@@ -51,14 +50,8 @@ export async function renderAndUpload({
   )
   const fileStream = fs.createReadStream(outputLocation)
   const r2Key = `${projectFolder}/outputs/${renderId}.mp4`
-  const uploadParams = {
-    Bucket: R2_BUCKET,
-    Key: r2Key,
-    Body: fileStream,
-    ContentType: 'video/mp4',
-  }
 
-  await r2.send(new PutObjectCommand(uploadParams))
+  await storage.upload(r2Key, fileStream, { mimeType: 'video/mp4' })
 
   // Cleanup
   fs.unlinkSync(outputLocation)

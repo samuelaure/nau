@@ -2,8 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
-import { r2, R2_BUCKET } from '@/modules/shared/r2'
-import { PutObjectCommand } from '@aws-sdk/client-s3'
+import { storage } from '@/modules/shared/r2'
 import { getAuthUser } from '@/lib/auth'
 import { logError } from '@/modules/shared/logger'
 import { createId } from '@paralleldrive/cuid2'
@@ -49,19 +48,9 @@ export async function POST(req: NextRequest) {
     const key = `recordings/${accountId}/${compositionId}-${createId()}.${ext}`
     const buffer = Buffer.from(await file.arrayBuffer())
 
-    if (!R2_BUCKET) throw new Error('R2_BUCKET_NAME is not configured')
-
-    await r2.send(
-      new PutObjectCommand({
-        Bucket: R2_BUCKET,
-        Key: key,
-        Body: buffer,
-        ContentType: file.type || 'video/mp4',
-      }),
-    )
-
-    const r2PublicUrl = process.env.R2_PUBLIC_URL
-    const mediaUrl = r2PublicUrl ? `${r2PublicUrl}/${key}` : key
+    const mediaUrl = await storage.upload(key, buffer, {
+      mimeType: file.type || 'video/mp4',
+    })
 
     // Phase 18: set userUploadedMediaUrl — renderer will do a passthrough job.
     // Also update videoUrl for backward compatibility with playback.

@@ -1,8 +1,7 @@
 'use server'
 
 import { prisma } from '@/modules/shared/prisma'
-import { r2, R2_BUCKET } from '@/modules/shared/r2'
-import { DeleteObjectCommand } from '@aws-sdk/client-s3'
+import { storage } from '@/modules/shared/r2'
 import { revalidatePath } from 'next/cache'
 import { requireAuth } from '@/lib/auth'
 import { z } from 'zod'
@@ -67,7 +66,7 @@ export async function deleteAsset(assetId: string) {
   if (!asset) return
 
   try {
-    await r2.send(new DeleteObjectCommand({ Bucket: R2_BUCKET, Key: asset.r2Key }))
+    await storage.delete(asset.r2Key)
   } catch (e) {
     console.error('Failed to delete from R2', e)
   }

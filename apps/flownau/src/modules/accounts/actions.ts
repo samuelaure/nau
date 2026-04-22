@@ -1,9 +1,7 @@
 'use server'
 
 import { prisma } from '@/modules/shared/prisma'
-import { r2, R2_BUCKET } from '@/modules/shared/r2'
-import { PutObjectCommand } from '@aws-sdk/client-s3'
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { storage } from '@/modules/shared/r2'
 import { revalidatePath } from 'next/cache'
 import { ApifyService } from '@/modules/accounts/apify'
 import { downloadAndUploadProfileImage } from '@/modules/accounts/profile-image-service'
@@ -289,14 +287,7 @@ export async function prepareUpload(
   const projectFolder = account.username || account.id
   const r2Key = `${projectFolder}/${folder}/${systemFilename}`
 
-  const command = new PutObjectCommand({
-    Bucket: R2_BUCKET,
-    Key: r2Key,
-    ContentType: params.contentType,
-    ContentLength: params.size,
-  })
-
-  const url = await getSignedUrl(r2, command, { expiresIn: 600 })
+  const { uploadUrl: url } = await storage.presignUpload(r2Key, params.contentType, 600)
 
   return { url, r2Key, systemFilename, type }
 }
@@ -316,9 +307,7 @@ export async function confirmUpload(
   await checkAuth()
   const params = ConfirmUploadSchema.parse({ accountId, assetData })
 
-  const publicUrl = process.env.R2_PUBLIC_URL
-    ? `${process.env.R2_PUBLIC_URL}/${params.assetData.r2Key}`
-    : `https://${R2_BUCKET}.r2.cloudflarestorage.com/${params.assetData.r2Key}`
+  const publicUrl = storage.cdnUrl(params.assetData.r2Key)
 
   await prisma.asset.create({
     data: {

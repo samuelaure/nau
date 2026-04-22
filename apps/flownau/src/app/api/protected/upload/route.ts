@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
-import { r2, R2_BUCKET } from '@/modules/shared/r2'
-import { PutObjectCommand } from '@aws-sdk/client-s3'
+import { storage } from '@/modules/shared/r2'
+import { flownau } from 'nau-storage'
 import {
   compressVideo,
   compressAudio,
@@ -37,13 +37,10 @@ export async function POST(req: NextRequest) {
   // Generate a pre-determined DB ID for the asset
   const assetId = createId()
 
-  // 2. Determine Context & ShortCode
-  let contextAccountId = accountId
-  let shortCode = 'XX'
-  let projectFolder = 'uploads'
+  // 2. Determine Context
+  let contextAccountId: string | null = accountId
 
   if (templateId) {
-    // If uploading to a template, check if it's linked to an account
     const template = await prisma.template.findUnique({
       where: { id: templateId },
       include: { account: true },
@@ -53,24 +50,20 @@ export async function POST(req: NextRequest) {
 
     if (template.account) {
       contextAccountId = template.accountId
-      shortCode = template.account.shortCode || 'AC'
-      projectFolder = template.account.username || template.account.id
     } else {
-      // Global template
-      shortCode = 'TMP'
-      projectFolder = 'templates/global'
+      contextAccountId = null
     }
   } else if (accountId) {
-    // Direct account upload
     const account = await prisma.socialAccount.findUnique({ where: { id: accountId } })
     if (!account) return NextResponse.json({ error: 'Account not found' }, { status: 404 })
 
-    shortCode = account.shortCode || 'AC'
+    // Backfill shortCode if missing
     if (!account.shortCode && account.username) {
-      shortCode = account.username.substring(0, 2).toUpperCase()
-      await prisma.socialAccount.update({ where: { id: accountId }, data: { shortCode } })
+      await prisma.socialAccount.update({
+        where: { id: accountId },
+        data: { shortCode: account.username.substring(0, 2).toUpperCase() },
+      })
     }
-    projectFolder = account.username || account.id
   }
 
   // 3. Duplicate Detection (content-hash, context-scoped)
@@ -102,14 +95,14 @@ export async function POST(req: NextRequest) {
   else if (file.type.startsWith('image/')) type = 'IMG'
   else return NextResponse.json({ error: 'Unsupported type' }, { status: 400 })
 
-  // 4. Save to Temp
+  // 5. Save to Temp
   const inputPath = getTempPath(file.name)
   const buffer = Buffer.from(await file.arrayBuffer())
   await fs.writeFile(inputPath, buffer)
   logger.debug({ inputPath }, 'Saved temp file')
 
   try {
-    // 5. Optimize
+    // 6. Optimize
     let outputPath = inputPath
     let finalExt = file.name.split('.').pop() || ''
     let finalMime = file.type
@@ -123,7 +116,6 @@ export async function POST(req: NextRequest) {
       outputPath = getTempPath(`optimized_${Date.now()}.mp4`)
       await compressVideo(inputPath, outputPath)
 
-      // Skip re-encode if output is larger than original (already well-compressed)
       const outputStats = await fs.stat(outputPath)
       if (outputStats.size > inputStats.size) {
         logger.info(
@@ -136,7 +128,6 @@ export async function POST(req: NextRequest) {
         finalMime = file.type || 'video/mp4'
       }
 
-      // Generate thumbnail
       thumbPath = getTempPath(`thumb_${Date.now()}.jpg`)
       try {
         await generateThumbnail(outputPath, thumbPath)
@@ -150,7 +141,6 @@ export async function POST(req: NextRequest) {
       outputPath = getTempPath(`optimized_${Date.now()}.m4a`)
       await compressAudio(inputPath, outputPath)
 
-      // Skip re-encode if output is larger
       const outputStats = await fs.stat(outputPath)
       if (outputStats.size > inputStats.size) {
         logger.info('Skipping audio re-encode: output larger than input')
@@ -165,7 +155,6 @@ export async function POST(req: NextRequest) {
       outputPath = getTempPath(`optimized_${Date.now()}.jpg`)
       await compressImage(inputPath, outputPath)
 
-      // Skip re-encode if output is larger
       const outputStats = await fs.stat(outputPath)
       if (outputStats.size > inputStats.size) {
         logger.info('Skipping image re-encode: output larger than input')
@@ -176,52 +165,39 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 6. Naming - Use the generated ID
-    const systemFilename = `${assetId}.${finalExt}`
-    const folder = type === 'VID' ? 'videos' : type === 'AUD' ? 'audios' : 'images'
+    // 7. Build R2 key using canonical path builders
+    const assetFolder = type === 'VID' ? 'videos' as const : type === 'AUD' ? 'audios' as const : 'images' as const
+    const r2Key = contextAccountId
+      ? flownau.accountAsset(contextAccountId, assetFolder, assetId, finalExt)
+      : flownau.templateAsset(templateId || 'global', assetId, finalExt)
 
-    // NEW STRUCTURE: [projectFolder]/assets/[videos|audios|images]/[id].[ext]
-    const r2Key = `${projectFolder}/assets/${folder}/${systemFilename}`
-
-    // 7. Upload to R2 from Optimized Path
+    // 8. Upload to R2
     const fileStream = createReadStream(outputPath)
     const stats = await fs.stat(outputPath)
 
     logger.info({ r2Key, size: stats.size }, 'Uploading asset to R2')
 
-    await r2.send(
-      new PutObjectCommand({
-        Bucket: R2_BUCKET,
-        Key: r2Key,
-        Body: fileStream,
-        ContentType: finalMime,
-        ContentLength: stats.size,
-      }),
-    )
+    const publicUrl = await storage.upload(r2Key, fileStream, {
+      mimeType: finalMime,
+      size: stats.size,
+    })
 
-    // Upload thumbnail if exists
+    // Upload thumbnail if generated
     let thumbnailUrl: string | null = null
     if (thumbPath) {
-      const thumbKey = `${projectFolder}/assets/thumbnails/${systemFilename.split('.')[0]}_thumb.jpg`
+      const thumbKey = contextAccountId
+        ? flownau.accountThumbnail(contextAccountId, assetId)
+        : flownau.templateThumbnail(templateId || 'global', assetId)
       const thumbStream = createReadStream(thumbPath)
       const thumbStats = await fs.stat(thumbPath)
 
-      await r2.send(
-        new PutObjectCommand({
-          Bucket: R2_BUCKET,
-          Key: thumbKey,
-          Body: thumbStream,
-          ContentType: 'image/jpeg',
-          ContentLength: thumbStats.size,
-        }),
-      )
-
-      thumbnailUrl = process.env.R2_PUBLIC_URL
-        ? `${process.env.R2_PUBLIC_URL}/${thumbKey}`
-        : `https://${R2_BUCKET}.r2.cloudflarestorage.com/${thumbKey}`
+      thumbnailUrl = await storage.upload(thumbKey, thumbStream, {
+        mimeType: 'image/jpeg',
+        size: thumbStats.size,
+      })
     }
 
-    // 7.5 Get Duration if applicable
+    // 9. Get Duration if applicable
     let duration: number | undefined = undefined
     if (type === 'VID' || type === 'AUD') {
       try {
@@ -231,11 +207,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 8. DB Record
-    const publicUrl = process.env.R2_PUBLIC_URL
-      ? `${process.env.R2_PUBLIC_URL}/${r2Key}`
-      : `https://${R2_BUCKET}.r2.cloudflarestorage.com/${r2Key}`
-
+    // 10. DB Record
+    const systemFilename = `${assetId}.${finalExt}`
     const asset = await prisma.asset.create({
       data: {
         id: assetId,
@@ -249,12 +222,12 @@ export async function POST(req: NextRequest) {
         hash: clientHash,
         type,
         url: publicUrl,
-        thumbnailUrl: thumbnailUrl,
-        duration: duration,
+        thumbnailUrl,
+        duration,
       },
     })
 
-    // 9. Cleanup
+    // 11. Cleanup
     await fs.unlink(inputPath).catch((e) => logger.warn({ err: e }, 'Cleanup failed'))
     if (outputPath !== inputPath) {
       await fs.unlink(outputPath).catch((e) => logger.warn({ err: e }, 'Cleanup failed'))
