@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.13.0](https://github.com/samuelaure/flownau/compare/v1.12.4...v1.13.0) (2026-04-22)
+
+
+### Features
+
+* **workspace:** wire up BrandSwitcher and update dashboard to use searchParams ([7af565c](https://github.com/samuelaure/flownau/commit/7af565c78f3d63ff9162a0fe27e530665d05e07f))
+
 ### [1.12.1](https://github.com/samuelaure/flownau/compare/v1.11.0...v1.12.1) (2026-04-22)
 
 ## [1.10.0](https://github.com/samuelaure/flownau/compare/v1.9.4...v1.10.0) (2026-04-21)
