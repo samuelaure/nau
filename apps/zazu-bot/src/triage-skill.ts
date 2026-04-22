@@ -14,7 +14,7 @@ type NauWorkspace = { id: string; name: string; brands: NauBrand[] };
 /** Fetch all brands the user has access to via 9naŭ workspaces API. */
 async function fetchUserBrands(nauUserId: string): Promise<NauBrand[]> {
   try {
-    const res = await axios.get<NauWorkspace[]>(`${NAU_API_URL}/api/workspaces`, {
+    const res = await axios.get<NauWorkspace[]>(`${NAU_API_URL}/workspaces`, {
       headers: { ...SERVICE_HEADERS, 'x-nau-user-id': nauUserId },
     });
     return (res.data ?? []).flatMap((ws) => ws.brands ?? []);
@@ -25,7 +25,7 @@ async function fetchUserBrands(nauUserId: string): Promise<NauBrand[]> {
 
 async function callTriageApi(text: string, userId: string, brandId: string | null) {
   const response = await axios.post(
-    `${NAU_API_URL}/api/triage`,
+    `${NAU_API_URL}/triage`,
     { text, userId, brandId },
     { headers: SERVICE_HEADERS },
   );

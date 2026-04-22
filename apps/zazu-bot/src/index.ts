@@ -47,7 +47,7 @@ bot.start(async (ctx) => {
   if (startParam.startsWith('link-')) {
     const linkToken = startParam.slice('link-'.length);
     try {
-      const resp = await fetch(`${nauApiUrl}/api/auth/link-token/verify`, {
+      const resp = await fetch(`${nauApiUrl}/auth/link-token/verify`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -59,7 +59,7 @@ bot.start(async (ctx) => {
         const data = await resp.json() as { ok: boolean };
         if (data.ok) {
           // Persist nauUserId locally from the API lookup
-          const userResp = await fetch(`${nauApiUrl}/api/auth/by-telegram/${user.telegramId}`, {
+          const userResp = await fetch(`${nauApiUrl}/auth/by-telegram/${user.telegramId}`, {
             headers: { 'x-nau-service-key': nauServiceKey },
           });
           if (userResp.ok) {
@@ -80,7 +80,7 @@ bot.start(async (ctx) => {
   // Attempt to link this Telegram user to their 9naŭ account (best-effort, passive)
   if (!user.nauUserId) {
     try {
-      const resp = await fetch(`${nauApiUrl}/api/auth/by-telegram/${user.telegramId}`, {
+      const resp = await fetch(`${nauApiUrl}/auth/by-telegram/${user.telegramId}`, {
         headers: { 'x-nau-service-key': nauServiceKey },
       });
       if (resp.ok) {

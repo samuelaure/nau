@@ -34,7 +34,7 @@ export class SummarySkill implements ZazuSkill {
       const nauUrl = process.env.NAU_API_URL || 'http://localhost:3000';
       const nauKey = process.env.NAU_SERVICE_KEY;
 
-      const response = await axios.post(`${nauUrl}/api/journal/summary`, {
+      const response = await axios.post(`${nauUrl}/journal/summary`, {
         periodType,
         startDate,
         endDate
