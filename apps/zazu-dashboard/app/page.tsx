@@ -33,7 +33,11 @@ export default function Dashboard() {
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {needsLink && <LinkAccountPrompt />}
+      {needsLink && (
+        <div style={{ position: 'sticky', top: 0, zIndex: 100 }}>
+          <LinkAccountPrompt />
+        </div>
+      )}
       {/* Workspace / Brand Context Selector */}
       {status === 'authenticated' && session?.user?.nauUserId && (
         <div style={{

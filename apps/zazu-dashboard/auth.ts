@@ -126,17 +126,29 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.isAdmin = (user as any).isAdminString === "true";
         token.nauUserId = (user as any).nauUserId ?? null;
       }
-      // Re-sync nauUserId from DB when the session is explicitly updated
-      if (trigger === "update" && token.id && typeof token.id === 'string' && /^\d+$/.test(token.id)) {
+      // Re-sync link status from DB when the session is explicitly updated
+      if (trigger === "update" && token.id && typeof token.id === 'string') {
         try {
-          const dbUser = await prisma.user.findUnique({
-            where: { telegramId: BigInt(token.id) },
-            select: { nauUserId: true },
-          });
-          token.nauUserId = dbUser?.nauUserId ?? null;
-        } catch {
-          // Non-critical
-        }
+          if (/^\d+$/.test(token.id)) {
+            // Case: User is logged in via Telegram, check for nauUserId
+            const dbUser = await prisma.user.findUnique({
+              where: { telegramId: BigInt(token.id) },
+              select: { nauUserId: true },
+            });
+            token.nauUserId = dbUser?.nauUserId ?? null;
+          } else {
+            // Case: User is logged in via naŭ SSO (CUID), check if they just linked Telegram
+            const dbUser = await prisma.user.findFirst({
+              where: { nauUserId: token.id },
+              select: { telegramId: true },
+            });
+            if (dbUser) {
+              const nauUserId = token.id;
+              token.id = dbUser.telegramId.toString();
+              token.nauUserId = nauUserId;
+            }
+          }
+        } catch { /* ignore */ }
       }
       return token;
     },
