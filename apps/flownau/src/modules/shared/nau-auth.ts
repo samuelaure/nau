@@ -4,7 +4,7 @@ import { logger } from '@/modules/shared/logger'
  * Validates the NAU_SERVICE_KEY for cross-service API authentication.
  * Used on all /api/v1/* routes (except /health).
  *
- * Expects the key in the 'x-service-key' header.
+ * Expects the key in the 'x-nau-service-key' header.
  * Returns true if valid, false if invalid or missing.
  */
 export function validateServiceKey(request: Request): boolean {
@@ -27,7 +27,7 @@ export function validateServiceKey(request: Request): boolean {
  */
 export function unauthorizedResponse(): Response {
   return new Response(
-    JSON.stringify({ error: 'Unauthorized: invalid or missing x-service-key header' }),
+    JSON.stringify({ error: 'Unauthorized: invalid or missing x-nau-service-key header' }),
     { status: 401, headers: { 'Content-Type': 'application/json' } },
   )
 }

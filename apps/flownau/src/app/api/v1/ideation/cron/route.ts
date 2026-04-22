@@ -21,11 +21,11 @@ export async function POST(request: NextRequest) {
     // 1. Fetch Brand Persona and InspoItems from nauthenticity
     const nauthUrl = process.env.NAUTHENTICITY_URL || 'http://nauthenticity:3000'
     const [brandRes, inspoRes] = await Promise.all([
-      fetch(`${nauthUrl}/api/v1/brands/${brandId}/persona`, {
-        headers: { Authorization: `Bearer ${expectedKey}` },
+      fetch(`${nauthUrl}/brands/${brandId}/intelligence`, {
+        headers: { 'x-nau-service-key': expectedKey },
       }),
-      fetch(`${nauthUrl}/api/v1/inspo?brandId=${brandId}&status=pending`, {
-        headers: { Authorization: `Bearer ${expectedKey}` },
+      fetch(`${nauthUrl}/inspo?brandId=${brandId}&status=pending`, {
+        headers: { 'x-nau-service-key': expectedKey },
       }),
     ])
 
@@ -63,9 +63,9 @@ export async function POST(request: NextRequest) {
 
     // 4. Mark items as processed in nauthenticity
     for (const item of inspoData) {
-      await fetch(`${nauthUrl}/api/v1/inspo/${item.id}/process`, {
+      await fetch(`${nauthUrl}/inspo/${item.id}/process`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${expectedKey}` },
+        headers: { 'x-nau-service-key': expectedKey },
       })
     }
 
