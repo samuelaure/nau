@@ -56,21 +56,23 @@ export async function linkTelegramAccount(
   jwt: string,
   initData?: string,
 ): Promise<{ success: boolean; error?: string }> {
-  // 1. Try to get telegramId from the existing session
-  let telegramId: string | null = null;
-
-  const session = await auth();
-  if (session?.user?.userId) {
-    telegramId = session.user.userId;
-  }
-
-  // 2. Fall back to re-validating initData from the client
-  if (!telegramId && initData) {
+  // 1. Try initData first (direct Telegram identity)
+  if (initData) {
     telegramId = extractTelegramId(initData);
   }
 
+  // 2. Fall back to existing session if no initData or initData invalid
   if (!telegramId) {
-    return { success: false, error: "Not authenticated" };
+    const session = await auth();
+    const userId = session?.user?.userId;
+    // Only use session ID if it looks like a Telegram ID (numeric)
+    if (userId && /^\d+$/.test(userId)) {
+      telegramId = userId;
+    }
+  }
+
+  if (!telegramId) {
+    return { success: false, error: "No se pudo identificar tu cuenta de Telegram. Por favor, abre Zazŭ desde Telegram." };
   }
 
   // 3. Verify the naŭ JWT and extract nauUserId

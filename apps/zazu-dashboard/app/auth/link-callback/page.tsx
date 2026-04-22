@@ -34,20 +34,26 @@ function LinkCallbackHandler() {
       } catch { /* not in Mini App context */ }
     }
 
-    linkTelegramAccount(token, initData).then(async (result) => {
-      if (result.success) {
-        setStatus('success');
-        // Discard the stale JWT (nauUserId: null) and force a fresh Telegram login.
-        // The /login page auto-signs in via WebApp.initData, and the new session
-        // will have nauUserId populated from the DB.
-        await signOut({ redirect: false });
-        router.replace('/login');
-      } else {
+    linkTelegramAccount(token, initData)
+      .then(async (result) => {
+        if (result.success) {
+          setStatus('success');
+          // Discard the stale JWT (nauUserId: null) and force a fresh Telegram login.
+          // The /login page auto-signs in via WebApp.initData, and the new session
+          // will have nauUserId populated from the DB.
+          await signOut({ redirect: false });
+          router.replace('/login');
+        } else {
+          setStatus('error');
+          setErrorMsg(result.error ?? 'Error desconocido');
+          setTimeout(() => router.replace('/'), 5000);
+        }
+      })
+      .catch((err) => {
         setStatus('error');
-        setErrorMsg(result.error ?? 'Error desconocido');
-        setTimeout(() => router.replace('/'), 3000);
-      }
-    });
+        setErrorMsg(err.message || 'Error de conexión con el servidor');
+        setTimeout(() => router.replace('/'), 5000);
+      });
   }, [searchParams, router]);
 
   return (

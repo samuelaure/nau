@@ -120,10 +120,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.nauUserId = (user as any).nauUserId ?? null;
       }
       // Re-sync nauUserId from DB when the session is explicitly updated
-      if (trigger === "update" && token.id) {
+      if (trigger === "update" && token.id && typeof token.id === 'string' && /^\d+$/.test(token.id)) {
         try {
           const dbUser = await prisma.user.findUnique({
-            where: { telegramId: BigInt(token.id as string) },
+            where: { telegramId: BigInt(token.id) },
             select: { nauUserId: true },
           });
           token.nauUserId = dbUser?.nauUserId ?? null;
