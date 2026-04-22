@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
     // 7. Save archive in 9nau (journal_summary block structure)
     const nauApiUrl = process.env.NAU_INTERNAL_URL || 'http://9nau-api:3000'
     try {
-      await fetch(`${nauApiUrl}/api/journal/summary/direct`, {
+      await fetch(`${nauApiUrl}/journal/summary/direct`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

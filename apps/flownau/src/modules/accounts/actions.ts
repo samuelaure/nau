@@ -68,7 +68,7 @@ export async function addBrand(formData: FormData) {
   const token = cookieStore.get('nau_token')?.value
   const nauApiUrl = process.env.NAU_API_URL ?? 'http://9nau-api:3000'
 
-  const res = await fetch(`${nauApiUrl}/api/workspaces/${workspaceId}/brands`, {
+  const res = await fetch(`${nauApiUrl}/workspaces/${workspaceId}/brands`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ name }),
@@ -168,6 +168,40 @@ export async function moveAccountToWorkspace(accountId: string, targetWorkspaceI
   const parsedId = IdSchema.parse(accountId)
   const parsedWsId = IdSchema.parse(targetWorkspaceId)
 
+  // 1. Fetch current account state to check for linked Brand
+  const account = await prisma.socialAccount.findUnique({ where: { id: parsedId } })
+  if (!account) throw new Error('Account not found')
+
+  // 2. If this account is linked to a 9naŭ Brand, move the Brand in 9naŭ-api first.
+  // This will trigger the structural sync to Nauthenticity.
+  if (account.brandId) {
+    const cookieStore = await import('next/headers').then((m) => m.cookies())
+    const token = cookieStore.get('nau_token')?.value
+    const nauApiUrl = process.env.NAU_API_URL ?? 'http://9nau-api:3000'
+
+    if (token) {
+      const res = await fetch(
+        `${nauApiUrl}/workspaces/${account.workspaceId}/brands/${account.brandId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ workspaceId: parsedWsId }),
+        },
+      )
+
+      if (!res.ok) {
+        const text = await res.text()
+        console.error(`Failed to move brand in 9naŭ-api: ${text}`)
+        // We continue anyway to at least update the local account,
+        // but ideally this should be atomic.
+      }
+    }
+  }
+
+  // 3. Update local SocialAccount workspaceId (flownaŭ domain)
   await prisma.socialAccount.update({
     where: { id: parsedId },
     data: { workspaceId: parsedWsId },

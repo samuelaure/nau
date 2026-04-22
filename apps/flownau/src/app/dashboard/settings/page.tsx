@@ -8,16 +8,12 @@ type NauWorkspace = { id: string; name: string; role: string }
 
 async function getWorkspaces(token: string): Promise<NauWorkspace[]> {
   const nauApiUrl = process.env.NAU_API_URL ?? 'http://9nau-api:3000'
-  try {
-    const res = await fetch(`${nauApiUrl}/api/workspaces`, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store',
-    })
-    if (!res.ok) return []
-    return res.json()
-  } catch {
-    return []
-  }
+  const res = await fetch(`${nauApiUrl}/workspaces`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  })
+  if (!res.ok) return []
+  return res.json()
 }
 
 export default async function SettingsPage() {
