@@ -1,6 +1,6 @@
 'use server';
 
-import prisma, { OnboardingState, Role } from '@zazu/db';
+import prisma, { Role } from '@zazu/db';
 import { revalidatePath } from 'next/cache';
 import { auth } from '../../auth';
 
@@ -181,7 +181,7 @@ export async function toggleUserFeature(userId: string, featureId: string, activ
 const getNautUrl = () => process.env.NAUTHENTICITY_URL || 'http://localhost:3000';
 const getNautHeaders = () => ({
   'Content-Type': 'application/json',
-  Authorization: `Bearer ${process.env.NAU_SERVICE_KEY}`,
+  'x-nau-service-key': process.env.NAU_SERVICE_KEY ?? '',
 });
 
 // ---------------------------------------------------------------------------
