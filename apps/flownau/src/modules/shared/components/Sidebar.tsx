@@ -13,7 +13,8 @@ import {
   Loader2,
   X,
 } from 'lucide-react'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, Suspense } from 'react'
+import { BrandSwitcher } from './BrandSwitcher'
 
 type NauWorkspace = { id: string; name: string }
 
@@ -317,6 +318,11 @@ export default function Sidebar() {
 
       {/* Workspace selector */}
       <WorkspaceSelector />
+
+      {/* Brand filter (only visible inside a workspace) */}
+      <Suspense fallback={null}>
+        <BrandSwitcher />
+      </Suspense>
 
       {/* Nav */}
       <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>

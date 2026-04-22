@@ -11,10 +11,13 @@ export const dynamic = 'force-dynamic'
 
 export default async function WorkspaceOverviewPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ workspaceId: string }>
+  searchParams: Promise<{ brandId?: string }>
 }) {
   const { workspaceId } = await params
+  const { brandId } = await searchParams
   // Workspace details are now fetched from the 9naŭ Platform Service
   const nauApiUrl = process.env.NAU_API_URL || 'http://9nau-api:3000'
   const workspaceResp = await fetch(`${nauApiUrl}/workspaces/${workspaceId}/service`, {
@@ -38,7 +41,7 @@ export default async function WorkspaceOverviewPage({
   const { workspace } = (await workspaceResp.json()) as { workspace: { name: string } }
 
   const accounts = await prisma.socialAccount.findMany({
-    where: { workspaceId },
+    where: { workspaceId, ...(brandId ? { brandId } : {}) },
     orderBy: { createdAt: 'desc' },
     include: { _count: { select: { templates: true, assets: true } } },
   })
