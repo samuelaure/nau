@@ -25,7 +25,11 @@ export default function Dashboard() {
 
   const isAdmin = session?.user?.isAdmin === true;
   const isActuallyShowingAdmin = isAdmin && viewMode === 'admin';
-  const needsLink = status === 'authenticated' && !session?.user?.nauUserId;
+  
+  const userId = session?.user?.userId;
+  const isTelegramId = userId && /^\d+$/.test(userId);
+  const isNauId = !!session?.user?.nauUserId;
+  const needsLink = status === 'authenticated' && (!isTelegramId || !isNauId);
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>

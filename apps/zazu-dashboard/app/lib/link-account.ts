@@ -57,8 +57,25 @@ export async function linkTelegramAccount(
   initData?: string,
 ): Promise<{ success: boolean; error?: string }> {
   // 1. Try initData first (direct Telegram identity)
+  let telegramId: string | null = null;
+  let tgUser: any = null;
+
   if (initData) {
-    telegramId = extractTelegramId(initData);
+    try {
+      const urlParams = new URLSearchParams(initData);
+      const userStr = urlParams.get("user");
+      if (userStr) {
+        tgUser = JSON.parse(userStr);
+        telegramId = tgUser.id?.toString() ?? null;
+      }
+    } catch { /* ignore */ }
+    
+    // Re-validate to be sure
+    const validatedId = extractTelegramId(initData);
+    if (!validatedId) {
+      telegramId = null;
+      tgUser = null;
+    }
   }
 
   // 2. Fall back to existing session if no initData or initData invalid
@@ -86,10 +103,18 @@ export async function linkTelegramAccount(
     return { success: false, error: "Invalid or expired token" };
   }
 
-  // 4. Update Zazu DB
-  await prisma.user.update({
+  // 4. Update or Create Zazu User
+  await prisma.user.upsert({
     where: { telegramId: BigInt(telegramId) },
-    data: { nauUserId },
+    update: { nauUserId },
+    create: {
+      telegramId: BigInt(telegramId),
+      nauUserId,
+      firstName: tgUser?.first_name,
+      lastName: tgUser?.last_name,
+      username: tgUser?.username,
+      onboardingState: 'COMPLETED', // Linking accounts skips onboarding
+    },
   });
 
   // 5. Notify 9nau API (best-effort)

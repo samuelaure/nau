@@ -97,11 +97,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           const { payload } = await jwtVerify(jwtToken, secret);
           if (!payload.sub) return null;
 
+          // Check if this naŭ account is already linked to a Telegram account
+          const dbUser = await prisma.user.findFirst({
+            where: { nauUserId: payload.sub as string },
+            select: { telegramId: true },
+          });
+
           return {
-            id: payload.sub,
+            id: dbUser ? dbUser.telegramId.toString() : (payload.sub as string),
             name: (payload.name as string) ?? "naŭ User",
             email: payload.email as string | undefined,
             isAdminString: "true",
+            nauUserId: payload.sub as string,
           };
         } catch {
           return null;
