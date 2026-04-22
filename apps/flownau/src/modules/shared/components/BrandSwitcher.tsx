@@ -16,7 +16,7 @@ export function BrandSwitcher() {
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
-    fetch(`${NAU_API_URL}/api/workspaces`, { credentials: 'include' })
+    fetch(`${NAU_API_URL}/workspaces`, { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : []))
       .then((data: NauWorkspace[]) => {
         setWorkspaces(data)

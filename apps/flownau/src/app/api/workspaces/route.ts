@@ -8,7 +8,7 @@ const NAU_API_URL = process.env.NAU_API_URL || 'https://api.9nau.com'
 export async function GET() {
   const cookieStore = await cookies()
   const token = cookieStore.get('nau_token')?.value
-  const res = await fetch(`${NAU_API_URL}/api/workspaces`, {
+  const res = await fetch(`${NAU_API_URL}/workspaces`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   })
   if (!res.ok) return NextResponse.json([], { status: res.status })
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json()
-  const res = await fetch(`${NAU_API_URL}/api/workspaces`, {
+  const res = await fetch(`${NAU_API_URL}/workspaces`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

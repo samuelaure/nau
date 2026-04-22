@@ -23,7 +23,7 @@ export default function WorkspaceNameEditor({
     if (!name.trim() || name.trim() === currentName) return
     setSaving(true)
     try {
-      const res = await fetch(`${NAU_API_URL}/api/workspaces/${workspaceId}`, {
+      const res = await fetch(`${NAU_API_URL}/workspaces/${workspaceId}`, {
         method: 'PATCH',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

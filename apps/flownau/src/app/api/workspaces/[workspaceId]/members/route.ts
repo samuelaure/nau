@@ -16,7 +16,7 @@ export async function GET(
 ) {
   const { workspaceId } = await params
   const token = await getToken()
-  const res = await fetch(`${NAU_API_URL}/api/workspaces/${workspaceId}/members`, {
+  const res = await fetch(`${NAU_API_URL}/workspaces/${workspaceId}/members`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
   })

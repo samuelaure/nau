@@ -17,7 +17,7 @@ export async function PATCH(
   const { workspaceId } = await params
   const token = await getToken()
   const body = await req.json()
-  const res = await fetch(`${NAU_API_URL}/api/workspaces/${workspaceId}`, {
+  const res = await fetch(`${NAU_API_URL}/workspaces/${workspaceId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
