@@ -66,11 +66,13 @@ const sectionStyle = {
 
 interface BrandFormProps {
   initial?: Brand | null;
+  workspaces?: any[];
   onSave: () => void;
   onCancel: () => void;
 }
 
-function BrandForm({ initial, onSave, onCancel }: BrandFormProps) {
+function BrandForm({ initial, workspaces = [], onSave, onCancel }: BrandFormProps) {
+  const [workspaceId, setWorkspaceId] = useState(initial?.workspaceId ?? (workspaces[0]?.id ?? ''));
   const [name, setName] = useState(initial?.brandName ?? '');
   const [voicePrompt, setVoicePrompt] = useState(initial?.voicePrompt ?? '');
   const [commentStrategy, setCommentStrategy] = useState(initial?.commentStrategy ?? '');
@@ -103,9 +105,14 @@ function BrandForm({ initial, onSave, onCancel }: BrandFormProps) {
 
     let res;
     if (initial) {
-      res = await updateBrand(initial.id, payload);
+      res = await updateBrand(initial.id, { ...payload, workspaceId });
     } else {
-      res = await createBrand(payload);
+      if (!workspaceId) {
+        setError('Debes seleccionar un espacio de trabajo.');
+        setIsLoading(false);
+        return;
+      }
+      res = await createBrand({ ...payload, workspaceId });
     }
 
     if (res.success) {
@@ -124,6 +131,23 @@ function BrandForm({ initial, onSave, onCancel }: BrandFormProps) {
       </h2>
 
       <div style={sectionStyle}>
+        {/* Workspace Selector — only on create */}
+        {!initial && workspaces.length > 1 && (
+          <div>
+            <label style={labelStyle}>Espacio de Trabajo</label>
+            <select
+              className="input-field"
+              value={workspaceId}
+              onChange={e => setWorkspaceId(e.target.value)}
+              style={{ cursor: 'pointer' }}
+            >
+              {workspaces.map(ws => (
+                <option key={ws.id} value={ws.id}>{ws.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* Name — always visible */}
         <div>
           <label style={labelStyle}>Nombre de la marca *</label>
@@ -397,7 +421,7 @@ function BrandDetail({ brand, onClose, onEdit, onDelete, onRefresh }: BrandDetai
   const handleDelete = async () => {
     if (!confirm(`¿Eliminar marca "${brand.brandName}" y todos sus perfiles monitoreados?`)) return;
     setIsDeleting(true);
-    await deleteBrand(brand.id);
+    await deleteBrand(brand.id, brand.workspaceId!);
     onDelete();
   };
 
@@ -516,8 +540,18 @@ function BrandDetail({ brand, onClose, onEdit, onDelete, onRefresh }: BrandDetai
 export default function ClientBrandsList({ initialBrands }: { initialBrands: Brand[] }) {
   const { isReady } = useTelegram();
   const [brands, setBrands] = useState<Brand[]>(initialBrands);
+  const [workspaces, setWorkspaces] = useState<any[]>([]);
   const [view, setView] = useState<'list' | 'create' | 'edit' | 'detail'>('list');
   const [selectedBrand, setSelectedBrand] = useState<Brand | null>(null);
+
+  const loadWorkspaces = async () => {
+    const ws = await getWorkspaces();
+    setWorkspaces(ws);
+  };
+
+  useEffect(() => {
+    loadWorkspaces();
+  }, []);
 
   const refresh = async () => {
     const updated = await getBrands();
@@ -575,6 +609,7 @@ export default function ClientBrandsList({ initialBrands }: { initialBrands: Bra
       {/* Create form */}
       {view === 'create' && (
         <BrandForm
+          workspaces={workspaces}
           onSave={async () => { await refresh(); setView('list'); }}
           onCancel={() => setView('list')}
         />
@@ -584,6 +619,7 @@ export default function ClientBrandsList({ initialBrands }: { initialBrands: Bra
       {view === 'edit' && selectedBrand && (
         <BrandForm
           initial={selectedBrand}
+          workspaces={workspaces}
           onSave={async () => { await refresh(); setView('detail'); }}
           onCancel={() => setView('detail')}
         />

@@ -209,6 +209,7 @@ export interface Brand {
   createdAt?: string;
   updatedAt?: string;
   targets?: BrandTarget[];
+  workspaceId?: string;
 }
 
 export interface NauWorkspace {
@@ -247,8 +248,8 @@ export async function getWorkspaces(): Promise<NauWorkspace[]> {
   if (!nauUserId) return [];
 
   try {
-    const res = await fetch(`${nauApiUrl}/workspaces`, {
-      headers: { 'x-nau-service-key': nauServiceKey, 'x-nau-user-id': nauUserId },
+    const res = await fetch(`${nauApiUrl}/workspaces/service/user/${nauUserId}`, {
+      headers: { 'x-nau-service-key': nauServiceKey },
       next: { revalidate: 0 },
     });
     if (!res.ok) return [];
@@ -260,31 +261,92 @@ export async function getWorkspaces(): Promise<NauWorkspace[]> {
 
 /**
  * Fetch all brands for the current user.
- * Now pulls from 9naŭ (source of truth) instead of nauthenticity.
+ * Merges structural data (9naŭ) with intelligence DNA (Nauthenticity).
  */
 export async function getBrands(): Promise<Brand[]> {
   const workspaces = await getWorkspaces();
-  return workspaces.flatMap((ws) =>
-    ws.brands.map((b) => ({ id: b.id, name: b.name, timezone: b.timezone })),
-  );
+  const nautUrl = getNautUrl();
+  const nautHeaders = getNautHeaders();
+
+  const allBrands: Brand[] = [];
+
+  for (const ws of workspaces) {
+    try {
+      // Fetch intelligence for all brands in this workspace from Nauthenticity
+      const intelligenceRes = await fetch(`${nautUrl}/api/service/brands?workspaceId=${ws.id}`, {
+        headers: nautHeaders,
+      });
+      const intelligence = intelligenceRes.ok ? await intelligenceRes.json() : [];
+
+      for (const b of ws.brands) {
+        const intel = intelligence.find((i: any) => i.brandId === b.id);
+        allBrands.push({
+          id: b.id,
+          brandId: b.id,
+          workspaceId: ws.id,
+          name: b.name,
+          brandName: b.name,
+          timezone: b.timezone ?? 'UTC',
+          voicePrompt: intel?.voicePrompt ?? '',
+          commentStrategy: intel?.commentStrategy ?? '',
+          suggestionsCount: intel?.suggestionsCount ?? 3,
+          windowStart: intel?.windowStart ?? null,
+          windowEnd: intel?.windowEnd ?? null,
+          targets: intel?.targets ?? [],
+          isActive: true,
+        });
+      }
+    } catch (e) {
+      console.error(`Failed to fetch intelligence for workspace ${ws.id}`, e);
+      // Fallback to just structural data
+      for (const b of ws.brands) {
+        allBrands.push({ id: b.id, name: b.name, timezone: b.timezone });
+      }
+    }
+  }
+
+  return allBrands;
 }
 
 /**
- * Create a new brand in nauthenticity.
+ * Create a new brand.
+ * 1. Create structural record in 9naŭ.
+ * 2. Create intelligence record in Nauthenticity.
  */
-export async function createBrand(payload: BrandCreatePayload): Promise<{ success: boolean; data?: Brand; error?: string }> {
-  const session = await auth();
-  const userId = session?.user?.userId || 'admin';
+export async function createBrand(payload: BrandCreatePayload & { workspaceId: string }): Promise<{ success: boolean; data?: Brand; error?: string }> {
+  const nauApiUrl = process.env.NAU_API_URL ?? 'http://9nau-api:3000';
+  const nauServiceKey = process.env.NAU_SERVICE_KEY ?? '';
 
   try {
-    const res = await fetch(`${getNautUrl()}/api/v1/brands`, {
+    // 1. Create in 9naŭ
+    const res9 = await fetch(`${nauApiUrl}/workspaces/${payload.workspaceId}/brands/service`, {
       method: 'POST',
-      headers: getNautHeaders(),
-      body: JSON.stringify({ ...payload, userId }),
+      headers: {
+        'Content-Type': 'application/json',
+        'x-nau-service-key': nauServiceKey,
+      },
+      body: JSON.stringify({ name: payload.brandName, timezone: payload.timezone }),
     });
-    if (!res.ok) throw new Error(await res.text());
+    if (!res9.ok) throw new Error(await res9.text());
+    const brand9 = await res9.json();
+
+    // 2. Initialize intelligence in Nauthenticity
+    const resN = await fetch(`${getNautUrl()}/api/brands/${brand9.id}/intelligence`, {
+      method: 'PUT',
+      headers: getNautHeaders(),
+      body: JSON.stringify({
+        workspaceId: payload.workspaceId,
+        voicePrompt: payload.voicePrompt,
+        commentStrategy: payload.commentStrategy,
+        suggestionsCount: payload.suggestionsCount,
+        windowStart: payload.windowStart,
+        windowEnd: payload.windowEnd,
+      }),
+    });
+    if (!resN.ok) throw new Error(await resN.text());
+
     revalidatePath('/brands');
-    return { success: true, data: (await res.json()) as Brand };
+    return { success: true, data: { ...brand9, brandName: brand9.name } };
   } catch (error: unknown) {
     console.error('[actions] createBrand error:', error);
     return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -292,17 +354,34 @@ export async function createBrand(payload: BrandCreatePayload): Promise<{ succes
 }
 
 /**
- * Update an existing brand in nauthenticity.
- * Also syncs delivery window changes (source of truth: Zazŭ).
+ * Update an existing brand.
+ * Updates both 9naŭ (structural) and Nauthenticity (intelligence).
  */
-export async function updateBrand(brandId: string, payload: BrandUpdatePayload): Promise<{ success: boolean; data?: Brand; error?: string }> {
+export async function updateBrand(brandId: string, payload: BrandUpdatePayload & { workspaceId?: string }): Promise<{ success: boolean; data?: Brand; error?: string }> {
+  const nauApiUrl = process.env.NAU_API_URL ?? 'http://9nau-api:3000';
+  const nauServiceKey = process.env.NAU_SERVICE_KEY ?? '';
+
   try {
-    const res = await fetch(`${getNautUrl()}/api/v1/brands/${encodeURIComponent(brandId)}`, {
+    // 1. Update 9naŭ if name/timezone changed and workspaceId is known
+    if (payload.workspaceId && (payload.brandName || payload.timezone)) {
+      await fetch(`${nauApiUrl}/workspaces/${payload.workspaceId}/brands/${encodeURIComponent(brandId)}/service`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-nau-service-key': nauServiceKey,
+        },
+        body: JSON.stringify({ name: payload.brandName, timezone: payload.timezone }),
+      });
+    }
+
+    // 2. Update intelligence in Nauthenticity
+    const res = await fetch(`${getNautUrl()}/api/brands/${encodeURIComponent(brandId)}/intelligence`, {
       method: 'PUT',
       headers: getNautHeaders(),
       body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error(await res.text());
+    
     revalidatePath('/brands');
     return { success: true, data: (await res.json()) as Brand };
   } catch (error: unknown) {
@@ -312,14 +391,19 @@ export async function updateBrand(brandId: string, payload: BrandUpdatePayload):
 }
 
 /**
- * Delete a brand and cascade-delete all its targets.
+ * Delete a brand.
  */
-export async function deleteBrand(brandId: string): Promise<{ success: boolean; error?: string }> {
+export async function deleteBrand(brandId: string, workspaceId: string): Promise<{ success: boolean; error?: string }> {
+  const nauApiUrl = process.env.NAU_API_URL ?? 'http://9nau-api:3000';
+  const nauServiceKey = process.env.NAU_SERVICE_KEY ?? '';
+
   try {
-    const res = await fetch(`${getNautUrl()}/api/v1/brands/${encodeURIComponent(brandId)}`, {
+    // Structural delete in 9naŭ
+    const res = await fetch(`${nauApiUrl}/workspaces/${workspaceId}/brands/${encodeURIComponent(brandId)}/service`, {
       method: 'DELETE',
-      headers: getNautHeaders(),
+      headers: { 'x-nau-service-key': nauServiceKey },
     });
+    
     if (!res.ok) throw new Error(await res.text());
     revalidatePath('/brands');
     return { success: true };
@@ -362,7 +446,7 @@ export interface TargetAddPayload {
  */
 export async function addBrandTargets(payload: TargetAddPayload): Promise<{ success: boolean; error?: string }> {
   try {
-    const res = await fetch(`${getNautUrl()}/api/v1/targets`, {
+    const res = await fetch(`${getNautUrl()}/api/targets`, {
       method: 'POST',
       headers: getNautHeaders(),
       body: JSON.stringify(payload),
@@ -386,7 +470,7 @@ export async function updateBrandTarget(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const res = await fetch(
-      `${getNautUrl()}/api/v1/targets/${encodeURIComponent(brandId)}/${encodeURIComponent(username)}`,
+      `${getNautUrl()}/api/targets/${encodeURIComponent(brandId)}/${encodeURIComponent(username)}`,
       {
         method: 'PUT',
         headers: getNautHeaders(),
@@ -408,7 +492,7 @@ export async function updateBrandTarget(
 export async function removeBrandTarget(brandId: string, username: string): Promise<{ success: boolean; error?: string }> {
   try {
     const res = await fetch(
-      `${getNautUrl()}/api/v1/targets?brandId=${encodeURIComponent(brandId)}&username=${encodeURIComponent(username)}`,
+      `${getNautUrl()}/api/targets?brandId=${encodeURIComponent(brandId)}&username=${encodeURIComponent(username)}`,
       { method: 'DELETE', headers: getNautHeaders() },
     );
     if (!res.ok) throw new Error(await res.text());
@@ -438,7 +522,7 @@ export interface CommentFeedbackPayload {
  */
 export async function submitCommentFeedback(payload: CommentFeedbackPayload): Promise<{ success: boolean; error?: string }> {
   try {
-    const res = await fetch(`${getNautUrl()}/api/v1/comment-feedback`, {
+    const res = await fetch(`${getNautUrl()}/api/comment-feedback`, {
       method: 'POST',
       headers: getNautHeaders(),
       body: JSON.stringify(payload),

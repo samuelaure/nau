@@ -6,8 +6,7 @@ import { Building2, Globe, ChevronDown } from 'lucide-react';
 type NauBrand = { id: string; name: string; timezone?: string };
 type NauWorkspace = { id: string; name: string; role: string; brands: NauBrand[] };
 
-const NAU_API_URL =
-  (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_NAU_API_URL) || 'https://api.9nau.com';
+import { getWorkspaces } from '../lib/actions';
 
 export default function WorkspaceContextPanel({
   onContextChange,
@@ -20,14 +19,13 @@ export default function WorkspaceContextPanel({
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    fetch(`${NAU_API_URL}/workspaces`, { credentials: 'include' })
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data: NauWorkspace[]) => {
-        setWorkspaces(data);
-        if (data.length > 0) setActiveWorkspaceId(data[0].id);
-      })
-      .catch(() => {});
-  }, []);
+    getWorkspaces().then((data) => {
+      setWorkspaces(data);
+      if (data.length > 0 && !activeWorkspaceId) {
+        setActiveWorkspaceId(data[0].id);
+      }
+    });
+  }, [activeWorkspaceId]);
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
   const activeBrand = activeWorkspace?.brands.find((b) => b.id === activeBrandId);
