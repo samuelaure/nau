@@ -114,6 +114,7 @@ jobs:
           R2_ACCESS_KEY_ID: placeholder
           R2_SECRET_ACCESS_KEY: placeholder
           R2_BUCKET_NAME: placeholder
+          R2_PUBLIC_URL: https://placeholder.r2.dev
           NODE_ENV: production
         run: npm run build
 
