@@ -244,7 +244,27 @@ export async function getWorkspaces(): Promise<NauWorkspace[]> {
   const nauServiceKey = process.env.NAU_SERVICE_KEY ?? '';
 
   const session = await auth();
-  const nauUserId = session?.user?.nauUserId;
+  if (!session?.user) return [];
+
+  // The JWT caches nauUserId at login time and only refreshes on explicit session.update().
+  // Re-read from DB to guarantee freshness — covers users who linked after logging in.
+  let nauUserId = session.user.nauUserId;
+
+  if (!nauUserId) {
+    const telegramId = session.user.userId;
+    if (telegramId && /^\d+$/.test(telegramId)) {
+      // Telegram login: look up the linked 9nau account from the Zazu DB
+      const dbUser = await prisma.user.findUnique({
+        where: { telegramId: BigInt(telegramId) },
+        select: { nauUserId: true },
+      });
+      nauUserId = dbUser?.nauUserId ?? null;
+    } else if (telegramId) {
+      // nau-sso login: userId IS the nauUserId (CUID)
+      nauUserId = telegramId;
+    }
+  }
+
   if (!nauUserId) return [];
 
   try {
