@@ -18,15 +18,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required field: brandId' }, { status: 400 })
     }
 
-    // 1. Fetch Brand Persona and InspoItems from nauthenticity
+    // 1. Fetch Brand Persona, InspoItems, and brand name concurrently
     const nauthUrl = process.env.NAUTHENTICITY_URL || 'http://nauthenticity:3000'
-    const [brandRes, inspoRes] = await Promise.all([
-      fetch(`${nauthUrl}/brands/${brandId}/intelligence`, {
+    const [brandRes, inspoRes, account] = await Promise.all([
+      fetch(`${nauthUrl}/api/brands/${brandId}/intelligence`, {
         headers: { 'x-nau-service-key': expectedKey },
       }),
-      fetch(`${nauthUrl}/inspo?brandId=${brandId}&status=pending`, {
+      fetch(`${nauthUrl}/api/inspo?brandId=${brandId}&status=pending`, {
         headers: { 'x-nau-service-key': expectedKey },
       }),
+      prisma.socialAccount.findFirst({ where: { brandId } }),
     ])
 
     if (!brandRes.ok) {
@@ -34,6 +35,7 @@ export async function POST(request: NextRequest) {
     }
 
     const brandData = await brandRes.json()
+    const brandName: string = account?.username ?? brandId
     const inspoData = (inspoRes.ok ? await inspoRes.json() : []) as any[]
 
     if (inspoData.length === 0) {
@@ -45,7 +47,7 @@ export async function POST(request: NextRequest) {
 
     // 3. Generate Ideation Brief
     const result = await generateContentIdeas({
-      brandName: brandData.brandName,
+      brandName: brandName,
       dna: brandData.voicePrompt,
       count: 5,
       inspoItems: inspoData.map((item) => ({
@@ -63,7 +65,7 @@ export async function POST(request: NextRequest) {
 
     // 4. Mark items as processed in nauthenticity
     for (const item of inspoData) {
-      await fetch(`${nauthUrl}/inspo/${item.id}/process`, {
+      await fetch(`${nauthUrl}/api/inspo/${item.id}/process`, {
         method: 'POST',
         headers: { 'x-nau-service-key': expectedKey },
       })
@@ -71,7 +73,6 @@ export async function POST(request: NextRequest) {
 
     // 4.5 Persist ideas as ContentIdea records in flownau
     try {
-      const account = await prisma.socialAccount.findFirst({ where: { brandId } })
       if (account) {
         const persona = await prisma.brandPersona.findFirst({ where: { accountId: account.id } })
         const autoApprove = persona?.automaticAutoApprove ?? false
@@ -96,7 +97,7 @@ export async function POST(request: NextRequest) {
       month: 'short',
       year: 'numeric',
     }).format(new Date())
-    let briefMd = `📋 *Brief de Contenido — ${dateStr}*\n_Marca: ${brandData.brandName}_\n\n`
+    let briefMd = `📋 *Brief de Contenido — ${dateStr}*\n_Marca: ${brandName}_\n\n`
     briefMd += `*💡 RESUMEN ESTRATÉGICO*\n${result.briefSummary}\n\n`
 
     result.ideas.forEach((idea, idx) => {
@@ -121,7 +122,7 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({
           type: 'content_brief',
           payload: {
-            brandName: brandData.brandName,
+            brandName: brandName,
             markdown: briefMd,
           },
         }),
