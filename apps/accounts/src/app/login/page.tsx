@@ -2,40 +2,21 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, Suspense } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
+import { loginAction } from '../actions'
 
-function setSharedCookie(name: string, value: string, days: number) {
-  const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toUTCString()
-  const isProduction = window.location.hostname.endsWith('.9nau.com')
-  const domainPart = isProduction ? '; domain=.9nau.com' : ''
-  document.cookie = `${name}=${value}; expires=${expires}; path=/${domainPart}; SameSite=Lax`
-}
-
-function getSharedCookie(name: string): string | undefined {
-  return document.cookie.split('; ').find((row) => row.startsWith(`${name}=`))?.split('=')[1]
-}
+const DEFAULT_REDIRECT = process.env['NEXT_PUBLIC_APP_URL'] ?? 'https://app.9nau.com'
 
 function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
   const searchParams = useSearchParams()
-  const continueUrl = searchParams.get('continue') ?? ''
-
-  useEffect(() => {
-    const token = getSharedCookie('nau_token')
-    if (token) {
-      const dest = continueUrl
-        ? `${continueUrl}${continueUrl.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}`
-        : 'https://app.9nau.com'
-      window.location.href = dest
-    }
-  }, [continueUrl])
+  const redirectUri = searchParams.get('redirect_uri') ?? DEFAULT_REDIRECT
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -43,27 +24,13 @@ function LoginForm() {
     setLoading(true)
 
     try {
-      const nauApiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'https://api.9nau.com'
-      const res = await fetch(`${nauApiUrl}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      })
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        setError((body as { message?: string }).message ?? 'Invalid credentials')
+      const result = await loginAction(email, password)
+      if (!result.ok) {
+        setError(result.message)
         return
       }
-
-      const { accessToken } = (await res.json()) as { accessToken: string }
-
-      setSharedCookie('nau_token', accessToken, 30)
-
-      const dest = continueUrl
-        ? `${continueUrl}${continueUrl.includes('?') ? '&' : '?'}token=${encodeURIComponent(accessToken)}`
-        : 'https://app.9nau.com'
-      window.location.href = dest
+      // Cookies are set server-side via the server action — just redirect.
+      window.location.href = redirectUri
     } catch {
       setError('Network error. Please try again.')
     } finally {
@@ -71,9 +38,7 @@ function LoginForm() {
     }
   }
 
-  const registerHref = continueUrl
-    ? `/register?continue=${encodeURIComponent(continueUrl)}`
-    : '/register'
+  const registerHref = `/register?redirect_uri=${encodeURIComponent(redirectUri)}`
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[radial-gradient(circle_at_top_right,#1e1b4b,#000)] p-4">
@@ -84,7 +49,7 @@ function LoginForm() {
           </div>
           <h1 className="text-3xl font-heading font-bold mb-2">Sign in to 9naŭ</h1>
           <p className="text-white/60 text-sm">
-            {continueUrl ? 'Sign in to continue to your app.' : 'Welcome back.'}
+            {redirectUri !== DEFAULT_REDIRECT ? 'Sign in to continue to your app.' : 'Welcome back.'}
           </p>
         </div>
 

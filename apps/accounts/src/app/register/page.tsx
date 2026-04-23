@@ -6,6 +6,9 @@ import { useState, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
+import { registerAction } from '../actions'
+
+const DEFAULT_REDIRECT = process.env['NEXT_PUBLIC_APP_URL'] ?? 'https://app.9nau.com'
 
 function RegisterForm() {
   const [name, setName] = useState('')
@@ -14,7 +17,7 @@ function RegisterForm() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const searchParams = useSearchParams()
-  const continueUrl = searchParams.get('continue') ?? ''
+  const redirectUri = searchParams.get('redirect_uri') ?? DEFAULT_REDIRECT
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -22,28 +25,12 @@ function RegisterForm() {
     setLoading(true)
 
     try {
-      const nauApiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'https://api.9nau.com'
-      const res = await fetch(`${nauApiUrl}/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password }),
-      })
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        setError((body as { message?: string }).message ?? 'Registration failed')
+      const result = await registerAction(email, password, name)
+      if (!result.ok) {
+        setError(result.message)
         return
       }
-
-      const { accessToken } = (await res.json()) as { accessToken: string }
-
-      if (continueUrl) {
-        const callbackUrl = new URL(continueUrl)
-        callbackUrl.searchParams.set('token', accessToken)
-        window.location.href = callbackUrl.toString()
-      } else {
-        window.location.href = 'https://app.9nau.com'
-      }
+      window.location.href = redirectUri
     } catch {
       setError('Network error. Please try again.')
     } finally {
@@ -51,9 +38,7 @@ function RegisterForm() {
     }
   }
 
-  const loginHref = continueUrl
-    ? `/login?continue=${encodeURIComponent(continueUrl)}`
-    : '/login'
+  const loginHref = `/login?redirect_uri=${encodeURIComponent(redirectUri)}`
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[radial-gradient(circle_at_top_right,#1e1b4b,#000)] p-4">
