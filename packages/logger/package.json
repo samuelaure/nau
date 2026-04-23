@@ -1,0 +1,29 @@
+{
+  "name": "@nau/logger",
+  "version": "0.1.0",
+  "description": "Structured JSON logger for the naŭ Platform",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc --build",
+    "dev": "tsc --build --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "pino": "^9.5.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "@types/node": "^24.1.0",
+    "pino": "^9.5.0"
+  },
+  "license": "UNLICENSED"
+}

@@ -1,0 +1,53 @@
+{
+  "name": "@nau/auth",
+  "version": "0.1.0",
+  "description": "JWT verification, guards, and cookie helpers for the naŭ Platform",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./nestjs": {
+      "import": "./dist/nestjs/index.js",
+      "require": "./dist/nestjs/index.js",
+      "types": "./dist/nestjs/index.d.ts"
+    },
+    "./nextjs": {
+      "import": "./dist/nextjs/index.js",
+      "require": "./dist/nextjs/index.js",
+      "types": "./dist/nextjs/index.d.ts"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc --build",
+    "dev": "tsc --build --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@nau/types": "file:../types",
+    "jose": "^5.9.6"
+  },
+  "peerDependencies": {
+    "@nestjs/common": ">=10",
+    "@nestjs/core": ">=10",
+    "reflect-metadata": ">=0.1"
+  },
+  "peerDependenciesMeta": {
+    "@nestjs/common": { "optional": true },
+    "@nestjs/core": { "optional": true },
+    "reflect-metadata": { "optional": true }
+  },
+  "devDependencies": {
+    "@nau/types": "file:../types",
+    "@nestjs/common": "^10.0.0",
+    "@types/node": "^24.1.0",
+    "jose": "^5.9.6",
+    "typescript": "^5.8.3"
+  },
+  "license": "UNLICENSED"
+}
