@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { validateServiceKey, unauthorizedResponse } from '@/modules/shared/nau-auth'
+import { validateServiceToken, unauthorizedResponse } from '@/modules/shared/nau-auth'
 import { prisma } from '@/modules/shared/prisma'
 import { logError, logger } from '@/modules/shared/logger'
 import { resolveProvenance } from '@/modules/ideation/provenance'
@@ -25,7 +25,7 @@ const ReplicateRequestSchema = z.object({
  * Auth: NAU_SERVICE_KEY (x-nau-service-key header)
  */
 export async function POST(req: Request) {
-  if (!validateServiceKey(req)) return unauthorizedResponse()
+  if (!(await validateServiceToken(req))) return unauthorizedResponse()
 
   try {
     const body = await req.json()

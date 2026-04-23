@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { logger } from '@/lib/logger'
+import { validateServiceToken, unauthorizedResponse } from '@/modules/shared/nau-auth'
 
 export async function POST(request: NextRequest) {
-  // Auth guard
-  const authHeader = request.headers.get('authorization')
-  const expectedKey = process.env.NAU_SERVICE_KEY
-  if (!expectedKey || !authHeader || authHeader !== `Bearer ${expectedKey}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  if (!(await validateServiceToken(request))) return unauthorizedResponse()
 
   try {
     const body = await request.json()

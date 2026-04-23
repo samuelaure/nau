@@ -11,11 +11,13 @@ datasource db {
 // flownau references workspaces via workspaceId (String = 9naŭ Workspace.id)
 // and brands via brandId (String = 9naŭ Brand.id).
 
+// SocialAccount stores OAuth credentials only.
+// Identity fields (username, profileImage) are synced from 9naŭ API SocialProfile.
+// Prompt data (directorPrompt, creationPrompt) moved to 9naŭ API Prompt table.
 model SocialAccount {
   id           String        @id @default(cuid())
-  // Platform hierarchy — reference 9naŭ IDs directly (no local Workspace model)
   workspaceId  String        // 9naŭ Workspace.id
-  brandId      String?       // 9naŭ Brand.id (was nauthenticity Brand.id — now 9naŭ)
+  brandId      String?       // 9naŭ Brand.id
   platform     String        @default("instagram")
   platformId   String?
   username     String?
@@ -23,8 +25,6 @@ model SocialAccount {
   accessToken  String
   refreshToken String?
   expiresAt    DateTime?
-  directorPrompt String?     @db.Text
-  creationPrompt String?     @db.Text
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   shortCode    String?
@@ -34,11 +34,7 @@ model SocialAccount {
 
   assets                  Asset[]
   compositions            Composition[]
-  brandPersonas           BrandPersona[]
   contentIdeas            ContentIdea[]
-  ideasFrameworks         IdeasFramework[]
-  contentPrinciples       ContentCreationPrinciples[]
-  contentPlanners         ContentPlanner[]
   contentPlans            ContentPlan[]
   accountTemplateConfigs  AccountTemplateConfig[]
   templates               Template[]
@@ -150,13 +146,14 @@ enum AIModel {
   OPENAI_O1_MINI
 }
 
+// DEPRECATED: Brand-level prompts are now stored in 9naŭ API Prompt table.
+// This model is retained for backward compatibility with existing records.
+// Do not create new BrandPersona records — use 9naŭ API /prompts (PromptType = BRAND_DNA)
 model BrandPersona {
   id                      String   @id @default(cuid())
-  // Strategy now lives at Brand level, not SocialAccount level
   brandId                 String   // 9naŭ Brand.id
   workspaceId             String   // 9naŭ Workspace.id
-  // Kept for backward compat with existing data — will be phased out when all records migrated
-  accountId               String?
+  accountId               String?  // legacy — use brandId for new queries
   name                    String
   systemPrompt            String   @db.Text
   modelSelection          AIModel  @default(GROQ_LLAMA_3_3)
@@ -172,39 +169,36 @@ model BrandPersona {
   automaticAutoApprove    Boolean  @default(false)
   automaticCount          Int      @default(5)
 
-  account                 SocialAccount? @relation(fields: [accountId], references: [id], onDelete: Cascade)
   ideas                   ContentIdea[]
   compositions            Composition[]
 }
 
 model IdeasFramework {
-  id                      String   @id @default(cuid())
-  brandId                 String   // 9naŭ Brand.id
-  workspaceId             String   // 9naŭ Workspace.id
-  accountId               String?  // kept for backward compat
-  name                    String
-  systemPrompt            String   @db.Text
-  isDefault               Boolean  @default(false)
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+  id          String   @id @default(cuid())
+  brandId     String   // 9naŭ Brand.id
+  workspaceId String   // 9naŭ Workspace.id
+  accountId   String?  // legacy — use brandId for new queries
+  name        String
+  systemPrompt String  @db.Text
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  account                 SocialAccount? @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  ideas                   ContentIdea[]
-  compositions            Composition[]
+  ideas        ContentIdea[]
+  compositions Composition[]
 }
 
 model ContentCreationPrinciples {
   id           String   @id @default(cuid())
   brandId      String   // 9naŭ Brand.id
   workspaceId  String   // 9naŭ Workspace.id
-  accountId    String?  // kept for backward compat
+  accountId    String?  // legacy — use brandId for new queries
   name         String
   systemPrompt String   @db.Text
   isDefault    Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  account      SocialAccount? @relation(fields: [accountId], references: [id], onDelete: Cascade)
   ideas        ContentIdea[]
   compositions Composition[]
 }
@@ -326,8 +320,6 @@ model ContentPlanner {
   trialPostingTimes   Json          @default("[]")
   timezone            String        @default("Europe/Madrid")
   lastPostedAt        DateTime?
-
-  account             SocialAccount? @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@unique([brandId, name])
 }

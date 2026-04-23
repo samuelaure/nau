@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { validateServiceKey, unauthorizedResponse } from '@/modules/shared/nau-auth'
+import { validateServiceToken, unauthorizedResponse } from '@/modules/shared/nau-auth'
 import { prisma } from '@/modules/shared/prisma'
 import { logError } from '@/modules/shared/logger'
 
@@ -11,7 +11,7 @@ import { logError } from '@/modules/shared/logger'
  * Query params: accountId (required), status, format, limit
  */
 export async function GET(req: Request) {
-  if (!validateServiceKey(req)) {
+  if (!(await validateServiceToken(req))) {
     return unauthorizedResponse()
   }
 

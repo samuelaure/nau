@@ -26,17 +26,17 @@ export default async function WorkspaceAccountPage({
   const { tab } = await searchParams
   const activeTab = tab || 'calendar'
 
-  const account = await prisma.socialAccount.findUnique({
-    where: { id: accountId },
-    include: {
-      _count: {
-        select: { templates: true, assets: true },
+  const [account, defaultPlanner] = await Promise.all([
+    prisma.socialAccount.findUnique({
+      where: { id: accountId },
+      include: {
+        _count: { select: { templates: true, assets: true } },
       },
-      contentPlanners: { where: { isDefault: true }, take: 1 },
-    },
-  })
-
-  const defaultPlanner = account?.contentPlanners?.[0] ?? null
+    }),
+    prisma.contentPlanner.findFirst({
+      where: { accountId, isDefault: true },
+    }),
+  ])
 
   if (!account || account.workspaceId !== workspaceId) {
     notFound()

@@ -39,6 +39,9 @@
     "release": "standard-version"
   },
   "dependencies": {
+    "@nau/auth": "file:../packages/auth",
+    "@nau/sdk": "file:../packages/sdk",
+    "@nau/types": "file:../packages/types",
     "@ai-sdk/google": "^3.0.30",
     "nau-storage": "^0.1.1",
     "@paralleldrive/cuid2": "^3.3.0",

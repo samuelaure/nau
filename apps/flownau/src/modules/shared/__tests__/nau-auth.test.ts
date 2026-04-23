@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { validateCronSecret, validateServiceKey } from '../nau-auth'
+import { validateCronSecret } from '../nau-auth'
 
 describe('nau-auth', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.stubEnv('CRON_SECRET', 'super-secret-cron')
-    vi.stubEnv('NAU_SERVICE_KEY', 'super-secret-service')
+    vi.stubEnv('AUTH_SECRET', 'super-secret-auth')
   })
 
   describe('validateCronSecret()', () => {
@@ -33,20 +33,6 @@ describe('nau-auth', () => {
         headers: { authorization: 'Basic secure' },
       })
       expect(validateCronSecret(req)).toBe(false)
-    })
-  })
-
-  describe('validateServiceKey()', () => {
-    it('returns true for valid x-service-key header', () => {
-      const req = new Request('http://localhost', {
-        headers: { 'x-nau-service-key': 'super-secret-service' },
-      })
-      expect(validateServiceKey(req)).toBe(true)
-    })
-
-    it('returns false for missing header', () => {
-      const req = new Request('http://localhost')
-      expect(validateServiceKey(req)).toBe(false)
     })
   })
 })

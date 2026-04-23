@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { validateServiceKey, unauthorizedResponse } from '@/modules/shared/nau-auth'
+import { validateServiceToken, unauthorizedResponse } from '@/modules/shared/nau-auth'
 import { generateDailyPlan } from '@/modules/planning/daily-plan.service'
 import { logError } from '@/modules/shared/logger'
 
@@ -12,7 +12,7 @@ import { logError } from '@/modules/shared/logger'
  *  - reminder=true: returns condensed version with only pending items
  */
 export async function GET(req: Request, { params }: { params: Promise<{ accountId: string }> }) {
-  if (!validateServiceKey(req)) {
+  if (!(await validateServiceToken(req))) {
     return unauthorizedResponse()
   }
 

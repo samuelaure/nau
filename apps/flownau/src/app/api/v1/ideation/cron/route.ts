@@ -1,14 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateContentIdeas } from '@/modules/ideation/ideation.service'
 import { prisma } from '@/modules/shared/prisma'
+import { validateServiceToken, unauthorizedResponse } from '@/modules/shared/nau-auth'
+import { signServiceToken } from '@nau/auth'
+
+async function serviceHeaders(): Promise<Record<string, string>> {
+  const secret = process.env.AUTH_SECRET!
+  const token = await signServiceToken({ iss: 'flownau', aud: 'nauthenticity', secret })
+  return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+}
+
+async function nauApiHeaders(): Promise<Record<string, string>> {
+  const secret = process.env.AUTH_SECRET!
+  const token = await signServiceToken({ iss: 'flownau', aud: '9nau-api', secret })
+  return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+}
 
 export async function POST(request: NextRequest) {
-  // Auth guard
-  const authHeader = request.headers.get('authorization')
-  const expectedKey = process.env.NAU_SERVICE_KEY
-  if (!expectedKey || !authHeader || authHeader !== `Bearer ${expectedKey}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  if (!(await validateServiceToken(request))) return unauthorizedResponse()
 
   try {
     const body = await request.json()
@@ -18,80 +27,79 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required field: brandId' }, { status: 400 })
     }
 
-    // 1. Fetch Brand Persona, InspoItems, and brand name concurrently
-    const nauthUrl = process.env.NAUTHENTICITY_URL || 'http://nauthenticity:3000'
-    const [brandRes, inspoRes, account] = await Promise.all([
-      fetch(`${nauthUrl}/api/brands/${brandId}/intelligence`, {
-        headers: { 'x-nau-service-key': expectedKey },
-      }),
-      fetch(`${nauthUrl}/api/inspo?brandId=${brandId}&status=pending`, {
-        headers: { 'x-nau-service-key': expectedKey },
-      }),
+    const nauthUrl = process.env.NAUTHENTICITY_URL || 'http://nauthenticity:4000'
+    const [nauthHeaders, account] = await Promise.all([
+      serviceHeaders(),
       prisma.socialAccount.findFirst({ where: { brandId } }),
     ])
 
-    if (!brandRes.ok) {
-      throw new Error('Failed to fetch brand persona from nauthenticity.')
-    }
-
-    const brandData = await brandRes.json()
-    const brandName: string = account?.username ?? brandId
-    const inspoData = (inspoRes.ok ? await inspoRes.json() : []) as any[]
+    // Fetch inspo items from nauthenticity NestJS API
+    const inspoRes = await fetch(
+      `${nauthUrl}/api/v1/_service/brands/${brandId}/inspo?status=pending`,
+      { headers: nauthHeaders },
+    )
+    const inspoData = (inspoRes.ok ? await inspoRes.json() : []) as Array<{
+      id: string
+      type: string
+      note?: string
+      extractedHook?: string
+      extractedTheme?: string
+      adaptedScript?: string
+    }>
 
     if (inspoData.length === 0) {
       return NextResponse.json({ success: true, message: 'No pending InspoItems to process.' })
     }
 
-    // 2. External strategy docs injected into the ideation context
-    // TBD: fetch from dedicated ideation_context table when implemented.
+    const brandName: string = account?.username ?? brandId
 
-    // 3. Generate Ideation Brief
     const result = await generateContentIdeas({
-      brandName: brandName,
-      dna: brandData.voicePrompt,
+      brandName,
+      dna: '',
       count: 5,
       inspoItems: inspoData.map((item) => ({
         id: item.id,
         type: item.type,
-        note: item.note,
-        extractedHook: item.extractedHook,
-        extractedTheme: item.extractedTheme,
-        adaptedScript: item.adaptedScript,
-        postCaption: item.post?.caption,
-        postTranscript: item.post?.transcripts?.[0]?.text,
+        note: item.note ?? null,
+        extractedHook: item.extractedHook ?? null,
+        extractedTheme: item.extractedTheme ?? null,
+        adaptedScript: item.adaptedScript ?? null,
+        postCaption: null,
+        postTranscript: null,
       })),
-      recentContent: [], // TBD: fetch from nauthenticity Post table where status = published
+      recentContent: [],
     })
 
-    // 4. Mark items as processed in nauthenticity
-    for (const item of inspoData) {
-      await fetch(`${nauthUrl}/api/inspo/${item.id}/process`, {
-        method: 'POST',
-        headers: { 'x-nau-service-key': expectedKey },
-      })
-    }
+    // Mark inspo items as processed
+    await Promise.allSettled(
+      inspoData.map((item) =>
+        fetch(`${nauthUrl}/api/v1/_service/brands/${brandId}/inspo/${item.id}`, {
+          method: 'PATCH',
+          headers: nauthHeaders,
+          body: JSON.stringify({ status: 'processed' }),
+        }),
+      ),
+    )
 
-    // 4.5 Persist ideas as ContentIdea records in flownau
-    try {
-      if (account) {
-        const persona = await prisma.brandPersona.findFirst({ where: { accountId: account.id } })
-        const autoApprove = persona?.automaticAutoApprove ?? false
+    // Persist as ContentIdea records
+    if (account) {
+      try {
         await prisma.contentIdea.createMany({
           data: result.ideas.map((idea) => ({
             accountId: account.id,
             ideaText: `Hook: ${idea.hook}\nAngle: ${idea.angle}\nFormat: ${idea.format}\nScript: ${idea.script}\nCTA: ${idea.cta}`,
             source: 'automatic',
-            status: autoApprove ? 'APPROVED' : 'PENDING',
+            status: 'PENDING',
             priority: 3,
           })),
           skipDuplicates: true,
         })
+      } catch (e) {
+        console.warn('[Ideation Cron] Could not persist ContentIdea records', e)
       }
-    } catch (e) {
-      console.warn('[Ideation Cron] Warning: Could not persist ContentIdea records', e)
     }
 
-    // 5. Format the Brief as Markdown
+    // Format brief
     const dateStr = new Intl.DateTimeFormat('es-ES', {
       day: 'numeric',
       month: 'short',
@@ -99,7 +107,6 @@ export async function POST(request: NextRequest) {
     }).format(new Date())
     let briefMd = `📋 *Brief de Contenido — ${dateStr}*\n_Marca: ${brandName}_\n\n`
     briefMd += `*💡 RESUMEN ESTRATÉGICO*\n${result.briefSummary}\n\n`
-
     result.ideas.forEach((idea, idx) => {
       briefMd += `*IDEA ${idx + 1}: ${idea.hook}*\n`
       briefMd += `📌 *Ángulo:* ${idea.angle}\n`
@@ -107,39 +114,28 @@ export async function POST(request: NextRequest) {
       briefMd += `📝 *Script:* ${idea.script}\n`
       briefMd += `🎯 *Call to Action:* ${idea.cta}\n\n`
     })
-
     briefMd += `_Basado en: ${inspoData.length} posts de Inspo Base._`
 
-    // 6. Deliver via Zazŭ
+    // Deliver via Zazŭ
     const zazuUrl = process.env.ZAZU_INTERNAL_URL || 'http://zazu-bot:3000'
     try {
+      const zazuHeaders = await nauApiHeaders()
       await fetch(`${zazuUrl}/api/internal/notify`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${expectedKey}`,
-        },
-        body: JSON.stringify({
-          type: 'content_brief',
-          payload: {
-            brandName: brandName,
-            markdown: briefMd,
-          },
-        }),
+        headers: zazuHeaders,
+        body: JSON.stringify({ type: 'content_brief', payload: { brandName, markdown: briefMd } }),
       })
     } catch (e) {
-      console.warn('[Ideation] Warning: Could not deliver brief via Zazu', e)
+      console.warn('[Ideation] Could not deliver brief via Zazŭ', e)
     }
 
-    // 7. Save archive in 9nau (journal_summary block structure)
+    // Archive in 9naŭ API
     const nauApiUrl = process.env.NAU_INTERNAL_URL || 'http://9nau-api:3000'
     try {
-      await fetch(`${nauApiUrl}/journal/summary/direct`, {
+      const apiHeaders = await nauApiHeaders()
+      await fetch(`${nauApiUrl}/_service/journal/summary/direct`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${expectedKey}`,
-        },
+        headers: apiHeaders,
         body: JSON.stringify({
           periodType: 'daily',
           type: 'content_brief',
@@ -150,13 +146,13 @@ export async function POST(request: NextRequest) {
         }),
       })
     } catch (e) {
-      console.warn('[Ideation] Warning: Could not archive brief in 9naŭ', e)
+      console.warn('[Ideation] Could not archive brief in 9naŭ', e)
     }
 
     return NextResponse.json({ success: true, ideasGenerated: result.ideas.length })
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error)
-    console.error('[Ideation Cron] Error in brief pipeline:', msg)
+    console.error('[Ideation Cron] Error:', msg)
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { validateServiceKey, unauthorizedResponse } from '@/modules/shared/nau-auth'
+import { validateServiceToken, unauthorizedResponse } from '@/modules/shared/nau-auth'
 import { ingestExternalIdeas } from '@/modules/ideation/sources/external-source'
 import { logError } from '@/modules/shared/logger'
 
@@ -26,7 +26,7 @@ const IngestRequestSchema = z.object({
  * Auth: NAU_SERVICE_KEY
  */
 export async function POST(req: Request) {
-  if (!validateServiceKey(req)) {
+  if (!(await validateServiceToken(req))) {
     return unauthorizedResponse()
   }
 
