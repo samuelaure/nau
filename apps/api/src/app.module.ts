@@ -16,6 +16,9 @@ import { TriageModule } from './triage/triage.module';
 import { JournalModule } from './journal/journal.module';
 import { AuthModule } from './auth/auth.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
+import { BrandsModule } from './brands/brands.module';
+import { SocialProfilesModule } from './social-profiles/social-profiles.module';
+import { PromptsModule } from './prompts/prompts.module';
 import { ScheduleModule as NestScheduleModule } from '@nestjs/schedule';
 
 @Module({
@@ -38,6 +41,9 @@ import { ScheduleModule as NestScheduleModule } from '@nestjs/schedule';
     JournalModule,
     AuthModule,
     WorkspacesModule,
+    BrandsModule,
+    SocialProfilesModule,
+    PromptsModule,
   ],
   controllers: [AppController],
   providers: [

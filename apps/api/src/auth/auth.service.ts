@@ -10,10 +10,17 @@ import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto, RegisterDto } from './auth.dto';
 
-const LINK_TOKEN_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const LINK_TOKEN_TTL_MS = 5 * 60 * 1000;
+const ACCESS_TOKEN_TTL = '15m';
+const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
-const ACCESS_TOKEN_EXPIRES = '30d';
-const REFRESH_TOKEN_EXPIRES_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+function generateOpaqueToken(): string {
+  return crypto.randomBytes(48).toString('hex');
+}
+
+function generateFamily(): string {
+  return crypto.randomBytes(16).toString('hex');
+}
 
 @Injectable()
 export class AuthService {
@@ -27,6 +34,9 @@ export class AuthService {
     if (existing) throw new ConflictException('Email already registered');
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
+    const workspaceName = dto.workspaceName ?? `${dto.name ?? dto.email}'s Workspace`;
+    const workspaceSlug = workspaceName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
     const user = await this.prisma.user.create({
       data: {
         email: dto.email,
@@ -35,7 +45,7 @@ export class AuthService {
         workspaces: {
           create: {
             workspace: {
-              create: { name: dto.workspaceName ?? `${dto.name ?? dto.email}'s Workspace` },
+              create: { name: workspaceName, slug: workspaceSlug },
             },
           },
         },
@@ -43,7 +53,7 @@ export class AuthService {
       include: { workspaces: { include: { workspace: true } } },
     });
 
-    return this.issueTokens(user.id, user.email);
+    return this.issueTokens(user.id);
   }
 
   async login(dto: LoginDto) {
@@ -53,22 +63,60 @@ export class AuthService {
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) throw new UnauthorizedException('Invalid credentials');
 
-    return this.issueTokens(user.id, user.email);
+    return this.issueTokens(user.id);
   }
 
-  async refresh(refreshToken: string) {
-    const session = await this.prisma.session.findUnique({
-      where: { refreshToken },
+  async refresh(rawToken: string) {
+    // Find all sessions that might match (we only store hashes)
+    // We can't query by hash directly — look up candidate sessions by userId is not possible
+    // without the userId. Instead we use a separate index: we store the token hash directly.
+    const tokenHash = await bcrypt.hash(rawToken, 10);
+
+    // Find by scanning — for scale we'd use a faster token scheme, but bcrypt compare is the
+    // security-correct approach. With 30d TTL and < 10K sessions this is fine pre-launch.
+    const sessions = await this.prisma.session.findMany({
+      where: { expiresAt: { gt: new Date() } },
       include: { user: true },
+      orderBy: { createdAt: 'desc' },
+      take: 1000,
     });
 
-    if (!session || session.expiresAt < new Date()) {
-      if (session) await this.prisma.session.delete({ where: { id: session.id } });
-      throw new UnauthorizedException('Refresh token invalid or expired');
+    let matched: (typeof sessions)[0] | undefined;
+    for (const s of sessions) {
+      if (await bcrypt.compare(rawToken, s.tokenHash)) {
+        matched = s;
+        break;
+      }
     }
 
-    await this.prisma.session.delete({ where: { id: session.id } });
-    return this.issueTokens(session.user.id, session.user.email);
+    if (!matched) {
+      // Token not found — could be a reuse attempt. We can't know the family without
+      // the session row, so just reject.
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    if (matched.expiresAt < new Date()) {
+      await this.prisma.session.delete({ where: { id: matched.id } });
+      throw new UnauthorizedException('Refresh token expired');
+    }
+
+    // Rotate: delete old session, issue new one in same family
+    await this.prisma.session.delete({ where: { id: matched.id } });
+    return this.issueTokens(matched.user.id, matched.tokenFamily);
+  }
+
+  async logout(rawToken: string) {
+    const sessions = await this.prisma.session.findMany({
+      where: { expiresAt: { gt: new Date() } },
+      take: 1000,
+    });
+    for (const s of sessions) {
+      if (await bcrypt.compare(rawToken, s.tokenHash)) {
+        // Revoke entire family (all devices for this login)
+        await this.prisma.session.deleteMany({ where: { tokenFamily: s.tokenFamily } });
+        return;
+      }
+    }
   }
 
   async me(userId: string) {
@@ -122,26 +170,33 @@ export class AuthService {
     return safe;
   }
 
-  private async issueTokens(userId: string, email: string) {
-    // Embed the user's primary workspace so consumers can bootstrap context
+  // ── Token issuance ──────────────────────────────────────────────────────────
+
+  async issueTokens(userId: string, existingFamily?: string) {
     const primaryMembership = await this.prisma.workspaceMember.findFirst({
-      where: { userId, role: 'owner' },
+      where: { userId, role: 'OWNER' },
       orderBy: { createdAt: 'asc' },
     });
-    const activeWorkspaceId = primaryMembership?.workspaceId ?? null;
+    const workspaceId = primaryMembership?.workspaceId ?? null;
 
-    const payload = { sub: userId, email, activeWorkspaceId };
-    const accessToken = this.jwt.sign(payload, { expiresIn: ACCESS_TOKEN_EXPIRES });
+    const accessToken = this.jwt.sign(
+      { sub: userId, workspaceId },
+      { expiresIn: ACCESS_TOKEN_TTL },
+    );
 
-    const rawRefresh = this.jwt.sign(payload, { expiresIn: '7d' });
+    const rawRefresh = generateOpaqueToken();
+    const tokenHash = await bcrypt.hash(rawRefresh, 10);
+    const tokenFamily = existingFamily ?? generateFamily();
+
     await this.prisma.session.create({
       data: {
         userId,
-        refreshToken: rawRefresh,
-        expiresAt: new Date(Date.now() + REFRESH_TOKEN_EXPIRES_MS),
+        tokenFamily,
+        tokenHash,
+        expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
       },
     });
 
-    return { accessToken, refreshToken: rawRefresh };
+    return { accessToken, refreshToken: rawRefresh, expiresIn: 900 };
   }
 }

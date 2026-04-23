@@ -1,34 +1,31 @@
-import {
-  Injectable,
-  CanActivate,
-  ExecutionContext,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
+import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { verifyAccessToken, extractBearerToken, AuthError, COOKIE_ACCESS_TOKEN } from '@nau/auth';
+import type { AccessTokenPayload } from '@nau/types';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-  constructor(
-    private readonly jwt: JwtService,
-    private readonly config: ConfigService,
-  ) {}
+  constructor(private readonly config: ConfigService) {}
 
-  canActivate(context: ExecutionContext): boolean {
-    const request = context.switchToHttp().getRequest<{ headers: Record<string, string>; user?: unknown }>();
-    const header = request.headers['authorization'] ?? '';
-    const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const req = context.switchToHttp().getRequest<{
+      cookies?: Record<string, string>
+      headers: Record<string, string | undefined>
+      user?: AccessTokenPayload
+    }>();
 
-    if (!token) throw new UnauthorizedException('Missing JWT token');
+    const cookieToken = req.cookies?.[COOKIE_ACCESS_TOKEN];
+    const bearerToken = extractBearerToken(req.headers['authorization']);
+    const token = cookieToken ?? bearerToken;
+
+    if (!token) throw new UnauthorizedException('Missing access token');
 
     try {
-      const payload = this.jwt.verify(token, {
-        secret: this.config.get<string>('AUTH_SECRET'),
-      });
-      request.user = payload;
+      req.user = await verifyAccessToken(token, this.config.getOrThrow<string>('AUTH_SECRET'));
       return true;
-    } catch {
-      throw new UnauthorizedException('Invalid or expired token');
+    } catch (err) {
+      if (err instanceof AuthError) throw new UnauthorizedException(err.message);
+      throw new UnauthorizedException('Invalid token');
     }
   }
 }

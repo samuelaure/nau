@@ -1,20 +1,27 @@
-import {
-  Injectable,
-  CanActivate,
-  ExecutionContext,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { extractBearerToken, verifyServiceToken, AuthError } from '@nau/auth';
+import type { ServiceTokenPayload } from '@nau/types';
 
 @Injectable()
 export class ServiceAuthGuard implements CanActivate {
-  canActivate(context: ExecutionContext): boolean {
-    const request = context.switchToHttp().getRequest();
-    const serviceKey = request.headers['x-nau-service-key'];
+  constructor(private readonly config: ConfigService) {}
 
-    if (!serviceKey || serviceKey !== process.env.NAU_SERVICE_KEY) {
-      throw new UnauthorizedException('Invalid service key');
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const req = context.switchToHttp().getRequest<{
+      headers: Record<string, string | undefined>
+      serviceClient?: ServiceTokenPayload
+    }>();
+
+    const token = extractBearerToken(req.headers['authorization']);
+    if (!token) throw new UnauthorizedException('Missing service token');
+
+    try {
+      req.serviceClient = await verifyServiceToken(token, this.config.getOrThrow<string>('AUTH_SECRET'));
+      return true;
+    } catch (err) {
+      if (err instanceof AuthError) throw new UnauthorizedException(err.message);
+      throw new UnauthorizedException('Invalid service token');
     }
-
-    return true;
   }
 }

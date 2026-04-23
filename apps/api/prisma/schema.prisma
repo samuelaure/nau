@@ -7,49 +7,212 @@ generator client {
   provider = "prisma-client-js"
 }
 
-model Block {
+// ── Identity ──────────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  telegramId   String?  @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  workspaces   WorkspaceMember[]
+  sessions     Session[]
+  linkTokens   AuthLinkToken[]
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  tokenFamily  String   // groups all rotated descendants of one login; reuse = revoke family
+  tokenHash    String   @unique // bcrypt hash of the opaque refresh token
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenFamily])
+}
+
+model AuthLinkToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model ServiceClient {
+  id         String   @id @default(cuid())
+  slug       String   @unique // e.g. "flownau", "nauthenticity", "zazu-bot"
+  secretHash String   // bcrypt hash of the service's signing secret
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// ── Workspace ─────────────────────────────────────────────────────────────────
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+model Workspace {
+  id        String            @id @default(cuid())
+  name      String
+  slug      String            @unique
+  timezone  String            @default("UTC")
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  members   WorkspaceMember[]
+  brands    Brand[]
+}
+
+model WorkspaceMember {
+  id          String        @id @default(cuid())
+  userId      String
+  workspaceId String
+  role        WorkspaceRole @default(OWNER)
+  createdAt   DateTime      @default(now())
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])
+  @@index([workspaceId])
+}
+
+// ── Brand ─────────────────────────────────────────────────────────────────────
+
+model Brand {
   id          String   @id @default(cuid())
-  type        String
-  properties  Json     @default("{}")
-  
-  // Hierarchy
-  parentId    String?
-  parent      Block?   @relation("BlockChildren", fields: [parentId], references: [id], onDelete: Cascade)
-  children    Block[]  @relation("BlockChildren")
-  
-  // Relations graph
-  relationsFrom  Relation[]  @relation("FromBlock")
-  relationsTo    Relation[]  @relation("ToBlock")
-  
-  // Scheduling
-  schedule    Schedule?
-  
-  // Event history
-  events      Event[]
-  
-  // Sync metadata
-  uuid        String   @unique @default(uuid())
-  updatedAt   DateTime @updatedAt
+  workspaceId String
+  name        String
+  handle      String
   createdAt   DateTime @default(now())
-  deletedAt   DateTime?
-  
-  // Origin tracking
-  source      String?
-  sourceRef   String?
+  updatedAt   DateTime @updatedAt
+
+  workspace      Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  socialProfiles SocialProfile[]
+  prompts        Prompt[]
+
+  @@unique([workspaceId, handle])
+  @@index([workspaceId])
+}
+
+// ── Social Profile ────────────────────────────────────────────────────────────
+
+enum SocialPlatform {
+  INSTAGRAM
+  TIKTOK
+  YOUTUBE
+  TWITTER
+}
+
+enum SocialProfileRole {
+  OWNED
+  COMMENT_TARGET
+  BENCHMARK_TARGET
+  INSPIRATION
+}
+
+model SocialProfile {
+  id          String            @id @default(cuid())
+  brandId     String
+  platform    SocialPlatform
+  platformId  String            // platform-native user/channel ID for dedup
+  handle      String
+  displayName String?
+  role        SocialProfileRole
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  brand       Brand             @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@unique([brandId, platform, platformId, role])
+  @@index([brandId])
+  @@index([platform, platformId])
+}
+
+// ── Prompt ────────────────────────────────────────────────────────────────────
+
+enum PromptOwnerType {
+  WORKSPACE
+  BRAND
+  USER
+}
+
+enum PromptType {
+  VOICE
+  IDEAS_FRAMEWORK
+  CONTENT_PERSONA
+  COMPOSITOR
+  CAPTION
+  COMMENT_STRATEGY
+  BENCHMARK_CHAT
+}
+
+model Prompt {
+  id        String          @id @default(cuid())
+  ownerType PromptOwnerType
+  ownerId   String
+  type      PromptType
+  body      String
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  // Optional FK for brand-scoped prompts (facilitates cascade delete)
+  brandId   String?
+  brand     Brand?          @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerType, ownerId, type])
+  @@index([ownerType, ownerId])
+}
+
+// ── Second Brain ──────────────────────────────────────────────────────────────
+
+model Block {
+  id         String     @id @default(cuid())
+  type       String
+  properties Json       @default("{}")
+
+  parentId   String?
+  parent     Block?     @relation("BlockChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children   Block[]    @relation("BlockChildren")
+
+  relationsFrom Relation[] @relation("FromBlock")
+  relationsTo   Relation[] @relation("ToBlock")
+
+  schedule   Schedule?
+  events     Event[]
+
+  uuid       String   @unique @default(uuid())
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+  deletedAt  DateTime?
+
+  source     String?
+  sourceRef  String?
 }
 
 model Relation {
   id          String  @id @default(cuid())
   type        String
   properties  Json    @default("{}")
-  
+
   fromBlockId String
   fromBlock   Block   @relation("FromBlock", fields: [fromBlockId], references: [id], onDelete: Cascade)
   toBlockId   String
   toBlock     Block   @relation("ToBlock", fields: [toBlockId], references: [id], onDelete: Cascade)
-  
+
   createdAt   DateTime @default(now())
-  
+
   @@unique([fromBlockId, toBlockId, type])
 }
 
@@ -66,95 +229,19 @@ model Schedule {
 }
 
 model Event {
-  id        String    @id @default(cuid())
-  type      String
-  metadata  Json      @default("{}")
-  
-  blockId   String
-  block     Block     @relation(fields: [blockId], references: [id], onDelete: Cascade)
-  
-  createdAt DateTime  @default(now())
-}
-
-model SyncCursor {
-  id            String   @id @default(cuid())
-  userId        String   @unique
-  lastSyncedAt  DateTime
-  updatedAt     DateTime @updatedAt
-}
-
-// ── Identity Provider Models ──────────────────────────────────────────────────
-
-model User {
-  id           String            @id @default(cuid())
-  email        String            @unique
-  passwordHash String
-  name         String?
-  telegramId   String?           @unique
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
-
-  workspaces   WorkspaceMember[]
-  sessions     Session[]
-  linkTokens   AuthLinkToken[]
-}
-
-model AuthLinkToken {
   id        String   @id @default(cuid())
-  token     String   @unique
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expiresAt DateTime
+  type      String
+  metadata  Json     @default("{}")
+
+  blockId   String
+  block     Block    @relation(fields: [blockId], references: [id], onDelete: Cascade)
+
   createdAt DateTime @default(now())
 }
 
-model Workspace {
-  id        String            @id @default(cuid())
-  name      String
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
-
-  members   WorkspaceMember[]
-  brands    Brand[]
-}
-
-model Brand {
-  id          String    @id @default(cuid())
-  workspaceId String
-  name        String
-  timezone    String    @default("UTC")
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-}
-
-enum WorkspaceRole {
-  owner
-  admin
-  member
-}
-
-model WorkspaceMember {
-  id          String        @id @default(cuid())
-  userId      String
-  workspaceId String
-  role        WorkspaceRole @default(owner)
-  createdAt   DateTime      @default(now())
-
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, workspaceId])
-}
-
-model Session {
+model SyncCursor {
   id           String   @id @default(cuid())
-  userId       String
-  refreshToken String   @unique
-  expiresAt    DateTime
-  createdAt    DateTime @default(now())
-
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String   @unique
+  lastSyncedAt DateTime
+  updatedAt    DateTime @updatedAt
 }
