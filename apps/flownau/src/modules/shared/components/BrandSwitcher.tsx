@@ -25,7 +25,7 @@ export function BrandSwitcher() {
   const activeBrandId = searchParams.get('brandId')
 
   useEffect(() => {
-    fetch(`${NAU_API_URL}/workspaces`, { credentials: 'include' })
+    fetch('/api/workspaces')
       .then((r) => (r.ok ? r.json() : []))
       .then((data: NauWorkspace[]) => setWorkspaces(data))
       .catch(() => {})

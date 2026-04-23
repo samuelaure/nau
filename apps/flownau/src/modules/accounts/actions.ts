@@ -58,7 +58,9 @@ const AUDIO_TYPES = ['audio/mpeg', 'audio/wav', 'audio/aac', 'audio/ogg', 'audio
 
 /** Quick Setup: create a named brand in 9naŭ without requiring an Instagram connection. */
 export async function addBrand(formData: FormData) {
-  const { workspaceId } = await getUserPrimaryWorkspace()
+  const explicitWorkspaceId = (formData.get('workspaceId') as string | null) || null
+  const { workspaceId: primaryWorkspaceId } = await getUserPrimaryWorkspace()
+  const workspaceId = explicitWorkspaceId ?? primaryWorkspaceId
   const name = (formData.get('brandName') as string | null)?.trim()
   if (!name) throw new Error('Brand name is required')
 

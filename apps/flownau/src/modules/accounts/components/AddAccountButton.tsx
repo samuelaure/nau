@@ -43,6 +43,7 @@ export default function AddAccountButton({
 
   const handleQuickSubmit = async (formData: FormData) => {
     setError(null)
+    if (workspaceId) formData.append('workspaceId', workspaceId)
     startTransition(async () => {
       try {
         await addBrand(formData)
