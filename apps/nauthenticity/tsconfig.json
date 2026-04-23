@@ -1,16 +1,21 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
+    "target": "ES2021",
     "module": "commonjs",
-    "lib": ["ES2020"],
+    "lib": ["ES2021"],
     "outDir": "./dist",
     "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "incremental": true,
+    "sourceMap": true
   },
-  "include": ["src/**/*", "temp/reset_and_ingest.ts"],
+  "include": ["src/main.ts", "src/nest/**/*"],
   "exclude": ["node_modules", "dist"]
 }

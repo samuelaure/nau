@@ -1,82 +1,65 @@
 {
   "name": "nauthenticity",
-  "version": "1.13.3",
-  "description": "**naŭthenticity** is an AI-powered content intelligence engine that turns Instagram profiles into structured, searchable knowledge. It extracts posts, transcribes media, analyzes hooks, pillars, and strategy, then builds a vectorized brain to generate high-performing content in the creator’s style.",
-  "main": "index.js",
+  "version": "2.0.0",
+  "description": "Brand intelligence service — scraping, transcription, semantic search, InspoBase, comment suggestions",
+  "main": "dist/main.js",
   "private": true,
   "engines": {
     "node": ">=20.0.0"
   },
   "scripts": {
-    "verify": "npm run format && npm run lint && npm run type-check && npm run test",
-    "build": "tsc",
-    "start": "node dist/app.js",
-    "dev": "nodemon --exec ts-node src/app.ts",
-    "format": "prettier --write .",
+    "build": "nest build",
+    "start": "node dist/main",
+    "start:dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch",
     "lint": "eslint src --ext .ts",
     "type-check": "tsc --noEmit",
-    "test": "jest",
-    "test:watch": "jest --watch",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "ts-node src/db/seed.ts",
-    "migrate:r2": "ts-node src/scripts/migrate-to-r2.ts",
-    "release": "standard-version"
+    "test": "jest"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/samuelaure/nauthenticity.git"
-  },
-  "keywords": [],
-  "author": {
-    "name": "Samuel Aure",
-    "url": "https://www.samuelaure.com"
-  },
-  "license": "Proprietary",
-  "bugs": {
-    "url": "https://github.com/samuelaure/nauthenticity/issues"
-  },
-  "homepage": "https://github.com/samuelaure/nauthenticity#readme",
   "dependencies": {
-    "nau-storage": "^0.1.1",
-    "@fastify/cors": "^11.2.0",
-    "@fastify/rate-limit": "^10.3.0",
-    "@fastify/static": "^9.0.0",
+    "@nau/auth": "file:../packages/auth",
+    "@nau/types": "file:../packages/types",
+    "@nau/logger": "file:../packages/logger",
+    "@nau/sdk": "file:../packages/sdk",
+    "@nestjs/bullmq": "^11.0.4",
+    "@nestjs/common": "^10.0.0",
+    "@nestjs/config": "^3.2.2",
+    "@nestjs/core": "^10.0.0",
+    "@nestjs/platform-express": "^10.0.0",
+    "@nestjs/schedule": "^6.1.1",
     "@prisma/client": "^5.22.0",
-    "@types/jsonwebtoken": "^9.0.10",
     "apify-client": "^2.22.0",
     "bullmq": "^5.67.2",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.2",
+    "cookie-parser": "^1.4.7",
     "date-fns-tz": "^3.2.0",
-    "dotenv": "^17.2.3",
-    "fastify": "^5.7.2",
     "fluent-ffmpeg": "^2.1.3",
     "ioredis": "^5.9.2",
-    "jsonwebtoken": "^9.0.3",
-    "node-cron": "^4.2.1",
+    "nau-storage": "^0.1.1",
     "openai": "^6.16.0",
-    "pino": "^10.3.1",
-    "zod": "^4.3.6"
+    "reflect-metadata": "^0.2.0",
+    "rxjs": "^7.8.1",
+    "zod": "^3.23.8"
   },
   "prisma": {
     "schema": "src/db/schema.prisma"
   },
   "devDependencies": {
+    "@nestjs/cli": "^10.0.0",
+    "@nestjs/schematics": "^10.0.0",
+    "@nestjs/testing": "^10.0.0",
+    "@types/cookie-parser": "^1.4.7",
     "@types/fluent-ffmpeg": "^2.1.28",
-    "@types/jest": "^30.0.0",
-    "@types/node": "^25.0.10",
-    "@types/node-cron": "^3.0.11",
-    "@typescript-eslint/eslint-plugin": "^8.54.0",
-    "@typescript-eslint/parser": "^8.54.0",
+    "@types/jest": "^29.5.12",
+    "@types/node": "^24.1.0",
     "eslint": "^9.39.2",
-    "eslint-config-prettier": "^10.1.8",
-    "jest": "^30.2.0",
-    "nodemon": "^3.1.11",
-    "prettier": "^3.8.1",
+    "jest": "^29.7.0",
     "prisma": "5.22.0",
-    "rimraf": "^6.1.2",
-    "standard-version": "^9.5.0",
-    "ts-jest": "^29.4.6",
+    "ts-jest": "^29.1.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.8.3"
   }
 }
