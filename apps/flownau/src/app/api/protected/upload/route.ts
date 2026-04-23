@@ -166,7 +166,12 @@ export async function POST(req: NextRequest) {
     }
 
     // 7. Build R2 key using canonical path builders
-    const assetFolder = type === 'VID' ? 'videos' as const : type === 'AUD' ? 'audios' as const : 'images' as const
+    const assetFolder =
+      type === 'VID'
+        ? ('videos' as const)
+        : type === 'AUD'
+          ? ('audios' as const)
+          : ('images' as const)
     const r2Key = contextAccountId
       ? flownau.accountAsset(contextAccountId, assetFolder, assetId, finalExt)
       : flownau.templateAsset(templateId || 'global', assetId, finalExt)

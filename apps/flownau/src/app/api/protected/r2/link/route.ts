@@ -49,7 +49,9 @@ export async function POST(req: NextRequest) {
       } else if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
         // Skip if a matching video exists (it's a thumbnail)
         const baseName = obj.key.substring(0, obj.key.lastIndexOf('.'))
-        const hasMatchingVideo = ['mp4', 'mov', 'webm'].some((vExt) => keySet.has(`${baseName}.${vExt}`))
+        const hasMatchingVideo = ['mp4', 'mov', 'webm'].some((vExt) =>
+          keySet.has(`${baseName}.${vExt}`),
+        )
         if (hasMatchingVideo) continue
 
         type = 'IMG'

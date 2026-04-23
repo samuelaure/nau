@@ -97,12 +97,15 @@ describe('compose()', () => {
     })
   })
 
-  it('throws when no Brand Persona is found for account', async () => {
+  it('uses platform default when no Brand Persona is found for account', async () => {
     ;(prisma.brandPersona.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(null)
+    vi.stubEnv('GROQ_API_KEY', 'test-groq-key')
+    mockGroqCreate.mockResolvedValue({
+      choices: [{ message: { content: JSON.stringify(validCreativeDirection) } }],
+    })
 
-    await expect(
-      compose({ ideaText: 'test idea', accountId: 'account-1', format: 'reel' }),
-    ).rejects.toThrow(/No Brand Persona found/)
+    const result = await compose({ ideaText: 'test idea', accountId: 'account-1', format: 'reel' })
+    expect(result.personaName).toBe('Platform Default')
   })
 
   it('returns CreativeDirection via Groq path when Groq model is selected', async () => {

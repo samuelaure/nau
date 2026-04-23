@@ -52,7 +52,7 @@ describe('fetchBrandDigest()', () => {
     const result = await fetchBrandDigest(brandId)
     expect(result).toEqual(mockDigest)
     expect(axios.get).toHaveBeenCalledWith(
-      expect.stringContaining('/inspo/digest'),
+      expect.stringContaining('/api/inspo/digest'),
       expect.objectContaining({
         params: { brandId },
         headers: { 'x-nau-service-key': mockKey },
@@ -65,7 +65,7 @@ describe('fetchBrandDigest()', () => {
 
     await fetchBrandDigest(brandId)
 
-    expect(axios.get).toHaveBeenCalledWith(`${mockUrl}/inspo/digest`, expect.anything())
+    expect(axios.get).toHaveBeenCalledWith(`${mockUrl}/api/inspo/digest`, expect.anything())
   })
 
   it('returns null and warns on ECONNREFUSED', async () => {
