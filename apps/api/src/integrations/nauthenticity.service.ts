@@ -1,135 +1,92 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import axios from 'axios';
+import { signServiceToken } from '@nau/auth';
 
 @Injectable()
 export class NauthenticityService {
   private readonly logger = new Logger(NauthenticityService.name);
   private readonly baseUrl: string;
-  private readonly serviceKey: string;
+  private readonly authSecret: string;
 
   constructor(private configService: ConfigService) {
     this.baseUrl = this.configService.get<string>(
       'NAUTHENTICITY_URL',
       'http://nauthenticity:4000',
     );
-    this.serviceKey = this.configService.get<string>('NAU_SERVICE_KEY') || '';
+    this.authSecret = this.configService.getOrThrow<string>('AUTH_SECRET');
   }
 
-  private get headers() {
-    return {
-      'x-nau-service-key': this.serviceKey,
-    };
+  private async serviceHeaders(): Promise<Record<string, string>> {
+    const token = await signServiceToken({
+      iss: '9nau-api',
+      aud: 'nauthenticity',
+      secret: this.authSecret,
+    });
+    return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  }
+
+  private async fetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+    const headers = await this.serviceHeaders();
+    const res = await fetch(`${this.baseUrl}/api/v1${path}`, {
+      ...options,
+      headers: { ...headers, ...(options.headers as Record<string, string> | undefined) },
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`nauthenticity ${options.method ?? 'GET'} ${path} → ${res.status}: ${text}`);
+    }
+    return res.json() as Promise<T>;
   }
 
   async addTargets(brandId: string, usernames: string[]) {
-    this.logger.log(
-      `Adding targets to Nauthenticity for brand ${brandId}: ${usernames.join(', ')}`,
-    );
-    try {
-      const response = await axios.post(
-        `${this.baseUrl}/targets`,
-        { brandId, usernames },
-        { headers: this.headers },
-      );
-      return response.data;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Failed to add targets: ${message}`);
-      throw error;
-    }
+    this.logger.log(`Starting scraping runs for brand ${brandId}: ${usernames.join(', ')}`);
+    return this.fetch('/_service/scraping/runs', {
+      method: 'POST',
+      body: JSON.stringify({ brandId, targets: usernames }),
+    });
   }
 
-  async generateComment(targetUrl: string, brandId: string) {
-    this.logger.log(
-      `Generating reactive comment for ${targetUrl} (Brand: ${brandId})`,
-    );
-    try {
-      const response = await axios.post(
-        `${this.baseUrl}/generate-comment`,
-        { targetUrl, brandId },
-        { headers: this.headers },
-      );
-      return response.data;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Failed to generate comment: ${message}`);
-      throw error;
-    }
+  async generateComment(postUrl: string, brandId: string) {
+    this.logger.log(`Generating comment for ${postUrl} (brand: ${brandId})`);
+    return this.fetch<{ suggestions: string[] }>(`/_service/brands/${brandId}/generate-comment`, {
+      method: 'POST',
+      body: JSON.stringify({ postUrl }),
+    });
   }
 
-  async getBrands(userId: string) {
-    this.logger.log(`Fetching brands for user: ${userId}`);
-    try {
-      const response = await axios.get(
-        `${this.baseUrl}/brands`,
-        {
-          params: { userId },
-          headers: this.headers
-        },
-      );
-      return response.data;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Failed to fetch brands: ${message}`);
-      return [];
-    }
+  async getBrandsForWorkspace(_workspaceId: string): Promise<Array<{ id: string; brandName: string; voicePrompt: string }>> {
+    // Brand data is now owned by 9naŭ API — this method is a no-op
+    return [];
   }
 
-  /**
-   * Fetches ultra-light Brand DNA for all brands in a workspace.
-   * Used by triage AI routing when no explicit brandId is provided.
-   */
-  async getBrandsForWorkspace(workspaceId: string): Promise<Array<{ id: string; brandName: string; voicePrompt: string }>> {
-    try {
-      const response = await axios.get(
-        `${this.baseUrl}/service/brands`,
-        {
-          params: { workspaceId },
-          headers: this.headers,
-        },
-      );
-      return response.data;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Failed to fetch brands for workspace ${workspaceId}: ${message}`);
-      return [];
-    }
+  async getBrandDnaLight(_brandId: string): Promise<{ id: string; brandName: string; voicePrompt: string; workspaceId: string } | null> {
+    // Brand data is now owned by 9naŭ API — callers should query BrandsService directly
+    return null;
   }
 
-  /**
-   * Fetches ultra-light Brand DNA for a single brand.
-   */
-  async getBrandDnaLight(brandId: string): Promise<{ id: string; brandName: string; voicePrompt: string; workspaceId: string } | null> {
-    try {
-      const response = await axios.get(
-        `${this.baseUrl}/brands/${brandId}/dna-light`,
-        { headers: this.headers },
-      );
-      return response.data;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Failed to fetch dna-light for brand ${brandId}: ${message}`);
-      return null;
-    }
+  async syncBrandStructuralData(_brandId: string, _data: { workspaceId?: string }) {
+    // No-op: brand ownership has moved to 9naŭ API; nauthenticity no longer stores brand metadata
   }
 
-  /**
-   * Syncs structural changes (like workspaceId) to nauthenticity's operational routing copy.
-   */
-  async syncBrandStructuralData(brandId: string, data: { workspaceId?: string }) {
-    this.logger.log(`Syncing structural data for brand ${brandId} to Nauthenticity`);
-    try {
-      await axios.patch(
-        `${this.baseUrl}/service/brands/${brandId}`,
-        data,
-        { headers: this.headers },
-      );
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Failed to sync structural data to nauthenticity: ${message}`);
-      // We don't throw here to avoid blocking the master update if the secondary sync fails,
-      // but in a more robust system we'd queue this for retry.
-    }
+  async getInspoItems(brandId: string, filters?: { type?: string; status?: string }) {
+    const params = new URLSearchParams();
+    if (filters?.type) params.set('type', filters.type);
+    if (filters?.status) params.set('status', filters.status);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    return this.fetch(`/_service/brands/${brandId}/inspo${qs}`);
+  }
+
+  async createInspoItem(brandId: string, data: { sourceUrl?: string; type: string; note?: string }) {
+    return this.fetch(`/_service/brands/${brandId}/inspo`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateInspoItem(brandId: string, id: string, data: { note?: string; status?: string; extractedHook?: string; extractedTheme?: string }) {
+    return this.fetch(`/_service/brands/${brandId}/inspo/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
   }
 }
