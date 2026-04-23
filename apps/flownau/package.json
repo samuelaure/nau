@@ -40,7 +40,7 @@
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.30",
-    "nau-storage": "^0.1.0",
+    "nau-storage": "^0.1.1",
     "@paralleldrive/cuid2": "^3.3.0",
     "@prisma/adapter-pg": "^7.3.0",
     "@prisma/client": "^7.3.0",
