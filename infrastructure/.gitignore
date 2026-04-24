@@ -1,0 +1,6 @@
+# Traefik TLS certificate store — contains private keys, never commit
+gateway/acme.json
+
+# Local env overrides
+.env
+.env.local

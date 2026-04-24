@@ -1,0 +1,20 @@
+services:
+  whisper:
+    image: onerahmet/openai-whisper-asr-webservice:latest
+    container_name: nau-whisper
+    environment:
+      - ASR_MODEL=${WHISPER_MODEL:-small}
+      - ASR_ENGINE=openai_whisper
+    ports:
+      - "8000:9000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.whisper.rule=Host(`whisper.localhost`)"
+      - "traefik.http.routers.whisper.entrypoints=web"
+      - "traefik.http.services.whisper.loadbalancer.server.port=9000"
+    networks:
+      - nau-network
+
+networks:
+  nau-network:
+    external: true
