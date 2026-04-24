@@ -2,12 +2,13 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api-client'
-import type { Workspace, Brand, WorkspaceMember, CreateBrandDto, UpdateBrandDto } from '@9nau/types'
+import type { Workspace, Brand, WorkspaceMember, CreateBrandDto, UpdateBrandDto, WorkspaceRole } from '@9nau/types'
 
+export type WorkspaceWithRole = Workspace & { role: WorkspaceRole }
 export type { Workspace, Brand, WorkspaceMember }
 
 export const useGetWorkspaces = () =>
-  useQuery<Workspace[]>({
+  useQuery<WorkspaceWithRole[]>({
     queryKey: ['workspaces'],
     queryFn: () => apiClient.get('/workspaces'),
   })

@@ -145,7 +145,7 @@ export class JournalService {
           const result = await llmClient.parseCompletion({
             model: llmModel,
             temperature: 0.2,
-          schema: JournalSummarySchema,
+          schema: JournalSummarySchema as any,
           schemaName: 'JournalSummary',
           messages: [
             {
@@ -169,7 +169,7 @@ LENGTH: ${periodType === 'daily' ? 'Brief (1-2 paragraphs)' : periodType === 'ye
             }
           ],
           });
-          aiResult = result.data;
+          aiResult = result.data as JournalSummaryOutput;
         } catch (err) {
           this.logger.error('Error calling LLM for hierarchical summary', err);
         }

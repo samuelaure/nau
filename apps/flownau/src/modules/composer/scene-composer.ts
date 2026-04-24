@@ -207,5 +207,5 @@ async function callAI(
     schemaName: 'CreativeDirection',
     timeoutMs: provider === 'openai' ? 60_000 : 30_000,
   })
-  return result.data
+  return result.data as CreativeDirection
 }

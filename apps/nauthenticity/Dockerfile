@@ -1,27 +1,43 @@
-FROM node:20-slim
+FROM node:20-slim AS builder
 
-WORKDIR /app
-
-# Install dependencies for media processing and Prisma
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     openssl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY package*.json ./
-RUN npm ci
+RUN corepack enable && corepack prepare pnpm@10.14.0 --activate
 
-# Copy all source
-COPY . .
-
-# Build Dashboard
-WORKDIR /app/dashboard
-RUN npm install
-RUN npm run build
-
-# Back to root and build Backend
 WORKDIR /app
-RUN npx prisma generate
-RUN npm run build
 
-CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]
+COPY pnpm-lock.yaml ./
+COPY pnpm-workspace.yaml ./
+COPY package.json ./
+COPY turbo.json ./
+COPY tsconfig.base.json ./
+
+COPY packages ./packages
+COPY apps/nauthenticity ./apps/nauthenticity
+
+RUN pnpm install --frozen-lockfile
+
+WORKDIR /app/apps/nauthenticity
+RUN npx prisma generate
+
+WORKDIR /app
+RUN pnpm build --filter=nauthenticity
+
+FROM node:20-slim AS runner
+
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    openssl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN corepack enable && corepack prepare pnpm@10.14.0 --activate
+
+WORKDIR /app
+COPY --from=builder /app ./
+
+ENV NODE_ENV=production
+
+CMD ["sh", "-c", "cd apps/nauthenticity && npx prisma migrate deploy && node dist/main"]

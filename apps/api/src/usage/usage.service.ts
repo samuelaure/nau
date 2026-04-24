@@ -59,13 +59,13 @@ export class UsageService {
         quantity: dto.quantity,
         unit: dto.unit,
         costUsd: dto.costUsd,
-        metadata: dto.metadata ?? {},
+        metadata: (dto.metadata ?? {}) as any,
       },
     });
   }
 
   async recordBatch(events: CreateUsageEventDto[]) {
-    return this.prisma.usageEvent.createMany({ data: events });
+    return this.prisma.usageEvent.createMany({ data: events as any });
   }
 
   async getSummary(params: UsageSummaryParams) {

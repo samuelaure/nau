@@ -20,7 +20,7 @@ import {
   useAddMember,
   useRemoveMember,
 } from '@/hooks/use-workspaces-api'
-import type { Workspace, Brand, WorkspaceMember } from '@/hooks/use-workspaces-api'
+import type { WorkspaceWithRole, Brand, WorkspaceMember } from '@/hooks/use-workspaces-api'
 
 export default function PlatformSettingsPage() {
   const { data: workspaces, isLoading } = useGetWorkspaces()
@@ -92,7 +92,7 @@ function WorkspaceCard({
   activeTab,
   onTabChange,
 }: {
-  workspace: Workspace
+  workspace: WorkspaceWithRole
   isExpanded: boolean
   onToggle: () => void
   activeTab: 'brands' | 'members'

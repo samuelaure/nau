@@ -129,5 +129,5 @@ Return valid JSON matching the schema.`,
     timeoutMs: 60_000,
   })
 
-  return result.data
+  return result.data as IdeationOutput
 }

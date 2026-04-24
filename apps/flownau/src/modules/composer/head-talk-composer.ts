@@ -57,5 +57,5 @@ Write in the brand's natural language (typically Spanish unless otherwise specif
     timeoutMs: 30_000,
   })
 
-  return result.data
+  return result.data as HeadTalkOutput
 }
