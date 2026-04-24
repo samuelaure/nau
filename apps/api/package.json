@@ -30,8 +30,8 @@
   },
   "dependencies": {
     "@9nau/types": "workspace:^",
-    "@nau/auth": "file:../../../packages/auth",
-    "@nau/types": "file:../../../packages/types",
+    "@nau/auth": "workspace:*",
+    "@nau/types": "workspace:*",
     "@aws-sdk/client-s3": "^3.1032.0",
     "@nestjs/bullmq": "^11.0.4",
     "@nestjs/common": "^10.0.0",
