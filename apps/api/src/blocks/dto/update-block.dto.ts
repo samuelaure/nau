@@ -1,5 +1,5 @@
 import { IsObject, IsOptional, IsString } from 'class-validator';
-import { UpdateBlockDto as IUpdateBlockDto } from '@9nau/types';
+import { UpdateBlockDto as IUpdateBlockDto } from '@nau/types';
 
 /**
  * Data Transfer Object for updating an existing Block.

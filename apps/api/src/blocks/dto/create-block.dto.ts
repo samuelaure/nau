@@ -1,5 +1,5 @@
 import { IsNotEmpty, IsString, IsObject, IsOptional } from 'class-validator';
-import { CreateBlockDto as ICreateBlockDto } from '@9nau/types';
+import { CreateBlockDto as ICreateBlockDto } from '@nau/types';
 
 /**
  * Data Transfer Object for creating a new Block.

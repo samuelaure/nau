@@ -31,7 +31,7 @@ describe('AllExceptionsFilter', () => {
     };
     const mockHost = {
       switchToHttp: () => mockCtx,
-    } as ArgumentsHost;
+    } as unknown as ArgumentsHost;
 
     const exception = new HttpException('Test error', HttpStatus.BAD_REQUEST);
 

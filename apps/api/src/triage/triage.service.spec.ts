@@ -145,8 +145,8 @@ describe('TriageService', () => {
     nauthenticityService.getBrandsForWorkspace.mockResolvedValue([]);
     flownauService.resolveAccountByBrandId.mockResolvedValue('acc-123');
     blocksService.findAll.mockResolvedValue([]);
-    blocksService.create.mockResolvedValue(makeBlock());
-    blocksService.update.mockResolvedValue(makeBlock());
+    blocksService.create.mockResolvedValue(makeBlock() as any);
+    blocksService.update.mockResolvedValue(makeBlock() as any);
   });
 
   afterEach(() => {
@@ -168,7 +168,7 @@ describe('TriageService', () => {
       mockParse.mockResolvedValueOnce({
         choices: [{ message: { parsed: contentIdeaTriageResult } }],
       });
-      blocksService.create.mockResolvedValueOnce(makeBlock({ id: 'idea-block-1' }));
+      blocksService.create.mockResolvedValueOnce(makeBlock({ id: 'idea-block-1' }) as any);
 
       await service.processRawText('Create a reel about productivity hacks', 'user-123');
 
@@ -183,7 +183,7 @@ describe('TriageService', () => {
         choices: [{ message: { parsed: contentIdeaTriageResult } }],
       });
       const ideaBlock = makeBlock({ id: 'idea-block-2' });
-      blocksService.create.mockResolvedValueOnce(ideaBlock);
+      blocksService.create.mockResolvedValueOnce(ideaBlock as any);
       flownauService.ingestIdeas.mockResolvedValueOnce(undefined);
 
       await service.processRawText('some text', 'user-123');
@@ -199,7 +199,7 @@ describe('TriageService', () => {
         choices: [{ message: { parsed: contentIdeaTriageResult } }],
       });
       const ideaBlock = makeBlock({ id: 'idea-block-3' });
-      blocksService.create.mockResolvedValueOnce(ideaBlock);
+      blocksService.create.mockResolvedValueOnce(ideaBlock as any);
       flownauService.ingestIdeas.mockRejectedValueOnce(new Error('ECONNREFUSED'));
 
       // Should NOT throw — fault-tolerance requirement
@@ -217,7 +217,7 @@ describe('TriageService', () => {
       mockParse.mockResolvedValueOnce({
         choices: [{ message: { parsed: actionTriageResult } }],
       });
-      blocksService.create.mockResolvedValue(makeBlock({ type: 'action' }));
+      blocksService.create.mockResolvedValue(makeBlock({ type: 'action' }) as any);
 
       await service.processRawText('Send the report by Friday', 'user-123');
 
@@ -239,7 +239,7 @@ describe('TriageService', () => {
       mockParse.mockResolvedValueOnce({
         choices: [{ message: { parsed: noBrandResult } }],
       });
-      blocksService.create.mockResolvedValue(makeBlock());
+      blocksService.create.mockResolvedValue(makeBlock() as any);
 
       await service.processRawText('generic idea', 'user-123');
 
@@ -250,7 +250,7 @@ describe('TriageService', () => {
       mockParse.mockResolvedValueOnce({
         choices: [{ message: { parsed: contentIdeaTriageResult } }],
       });
-      blocksService.create.mockResolvedValueOnce(makeBlock({ id: 'idea-block-4' }));
+      blocksService.create.mockResolvedValueOnce(makeBlock({ id: 'idea-block-4' }) as any);
 
       await service.processRawText('some idea', 'user-123');
 
