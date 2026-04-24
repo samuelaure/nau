@@ -1,6 +1,4 @@
-import OpenAI from 'openai'
-import { Groq } from 'groq-sdk'
-import { zodResponseFormat } from 'openai/helpers/zod'
+import { createLLMClient, type LLMClient } from '@nau/llm-client'
 import { prisma } from '@/modules/shared/prisma'
 import { resolveModelId } from '@/modules/composer/model-resolver'
 import { getSetting } from '@/modules/shared/settings'
@@ -199,81 +197,28 @@ async function callAI(
 ): Promise<CreativeDirection> {
   if (provider === 'openai') {
     if (!openaiKey) throw new Error('OPENAI_API_KEY is not configured')
-    const openai = new OpenAI({ apiKey: openaiKey })
-
-    // The OpenAI SDK types beta.chat.completions.parse as returning any.
-    // We accept that here and validate the parsed value with Zod immediately after.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const completion: any = await openai.chat.completions.parse(
-      {
-        model,
-        temperature: 0.7,
-        messages,
-        response_format: zodResponseFormat(CreativeDirectionSchema, 'CreativeDirection'),
-      },
-      { timeout: 60000 },
-    )
-
-    const parsed: unknown = completion.choices[0]?.message?.parsed
-    if (!parsed) throw new Error('OpenAI returned empty parsed response')
-
-    // Validate with Zod
-    return CreativeDirectionSchema.parse(parsed)
-  }
-
-  // Groq fallback — no structured outputs, parse JSON manually
-  if (!groqKey) throw new Error('GROQ_API_KEY is not configured')
-  const groq = new Groq({ apiKey: groqKey })
-
-  const completion = await groq.chat.completions.create(
-    {
+    const llm: LLMClient = createLLMClient({ provider: 'openai', apiKey: openaiKey })
+    const result = await llm.parseCompletion({
       model,
       temperature: 0.7,
-      messages: [
-        ...messages,
-        {
-          role: 'user',
-          content:
-            'Respond with ONLY valid JSON matching the CreativeDirection schema. No markdown, no explanation.',
-        },
-      ],
-    },
-    { timeout: 30_000 },
-  )
-
-  const raw = completion.choices[0]?.message?.content?.trim()
-  if (!raw) throw new Error('Groq returned empty response')
-
-  // Extract JSON from potential markdown code blocks
-  const jsonStr = raw
-    .replace(/```json?\n?/g, '')
-    .replace(/```/g, '')
-    .trim()
-
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(jsonStr)
-  } catch (parseErr) {
-    throw new Error(
-      `[SceneComposer] Groq returned invalid JSON: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}. Raw: ${jsonStr.slice(0, 200)}`,
-    )
+      messages,
+      schema: CreativeDirectionSchema,
+      schemaName: 'CreativeDirection',
+      timeoutMs: 60_000,
+    })
+    return result.data
   }
 
-  // Normalize: unwrap array wrapper if the model returned [{...}] instead of {...}
-  if (Array.isArray(parsed)) {
-    parsed = parsed[0]
-  }
-
-  // Normalize: unwrap nested keys the model may use (e.g. { creative_direction: {...} })
-  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-    const obj = parsed as Record<string, unknown>
-    if (!obj.scenes && !obj.caption) {
-      const firstVal = Object.values(obj)[0]
-      if (firstVal && typeof firstVal === 'object' && !Array.isArray(firstVal)) {
-        parsed = firstVal
-      }
-    }
-  }
-
-  return CreativeDirectionSchema.parse(parsed)
+  // Groq fallback
+  if (!groqKey) throw new Error('GROQ_API_KEY is not configured')
+  const llm: LLMClient = createLLMClient({ provider: 'groq', apiKey: groqKey })
+  const result = await llm.parseCompletion({
+    model,
+    temperature: 0.7,
+    messages,
+    schema: CreativeDirectionSchema,
+    schemaName: 'CreativeDirection',
+    timeoutMs: 30_000,
+  })
+  return result.data
 }

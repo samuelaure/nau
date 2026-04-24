@@ -40,6 +40,7 @@
   },
   "dependencies": {
     "@nau/auth": "workspace:*",
+    "@nau/llm-client": "workspace:*",
     "@nau/sdk": "workspace:*",
     "@nau/types": "workspace:*",
     "@ai-sdk/google": "^3.0.30",

@@ -274,16 +274,15 @@ const transcribeVideo = async (
 };
 
 const createEmbedding = async (text: string, transcriptId: string): Promise<void> => {
-  const { OpenAI } = await import('openai');
-  const openai = new OpenAI({ apiKey: config.openai.apiKey });
+  const { createDefaultLLMClient } = await import('@nau/llm-client');
+  const llm = createDefaultLLMClient();
 
-  const response = await openai.embeddings.create({
+  const result = await llm.createEmbedding({
     model: 'text-embedding-3-small',
     input: text.replace(/\n/g, ' '),
-    encoding_format: 'float',
   });
 
-  const embedding = response.data[0].embedding;
+  const embedding = result.embedding;
 
   await prisma.$executeRaw`
     INSERT INTO "Embedding" ("id", "transcriptId", "vector", "model", "createdAt")

@@ -2,8 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
-import OpenAI from 'openai';
-import { zodResponseFormat } from 'openai/helpers/zod';
+import { createDefaultLLMClient, type LLMClient } from '@nau/llm-client';
 import { z } from 'zod';
 import { BlocksService } from '../blocks/blocks.service';
 import dayjs from 'dayjs';
@@ -20,18 +19,17 @@ type JournalSummaryOutput = z.infer<typeof JournalSummarySchema>;
 @Injectable()
 export class JournalService {
   private readonly logger = new Logger(JournalService.name);
-  private openai: OpenAI | null = null;
+  private llm: LLMClient | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly blocksService: BlocksService,
   ) {
-    const apiKey = this.configService.get('OPENAI_API_KEY');
-    if (apiKey) {
-      this.openai = new OpenAI({ apiKey });
-    } else {
-      this.logger.warn('OPENAI_API_KEY not found. Journal summaries AI generation is disabled.');
+    try {
+      this.llm = createDefaultLLMClient();
+    } catch {
+      this.logger.warn('LLM client not configured. Journal AI summaries are disabled.');
     }
   }
 
@@ -148,25 +146,27 @@ export class JournalService {
       highlights: [] 
     };
 
-    if (this.openai) {
+    if (this.llm) {
       try {
-        const completion = await (this.openai.beta as any).chat.completions.parse({
+        const result = await this.llm.parseCompletion({
           model: 'gpt-4o',
           temperature: 0.2,
+          schema: JournalSummarySchema,
+          schemaName: 'JournalSummary',
           messages: [
             {
               role: 'system',
-              content: `You are an AI Second Brain architect creating a ${periodType} review. 
+              content: `You are an AI Second Brain architect creating a ${periodType} review.
 Your output MUST contain two distinct parts:
 1. **Synthesis**: The "Soul" of the period. A deep, high-level interpretation of what these experiences mean, mood trajectory, recurring patterns, and overall impact. Prioritize this in position.
 2. **Summary**: The "Body". An objective, structured recount of what actually happened, tasks completed, metrics, and facts.
 
 RECURSIVE LOGIC:
-You are provided with both "Inferior Summaries" (condensed knowledge from smaller periods) and "Raw Data" (individual events). 
+You are provided with both "Inferior Summaries" (condensed knowledge from smaller periods) and "Raw Data" (individual events).
 Use the Inferior Summaries as your primary cognitive anchor to avoid getting lost in noise, while using Raw Data to extract specific flavor and evidence.
 
-TONE: Reflective, elite, concise yet profound. 
-LANGUAGE: Spanish (predominantly). 
+TONE: Reflective, elite, concise yet profound.
+LANGUAGE: Spanish (predominantly).
 LENGTH: ${periodType === 'daily' ? 'Brief (1-2 paragraphs)' : periodType === 'yearly' ? 'Comprehensive (4-5 paragraphs)' : 'Balanced (2-3 paragraphs)'}.`
             },
             {
@@ -174,15 +174,10 @@ LENGTH: ${periodType === 'daily' ? 'Brief (1-2 paragraphs)' : periodType === 'ye
               content: contextText
             }
           ],
-          response_format: zodResponseFormat(JournalSummarySchema, 'JournalSummary'),
         });
-
-        const parsed = completion.choices[0].message.parsed;
-        if (parsed) {
-          aiResult = parsed as JournalSummaryOutput;
-        }
+        aiResult = result.data;
       } catch (err) {
-        this.logger.error('Error calling openai for hierarchical summary', err);
+        this.logger.error('Error calling LLM for hierarchical summary', err);
       }
     }
 

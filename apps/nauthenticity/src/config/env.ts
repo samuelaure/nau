@@ -12,6 +12,8 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().min(1),
   TRANSCRIPTION_URL: z.string().url().optional(),
   NAU_SERVICE_KEY: z.string().default('development_key'),
+  NAU_API_URL: z.string().url().optional(),
+  AUTH_SECRET: z.string().min(32).optional(),
   JWT_SECRET: z.string().default('changeme'),
   ZAZU_URL: z.string().default('http://zazu:3000'),
   R2_ACCESS_KEY_ID: z.string().optional(),

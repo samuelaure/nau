@@ -245,3 +245,34 @@ model SyncCursor {
   lastSyncedAt DateTime
   updatedAt    DateTime @updatedAt
 }
+
+
+// ── Usage Tracking ────────────────────────────────────────────────────────────
+
+model UsageEvent {
+  id          String   @id @default(cuid())
+
+  workspaceId String
+  brandId     String?
+  userId      String?
+
+  service     String   // "api" | "flownau" | "nauthenticity" | "zazu-bot"
+  operation   String   // "chat_completion" | "embedding" | "transcription" | "apify_scrape"
+  model       String?  // "gpt-4o" | "text-embedding-3-small" | "whisper-1" | null
+  provider    String?  // "openai" | "groq" | "apify" | null
+
+  promptTokens     Int?
+  completionTokens Int?
+  totalTokens      Int?
+  quantity         Float?   // units consumed (e.g. characters, pages, API calls)
+  unit             String?  // "tokens" | "characters" | "calls"
+  costUsd          Float?   // estimated cost in USD
+
+  metadata    Json     @default("{}")
+
+  createdAt   DateTime @default(now())
+
+  @@index([workspaceId, createdAt])
+  @@index([brandId, createdAt])
+  @@index([service, operation, createdAt])
+}

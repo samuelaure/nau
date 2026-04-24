@@ -1,8 +1,13 @@
 import crypto from 'node:crypto'
 
 const ALGORITHM = 'aes-256-cbc'
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'default-encryption-key-32-chars-!!' // Should be 32 chars
 const IV_LENGTH = 16
+
+const _rawKey = process.env.ENCRYPTION_KEY
+if (!_rawKey) {
+  throw new Error('ENCRYPTION_KEY environment variable is required')
+}
+const ENCRYPTION_KEY = _rawKey
 
 export function encrypt(text: string): string {
   const iv = crypto.randomBytes(IV_LENGTH)

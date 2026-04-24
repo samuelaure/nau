@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import OpenAI from 'openai'
+import { createDefaultLLMClient, type LLMClient } from '@nau/llm-client'
 import { PrismaService } from '../prisma/prisma.service'
 import { GenerateCommentDto, CommentFeedbackDto } from './benchmark.dto'
 
@@ -9,13 +9,13 @@ const DEFAULT_VOICE = `You are an authentic, engaging brand on social media. Wri
 @Injectable()
 export class BenchmarkService {
   private readonly logger = new Logger(BenchmarkService.name)
-  private readonly openai: OpenAI
+  private readonly llm: LLMClient
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
   ) {
-    this.openai = new OpenAI({ apiKey: this.config.getOrThrow('OPENAI_API_KEY') })
+    this.llm = createDefaultLLMClient()
   }
 
   async generateComments(brandId: string, dto: GenerateCommentDto): Promise<{ suggestions: string[] }> {
@@ -32,15 +32,14 @@ export class BenchmarkService {
       'Generate 3 distinct comment suggestions. Return JSON: { "comments": ["...", "...", "..."] }',
     ].filter(Boolean)
 
-    const response = await this.openai.chat.completions.create({
+    const result = await this.llm.chatCompletion({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: parts.join('\n\n') }],
-      response_format: { type: 'json_object' },
-      max_tokens: 400,
+      responseFormat: { type: 'json_object' },
+      maxTokens: 400,
     })
 
-    const raw = response.choices[0]?.message?.content ?? '{}'
-    const parsed = JSON.parse(raw) as { comments?: string[] }
+    const parsed = JSON.parse(result.content) as { comments?: string[] }
     const suggestions = parsed.comments ?? []
 
     this.logger.log(`Generated ${suggestions.length} comments for brand ${brandId}`)

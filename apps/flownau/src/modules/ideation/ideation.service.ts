@@ -1,6 +1,5 @@
-import OpenAI from 'openai'
+import { createDefaultLLMClient, type LLMClient } from '@nau/llm-client'
 import { z } from 'zod'
-import { zodResponseFormat } from 'openai/helpers/zod'
 
 const IdeationOutputSchema = z.object({
   ideas: z.array(
@@ -53,12 +52,7 @@ interface InspoItemInput {
 }
 
 export async function generateContentIdeas(req: GenerationRequest): Promise<IdeationOutput> {
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) {
-    throw new Error('OPENAI_API_KEY is not configured. Cannot generate content ideas.')
-  }
-
-  const openai = new OpenAI({ apiKey })
+  const llm: LLMClient = createDefaultLLMClient()
 
   let contextBlock = ''
 
@@ -105,14 +99,15 @@ export async function generateContentIdeas(req: GenerationRequest): Promise<Idea
     contextBlock += '\n'
   }
 
-  const completion = await openai.chat.completions.parse(
-    {
-      model: 'gpt-4o',
-      temperature: 0.7,
-      messages: [
-        {
-          role: 'system',
-          content: `You are the Content Ideation Engine for "${req.brandName}".
+  const result = await llm.parseCompletion({
+    model: 'gpt-4o',
+    temperature: 0.7,
+    schema: IdeationOutputSchema,
+    schemaName: 'IdeationOutput',
+    messages: [
+      {
+        role: 'system',
+        content: `You are the Content Ideation Engine for "${req.brandName}".
 Generate exactly ${req.count} fresh, high-quality content ideas.
 
 RULES:
@@ -125,21 +120,14 @@ RULES:
 7. Write scripts in the brand's natural language (typically Spanish).
 
 Return valid JSON matching the schema.`,
-        },
-        {
-          role: 'user',
-          content: contextBlock,
-        },
-      ],
-      response_format: zodResponseFormat(IdeationOutputSchema, 'IdeationOutput'),
-    },
-    { timeout: 60_000 },
-  )
+      },
+      {
+        role: 'user',
+        content: contextBlock,
+      },
+    ],
+    timeoutMs: 60_000,
+  })
 
-  const parsed = completion.choices[0].message.parsed
-  if (!parsed) {
-    throw new Error('Failed to parse ideation AI response.')
-  }
-
-  return parsed as IdeationOutput
+  return result.data
 }

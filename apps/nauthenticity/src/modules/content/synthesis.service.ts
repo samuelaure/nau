@@ -1,8 +1,9 @@
-import OpenAI from 'openai';
+import { createDefaultLLMClient, type LLMClient, reportUsage } from '@nau/llm-client';
 import { z } from 'zod';
 import { prisma } from '../../db/prisma';
 import { config } from '../../config';
 import { logger } from '../../utils/logger';
+import { estimateCostUsd } from '@nau/config';
 
 // ---------------------------------------------------------------------------
 // Output schemas
@@ -31,39 +32,51 @@ export interface BrandDigest {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function getOpenAI(): OpenAI {
-  if (!config.openai.apiKey) {
-    throw new Error('[SynthesisService] OPENAI_API_KEY is not configured.');
-  }
-  return new OpenAI({ apiKey: config.openai.apiKey });
+function getLLM(): LLMClient {
+  return createDefaultLLMClient();
 }
 
 async function runSynthesisLLM(
   systemPrompt: string,
   userContent: string,
+  brandId?: string,
 ): Promise<SynthesisOutput> {
-  const openai = getOpenAI();
+  const llm = getLLM();
+  const model = 'gpt-4o';
 
-  const completion = await openai.chat.completions.create({
-    model: 'gpt-4o',
+  const result = await llm.chatCompletion({
+    model,
     temperature: 0.7,
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userContent },
     ],
-    response_format: { type: 'json_object' },
+    responseFormat: { type: 'json_object' },
   });
 
-  const content = completion.choices[0]?.message?.content;
-  if (!content) {
-    throw new Error('[SynthesisService] OpenAI returned an empty synthesis response.');
+  if (brandId && config.env.NAU_API_URL && config.env.AUTH_SECRET) {
+    const { signServiceToken } = await import('@nau/auth')
+    signServiceToken({ secret: config.env.AUTH_SECRET, iss: 'nauthenticity', aud: 'api' })
+      .then((token) => {
+        reportUsage({
+          apiUrl: config.env.NAU_API_URL!,
+          serviceToken: token,
+          workspaceId: '',
+          brandId,
+          service: 'nauthenticity',
+          operation: 'chat_completion',
+          usage: result.usage,
+          costUsd: estimateCostUsd(model, result.usage.promptTokens, result.usage.completionTokens),
+        })
+      })
+      .catch(() => { /* silent */ })
   }
 
   try {
-    const parsed = JSON.parse(content);
+    const parsed = JSON.parse(result.content);
     return SynthesisOutputSchema.parse(parsed);
-  } catch (err: any) {
-    logger.error(`[SynthesisService] Failed to parse LLM output: ${content}`, err);
+  } catch (err: unknown) {
+    logger.error(`[SynthesisService] Failed to parse LLM output: ${result.content}`, err);
     throw new Error('[SynthesisService] LLM response was not valid JSON.');
   }
 }
@@ -106,7 +119,7 @@ Return the synthesis text, the Instagram URLs of posts that most influenced this
 
   userContent += `Synthesize the above into a new, evolved Global creative direction for "${brandId}".`;
 
-  const result = await runSynthesisLLM(systemPrompt, userContent);
+  const result = await runSynthesisLLM(systemPrompt, userContent, brandId);
   return { content: result.content, attachedUrls: result.attachedUrls };
 }
 
@@ -171,7 +184,7 @@ Identify which specific post URLs most influenced this direction and include the
 
   userContent += `Generate a fresh Recent Synthesis for "${brandId}" that reflects current creative momentum.`;
 
-  const result = await runSynthesisLLM(systemPrompt, userContent);
+  const result = await runSynthesisLLM(systemPrompt, userContent, brandId);
   return { content: result.content, attachedUrls: result.attachedUrls };
 }
 

@@ -1,53 +1,36 @@
-import OpenAI, { toFile } from 'openai';
-import fs from 'fs';
-import axios from 'axios';
-import path from 'path';
-import { logger } from './lib/logger';
+import { createDefaultLLMClient, toFile, type LLMClient } from '@nau/llm-client'
+import axios from 'axios'
+import { logger } from './lib/logger'
 
-/**
- * Service to handle media-to-text transformation.
- * Specifically handles downloading and transcribing Telegram voice-notes via OpenAI Whisper.
- */
 export class VoiceService {
-  private openai: OpenAI;
+  private llm: LLMClient
 
   constructor() {
-    this.openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
+    this.llm = createDefaultLLMClient()
   }
 
-  /**
-   * Transcribes a remotely hosted audio file.
-   * @param fileUrl URL of the audio file to transcribe.
-   * @param fileName Generic name for the file buffer (e.g., 'voice.ogg').
-   * @returns Transcribed text.
-   */
   async transcribe(fileUrl: string, fileName: string = 'voice.ogg'): Promise<string> {
     try {
-      // Download file to a buffer or temporary storage. 
-      // For simplicity and to avoid complex FS operations in high-throughput, we'll download to buffer.
       const response = await axios({
         method: 'GET',
         url: fileUrl,
         responseType: 'arraybuffer',
-      });
+      })
 
-      const buffer = Buffer.from(response.data);
-      
-      // OpenAI SDK supports `toFile` for passing buffers as file-like objects for Whisper.
-      const transcription = await this.openai.audio.transcriptions.create({
-        file: await toFile(buffer, fileName),
-        model: 'whisper-1',
-        language: 'es', // Preferred language for Zazŭ
-      });
+      const buffer = Buffer.from(response.data)
+      const file = await toFile(buffer, fileName)
 
-      return transcription.text;
+      const result = await this.llm.transcribe({
+        model: process.env.LLM_TRANSCRIPTION_MODEL ?? 'whisper-1',
+        file,
+        language: 'es',
+      })
+      return result.text
     } catch (error) {
-      logger.error({ err: error }, 'Voice transcription failed');
-      throw new Error('No pude transcribir tu audio. Revisa mi clave de OpenAI o intenta de nuevo.');
+      logger.error({ err: error }, 'Voice transcription failed')
+      throw new Error('No pude transcribir tu audio. Revisa mi clave de OpenAI o intenta de nuevo.')
     }
   }
 }
 
-export const voiceService = new VoiceService();
+export const voiceService = new VoiceService()

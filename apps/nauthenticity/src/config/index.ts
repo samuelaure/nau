@@ -24,6 +24,8 @@ export const config = {
   },
   nauServiceKey: env.NAU_SERVICE_KEY,
   jwtSecret: env.JWT_SECRET,
+  nauApiUrl: env.NAU_API_URL,
+  authSecret: env.AUTH_SECRET,
   paths: {
     temp: './temp',
     storage: './storage',

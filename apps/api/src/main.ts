@@ -1,5 +1,6 @@
 import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { Logger } from '@nestjs/common';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
@@ -8,6 +9,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   // Enable graceful shutdown hooks (onModuleDestroy, onApplicationShutdown)
   app.enableShutdownHooks();
+  app.use(helmet());
 
   const httpAdapter = app.get(HttpAdapterHost);
   app.useGlobalFilters(new AllExceptionsFilter(httpAdapter));

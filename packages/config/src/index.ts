@@ -34,3 +34,27 @@ export const baseNextSchema = z.object({
 })
 
 export { z }
+
+// ── LLM cost rates (USD per 1M tokens) ─────────────────────────────────────
+// Source: OpenAI pricing page (2025-04). Update as pricing changes.
+
+export const UNIT_COSTS: Record<string, { inputPer1M: number; outputPer1M: number }> = {
+  'gpt-4o': { inputPer1M: 2.5, outputPer1M: 10.0 },
+  'gpt-4o-2024-08-06': { inputPer1M: 2.5, outputPer1M: 10.0 },
+  'gpt-4o-mini': { inputPer1M: 0.15, outputPer1M: 0.6 },
+  'text-embedding-3-small': { inputPer1M: 0.02, outputPer1M: 0 },
+  'text-embedding-3-large': { inputPer1M: 0.13, outputPer1M: 0 },
+  'whisper-1': { inputPer1M: 0, outputPer1M: 0 }, // billed per minute, not tokens
+}
+
+export function estimateCostUsd(
+  model: string,
+  promptTokens: number,
+  completionTokens: number,
+): number | undefined {
+  const rates = UNIT_COSTS[model]
+  if (!rates) return undefined
+  return (
+    (promptTokens * rates.inputPer1M + completionTokens * rates.outputPer1M) / 1_000_000
+  )
+}

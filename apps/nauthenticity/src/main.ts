@@ -1,5 +1,6 @@
 import { NestFactory, HttpAdapterHost } from '@nestjs/core'
 import { Logger } from '@nestjs/common'
+import helmet from 'helmet'
 import { AppModule } from './nest/app.module'
 import { AllExceptionsFilter } from './nest/common/filters/all-exceptions.filter'
 
@@ -7,6 +8,7 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap')
   const app = await NestFactory.create(AppModule)
   app.enableShutdownHooks()
+  app.use(helmet())
   app.setGlobalPrefix('api/v1', { exclude: ['health'] })
 
   const httpAdapter = app.get(HttpAdapterHost)

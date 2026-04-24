@@ -19,7 +19,10 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
 import { BrandsModule } from './brands/brands.module';
 import { SocialProfilesModule } from './social-profiles/social-profiles.module';
 import { PromptsModule } from './prompts/prompts.module';
+import { UsageModule } from './usage/usage.module';
 import { ScheduleModule as NestScheduleModule } from '@nestjs/schedule';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 
 @Module({
   imports: [
@@ -28,6 +31,10 @@ import { ScheduleModule as NestScheduleModule } from '@nestjs/schedule';
       envFilePath: [`.env.${process.env.NODE_ENV ?? 'development'}.local`, `.env.${process.env.NODE_ENV ?? 'development'}`, '.env.local', '.env'],
     }),
     NestScheduleModule.forRoot(),
+    ThrottlerModule.forRoot([
+      { name: 'short', ttl: 1000, limit: 20 },
+      { name: 'medium', ttl: 60_000, limit: 200 },
+    ]),
     PrismaModule,
     BlocksModule,
     HealthModule,
@@ -44,6 +51,7 @@ import { ScheduleModule as NestScheduleModule } from '@nestjs/schedule';
     BrandsModule,
     SocialProfilesModule,
     PromptsModule,
+    UsageModule,
   ],
   controllers: [AppController],
   providers: [
@@ -51,6 +59,10 @@ import { ScheduleModule as NestScheduleModule } from '@nestjs/schedule';
     {
       provide: APP_PIPE,
       useClass: ValidationPipe,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
     },
   ],
 })
