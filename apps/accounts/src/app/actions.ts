@@ -71,7 +71,7 @@ async function callAuthEndpoint(
 }
 
 // Minimal Set-Cookie string parser for Next.js cookies().set()
-function parseSetCookie(header: string): Parameters<Awaited<ReturnType<typeof cookies>>['set']>[0] {
+function parseSetCookie(header: string): { name: string; value: string; [key: string]: unknown } {
   const [nameValue, ...attrs] = header.split(';').map((s) => s.trim())
   const eqIdx = nameValue.indexOf('=')
   const name = nameValue.slice(0, eqIdx)

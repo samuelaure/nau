@@ -20,7 +20,9 @@
     "types": ["jest", "@testing-library/jest-dom"],
     "incremental": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@9nau/ui": ["../../packages/nau-ui/src/index.ts"],
+      "@9nau/ui/*": ["../../packages/nau-ui/src/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

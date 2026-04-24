@@ -1,9 +1,11 @@
 const handler = {
-  get: () => noopFn,
-  construct: () => proxy,
-  apply: () => proxy,
+  get(target, prop) {
+    if (prop === '__esModule') return true;
+    if (prop === 'default') return proxy;
+    return proxy;
+  },
+  apply() { return proxy; },
+  construct() { return proxy; },
 };
-function noopFn() { return proxy; }
-const proxy = new Proxy(noopFn, handler);
+const proxy = new Proxy(function () {}, handler);
 module.exports = proxy;
-module.exports.default = proxy;
