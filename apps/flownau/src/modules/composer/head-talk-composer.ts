@@ -38,7 +38,7 @@ export async function composeHeadTalk(input: HeadTalkInput): Promise<HeadTalkOut
   const result = await llm.parseCompletion({
     model,
     temperature: 0.6,
-    schema: HeadTalkOutputSchema,
+    schema: HeadTalkOutputSchema as any,
     schemaName: 'HeadTalkOutput',
     messages: [
       {

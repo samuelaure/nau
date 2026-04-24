@@ -55,7 +55,7 @@ export async function runPlannerStrategist(input: StrategistInput): Promise<stri
     const result = await llm.parseCompletion({
       model,
       temperature: 0.3,
-      schema: StrategistOutputSchema,
+      schema: StrategistOutputSchema as any,
       schemaName: 'StrategistOutput',
       messages: [
         {

@@ -102,7 +102,7 @@ export async function generateContentIdeas(req: GenerationRequest): Promise<Idea
   const result = await llm.parseCompletion({
     model,
     temperature: 0.7,
-    schema: IdeationOutputSchema,
+    schema: IdeationOutputSchema as any,
     schemaName: 'IdeationOutput',
     messages: [
       {

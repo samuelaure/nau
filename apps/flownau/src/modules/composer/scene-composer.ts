@@ -203,7 +203,7 @@ async function callAI(
     model,
     temperature: 0.7,
     messages,
-    schema: CreativeDirectionSchema,
+    schema: CreativeDirectionSchema as any,
     schemaName: 'CreativeDirection',
     timeoutMs: provider === 'openai' ? 60_000 : 30_000,
   })
