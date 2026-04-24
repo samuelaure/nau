@@ -16,8 +16,8 @@
     "incremental": true,
     "paths": {
       "@/*": ["./src/*"],
-      "@9nau/ui": ["../../packages/ui/src/index.ts"],
-      "@9nau/ui/*": ["../../packages/ui/src/*"]
+      "@9nau/ui": ["../../packages/nau-ui/src/index.ts"],
+      "@9nau/ui/*": ["../../packages/nau-ui/src/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

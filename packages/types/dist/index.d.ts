@@ -148,6 +148,11 @@ export interface AuthTokensResponse {
     accessToken: string;
     expiresIn: number;
 }
+export interface CreateBlockDto {
+    type: string;
+    parentId?: string | null;
+    properties: Record<string, unknown>;
+}
 export interface PaginatedResponse<T> {
     data: T[];
     total: number;

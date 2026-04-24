@@ -9,7 +9,7 @@ export async function downloadAndUploadProfileImage(
   try {
     const response = await axios.get(imageUrl, { responseType: 'arraybuffer' })
     const buffer = Buffer.from(response.data)
-    const contentType: string = response.headers['content-type'] || 'image/jpeg'
+    const contentType: string = (response.headers['content-type'] as string) || 'image/jpeg'
 
     const ext = extFromMime(contentType) || 'jpg'
     const key = flownau.profileAvatar(userId, ext)
