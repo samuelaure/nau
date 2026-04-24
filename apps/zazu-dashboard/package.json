@@ -9,6 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@nau/auth": "file:../../../packages/auth",
+    "@nau/types": "file:../../../packages/types",
     "@twa-dev/sdk": "^8.0.2",
     "jose": "^5.0.0",
     "@zazu/db": "*",
