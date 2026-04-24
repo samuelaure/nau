@@ -1,12 +1,35 @@
+# Dependencies
 node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
 dist/
 .next/
-*.local
+out/
+build/
+*.tsbuildinfo
+
+# Environment files — never commit secrets
 .env
 .env.*
 !.env.example
-*.log
-.turbo/
-coverage/
-.DS_Store
+
+# Traefik TLS certs
 acme.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs
+*.log
+logs/
+
+# pnpm
+.pnpm-store/
+
+# Turbo
+.turbo/
