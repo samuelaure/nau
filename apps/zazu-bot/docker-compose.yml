@@ -1,0 +1,67 @@
+services:
+  zazu-bot:
+    container_name: zazu-bot
+    image: ghcr.io/samuelaure/nau/zazu-bot:${TAG:-latest}
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@zazu-postgres:5432/${DATABASE_NAME}
+    depends_on:
+      zazu-postgres:
+        condition: service_healthy
+    networks:
+      - nau-network
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.zazu-bot.rule=Host(`bot.9nau.com`)
+      - traefik.http.routers.zazu-bot.entrypoints=websecure
+      - traefik.http.routers.zazu-bot.tls=true
+      - traefik.http.routers.zazu-bot.tls.certresolver=letsencrypt
+      - traefik.http.services.zazu-bot.loadbalancer.server.port=3000
+      - traefik.docker.network=nau-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.30'
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+  zazu-postgres:
+    image: postgres:16-alpine
+    container_name: zazu-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DATABASE_USER}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_DB: ${DATABASE_NAME}
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DATABASE_USER} -d ${DATABASE_NAME}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - zazu-postgres-data:/var/lib/postgresql/data
+    networks:
+      - nau-network
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.20'
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+networks:
+  nau-network:
+    external: true
+
+volumes:
+  zazu-postgres-data:

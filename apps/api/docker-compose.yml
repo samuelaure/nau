@@ -1,47 +1,44 @@
 services:
-  nauthenticity:
-    container_name: nauthenticity
-    image: ghcr.io/samuelaure/nau/nauthenticity:${TAG:-latest}
+  api:
+    container_name: api
+    image: ghcr.io/samuelaure/nau/api:${TAG:-latest}
     env_file: .env
     environment:
       - NODE_ENV=production
-      - PORT=3000
-      - DATABASE_URL=postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@nauthenticity-postgres:5432/${DATABASE_NAME}?schema=public
-      - REDIS_HOST=nauthenticity-redis
+      - DATABASE_URL=postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@api-postgres:5432/${DATABASE_NAME}
+      - REDIS_HOST=api-redis
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD}
-    volumes:
-      - ./storage:/app/storage
     depends_on:
-      nauthenticity-postgres:
+      api-postgres:
         condition: service_healthy
-      nauthenticity-redis:
+      api-redis:
         condition: service_healthy
     networks:
       - nau-network
     labels:
       - traefik.enable=true
-      - traefik.http.routers.nauthenticity.rule=Host(`nauthenticity.9nau.com`)
-      - traefik.http.routers.nauthenticity.entrypoints=websecure
-      - traefik.http.routers.nauthenticity.tls=true
-      - traefik.http.routers.nauthenticity.tls.certresolver=letsencrypt
-      - traefik.http.services.nauthenticity.loadbalancer.server.port=3000
+      - traefik.http.routers.api.rule=Host(`api.9nau.com`)
+      - traefik.http.routers.api.entrypoints=websecure
+      - traefik.http.routers.api.tls=true
+      - traefik.http.routers.api.tls.certresolver=letsencrypt
+      - traefik.http.services.api.loadbalancer.server.port=3000
       - traefik.docker.network=nau-network
     restart: unless-stopped
     deploy:
       resources:
         limits:
-          memory: 384M
-          cpus: '0.70'
+          memory: 512M
+          cpus: '0.50'
     logging:
       driver: json-file
       options:
         max-size: 10m
         max-file: '3'
 
-  nauthenticity-postgres:
-    image: pgvector/pgvector:pg16
-    container_name: nauthenticity-postgres
+  api-postgres:
+    image: postgres:16-alpine
+    container_name: api-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DATABASE_USER}
@@ -53,7 +50,7 @@ services:
       timeout: 5s
       retries: 5
     volumes:
-      - nauthenticity-postgres-data:/var/lib/postgresql/data
+      - api-postgres-data:/var/lib/postgresql/data
     networks:
       - nau-network
     deploy:
@@ -67,9 +64,9 @@ services:
         max-size: 10m
         max-file: '3'
 
-  nauthenticity-redis:
+  api-redis:
     image: redis:7-alpine
-    container_name: nauthenticity-redis
+    container_name: api-redis
     restart: unless-stopped
     command: redis-server --requirepass "${REDIS_PASSWORD}"
     healthcheck:
@@ -78,7 +75,7 @@ services:
       timeout: 5s
       retries: 5
     volumes:
-      - nauthenticity-redis-data:/data
+      - api-redis-data:/data
     networks:
       - nau-network
     deploy:
@@ -97,5 +94,5 @@ networks:
     external: true
 
 volumes:
-  nauthenticity-postgres-data:
-  nauthenticity-redis-data:
+  api-postgres-data:
+  api-redis-data:

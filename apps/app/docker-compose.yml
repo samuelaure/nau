@@ -1,0 +1,32 @@
+services:
+  app:
+    container_name: app
+    image: ghcr.io/samuelaure/nau/app:${TAG:-latest}
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+    networks:
+      - nau-network
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.app.rule=Host(`app.9nau.com`)
+      - traefik.http.routers.app.entrypoints=websecure
+      - traefik.http.routers.app.tls=true
+      - traefik.http.routers.app.tls.certresolver=letsencrypt
+      - traefik.http.services.app.loadbalancer.server.port=3000
+      - traefik.docker.network=nau-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.30'
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+networks:
+  nau-network:
+    external: true

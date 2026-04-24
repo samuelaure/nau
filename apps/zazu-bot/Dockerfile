@@ -1,39 +1,35 @@
-# Stage 1: Build
 FROM node:20-alpine AS builder
 RUN apk add --no-cache openssl
+RUN corepack enable && corepack prepare pnpm@10.14.0 --activate
+
 WORKDIR /app
+COPY pnpm-lock.yaml ./
+COPY pnpm-workspace.yaml ./
+COPY package.json ./
+COPY turbo.json ./
+COPY tsconfig.base.json ./
 
-# Copy ALL workspace package manifests first to leverage layer caching
-COPY package*.json ./
-COPY apps/bot/package.json ./apps/bot/package.json
+COPY packages/auth ./packages/auth
+COPY packages/types ./packages/types
+COPY packages/logger ./packages/logger
+COPY packages/zazu-db ./packages/zazu-db
+COPY packages/skills-core ./packages/skills-core
+COPY packages/feature-conversational ./packages/feature-conversational
+COPY apps/zazu-bot ./apps/zazu-bot
 
-COPY apps/dashboard/package.json ./apps/dashboard/package.json
-COPY packages/db/package.json ./packages/db/package.json
-COPY packages/skills-core/package.json ./packages/skills-core/package.json
-COPY packages/feature-conversational/package.json ./packages/feature-conversational/package.json
+RUN pnpm install --frozen-lockfile
 
-RUN npm install
+RUN cd packages/zazu-db && npx prisma generate
+RUN pnpm turbo build --filter=@zazu/bot
 
-# Copy all source code
-COPY . .
-
-# Build dependency chain sequentially to avoid race conditions
-RUN npm run build --workspace=@zazu/db
-RUN npm run build --workspace=@zazu/skills-core
-RUN npm run build --workspace=@zazu/feature-conversational
-RUN npm run build --workspace=@zazu/bot
-
-# Stage 2: Runtime
-FROM node:20-alpine
+FROM node:20-alpine AS runner
 RUN apk add --no-cache openssl
 WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Copy the entire built monorepo (node_modules + compiled packages + app)
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/packages ./packages
-COPY --from=builder /app/apps/bot ./apps/bot
+COPY --from=builder /app ./
 
-CMD ["sh", "-c", "cd packages/db && npx prisma migrate deploy && cd /app && node apps/bot/dist/index.js"]
+EXPOSE 3000
+
+CMD ["sh", "-c", "cd packages/zazu-db && npx prisma migrate deploy && cd /app && node apps/zazu-bot/dist/index.js"]

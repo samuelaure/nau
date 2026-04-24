@@ -1,189 +1,125 @@
+x-app-env: &app-env
+  env_file: .env
+  environment:
+    - NODE_ENV=production
+    - DATABASE_URL=postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@whatsnau-postgres:5432/${DATABASE_NAME}?schema=public
+    - REDIS_HOST=whatsnau-redis
+    - REDIS_PORT=6379
+    - REDIS_PASSWORD=${REDIS_PASSWORD}
+
 services:
-  whatsnau_postgres:
-    image: postgres:15-alpine
-    restart: unless-stopped
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '0.35'
-          memory: 192M
-    environment:
-      - POSTGRES_USER=${DATABASE_USER}
-      - POSTGRES_PASSWORD=${DATABASE_PASSWORD}
-      - POSTGRES_DB=${DATABASE_NAME}
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER} -d ${DATABASE_NAME}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      - app-network
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-  whatsnau_redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '0.35'
-          memory: 192M
-    command: redis-server --requirepass "${REDIS_PASSWORD}"
-    environment:
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-    healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      - app-network
-
-  app:
-    image: ghcr.io/samuelaure/whatsnau-backend:latest
-    restart: unless-stopped
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '0.7'
-          memory: 384M
-    environment:
-      # Infrastructure (Required)
-      - DATABASE_URL=postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@whatsnau_postgres:5432/${DATABASE_NAME}?schema=public
-      - REDIS_HOST=whatsnau_redis
-      - REDIS_PORT=${REDIS_PORT:-6379}
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
-      
-      # Security (Required)
-      - AUTH_SECRET=${AUTH_SECRET}
-      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
-      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
-      
-      # Telegram (System-level - Required)
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - TELEGRAM_SYSTEM_CHAT_ID=${TELEGRAM_SYSTEM_CHAT_ID}
-      
-      # Meta App (Optional - for Embedded Signup)
-      - META_APP_ID=${META_APP_ID:-}
-      - META_APP_SECRET=${META_APP_SECRET:-}
-      
-      # Platform
-      - NODE_ENV=${NODE_ENV:-production}
-      - LOG_LEVEL=${LOG_LEVEL:-info}
-      - DASHBOARD_URL=${DASHBOARD_URL}
-      - INITIAL_ADMIN_PASSWORD=${INITIAL_ADMIN_PASSWORD:-admin123}
-      
-      # WhatsApp Provider
-      - WHATSAPP_PROVIDER=${WHATSAPP_PROVIDER:-meta}
-      - WHATSAPP_VERSION=${WHATSAPP_VERSION:-v18.0}
-      
-      # WhatsApp (Tenant-scoped - Optional fallback)
-      - WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID:-}
-      - WHATSAPP_PHONE_NUMBER=${WHATSAPP_PHONE_NUMBER:-}
-      - WHATSAPP_BUSINESS_ACCOUNT_ID=${WHATSAPP_BUSINESS_ACCOUNT_ID:-}
-      - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN:-}
-      - WHATSAPP_VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN:-}
-      
-      # YCloud (Tenant-scoped - Optional fallback)
-      - YCLOUD_API_KEY=${YCLOUD_API_KEY:-}
-      
-      # OpenAI (Tenant-scoped - Optional fallback)
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - PRIMARY_AI_MODEL=${PRIMARY_AI_MODEL:-gpt-4o}
-      - CHEAP_AI_MODEL=${CHEAP_AI_MODEL:-gpt-4o-mini}
-    networks:
-      - app-network
+  whatsnau:
+    container_name: whatsnau
+    image: ghcr.io/samuelaure/nau/whatsnau:${TAG:-latest}
+    <<: *app-env
     depends_on:
-      whatsnau_postgres:
+      whatsnau-postgres:
         condition: service_healthy
-      whatsnau_redis:
+      whatsnau-redis:
         condition: service_healthy
+    networks:
+      - nau-network
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.whatsnau.rule=Host(`whatsnau.9nau.com`)
+      - traefik.http.routers.whatsnau.entrypoints=websecure
+      - traefik.http.routers.whatsnau.tls=true
+      - traefik.http.routers.whatsnau.tls.certresolver=letsencrypt
+      - traefik.http.services.whatsnau.loadbalancer.server.port=3000
+      - traefik.docker.network=nau-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+          cpus: '0.50'
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
 
-  worker:
-    image: ghcr.io/samuelaure/whatsnau-backend:latest
+  whatsnau-worker:
+    container_name: whatsnau-worker
+    image: ghcr.io/samuelaure/nau/whatsnau:${TAG:-latest}
     command: npm run start:worker:prod
+    <<: *app-env
+    depends_on:
+      whatsnau-postgres:
+        condition: service_healthy
+      whatsnau-redis:
+        condition: service_healthy
+    networks:
+      - nau-network
     restart: unless-stopped
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
     deploy:
       resources:
         limits:
-          cpus: '0.7'
           memory: 384M
+          cpus: '0.50'
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+  whatsnau-postgres:
+    image: postgres:16-alpine
+    container_name: whatsnau-postgres
+    restart: unless-stopped
     environment:
-      # Infrastructure (Required)
-      - DATABASE_URL=postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@whatsnau_postgres:5432/${DATABASE_NAME}?schema=public
-      - REDIS_HOST=whatsnau_redis
-      - REDIS_PORT=${REDIS_PORT:-6379}
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
-      
-      # Security (Required)
-      - AUTH_SECRET=${AUTH_SECRET}
-      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
-      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
-      
-      # Telegram (System-level - Required)
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - TELEGRAM_SYSTEM_CHAT_ID=${TELEGRAM_SYSTEM_CHAT_ID}
-      
-      # Meta App (Optional - for Embedded Signup)
-      - META_APP_ID=${META_APP_ID:-}
-      - META_APP_SECRET=${META_APP_SECRET:-}
-      
-      # Platform
-      - NODE_ENV=${NODE_ENV:-production}
-      - LOG_LEVEL=${LOG_LEVEL:-info}
-      - DASHBOARD_URL=${DASHBOARD_URL}
-      
-      # WhatsApp Provider
-      - WHATSAPP_PROVIDER=${WHATSAPP_PROVIDER:-meta}
-      - WHATSAPP_VERSION=${WHATSAPP_VERSION:-v18.0}
-      
-      # WhatsApp (Tenant-scoped - Optional fallback)
-      - WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID:-}
-      - WHATSAPP_PHONE_NUMBER=${WHATSAPP_PHONE_NUMBER:-}
-      - WHATSAPP_BUSINESS_ACCOUNT_ID=${WHATSAPP_BUSINESS_ACCOUNT_ID:-}
-      - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN:-}
-      - WHATSAPP_VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN:-}
-      
-      # YCloud (Tenant-scoped - Optional fallback)
-      - YCLOUD_API_KEY=${YCLOUD_API_KEY:-}
-      
-      # OpenAI (Tenant-scoped - Optional fallback)
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - PRIMARY_AI_MODEL=${PRIMARY_AI_MODEL:-gpt-4o}
-      - CHEAP_AI_MODEL=${CHEAP_AI_MODEL:-gpt-4o-mini}
+      POSTGRES_USER: ${DATABASE_USER}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_DB: ${DATABASE_NAME}
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DATABASE_USER} -d ${DATABASE_NAME}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - whatsnau-postgres-data:/var/lib/postgresql/data
     networks:
-      - app-network
-    depends_on:
-      whatsnau_postgres:
-        condition: service_healthy
-      whatsnau_redis:
-        condition: service_healthy
+      - nau-network
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.20'
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+  whatsnau-redis:
+    image: redis:7-alpine
+    container_name: whatsnau-redis
+    restart: unless-stopped
+    command: redis-server --requirepass "${REDIS_PASSWORD}"
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli -a "$$REDIS_PASSWORD" ping']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - whatsnau-redis-data:/data
+    networks:
+      - nau-network
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: '0.10'
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
 
 networks:
-  app-network:
-    driver: bridge
+  nau-network:
+    external: true
 
 volumes:
-  postgres_data:
-
+  whatsnau-postgres-data:
+  whatsnau-redis-data:

@@ -1,30 +1,34 @@
 FROM node:20-alpine AS builder
-WORKDIR /app
-
 RUN apk add --no-cache libc6-compat openssl
+RUN corepack enable && corepack prepare pnpm@10.14.0 --activate
 
-# Copy ALL workspace package manifests first to leverage layer caching
-COPY package*.json tsconfig.json ./
-COPY apps/bot/package.json ./apps/bot/package.json
-COPY apps/dashboard/package.json ./apps/dashboard/package.json
-COPY packages/db/package.json ./packages/db/package.json
-COPY packages/skills-core/package.json ./packages/skills-core/package.json
-COPY packages/feature-conversational/package.json ./packages/feature-conversational/package.json
+WORKDIR /app
+COPY pnpm-lock.yaml ./
+COPY pnpm-workspace.yaml ./
+COPY package.json ./
+COPY turbo.json ./
+COPY tsconfig.base.json ./
 
-RUN npm install
+COPY packages/auth ./packages/auth
+COPY packages/types ./packages/types
+COPY packages/logger ./packages/logger
+COPY packages/zazu-db ./packages/zazu-db
+COPY packages/skills-core ./packages/skills-core
+COPY packages/feature-conversational ./packages/feature-conversational
+COPY apps/zazu-dashboard ./apps/zazu-dashboard
 
-# Copy all source code
-COPY . .
+RUN pnpm install --frozen-lockfile
 
-# Dummy env vars so Next.js build doesn't fail on missing vars at build time
+# Dummy build-time vars — real values are injected at runtime via env_file
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
-ENV AUTH_SECRET="7ef44a4289280436f1e5e709fab0e7d86d3d84b2f91670feacc67f4ee139c077"
+ENV AUTH_SECRET="build-time-placeholder-not-a-real-secret"
 ENV NEXTAUTH_URL="https://zazu.9nau.com"
 
-RUN npm run build --workspace=@zazu/db
-RUN npm run build --workspace=@zazu/dashboard
+RUN cd packages/zazu-db && npx prisma generate
+RUN pnpm turbo build --filter=@zazu/dashboard
 
-# --- RUNNER PHASE ---
+RUN mkdir -p apps/zazu-dashboard/public apps/zazu-dashboard/.next/static
+
 FROM node:20-alpine AS runner
 WORKDIR /app
 RUN apk add --no-cache openssl
@@ -33,14 +37,15 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Copy Next.js standalone output
-COPY --from=builder /app/apps/dashboard/.next/standalone ./
-COPY --from=builder /app/apps/dashboard/.next/static ./apps/dashboard/.next/static
-COPY --from=builder /app/apps/dashboard/public ./apps/dashboard/public
+RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 
-# Symlink for static resolution in Next.js standalone mode
-RUN mkdir -p .next && ln -s /app/apps/dashboard/.next/static /app/.next/static
+COPY --from=builder /app/apps/zazu-dashboard/.next/standalone ./
+COPY --from=builder /app/apps/zazu-dashboard/.next/static ./apps/zazu-dashboard/.next/static
+COPY --from=builder /app/apps/zazu-dashboard/public ./apps/zazu-dashboard/public
 
+RUN mkdir -p .next && ln -s /app/apps/zazu-dashboard/.next/static /app/.next/static
+
+USER nextjs
 EXPOSE 3000
 
-CMD ["node", "apps/dashboard/server.js"]
+CMD ["node", "apps/zazu-dashboard/server.js"]

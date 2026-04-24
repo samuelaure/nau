@@ -1,0 +1,32 @@
+services:
+  accounts:
+    container_name: accounts
+    image: ghcr.io/samuelaure/nau/accounts:${TAG:-latest}
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+    networks:
+      - nau-network
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.accounts.rule=Host(`accounts.9nau.com`)
+      - traefik.http.routers.accounts.entrypoints=websecure
+      - traefik.http.routers.accounts.tls=true
+      - traefik.http.routers.accounts.tls.certresolver=letsencrypt
+      - traefik.http.services.accounts.loadbalancer.server.port=3000
+      - traefik.docker.network=nau-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.30'
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+networks:
+  nau-network:
+    external: true
