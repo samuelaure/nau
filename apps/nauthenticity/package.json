@@ -16,7 +16,9 @@
     "type-check": "tsc --noEmit",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "test": "jest"
+    "test": "jest",
+    "test:cov": "jest --coverage",
+    "test:ci": "jest --coverage --ci --forceExit"
   },
   "dependencies": {
     "@nau/auth": "workspace:*",
@@ -55,9 +57,12 @@
     "@types/fluent-ffmpeg": "^2.1.28",
     "@types/jest": "^29.5.12",
     "@types/node": "^24.1.0",
+    "@types/supertest": "^6.0.3",
     "eslint": "^9.39.2",
     "jest": "^29.7.0",
+    "jest-mock-extended": "^3.0.7",
     "prisma": "5.22.0",
+    "supertest": "^7.0.0",
     "ts-jest": "^29.1.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"

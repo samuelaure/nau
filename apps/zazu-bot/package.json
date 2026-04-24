@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "ts-node src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "test": "vitest",
+    "test:ci": "vitest --run --coverage"
   },
   "dependencies": {
     "@nau/auth": "workspace:*",
@@ -31,7 +33,9 @@
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^25.5.0",
     "@types/node-cron": "^3.0.11",
+    "@vitest/coverage-v8": "^2.1.9",
     "ts-node": "^10.9.1",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vitest": "^2.1.9"
   }
 }

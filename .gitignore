@@ -33,3 +33,12 @@ logs/
 
 # Turbo
 .turbo/
+
+# Test coverage output
+coverage/
+**/coverage/
+
+# Playwright — auth state contains real session tokens, never commit
+tests/e2e/.auth/user.json
+playwright-report/
+test-results/
