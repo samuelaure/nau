@@ -129,3 +129,38 @@ Rejected for this phase because:
 - [../platform/ENTITIES.md](../platform/ENTITIES.md) — `Session`, `ServiceClient`, `AuthLinkToken` schemas
 - [../packages/auth.md](../packages/auth.md) — `@nau/auth` package docs
 - [../future/rs256-jwks-migration.md](../future/rs256-jwks-migration.md) — future asymmetric upgrade
+
+## Implementation (Phases 1–7 — completed)
+
+### `@nau/auth` package (`packages/auth/src/`)
+
+```typescript
+// Core exports
+signServiceToken({ iss, aud, secret }): Promise<string>   // signs 60s JWT
+verifyServiceToken(token, secret): Promise<JWTPayload>    // throws AuthError on failure
+extractBearerToken(authHeader): string | undefined
+buildAccessTokenCookie(token, env): string
+buildRefreshTokenCookie(token, env): string
+
+// NestJS guards (packages/auth/src/nest/)
+JwtAuthGuard     // verifies nau_at cookie or Authorization Bearer
+ServiceAuthGuard // verifies service JWT via verifyServiceToken
+```
+
+### Service-to-service auth — adopted across all services
+
+| Caller | Called | Method |
+|---|---|---|
+| zazu-bot | 9nau-api | `buildServiceHeaders('9nau-api')` → `signServiceToken({ iss: 'zazu-bot', aud: '9nau-api', secret })` |
+| zazu-dashboard | 9nau-api | `serviceHeaders('9nau-api')` in `actions.ts` |
+| zazu-dashboard | nauthenticity | `serviceHeaders('nauthenticity')` in `actions.ts` |
+| flownau | nauthenticity | `signServiceToken({ iss: 'flownau', aud: 'nauthenticity', secret })` in cron route |
+| flownau | 9nau-api | via `@nau/sdk` → `createNauServiceClient()` |
+| 9nau-api | nauthenticity | `signServiceToken({ iss: '9nau-api', aud: 'nauthenticity', secret })` in `NauthenticityService` |
+
+### Inbound validation — where each service uses what
+
+- `nauthenticity`: NestJS `ServiceAuthGuard` on `/_service/*` routes
+- `flownau`: `validateServiceToken(req)` (`src/modules/shared/nau-auth.ts`)
+- `zazu-bot` (Express): `requireServiceAuth` middleware (`src/lib/service-auth.ts`)
+- `9nau-api`: `ServiceAuthGuard` on `/_service/*` routes

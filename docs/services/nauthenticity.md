@@ -2,7 +2,7 @@
 
 - **Domain:** `nauthenticity.9nau.com`
 - **Role:** Brand intelligence. Instagram scraping, transcription, semantic search, benchmark chat, InspoBase, comment suggestions.
-- **Stack (target):** NestJS · Prisma · PostgreSQL + pgvector · Redis · BullMQ · Apify
+- **Stack:** NestJS (migrated from Fastify, Phase 5) · Prisma · PostgreSQL + pgvector · Redis · BullMQ · Apify
 - **Owned entities:** `Post`, `Media`, `Transcript`, `Embedding` (or future `KnowledgeChunk`), `ScrapingRun`, `InspoItem`, `BrandSynthesis`, `CommentFeedback`
 - **References:** `brandId`, `socialProfileId` (from 9naŭ API). Scraped content keyed by `(platform, platformId)` for dedup across brands monitoring the same profile.
 

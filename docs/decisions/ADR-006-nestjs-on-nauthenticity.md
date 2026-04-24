@@ -98,3 +98,22 @@ Fastify vs NestJS perf delta is <5% on realistic workloads (see any microbenchma
 - [../services/nauthenticity.md](../services/nauthenticity.md) — target service spec
 - [../future/ROADMAP.md §Phase 5](../future/ROADMAP.md#phase-5--nauthenticity-refactor-fastify--nestjs)
 - [NestJS docs](https://docs.nestjs.com) (external)
+
+## Implementation (Phase 5 — completed)
+
+```
+nauthenticity/src/nest/
+├── app.module.ts            — root module: ConfigModule, PrismaModule, AuthModule, InspoModule, BenchmarkModule, ScrapingModule
+├── auth/                    — AuthModule: re-exports @nau/auth guards (JwtAuthGuard, ServiceAuthGuard)
+├── inspo/                   — InspoModule: CRUD for InspoItem; user + _service routes
+├── benchmark/               — BenchmarkModule: comment generation, synthesis, feedback
+├── scraping/                — ScrapingModule: Apify trigger, post ingest, run listing
+└── health/                  — GET /health
+```
+
+Key files:
+- `nauthenticity/src/main.ts` — `NestFactory.create(AppModule)`, prefix `api/v1`, CORS
+- `nauthenticity/nest-cli.json` — `"entryFile": "main"`
+- `nauthenticity/tsconfig.json` — `include: ["src/main.ts", "src/nest/**/*"]` (excludes old Fastify code from typecheck)
+
+Old Fastify code (`src/app.ts`, `src/modules/`) is kept intact but excluded from the TypeScript build — removed only after validation in prod.

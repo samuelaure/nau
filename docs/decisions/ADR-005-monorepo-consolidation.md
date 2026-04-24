@@ -27,36 +27,52 @@ The platform is moving to SaaS launch with several more services planned. Contin
 
 ## Decision
 
-**Consolidate into a single pnpm + turbo monorepo.**
+**Consolidate into a single pnpm + turbo monorepo, in-place (no directory flattening).**
 
-### Target structure
+The original plan called for a full `git mv` to flatten everything under a top-level `apps/`. After weighing the migration cost against the benefit (the nested layout is already navigable and all apps have Dockerfiles relative to their current location), we kept the existing directory tree and instead made the **root `pnpm-workspace.yaml`** the single source of package resolution:
+
+### Implemented structure
 
 ```
 nau-platform/
-├── apps/
-│   ├── 9nau-api/             (was 9nau/apps/api)
-│   ├── accounts/             (was 9nau/apps/accounts)
-│   ├── app/                  (was 9nau/apps/app)
-│   ├── mobile/               (was 9nau/apps/mobile)
-│   ├── flownau/              (was flownau)
-│   ├── nauthenticity/        (was nauthenticity)
-│   ├── zazu-bot/             (was zazu/apps/bot)
-│   ├── zazu-dashboard/       (was zazu/apps/dashboard)
-│   ├── whatsnau-backend/     (was whatsnau/packages/backend)
-│   └── whatsnau-frontend/    (was whatsnau/packages/frontend)
-├── packages/
+├── 9nau/
+│   ├── apps/api/             — @9nau/api
+│   ├── apps/accounts/        — @9nau/accounts
+│   ├── apps/app/             — @9nau/app
+│   ├── apps/mobile/          — mobile
+│   └── packages/{core,types,ui}/
+├── flownau/                  — flownau (Next.js)
+├── nauthenticity/            — nauthenticity (NestJS)
+├── zazu/
+│   ├── apps/bot/             — @zazu/bot
+│   ├── apps/dashboard/       — @zazu/dashboard
+│   └── packages/{db,skills-core,feature-conversational}/
+├── packages/                 ← @nau/* shared packages
+│   ├── auth/                 — @nau/auth
 │   ├── types/                — @nau/types
 │   ├── sdk/                  — @nau/sdk
-│   ├── auth/                 — @nau/auth
 │   ├── config/               — @nau/config
 │   ├── logger/               — @nau/logger
-│   ├── ui/                   — @nau/ui
-│   └── storage/              — @nau/storage (existing)
+│   └── storage/              — @nau/storage
 ├── docs/
-├── pnpm-workspace.yaml
+├── pnpm-workspace.yaml       ← includes all of the above
 ├── turbo.json
 └── package.json
 ```
+
+`pnpm-workspace.yaml` globs:
+```yaml
+packages:
+  - 'packages/*'
+  - '9nau/apps/*'
+  - '9nau/packages/*'
+  - 'nauthenticity'
+  - 'flownau'
+  - 'zazu/apps/*'
+  - 'zazu/packages/*'
+```
+
+All `file:` references to `@nau/*` and `@zazu/*` packages replaced with `workspace:*` so pnpm resolves them as symlinks from the workspace root.
 
 ### Independent deployment
 
