@@ -29,7 +29,7 @@
     "test": "jest"
   },
   "dependencies": {
-    "@nau/types": "file:../types",
+    "@nau/types": "workspace:*",
     "jose": "^5.9.6"
   },
   "peerDependencies": {
@@ -43,7 +43,7 @@
     "reflect-metadata": { "optional": true }
   },
   "devDependencies": {
-    "@nau/types": "file:../types",
+    "@nau/types": "workspace:*",
     "@nestjs/common": "^10.0.0",
     "@types/node": "^24.1.0",
     "jose": "^5.9.6",

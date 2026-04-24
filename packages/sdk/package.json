@@ -18,12 +18,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@nau/auth": "file:../auth",
-    "@nau/types": "file:../types"
+    "@nau/auth": "workspace:*",
+    "@nau/types": "workspace:*"
   },
   "devDependencies": {
-    "@nau/auth": "file:../auth",
-    "@nau/types": "file:../types",
+    "@nau/auth": "workspace:*",
+    "@nau/types": "workspace:*",
     "typescript": "^5.8.3",
     "@types/node": "^24.1.0"
   },
