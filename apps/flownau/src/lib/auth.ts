@@ -7,10 +7,14 @@ export interface AuthUser {
   email: string
 }
 
-const AUTH_SECRET = process.env.AUTH_SECRET
-if (!AUTH_SECRET) throw new Error('AUTH_SECRET environment variable is required')
 const ACCOUNTS_URL = process.env.NEXT_PUBLIC_ACCOUNTS_URL ?? 'https://accounts.9nau.com'
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://flownau.9nau.com'
+
+function getAuthSecret(): string {
+  const secret = process.env.AUTH_SECRET
+  if (!secret) throw new Error('AUTH_SECRET environment variable is required')
+  return secret
+}
 
 export async function getAuthUser(): Promise<AuthUser | null> {
   const cookieStore = await cookies()
@@ -18,7 +22,7 @@ export async function getAuthUser(): Promise<AuthUser | null> {
   if (!token) return null
 
   try {
-    const secret = new TextEncoder().encode(AUTH_SECRET)
+    const secret = new TextEncoder().encode(getAuthSecret())
     const { payload } = await jwtVerify(token, secret)
     if (!payload.sub || !payload.email) return null
     return { id: payload.sub, email: payload.email as string }
