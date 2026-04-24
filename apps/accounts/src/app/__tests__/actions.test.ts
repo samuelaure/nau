@@ -20,11 +20,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ── Mock next/headers ─────────────────────────────────────────────────────────
 // cookies() is an async function that returns a CookieStore-like object.
-const cookieSpy = {
+// vi.hoisted ensures cookieSpy is initialized before vi.mock hoists the factory.
+const cookieSpy = vi.hoisted(() => ({
   set: vi.fn(),
   get: vi.fn(),
   delete: vi.fn(),
-}
+}))
 vi.mock('next/headers', () => ({
   cookies: vi.fn().mockResolvedValue(cookieSpy),
 }))

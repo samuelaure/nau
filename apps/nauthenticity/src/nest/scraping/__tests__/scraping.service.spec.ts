@@ -12,7 +12,7 @@
  */
 import { NotFoundException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { mock, MockProxy } from 'jest-mock-extended'
+import { mockDeep, DeepMockProxy } from 'jest-mock-extended'
 import { ScrapingService } from '../scraping.service'
 import { PrismaService } from '../../prisma/prisma.service'
 
@@ -22,11 +22,11 @@ const mockConfigService = {
 
 describe('ScrapingService', () => {
   let service: ScrapingService
-  let prisma: MockProxy<PrismaService>
+  let prisma: DeepMockProxy<PrismaService>
   let fetchMock: jest.Mock
 
   beforeEach(() => {
-    prisma = mock<PrismaService>()
+    prisma = mockDeep<PrismaService>()
     service = new ScrapingService(prisma, mockConfigService)
 
     fetchMock = jest.fn()

@@ -16,7 +16,7 @@ describe('AllExceptionsFilter', () => {
     };
     const adapterHost = {
       httpAdapter: mockHttpAdapter,
-    } as HttpAdapterHost;
+    } as unknown as HttpAdapterHost;
     filter = new AllExceptionsFilter(adapterHost);
   });
 

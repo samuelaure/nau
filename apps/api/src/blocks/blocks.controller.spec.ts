@@ -52,7 +52,7 @@ describe('BlocksController', () => {
   describe('create', () => {
     it('should call blocksService.create with the correct DTO', async () => {
       const createDto: CreateBlockDto = { type: 'note', properties: {} };
-      jest.spyOn(service, 'create').mockResolvedValue(mockBlock);
+      jest.spyOn(service, 'create').mockResolvedValue(mockBlock as any);
       await controller.create(createDto);
       expect(service.create).toHaveBeenCalledWith(createDto);
     });
@@ -61,7 +61,7 @@ describe('BlocksController', () => {
   describe('findAll', () => {
     it('should call blocksService.findAll with the correct query', async () => {
       const queryDto: FindBlocksQueryDto = { type: 'note' };
-      jest.spyOn(service, 'findAll').mockResolvedValue([mockBlock]);
+      jest.spyOn(service, 'findAll').mockResolvedValue([mockBlock] as any);
       await controller.findAll(queryDto);
       expect(service.findAll).toHaveBeenCalledWith(queryDto);
     });
@@ -70,7 +70,7 @@ describe('BlocksController', () => {
   describe('update', () => {
     it('should call blocksService.update with the correct ID and DTO', async () => {
       const updateDto: UpdateBlockDto = { properties: { text: 'updated' } };
-      jest.spyOn(service, 'update').mockResolvedValue(mockBlock);
+      jest.spyOn(service, 'update').mockResolvedValue(mockBlock as any);
       await controller.update('block-1', updateDto);
       expect(service.update).toHaveBeenCalledWith('block-1', updateDto);
     });
@@ -78,7 +78,7 @@ describe('BlocksController', () => {
 
   describe('remove', () => {
     it('should call blocksService.remove with the correct ID', async () => {
-      jest.spyOn(service, 'remove').mockResolvedValue(mockBlock);
+      jest.spyOn(service, 'remove').mockResolvedValue(mockBlock as any);
       await controller.remove('block-1');
       expect(service.remove).toHaveBeenCalledWith('block-1');
     });
@@ -86,7 +86,7 @@ describe('BlocksController', () => {
 
   describe('findOne', () => {
     it('should call blocksService.findOne with the correct ID', async () => {
-      jest.spyOn(service, 'findOne').mockResolvedValue(mockBlock);
+      jest.spyOn(service, 'findOne').mockResolvedValue(mockBlock as any);
       await controller.findOne('block-1');
       expect(service.findOne).toHaveBeenCalledWith('block-1');
     });
@@ -94,7 +94,7 @@ describe('BlocksController', () => {
 
   describe('getRemindableBlocks', () => {
     it('should call blocksService.getRemindableBlocks', async () => {
-      jest.spyOn(service, 'getRemindableBlocks').mockResolvedValue([mockBlock]);
+      jest.spyOn(service, 'getRemindableBlocks').mockResolvedValue([mockBlock] as any);
       await controller.getRemindableBlocks();
       expect(service.getRemindableBlocks).toHaveBeenCalled();
     });

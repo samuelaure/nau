@@ -50,11 +50,11 @@ describe('FlownauIntegrationService', () => {
         {
           accountId: 'brand-123',
           source: 'captured',
-          ideas: [{ text: 'Idea about productivity', sourceRef: 'block-abc' }],
+          ideas: [{ text: 'Idea about productivity', source: 'captured', sourceRef: 'block-abc', aiLinked: false }],
         },
         {
           headers: {
-            Authorization: 'Bearer test-service-key',
+            'x-nau-service-key': 'test-service-key',
             'Content-Type': 'application/json',
           },
         },
@@ -82,7 +82,7 @@ describe('FlownauIntegrationService', () => {
 
       const callArgs = mockedAxios.post.mock.calls[0]!;
       const headers = (callArgs[2] as { headers: Record<string, string> }).headers;
-      expect(headers['Authorization']).toBe('Bearer test-service-key');
+      expect(headers['x-nau-service-key']).toBe('test-service-key');
     });
 
     it('falls back to default FLOWNAU_URL when env var is not set', async () => {

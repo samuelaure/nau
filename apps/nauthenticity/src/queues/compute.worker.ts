@@ -182,8 +182,8 @@ const ensureLocalFile = async (
 
   const stream = response.Body as Readable;
   const writeStream = fs.createWriteStream(tempPath);
-  await new Promise((resolve, reject) => {
-    stream.pipe(writeStream).on('finish', resolve).on('error', reject);
+  await new Promise<void>((resolve, reject) => {
+    stream.pipe(writeStream).on('finish', () => resolve()).on('error', reject);
   });
 
   return { path: tempPath, isTemp: true };

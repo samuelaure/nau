@@ -101,7 +101,7 @@ export class TriageService {
       this.logger.log(`Calling LLM for triage... Brands: ${brandsForPrompt.length}, AI routing: ${aiRoutingEnabled}`);
 
       const { client: llm, model } = getClientForFeature('triage');
-      const result = await llm.parseCompletion({
+      const result = await llm.parseCompletion<TriageResult>({
         model,
         temperature: 0.1,
         schema: TriageResultSchema,

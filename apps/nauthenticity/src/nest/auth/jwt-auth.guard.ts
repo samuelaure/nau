@@ -24,7 +24,7 @@ export class JwtAuthGuard implements CanActivate {
       req.user = await verifyAccessToken(token, this.config.getOrThrow<string>('AUTH_SECRET'))
       return true
     } catch (err) {
-      if (err instanceof AuthError) throw new UnauthorizedException(err.message)
+      if (err instanceof AuthError) throw new UnauthorizedException('Invalid token')
       throw new UnauthorizedException('Invalid token')
     }
   }

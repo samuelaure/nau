@@ -29,7 +29,7 @@ async function callTriageApi(text: string, userId: string, brandId: string | nul
     body: JSON.stringify({ text, userId, brandId }),
   });
   if (!res.ok) throw new Error(`Triage API error: ${res.status}`);
-  return res.json();
+  return res.json() as Promise<any>;
 }
 
 export class TriageSkill implements ZazuSkill {

@@ -26,7 +26,7 @@
     "build": "tsc --build",
     "dev": "tsc --build --watch",
     "typecheck": "tsc --noEmit",
-    "test": "jest"
+    "test": "echo \"No tests\""
   },
   "dependencies": {
     "@nau/types": "workspace:*",

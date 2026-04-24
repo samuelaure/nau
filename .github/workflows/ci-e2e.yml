@@ -89,6 +89,9 @@ jobs:
       - name: Run API DB migrations
         run: pnpm --filter=@9nau/api test:db:migrate:deploy
 
+      - name: Generate Prisma client
+        run: pnpm --filter=@9nau/api exec prisma generate
+
       - name: Seed test database
         run: pnpm --filter=@9nau/api test:db:seed
 

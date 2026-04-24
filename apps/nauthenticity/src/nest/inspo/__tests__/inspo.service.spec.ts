@@ -9,16 +9,16 @@
  *   - NotFoundException is thrown when an item is not found
  */
 import { NotFoundException } from '@nestjs/common'
-import { mock, MockProxy } from 'jest-mock-extended'
+import { mockDeep, DeepMockProxy } from 'jest-mock-extended'
 import { InspoService } from '../inspo.service'
 import { PrismaService } from '../../prisma/prisma.service'
 
 describe('InspoService', () => {
   let service: InspoService
-  let prisma: MockProxy<PrismaService>
+  let prisma: DeepMockProxy<PrismaService>
 
   beforeEach(() => {
-    prisma = mock<PrismaService>()
+    prisma = mockDeep<PrismaService>()
     service = new InspoService(prisma)
   })
 
