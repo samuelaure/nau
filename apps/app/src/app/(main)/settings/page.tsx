@@ -21,6 +21,7 @@ import {
   useRemoveMember,
 } from '@/hooks/use-workspaces-api'
 import type { WorkspaceWithRole, Brand, WorkspaceMember } from '@/hooks/use-workspaces-api'
+import { WorkspaceRole } from '@9nau/types'
 
 export default function PlatformSettingsPage() {
   const { data: workspaces, isLoading } = useGetWorkspaces()
@@ -128,7 +129,7 @@ function WorkspaceCard({
           {isExpanded ? <ChevronDown className="w-4 h-4 text-gray-400 ml-auto" /> : <ChevronRight className="w-4 h-4 text-gray-400 ml-auto" />}
         </button>
 
-        {workspace.role === 'owner' && !renaming && (
+        {workspace.role === WorkspaceRole.OWNER && !renaming && (
           <div className="flex items-center gap-1 ml-2">
             <button
               onClick={(e) => { e.stopPropagation(); setRenaming(true); setNewName(workspace.name) }}
@@ -188,7 +189,7 @@ function WorkspaceCard({
           </div>
 
           {activeTab === 'brands' && <BrandsPanel workspaceId={workspace.id} />}
-          {activeTab === 'members' && <MembersPanel workspaceId={workspace.id} isOwner={workspace.role === 'owner'} />}
+          {activeTab === 'members' && <MembersPanel workspaceId={workspace.id} isOwner={workspace.role === WorkspaceRole.OWNER} />}
         </div>
       )}
     </div>

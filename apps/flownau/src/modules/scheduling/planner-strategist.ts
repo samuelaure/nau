@@ -82,7 +82,7 @@ RULES:
       timeoutMs: 30_000,
     })
 
-    const ordered = result.data.orderedIds
+    const ordered = (result.data as StrategistOutput).orderedIds
     const allIds = new Set(input.pieces.map((p) => p.id))
     if (ordered.length !== input.pieces.length || !ordered.every((id) => allIds.has(id))) {
       throw new Error('AI returned invalid or incomplete orderedIds')
