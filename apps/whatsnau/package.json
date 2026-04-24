@@ -1,0 +1,26 @@
+{
+  "name": "whatsnau-monorepo",
+  "private": true,
+  "version": "0.1.4",
+  "packageManager": "npm@10.9.4",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "format": "turbo run format",
+    "type-check": "turbo run type-check",
+    "security:infra": "node scripts/audit-infra.js",
+    "verify": "turbo run format lint type-check test",
+    "release": "standard-version",
+    "clean": "rm -rf node_modules packages/*/node_modules"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "standard-version": "^9.5.0",
+    "turbo": "^2.8.3"
+  }
+}
