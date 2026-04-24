@@ -1,22 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// Use vi.hoisted() so the mock parse ref is accessible inside the hoisted vi.mock() factory
-const { mockParse } = vi.hoisted(() => ({ mockParse: vi.fn() }))
+const { mockParseCompletion } = vi.hoisted(() => ({ mockParseCompletion: vi.fn() }))
 
-vi.mock('openai', () => {
-  function MockOpenAI() {
-    return { chat: { completions: { parse: mockParse } } }
-  }
-  return { default: MockOpenAI }
-})
-
-vi.mock('openai/helpers/zod', () => ({
-  zodResponseFormat: vi.fn().mockReturnValue({ type: 'json_schema' }),
+vi.mock('@nau/llm-client', () => ({
+  getClientForFeature: vi.fn(() => ({
+    client: { parseCompletion: mockParseCompletion },
+    model: 'gpt-4o',
+  })),
 }))
 
 import { generateContentIdeas } from '../ideation.service'
-
-// ─── Helpers ──────────────────────────────────────────────────────
 
 const validIdeationOutput = {
   ideas: [
@@ -45,26 +38,13 @@ const baseContext = {
   inspoItems: [],
 }
 
-// ─── Tests ────────────────────────────────────────────────────────
-
 describe('generateContentIdeas()', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.stubEnv('OPENAI_API_KEY', 'test-openai-key')
-  })
-
-  it('throws when OPENAI_API_KEY is not configured', async () => {
-    vi.stubEnv('OPENAI_API_KEY', '')
-
-    await expect(generateContentIdeas(baseContext)).rejects.toThrow(
-      /OPENAI_API_KEY is not configured/,
-    )
   })
 
   it('returns IdeationOutput on successful API call', async () => {
-    mockParse.mockResolvedValue({
-      choices: [{ message: { parsed: validIdeationOutput } }],
-    })
+    mockParseCompletion.mockResolvedValue({ data: validIdeationOutput })
 
     const result = await generateContentIdeas(baseContext)
 
@@ -73,17 +53,14 @@ describe('generateContentIdeas()', () => {
     expect(result.ideas[0].format).toBe('reel')
   })
 
-  it('includes brand DNA in the messages sent to OpenAI', async () => {
+  it('includes brand DNA in the messages sent to LLM', async () => {
     let capturedMessages: unknown[] = []
-    mockParse.mockImplementation((params: { messages: unknown[] }) => {
+    mockParseCompletion.mockImplementation((params: { messages: unknown[] }) => {
       capturedMessages = params.messages
-      return Promise.resolve({ choices: [{ message: { parsed: validIdeationOutput } }] })
+      return Promise.resolve({ data: validIdeationOutput })
     })
 
-    await generateContentIdeas({
-      ...baseContext,
-      dna: 'Unique brand DNA content for testing',
-    })
+    await generateContentIdeas({ ...baseContext, dna: 'Unique brand DNA content for testing' })
 
     const userMessage = capturedMessages.find((m: unknown) => {
       const msg = m as { role: string; content: string }
@@ -95,9 +72,9 @@ describe('generateContentIdeas()', () => {
 
   it('includes inspo items in the prompt when provided', async () => {
     let capturedMessages: unknown[] = []
-    mockParse.mockImplementation((params: { messages: unknown[] }) => {
+    mockParseCompletion.mockImplementation((params: { messages: unknown[] }) => {
       capturedMessages = params.messages
-      return Promise.resolve({ choices: [{ message: { parsed: validIdeationOutput } }] })
+      return Promise.resolve({ data: validIdeationOutput })
     })
 
     await generateContentIdeas({
@@ -124,23 +101,11 @@ describe('generateContentIdeas()', () => {
   })
 
   it('works correctly with an empty inspo items array', async () => {
-    mockParse.mockResolvedValue({
-      choices: [{ message: { parsed: validIdeationOutput } }],
-    })
+    mockParseCompletion.mockResolvedValue({ data: validIdeationOutput })
 
     const result = await generateContentIdeas({ ...baseContext, inspoItems: [] })
 
     expect(result.ideas).toBeDefined()
     expect(result.ideas.length).toBeGreaterThan(0)
-  })
-
-  it('throws when API returns no parsed content', async () => {
-    mockParse.mockResolvedValue({
-      choices: [{ message: { parsed: null } }],
-    })
-
-    await expect(generateContentIdeas(baseContext)).rejects.toThrow(
-      /Failed to parse ideation AI response/,
-    )
   })
 })

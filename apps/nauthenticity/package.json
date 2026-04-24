@@ -54,6 +54,7 @@
     "schema": "src/db/schema.prisma"
   },
   "devDependencies": {
+    "@aws-sdk/client-s3": "*",
     "@nestjs/cli": "^10.0.0",
     "@nestjs/schematics": "^10.0.0",
     "@nestjs/testing": "^10.0.0",

@@ -34,6 +34,8 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Build workspace packages
+        run: pnpm build --filter='./packages/**'
 
       - name: Run unit tests with coverage
         run: pnpm --filter=@9nau/app test:ci

@@ -69,7 +69,7 @@ describe('Security — JwtAuthGuard (nauthenticity)', () => {
   it('rejects expired tokens (AuthError from verifyAccessToken)', async () => {
     ;(nauAuth.extractBearerToken as jest.Mock).mockReturnValue('expired-token')
     ;(nauAuth.verifyAccessToken as jest.Mock).mockRejectedValue(
-      new nauAuth.AuthError('Token expired'),
+      new nauAuth.AuthError('Token expired', 'INVALID'),
     )
 
     await expect(jwtGuard.canActivate(makeJwtContext({ bearer: 'expired-token' }) as any)).rejects.toThrow(
@@ -81,7 +81,7 @@ describe('Security — JwtAuthGuard (nauthenticity)', () => {
     ;(nauAuth.extractBearerToken as jest.Mock).mockReturnValue('svc-token')
     // verifyAccessToken should fail on a service token (wrong claims)
     ;(nauAuth.verifyAccessToken as jest.Mock).mockRejectedValue(
-      new nauAuth.AuthError('Invalid token audience'),
+      new nauAuth.AuthError('Invalid token audience', 'INVALID'),
     )
 
     await expect(jwtGuard.canActivate(makeJwtContext({ bearer: 'svc-token' }) as any)).rejects.toThrow(
@@ -92,7 +92,7 @@ describe('Security — JwtAuthGuard (nauthenticity)', () => {
   it('error message from UnauthorizedException does not reveal whether user exists', async () => {
     ;(nauAuth.extractBearerToken as jest.Mock).mockReturnValue('unknown-user-token')
     ;(nauAuth.verifyAccessToken as jest.Mock).mockRejectedValue(
-      new nauAuth.AuthError('User not found'),
+      new nauAuth.AuthError('User not found', 'INVALID'),
     )
 
     try {
@@ -124,7 +124,7 @@ describe('Security — ServiceAuthGuard (nauthenticity)', () => {
   it('does not accept a user token as a service token', async () => {
     ;(nauAuth.extractBearerToken as jest.Mock).mockReturnValue('user-token')
     ;(nauAuth.verifyServiceToken as jest.Mock).mockRejectedValue(
-      new nauAuth.AuthError('Invalid audience'),
+      new nauAuth.AuthError('Invalid audience', 'INVALID'),
     )
 
     await expect(svcGuard.canActivate(makeServiceContext('user-token') as any)).rejects.toThrow(

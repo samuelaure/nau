@@ -86,7 +86,7 @@ describe('JwtAuthGuard', () => {
 
   it('throws UnauthorizedException when verifyAccessToken raises AuthError', async () => {
     ;(nauAuth.extractBearerToken as jest.Mock).mockReturnValue('bad-token')
-    const authErr = new nauAuth.AuthError('Token expired')
+    const authErr = new nauAuth.AuthError('Token expired', 'INVALID')
     ;(nauAuth.verifyAccessToken as jest.Mock).mockRejectedValue(authErr)
 
     const ctx = makeContext({ authHeader: 'Bearer bad-token' })

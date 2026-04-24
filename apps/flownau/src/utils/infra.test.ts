@@ -16,27 +16,27 @@ import { detectHeadTalk, generateTopicHash } from '@/modules/planning/daily-plan
 describe('resolveModelId', () => {
   it('resolves OpenAI GPT-4o to correct provider and model', () => {
     const result = resolveModelId('OPENAI_GPT_4O')
-    expect(result).toEqual({ provider: 'openai', model: 'gpt-4o' })
+    expect(result).toMatchObject({ provider: 'openai', model: 'gpt-4o' })
   })
 
   it('resolves OpenAI GPT-4o-mini', () => {
     const result = resolveModelId('OPENAI_GPT_4O_MINI')
-    expect(result).toEqual({ provider: 'openai', model: 'gpt-4o-mini' })
+    expect(result).toMatchObject({ provider: 'openai', model: 'gpt-4o-mini' })
   })
 
   it('resolves Groq Llama 3.3 to groq provider', () => {
     const result = resolveModelId('GROQ_LLAMA_3_3')
-    expect(result).toEqual({ provider: 'groq', model: 'llama-3.3-70b-versatile' })
+    expect(result).toMatchObject({ provider: 'groq', model: 'llama-3.3-70b-versatile' })
   })
 
   it('resolves Groq DeepSeek R1', () => {
     const result = resolveModelId('GROQ_DEEPSEEK_R1_70B')
-    expect(result).toEqual({ provider: 'groq', model: 'deepseek-r1-distill-llama-70b' })
+    expect(result).toMatchObject({ provider: 'groq', model: 'deepseek-r1-distill-llama-70b' })
   })
 
   it('returns default Groq Llama model for unknown enum value', () => {
     const result = resolveModelId('UNKNOWN_MODEL')
-    expect(result).toEqual({ provider: 'groq', model: 'llama-3.3-70b-versatile' })
+    expect(result).toMatchObject({ provider: 'groq', model: 'llama-3.3-70b-versatile' })
   })
 })
 

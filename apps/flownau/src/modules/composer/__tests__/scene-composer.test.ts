@@ -1,38 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// Use vi.hoisted() so these refs are accessible inside the hoisted vi.mock() factories
-const { mockGroqCreate, mockOpenAIParse } = vi.hoisted(() => ({
-  mockGroqCreate: vi.fn(),
-  mockOpenAIParse: vi.fn(),
+const { mockParseCompletion } = vi.hoisted(() => ({ mockParseCompletion: vi.fn() }))
+
+vi.mock('@nau/llm-client', () => ({
+  createLLMClient: vi.fn(() => ({ parseCompletion: mockParseCompletion })),
 }))
-
-vi.mock('openai', () => {
-  function MockOpenAI() {
-    return { beta: { chat: { completions: { parse: mockOpenAIParse } } } }
-  }
-  return { default: MockOpenAI }
-})
-
-vi.mock('openai/helpers/zod', () => ({
-  zodResponseFormat: vi.fn().mockReturnValue({ type: 'json_schema' }),
-}))
-
-vi.mock('groq-sdk', () => {
-  function MockGroq() {
-    return { chat: { completions: { create: mockGroqCreate } } }
-  }
-  return { Groq: MockGroq }
-})
 
 vi.mock('@/modules/shared/prisma', () => ({
   prisma: {
-    brandPersona: {
-      findUnique: vi.fn(),
-      findFirst: vi.fn(),
-    },
-    asset: {
-      findMany: vi.fn(),
-    },
+    brandPersona: { findUnique: vi.fn(), findFirst: vi.fn() },
+    asset: { findMany: vi.fn() },
   },
 }))
 
@@ -47,8 +24,6 @@ vi.mock('@/modules/composer/model-resolver', () => ({
 import { compose } from '../scene-composer'
 import { prisma } from '@/modules/shared/prisma'
 import { resolveModelId } from '@/modules/composer/model-resolver'
-
-// ─── Helpers ──────────────────────────────────────────────────────
 
 const mockPersona = {
   id: 'persona-1',
@@ -85,8 +60,6 @@ const validCreativeDirection = {
   suggestedAudioMood: 'upbeat',
 }
 
-// ─── Tests ────────────────────────────────────────────────────────
-
 describe('compose()', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -94,15 +67,14 @@ describe('compose()', () => {
     ;(resolveModelId as ReturnType<typeof vi.fn>).mockReturnValue({
       provider: 'groq',
       model: 'llama-3.3-70b-versatile',
+      registryId: 'groq/llama-3.3-70b',
     })
+    vi.stubEnv('GROQ_API_KEY', 'test-groq-key')
   })
 
   it('uses platform default when no Brand Persona is found for account', async () => {
     ;(prisma.brandPersona.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(null)
-    vi.stubEnv('GROQ_API_KEY', 'test-groq-key')
-    mockGroqCreate.mockResolvedValue({
-      choices: [{ message: { content: JSON.stringify(validCreativeDirection) } }],
-    })
+    mockParseCompletion.mockResolvedValue({ data: validCreativeDirection })
 
     const result = await compose({ ideaText: 'test idea', accountId: 'account-1', format: 'reel' })
     expect(result.personaName).toBe('Platform Default')
@@ -110,17 +82,9 @@ describe('compose()', () => {
 
   it('returns CreativeDirection via Groq path when Groq model is selected', async () => {
     ;(prisma.brandPersona.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(mockPersona)
-    vi.stubEnv('GROQ_API_KEY', 'test-groq-key')
+    mockParseCompletion.mockResolvedValue({ data: validCreativeDirection })
 
-    mockGroqCreate.mockResolvedValue({
-      choices: [{ message: { content: JSON.stringify(validCreativeDirection) } }],
-    })
-
-    const result = await compose({
-      ideaText: 'test idea',
-      accountId: 'account-1',
-      format: 'reel',
-    })
+    const result = await compose({ ideaText: 'test idea', accountId: 'account-1', format: 'reel' })
 
     expect(result.creative.scenes).toHaveLength(2)
     expect(result.creative.caption).toBe('Test caption for the post.')
@@ -129,22 +93,15 @@ describe('compose()', () => {
 
   it('retries once on first AI failure and succeeds on second attempt', async () => {
     ;(prisma.brandPersona.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(mockPersona)
-    vi.stubEnv('GROQ_API_KEY', 'test-groq-key')
 
     let callCount = 0
-    mockGroqCreate.mockImplementation(() => {
+    mockParseCompletion.mockImplementation(() => {
       callCount++
-      if (callCount === 1) throw new Error('Groq timeout')
-      return Promise.resolve({
-        choices: [{ message: { content: JSON.stringify(validCreativeDirection) } }],
-      })
+      if (callCount === 1) throw new Error('LLM timeout')
+      return Promise.resolve({ data: validCreativeDirection })
     })
 
-    const result = await compose({
-      ideaText: 'retry test idea',
-      accountId: 'account-1',
-      format: 'reel',
-    })
+    const result = await compose({ ideaText: 'retry test idea', accountId: 'account-1', format: 'reel' })
 
     expect(result.creative.scenes).toHaveLength(2)
     expect(callCount).toBe(2)
@@ -152,9 +109,7 @@ describe('compose()', () => {
 
   it('throws with "after 2 attempts" message when both AI calls fail', async () => {
     ;(prisma.brandPersona.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(mockPersona)
-    vi.stubEnv('GROQ_API_KEY', 'test-groq-key')
-
-    mockGroqCreate.mockRejectedValue(new Error('Groq always fails'))
+    mockParseCompletion.mockRejectedValue(new Error('LLM always fails'))
 
     await expect(
       compose({ ideaText: 'failing idea', accountId: 'account-1', format: 'reel' }),
@@ -163,88 +118,20 @@ describe('compose()', () => {
 
   it('clamps coverSceneIndex to 0 when AI returns out-of-range value', async () => {
     ;(prisma.brandPersona.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(mockPersona)
-    vi.stubEnv('GROQ_API_KEY', 'test-groq-key')
+    mockParseCompletion.mockResolvedValue({ data: { ...validCreativeDirection, coverSceneIndex: 99 } })
 
-    mockGroqCreate.mockResolvedValue({
-      choices: [
-        {
-          message: { content: JSON.stringify({ ...validCreativeDirection, coverSceneIndex: 99 }) },
-        },
-      ],
-    })
-
-    const result = await compose({
-      ideaText: 'cover index test',
-      accountId: 'account-1',
-      format: 'reel',
-    })
+    const result = await compose({ ideaText: 'cover index test', accountId: 'account-1', format: 'reel' })
 
     expect(result.creative.coverSceneIndex).toBe(0)
   })
 
-  it('throws when OPENAI_API_KEY is not configured for OpenAI provider', async () => {
+  it('Groq path: parses valid response successfully', async () => {
     ;(prisma.brandPersona.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(mockPersona)
-    ;(resolveModelId as ReturnType<typeof vi.fn>).mockReturnValue({
-      provider: 'openai',
-      model: 'gpt-4o',
-    })
-    vi.stubEnv('OPENAI_API_KEY', '')
+    mockParseCompletion.mockResolvedValue({ data: validCreativeDirection })
 
-    await expect(
-      compose({ ideaText: 'openai test', accountId: 'account-1', format: 'reel' }),
-    ).rejects.toThrow(/OPENAI_API_KEY is not configured/)
-  })
-
-  // ─── Groq JSON parsing edge cases ─────────────────────────────
-
-  it('Groq path: parses valid JSON response successfully', async () => {
-    ;(prisma.brandPersona.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(mockPersona)
-    vi.stubEnv('GROQ_API_KEY', 'test-groq-key')
-
-    mockGroqCreate.mockResolvedValue({
-      choices: [{ message: { content: JSON.stringify(validCreativeDirection) } }],
-    })
-
-    const result = await compose({
-      ideaText: 'json parse test',
-      accountId: 'account-1',
-      format: 'reel',
-    })
+    const result = await compose({ ideaText: 'json parse test', accountId: 'account-1', format: 'reel' })
 
     expect(result.creative).toBeDefined()
     expect(result.creative.hashtags).toContain('test')
-  })
-
-  it('Groq path: throws readable error when response is invalid JSON', async () => {
-    ;(prisma.brandPersona.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(mockPersona)
-    vi.stubEnv('GROQ_API_KEY', 'test-groq-key')
-
-    mockGroqCreate.mockResolvedValue({
-      choices: [{ message: { content: 'NOT VALID JSON {{{' } }],
-    })
-
-    // After Phase 2.1 fix: error contains "[SceneComposer] Groq returned invalid JSON"
-    await expect(
-      compose({ ideaText: 'bad json test', accountId: 'account-1', format: 'reel' }),
-    ).rejects.toThrow(/Groq returned invalid JSON|after 2 attempts/)
-  })
-
-  it('Groq path: strips markdown code fences before parsing JSON', async () => {
-    ;(prisma.brandPersona.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(mockPersona)
-    vi.stubEnv('GROQ_API_KEY', 'test-groq-key')
-
-    const markdownWrapped = `\`\`\`json\n${JSON.stringify(validCreativeDirection)}\n\`\`\``
-
-    mockGroqCreate.mockResolvedValue({
-      choices: [{ message: { content: markdownWrapped } }],
-    })
-
-    const result = await compose({
-      ideaText: 'markdown wrapped test',
-      accountId: 'account-1',
-      format: 'reel',
-    })
-
-    expect(result.creative.scenes).toHaveLength(2)
   })
 })

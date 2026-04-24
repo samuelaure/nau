@@ -57,7 +57,7 @@ describe('ServiceAuthGuard', () => {
   it('throws UnauthorizedException on AuthError', async () => {
     ;(nauAuth.extractBearerToken as jest.Mock).mockReturnValue('expired')
     ;(nauAuth.verifyServiceToken as jest.Mock).mockRejectedValue(
-      new nauAuth.AuthError('Token expired'),
+      new nauAuth.AuthError('Token expired', 'INVALID'),
     )
     await expect(guard.canActivate(makeContext('Bearer expired'))).rejects.toThrow(
       UnauthorizedException,
