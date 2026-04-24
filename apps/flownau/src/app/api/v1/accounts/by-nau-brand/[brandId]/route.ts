@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { NextResponse } from 'next/server'
 import { validateServiceToken, unauthorizedResponse } from '@/modules/shared/nau-auth'
 import { prisma } from '@/modules/shared/prisma'
