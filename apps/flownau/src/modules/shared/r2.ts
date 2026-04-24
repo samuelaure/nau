@@ -7,6 +7,6 @@ export const storage = new Proxy({} as NauStorage, {
     if (!_storage) {
       _storage = createStorage(loadStorageConfig())
     }
-    return (_storage as Record<string | symbol, unknown>)[prop]
+    return (_storage as unknown as Record<string | symbol, unknown>)[prop]
   },
 })
