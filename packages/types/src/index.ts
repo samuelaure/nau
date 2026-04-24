@@ -113,6 +113,7 @@ export interface UpdateWorkspaceDto {
 export interface CreateBrandDto {
   name: string
   handle?: string
+  timezone?: string
 }
 
 export interface UpdateBrandDto {

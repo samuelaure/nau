@@ -124,7 +124,7 @@ export function EditorCanvas() {
       >
         <Player
           ref={playerRef}
-          component={UniversalComposition}
+          component={UniversalComposition as any}
           inputProps={{ template }}
           durationInFrames={Math.max(1, template.durationInFrames)}
           fps={template.fps}
