@@ -1,0 +1,36 @@
+name: CI — zazu-dashboard
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/zazu-dashboard/**'
+      - 'packages/**'
+      - '.github/workflows/ci-zazu-dashboard.yml'
+  pull_request:
+    paths:
+      - 'apps/zazu-dashboard/**'
+      - 'packages/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm turbo typecheck --filter=zazu-dashboard
+
+      - name: Build
+        run: pnpm turbo build --filter=zazu-dashboard
