@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import jwt from 'jsonwebtoken';
+import { config } from '../../config';
 
 export const authController = async (fastify: FastifyInstance) => {
   fastify.get('/auth/callback', async (request: FastifyRequest, reply: FastifyReply) => {
@@ -9,15 +10,14 @@ export const authController = async (fastify: FastifyInstance) => {
       return reply.status(400).send({ error: 'Missing token parameter' });
     }
 
-    // Decode token without verification to get the payload
-    const payload = jwt.decode(token);
-    if (!payload || typeof payload === 'string') {
-      return reply.status(401).send({ error: 'Invalid token format' });
-    }
-
-    // Check if token is expired
-    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
-      return reply.status(401).send({ error: 'Token expired' });
+    const secret = config.authSecret ?? config.jwtSecret;
+    let payload: jwt.JwtPayload;
+    try {
+      const verified = jwt.verify(token, secret);
+      if (typeof verified === 'string') throw new Error('string payload');
+      payload = verified;
+    } catch {
+      return reply.status(401).send({ error: 'Invalid or expired token' });
     }
 
     // Set token as httpOnly cookie via Set-Cookie header

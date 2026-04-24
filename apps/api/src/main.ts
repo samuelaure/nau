@@ -19,6 +19,8 @@ async function bootstrap() {
     .map((o) => o.trim())
     .filter(Boolean);
 
+  if (origins.length === 0) throw new Error('ALLOWED_ORIGINS environment variable is required');
+
   app.enableCors({
     origin: origins,
     credentials: true,

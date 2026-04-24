@@ -11,6 +11,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -39,6 +40,7 @@ function setCookies(res: Response, accessToken: string, refreshToken: string) {
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
+  @Throttle({ short: { ttl: 900_000, limit: 5 }, medium: { ttl: 900_000, limit: 5 } })
   @Post('register')
   async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: Response) {
     const tokens = await this.auth.register(dto);
@@ -46,6 +48,7 @@ export class AuthController {
     return { expiresIn: tokens.expiresIn };
   }
 
+  @Throttle({ short: { ttl: 900_000, limit: 5 }, medium: { ttl: 900_000, limit: 5 } })
   @Post('login')
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     const tokens = await this.auth.login(dto);

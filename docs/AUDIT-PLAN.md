@@ -405,3 +405,11 @@ Tracking must start from day one. Data cannot be reconstructed retroactively.
 | FLOWNAU_DEFAULT_WORKSPACE_ID used incorrectly | Medium | ✅ Fixed — removed, now requires JWT |
 | Uptime monitoring not implemented | High | ✅ Fixed — GitHub Actions workflow every 5 min |
 | nauthenticity missing /digest endpoint | High | ✅ Fixed — added _service/brands/:brandId/inspo/digest |
+| All LLM calls referenced OpenAI/Groq directly | High | ✅ Fixed — getClientForFeature() + MODEL_REGISTRY abstraction |
+| UsageEvent model and instrumentation missing | High | ✅ Fixed — UsageEvent schema, /usage/events endpoint, LLM + Apify instrumented |
+| Security headers missing on NestJS apps | High | ✅ Fixed — helmet() added to api + nauthenticity |
+| Security headers missing on Next.js apps | Medium | ✅ Fixed — CSP, HSTS, X-Frame-Options on all 4 apps |
+| Rate limiting missing | High | ✅ Fixed — ThrottlerModule on api + nauthenticity; 5/15min on auth endpoints |
+| `api` ALLOWED_ORIGINS no-throw fallback | Medium | ✅ Fixed — throws if ALLOWED_ORIGINS not set |
+| `jwt.decode()` without verification in nauthenticity auth callback | High | ✅ Fixed — now uses jwt.verify() |
+| ENCRYPTION_KEY insecure fallback in flownau | High | ✅ Fixed — throws on missing |
