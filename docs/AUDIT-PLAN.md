@@ -286,24 +286,98 @@ Current allocation:
 
 ---
 
+## 9. GDPR & Privacy compliance
+
+### 9.1 Pre-deployment (required before first user)
+- [ ] **Sensitive field encryption** — encrypt API keys (Instagram access tokens, OAuth tokens) stored in DB using AES-256 (already using `encrypt()` in flownau, verify this covers all fields)
+- [ ] **No credential logging** — verify no service logs plaintext tokens, passwords, or API keys (check pino serializers strip sensitive fields)
+- [ ] **Privacy policy published** — accessible at a public URL before any user signs up (use Termly/iubenda template, customise for naŭ)
+- [ ] **OpenAI DPA signed** — accept OpenAI's Data Processing Addendum at platform.openai.com (required for GDPR compliance when sending user content to OpenAI)
+- [ ] **Breach response runbook documented** — procedure: detect → assess scope → notify affected users within 72h → notify supervisory authority within 72h → post-mortem
+- [ ] **Data minimisation documented** — list of all data collected per entity (User, Workspace, Brand, Post, SocialProfile) with legal basis for each field
+
+### 9.2 Post-deployment — Month 1
+- [ ] **User data export endpoint** — `GET /api/users/{id}/export` returns JSON of all user-owned data
+- [ ] **User deletion endpoint** — `DELETE /api/users/{id}` cascades deletes to all owned data and notifies third-party services (Instagram token revocation, etc.)
+- [ ] **Data retention policy enforced** — define and implement automatic deletion schedules (e.g. delete draft posts after 90 days, usage events after 12 months)
+- [ ] **DPAs with all third-party processors** — Apify, Cloudflare R2, Hetzner, Telegram (assess if required)
+
+### 9.3 Instagram OAuth — deferred (Phase 2)
+Current approach uses direct access tokens (user provides manually). This is acceptable for MVP but:
+- Tokens expire ~60 days (manual refresh required)
+- Users cannot revoke from Instagram settings
+- Does not scale beyond technical users
+
+**Migration path:** Implement Meta OAuth flow when onboarding non-technical users or when token renewal complaints begin. Requires Meta Developer App approval (~5 days) and `instagram_basic` + `pages_read_engagement` permissions.
+
+### 9.4 LLM provider abstraction — pre-deployment scaffold, swap post-launch
+- [ ] **Pre-deployment:** Create `packages/llm-client/` with `LLMClient` interface; all OpenAI calls go through it
+- [ ] **Post-deployment (Month 3+):** Evaluate self-hosted Llama 2 / Mistral on GPU server; plug in as alternative implementation behind feature flag
+- [ ] **Privacy gain:** User content no longer leaves your infrastructure; eliminates need for OpenAI DPA for that subset of calls
+
+---
+
+## 10. Usage tracking & cost attribution
+
+### 10.1 Pre-deployment (implement before first user — ~1 day)
+Tracking must start from day one. Data cannot be reconstructed retroactively.
+
+- [ ] **`UsageEvent` model** added to api Prisma schema:
+  ```
+  fields: id, workspaceId, brandId?, userId?, service, operation, quantity, unit, costUsd, metadata, recordedAt
+  indices: [workspaceId + recordedAt], [service + recordedAt]
+  ```
+- [ ] **`POST /_service/usage/events`** endpoint in api (ServiceAuthGuard) — any service can emit a usage event
+- [ ] **`GET /admin/usage/summary`** endpoint in api — aggregate cost by workspace/brand over date range
+- [ ] **OpenAI usage instrumented** — both flownau and nauthenticity wrap OpenAI calls and emit events with `response.usage.total_tokens` and cost calculated from rate table
+- [ ] **Apify usage instrumented** — nauthenticity reads `run.usageTotalUsd` from actor run response and emits event
+- [ ] **`UNIT_COSTS` rate table** defined in `packages/config/` — maps service+operation to USD per unit; update when provider pricing changes
+
+### 10.2 Post-deployment — Month 2
+- [ ] **Quota enforcement middleware** — NestJS interceptor checks workspace's monthly usage against plan limit before allowing expensive operations
+- [ ] **Plan tier definitions** — define what quota each plan includes (e.g. Free: 10k OpenAI tokens/month, Pro: 500k, Business: unlimited)
+- [ ] **Usage dashboard (admin)** — per-workspace cost breakdown by service, date range, top consumers
+- [ ] **Threshold alerts** — Telegram alert when workspace reaches 80% and 100% of monthly quota
+- [ ] **R2 bandwidth tracking** — instrument Cloudflare R2 reads/writes via Cloudflare Analytics API or SDK wrapper
+- [ ] **Render count tracking** — flownau-renderer emits usage event per video render
+
+### 10.3 Post-deployment — Month 3+
+- [ ] **User-facing usage page** — workspace owner sees their monthly consumption and cost breakdown
+- [ ] **Billing integration** — Stripe metered billing consuming UsageEvent data
+- [ ] **Invoice generation** — monthly summary per workspace with itemised third-party costs + margin
+- [ ] **LLM provider swap** — when self-hosted LLM is running, reduce `costUsd` contribution from OpenAI; cost attribution remains valid
+
+---
+
 ## Audit execution order
 
-**Blocking (must complete before first deployment):**
-1. **Repository hygiene** — verify no secrets, artifacts, or excluded files in git
-2. **Secrets & credentials** — all env vars set, no defaults, strong passwords
-3. **Anti-hacking hardening** (section 2.6) — rate limiting, security headers, session revocation
-4. **DNS** — A records live and propagated (required for Let's Encrypt)
+### Phase A — Blocking (must be done before deploying to server)
+1. **Repository hygiene** (§1) — no secrets, artifacts, or excluded files in git history
+2. **Secrets & credentials** (§2.2) — all env vars set, no defaults, strong passwords
+3. **Anti-hacking hardening** (§2.6) — rate limiting, security headers, session revocation
+4. **DNS** (§8.1) — A records live and propagated (Let's Encrypt won't issue without this)
 
-**High priority (before traffic reaches production):**
-5. **TLS certificates** — Let's Encrypt obtains certs successfully
-6. **Application code** — critical security issues fixed, migrations tested
-7. **Infrastructure & resource allocation** — docker-compose correct, memory limits appropriate
+### Phase B — Pre-launch (must be done before the first non-technical user)
+5. **TLS certificates** (§8.2) — Let's Encrypt obtains certs successfully after DNS is live
+6. **Application code** (§5) — service auth, migrations tested, no insecure env var fallbacks
+7. **Infrastructure** (§3) — docker-compose correct, resource limits, named volumes
+8. **GDPR pre-deploy** (§9.1) — field encryption, privacy policy, OpenAI DPA, breach runbook
+9. **Usage tracking** (§10.1) — UsageEvent model + instrumentation live from day one
+10. **Dockerfile & CI** (§4) — all images build reproducibly, no secrets in layers
+11. **Dependency audit** (§7) — no high/critical CVEs without documented mitigation
+12. **Operational readiness** (§6) — health checks, uptime monitoring, log rotation, backups
+13. **First-boot checklist** (§6.5) — migrations, webhook registration, DNS verification
 
-**Pre-launch (execute before opening to users):**
-8. **Dockerfile & CI** — all images build reproducibly, no secrets in layers
-9. **Dependency audit** — no high/critical CVEs without mitigation
-10. **Operational readiness** — health checks working, logs rotating, backups configured
-11. **First-boot checklist** — all post-deploy steps executed (schema migrations, webhooks, DNS)
+### Phase C — Post-deployment Month 1 (before charging users)
+14. **GDPR user rights** (§9.2) — data export endpoint, deletion endpoint, retention schedules
+15. **Usage quota enforcement** (§10.2) — plan tiers, threshold alerts, quota middleware
+
+### Phase D — Post-deployment Month 3+ (as platform scales)
+16. **Billing integration** (§10.3) — Stripe metered billing, invoices, user-facing usage page
+17. **Instagram OAuth** (§9.3) — Meta app approval, OAuth flow, token auto-refresh
+18. **Self-hosted LLM** (§9.4) — GPU server, Llama 2/Mistral evaluation, provider abstraction swap
+19. **Log aggregation** (observability.md) — Axiom or Loki when SSH grep becomes painful
+20. **Distributed tracing** (observability.md) — OpenTelemetry when cross-service latency is complained about
 
 ---
 
