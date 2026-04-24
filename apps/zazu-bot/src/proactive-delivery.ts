@@ -4,6 +4,7 @@ import { Telegraf } from 'telegraf';
 import { ZazuContext } from '@zazu/skills-core';
 import prisma from '@zazu/db';
 import { logger } from './lib/logger';
+import { requireServiceAuth, buildServiceHeaders } from './lib/service-auth';
 
 export class ProactiveDeliverySystem {
   private bot: Telegraf<ZazuContext>;
@@ -17,15 +18,8 @@ export class ProactiveDeliverySystem {
   }
 
   private setupRoutes() {
-    this.app.post('/api/internal/notify', async (req, res) => {
-      const serviceKey = req.headers['x-nau-service-key'];
-      const expectedKey = process.env.NAU_SERVICE_KEY || 'development_key';
-      
-      if (!serviceKey || serviceKey !== expectedKey) {
-        return res.status(401).json({ error: 'Unauthorized. Invalid x-nau-service-key.' });
-      }
-
-      // 2. Parse Payload
+    this.app.post('/api/internal/notify', requireServiceAuth, async (req, res) => {
+      // Parse Payload
       const payload = req.body; 
       if (!payload.userId) return res.status(400).json({ error: 'Missing userId' });
 
@@ -99,16 +93,15 @@ export class ProactiveDeliverySystem {
         }
 
         // Submit feedback to nauthenticity
-        const nautUrl = process.env.NAUTHENTICITY_URL || 'http://nauthenticity:3000';
-        const nauKey = process.env.NAU_SERVICE_KEY || '';
+        const nautUrl = process.env.NAUTHENTICITY_URL || 'http://nauthenticity:4000';
+        const nautHeaders = await buildServiceHeaders('nauthenticity');
 
-        await fetch(`${nautUrl}/api/v1/comment-feedback`, {
+        await fetch(`${nautUrl}/api/v1/brands/${payload.brandId}/comment-feedback`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-nau-service-key': nauKey },
+          headers: nautHeaders,
           body: JSON.stringify({
             commentText: selectedComment,
-            brandId: payload.brandId,
-            sourcePostId: postId,
+            postId: postId,
             isSelected: true,
           }),
         });

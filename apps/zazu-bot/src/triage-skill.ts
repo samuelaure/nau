@@ -1,12 +1,9 @@
 import { ZazuSkill, ZazuContext } from '@zazu/skills-core';
-import axios from 'axios';
 import { logger } from './lib/logger';
 import { getCachedBrand, setCachedBrand } from './lib/brand-context-cache';
+import { buildServiceHeaders } from './lib/service-auth';
 
 const NAU_API_URL = process.env.NAU_API_URL || 'http://localhost:3000';
-const NAU_SERVICE_KEY = process.env.NAU_SERVICE_KEY || '';
-
-const SERVICE_HEADERS = { 'x-nau-service-key': NAU_SERVICE_KEY };
 
 type NauBrand = { id: string; name: string };
 type NauWorkspace = { id: string; name: string; brands: NauBrand[] };
@@ -14,22 +11,25 @@ type NauWorkspace = { id: string; name: string; brands: NauBrand[] };
 /** Fetch all brands the user has access to via 9naŭ workspaces API. */
 async function fetchUserBrands(nauUserId: string): Promise<NauBrand[]> {
   try {
-    const res = await axios.get<NauWorkspace[]>(`${NAU_API_URL}/workspaces`, {
-      headers: { ...SERVICE_HEADERS, 'x-nau-user-id': nauUserId },
-    });
-    return (res.data ?? []).flatMap((ws) => ws.brands ?? []);
+    const headers = await buildServiceHeaders('9nau-api');
+    const res = await fetch(`${NAU_API_URL}/_service/workspaces?userId=${nauUserId}`, { headers });
+    if (!res.ok) return [];
+    const data = (await res.json()) as NauWorkspace[];
+    return (data ?? []).flatMap((ws) => ws.brands ?? []);
   } catch {
     return [];
   }
 }
 
 async function callTriageApi(text: string, userId: string, brandId: string | null) {
-  const response = await axios.post(
-    `${NAU_API_URL}/triage`,
-    { text, userId, brandId },
-    { headers: SERVICE_HEADERS },
-  );
-  return response.data;
+  const headers = await buildServiceHeaders('9nau-api');
+  const res = await fetch(`${NAU_API_URL}/_service/triage`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ text, userId, brandId }),
+  });
+  if (!res.ok) throw new Error(`Triage API error: ${res.status}`);
+  return res.json();
 }
 
 export class TriageSkill implements ZazuSkill {

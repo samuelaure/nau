@@ -8,6 +8,8 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@nau/auth": "file:../../../packages/auth",
+    "@nau/types": "file:../../../packages/types",
     "@types/express": "^5.0.6",
     "@zazu/db": "*",
     "@zazu/feature-conversational": "*",

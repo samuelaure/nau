@@ -1,7 +1,7 @@
 import { ZazuSkill, ZazuContext } from '@zazu/skills-core';
-import axios from 'axios';
 import dayjs from 'dayjs';
 import { logger } from './lib/logger';
+import { buildServiceHeaders } from './lib/service-auth';
 
 export class SummarySkill implements ZazuSkill {
   id = 'core-summary';
@@ -32,17 +32,16 @@ export class SummarySkill implements ZazuSkill {
 
     try {
       const nauUrl = process.env.NAU_API_URL || 'http://localhost:3000';
-      const nauKey = process.env.NAU_SERVICE_KEY;
+      const headers = await buildServiceHeaders('9nau-api');
 
-      const response = await axios.post(`${nauUrl}/journal/summary`, {
-        periodType,
-        startDate,
-        endDate
-      }, {
-        headers: { 'x-nau-service-key': nauKey }
+      const res = await fetch(`${nauUrl}/_service/journal/summary`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ periodType, startDate, endDate }),
       });
+      const responseData = res.ok ? await res.json() as { success?: boolean; error?: string } : { success: false, error: `HTTP ${res.status}` };
 
-      if (response.data && response.data.success) {
+      if (responseData?.success) {
         // Edit waitMsg with success
         await ctx.telegram.editMessageText(
           ctx.chat?.id,
@@ -55,7 +54,7 @@ export class SummarySkill implements ZazuSkill {
           ctx.chat?.id,
           waitMsg.message_id,
           undefined,
-          `⚠️ No pude generar el resumen: ${response.data?.error || 'Error desconocido'}`
+          `⚠️ No pude generar el resumen: ${responseData?.error || 'Error desconocido'}`
         );
       }
 

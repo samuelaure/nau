@@ -2,6 +2,7 @@ import * as dotenv from 'dotenv';
 import path from 'path';
 import { ProactiveDeliverySystem } from './proactive-delivery';
 import { logger } from './lib/logger';
+import { buildServiceHeaders } from './lib/service-auth';
 
 // Load environment variables for local development
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
@@ -40,28 +41,22 @@ bot.start(async (ctx) => {
   const user = ctx.dbUser;
   const domain = process.env.BOT_DOMAIN || 'zazu.9nau.com';
   const nauApiUrl = process.env.NAU_API_URL ?? 'http://9nau-api:3000';
-  const nauServiceKey = process.env.NAU_SERVICE_KEY ?? '';
 
   // Handle OTT account-linking handshake: /start link-{token}
   const startParam: string = (ctx as any).startPayload ?? '';
   if (startParam.startsWith('link-')) {
     const linkToken = startParam.slice('link-'.length);
     try {
-      const resp = await fetch(`${nauApiUrl}/auth/link-token/verify`, {
+      const headers = await buildServiceHeaders('9nau-api');
+      const resp = await fetch(`${nauApiUrl}/_service/auth/link-token/verify`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-nau-service-key': nauServiceKey,
-        },
+        headers,
         body: JSON.stringify({ token: linkToken, telegramId: user.telegramId.toString() }),
       });
       if (resp.ok) {
         const data = await resp.json() as { ok: boolean };
         if (data.ok) {
-          // Persist nauUserId locally from the API lookup
-          const userResp = await fetch(`${nauApiUrl}/auth/by-telegram/${user.telegramId}`, {
-            headers: { 'x-nau-service-key': nauServiceKey },
-          });
+          const userResp = await fetch(`${nauApiUrl}/_service/auth/by-telegram/${user.telegramId}`, { headers });
           if (userResp.ok) {
             const found = await userResp.json() as { found: boolean; user?: { id: string } };
             if (found.found && found.user?.id) {
@@ -80,9 +75,8 @@ bot.start(async (ctx) => {
   // Attempt to link this Telegram user to their 9naŭ account (best-effort, passive)
   if (!user.nauUserId) {
     try {
-      const resp = await fetch(`${nauApiUrl}/auth/by-telegram/${user.telegramId}`, {
-        headers: { 'x-nau-service-key': nauServiceKey },
-      });
+      const headers = await buildServiceHeaders('9nau-api');
+      const resp = await fetch(`${nauApiUrl}/_service/auth/by-telegram/${user.telegramId}`, { headers });
       if (resp.ok) {
         const data = await resp.json() as { found: boolean; user?: { id: string } };
         if (data.found && data.user?.id) {
