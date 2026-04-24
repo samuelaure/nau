@@ -1,21 +1,26 @@
-import { NestFactory } from '@nestjs/core'
+import { NestFactory, HttpAdapterHost } from '@nestjs/core'
 import { Logger } from '@nestjs/common'
 import { AppModule } from './nest/app.module'
+import { AllExceptionsFilter } from './nest/common/filters/all-exceptions.filter'
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap')
   const app = await NestFactory.create(AppModule)
   app.enableShutdownHooks()
-  app.setGlobalPrefix('api/v1')
+  app.setGlobalPrefix('api/v1', { exclude: ['health'] })
+
+  const httpAdapter = app.get(HttpAdapterHost)
+  app.useGlobalFilters(new AllExceptionsFilter(httpAdapter))
 
   const origins = (process.env.ALLOWED_ORIGINS ?? '')
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean)
 
-  app.enableCors({ origin: origins.length ? origins : '*', credentials: true })
+  if (origins.length === 0) throw new Error('ALLOWED_ORIGINS environment variable is required')
+  app.enableCors({ origin: origins, credentials: true })
 
-  const port = process.env.PORT ?? 4000
+  const port = process.env.PORT ?? 3000
   await app.listen(port)
   logger.log(`nauthenticity listening on port ${port}`)
 }

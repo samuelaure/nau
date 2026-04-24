@@ -176,6 +176,9 @@ bot.launch().then(() => {
       }
     })
   }).catch(e => logger.error({ err: e }, 'Error setting menu button'));
+}).catch((err: unknown) => {
+  logger.fatal({ err }, 'Failed to launch bot — exiting')
+  process.exit(1)
 });
 
 // --- 6. Proactive Delivery Queue ---

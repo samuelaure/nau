@@ -77,6 +77,12 @@ export class InspoController {
     return this.inspoService.list(brandId, { type, status })
   }
 
+  @Get('_service/brands/:brandId/inspo/digest')
+  @UseGuards(ServiceAuthGuard)
+  digestByService(@Param('brandId') brandId: string) {
+    return this.inspoService.digest(brandId)
+  }
+
   @Patch('_service/brands/:brandId/inspo/:id')
   @UseGuards(ServiceAuthGuard)
   updateByService(

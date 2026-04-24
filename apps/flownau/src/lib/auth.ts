@@ -7,7 +7,8 @@ export interface AuthUser {
   email: string
 }
 
-const AUTH_SECRET = process.env.AUTH_SECRET ?? 'changeme'
+const AUTH_SECRET = process.env.AUTH_SECRET
+if (!AUTH_SECRET) throw new Error('AUTH_SECRET environment variable is required')
 const ACCOUNTS_URL = process.env.NEXT_PUBLIC_ACCOUNTS_URL ?? 'https://accounts.9nau.com'
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://flownau.9nau.com'
 

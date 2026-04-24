@@ -94,21 +94,18 @@
 - [ ] Traefik dashboard is NOT exposed publicly
 
 ### 3.3 Resource allocation vs available RAM
-Total server RAM: 3.7GB. Verify all memory limits sum ≤ 3.2GB (leaving 0.5GB for OS).
+Total server RAM: 8GB (Hetzner CX33). Verify all memory limits sum ≤ 7.5GB (leaving 0.5GB for OS).
 
 Current allocation:
 | Category | Total |
 |---|---|
-| App containers (8 services + renderer) | ~3.5GB |
-| Databases (5× postgres) | ~1.0GB |
-| Redis (5×) | ~0.3GB |
+| App containers (7 services + renderer, whatsnau deferred) | ~5.4GB |
+| Databases (4× postgres) | ~1.3GB |
+| Redis (4×) | ~0.5GB |
 | OS + Traefik | ~0.3GB |
-| **Total** | **~5.1GB** |
+| **Total** | **~7.5GB** |
 
-⚠️ **This exceeds available RAM.** Not all services will run simultaneously at their limits, but this needs review. Consider:
-- Reducing flownau-renderer limit (heaviest consumer at 1.5GB)
-- Consolidating databases where services share a Postgres instance
-- Evaluating which services must co-run on this server
+✅ **Within budget.** ~500MB headroom at theoretical peak; realistic headroom is ~1.5GB since not all services hit limits simultaneously.
 
 ### 3.4 Persistent data
 - [ ] All database volumes survive container restarts
@@ -136,7 +133,7 @@ Current allocation:
 - [ ] Non-root user in Next.js runners (`nextjs` user, uid 1001)
 - [ ] zazu-bot Dockerfile paths updated for monorepo (`apps/zazu-bot/`, `packages/zazu-db/`)
 - [ ] zazu-dashboard Dockerfile paths updated for monorepo
-- [ ] `whatsnau` Dockerfile — **MISSING, needs to be created**
+- [ ] `whatsnau` Dockerfile — **OUT OF SCOPE** (whatsnau deferred, not deploying in v1)
 
 ### 4.3 Image security
 - [ ] Base images are specific versions (not `latest`)
@@ -244,11 +241,12 @@ Current allocation:
 
 | Finding | Severity | Status |
 |---|---|---|
-| `flownau/src/lib/auth.ts`: `AUTH_SECRET ?? 'changeme'` fallback | High | 🔴 Open |
-| `nauthenticity/src/modules/` legacy `NAU_SERVICE_KEY` outbound calls | Medium | 🟡 Open — confirm dead code |
-| `flownau/src/modules/ideation/.../inspo-source.ts`: `NAU_SERVICE_KEY` outbound to nauthenticity | Medium | 🔴 Open |
-| `whatsnau` missing Dockerfile | Medium | 🔴 Open |
-| Total memory allocation exceeds server RAM | High | 🔴 Open |
+| `flownau/src/lib/auth.ts`: `AUTH_SECRET ?? 'changeme'` fallback | High | ✅ Fixed — throws on missing |
+| `nauthenticity/src/modules/` legacy `NAU_SERVICE_KEY` outbound calls | Medium | ✅ Dead code confirmed (app.module.ts only imports src/nest/) |
+| `flownau/src/modules/ideation/.../inspo-source.ts`: `NAU_SERVICE_KEY` outbound to nauthenticity | Medium | ✅ Fixed — signServiceToken + correct endpoint |
+| `flownau/inspo-source.ts` called non-existent `/api/inspo/digest` endpoint | High | ✅ Fixed — added `_service/brands/:brandId/inspo/digest` to nauthenticity |
+| `whatsnau` missing Dockerfile | Medium | ⏸ Deferred — whatsnau out of scope for v1 |
+| Total memory allocation exceeds server RAM | High | ✅ Resolved — server upgraded to 8GB RAM |
 | zazu-bot/dashboard Dockerfiles updated for monorepo paths | — | ✅ Fixed |
 | `INITIAL_ADMIN_PASSWORD:-admin123` fallback | Critical | ✅ Fixed |
 | `REDIS_PASSWORD:-` empty default | High | ✅ Fixed |

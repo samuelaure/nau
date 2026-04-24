@@ -35,6 +35,25 @@ export class InspoService {
     await this.prisma.inspoItem.delete({ where: { id } })
   }
 
+  async digest(brandId: string): Promise<{ content: string; attachedUrls: string[] }> {
+    const items = await this.prisma.inspoItem.findMany({
+      where: { brandId },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    })
+
+    const parts: string[] = []
+    const attachedUrls: string[] = []
+
+    for (const item of items) {
+      const line = [item.extractedHook, item.extractedTheme, item.note].filter(Boolean).join(' — ')
+      if (line) parts.push(line)
+      if (item.sourceUrl) attachedUrls.push(item.sourceUrl)
+    }
+
+    return { content: parts.join('\n'), attachedUrls }
+  }
+
   private async assertOwnership(id: string, brandId: string) {
     const item = await this.prisma.inspoItem.findUnique({ where: { id } })
     if (!item || item.brandId !== brandId) throw new NotFoundException('Inspo item not found')

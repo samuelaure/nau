@@ -2,17 +2,76 @@
 
 > Metrics, tracing, and alerting for the platform as it scales.
 
-**Status:** not scoped for the current refactor. Trigger to start: first on-call incident or sustained user-visible latency.
+**Status:** uptime monitoring is live. Two capabilities remain future work: centralized log aggregation and distributed tracing.
 
 ---
 
 ## Current state
 
-- Structured logs via pino (after Phase 1 `@nau/logger` lands — before that, mix of `console.log` and Fastify logs).
+- Structured logs via `@nau/logger` (pino) active in all NestJS/Express services.
+- Global exception filter in api and nauthenticity — all unhandled errors logged with path, method, and stack.
+- Health endpoints at `/health` for api and nauthenticity.
+- Docker log rotation configured (json-file, 10m/3 files per service).
+- ✅ **Uptime monitoring active** — `.github/workflows/uptime.yml`, every 5 min, Telegram alerts.
 - No centralized log aggregation.
 - No distributed tracing.
-- No metrics endpoint.
-- No alerting beyond Docker container health.
+- No Prometheus metrics endpoints.
+
+---
+
+## Two remaining future capabilities
+
+### 1. ~~Uptime monitoring~~ ✅ Implemented
+
+See [DEPLOYMENT.md → Uptime monitoring](../platform/DEPLOYMENT.md#uptime-monitoring).
+
+---
+
+**How:**
+- [BetterStack Uptime](https://betterstack.com/uptime) — free tier covers 10 monitors, 3-min check intervals, Telegram/email alerts.
+- [UptimeRobot](https://uptimerobot.com) — free tier, 5-min intervals.
+- Configure one monitor per service pointing at its `/health` endpoint.
+- Alert channel: Telegram (same bot token already configured).
+
+**Estimated effort:** 15 minutes.
+
+---
+
+### 2. Centralized log aggregation
+
+**What it is:** shipping all container stdout logs to a queryable central store so you can search across services, filter by `requestId` or `userId`, and correlate events without SSHing into individual containers.
+
+**Why you need it:** `docker logs api --tail=100` is fine for one service in development. In production, when a user reports "it broke around 3pm", you need to search across all 7 services simultaneously, filter by user ID, and see the full request chain. Without aggregation you're blind — you SSH to one container, grep manually, then move to the next. It takes 20 minutes to find what aggregation would surface in 10 seconds.
+
+**When to add it:** when you have real users and the first "what happened to user X?" question takes more than 5 minutes to answer. Before that, `docker logs` via SSH is sufficient.
+
+**How:**
+- **MVP (self-hosted, $0):** Grafana Loki + Promtail on the same Hetzner server. Promtail reads Docker container logs and ships to Loki. Add a Grafana container for the UI. Total overhead: ~300MB RAM.
+- **Managed (~$25/mo):** [Axiom](https://axiom.co) — generous free tier (50GB/month), no infrastructure to manage, excellent search UI. Ship via the `axiom` Docker log driver.
+- **Standard fields to emit:** `service`, `requestId`, `userId`, `workspaceId`, `brandId`, `operation`, `durationMs` — `@nau/logger` already structures logs this way.
+
+**Estimated effort:** 2–4 hours for Loki self-hosted, 30 minutes for Axiom managed.
+
+---
+
+### 3. Distributed tracing (OpenTelemetry)
+
+**What it is:** attaching a `traceId` to every incoming request and propagating it through every service call, queue job, and database query, so you can see the full execution tree of a single user action across multiple services — including exactly how long each hop took.
+
+**Why you need it:** when a user says "content generation is slow", you need to know whether the bottleneck is in flownau's Next.js server action, the `@nau/sdk` call to the API, the API's Prisma query, or the nauthenticity call for brand context. Without tracing, each service's logs are a separate timeline and you have to mentally reconstruct the causality. With tracing, you open one waterfall diagram and immediately see `flownau → api (12ms) → nauthenticity (2.3s)` — the nauthenticity call is the problem.
+
+**When to add it:** when you have a cross-service latency complaint you can't diagnose from logs alone. Don't add it speculatively — OTEL instrumentation adds ~5–10ms overhead per request and complexity to every service's startup.
+
+**How:**
+- **Instrumentation:** OpenTelemetry SDK in each service. NestJS has first-class OTEL support via `@opentelemetry/sdk-node`. Next.js supports it via `instrumentation.ts` (stable in Next.js 15).
+- **Auto-instrumented:** HTTP server, Prisma (via `@prisma/instrumentation`), BullMQ jobs.
+- **Manually instrumented:** `@nau/sdk` outbound calls (add `traceparent` header), queue job processors.
+- **Collector options:**
+  - Self-hosted: [Jaeger](https://jaegertracing.io) (in-memory for dev, Cassandra/Elasticsearch for prod).
+  - Managed: [Grafana Tempo](https://grafana.com/oss/tempo/) (free on Grafana Cloud), [Honeycomb](https://honeycomb.io) (excellent DX, paid after 20M events/mo).
+- **Context propagation:** `traceparent` / `tracestate` W3C headers — `@nau/sdk` needs to forward these on all outbound calls.
+
+**Estimated effort:** 1–2 days to instrument all services + set up a collector.
 
 ## Target
 

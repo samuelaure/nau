@@ -75,16 +75,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(new URL('/dashboard?error=no_instagram_account', req.url))
     }
 
-    // 4. Resolve workspaceId from the active session context.
-    // Workspace ownership now lives in 9naŭ. The workspaceId is forwarded
-    // via JWT claims once the cross-service SSO propagation is complete.
-    // Until then, read from the env fallback set during account onboarding.
-    const workspaceId =
-      ((user as unknown as Record<string, unknown>).activeWorkspaceId as string) ||
-      process.env.FLOWNAU_DEFAULT_WORKSPACE_ID
+    // 4. Resolve workspaceId from the JWT claims (set by 9naŭ SSO).
+    const workspaceId = (user as unknown as Record<string, unknown>).activeWorkspaceId as string | undefined
 
     if (!workspaceId) {
-      console.error('No activeWorkspaceId on session for user:', user!.id)
       return NextResponse.redirect(new URL('/dashboard?error=no_workspace', req.url))
     }
     await prisma.socialAccount.upsert({

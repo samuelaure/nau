@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { signServiceToken } from '@nau/auth'
 import { logger, logError } from '@/modules/shared/logger'
 
 export interface BrandDigest {
@@ -6,36 +7,29 @@ export interface BrandDigest {
   attachedUrls: string[]
 }
 
-const NAUTHENTICITY_TIMEOUT_MS = 30_000 // Digest may trigger an LLM call — allow up to 30s
+const NAUTHENTICITY_TIMEOUT_MS = 30_000
 
-/**
- * Fetches the mechanical InspoBase Digest from nauthenticity for a brand.
- *
- * On every 3rd call nauthenticity will run an LLM synthesis — this call can
- * take longer than a normal API request, hence the 30s timeout.
- *
- * Graceful degradation: returns null + logs warning when nauthenticity is
- * unreachable or returns an error.
- */
 export async function fetchBrandDigest(brandId: string): Promise<BrandDigest | null> {
   const baseUrl = process.env.NAUTHENTICITY_URL
+  const authSecret = process.env.AUTH_SECRET
   if (!baseUrl) {
     logger.warn('[InspoSource] NAUTHENTICITY_URL not configured — skipping brand digest')
     return null
   }
-
-  const serviceKey = process.env.NAU_SERVICE_KEY
-  if (!serviceKey) {
-    logger.warn('[InspoSource] NAU_SERVICE_KEY not configured — cannot call nauthenticity')
+  if (!authSecret) {
+    logger.warn('[InspoSource] AUTH_SECRET not configured — cannot call nauthenticity')
     return null
   }
 
   try {
-    const response = await axios.get<BrandDigest>(`${baseUrl}/api/inspo/digest`, {
-      params: { brandId },
-      headers: { 'x-nau-service-key': serviceKey },
-      timeout: NAUTHENTICITY_TIMEOUT_MS,
-    })
+    const token = await signServiceToken({ secret: authSecret, iss: 'flownau', aud: 'nauthenticity' })
+    const response = await axios.get<BrandDigest>(
+      `${baseUrl}/_service/brands/${encodeURIComponent(brandId)}/inspo/digest`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: NAUTHENTICITY_TIMEOUT_MS,
+      },
+    )
 
     const digest = response.data
     if (!digest || typeof digest.content !== 'string') {
