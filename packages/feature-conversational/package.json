@@ -8,8 +8,8 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@zazu/db": "*",
-    "@zazu/skills-core": "*",
+    "@zazu/db": "workspace:*",
+    "@zazu/skills-core": "workspace:*",
     "openai": "^4.0.0"
   },
   "devDependencies": {
