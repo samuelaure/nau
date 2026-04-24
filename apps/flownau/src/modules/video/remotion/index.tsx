@@ -109,4 +109,4 @@ export const RemotionVideo: React.FC = () => {
   )
 }
 
-registerRoot(RemotionVideo)
+registerRoot(RemotionVideo as any)

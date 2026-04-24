@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Block } from '@9nau/types'
+import { Block, CreateBlockDto } from '@9nau/types'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { EditableItem } from './EditableItem'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
@@ -45,7 +45,7 @@ export function HierarchicalSection({ dateStr, sectionType, title, items }: Hier
   }
 
   const handleAdd = (afterId: string | null, parentId: string | null) => {
-    const newBlock: Omit<Block, 'id' | 'createdAt' | 'updatedAt' | 'uuid'> = {
+    const newBlock: CreateBlockDto = {
       type: sectionType,
       parentId,
       properties: { text: '', date: dateStr, status: 'inbox' },
