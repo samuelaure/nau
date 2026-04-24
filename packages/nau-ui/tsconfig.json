@@ -6,6 +6,7 @@
     "declaration": true,
     "composite": true,
     "jsx": "react-jsx",
+    "lib": ["ES2021", "DOM", "DOM.Iterable"],
     "types": ["jest", "@testing-library/jest-dom"]
   },
   "include": ["src", "test"],

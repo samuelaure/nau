@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { cn } from '@9nau/ui/lib/utils'
+import { cn } from '../lib/utils'
 
 const COOKIE_KEY = 'zazu_banner_dismissed'
 const COOKIE_TTL_HOURS = 12
