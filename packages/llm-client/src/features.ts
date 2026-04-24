@@ -22,6 +22,9 @@ export type LLMFeature =
   | 'default'              // fallback for any uncategorised call
   | 'ideation'             // content idea generation (flownau)
   | 'composition'          // scene/creative direction generation (flownau)
+  | 'triage'               // GTD triage of raw text captures (api)
+  | 'planning'             // scheduling/ordering content pieces (flownau)
+  | 'template_compile'     // template schema → system prompt compilation (flownau)
   | 'journal_summary'      // hierarchical journal summaries (api)
   | 'comment_suggestions'  // Instagram comment suggestions (nauthenticity)
   | 'post_intelligence'    // post hook/theme/sentiment extraction (nauthenticity)
@@ -40,6 +43,9 @@ const DEFAULT_FEATURE_MODELS: Record<LLMFeature, string> = {
   default:             'openai/gpt-4o',
   ideation:            'openai/gpt-4o',
   composition:         'openai/gpt-4o',
+  triage:              'openai/gpt-4o',
+  planning:            'openai/gpt-4o-mini',
+  template_compile:    'openai/gpt-4o',
   journal_summary:     'openai/gpt-4o',
   comment_suggestions: 'openai/gpt-4o-mini',
   post_intelligence:   'openai/gpt-4o-mini',

@@ -1,6 +1,5 @@
-import OpenAI from 'openai'
+import { getClientForFeature } from '@nau/llm-client'
 import { z } from 'zod'
-import { zodResponseFormat } from 'openai/helpers/zod'
 
 const StrategistOutputSchema = z.object({
   orderedIds: z
@@ -35,13 +34,12 @@ interface StrategistInput {
  * Falls back to creation-order if AI call fails.
  */
 export async function runPlannerStrategist(input: StrategistInput): Promise<string[]> {
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey || !input.strategistPrompt || input.pieces.length === 0) {
+  if (!input.strategistPrompt || input.pieces.length === 0) {
     return input.pieces.map((p) => p.id)
   }
 
   try {
-    const openai = new OpenAI({ apiKey })
+    const { client: llm, model } = getClientForFeature('planning')
 
     const piecesText = input.pieces
       .map(
@@ -54,48 +52,44 @@ export async function runPlannerStrategist(input: StrategistInput): Promise<stri
       `Target: ${input.reelsPerDay} reels/day, ${input.trialReelsPerDay} trial reels/day, ` +
       `planning horizon: ${input.daysToPlan} days.`
 
-    const completion = await openai.chat.completions.parse(
-      {
-        model: 'gpt-4o',
-        temperature: 0.3,
-        messages: [
-          {
-            role: 'system',
-            content: `You are a content planning strategist. Order the given content pieces for maximum strategic impact.
+    const result = await llm.parseCompletion({
+      model,
+      temperature: 0.3,
+      schema: StrategistOutputSchema,
+      schemaName: 'StrategistOutput',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a content scheduling strategist. Given a list of approved content pieces and the brand's strategic posting guidelines, reorder them by posting priority.
 
-STRATEGY GUIDELINES:
+BRAND STRATEGY:
 ${input.strategistPrompt}
 
 POSTING FREQUENCY:
 ${frequencyText}
 
-Return ALL provided IDs in your preferred posting order. Do not omit any.`,
-          },
-          {
-            role: 'user',
-            content: `Order these ${input.pieces.length} content pieces:\n\n${piecesText}`,
-          },
-        ],
-        response_format: zodResponseFormat(StrategistOutputSchema, 'StrategistOutput'),
-      },
-      { timeout: 30_000 },
-    )
+RULES:
+1. Return ALL provided IDs in orderedIds — no additions or omissions.
+2. Prioritize variety of format and topic to avoid audience fatigue.
+3. Lead with highest-engagement formats (reels before carousels, etc.).
+4. Provide a brief reasoning for the chosen order.`,
+        },
+        {
+          role: 'user',
+          content: `Please prioritize these ${input.pieces.length} content pieces:\n\n${piecesText}`,
+        },
+      ],
+      timeoutMs: 30_000,
+    })
 
-    const parsed = completion.choices[0]?.message?.parsed
-    if (!parsed) throw new Error('Empty strategist response')
-
-    // Validate: all original IDs must be present
-    const inputIds = new Set(input.pieces.map((p) => p.id))
-    const outputIds = new Set(parsed.orderedIds)
-    const isComplete = input.pieces.every((p) => outputIds.has(p.id))
-
-    if (!isComplete || parsed.orderedIds.length !== input.pieces.length) {
-      throw new Error('Strategist returned incomplete or duplicate ID list')
+    const ordered = result.data.orderedIds
+    const allIds = new Set(input.pieces.map((p) => p.id))
+    if (ordered.length !== input.pieces.length || !ordered.every((id) => allIds.has(id))) {
+      throw new Error('AI returned invalid or incomplete orderedIds')
     }
 
-    return parsed.orderedIds.filter((id) => inputIds.has(id))
+    return ordered
   } catch {
-    // Graceful fallback: original order
     return input.pieces.map((p) => p.id)
   }
 }

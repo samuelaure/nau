@@ -1,7 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import OpenAI from 'openai';
-import { zodResponseFormat } from 'openai/helpers/zod';
+import { getClientForFeature } from '@nau/llm-client';
 import { z } from 'zod';
 import { BlocksService } from '../blocks/blocks.service';
 import { NauthenticityService } from '../integrations/nauthenticity.service';
@@ -33,22 +31,13 @@ export type TriageResult = z.infer<typeof TriageResultSchema>;
 @Injectable()
 export class TriageService {
   private readonly logger = new Logger(TriageService.name);
-  private openai: OpenAI | null = null;
 
   constructor(
-    private readonly configService: ConfigService,
     private readonly blocksService: BlocksService,
     private readonly nauthenticityService: NauthenticityService,
     private readonly flownauService: FlownauIntegrationService,
     private readonly prisma: PrismaService,
-  ) {
-    const apiKey = this.configService.get<string>('OPENAI_API_KEY');
-    if (apiKey) {
-      this.openai = new OpenAI({ apiKey });
-    } else {
-      this.logger.warn('OPENAI_API_KEY not found. AI Triage will be disabled.');
-    }
-  }
+  ) {}
 
   async processRawText(
     text: string,
@@ -57,9 +46,6 @@ export class TriageService {
     brandId?: string | null,
     workspaceId?: string,
   ) {
-    if (!this.openai) {
-      throw new Error('AI Triage is disabled due to missing configuration.');
-    }
 
     try {
       // 1. Fetch context — projects + brand DNA
@@ -111,12 +97,15 @@ export class TriageService {
           ? `\nBrand context provided: all content_ideas should be linked to the brand with ID "${brandId}" unless clearly unrelated.`
           : '';
 
-      // 5. Call OpenAI
-      this.logger.log(`Calling OpenAI for triage... Brands: ${brandsForPrompt.length}, AI routing: ${aiRoutingEnabled}`);
+      // 5. Call LLM via abstraction layer
+      this.logger.log(`Calling LLM for triage... Brands: ${brandsForPrompt.length}, AI routing: ${aiRoutingEnabled}`);
 
-      const completion = await this.openai.chat.completions.parse({
-        model: 'gpt-4o',
+      const { client: llm, model } = getClientForFeature('triage');
+      const result = await llm.parseCompletion({
+        model,
         temperature: 0.1,
+        schema: TriageResultSchema,
+        schemaName: 'TriageResult',
         messages: [
           {
             role: 'system',
@@ -146,22 +135,13 @@ RULES:
 3. If an action could belong to a project, note the project topic.
 4. You MUST ALWAYS write a 'journalSummary'. Keep it brief and reflective.
 
-OUTPUT: Return valid JSON matching the schema.`
+OUTPUT: Return valid JSON matching the schema.`,
           },
-          {
-            role: 'user',
-            content: text
-          }
+          { role: 'user', content: text },
         ],
-        response_format: zodResponseFormat(TriageResultSchema, 'TriageResult'),
       });
 
-      const choice = completion.choices[0];
-      if (!choice || !choice.message.parsed) {
-        throw new Error('Failed to parse AI response or no choices returned');
-      }
-
-      const parsed = choice.message.parsed;
+      const parsed = result.data;
 
       // 6. Save blocks — pass through explicit brandId and aiRouting flag
       const createdBlocks = await this.saveTriagedBlocks(parsed, sourceBlockId, brandId, aiRoutingEnabled);

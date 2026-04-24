@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { getAuthUser } from '@/lib/auth'
 import { prisma } from '@/modules/shared/prisma'
 import { NextResponse } from 'next/server'
-import { OpenAI } from 'openai'
+import { createLLMClient } from '@nau/llm-client'
 import { getSetting } from '@/modules/shared/settings'
 import { decrypt } from '@/modules/shared/encryption'
 
@@ -22,8 +22,8 @@ export async function PUT(req: Request, props: { params: Promise<{ id: string }>
     const apiKey = keyStr ? decrypt(keyStr) : process.env.OPENAI_API_KEY
     if (!apiKey) throw new Error('Missing OpenAI Key for Compilation')
 
-    const openai = new OpenAI({ apiKey })
-    const compilationRes = await openai.chat.completions.create({
+    const llm = createLLMClient({ provider: 'openai', apiKey })
+    const result = await llm.chatCompletion({
       model: 'gpt-4o',
       messages: [
         {
@@ -35,7 +35,7 @@ export async function PUT(req: Request, props: { params: Promise<{ id: string }>
       ],
     })
 
-    const generatedSystemPrompt = compilationRes.choices[0].message.content || 'No prompt generated'
+    const generatedSystemPrompt = result.content || 'No prompt generated'
 
     const updated = await (prisma.template as any).update({
       where: { id },
