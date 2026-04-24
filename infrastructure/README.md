@@ -1,65 +1,28 @@
 # Infrastructure
 
-Central Traefik gateway and local development services for the naŭ platform.
+Traefik reverse proxy and the `nau-network` Docker bridge network.
 
-## Structure
-
-```
-infrastructure/
-├── gateway/
-│   ├── docker-compose.yml   # Traefik reverse proxy — required in all environments
-│   └── acme.json            # Let's Encrypt cert storage (gitignored, auto-created)
-├── local/
-│   ├── whisper/             # Whisper ASR — local dev only
-│   │   └── docker-compose.yml
-│   └── postgres-admin/      # (reserved) pgAdmin — local dev only
-├── scripts/
-│   ├── init-network.sh      # Create nau-network once before first service start
-│   └── start-local.sh       # Start gateway + any local services
-└── README.md
-```
-
-## Quick start
+## Start
 
 ```bash
-# First time only — create the shared Docker network
-./scripts/init-network.sh
+# First time: create the shared Docker network
+docker network create nau-network
 
-# Start gateway only
-./scripts/start-local.sh
-
-# Start gateway + Whisper transcription
-./scripts/start-local.sh whisper
+# Start the gateway
+cd infrastructure
+docker compose up -d
 ```
 
-## The `nau-network`
+## How it works
 
-Defined here and nowhere else. Every platform service attaches to it as `external: true`. Never redefine it in an app's `docker-compose.yml`.
+All platform services declare Traefik labels in their own `docker-compose.yml` and attach to `nau-network` as `external: true`. Traefik picks them up automatically via the Docker socket — no gateway config changes needed when adding a service.
 
-## Gateway
+`nau-network` is defined here and nowhere else. Never redefine it in an app compose file.
 
-Traefik v2.11 handles:
-- HTTP → HTTPS redirect
-- TLS termination via Let's Encrypt (prod) / self-signed (local)
-- Routing by hostname to the correct container
+## TLS
 
-Each app declares its own Traefik labels in its `docker-compose.yml`. The gateway picks them up automatically via Docker socket.
+Certificates are issued automatically by Let's Encrypt and stored in `acme.json` (gitignored). The file must exist with `600` permissions before first run:
 
-## Local services
-
-These **never run in production**. They exist only for local development.
-
-| Service | Path | RAM | Purpose |
-|---|---|---|---|
-| Whisper ASR | `local/whisper/` | ~2.5 GB | Audio → text transcription for nauthenticity |
-
-Configure Whisper model via `WHISPER_MODEL` env var (default: `small`).
-Options: `tiny` (1 GB), `base` (1.5 GB), `small` (2.5 GB), `medium` (5 GB).
-
-## Adding a local service
-
-1. Create `local/<name>/docker-compose.yml`
-2. Attach to `nau-network` as `external: true`
-3. Add Traefik labels with `<name>.localhost` hostname
-4. Pass `<name>` to `start-local.sh` to start it
-5. Document in this README with RAM usage
+```bash
+touch infrastructure/acme.json && chmod 600 infrastructure/acme.json
+```
