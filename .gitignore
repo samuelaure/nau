@@ -42,3 +42,20 @@ coverage/
 tests/e2e/.auth/user.json
 playwright-report/
 test-results/
+
+# Database dumps and ad-hoc SQL files — schema lives in prisma/migrations/
+*.sql
+!**/prisma/migrations/**/*.sql
+
+# Ad-hoc output files generated during debugging/development
+*_fail_log.txt
+*_output.txt
+tsc_errors.txt
+lint_output.txt
+
+# AI agent working directories
+.agent/
+
+# Local scripts dependencies
+scripts/node_modules/
+scripts/package-lock.json
