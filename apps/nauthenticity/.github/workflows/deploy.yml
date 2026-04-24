@@ -1,0 +1,108 @@
+name: Deploy naŭthenticity
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push App
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}/app:latest,ghcr.io/${{ github.repository }}/app:${{ github.ref_name }}
+
+      - name: Copy docker-compose.yml to server
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: 'docker-compose.yml'
+          target: '/root/nauthenticity/'
+
+      - name: Deploy to Server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            mkdir -p /root/nauthenticity
+
+            # Login to GHCR to pull private images
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+
+            # Write production .env from secrets
+            cat > /root/nauthenticity/.env.tmp << 'ENVEOF'
+            DATABASE_USER=nauthenticity_user
+            DATABASE_PASSWORD=${{ secrets.DATABASE_PASSWORD }}
+            DATABASE_NAME=nauthenticity
+            REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+            NAU_SERVICE_KEY=${{ secrets.NAU_SERVICE_KEY }}
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            APIFY_TOKEN=${{ secrets.APIFY_TOKEN }}
+            APIFY_INSTAGRAM_UNIVERSAL_ACTOR_ID=samuelaure/nau-ig-actor
+            TRANSCRIPTION_URL=http://whisper:8000
+            R2_ACCESS_KEY_ID=${{ secrets.R2_ACCESS_KEY_ID }}
+            R2_SECRET_ACCESS_KEY=${{ secrets.R2_SECRET_ACCESS_KEY }}
+            R2_ENDPOINT=${{ secrets.R2_ENDPOINT }}
+            R2_BUCKET_NAME=${{ secrets.R2_BUCKET_NAME }}
+            R2_PUBLIC_URL=${{ secrets.R2_PUBLIC_URL }}
+            TAG=latest
+            ENVEOF
+            sed 's/^[[:space:]]*//' /root/nauthenticity/.env.tmp | tr -d '\r' > /root/nauthenticity/.env
+
+            cd /root/nauthenticity
+            echo "--- Server Disk Space [BEFORE SWAP] ---"
+            df -h /
+
+            # Prune system to clear runway and comply with Protocol S11
+            docker system prune -f
+
+            # Pull and deploy with explicit down to resolve container name sync issues
+            TAG=latest docker compose pull
+            TAG=latest docker compose down
+            TAG=latest docker compose up -d --remove-orphans
+
+            # Prune old images
+            docker image prune -a -f --filter "until=2h" || true
+
+            echo "--- Server Disk Space [AFTER SWAP] ---"
+            df -h /
+
+            # Give the database a moment to fully initialize after recreation
+            sleep 5
+
+            # Run migrations in a separate container without memory constraints
+            # (docker compose exec hits the 384M app container limit and gets OOM-killed)
+            DB_URL="postgresql://nauthenticity_user:${{ secrets.DATABASE_PASSWORD }}@nauthenticity_postgres:5432/nauthenticity?schema=public"
+            docker run --rm \
+              --network nau-network \
+              -e DATABASE_URL="$DB_URL" \
+              ghcr.io/${{ github.repository }}/app:latest \
+              npx prisma migrate deploy --schema src/db/schema.prisma
