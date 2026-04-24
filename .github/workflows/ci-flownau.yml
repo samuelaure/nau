@@ -122,7 +122,7 @@ jobs:
       - name: Build & push renderer image
         uses: docker/build-push-action@v6
         with:
-          context: apps/flownau
+          context: .
           file: apps/flownau/Dockerfile.renderer
           push: true
           tags: |
