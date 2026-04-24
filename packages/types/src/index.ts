@@ -180,6 +180,21 @@ export interface AuthTokensResponse {
   expiresIn: number
 }
 
+// ── Block ─────────────────────────────────────────────────────────────────────
+
+export interface Block {
+  id: string
+  type: string
+  properties: Record<string, unknown>
+  parentId: string | null
+  uuid: string
+  source: string | null
+  sourceRef: string | null
+  createdAt: string
+  updatedAt: string
+  deletedAt: string | null
+}
+
 // ── Block DTOs ────────────────────────────────────────────────────────────────
 
 export interface CreateBlockDto {

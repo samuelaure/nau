@@ -66,6 +66,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Build workspace packages
         run: pnpm build --filter='./packages/**'
+      - name: Generate Prisma client
+        run: pnpm --filter=@9nau/api exec npx prisma generate
       - name: Typecheck
         run: pnpm turbo typecheck --filter=@9nau/api
       - name: Build

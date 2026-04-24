@@ -24,7 +24,9 @@
       "@9nau/ui": ["../../packages/nau-ui/src/index.ts"],
       "@9nau/ui/*": ["../../packages/nau-ui/src/*"],
       "@9nau/core": ["../../packages/nau-core/src/index.ts"],
-      "@9nau/core/*": ["../../packages/nau-core/src/*"]
+      "@9nau/core/*": ["../../packages/nau-core/src/*"],
+      "@nau/types": ["../../packages/types/src/index.ts"],
+      "@9nau/types": ["../../packages/types/src/index.ts"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
