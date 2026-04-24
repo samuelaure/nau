@@ -29,7 +29,6 @@
     "test:watch": "jest --watch"
   },
   "dependencies": {
-    "@9nau/types": "workspace:^",
     "@nau/auth": "workspace:*",
     "@nau/llm-client": "workspace:*",
     "@nau/types": "workspace:*",

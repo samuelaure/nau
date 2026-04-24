@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "main": "./src/index.ts",
   "dependencies": {
-    "@9nau/types": "workspace:*",
+    "@nau/types": "workspace:*",
     "date-fns": "^3.6.0",
     "rrule": "^2.8.1"
   },

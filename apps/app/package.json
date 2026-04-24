@@ -14,7 +14,7 @@
     "test:on": "dotenv -e ../../.env.test -e .env.test next dev"
   },
   "dependencies": {
-    "@9nau/types": "workspace:^",
+    "@nau/types": "workspace:*",
     "@9nau/ui": "workspace:^",
     "@tanstack/react-query": "^5.51.1",
     "@tanstack/react-query-devtools": "^5.51.1",
