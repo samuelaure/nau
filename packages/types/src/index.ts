@@ -212,6 +212,13 @@ export interface UpdateBlockDto {
   properties?: Record<string, unknown>
 }
 
+// ── Schedule ──────────────────────────────────────────────────────────────────
+
+export interface Schedule {
+  startDate: string
+  rrule?: string
+}
+
 // ── API response wrapper ───────────────────────────────────────────────────────
 
 export interface PaginatedResponse<T> {
