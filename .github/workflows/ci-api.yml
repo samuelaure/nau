@@ -108,3 +108,4 @@ jobs:
             docker compose up -d api-postgres api-redis
             docker compose run --rm --no-deps api sh -c "cd apps/api && npx prisma migrate deploy"
             docker compose up -d
+            docker image prune -f

@@ -123,3 +123,4 @@ jobs:
             docker compose up -d flownau-postgres flownau-redis
             docker compose run --rm --no-deps flownau sh -c "cd apps/flownau && npx prisma migrate deploy"
             docker compose up -d
+            docker image prune -f

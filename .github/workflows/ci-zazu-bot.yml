@@ -108,3 +108,4 @@ jobs:
             docker compose up -d zazu-postgres
             docker compose run --rm --no-deps zazu-bot sh -c "cd apps/zazu-bot && npx prisma migrate deploy"
             docker compose up -d
+            docker image prune -f

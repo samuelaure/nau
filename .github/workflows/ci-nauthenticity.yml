@@ -111,3 +111,4 @@ jobs:
             docker compose up -d nauthenticity-postgres nauthenticity-redis
             docker compose run --rm --no-deps nauthenticity sh -c "cd apps/nauthenticity && npx prisma migrate deploy"
             docker compose up -d
+            docker image prune -f
