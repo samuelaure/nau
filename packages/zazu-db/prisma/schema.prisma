@@ -1,0 +1,85 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+enum OnboardingState {
+  AWAITING_NAME
+  COMPLETED
+}
+
+enum Role {
+  USER
+  ASSISTANT
+}
+
+model User {
+  id              String          @id @default(uuid())
+  telegramId      BigInt          @unique
+  firstName       String?
+  lastName        String?
+  username        String?
+  displayName     String?
+  onboardingState OnboardingState @default(AWAITING_NAME)
+  nauUserId        String?         // 9naŭ User.id once linked
+  messages         Message[]
+  features         UserFeature[]
+  deliveryWindow   DeliveryWindow?
+  notifications    NotificationQueue[]
+  createdAt        DateTime        @default(now())
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  role      Role
+  content   String
+  metadata  Json?
+  createdAt DateTime @default(now())
+}
+
+model Feature {
+  id          String        @id
+  name        String
+  description String
+  users       UserFeature[]
+}
+
+model UserFeature {
+  userId    String
+  user      User    @relation(fields: [userId], references: [id])
+  featureId String
+  feature   Feature @relation(fields: [featureId], references: [id])
+  config    Json?
+
+  @@id([userId, featureId])
+}
+
+model DeliveryWindow {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  startHour Int      @default(9)  // 0-23
+  endHour   Int      @default(18) // 0-23
+  timeZone  String   @default("UTC")
+}
+
+model NotificationQueue {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  brandName      String?
+  payloadJson    Json
+  status         String   @default("PENDING") // PENDING, SENT, FAILED
+  failures       Int      @default(0)
+  createdAt      DateTime @default(now())
+  sentAt         DateTime?
+  
+  @@index([userId, status])
+}
