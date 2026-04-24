@@ -1,18 +1,17 @@
-name: CI — zazu-dashboard
+name: CI — mobile
 
-# Next.js 15 Telegram Web App. Uses Vitest + @testing-library/react.
-# Telegram init-data validation (HMAC/crypto) tested with crafted signatures.
+# Expo/React Native app. Tests run under Jest with the react-native preset.
+# No device/emulator required — jest-expo patches the RN runtime for Node.
+# Expo SDK modules (expo-sqlite, expo-file-system, etc.) are auto-mocked.
 on:
   push:
     branches: [main]
     paths:
-      - 'apps/zazu-dashboard/**'
-      - 'packages/**'
-      - '.github/workflows/ci-zazu-dashboard.yml'
+      - 'apps/mobile/**'
+      - '.github/workflows/ci-mobile.yml'
   pull_request:
     paths:
-      - 'apps/zazu-dashboard/**'
-      - 'packages/**'
+      - 'apps/mobile/**'
 
 jobs:
   test:
@@ -20,45 +19,50 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NODE_ENV: test
-      TELEGRAM_BOT_TOKEN: ci-bot-token
 
     steps:
       - uses: actions/checkout@v4
+
       - uses: pnpm/action-setup@v4
         with:
           version: 10
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
+
       - run: pnpm install --frozen-lockfile
 
       - name: Run unit tests with coverage
-        run: pnpm --filter=@zazu/dashboard test:ci
+        run: pnpm --filter=mobile test:ci
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: zazu-dashboard-coverage
-          path: apps/zazu-dashboard/coverage/
+          name: mobile-coverage
+          path: apps/mobile/coverage/
           retention-days: 7
 
   build:
-    name: Typecheck & build
+    name: Typecheck
     runs-on: ubuntu-latest
     needs: test
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: pnpm/action-setup@v4
         with:
           version: 10
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
+
       - run: pnpm install --frozen-lockfile
+
       - name: Typecheck
-        run: pnpm turbo typecheck --filter=@zazu/dashboard
-      - name: Build
-        run: pnpm turbo build --filter=@zazu/dashboard
+        run: pnpm --filter=mobile type-check
