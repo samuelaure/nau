@@ -1,12 +1,5 @@
 packages:
-  # Shared platform packages
+  # Platform shared packages
   - 'packages/*'
-  # 9naŭ API monorepo
-  - '9nau/apps/*'
-  - '9nau/packages/*'
-  # Standalone apps
-  - 'nauthenticity'
-  - 'flownau'
-  # Zazŭ bot + dashboard
-  - 'zazu/apps/*'
-  - 'zazu/packages/*'
+  # All application services (flat)
+  - 'apps/*'
