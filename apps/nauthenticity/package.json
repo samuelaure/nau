@@ -19,10 +19,10 @@
     "test": "jest"
   },
   "dependencies": {
-    "@nau/auth": "file:../packages/auth",
-    "@nau/types": "file:../packages/types",
-    "@nau/logger": "file:../packages/logger",
-    "@nau/sdk": "file:../packages/sdk",
+    "@nau/auth": "workspace:*",
+    "@nau/types": "workspace:*",
+    "@nau/logger": "workspace:*",
+    "@nau/sdk": "workspace:*",
     "@nestjs/bullmq": "^11.0.4",
     "@nestjs/common": "^10.0.0",
     "@nestjs/config": "^3.2.2",
