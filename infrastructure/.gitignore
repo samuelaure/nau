@@ -1,2 +1,0 @@
-# Traefik stores TLS private keys here — never commit
-acme.json
