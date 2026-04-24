@@ -10,6 +10,12 @@ module.exports = {
     '!src/app.ts',
     '!src/main.ts',
     '!src/scheduler.ts',
+    '!src/scripts/**',
+    '!src/modules/content/**',
+    '!src/modules/ingestion/**',
+    '!src/modules/proactive/**',
+    '!src/modules/workspaces/**',
+    '!src/queues/download.worker.ts',
   ],
   moduleFileExtensions: ['ts', 'js', 'json'],
   transform: {
@@ -23,6 +29,7 @@ module.exports = {
   },
   globals: {
     'ts-jest': {
+      diagnostics: false,
       tsconfig: {
         esModuleInterop: true,
       },

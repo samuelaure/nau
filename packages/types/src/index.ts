@@ -188,6 +188,12 @@ export interface CreateBlockDto {
   properties: Record<string, unknown>
 }
 
+export interface UpdateBlockDto {
+  type?: string
+  parentId?: string | null
+  properties?: Record<string, unknown>
+}
+
 // ── API response wrapper ───────────────────────────────────────────────────────
 
 export interface PaginatedResponse<T> {

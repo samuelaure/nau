@@ -26,6 +26,7 @@ jobs:
     env:
       NODE_ENV: test
       AUTH_SECRET: ci-test-secret-32-chars-minimum!!
+      OPENAI_API_KEY: ci-test-openai-key
 
     steps:
       - uses: actions/checkout@v4

@@ -188,12 +188,6 @@ export const downloadWorker = new Worker(
             if (fs.existsSync(tempProfilePath)) fs.unlinkSync(tempProfilePath);
             if (fs.existsSync(optimizedProfilePath)) fs.unlinkSync(optimizedProfilePath);
 
-            if (username === contextUsername) {
-              await prisma.igProfile.update({
-                where: { username },
-                data: { profileImageUrl: publicUrl },
-              });
-            }
 
             const allAccountPosts = await prisma.post.findMany({ where: { username: contextUsername } });
             for (const p of allAccountPosts.filter((p) => p.collaborators !== null)) {
