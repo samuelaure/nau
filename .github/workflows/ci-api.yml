@@ -105,4 +105,6 @@ jobs:
             echo "${{ secrets.API_ENV_FILE }}" > ~/apps/api/.env
             cd ~/apps/api
             docker compose pull
+            docker compose up -d api-postgres api-redis
+            docker compose run --rm --no-deps api sh -c "cd apps/api && npx prisma migrate deploy"
             docker compose up -d

@@ -108,4 +108,6 @@ jobs:
             echo "${{ secrets.NAUTHENTICITY_ENV_FILE }}" > ~/apps/nauthenticity/.env
             cd ~/apps/nauthenticity
             docker compose pull
+            docker compose up -d nauthenticity-postgres nauthenticity-redis
+            docker compose run --rm --no-deps nauthenticity sh -c "cd apps/nauthenticity && npx prisma migrate deploy"
             docker compose up -d
