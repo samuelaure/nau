@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@9nau/ui": "workspace:^",
-    "@nau/auth": "file:../../../packages/auth",
+    "@nau/auth": "workspace:*",
     "dotenv": "^17.2.1",
     "lucide-react": "^0.408.0",
     "next": "14.2.5",
