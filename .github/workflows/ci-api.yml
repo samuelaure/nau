@@ -64,10 +64,12 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Build workspace packages
+        run: pnpm build --filter='./packages/**'
       - name: Typecheck
-        run: pnpm turbo typecheck --filter=api
+        run: pnpm turbo typecheck --filter=@9nau/api
       - name: Build
-        run: pnpm turbo build --filter=api
+        run: pnpm turbo build --filter=@9nau/api
 
   publish:
     name: Build & push image
