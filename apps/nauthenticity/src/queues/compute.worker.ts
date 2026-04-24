@@ -427,11 +427,6 @@ const handleProfileSyncBatch = async (
 
         const imgUrl = profile.profilePicUrlHD || profile.profilePicUrl;
 
-        await prisma.igProfile.updateMany({
-          where: { username: profile.username },
-          data: { profileImageUrl: imgUrl },
-        });
-
         await downloadQueue.add('process-profile-image', {
           username: profile.username,
           url: imgUrl,
@@ -581,7 +576,7 @@ const handleEmbedBatch = async (
 ): Promise<{ paused: true } | void> => {
   logger.info(`[ComputeWorker] Phase: Embedding Run ${runId}`);
   const transcripts = await prisma.transcript.findMany({
-    where: { post: { runId }, embedding: { is: null } },
+    where: { post: { runId }, knowledgeChunks: { none: {} } },
     include: { post: true },
   });
 

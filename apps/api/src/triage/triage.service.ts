@@ -104,7 +104,7 @@ export class TriageService {
       const result = await llm.parseCompletion<TriageResult>({
         model,
         temperature: 0.1,
-        schema: TriageResultSchema,
+        schema: TriageResultSchema as unknown as import('zod').ZodType<TriageResult>,
         schemaName: 'TriageResult',
         messages: [
           {

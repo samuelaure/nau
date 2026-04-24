@@ -180,6 +180,14 @@ export interface AuthTokensResponse {
   expiresIn: number
 }
 
+// ── Block DTOs ────────────────────────────────────────────────────────────────
+
+export interface CreateBlockDto {
+  type: string
+  parentId?: string | null
+  properties: Record<string, unknown>
+}
+
 // ── API response wrapper ───────────────────────────────────────────────────────
 
 export interface PaginatedResponse<T> {

@@ -15,6 +15,7 @@ COPY packages/logger ./packages/logger
 COPY packages/zazu-db ./packages/zazu-db
 COPY packages/skills-core ./packages/skills-core
 COPY packages/feature-conversational ./packages/feature-conversational
+COPY packages/llm-client ./packages/llm-client
 COPY apps/zazu-bot ./apps/zazu-bot
 
 RUN pnpm install --frozen-lockfile

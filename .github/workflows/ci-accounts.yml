@@ -60,9 +60,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Typecheck
-        run: pnpm turbo typecheck --filter=accounts
+        run: pnpm turbo typecheck --filter=@9nau/accounts
       - name: Build
-        run: pnpm turbo build --filter=accounts
+        run: pnpm turbo build --filter=@9nau/accounts
 
   publish:
     name: Build & push image
