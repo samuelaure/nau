@@ -1,0 +1,133 @@
+services:
+  app:
+    container_name: flownau
+    image: ghcr.io/samuelaure/flownau/app:${TAG:-latest}
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@flownau_postgres:5432/${DATABASE_NAME}
+      - REDIS_HOST=flownau_redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - FFMPEG_PATH=/usr/bin/ffmpeg
+      - FFPROBE_PATH=/usr/bin/ffprobe
+    depends_on:
+      flownau_postgres:
+        condition: service_healthy
+      flownau_redis:
+        condition: service_healthy
+    networks:
+      - nau-network
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.flownau.rule=Host(`${PUBLIC_DOMAIN:-flownau.localhost}`)'
+      - 'traefik.http.routers.flownau.entrypoints=websecure'
+      - 'traefik.http.routers.flownau.tls=true'
+      - 'traefik.http.routers.flownau.tls.certresolver=letsencrypt'
+      - 'traefik.http.services.flownau.loadbalancer.server.port=3000'
+      - 'traefik.docker.network=nau-network'
+    command: node server.js
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+          cpus: '0.40'
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  renderer:
+    container_name: flownau-renderer
+    image: ghcr.io/samuelaure/flownau/renderer:${TAG:-latest}
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@flownau_postgres:5432/${DATABASE_NAME}
+      - REDIS_HOST=flownau_redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - FFMPEG_PATH=/usr/bin/ffmpeg
+      - FFPROBE_PATH=/usr/bin/ffprobe
+    depends_on:
+      flownau_postgres:
+        condition: service_healthy
+      flownau_redis:
+        condition: service_healthy
+    networks:
+      - nau-network
+    # No Traefik labels — this container has no web traffic
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1536M
+          cpus: '1.0'
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  flownau_postgres:
+    image: postgres:15-alpine
+    container_name: flownau-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DATABASE_USER}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_DB: ${DATABASE_NAME}
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DATABASE_USER} -d ${DATABASE_NAME}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nau-network
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+    deploy:
+      resources:
+        limits:
+          memory: 192M
+          cpus: '0.35'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  flownau_redis:
+    image: redis:alpine
+    container_name: flownau-redis
+    restart: unless-stopped
+    command: redis-server --requirepass "${REDIS_PASSWORD}"
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli -a "$$REDIS_PASSWORD" ping']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nau-network
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+    deploy:
+      resources:
+        limits:
+          memory: 192M
+          cpus: '0.35'
+    volumes:
+      - redis_data:/data
+
+networks:
+  nau-network:
+    external: true
+
+volumes:
+  postgres_data:
+  redis_data:

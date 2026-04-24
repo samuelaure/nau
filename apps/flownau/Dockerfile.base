@@ -1,0 +1,41 @@
+# ============================================================
+# Base Image — Shared runtime for App and Renderer containers
+# ============================================================
+# Pre-installs all heavy system deps (ffmpeg, Chromium, fonts)
+# and the Remotion browser so downstream images avoid repeating
+# this ~4-minute layer every deploy.
+#
+# Publish this separately on major dep changes (rarely). All other
+# deploys use this as a pre-cached foundation via `cache-from: type=gha`.
+# ============================================================
+
+FROM node:20-bookworm-slim
+
+# System dependencies shared by both App and Renderer
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    chromium \
+    openssl \
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    libpango-1.0-0 \
+    libcairo2 \
+    fonts-noto \
+    && rm -rf /var/lib/apt/lists/*
+
+# Point Remotion/Puppeteer at the system Chromium (avoids downloading a second browser)
+ENV CHROME_PATH=/usr/bin/chromium
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV FFMPEG_PATH=/usr/bin/ffmpeg
+ENV FFPROBE_PATH=/usr/bin/ffprobe

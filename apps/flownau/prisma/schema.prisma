@@ -1,0 +1,325 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ── Workspace & WorkspaceUser models removed ──────────────────────────────────
+// These structural models are now owned exclusively by 9naŭ (9nau-api).
+// flownau references workspaces via workspaceId (String = 9naŭ Workspace.id)
+// and brands via brandId (String = 9naŭ Brand.id).
+
+// SocialAccount stores OAuth credentials only.
+// Identity fields (username, profileImage) are synced from 9naŭ API SocialProfile.
+// Prompt data (directorPrompt, creationPrompt) moved to 9naŭ API Prompt table.
+model SocialAccount {
+  id           String        @id @default(cuid())
+  workspaceId  String        // 9naŭ Workspace.id
+  brandId      String?       // 9naŭ Brand.id
+  platform     String        @default("instagram")
+  platformId   String?
+  username     String?
+  profileImage String?
+  accessToken  String
+  refreshToken String?
+  expiresAt    DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  shortCode    String?
+  assetsRoot   String?
+  tokenExpiresAt   DateTime?
+  tokenRefreshedAt DateTime?
+
+  assets                  Asset[]
+  compositions            Composition[]
+  contentIdeas            ContentIdea[]
+  contentPlans            ContentPlan[]
+  accountTemplateConfigs  AccountTemplateConfig[]
+  templates               Template[]
+
+  @@unique([platform, platformId])
+}
+
+model Asset {
+  id               String         @id @default(cuid())
+  accountId        String?
+  templateId       String?
+  type             String
+  systemFilename   String
+  originalFilename String
+  r2Key            String
+  url              String
+  size             Int
+  mimeType         String
+  hash             String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  thumbnailUrl     String?
+  duration         Float?
+  description      String?        @db.Text
+  tags             String[]       @default([])
+  lastUsedAt       DateTime?
+  usageCount       Int            @default(0)
+  account          SocialAccount? @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  template         Template?      @relation(fields: [templateId], references: [id])
+}
+
+model Template {
+  id               String         @id @default(cuid())
+  name             String
+  remotionId       String
+
+  config           Json?
+  accountId        String
+  scope            String         @default("account")
+  useAccountAssets Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  assetsRoot       String?
+  systemPrompt     String?        @db.Text
+  creationPrompt   String?        @db.Text
+  captionPrompt    String?        @db.Text
+  schemaJson       Json?
+  contentSchema    Json?
+  sceneType        String?
+  slotSchema       Json?
+  styleConfig      Json?
+  renders          Render[]
+  assets           Asset[]
+  compositions     Composition[]
+  accountConfigs   AccountTemplateConfig[]
+  account          SocialAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+}
+
+model AccountTemplateConfig {
+  id              String   @id @default(cuid())
+  accountId       String
+  templateId      String
+  autoApprovePost Boolean  @default(false)
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  account         SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  template        Template      @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, templateId])
+}
+
+/// DEPRECATED: Legacy render tracking. Use RenderJob instead.
+model Render {
+  id               String   @id @default(cuid())
+  templateId       String
+  status           String   @default("IDLE")
+  progress         Float    @default(0)
+  inputData        Json?
+  r2Url            String?
+  instagramMediaId String?
+  instagramStatus  String?
+  error            String?
+  renderLog        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  template         Template @relation(fields: [templateId], references: [id])
+}
+
+model SystemSetting {
+  key       String   @id
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum AIModel {
+  GROQ_LLAMA_3_3
+  GROQ_LLAMA_3_1_70B
+  GROQ_LLAMA_3_1_8B
+  GROQ_MIXTRAL_8X7B
+  GROQ_DEEPSEEK_R1_70B
+  OPENAI_GPT_4O
+  OPENAI_GPT_4O_MINI
+  OPENAI_GPT_4_TURBO
+  OPENAI_GPT_4_1
+  OPENAI_O1
+  OPENAI_O1_MINI
+}
+
+// DEPRECATED: Brand-level prompts are now stored in 9naŭ API Prompt table.
+// This model is retained for backward compatibility with existing records.
+// Do not create new BrandPersona records — use 9naŭ API /prompts (PromptType = BRAND_DNA)
+model BrandPersona {
+  id                      String   @id @default(cuid())
+  brandId                 String   // 9naŭ Brand.id
+  workspaceId             String   // 9naŭ Workspace.id
+  accountId               String?  // legacy — use brandId for new queries
+  name                    String
+  systemPrompt            String   @db.Text
+  modelSelection          AIModel  @default(GROQ_LLAMA_3_3)
+  isDefault               Boolean  @default(false)
+  autoApproveIdeas        Boolean  @default(false)
+  autoApproveCompositions Boolean  @default(false)
+  autoApprovePool         Boolean  @default(false)
+
+  capturedAutoApprove     Boolean  @default(false)
+  capturedCount           Int      @default(3)
+  manualAutoApprove       Boolean  @default(false)
+  manualCount             Int      @default(5)
+  automaticAutoApprove    Boolean  @default(false)
+  automaticCount          Int      @default(5)
+
+  ideas                   ContentIdea[]
+  compositions            Composition[]
+}
+
+model IdeasFramework {
+  id          String   @id @default(cuid())
+  brandId     String   // 9naŭ Brand.id
+  workspaceId String   // 9naŭ Workspace.id
+  accountId   String?  // legacy — use brandId for new queries
+  name        String
+  systemPrompt String  @db.Text
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ideas        ContentIdea[]
+  compositions Composition[]
+}
+
+model ContentCreationPrinciples {
+  id           String   @id @default(cuid())
+  brandId      String   // 9naŭ Brand.id
+  workspaceId  String   // 9naŭ Workspace.id
+  accountId    String?  // legacy — use brandId for new queries
+  name         String
+  systemPrompt String   @db.Text
+  isDefault    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  ideas        ContentIdea[]
+  compositions Composition[]
+}
+
+model ContentIdea {
+  id                   String        @id @default(cuid())
+  accountId            String
+  ideaText             String        @db.Text
+  format               String?
+  status               String        @default("PENDING")
+  source               String        @default("automatic")
+  sourceRef            String?
+  priority             Int           @default(3)
+  aiLinked             Boolean       @default(false)
+  createdAt            DateTime      @default(now())
+
+  brandPersonaId       String?
+  ideasFrameworkId     String?
+  contentPrinciplesId  String?
+
+  compositions         Composition[]
+  account              SocialAccount             @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  brandPersona         BrandPersona?             @relation(fields: [brandPersonaId], references: [id])
+  ideasFramework       IdeasFramework?           @relation(fields: [ideasFrameworkId], references: [id])
+  contentPrinciples    ContentCreationPrinciples? @relation(fields: [contentPrinciplesId], references: [id])
+}
+
+model Composition {
+  id                   String        @id @default(cuid())
+  accountId            String
+  templateId           String?
+  format               String        @default("reel")
+  creative             Json?
+  payload              Json
+  videoUrl             String?
+  coverUrl             String?
+  caption              String?       @db.Text
+  hashtags             String[]      @default([])
+  externalPostId       String?
+  externalPostUrl      String?
+  source               String        @default("composed")
+  status               String        @default("DRAFT")
+  scheduledAt          DateTime?
+  publishAttempts      Int           @default(0)
+  lastPublishError     String?       @db.Text
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  ideaId               String?
+  sceneTypes           String[]      @default([])
+  topicHash            String?
+
+  brandPersonaId       String?
+  ideasFrameworkId     String?
+  contentPrinciplesId  String?
+
+  userUploadedMediaUrl String?
+  userPostedManually   Boolean       @default(false)
+
+  account              SocialAccount             @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  template             Template?                 @relation(fields: [templateId], references: [id])
+  idea                 ContentIdea?              @relation(fields: [ideaId], references: [id])
+  brandPersona         BrandPersona?             @relation(fields: [brandPersonaId], references: [id])
+  ideasFramework       IdeasFramework?           @relation(fields: [ideasFrameworkId], references: [id])
+  contentPrinciples    ContentCreationPrinciples? @relation(fields: [contentPrinciplesId], references: [id])
+  renderJob            RenderJob?
+}
+
+model RenderJob {
+  id            String      @id @default(cuid())
+  compositionId String      @unique
+  status        String      @default("queued")
+  progress      Float       @default(0)
+  outputUrl     String?
+  outputType    String      @default("video")
+  error         String?     @db.Text
+  attempts      Int         @default(0)
+  maxAttempts   Int         @default(3)
+  startedAt     DateTime?
+  completedAt   DateTime?
+  renderTimeMs  Int?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  composition   Composition @relation(fields: [compositionId], references: [id], onDelete: Cascade)
+}
+
+model ContentPlan {
+  id          String        @id @default(cuid())
+  accountId   String
+  date        DateTime      @db.Date
+  pieces      Json
+  scripts     Json?
+  delivered   Boolean       @default(false)
+  deliveredAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  account     SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, date])
+}
+
+model ContentPlanner {
+  id                  String        @id @default(cuid())
+  // Strategy is now brand-scoped
+  brandId             String        // 9naŭ Brand.id
+  workspaceId         String        // 9naŭ Workspace.id
+  accountId           String?       // kept for backward compat
+  name                String
+  isDefault           Boolean       @default(false)
+  autoApproveSchedule Boolean       @default(false)
+  strategistPrompt    String?       @db.Text
+  daysToPlan          Int           @default(7)
+
+  frequencyDays       Int           @default(1)
+  reelsPerDay         Int           @default(5)
+  trialReelsPerDay    Int           @default(5)
+  postingTimes        Json          @default("[]")
+  trialPostingTimes   Json          @default("[]")
+  timezone            String        @default("Europe/Madrid")
+  lastPostedAt        DateTime?
+
+  @@unique([brandId, name])
+}

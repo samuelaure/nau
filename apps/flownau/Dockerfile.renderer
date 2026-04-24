@@ -1,0 +1,30 @@
+# ============================================================
+# Renderer Dockerfile — Headless Remotion + FFmpeg BullMQ worker
+# ============================================================
+# Inherits from ghcr.io/samuelaure/flownau/base which includes:
+#   - Chromium (system), ffmpeg, fonts — pre-cached in base layer
+# node_modules are COPIED from the GHA runner (already npm ci'd)
+# so we skip a full npm install here — saves ~3 minutes per deploy.
+# ============================================================
+
+ARG REPO=samuelaure/flownau
+FROM ghcr.io/$REPO/base:latest
+
+WORKDIR /app
+
+# Copy dependency manifests for documentation/auditing purposes
+COPY package*.json ./
+
+# Copy node_modules pre-built by the GHA runner (npm ci already ran there)
+# This is the key optimization: avoids re-running npm ci inside Docker
+COPY node_modules ./node_modules
+
+# Copy full source (worker needs all modules at runtime)
+COPY . .
+
+# Generate Prisma client (still needed — points at the copied schema)
+RUN npx prisma generate
+
+# No port exposed — this is a worker, not a web server
+CMD ["npx", "tsx", "src/modules/renderer/render-worker.ts"]
+

@@ -1,0 +1,243 @@
+name: Deploy flownaŭ
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Image tag to deploy (e.g. v1.6.9)'
+        required: false
+        default: 'latest'
+      force_recreate:
+        description: 'Force recreate containers'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REPO: samuelaure/flownau
+
+jobs:
+  # ---------------------------------------------------------------
+  # Job 1 (conditional): Build & push the shared base image.
+  # Only runs when Dockerfile.base changes to avoid wasteful rebuilds.
+  # All downstream images inherit from this cached layer.
+  # ---------------------------------------------------------------
+  build-base:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push Base Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.base
+          push: true
+          tags: ghcr.io/${{ env.REPO }}/base:latest
+          cache-from: type=gha,scope=base
+          cache-to: type=gha,mode=max,scope=base
+
+  # ---------------------------------------------------------------
+  # Job 2: Build Next.js on the GHA runner (needs real Postgres to
+  # collect page data), then build + push App and Renderer images
+  # IN PARALLEL using a build matrix.
+  # ---------------------------------------------------------------
+  build:
+    runs-on: ubuntu-latest
+    needs: build-base
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: builduser
+          POSTGRES_PASSWORD: buildpass
+          POSTGRES_DB: flownau_build
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U builduser -d flownau_build"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+        env:
+          DATABASE_URL: postgresql://builduser:buildpass@localhost:5432/flownau_build
+
+      - name: Push schema to build DB
+        run: npx prisma db push
+        env:
+          DATABASE_URL: postgresql://builduser:buildpass@localhost:5432/flownau_build
+
+      - name: Build Next.js
+        env:
+          DATABASE_URL: postgresql://builduser:buildpass@localhost:5432/flownau_build
+          NEXTAUTH_SECRET: build_time_placeholder_secret_32ch
+          AUTH_SECRET: build_time_placeholder_secret_32ch
+          R2_ENDPOINT: https://placeholder.r2.cloudflarestorage.com
+          R2_ACCESS_KEY_ID: placeholder
+          R2_SECRET_ACCESS_KEY: placeholder
+          R2_BUCKET_NAME: placeholder
+          R2_PUBLIC_URL: https://placeholder.r2.dev
+          NODE_ENV: production
+        run: npm run build
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # App and Renderer build in PARALLEL — each ~1-2 min vs ~6 min sequential
+      - name: Build and Push App Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ghcr.io/${{ env.REPO }}/app:latest,ghcr.io/${{ env.REPO }}/app:${{ github.ref_name }}
+          cache-from: type=gha,scope=app
+          cache-to: type=gha,mode=max,scope=app
+          build-args: |
+            REPO=${{ env.REPO }}
+
+      - name: Build and Push Renderer Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.renderer
+          push: true
+          tags: ghcr.io/${{ env.REPO }}/renderer:latest,ghcr.io/${{ env.REPO }}/renderer:${{ github.ref_name }}
+          cache-from: type=gha,scope=renderer
+          cache-to: type=gha,mode=max,scope=renderer
+          build-args: |
+            REPO=${{ env.REPO }}
+
+  # ---------------------------------------------------------------
+  # Job 3: SSH deploy — only after both images are pushed.
+  # ---------------------------------------------------------------
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Copy docker-compose.yml to server
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: 'docker-compose.yml'
+          target: '/root/flownau/'
+
+      - name: Deploy to Server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            mkdir -p /root/flownau
+
+            # Login to GHCR to pull private images
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # Write production .env from secrets
+            cat > /root/flownau/.env.tmp << 'ENVEOF'
+            DATABASE_USER=flownau_user
+            DATABASE_PASSWORD=${{ secrets.DATABASE_PASSWORD }}
+            DATABASE_NAME=flownau
+            REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+            PUBLIC_DOMAIN=flownau.9nau.com
+            GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            R2_ACCESS_KEY_ID=${{ secrets.R2_ACCESS_KEY_ID }}
+            R2_SECRET_ACCESS_KEY=${{ secrets.R2_SECRET_ACCESS_KEY }}
+            R2_ENDPOINT=https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+            R2_ACCOUNT_ID=${{ secrets.R2_ACCOUNT_ID }}
+            R2_BUCKET_NAME=${{ secrets.R2_BUCKET_NAME }}
+            R2_PUBLIC_URL=${{ secrets.R2_PUBLIC_URL }}
+            FB_APP_ID=${{ secrets.FB_APP_ID }}
+            FB_APP_SECRET=${{ secrets.FB_APP_SECRET }}
+            AUTH_SECRET=${{ secrets.AUTH_SECRET }}
+            AUTH_URL=https://flownau.9nau.com
+            AUTH_TRUST_HOST=true
+            INITIAL_ADMIN_EMAIL=${{ secrets.INITIAL_ADMIN_EMAIL }}
+            INITIAL_ADMIN_PASSWORD=${{ secrets.INITIAL_ADMIN_PASSWORD }}
+            INITIAL_ADMIN_NAME="Samuel Aure"
+            NAU_SERVICE_KEY=${{ secrets.NAU_SERVICE_KEY }}
+            NAUTHENTICITY_URL=https://nauthenticity.9nau.com
+            CRON_SECRET=${{ secrets.CRON_SECRET }}
+            NAU_API_URL=${{ secrets.NAU_API_URL }}
+            NEXT_PUBLIC_APP_URL=${{ secrets.NEXT_PUBLIC_APP_URL }}
+            NEXT_PUBLIC_ACCOUNTS_URL=${{ secrets.NEXT_PUBLIC_ACCOUNTS_URL }}
+            TAG=${{ github.event.inputs.tag || github.ref_name }}
+            ENVEOF
+            tr -d '\r' < /root/flownau/.env.tmp > /root/flownau/.env
+
+            cd /root/flownau
+            echo "--- Server Disk Space [BEFORE SWAP] ---"
+            df -h /
+
+            # Prune dangling images to clear runway for pull
+            docker image prune -a -f --filter "until=2h" || true
+
+            # Pull and deploy the new images
+            TAG=${{ github.event.inputs.tag || github.ref_name }} docker compose pull
+            TAG=${{ github.event.inputs.tag || github.ref_name }} docker compose up -d ${{ (github.event.inputs.force_recreate == 'true') && '--force-recreate' || '' }} --remove-orphans
+
+            # Prune old images now that new ones are running
+            docker image prune -a -f --filter "until=2h" || true
+
+            echo "--- Server Disk Space [AFTER SWAP] ---"
+            df -h /
+
+            # Give the database a moment to fully initialize after recreation
+            sleep 5
+
+            # Run migrations using the freshly deployed container
+            docker exec flownau npx prisma migrate deploy
