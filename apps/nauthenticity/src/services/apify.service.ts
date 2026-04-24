@@ -3,6 +3,31 @@ import { config } from '../config';
 import { logger } from '../utils/logger';
 import { withRetry } from '../utils/retry';
 
+function reportApifyRun(opts: {
+  runId: string;
+  operation: string;
+  usageTotalUsd?: number;
+  metadata?: Record<string, unknown>;
+}): void {
+  const apiUrl = config.nauApiUrl;
+  const serviceToken = config.nauServiceKey;
+  if (!apiUrl) return;
+
+  fetch(`${apiUrl}/_service/usage/events`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${serviceToken}` },
+    body: JSON.stringify({
+      service: 'apify',
+      operation: opts.operation,
+      model: 'apify-actor',
+      provider: 'apify',
+      unit: 'usd',
+      costUsd: opts.usageTotalUsd ?? 0,
+      metadata: { runId: opts.runId, ...opts.metadata },
+    }),
+  }).catch(() => {});
+}
+
 const client = new ApifyClient({
   token: config.apify.token,
 });
@@ -186,6 +211,13 @@ export const runUniversalInstagramScraper = async (
     { attempts: 3, delay: 5000, factor: 2 },
   );
 
+  reportApifyRun({
+    runId: run.id,
+    operation: `instagram_scrape_${mode.toLowerCase()}`,
+    usageTotalUsd: (run as any).usageTotalUsd,
+    metadata: { username, maxPosts },
+  });
+
   if (items.length === 0) {
     throw new Error(`[Apify] No items returned for ${username}`);
   }
@@ -239,6 +271,13 @@ export const runUniversalProfilesScraper = async (
     },
     { attempts: 3, delay: 5000, factor: 2 },
   );
+
+  reportApifyRun({
+    runId: run.id,
+    operation: 'instagram_scrape_profiles_batch',
+    usageTotalUsd: (run as any).usageTotalUsd,
+    metadata: { usernameCount: usernames.length },
+  });
 
   return {
     profiles: items as NauIGProfile[],
@@ -370,6 +409,13 @@ export const runUniversalBatchInstagramScraper = async (
     },
     { attempts: 3, delay: 5000, factor: 2 },
   );
+
+  reportApifyRun({
+    runId: run.id,
+    operation: 'instagram_scrape_feed_batch',
+    usageTotalUsd: (run as any).usageTotalUsd,
+    metadata: { usernameCount: usernames.length, maxPosts },
+  });
 
   // Filter out profile objects (which lack shortcode) and map posts
   const posts = items.filter((item) => !!item.shortcode) as NauIGPost[];
