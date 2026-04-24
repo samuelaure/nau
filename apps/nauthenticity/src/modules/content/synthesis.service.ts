@@ -1,4 +1,4 @@
-import { createDefaultLLMClient, type LLMClient, reportUsage } from '@nau/llm-client';
+import { getClientForFeature, reportUsage } from '@nau/llm-client';
 import { z } from 'zod';
 import { prisma } from '../../db/prisma';
 import { config } from '../../config';
@@ -32,19 +32,14 @@ export interface BrandDigest {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function getLLM(): LLMClient {
-  return createDefaultLLMClient();
-}
-
 async function runSynthesisLLM(
   systemPrompt: string,
   userContent: string,
   brandId?: string,
 ): Promise<SynthesisOutput> {
-  const llm = getLLM();
-  const model = 'gpt-4o';
+  const { client, model, provider } = getClientForFeature('synthesis');
 
-  const result = await llm.chatCompletion({
+  const result = await client.chatCompletion({
     model,
     temperature: 0.7,
     messages: [

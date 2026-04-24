@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { createDefaultLLMClient, type LLMClient } from '@nau/llm-client'
+import { getClientForFeature } from '@nau/llm-client'
 import { PrismaService } from '../prisma/prisma.service'
 import { GenerateCommentDto, CommentFeedbackDto } from './benchmark.dto'
 
@@ -9,14 +9,10 @@ const DEFAULT_VOICE = `You are an authentic, engaging brand on social media. Wri
 @Injectable()
 export class BenchmarkService {
   private readonly logger = new Logger(BenchmarkService.name)
-  private readonly llm: LLMClient
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
-  ) {
-    this.llm = createDefaultLLMClient()
-  }
+  ) {}
 
   async generateComments(brandId: string, dto: GenerateCommentDto): Promise<{ suggestions: string[] }> {
     const synthesis = await this.prisma.brandSynthesis.findFirst({
@@ -32,8 +28,9 @@ export class BenchmarkService {
       'Generate 3 distinct comment suggestions. Return JSON: { "comments": ["...", "...", "..."] }',
     ].filter(Boolean)
 
-    const result = await this.llm.chatCompletion({
-      model: 'gpt-4o-mini',
+    const { client, model } = getClientForFeature('benchmark')
+    const result = await client.chatCompletion({
+      model,
       messages: [{ role: 'user', content: parts.join('\n\n') }],
       responseFormat: { type: 'json_object' },
       maxTokens: 400,

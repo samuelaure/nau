@@ -195,30 +195,17 @@ async function callAI(
   groqKey: string | null,
   openaiKey: string | null,
 ): Promise<CreativeDirection> {
-  if (provider === 'openai') {
-    if (!openaiKey) throw new Error('OPENAI_API_KEY is not configured')
-    const llm: LLMClient = createLLMClient({ provider: 'openai', apiKey: openaiKey })
-    const result = await llm.parseCompletion({
-      model,
-      temperature: 0.7,
-      messages,
-      schema: CreativeDirectionSchema,
-      schemaName: 'CreativeDirection',
-      timeoutMs: 60_000,
-    })
-    return result.data
-  }
+  const apiKey = provider === 'groq' ? groqKey : openaiKey
+  if (!apiKey) throw new Error(`${provider.toUpperCase()}_API_KEY is not configured`)
 
-  // Groq fallback
-  if (!groqKey) throw new Error('GROQ_API_KEY is not configured')
-  const llm: LLMClient = createLLMClient({ provider: 'groq', apiKey: groqKey })
+  const llm: LLMClient = createLLMClient({ provider, apiKey })
   const result = await llm.parseCompletion({
     model,
     temperature: 0.7,
     messages,
     schema: CreativeDirectionSchema,
     schemaName: 'CreativeDirection',
-    timeoutMs: 30_000,
+    timeoutMs: provider === 'openai' ? 60_000 : 30_000,
   })
   return result.data
 }

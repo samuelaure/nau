@@ -274,11 +274,11 @@ const transcribeVideo = async (
 };
 
 const createEmbedding = async (text: string, transcriptId: string): Promise<void> => {
-  const { createDefaultLLMClient } = await import('@nau/llm-client');
-  const llm = createDefaultLLMClient();
+  const { getClientForFeature } = await import('@nau/llm-client');
+  const { client, model } = getClientForFeature('embedding');
 
-  const result = await llm.createEmbedding({
-    model: 'text-embedding-3-small',
+  const result = await client.createEmbedding({
+    model,
     input: text.replace(/\n/g, ' '),
   });
 

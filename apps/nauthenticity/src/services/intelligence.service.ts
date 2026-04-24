@@ -1,8 +1,6 @@
-import { createDefaultLLMClient, type LLMClient } from '@nau/llm-client'
+import { getClientForFeature } from '@nau/llm-client'
 import { z } from 'zod'
 import { logger } from '../utils/logger'
-
-const llm: LLMClient = createDefaultLLMClient()
 
 // ---------------------------------------------------------------------------
 // Platform-level fallbacks — used when a brand has no configured voice/strategy
@@ -42,8 +40,9 @@ export const extractPostIntelligence = async (
     ${transcript}
   `.trim()
 
-  const result = await llm.chatCompletion({
-    model: 'gpt-4o-2024-08-06',
+  const { client, model } = getClientForFeature('post_intelligence')
+  const result = await client.chatCompletion({
+    model,
     messages: [
       {
         role: 'system',
@@ -143,8 +142,9 @@ export const generateCommentSuggestions = async (
   const systemPrompt = buildCommentSystemPrompt(params)
   const userMessage = buildPostUserMessage(params.post)
 
-  const result = await llm.chatCompletion({
-    model: 'gpt-4o-2024-08-06',
+  const { client, model } = getClientForFeature('comment_suggestions')
+  const result = await client.chatCompletion({
+    model,
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userMessage },

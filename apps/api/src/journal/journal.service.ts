@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
-import { createDefaultLLMClient, type LLMClient } from '@nau/llm-client';
+import { getClientForFeature } from '@nau/llm-client';
 import { z } from 'zod';
 import { BlocksService } from '../blocks/blocks.service';
 import dayjs from 'dayjs';
@@ -19,19 +19,11 @@ type JournalSummaryOutput = z.infer<typeof JournalSummarySchema>;
 @Injectable()
 export class JournalService {
   private readonly logger = new Logger(JournalService.name);
-  private llm: LLMClient | null = null;
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly blocksService: BlocksService,
-  ) {
-    try {
-      this.llm = createDefaultLLMClient();
-    } catch {
-      this.logger.warn('LLM client not configured. Journal AI summaries are disabled.');
-    }
-  }
+  ) {}
 
   /**
    * Mock for user preferences. In Phase 9 this will be a real DB model.
@@ -146,11 +138,13 @@ export class JournalService {
       highlights: [] 
     };
 
-    if (this.llm) {
-      try {
-        const result = await this.llm.parseCompletion({
-          model: 'gpt-4o',
-          temperature: 0.2,
+    try {
+      const { client: llmClient, model: llmModel } = getClientForFeature('journal_summary');
+      if (llmClient) {
+        try {
+          const result = await llmClient.parseCompletion({
+            model: llmModel,
+            temperature: 0.2,
           schema: JournalSummarySchema,
           schemaName: 'JournalSummary',
           messages: [
@@ -174,11 +168,14 @@ LENGTH: ${periodType === 'daily' ? 'Brief (1-2 paragraphs)' : periodType === 'ye
               content: contextText
             }
           ],
-        });
-        aiResult = result.data;
-      } catch (err) {
-        this.logger.error('Error calling LLM for hierarchical summary', err);
+          });
+          aiResult = result.data;
+        } catch (err) {
+          this.logger.error('Error calling LLM for hierarchical summary', err);
+        }
       }
+    } catch {
+      this.logger.warn('LLM not configured. Skipping journal AI summary.');
     }
 
     // 5. Save as Block

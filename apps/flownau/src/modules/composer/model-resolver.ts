@@ -1,45 +1,53 @@
 import type { AIModel } from '@prisma/client'
+import type { LLMProvider } from '@nau/llm-client'
 
 /**
- * Resolved AI model information.
- * Provider determines which SDK to instantiate.
- * Model is the API model string to pass to the SDK.
+ * Resolved AI model information — maps a persona's AIModel enum to the
+ * registry ID and API model string from @nau/llm-client.
  */
 export interface ResolvedModel {
-  provider: 'openai' | 'groq'
+  provider: LLMProvider
   model: string
+  registryId: string
 }
 
 /**
- * Maps an AIModel enum value to its provider and API model string.
+ * Maps AIModel enum values to their @nau/llm-client registry IDs.
  *
- * This is the SINGLE SOURCE OF TRUTH for model resolution.
- * Previously duplicated across agent.ts, builderAgent.ts, and ideation.service.ts.
+ * Registry IDs must match entries in packages/llm-client/src/registry.ts.
+ * When a model is removed or renamed: update both here and in the registry.
  */
-const MODEL_MAP: Record<AIModel, ResolvedModel> = {
-  OPENAI_GPT_4O: { provider: 'openai', model: 'gpt-4o' },
-  OPENAI_GPT_4O_MINI: { provider: 'openai', model: 'gpt-4o-mini' },
-  OPENAI_GPT_4_TURBO: { provider: 'openai', model: 'gpt-4-turbo' },
-  OPENAI_GPT_4_1: { provider: 'openai', model: 'gpt-4.1' },
-  OPENAI_O1: { provider: 'openai', model: 'o1' },
-  OPENAI_O1_MINI: { provider: 'openai', model: 'o1-mini' },
-  GROQ_LLAMA_3_3: { provider: 'groq', model: 'llama-3.3-70b-versatile' },
-  GROQ_LLAMA_3_1_70B: { provider: 'groq', model: 'llama-3.1-70b-versatile' },
-  GROQ_LLAMA_3_1_8B: { provider: 'groq', model: 'llama3-8b-8192' },
-  GROQ_MIXTRAL_8X7B: { provider: 'groq', model: 'mixtral-8x7b-32768' },
-  GROQ_DEEPSEEK_R1_70B: { provider: 'groq', model: 'deepseek-r1-distill-llama-70b' },
+const MODEL_MAP: Record<AIModel, string> = {
+  OPENAI_GPT_4O:       'openai/gpt-4o',
+  OPENAI_GPT_4O_MINI:  'openai/gpt-4o-mini',
+  OPENAI_GPT_4_TURBO:  'openai/gpt-4-turbo',
+  OPENAI_GPT_4_1:      'openai/gpt-4.1',
+  OPENAI_O1:           'openai/o1',
+  OPENAI_O1_MINI:      'openai/o1-mini',
+  GROQ_LLAMA_3_3:         'groq/llama-3.3-70b',
+  GROQ_LLAMA_3_1_70B:     'groq/llama-3.1-70b',
+  GROQ_LLAMA_3_1_8B:      'groq/llama-3.1-8b',
+  GROQ_MIXTRAL_8X7B:      'groq/mixtral-8x7b',
+  GROQ_DEEPSEEK_R1_70B:   'groq/deepseek-r1-70b',
 }
 
-/** Default model when the enum value is unrecognized */
-const DEFAULT_MODEL: ResolvedModel = { provider: 'groq', model: 'llama-3.3-70b-versatile' }
+const DEFAULT_REGISTRY_ID = 'groq/llama-3.3-70b'
 
 /**
- * Resolves an AIModel enum value to provider + model string.
- *
- * @example
- * const { provider, model } = resolveModelId('GROQ_LLAMA_3_3')
- * // { provider: 'groq', model: 'llama-3.3-70b-versatile' }
+ * Resolves an AIModel enum value to provider + API model string.
+ * Uses the @nau/llm-client registry as the source of truth.
  */
 export function resolveModelId(modelSelection: AIModel | string): ResolvedModel {
-  return MODEL_MAP[modelSelection as AIModel] ?? DEFAULT_MODEL
+  // Dynamic import to keep model-resolver importable in server components
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { MODEL_REGISTRY } = require('@nau/llm-client')
+
+  const registryId = MODEL_MAP[modelSelection as AIModel] ?? DEFAULT_REGISTRY_ID
+  const def = MODEL_REGISTRY[registryId] ?? MODEL_REGISTRY[DEFAULT_REGISTRY_ID]
+
+  return {
+    provider: def.provider as LLMProvider,
+    model: def.apiModel,
+    registryId: def.id,
+  }
 }

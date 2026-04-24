@@ -1,4 +1,4 @@
-import { createDefaultLLMClient, type LLMClient } from '@nau/llm-client'
+import { getClientForFeature } from '@nau/llm-client'
 import { z } from 'zod'
 
 const IdeationOutputSchema = z.object({
@@ -52,7 +52,7 @@ interface InspoItemInput {
 }
 
 export async function generateContentIdeas(req: GenerationRequest): Promise<IdeationOutput> {
-  const llm: LLMClient = createDefaultLLMClient()
+  const { client: llm, model } = getClientForFeature('ideation')
 
   let contextBlock = ''
 
@@ -100,7 +100,7 @@ export async function generateContentIdeas(req: GenerationRequest): Promise<Idea
   }
 
   const result = await llm.parseCompletion({
-    model: 'gpt-4o',
+    model,
     temperature: 0.7,
     schema: IdeationOutputSchema,
     schemaName: 'IdeationOutput',
