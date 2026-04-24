@@ -70,6 +70,25 @@
 - [ ] SameSite=Strict on refresh token cookie
 - [ ] SameSite=Lax on access token cookie
 
+### 2.6 Anti-hacking & hardening
+- [ ] **Rate limiting** on auth endpoints (login, register, password reset) — max 5 attempts per IP per 15 min
+- [ ] **Rate limiting** on API endpoints — max 100 req/min per IP (tighten for sensitive endpoints like `/auth/refresh`)
+- [ ] **Account lockout** after 5 failed login attempts; unlock after 30 min or admin intervention
+- [ ] **IP-based lockout** after 10 failed login attempts from same IP; blocks for 1 hour
+- [ ] No debug modes left enabled in production (`NODE_ENV=production` actually disables them)
+- [ ] No deprecated routes or legacy endpoints still accepting requests
+- [ ] Security headers set on all responses:
+  - [ ] `X-Frame-Options: DENY` (prevent clickjacking)
+  - [ ] `X-Content-Type-Options: nosniff` (prevent MIME sniffing)
+  - [ ] `Strict-Transport-Security: max-age=31536000` (force HTTPS)
+  - [ ] `Content-Security-Policy` configured for each app (at minimum: `default-src 'self'`)
+  - [ ] `Referrer-Policy: strict-origin-when-cross-origin`
+- [ ] Session revocation on logout — refresh token deleted from DB immediately
+- [ ] Token revocation on password change — invalidate all existing refresh tokens
+- [ ] No plaintext passwords in logs or error messages
+- [ ] All external service calls (OpenAI, Apify, Instagram, Telegram) validate response signatures/checksums
+- [ ] Database queries use parameterized statements exclusively (Prisma enforces this, verify no raw SQL escapes)
+
 ---
 
 ## 3. Infrastructure audit
@@ -196,44 +215,95 @@ Current allocation:
 - [ ] Unhandled promise rejections crash the process (so Docker restarts it) — confirmed by `--no-unhandled-rejections` not being set
 - [ ] `restart: unless-stopped` ensures recovery from crashes
 
-### 6.4 First-boot checklist
+### 6.4 Disaster recovery & data protection
+- [ ] Database backups are automated (frequency: daily minimum)
+- [ ] Backup restoration has been tested (not just assumed to work)
+- [ ] Backup location is offsite or in separate region from primary
+- [ ] All persistent data is in named Docker volumes (not container filesystem)
+- [ ] Sensitive data at rest is encrypted (Postgres encrypted password fields, Redis with requirepass)
+- [ ] Log retention policy documented (how long logs kept, when rotated)
+- [ ] SSL/TLS certificate expiration monitoring in place (alerts before 30-day window)
+
+### 6.5 First-boot checklist
 - [ ] API database schema created via `prisma migrate deploy`
 - [ ] Zazu-bot database schema created via `prisma migrate deploy`
 - [ ] whatsnau initial admin account created with strong password
 - [ ] Telegram bot webhook registered at `https://bot.9nau.com`
 - [ ] DNS records point all 8 domains to `46.62.252.13`
+- [ ] Uptime monitoring GitHub Secrets set (`UPTIME_TELEGRAM_CHAT_ID`, `UPTIME_TELEGRAM_BOT_TOKEN`)
 
 ---
 
 ## 7. Dependency audit
 
-- [ ] Run `pnpm audit` — check for high/critical CVEs
+### 7.1 Vulnerability scanning
+- [ ] Run `pnpm audit` — check for high/critical CVEs and audit exceptions documented
+- [ ] No high/critical vulnerabilities without documented mitigation or waiver
+- [ ] Deprecated packages identified and plan for replacement (e.g. `jsonwebtoken` → `jose`)
+- [ ] Direct dependencies pinned to specific versions (not `^` or `~`)
+- [ ] Transitive dependencies reviewed for major version mismatches
+
+### 7.2 Version consistency
+- [ ] All Next.js apps on same major version (currently 15.x, App Router)
+- [ ] NestJS services on same major version
+- [ ] `@prisma/client` version matches `prisma` CLI version
+- [ ] `pnpm` version pinned consistently (currently 10.14.0)
+- [ ] Node.js version pinned in Dockerfiles (currently `node:20-alpine`)
 - [ ] Check that `@nau/auth` uses `jose` (not deprecated `jsonwebtoken`) — ✓ confirmed
-- [ ] All Next.js apps on 15.x (App Router) — consistent version
-- [ ] NestJS services on consistent major version
-- [ ] Prisma client version matches `@prisma/client` in package.json
+
+### 7.3 Supply chain hygiene
+- [ ] No local patches or forks of major dependencies (use upstream or file issues)
+- [ ] All `npm install` commands use `--frozen-lockfile` (builds reproduce exactly)
 - [ ] No `node_modules` in git tracking
+- [ ] `package-lock.json` / `pnpm-lock.yaml` committed (reproducibility)
 
 ---
 
 ## 8. DNS & TLS
 
+### 8.1 DNS configuration
 - [ ] A records created for all 8 subdomains pointing to `46.62.252.13`
-- [ ] Traefik successfully obtains Let's Encrypt certs on first HTTPS request
+  - `api.9nau.com`
+  - `accounts.9nau.com`
+  - `app.9nau.com`
+  - `flownau.9nau.com`
+  - `nauthenticity.9nau.com`
+  - `zazu.9nau.com`
+  - `bot.9nau.com`
+  - `whatsnau.9nau.com` (deferred)
+- [ ] DNS propagation verified (check with `dig` or `nslookup`)
+- [ ] No DNS wildcards or overly broad records
+
+### 8.2 TLS & certificates
+- [ ] Traefik successfully obtains Let's Encrypt certs on first HTTPS request (after DNS is live)
 - [ ] `acme.json` is not committed to git (covered by `.gitignore`)
-- [ ] Certificate renewal is automatic (Traefik handles this)
+- [ ] Certificate renewal is automatic (Traefik with Let's Encrypt handles this)
+- [ ] ACME email configured for certificate renewal notifications
+- [ ] TLS version enforced: minimum TLS 1.2 (Traefik default)
+- [ ] HTTP → HTTPS redirect active on all services
+- [ ] HSTS header configured on Traefik (Strict-Transport-Security)
+- [ ] Certificate pinning not required (HPKP not configured; Let's Encrypt certificates are short-lived)
 
 ---
 
 ## Audit execution order
 
-1. **Repository hygiene** (blocking — fix before anything else)
-2. **Secrets & credentials** (blocking — fix before deploy)
-3. **DNS** (blocking — certs won't issue without it)
-4. **Resource allocation** (assess — may need to defer some services)
-5. **Application code findings** (fix critical issues, document accepted risks)
-6. **Dockerfile & CI** (fix blocking items, note improvements)
-7. **Operational checklist** (execute on first boot)
+**Blocking (must complete before first deployment):**
+1. **Repository hygiene** — verify no secrets, artifacts, or excluded files in git
+2. **Secrets & credentials** — all env vars set, no defaults, strong passwords
+3. **Anti-hacking hardening** (section 2.6) — rate limiting, security headers, session revocation
+4. **DNS** — A records live and propagated (required for Let's Encrypt)
+
+**High priority (before traffic reaches production):**
+5. **TLS certificates** — Let's Encrypt obtains certs successfully
+6. **Application code** — critical security issues fixed, migrations tested
+7. **Infrastructure & resource allocation** — docker-compose correct, memory limits appropriate
+
+**Pre-launch (execute before opening to users):**
+8. **Dockerfile & CI** — all images build reproducibly, no secrets in layers
+9. **Dependency audit** — no high/critical CVEs without mitigation
+10. **Operational readiness** — health checks working, logs rotating, backups configured
+11. **First-boot checklist** — all post-deploy steps executed (schema migrations, webhooks, DNS)
 
 ---
 
@@ -254,3 +324,10 @@ Current allocation:
 | `whatsnau` on isolated bridge network (not Traefik) | High | ✅ Fixed |
 | `.agent/` directory in repo | Low | ✅ Fixed |
 | `full.sql`, `*_output.txt` in repo | Low | ✅ Fixed |
+| Missing global exception filter in nauthenticity | High | ✅ Fixed — added AllExceptionsFilter |
+| Missing error boundaries in Next.js apps | Medium | ✅ Fixed — added global-error.tsx to all 4 apps |
+| zazu-bot uncaught launch error | Medium | ✅ Fixed — added .catch() handler |
+| nauthenticity PORT default wrong (4000 vs 3000) | Low | ✅ Fixed |
+| FLOWNAU_DEFAULT_WORKSPACE_ID used incorrectly | Medium | ✅ Fixed — removed, now requires JWT |
+| Uptime monitoring not implemented | High | ✅ Fixed — GitHub Actions workflow every 5 min |
+| nauthenticity missing /digest endpoint | High | ✅ Fixed — added _service/brands/:brandId/inspo/digest |
