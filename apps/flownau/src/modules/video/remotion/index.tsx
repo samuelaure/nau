@@ -17,7 +17,7 @@ export const RemotionVideo: React.FC = () => {
       {/* v2: Scene-based composition — the new primary */}
       <Composition
         id="SceneSequence"
-        component={SceneSequenceComposition as React.FC<any>}
+        component={SceneSequenceComposition as any}
         durationInFrames={450}
         fps={30}
         width={1080}

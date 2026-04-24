@@ -70,6 +70,8 @@ export interface Brand {
   workspaceId: string
   name: string
   handle: string
+  timezone?: string
+  isActive?: boolean
   createdAt: string
   updatedAt: string
 }
