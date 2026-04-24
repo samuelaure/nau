@@ -22,7 +22,9 @@
     "paths": {
       "@/*": ["./src/*"],
       "@9nau/ui": ["../../packages/nau-ui/src/index.ts"],
-      "@9nau/ui/*": ["../../packages/nau-ui/src/*"]
+      "@9nau/ui/*": ["../../packages/nau-ui/src/*"],
+      "@9nau/core": ["../../packages/nau-core/src/index.ts"],
+      "@9nau/core/*": ["../../packages/nau-core/src/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

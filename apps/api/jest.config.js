@@ -9,4 +9,9 @@ module.exports = {
   coverageDirectory: '../coverage',
   testEnvironment: 'node',
   setupFiles: ['dotenv/config'],
+  globals: {
+    'ts-jest': {
+      diagnostics: false,
+    },
+  },
 };
