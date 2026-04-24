@@ -350,7 +350,7 @@ function MembersPanel({ workspaceId, isOwner }: { workspaceId: string; isOwner: 
               <span className="text-xs capitalize text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-full">
                 {m.role}
               </span>
-              {isOwner && m.role !== 'owner' && (
+              {isOwner && m.role !== WorkspaceRole.OWNER && (
                 <button
                   onClick={() => handleRemove(m)}
                   className="p-1 text-gray-400 hover:text-red-500 rounded opacity-0 group-hover:opacity-100 transition-opacity"

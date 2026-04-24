@@ -52,7 +52,7 @@ export const RemotionVideo: React.FC = () => {
       {/* v1: Legacy track-based composition (backward compat) */}
       <Composition
         id="DynamicTemplateMaster"
-        component={DynamicTemplateMaster}
+        component={DynamicTemplateMaster as any}
         durationInFrames={150}
         fps={30}
         width={1080}
