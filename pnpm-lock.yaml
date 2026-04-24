@@ -401,6 +401,9 @@ importers:
       groq-sdk:
         specifier: ^0.37.0
         version: 0.37.0
+      ioredis:
+        specifier: ^5.0.0
+        version: 5.10.1
       jose:
         specifier: ^6.2.2
         version: 6.2.2

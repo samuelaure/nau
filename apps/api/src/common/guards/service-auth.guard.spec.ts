@@ -1,51 +1,53 @@
-import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
-import { ServiceAuthGuard } from './service-auth.guard';
+import { Test, TestingModule } from '@nestjs/testing'
+import { ExecutionContext, UnauthorizedException } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
+import { ServiceAuthGuard } from './service-auth.guard'
+
+function makeContext(headers: Record<string, string>): ExecutionContext {
+  return {
+    switchToHttp: () => ({
+      getRequest: () => ({ headers }),
+    }),
+  } as ExecutionContext
+}
+
+const mockConfigService = {
+  getOrThrow: jest.fn().mockReturnValue('test-auth-secret-32-chars-minimum!!'),
+}
 
 describe('ServiceAuthGuard', () => {
-  let guard: ServiceAuthGuard;
+  let guard: ServiceAuthGuard
 
-  beforeEach(() => {
-    guard = new ServiceAuthGuard();
-    process.env.NAU_SERVICE_KEY = 'secret';
-  });
+  beforeEach(async () => {
+    jest.clearAllMocks()
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        ServiceAuthGuard,
+        { provide: ConfigService, useValue: mockConfigService },
+      ],
+    }).compile()
+
+    guard = module.get<ServiceAuthGuard>(ServiceAuthGuard)
+  })
 
   it('should be defined', () => {
-    expect(guard).toBeDefined();
-  });
+    expect(guard).toBeDefined()
+  })
 
-  it('should allow access with correct x-nau-service-key header', () => {
-    const context = {
-      switchToHttp: () => ({
-        getRequest: () => ({
-          headers: { 'x-nau-service-key': 'secret' },
-        }),
-      }),
-    } as ExecutionContext;
+  it('rejects requests with no Authorization header', async () => {
+    await expect(guard.canActivate(makeContext({}))).rejects.toThrow(UnauthorizedException)
+  })
 
-    expect(guard.canActivate(context)).toBe(true);
-  });
+  it('rejects requests with a malformed Bearer token', async () => {
+    await expect(
+      guard.canActivate(makeContext({ authorization: 'Bearer not-a-valid-jwt' })),
+    ).rejects.toThrow(UnauthorizedException)
+  })
 
-  it('should allow access with correct Bearer token', () => {
-    const context = {
-      switchToHttp: () => ({
-        getRequest: () => ({
-          headers: { authorization: 'Bearer secret' },
-        }),
-      }),
-    } as ExecutionContext;
-
-    expect(guard.canActivate(context)).toBe(true);
-  });
-
-  it('should throw UnauthorizedException with incorrect key', () => {
-    const context = {
-      switchToHttp: () => ({
-        getRequest: () => ({
-          headers: { 'x-nau-service-key': 'wrong' },
-        }),
-      }),
-    } as ExecutionContext;
-
-    expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
-  });
-});
+  it('rejects an Authorization Bearer with an invalid token', async () => {
+    await expect(
+      guard.canActivate(makeContext({ authorization: 'Bearer invalid.jwt.token' })),
+    ).rejects.toThrow(UnauthorizedException)
+  })
+})

@@ -59,7 +59,7 @@ describe('requireServiceAuth', () => {
   it('returns 401 with AuthError message when token verification fails', async () => {
     ;(nauAuth.extractBearerToken as ReturnType<typeof vi.fn>).mockReturnValue('bad-token')
     ;(nauAuth.verifyServiceToken as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new nauAuth.AuthError('Token expired'),
+      new nauAuth.AuthError('Token expired', 'EXPIRED'),
     )
 
     const res = makeRes()

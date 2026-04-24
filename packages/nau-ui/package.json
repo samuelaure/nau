@@ -14,6 +14,26 @@
       "require": "./dist/lib/utils.js",
       "import": "./dist/lib/utils.js",
       "types": "./dist/lib/utils.d.ts"
+    },
+    "./components/button": {
+      "require": "./dist/components/button.js",
+      "import": "./dist/components/button.js",
+      "types": "./dist/components/button.d.ts"
+    },
+    "./components/card": {
+      "require": "./dist/components/card.js",
+      "import": "./dist/components/card.js",
+      "types": "./dist/components/card.d.ts"
+    },
+    "./components/input": {
+      "require": "./dist/components/input.js",
+      "import": "./dist/components/input.js",
+      "types": "./dist/components/input.d.ts"
+    },
+    "./components/TelegramLinkBanner": {
+      "require": "./dist/components/TelegramLinkBanner.js",
+      "import": "./dist/components/TelegramLinkBanner.js",
+      "types": "./dist/components/TelegramLinkBanner.d.ts"
     }
   },
   "scripts": {

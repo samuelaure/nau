@@ -10,14 +10,18 @@ describe('BlocksController', () => {
   let controller: BlocksController;
   let service: BlocksService;
 
-  const mockBlock: Block = {
+  const mockBlock = {
     id: 'block-1',
     type: 'note',
     properties: { text: 'Test note' },
     parentId: null,
+    uuid: 'uuid-1',
+    deletedAt: null,
+    source: null,
+    sourceRef: null,
     createdAt: new Date(),
     updatedAt: new Date(),
-  };
+  } as unknown as Block;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
