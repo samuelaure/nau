@@ -8,11 +8,15 @@ on:
     paths:
       - 'apps/zazu-bot/**'
       - 'packages/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
       - '.github/workflows/ci-zazu-bot.yml'
   pull_request:
     paths:
       - 'apps/zazu-bot/**'
       - 'packages/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
 
 jobs:
   test:

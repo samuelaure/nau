@@ -8,11 +8,15 @@ on:
     paths:
       - 'apps/accounts/**'
       - 'packages/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
       - '.github/workflows/ci-accounts.yml'
   pull_request:
     paths:
       - 'apps/accounts/**'
       - 'packages/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
 
 jobs:
   test:

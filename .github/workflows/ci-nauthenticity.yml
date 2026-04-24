@@ -8,11 +8,15 @@ on:
     paths:
       - 'apps/nauthenticity/**'
       - 'packages/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
       - '.github/workflows/ci-nauthenticity.yml'
   pull_request:
     paths:
       - 'apps/nauthenticity/**'
       - 'packages/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
 
 jobs:
   test:

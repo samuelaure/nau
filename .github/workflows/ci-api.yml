@@ -9,11 +9,15 @@ on:
     paths:
       - 'apps/api/**'
       - 'packages/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
       - '.github/workflows/ci-api.yml'
   pull_request:
     paths:
       - 'apps/api/**'
       - 'packages/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
 
 jobs:
   test:

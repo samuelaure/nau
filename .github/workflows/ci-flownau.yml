@@ -8,11 +8,15 @@ on:
     paths:
       - 'apps/flownau/**'
       - 'packages/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
       - '.github/workflows/ci-flownau.yml'
   pull_request:
     paths:
       - 'apps/flownau/**'
       - 'packages/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
 
 jobs:
   test:
