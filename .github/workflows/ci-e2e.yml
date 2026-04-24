@@ -83,6 +83,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Build workspace packages
+        run: pnpm build --filter='./packages/**'
+
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
 
@@ -96,10 +99,11 @@ jobs:
         run: pnpm --filter=@9nau/api test:db:seed
 
       - name: Start accounts app (background)
-        run: pnpm --filter=@9nau/accounts dev:on &
+        # Use next directly — CI env vars are already set; avoid Ruby dotenv conflict
+        run: pnpm --filter=@9nau/accounts exec next dev --port 3002 &
 
       - name: Start main app (background)
-        run: pnpm --filter=@9nau/app dev:on &
+        run: pnpm --filter=@9nau/app exec next dev --port 3001 &
 
       - name: Wait for apps to be ready
         # Poll until both apps respond with 200 — avoids a fixed sleep
