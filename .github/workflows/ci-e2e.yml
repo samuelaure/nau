@@ -4,7 +4,7 @@ name: CI — E2E (Playwright)
 # They require a running set of services, provided by docker-compose.
 #
 # IMPORTANT: E2E tests require the following secrets to be set in GitHub:
-#   E2E_ENV_FILE   — full env file content (see .env.example at repo root)
+#   ROOT_ENV_FILE  — full env file content (see .env.example at repo root)
 #   AUTH_SECRET    — must match the secret used by the api service
 #
 # The test database is seeded by the api app's seed script before tests run.
@@ -74,7 +74,7 @@ jobs:
 
       - name: Load E2E env vars
         run: |
-          echo "${{ secrets.E2E_ENV_FILE }}" > .env.e2e
+          echo "${{ secrets.ROOT_ENV_FILE }}" > .env.e2e
           grep -v '^#' .env.e2e | grep -v '^$' >> $GITHUB_ENV
           rm .env.e2e
 
