@@ -13,7 +13,7 @@ export class ScrapingService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
   ) {
-    this.apifyToken = this.config.getOrThrow('APIFY_API_TOKEN')
+    this.apifyToken = this.config.getOrThrow('APIFY_TOKEN')
   }
 
   async startRun(dto: StartScrapingDto) {
