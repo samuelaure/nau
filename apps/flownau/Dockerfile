@@ -26,7 +26,7 @@ COPY prisma.config.js ./
 # Install runtime-only packages not captured by the standalone tracer in pnpm monorepos.
 # @swc/helpers: pnpm virtual-store layout prevents nft from hoisting it — install explicitly.
 # prisma: required by Prisma 7 prisma.config.js at migrate-deploy time.
-RUN npm install prisma@^7.3.0 @swc/helpers@^0.5.5 --no-save
+RUN npm install prisma@^7.3.0 @swc/helpers@^0.5.5 @next/env --no-save
 
 EXPOSE 3000
 ENV PORT=3000
