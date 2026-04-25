@@ -147,6 +147,7 @@ jobs:
           username: root
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           envs: GITHUB_TOKEN
+          command_timeout: 10m
           script: |
             echo "$GITHUB_TOKEN" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             echo "${{ secrets.FLOWNAU_ENV_FILE }}" > ~/apps/flownau/.env
@@ -155,4 +156,4 @@ jobs:
             docker compose up -d flownau-postgres flownau-redis
             docker compose run --rm --no-deps flownau sh -c "cd apps/flownau && npx prisma migrate deploy"
             docker compose up -d
-            docker image prune -f
+            docker image prune -f || true

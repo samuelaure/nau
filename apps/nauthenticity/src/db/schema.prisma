@@ -9,70 +9,74 @@ datasource db {
   extensions = [pgvector(map: "vector")]
 }
 
+// ── Social Profiles ───────────────────────────────────────────────────────────
+
+model IgProfile {
+  username        String    @id
+  profileImageUrl String?
+  lastScrapedAt   DateTime  @default(now())
+
+  posts           Post[]
+  targets         BrandTarget[]
+}
+
 // ── Scraped Content ───────────────────────────────────────────────────────────
 
-/// Post scraped from any social platform.
-/// Keyed by (platform, platformId) for dedup — multiple brands can monitor the same profile.
 model Post {
-  id          String   @id @default(uuid())
-  platform    String   @default("INSTAGRAM")
-  platformId  String   // platform-native post ID
-  url         String   @unique
-  username    String?
-  caption     String?
-  postedAt    DateTime
-  likes       Int      @default(0)
-  comments    Int      @default(0)
-  views       Int?
+  id              String    @id @default(uuid())
+  instagramId     String?   @unique
+  instagramUrl    String    @unique
+  username        String?
+  igProfile       IgProfile? @relation(fields: [username], references: [username])
+  caption         String?
+  originalCaption String?
+  postedAt        DateTime
+  likes           Int       @default(0)
+  comments        Int       @default(0)
+  views           Int?
   engagementScore Float?
   collaborators   Json?
   intelligence    Json?
 
-  runId       String?
-  run         ScrapingRun?    @relation(fields: [runId], references: [id])
+  runId           String?
+  run             ScrapingRun? @relation(fields: [runId], references: [id])
 
-  media       Media[]
-  transcripts Transcript[]
-  feedbacks   CommentFeedback[]
-  inspoItems  InspoItem[]
+  media           Media[]
+  transcripts     Transcript[]
+  feedbacks       CommentFeedback[]
+  inspoItems      InspoItem[]
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  @@unique([platform, platformId])
   @@index([username, postedAt(sort: Desc)])
-  @@index([platform, username])
 }
 
 model ScrapingRun {
-  id         String   @id @default(uuid())
-  brandId    String   @default("")
-  platform   String   @default("INSTAGRAM")
-  username   String
-  actorRunId String?  @unique
-  datasetId  String?
-  rawData    Json?
-  status     String   @default("completed")
-  phase      String   @default("finished")
-  isPaused   Boolean  @default(false)
+  id          String   @id @default(uuid())
+  username    String
+  actorRunId  String?  @unique
+  datasetId   String?
+  rawData     Json?
+  status      String   @default("completed")
+  phase       String   @default("finished")
+  isPaused    Boolean  @default(false)
 
-  posts      Post[]
+  posts       Post[]
 
-  createdAt  DateTime @default(now())
-
-  @@index([brandId])
+  createdAt   DateTime @default(now())
 }
 
 model Media {
-  id           String     @id @default(uuid())
+  id           String      @id @default(uuid())
   postId       String
-  post         Post       @relation(fields: [postId], references: [id])
+  post         Post        @relation(fields: [postId], references: [id])
   type         String
   url          String?
   storageUrl   String
   thumbnailUrl String?
   duration     Float?
-  index        Int        @default(0)
+  index        Int         @default(0)
 
   transcript   Transcript?
 
@@ -93,22 +97,31 @@ model Transcript {
 
   createdAt    DateTime @default(now())
 
+  embeddings   Embedding[]
   knowledgeChunks KnowledgeChunk[]
 
   @@index([postId])
 }
 
+model Embedding {
+  id           String     @id @default(uuid())
+  transcriptId String     @unique
+  transcript   Transcript @relation(fields: [transcriptId], references: [id])
+  vector       Unsupported("vector(1536)")
+  model        String     @default("text-embedding-3-small")
+
+  createdAt    DateTime @default(now())
+}
+
 // ── Knowledge / RAG ───────────────────────────────────────────────────────────
 
-/// Generic chunked content for pgvector RAG.
-/// Replaces the old Embedding model — supports chunking policies beyond transcript-only.
 model KnowledgeChunk {
   id           String   @id @default(uuid())
   platform     String
-  platformId   String   // platformId of the source post/profile
-  brandId      String?  // null = shared across all brands monitoring this profile
-  sourceType   String   @default("transcript") // transcript | caption | synthesis | inspo
-  sourceId     String?  // transcript.id or other source row id
+  platformId   String
+  brandId      String?
+  sourceType   String   @default("transcript")
+  sourceId     String?
   chunkIndex   Int      @default(0)
   text         String
   vector       Unsupported("vector(1536)")
@@ -123,51 +136,96 @@ model KnowledgeChunk {
   @@index([brandId])
 }
 
-// ── Brand-scoped entities ──────────────────────────────────────────────────────
+// ── Brand Intelligence ────────────────────────────────────────────────────────
 
-/// Inspiration item captured by user.
-/// brandId = 9naŭ API Brand.id (referenced, not owned)
-model InspoItem {
-  id             String   @id @default(uuid())
-  brandId        String
-  postId         String?
-  post           Post?    @relation(fields: [postId], references: [id])
-  sourceUrl      String?
-  type           String
-  note           String?  @db.Text
-  status         String   @default("pending")
-  extractedHook  String?  @db.Text
-  extractedTheme String?
-  adaptedScript  String?  @db.Text
-  injectedContext String? @db.Text
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+model BrandIntelligence {
+  brandId           String   @id
+  workspaceId       String   @default("")
+  mainIgUsername    String?
+  voicePrompt       String
+  commentStrategy   String?
+  suggestionsCount  Int      @default(3)
+  windowStart       String?
+  windowEnd         String?
+  timezone          String   @default("UTC")
+  inspoRequestCount Int      @default(0)
 
-  @@index([brandId])
-  @@index([brandId, status])
+  targets    BrandTarget[]
+  syntheses  BrandSynthesis[]
+  feedbacks  CommentFeedback[]
+  inspoItems InspoItem[]
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([workspaceId])
 }
 
-/// AI-generated pattern/theme digest for a brand or monitored profile.
 model BrandSynthesis {
   id           String   @id @default(uuid())
   brandId      String
+  brand        BrandIntelligence @relation(fields: [brandId], references: [brandId], onDelete: Cascade)
   type         String
   content      String   @db.Text
   attachedUrls Json     @default("[]")
+
   createdAt    DateTime @default(now())
 
   @@index([brandId, type])
 }
 
-/// Feedback on comment suggestions — tracks which variant was chosen.
+model BrandTarget {
+  id                   String   @id @default(uuid())
+  brandId              String
+  brand                BrandIntelligence @relation(fields: [brandId], references: [brandId])
+  username             String
+  igProfile            IgProfile @relation(fields: [username], references: [username])
+  profileStrategy      String?
+  targetType           String   @default("monitored")
+  isActive             Boolean  @default(true)
+  initialDownloadCount Int?     @default(20)
+  autoUpdate           Boolean? @default(false)
+
+  createdAt            DateTime @default(now())
+
+  @@unique([brandId, username])
+  @@index([brandId, targetType])
+}
+
 model CommentFeedback {
   id          String   @id @default(uuid())
   brandId     String
+  brand       BrandIntelligence @relation(fields: [brandId], references: [brandId])
   postId      String
   post        Post     @relation(fields: [postId], references: [id])
   commentText String   @db.Text
   isSelected  Boolean  @default(false)
+
   sentAt      DateTime @default(now())
 
   @@index([brandId])
+}
+
+// ── Inspo ─────────────────────────────────────────────────────────────────────
+
+model InspoItem {
+  id              String   @id @default(uuid())
+  brandId         String
+  brand           BrandIntelligence @relation(fields: [brandId], references: [brandId], onDelete: Cascade)
+  postId          String?
+  post            Post?    @relation(fields: [postId], references: [id])
+  sourceUrl       String?
+  type            String
+  note            String?  @db.Text
+  status          String   @default("pending")
+  extractedHook   String?  @db.Text
+  extractedTheme  String?
+  adaptedScript   String?  @db.Text
+  injectedContext String?  @db.Text
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([brandId])
+  @@index([brandId, status])
 }

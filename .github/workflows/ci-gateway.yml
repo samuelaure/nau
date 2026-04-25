@@ -41,4 +41,4 @@ jobs:
             cd ~
             docker compose pull
             docker compose up -d
-            docker image prune -f
+            docker image prune -f || true
