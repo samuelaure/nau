@@ -55,8 +55,9 @@ function LoginForm() {
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-white/80">Email Address</label>
+            <label htmlFor="email" className="text-sm font-medium text-white/80">Email Address</label>
             <input
+              id="email"
               type="email"
               placeholder="you@example.com"
               value={email}
@@ -67,8 +68,9 @@ function LoginForm() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-white/80">Password</label>
+            <label htmlFor="password" className="text-sm font-medium text-white/80">Password</label>
             <input
+              id="password"
               type="password"
               placeholder="••••••••"
               value={password}
