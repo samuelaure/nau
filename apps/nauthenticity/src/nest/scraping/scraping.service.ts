@@ -22,21 +22,20 @@ export class ScrapingService {
 
     const runs = await Promise.all(
       dto.targets.map((target) =>
-        this.createAndTriggerRun(dto.brandId, platform, target, dto.limit ?? 50, actorId),
+        this.createAndTriggerRun(platform, target, dto.limit ?? 50, actorId),
       ),
     )
     return { runs }
   }
 
   private async createAndTriggerRun(
-    brandId: string,
     platform: string,
     username: string,
     limit: number,
     actorId: string,
   ) {
     const run = await this.prisma.scrapingRun.create({
-      data: { brandId: brandId, platform, username, status: 'running' },
+      data: { username, status: 'running' },
     })
 
     this.callApify(run.id, actorId, platform, username, limit).catch((err: unknown) => {
@@ -74,15 +73,10 @@ export class ScrapingService {
 
     let saved = 0
     for (const post of dto.posts) {
-      const platformId = post.id
-      const platform = (post.platform ?? run.platform) as string
-
       await this.prisma.post.upsert({
-        where: { platform_platformId: { platform, platformId } },
+        where: { instagramUrl: post.url ?? '' },
         create: {
-          platform,
-          platformId,
-          url: post.url ?? '',
+          instagramUrl: post.url ?? '',
           username: post.username,
           caption: post.caption,
           postedAt: post.postedAt ? new Date(post.postedAt) : new Date(),
@@ -109,9 +103,8 @@ export class ScrapingService {
     return { saved }
   }
 
-  async listRuns(brandId: string) {
+  async listRuns(_brandId: string) {
     return this.prisma.scrapingRun.findMany({
-      where: { brandId },
       orderBy: { createdAt: 'desc' },
       take: 50,
     })

@@ -9,6 +9,7 @@
  *   - NotFoundException is thrown when an item is not found
  */
 import { NotFoundException } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { mockDeep, DeepMockProxy } from 'jest-mock-extended'
 import { InspoService } from '../inspo.service'
 import { PrismaService } from '../../prisma/prisma.service'
@@ -19,7 +20,8 @@ describe('InspoService', () => {
 
   beforeEach(() => {
     prisma = mockDeep<PrismaService>()
-    service = new InspoService(prisma)
+    const config = mockDeep<ConfigService>()
+    service = new InspoService(prisma, config)
   })
 
   describe('create', () => {
