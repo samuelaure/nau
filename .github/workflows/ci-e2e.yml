@@ -97,11 +97,15 @@ jobs:
       - name: Generate Prisma client
         run: pnpm --filter=@9nau/api exec prisma generate
 
+      - name: Build API
+        run: pnpm --filter=@9nau/api exec nest build
+
       - name: Seed test database
         run: pnpm --filter=@9nau/api test:db:seed
 
       - name: Start API (background)
-        run: pnpm --filter=@9nau/api exec nest start &
+        # Run precompiled output — avoids TypeScript compilation delay at startup
+        run: node apps/api/dist/main.js &
 
       - name: Start accounts app (background)
         # Use next directly — CI env vars are already set; avoid Ruby dotenv conflict
@@ -111,9 +115,8 @@ jobs:
         run: pnpm --filter=@9nau/app exec next dev --port 3001 &
 
       - name: Wait for apps to be ready
-        # Poll until both apps respond with 200 — avoids a fixed sleep
         run: |
-          npx wait-on http://localhost:3000/health http://localhost:3002/login http://localhost:3001 --timeout 90000
+          npx wait-on http://localhost:3000/health http://localhost:3002/login http://localhost:3001 --timeout 120000
 
       - name: Run Playwright tests
         run: pnpm exec playwright test
