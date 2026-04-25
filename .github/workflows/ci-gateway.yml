@@ -1,0 +1,44 @@
+name: CI — gateway
+
+# Deploys the root docker-compose.yml (Traefik) to production.
+# Triggers only when the gateway config changes on main.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docker-compose.yml'
+      - '.github/workflows/ci-gateway.yml'
+
+jobs:
+  deploy:
+    name: Deploy gateway
+    runs-on: ubuntu-latest
+    permissions:
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy compose file to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_SSH_HOST }}
+          username: root
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: docker-compose.yml
+          target: ~/traefik/
+
+      - name: Restart gateway
+        uses: appleboy/ssh-action@v1
+        env:
+          ROOT_ENV_FILE: ${{ secrets.ROOT_ENV_FILE }}
+        with:
+          host: ${{ secrets.DEPLOY_SSH_HOST }}
+          username: root
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: ROOT_ENV_FILE
+          script: |
+            echo "$ROOT_ENV_FILE" > ~/traefik/.env
+            cd ~/traefik
+            docker compose pull
+            docker compose up -d
+            docker image prune -f
