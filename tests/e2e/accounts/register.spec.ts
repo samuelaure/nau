@@ -29,6 +29,7 @@ test.describe('Register page', () => {
       }
     })
 
+    await page.getByLabel(/full name|name/i).fill('Test User')
     await page.getByLabel(/email address/i).fill('test@test.com')
     await page.getByLabel(/password/i).fill('Password1!')
     await page.getByRole('button', { name: /create|register|sign up/i }).click()
