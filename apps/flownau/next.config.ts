@@ -33,11 +33,7 @@ const nextConfig: NextConfig = {
   // so the standalone tracer bundles it regardless of hoisting layout.
   // Glob is relative to outputFileTracingRoot (monorepo root, two levels up).
   outputFileTracingIncludes: {
-    '/**': [
-      'node_modules/.pnpm/@swc+helpers*/node_modules/@swc/helpers/**',
-      'node_modules/.pnpm/@prisma+client*/node_modules/.prisma/client/**',
-      'node_modules/.pnpm/prisma*/node_modules/prisma/query-engine*',
-    ],
+    '/**': ['node_modules/.pnpm/@swc+helpers*/node_modules/@swc/helpers/**'],
   },
   async headers() {
     return [{ source: '/(.*)', headers: securityHeaders }]

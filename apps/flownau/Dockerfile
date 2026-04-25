@@ -24,9 +24,11 @@ COPY prisma ./prisma
 COPY prisma.config.js ./
 
 # Install runtime-only packages not captured by the standalone tracer in pnpm monorepos.
-# @swc/helpers: pnpm virtual-store layout prevents nft from hoisting it — install explicitly.
-# prisma: required by Prisma 7 prisma.config.js at migrate-deploy time.
-RUN npm install prisma@^7.3.0 @swc/helpers@^0.5.5 @next/env --no-save
+# @swc/helpers: pnpm virtual-store layout prevents nft from hoisting it.
+# prisma + @prisma/client: Turbopack doesn't trace native .so engine into standalone output.
+# pino-std-serializers: transitive dep of pino not hoisted correctly by nft.
+RUN npm install prisma@^7.3.0 @prisma/client@^7.3.0 @swc/helpers@^0.5.5 @next/env pino-std-serializers --no-save && \
+    node_modules/.bin/prisma generate --schema=prisma/schema.prisma
 
 EXPOSE 3000
 ENV PORT=3000
