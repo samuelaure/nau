@@ -100,15 +100,12 @@ jobs:
       - name: Build API
         run: pnpm --filter=@9nau/api run build
 
-      - name: Check API build output
-        run: find apps/api/dist -type f -name "*.js" 2>/dev/null | head -20 || echo "dist directory not found or empty"
-
       - name: Seed test database
         run: pnpm --filter=@9nau/api test:db:seed
 
       - name: Start API (background)
         # Run precompiled output — avoids TypeScript compilation delay at startup
-        run: node apps/api/dist/main.js &
+        run: node apps/api/dist/src/main.js &
 
       - name: Start accounts app (background)
         # Use next directly — CI env vars are already set; avoid Ruby dotenv conflict
