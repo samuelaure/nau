@@ -16,14 +16,14 @@ import { test, expect } from '@playwright/test'
 
 test.describe('Dashboard (authenticated)', () => {
   test('loads the dashboard without redirecting to login', async ({ page }) => {
-    await page.goto('/')
+    await page.goto('/home')
 
     // If auth cookies are not set correctly, Next.js middleware would redirect to /login
     await expect(page).not.toHaveURL(/\/login/)
   })
 
   test('shows the main navigation', async ({ page }) => {
-    await page.goto('/')
+    await page.goto('/home')
 
     // The nav is always present when authenticated — exact selectors depend on
     // the app structure; update these if the layout changes
@@ -35,7 +35,8 @@ test.describe('Session expiry', () => {
   test('redirects to accounts login when access cookie is cleared', async ({ page, context }) => {
     // Clear cookies to simulate an expired session
     await context.clearCookies()
-    await page.goto('/')
+    // Navigate to a protected route — / is the public landing page now
+    await page.goto('/home')
 
     // Should redirect to the accounts SSO URL
     await page.waitForURL(/\/login|accounts\.9nau\.com/, { timeout: 8_000 })

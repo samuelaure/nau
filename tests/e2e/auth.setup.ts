@@ -36,7 +36,7 @@ setup('authenticate', async ({ page }) => {
   // Navigate to the login page with a local redirect so the post-login redirect
   // stays within the test environment rather than going to the production app URL.
   const appBase = process.env.PLAYWRIGHT_BASE_URL_APP ?? 'http://localhost:3001'
-  await page.goto(`/login?redirect_uri=${encodeURIComponent(appBase)}`)
+  await page.goto(`/login?redirect_uri=${encodeURIComponent(appBase + '/home')}`)
 
   // Fill in credentials
   await page.getByLabel(/email address/i).fill(email)
