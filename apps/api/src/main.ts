@@ -1,6 +1,7 @@
 import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { Logger } from '@nestjs/common';
 import helmet from 'helmet';
+import * as cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
@@ -10,6 +11,7 @@ async function bootstrap() {
   // Enable graceful shutdown hooks (onModuleDestroy, onApplicationShutdown)
   app.enableShutdownHooks();
   app.use(helmet());
+  app.use(cookieParser());
 
   const httpAdapter = app.get(HttpAdapterHost);
   app.useGlobalFilters(new AllExceptionsFilter(httpAdapter));
