@@ -29,6 +29,12 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   output: 'standalone',
   outputFileTracingRoot: path.join(__dirname, '../../'),
+  // pnpm virtual store doesn't expose @swc/helpers at a standard path — force-include it
+  // so the standalone tracer bundles it regardless of hoisting layout.
+  // Glob is relative to outputFileTracingRoot (monorepo root, two levels up).
+  outputFileTracingIncludes: {
+    '/**': ['node_modules/.pnpm/@swc+helpers*/node_modules/@swc/helpers/**'],
+  },
   async headers() {
     return [{ source: '/(.*)', headers: securityHeaders }]
   },
