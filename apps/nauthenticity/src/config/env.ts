@@ -10,7 +10,6 @@ const envSchema = z.object({
   APIFY_TOKEN: z.string().min(1),
   APIFY_INSTAGRAM_UNIVERSAL_ACTOR_ID: z.string().default('samuelaure/nau-ig-actor'),
   OPENAI_API_KEY: z.string().min(1),
-  TRANSCRIPTION_URL: z.string().url().optional(),
   NAU_SERVICE_KEY: z.string().default('development_key'),
   NAU_API_URL: z.string().url().optional(),
   AUTH_SECRET: z.string().min(32).optional(),

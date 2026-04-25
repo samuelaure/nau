@@ -29,8 +29,8 @@ function makeUsage(
 export class OpenAIClient implements LLMClient {
   private client: OpenAI
 
-  constructor(apiKey: string) {
-    this.client = new OpenAI({ apiKey })
+  constructor(apiKey: string, baseURL?: string) {
+    this.client = new OpenAI({ apiKey, ...(baseURL ? { baseURL } : {}) })
   }
 
   async chatCompletion(options: ChatCompletionOptions): Promise<ChatCompletionResult> {
