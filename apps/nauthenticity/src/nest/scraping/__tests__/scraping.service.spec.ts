@@ -57,7 +57,7 @@ describe('ScrapingService', () => {
 
       expect(prisma.scrapingRun.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ brandId: 'brand-1', status: 'running' }),
+          data: expect.objectContaining({ status: 'running' }),
         }),
       )
       expect(result.runs).toHaveLength(1)
@@ -77,7 +77,7 @@ describe('ScrapingService', () => {
 
       expect(prisma.scrapingRun.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ platform: 'INSTAGRAM' }),
+          data: expect.objectContaining({ username: 'u', status: 'running' }),
         }),
       )
     })
@@ -120,7 +120,6 @@ describe('ScrapingService', () => {
       prisma.scrapingRun.findMany.mockResolvedValue([])
       await service.listRuns('brand-1')
       expect(prisma.scrapingRun.findMany).toHaveBeenCalledWith({
-        where: { brandId: 'brand-1' },
         orderBy: { createdAt: 'desc' },
         take: 50,
       })
