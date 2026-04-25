@@ -29,7 +29,15 @@ export class WorkspacesService {
   }
 
   async createWorkspace(userId: string, dto: CreateWorkspaceDto) {
-    const slug = dto.slug ?? generateSlug(dto.name);
+    let slug = dto.slug ?? generateSlug(dto.name);
+
+    // Handle slug collisions by appending a counter
+    let counter = 1;
+    const originalSlug = slug;
+    while (await this.prisma.workspace.findUnique({ where: { slug } })) {
+      slug = `${originalSlug}-${counter++}`;
+    }
+
     return this.prisma.workspace.create({
       data: {
         name: dto.name,
