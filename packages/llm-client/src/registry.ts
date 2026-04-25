@@ -85,13 +85,6 @@ export const MODEL_REGISTRY: Record<string, ModelDefinition> = {
     capabilities: ['transcription'],
     description: 'OpenAI Whisper — audio transcription',
   },
-  'local/whisper': {
-    id: 'local/whisper',
-    provider: 'openai',
-    apiModel: 'Systran/faster-whisper-base',
-    capabilities: ['transcription'],
-    description: 'Self-hosted Whisper via OpenAI-compatible endpoint (requires WHISPER_BASE_URL)',
-  },
   // ── Groq ──────────────────────────────────────────────────────────────────
   'groq/llama-3.3-70b': {
     id: 'groq/llama-3.3-70b',

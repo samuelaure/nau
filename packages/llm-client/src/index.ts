@@ -66,7 +66,7 @@ export interface FeatureClient {
  */
 export function getClientForFeature(feature: LLMFeature): FeatureClient {
   const modelDef = resolveFeatureModel(feature)
-  const client = createProviderClient(modelDef.provider, modelDef.id)
+  const client = createProviderClient(modelDef.provider)
   return {
     client,
     model: modelDef.apiModel,
@@ -86,15 +86,12 @@ export { createLLMClient } from './factory'
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-function createProviderClient(provider: string, modelId: string): LLMClient {
-  const apiKey = resolveApiKey(provider, modelId)
-  const baseURL = resolveBaseURL(modelId)
-  return createLLMClientInternal(provider, apiKey, baseURL)
+function createProviderClient(provider: string): LLMClient {
+  const apiKey = resolveApiKey(provider)
+  return createLLMClientInternal(provider, apiKey)
 }
 
-function resolveApiKey(provider: string, modelId: string): string {
-  if (modelId === 'local/whisper') return 'local-no-key'
-
+function resolveApiKey(provider: string): string {
   const explicit = process.env.LLM_API_KEY
   if (explicit) return explicit
 
@@ -109,20 +106,11 @@ function resolveApiKey(provider: string, modelId: string): string {
   return key
 }
 
-function resolveBaseURL(modelId: string): string | undefined {
-  if (modelId === 'local/whisper') {
-    const url = process.env.WHISPER_BASE_URL
-    if (!url) throw new Error('@nau/llm-client: WHISPER_BASE_URL is required when using local/whisper')
-    return `${url}/v1`
-  }
-  return undefined
-}
-
-function createLLMClientInternal(provider: string, apiKey: string, baseURL?: string): LLMClient {
+function createLLMClientInternal(provider: string, apiKey: string): LLMClient {
   switch (provider) {
     case 'openai': {
       const { OpenAIClient } = require('./openai-client')
-      return new OpenAIClient(apiKey, baseURL)
+      return new OpenAIClient(apiKey)
     }
     case 'groq': {
       const { GroqClient } = require('./groq-client')
