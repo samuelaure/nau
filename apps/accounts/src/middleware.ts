@@ -16,6 +16,12 @@ function getIp(req: NextRequest): string {
 export function middleware(req: NextRequest) {
   const now = Date.now()
   const ip = getIp(req)
+
+  // Skip rate limiting for loopback — covers local dev and E2E CI tests
+  if (ip === '127.0.0.1' || ip === '::1' || ip === 'unknown') {
+    return NextResponse.next()
+  }
+
   const key = `rl:${ip}`
 
   let entry = store.get(key)
