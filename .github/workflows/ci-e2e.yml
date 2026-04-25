@@ -4,10 +4,8 @@ name: CI — E2E (Playwright)
 # They require a running set of services, provided by docker-compose.
 #
 # IMPORTANT: E2E tests require the following secrets to be set in GitHub:
-#   E2E_USER_EMAIL     — email of a pre-seeded test user
-#   E2E_USER_PASSWORD  — password for that user
-#   AUTH_SECRET        — must match the secret used by the api service
-#   DATABASE_URL       — postgres URL for the test database
+#   E2E_ENV_FILE   — full env file content (see .env.example at repo root)
+#   AUTH_SECRET    — must match the secret used by the api service
 #
 # The test database is seeded by the api app's seed script before tests run.
 # See apps/api/prisma/seed.ts and the "Seed test database" step below.
@@ -64,8 +62,6 @@ jobs:
       NODE_ENV: test
       DATABASE_URL: postgresql://nau:nau_test@localhost:5432/nau_e2e
       AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
-      E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
-      E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
       # Point accounts app at the locally running API
       NAU_API_URL: http://localhost:3000
       # Override Playwright base URLs to point to CI-started dev servers
@@ -75,6 +71,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Load E2E env vars
+        run: |
+          echo "${{ secrets.E2E_ENV_FILE }}" > .env.e2e
+          grep -v '^#' .env.e2e | grep -v '^$' >> $GITHUB_ENV
+          rm .env.e2e
 
       - uses: pnpm/action-setup@v4
 
