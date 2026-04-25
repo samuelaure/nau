@@ -1,6 +1,24 @@
-import { redirectToLogin } from '../lib/auth';
+import { useEffect, useState } from 'react';
+import { checkSession, redirectToLogin, SessionUser } from '../lib/auth';
 
 export function LandingPage() {
+  const [session, setSession] = useState<SessionUser | null | 'loading'>('loading');
+
+  useEffect(() => {
+    checkSession().then(setSession);
+  }, []);
+
+  const handleCta = () => {
+    if (session && session !== 'loading') {
+      window.location.href = '/';
+    } else {
+      redirectToLogin();
+    }
+  };
+
+  const ctaLabel =
+    session === 'loading' ? 'Loading…' : session ? 'Go to Dashboard →' : 'Get started →';
+
   return (
     <div style={styles.root}>
       <div style={styles.container}>
@@ -25,8 +43,12 @@ export function LandingPage() {
             <Feature icon="⚡" title="Smart Fanout" desc="Auto-generate and queue comments during your delivery window." />
           </div>
 
-          <button style={styles.cta} onClick={redirectToLogin}>
-            Get started →
+          <button
+            style={styles.cta}
+            onClick={handleCta}
+            disabled={session === 'loading'}
+          >
+            {ctaLabel}
           </button>
         </main>
 

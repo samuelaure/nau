@@ -1,22 +1,19 @@
-const TOKEN_KEY = 'nau_token';
-
 const ACCOUNTS_URL = import.meta.env.VITE_ACCOUNTS_URL ?? 'https://accounts.9nau.com';
 const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL ?? 'https://nauthenticity.9nau.com';
 
-export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+export interface SessionUser {
+  id: string;
+  workspaceId?: string;
 }
 
-export function setToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token);
-}
-
-export function clearToken(): void {
-  localStorage.removeItem(TOKEN_KEY);
-}
-
-export function isAuthenticated(): boolean {
-  return !!getToken();
+export async function checkSession(): Promise<SessionUser | null> {
+  try {
+    const res = await fetch('/auth/me', { credentials: 'include' });
+    if (!res.ok) return null;
+    return res.json() as Promise<SessionUser>;
+  } catch {
+    return null;
+  }
 }
 
 export function redirectToLogin(): void {

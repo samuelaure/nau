@@ -1,21 +1,18 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { setToken, redirectToLogin } from '../lib/auth';
+import { checkSession, redirectToLogin } from '../lib/auth';
 
 export function AuthCallback() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
-
-    if (!token) {
-      redirectToLogin();
-      return;
-    }
-
-    setToken(token);
-    navigate('/', { replace: true });
+    checkSession().then((session) => {
+      if (session) {
+        navigate('/', { replace: true });
+      } else {
+        redirectToLogin();
+      }
+    });
   }, [navigate]);
 
   return (

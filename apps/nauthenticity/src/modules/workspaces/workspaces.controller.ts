@@ -12,8 +12,11 @@ export const workspacesController = async (fastify: FastifyInstance) => {
     const cookieHeader = request.headers.cookie || '';
     const token = cookieHeader
       .split(';')
-      .find((c) => c.trim().startsWith('nau_token='))
-      ?.split('=')[1];
+      .find((c) => c.trim().startsWith('nau_at='))
+      ?.split('=')
+      .slice(1)
+      .join('=')
+      .trim();
 
     if (!token) {
       return reply.status(401).send({ error: 'Unauthorized: No token found' });
