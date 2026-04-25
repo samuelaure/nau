@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@nau/auth'
 
-const ACCOUNTS_URL = process.env['NEXT_PUBLIC_ACCOUNTS_URL'] ?? 'https://accounts.9nau.com'
+// ACCOUNTS_URL is server-only — middleware runs server-side so NEXT_PUBLIC_ is not needed
+const ACCOUNTS_URL = process.env['ACCOUNTS_URL'] ?? process.env['NEXT_PUBLIC_ACCOUNTS_URL'] ?? 'https://accounts.9nau.com'
 
 export async function middleware(request: NextRequest) {
   const session = await getSession(request)
