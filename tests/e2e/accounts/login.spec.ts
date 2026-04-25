@@ -40,8 +40,14 @@ test.describe('Login page', () => {
   })
 
   test('shows a network error when the API is unreachable', async ({ page }) => {
-    // Block all requests to the API to simulate a network failure
-    await page.route('**/auth/login', (route) => route.abort('failed'))
+    // Abort the Server Action POST (Next.js App Router: action is posted to the page URL)
+    await page.route('**/login', async (route) => {
+      if (route.request().method() === 'POST') {
+        await route.abort('failed')
+      } else {
+        await route.continue()
+      }
+    })
 
     await page.getByLabel(/email address/i).fill('user@test.com')
     await page.getByLabel(/password/i).fill('password')

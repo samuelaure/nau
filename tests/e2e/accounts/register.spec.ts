@@ -19,21 +19,21 @@ test.describe('Register page', () => {
     await expect(page.getByLabel(/password/i)).toBeVisible()
   })
 
-  test('shows an error when trying to register with an already-taken email', async ({ page }) => {
-    // Block the API and return a "taken" error
-    await page.route('**/auth/register', (route) =>
-      route.fulfill({
-        status: 409,
-        contentType: 'application/json',
-        body: JSON.stringify({ message: 'Email already taken' }),
-      }),
-    )
+  test('shows a network error when the API is unreachable during registration', async ({ page }) => {
+    // Abort the Server Action POST (Next.js App Router: action is posted to the page URL)
+    await page.route('**/register', async (route) => {
+      if (route.request().method() === 'POST') {
+        await route.abort('failed')
+      } else {
+        await route.continue()
+      }
+    })
 
-    await page.getByLabel(/email/i).fill('taken@test.com')
+    await page.getByLabel(/email address/i).fill('test@test.com')
     await page.getByLabel(/password/i).fill('Password1!')
     await page.getByRole('button', { name: /create|register|sign up/i }).click()
 
-    await expect(page.getByText(/already taken|already exists/i)).toBeVisible({ timeout: 8_000 })
+    await expect(page.getByText(/network error|could not reach|try again/i)).toBeVisible({ timeout: 8_000 })
   })
 
   test('has a back link to the login page', async ({ page }) => {
