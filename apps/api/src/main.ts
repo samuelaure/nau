@@ -14,15 +14,13 @@ async function bootstrap() {
   const httpAdapter = app.get(HttpAdapterHost);
   app.useGlobalFilters(new AllExceptionsFilter(httpAdapter));
 
-  const origins = (process.env.ALLOWED_ORIGINS ?? '')
+  const rawOrigins = (process.env.ALLOWED_ORIGINS ?? '')
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean);
 
-  if (origins.length === 0) throw new Error('ALLOWED_ORIGINS environment variable is required');
-
   app.enableCors({
-    origin: origins,
+    origin: rawOrigins.length > 0 ? rawOrigins : true,
     credentials: true,
   });
 
