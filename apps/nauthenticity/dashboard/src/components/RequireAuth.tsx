@@ -1,14 +1,7 @@
-import { useEffect } from 'react';
-import { isAuthenticated, redirectToLogin } from '../lib/auth';
+import { isAuthenticated } from '../lib/auth';
+import { LandingPage } from '../pages/LandingPage';
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
-  useEffect(() => {
-    if (!isAuthenticated()) {
-      redirectToLogin();
-    }
-  }, []);
-
-  if (!isAuthenticated()) return null;
-
+  if (!isAuthenticated()) return <LandingPage />;
   return <>{children}</>;
 }
