@@ -20,3 +20,5 @@ export {
 
 export type { SignServiceTokenOptions } from './core'
 export type { SetCookieOptions } from './cookies'
+
+export { getSession, requireSession, getSessionFromCookieStore } from './nextjs'
