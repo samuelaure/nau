@@ -15,7 +15,6 @@ declare module "next-auth" {
 }
 
 const ADMIN_TELEGRAM_ID = process.env.ADMIN_TELEGRAM_ID || "5109114390";
-const AUTH_SECRET = process.env.AUTH_SECRET ?? "changeme";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -93,7 +92,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!jwtToken) return null;
 
         try {
-          const secret = new TextEncoder().encode(AUTH_SECRET);
+          const secret = new TextEncoder().encode(process.env.AUTH_SECRET ?? "changeme");
           const { payload } = await jwtVerify(jwtToken, secret);
           if (!payload.sub) return null;
 
