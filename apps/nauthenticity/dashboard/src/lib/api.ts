@@ -2,7 +2,7 @@ import axios from 'axios';
 import { getToken } from './auth';
 
 // Sanitize URL to remove accidental quotes, whitespace, or trailing semicolons
-const rawUrl = import.meta.env.VITE_API_URL || '/api';
+const rawUrl = import.meta.env.VITE_API_URL || '/api/v1';
 export const API_URL = rawUrl.replace(/['";]/g, '').trim();
 
 export const api = axios.create({
@@ -265,17 +265,17 @@ export const patchBrandIntelligence = async (brandId: string, patch: Record<stri
 };
 
 export const getInspoItems = async (brandId: string) => {
-  const { data } = await api.get(`/inspo?brandId=${brandId}`);
+  const { data } = await api.get(`/brands/${brandId}/inspo`);
   return data;
 };
 
 export const getInspoDigest = async (brandId: string) => {
-  const { data } = await api.get(`/inspo/digest?brandId=${brandId}`);
+  const { data } = await api.get(`/brands/${brandId}/inspo/digest`);
   return data;
 };
 
-export const updateInspoItem = async (id: string, updates: any) => {
-  const { data } = await api.post(`/inspo/${id}/process`, updates);
+export const updateInspoItem = async (id: string, brandId: string, updates: any) => {
+  const { data } = await api.patch(`/brands/${brandId}/inspo/${id}`, updates);
   return data;
 };
 

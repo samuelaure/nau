@@ -6,7 +6,14 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
 import { ServeStaticModule } from '@nestjs/serve-static'
 import { PrismaModule } from './prisma/prisma.module'
 import { AuthModule } from './auth/auth.module'
+import { WorkersModule } from './workers/workers.module'
 import { InspoModule } from './inspo/inspo.module'
+import { IngestionModule } from './ingestion/ingestion.module'
+import { ContentModule } from './content/content.module'
+import { AnalyticsModule } from './analytics/analytics.module'
+import { WorkspacesModule } from './workspaces/workspaces.module'
+import { IntelligenceModule } from './intelligence/intelligence.module'
+import { SchedulerModule } from './scheduler/scheduler.module'
 import { BenchmarkModule } from './benchmark/benchmark.module'
 import { ScrapingModule } from './scraping/scraping.module'
 import { HealthController } from './health/health.controller'
@@ -27,7 +34,14 @@ import { HealthController } from './health/health.controller'
     }),
     PrismaModule,
     AuthModule,
+    WorkersModule,
     InspoModule,
+    IngestionModule,
+    ContentModule,
+    AnalyticsModule,
+    WorkspacesModule,
+    IntelligenceModule,
+    SchedulerModule,
     BenchmarkModule,
     ScrapingModule,
   ],

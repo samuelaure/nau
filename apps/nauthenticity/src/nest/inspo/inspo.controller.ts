@@ -60,6 +60,21 @@ export class InspoController {
     return this.inspoService.delete(id, brandId)
   }
 
+  @Get('brands/:brandId/inspo/digest')
+  @UseGuards(JwtAuthGuard)
+  digest(@Param('brandId') brandId: string) {
+    return this.inspoService.digest(brandId)
+  }
+
+  @Post('repost')
+  @UseGuards(JwtAuthGuard)
+  repost(@Body() body: { brandId?: string; postUrl?: string }) {
+    if (!body.brandId || !body.postUrl) {
+      throw new BadRequestException('Missing required fields: brandId, postUrl')
+    }
+    return this.inspoService.repost(body.brandId, body.postUrl)
+  }
+
   // Service route (called by 9naŭ API / flownau)
   @Post('_service/brands/:brandId/inspo')
   @UseGuards(ServiceAuthGuard)
