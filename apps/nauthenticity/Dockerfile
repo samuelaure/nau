@@ -23,6 +23,11 @@ RUN pnpm install --frozen-lockfile
 WORKDIR /app/apps/nauthenticity
 RUN npx prisma generate
 
+# Build the Vite dashboard SPA (uses npm, not pnpm — not a workspace package)
+WORKDIR /app/apps/nauthenticity/dashboard
+RUN npm install --frozen-lockfile
+RUN npm run build
+
 WORKDIR /app
 RUN pnpm build --filter=nauthenticity
 

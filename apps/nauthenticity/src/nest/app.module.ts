@@ -1,7 +1,9 @@
+import path from 'path'
 import { Module, ValidationPipe } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { APP_PIPE, APP_GUARD } from '@nestjs/core'
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
+import { ServeStaticModule } from '@nestjs/serve-static'
 import { PrismaModule } from './prisma/prisma.module'
 import { AuthModule } from './auth/auth.module'
 import { InspoModule } from './inspo/inspo.module'
@@ -19,6 +21,10 @@ import { HealthController } from './health/health.controller'
       { name: 'short', ttl: 1000, limit: 20 },
       { name: 'medium', ttl: 60_000, limit: 200 },
     ]),
+    ServeStaticModule.forRoot({
+      rootPath: path.join(__dirname, '../../dashboard/dist'),
+      exclude: ['/api/(.*)', '/health'],
+    }),
     PrismaModule,
     AuthModule,
     InspoModule,
