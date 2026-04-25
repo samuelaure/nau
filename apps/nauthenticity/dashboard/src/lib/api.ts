@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getToken } from './auth';
+import { getToken, clearToken } from './auth';
 
 // Sanitize URL to remove accidental quotes, whitespace, or trailing semicolons
 const rawUrl = import.meta.env.VITE_API_URL || '/api/v1';
@@ -15,6 +15,18 @@ api.interceptors.request.use((config) => {
   if (token) config.headers['Authorization'] = `Bearer ${token}`;
   return config;
 });
+
+// On 401, the stored token is stale — clear it and return to the landing page
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      clearToken();
+      window.location.replace('/');
+    }
+    return Promise.reject(error);
+  },
+);
 
 export const getMediaUrl = (url?: string) => {
   if (!url) return '';
