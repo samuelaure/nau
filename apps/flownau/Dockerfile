@@ -28,7 +28,7 @@ COPY prisma.config.js ./
 # prisma + @prisma/client: Turbopack doesn't trace native .so engine into standalone output.
 # pino-std-serializers: transitive dep of pino not hoisted correctly by nft.
 RUN npm install prisma@^7.3.0 @prisma/client@^7.3.0 @swc/helpers@^0.5.5 @next/env \
-      pino-std-serializers @pinojs/redact pg-types quick-format-unescaped --no-save && \
+      pino@^10.3.1 pino-pretty@^13.1.3 pg-types --no-save && \
     node_modules/.bin/prisma generate --schema=prisma/schema.prisma
 
 EXPOSE 3000

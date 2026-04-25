@@ -38,7 +38,7 @@ export async function getNauWorkspaces() {
 export async function getUserPrimaryWorkspace() {
   const { user } = await checkAuth()
   const workspaces = await getNauWorkspaces()
-  const primary = workspaces.find((w) => w.role === 'owner') ?? workspaces[0]
+  const primary = workspaces.find((w) => w.role === 'OWNER') ?? workspaces[0]
   if (!primary) throw new Error('No workspace found for user')
   return { workspaceId: primary.id, user }
 }
