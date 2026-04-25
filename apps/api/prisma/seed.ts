@@ -1,17 +1,39 @@
 import { PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('Seeding test database...');
-  // Seed data for testing purposes
-  // Example:
-  // await prisma.block.createMany({
-  //   data: [
-  //     { type: 'note', properties: { text: 'Test note 1' } },
-  //     { type: 'action', properties: { text: 'Test action 1', completed: false } },
-  //   ],
-  // });
+
+  const email = process.env.E2E_USER_EMAIL;
+  const password = process.env.E2E_USER_PASSWORD;
+
+  if (email && password) {
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (!existing) {
+      const passwordHash = await bcrypt.hash(password, 12);
+      const workspaceName = "E2E Test Workspace";
+      const workspaceSlug = "e2e-test-workspace";
+      await prisma.user.create({
+        data: {
+          email,
+          name: 'E2E Test User',
+          passwordHash,
+          workspaces: {
+            create: {
+              role: 'OWNER',
+              workspace: { create: { name: workspaceName, slug: workspaceSlug } },
+            },
+          },
+        },
+      });
+      console.log(`E2E test user created: ${email}`);
+    } else {
+      console.log(`E2E test user already exists: ${email}`);
+    }
+  }
+
   console.log('Test database seeded.');
 }
 
