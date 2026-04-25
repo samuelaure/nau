@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getOrRefreshSession } from '@nau/auth/nextjs'
+import { getOrRefreshSession } from '@nau/auth'
 
 const ACCOUNTS_URL = process.env['ACCOUNTS_URL'] ?? process.env['NEXT_PUBLIC_ACCOUNTS_URL'] ?? 'https://accounts.9nau.com'
 const APP_URL = process.env['APP_URL'] ?? process.env['NEXT_PUBLIC_APP_URL'] ?? 'https://app.9nau.com'

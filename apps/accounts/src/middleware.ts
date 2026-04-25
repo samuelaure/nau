@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getOrRefreshSession } from '@nau/auth/nextjs'
+import { getOrRefreshSession } from '@nau/auth'
 
 const WINDOW_MS = 60_000
 const MAX_REQUESTS = 20
