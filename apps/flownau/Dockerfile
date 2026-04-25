@@ -13,8 +13,8 @@ FROM ghcr.io/$REPO/base:latest
 WORKDIR /app
 
 # Copy the pre-built Next.js standalone output (built in GHA runner)
-# In a monorepo without outputFileTracingRoot, standalone puts server.js
-# at apps/flownau/server.js (mirrors the source tree), not at root.
+# outputFileTracingRoot=../../ means standalone mirrors the monorepo tree:
+# node_modules/ at root, server.js at apps/flownau/server.js.
 COPY .next/standalone ./
 COPY .next/static ./apps/flownau/.next/static
 COPY public ./apps/flownau/public
