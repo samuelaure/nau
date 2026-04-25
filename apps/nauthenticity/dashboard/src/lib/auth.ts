@@ -20,3 +20,13 @@ export function redirectToLogin(): void {
   const callbackUrl = `${DASHBOARD_URL}/auth/callback`;
   window.location.href = `${ACCOUNTS_URL}/login?continue=${encodeURIComponent(callbackUrl)}`;
 }
+
+/** Clears the session by hitting the server-side logout endpoint. */
+export function clearToken(): void {
+  window.location.href = '/auth/logout';
+}
+
+/** No-op: tokens are now cookie-based and not accessible from JS. */
+export function getToken(): null {
+  return null;
+}

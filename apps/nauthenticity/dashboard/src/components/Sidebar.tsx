@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { clearToken, getToken } from '../lib/auth';
+import { clearToken } from '../lib/auth';
 import {
   LayoutDashboard,
   Activity,
@@ -34,10 +34,7 @@ function WorkspaceSelector() {
   const active = workspaces.find((w) => w.id === activeId);
 
   useEffect(() => {
-    const token = getToken();
-    fetch('/api/workspaces', {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
+    fetch('/api/workspaces', { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : []))
       .then((data: Workspace[]) => {
         setWorkspaces(data);
@@ -68,13 +65,10 @@ function WorkspaceSelector() {
     if (!newName.trim()) return;
     setSaving(true);
     try {
-      const token = getToken();
       const res = await fetch('/api/workspaces', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newName.trim() }),
       });
       if (!res.ok) {

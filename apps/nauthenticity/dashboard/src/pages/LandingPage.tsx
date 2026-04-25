@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { checkSession, redirectToLogin, SessionUser } from '../lib/auth';
+import { checkSession, redirectToLogin, type SessionUser } from '../lib/auth';
 
 export function LandingPage() {
   const [session, setSession] = useState<SessionUser | null | 'loading'>('loading');

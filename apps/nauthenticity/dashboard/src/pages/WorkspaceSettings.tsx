@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Building2, Users, Loader2, Check, Settings } from 'lucide-react';
-import { getToken } from '../lib/auth';
 
 type Workspace = { id: string; name: string };
 type Member = {
@@ -28,11 +27,8 @@ export function WorkspaceSettings() {
       return;
     }
 
-    const token = getToken();
-    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
-
     // Load the workspace name by fetching the full list and finding the active one
-    fetch('/api/workspaces', { headers })
+    fetch('/api/workspaces', { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : []))
       .then((data: Workspace[]) => {
         const ws = data.find((w) => w.id === workspaceId) ?? null;
@@ -46,7 +42,7 @@ export function WorkspaceSettings() {
       .finally(() => setLoading(false));
 
     // Load members separately
-    fetch(`/api/workspaces/${workspaceId}/members`, { headers })
+    fetch(`/api/workspaces/${workspaceId}/members`, { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : []))
       .then((data: Member[]) => setMembers(data))
       .catch(() => {})
@@ -57,13 +53,10 @@ export function WorkspaceSettings() {
     if (!name.trim() || name.trim() === originalName || !workspaceId) return;
     setSaving(true);
     try {
-      const token = getToken();
       const res = await fetch(`/api/workspaces/${workspaceId}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim() }),
       });
       if (!res.ok) throw new Error();
@@ -84,13 +77,10 @@ export function WorkspaceSettings() {
     if (!inviteEmail.trim() || !workspaceId) return;
     setInviting(true);
     try {
-      const token = getToken();
       const res = await fetch(`/api/workspaces/${workspaceId}/members`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: inviteEmail.trim() }),
       });
       if (!res.ok) {
@@ -110,10 +100,9 @@ export function WorkspaceSettings() {
   const handleRemove = async (userId: string) => {
     if (!workspaceId || !confirm('Are you sure you want to remove this member?')) return;
     try {
-      const token = getToken();
       const res = await fetch(`/api/workspaces/${workspaceId}/members/${userId}`, {
         method: 'DELETE',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: 'include',
       });
       if (!res.ok) throw new Error();
       setMembers(members.filter((m) => m.user.id !== userId));

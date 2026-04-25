@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { getToken, clearToken } from './auth';
 
 // Sanitize URL to remove accidental quotes, whitespace, or trailing semicolons
 const rawUrl = import.meta.env.VITE_API_URL || '/api/v1';
@@ -7,22 +6,15 @@ export const API_URL = rawUrl.replace(/['";]/g, '').trim();
 
 export const api = axios.create({
   baseURL: API_URL,
+  withCredentials: true,
 });
 
-// Attach auth token to every request
-api.interceptors.request.use((config) => {
-  const token = getToken();
-  if (token) config.headers['Authorization'] = `Bearer ${token}`;
-  return config;
-});
-
-// On 401, the stored token is stale — clear it and return to the landing page
+// On 401, session has expired — redirect to logout which clears cookies and returns to landing.
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      clearToken();
-      window.location.replace('/');
+      window.location.replace('/auth/logout');
     }
     return Promise.reject(error);
   },

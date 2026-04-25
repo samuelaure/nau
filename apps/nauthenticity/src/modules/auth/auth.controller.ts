@@ -43,6 +43,16 @@ export const authController = async (fastify: FastifyInstance) => {
     return reply.redirect('/');
   });
 
+  // Clears the shared .9nau.com session cookies and returns to the landing page.
+  fastify.get('/auth/logout', async (_request: FastifyRequest, reply: FastifyReply) => {
+    const cookieDomain = process.env['COOKIE_DOMAIN'] ?? '.9nau.com';
+    reply.header('Set-Cookie', [
+      `nau_at=; Path=/; Domain=${cookieDomain}; Max-Age=0; HttpOnly; Secure; SameSite=Lax`,
+      `nau_rt=; Path=/auth/refresh; Domain=${cookieDomain}; Max-Age=0; HttpOnly; Secure; SameSite=Strict`,
+    ]);
+    return reply.redirect('/');
+  });
+
   // Session check for the SPA: returns user info if nau_at cookie is valid.
   fastify.get('/auth/me', async (request: FastifyRequest, reply: FastifyReply) => {
     const cookieHeader = request.headers.cookie ?? '';
