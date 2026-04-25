@@ -98,7 +98,7 @@ jobs:
         run: pnpm --filter=@9nau/api exec prisma generate
 
       - name: Build API
-        run: pnpm --filter=@9nau/api exec nest build
+        run: pnpm --filter=@9nau/api run build
 
       - name: Seed test database
         run: pnpm --filter=@9nau/api test:db:seed
