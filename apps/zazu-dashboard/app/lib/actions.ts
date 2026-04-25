@@ -284,6 +284,53 @@ export async function getWorkspaces(): Promise<NauWorkspace[]> {
 }
 
 /**
+ * Create a new workspace owned by the current user.
+ * Service-to-service: signs a service token and POSTs to the central API.
+ */
+export async function createWorkspace(
+  name: string,
+  timezone?: string,
+): Promise<{ success: boolean; data?: NauWorkspace; error?: string }> {
+  const nauApiUrl = process.env.NAU_API_URL ?? 'http://9nau-api:3000';
+
+  const session = await auth();
+  if (!session?.user) return { success: false, error: 'Not authenticated' };
+
+  let nauUserId = session.user.nauUserId;
+  if (!nauUserId) {
+    const telegramId = session.user.userId;
+    if (telegramId && /^\d+$/.test(telegramId)) {
+      const dbUser = await prisma.user.findUnique({
+        where: { telegramId: BigInt(telegramId) },
+        select: { nauUserId: true },
+      });
+      nauUserId = dbUser?.nauUserId ?? null;
+    } else if (telegramId) {
+      nauUserId = telegramId;
+    }
+  }
+  if (!nauUserId) return { success: false, error: 'No linked naŭ account' };
+
+  if (!name.trim()) return { success: false, error: 'Workspace name is required' };
+
+  try {
+    const headers = await serviceHeaders('9nau-api');
+    const res = await fetch(`${nauApiUrl}/_service/workspaces`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ userId: nauUserId, name: name.trim(), timezone }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const data = (await res.json()) as NauWorkspace;
+    revalidatePath('/');
+    return { success: true, data };
+  } catch (error: unknown) {
+    console.error('[actions] createWorkspace error:', error);
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/**
  * Fetch all brands for the current user.
  * Merges structural data (9naŭ) with intelligence DNA (Nauthenticity).
  */

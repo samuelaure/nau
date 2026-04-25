@@ -7,6 +7,7 @@ import { ApifyService } from '@/modules/accounts/apify'
 import { downloadAndUploadProfileImage } from '@/modules/accounts/profile-image-service'
 import { checkAuth, getUserPrimaryWorkspace } from '@/modules/shared/actions'
 import { z } from 'zod'
+import { COOKIE_ACCESS_TOKEN } from '@nau/auth'
 
 // --- HELPER SCHEMAS ---
 const AccountSchema = z.object({
@@ -65,7 +66,7 @@ export async function addBrand(formData: FormData) {
   if (!name) throw new Error('Brand name is required')
 
   const cookieStore = await import('next/headers').then((m) => m.cookies())
-  const token = cookieStore.get('nau_token')?.value
+  const token = cookieStore.get(COOKIE_ACCESS_TOKEN)?.value
   const nauApiUrl = process.env.NAU_API_URL ?? 'http://9nau-api:3000'
 
   const res = await fetch(`${nauApiUrl}/workspaces/${workspaceId}/brands`, {
@@ -176,7 +177,7 @@ export async function moveAccountToWorkspace(accountId: string, targetWorkspaceI
   // This will trigger the structural sync to Nauthenticity.
   if (account.brandId) {
     const cookieStore = await import('next/headers').then((m) => m.cookies())
-    const token = cookieStore.get('nau_token')?.value
+    const token = cookieStore.get(COOKIE_ACCESS_TOKEN)?.value
     const nauApiUrl = process.env.NAU_API_URL ?? 'http://9nau-api:3000'
 
     if (token) {

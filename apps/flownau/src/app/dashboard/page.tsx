@@ -4,6 +4,7 @@ import { Card } from '@/modules/shared/components/ui/Card'
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import { cookies } from 'next/headers'
+import { COOKIE_ACCESS_TOKEN } from '@nau/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,7 +28,7 @@ export default async function DashboardRoot() {
   await requireAuth()
 
   const cookieStore = await cookies()
-  const token = cookieStore.get('nau_token')?.value ?? ''
+  const token = cookieStore.get(COOKIE_ACCESS_TOKEN)?.value ?? ''
   const workspaces = await getWorkspacesFromNau(token)
 
   if (workspaces.length === 0) {

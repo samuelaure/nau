@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Building2, Globe, ChevronDown } from 'lucide-react';
+import { Building2, Globe, ChevronDown, Plus, X, Loader2 } from 'lucide-react';
 
 type NauBrand = { id: string; name: string; timezone?: string };
 type NauWorkspace = { id: string; name: string; role: string; brands: NauBrand[] };
 
-import { getWorkspaces } from '../lib/actions';
+import { getWorkspaces, createWorkspace } from '../lib/actions';
 
 export default function WorkspaceContextPanel({
   onContextChange,
@@ -17,6 +17,10 @@ export default function WorkspaceContextPanel({
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
   const [activeBrandId, setActiveBrandId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   useEffect(() => {
     getWorkspaces().then((data) => {
@@ -26,6 +30,25 @@ export default function WorkspaceContextPanel({
       }
     });
   }, [activeWorkspaceId]);
+
+  const handleCreate = async () => {
+    if (!newName.trim() || saving) return;
+    setSaving(true);
+    setCreateError(null);
+    const res = await createWorkspace(newName.trim());
+    if (res.success && res.data) {
+      const ws = { ...res.data, brands: res.data.brands ?? [] };
+      setWorkspaces((all) => [...all, ws]);
+      setActiveWorkspaceId(ws.id);
+      onContextChange?.(ws.id, null);
+      setCreating(false);
+      setNewName('');
+      setOpen(false);
+    } else {
+      setCreateError(res.error ?? 'Failed to create workspace');
+    }
+    setSaving(false);
+  };
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
   const activeBrand = activeWorkspace?.brands.find((b) => b.id === activeBrandId);
@@ -123,11 +146,104 @@ export default function WorkspaceContextPanel({
               ))}
             </div>
           ))}
-          {workspaces.length === 0 && (
+          {workspaces.length === 0 && !creating && (
             <p style={{ padding: '12px 16px', color: 'var(--text-dim)', fontSize: '0.82rem' }}>
               No workspaces found.
             </p>
           )}
+
+          <div style={{ borderTop: '1px solid var(--border-glass)', padding: '6px 0' }}>
+            {creating ? (
+              <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <input
+                  autoFocus
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleCreate();
+                    if (e.key === 'Escape') {
+                      setCreating(false);
+                      setNewName('');
+                      setCreateError(null);
+                    }
+                  }}
+                  placeholder="Workspace name"
+                  style={{
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid var(--border-glass)',
+                    borderRadius: 6,
+                    padding: '6px 10px',
+                    color: 'var(--text)',
+                    fontSize: '0.82rem',
+                    outline: 'none',
+                  }}
+                />
+                {createError && (
+                  <span style={{ fontSize: '0.75rem', color: '#f85149' }}>{createError}</span>
+                )}
+                <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                  <button
+                    onClick={() => {
+                      setCreating(false);
+                      setNewName('');
+                      setCreateError(null);
+                    }}
+                    style={{
+                      padding: '4px 8px',
+                      borderRadius: 6,
+                      border: '1px solid var(--border-glass)',
+                      background: 'transparent',
+                      color: 'var(--text-dim)',
+                      fontSize: '0.75rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <X size={12} />
+                  </button>
+                  <button
+                    onClick={handleCreate}
+                    disabled={saving || !newName.trim()}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: 6,
+                      background: 'var(--primary)',
+                      border: 'none',
+                      color: 'white',
+                      fontSize: '0.75rem',
+                      cursor: saving || !newName.trim() ? 'not-allowed' : 'pointer',
+                      opacity: saving || !newName.trim() ? 0.6 : 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    {saving ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : 'Create'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setCreating(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  width: '100%',
+                  padding: '10px 16px',
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--primary)',
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <Plus size={14} /> Create workspace
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>

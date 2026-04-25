@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { requireAuth } from '@/lib/auth'
 import { z } from 'zod'
 import { cookies } from 'next/headers'
+import { COOKIE_ACCESS_TOKEN } from '@nau/auth'
 
 export async function checkAuth() {
   const user = await requireAuth()
@@ -15,7 +16,7 @@ export async function checkAuth() {
 /** Fetch the user's workspaces from 9nau-api using the session JWT. */
 export async function getNauWorkspaces() {
   const cookieStore = await cookies()
-  const token = cookieStore.get('nau_token')?.value
+  const token = cookieStore.get(COOKIE_ACCESS_TOKEN)?.value
   if (!token) return []
 
   const nauApiUrl = process.env.NAU_API_URL ?? 'http://9nau-api:3000'

@@ -55,6 +55,11 @@ export class WorkspacesController {
     return this.proxy(req, res, '/workspaces')
   }
 
+  @Post()
+  create(@Body() body: unknown, @Req() req: unknown, @Res() res: unknown) {
+    return this.proxy(req, res, '/workspaces', 'POST', body)
+  }
+
   @Get(':id/members')
   getMembers(@Param('id') id: string, @Req() req: unknown, @Res() res: unknown) {
     return this.proxy(req, res, `/workspaces/${id}/members`)

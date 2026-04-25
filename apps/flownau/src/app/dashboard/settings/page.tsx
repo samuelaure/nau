@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { Card } from '@/modules/shared/components/ui/Card'
 import WorkspaceNameEditor from './WorkspaceNameEditor'
 import { cookies } from 'next/headers'
+import { COOKIE_ACCESS_TOKEN } from '@nau/auth'
 
 type NauWorkspace = { id: string; name: string; role: string }
 
@@ -18,7 +19,7 @@ async function getWorkspaces(token: string): Promise<NauWorkspace[]> {
 
 export default async function SettingsPage() {
   const cookieStore = await cookies()
-  const token = cookieStore.get('nau_token')?.value ?? ''
+  const token = cookieStore.get(COOKIE_ACCESS_TOKEN)?.value ?? ''
   const workspaces = await getWorkspaces(token)
 
   return (

@@ -28,7 +28,7 @@ export function WorkspaceSettings() {
     }
 
     // Load the workspace name by fetching the full list and finding the active one
-    fetch('/api/workspaces', { credentials: 'include' })
+    fetch('/api/v1/workspaces', { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : []))
       .then((data: Workspace[]) => {
         const ws = data.find((w) => w.id === workspaceId) ?? null;
@@ -42,7 +42,7 @@ export function WorkspaceSettings() {
       .finally(() => setLoading(false));
 
     // Load members separately
-    fetch(`/api/workspaces/${workspaceId}/members`, { credentials: 'include' })
+    fetch(`/api/v1/workspaces/${workspaceId}/members`, { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : []))
       .then((data: Member[]) => setMembers(data))
       .catch(() => {})
@@ -53,7 +53,7 @@ export function WorkspaceSettings() {
     if (!name.trim() || name.trim() === originalName || !workspaceId) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/workspaces/${workspaceId}`, {
+      const res = await fetch(`/api/v1/workspaces/${workspaceId}`, {
         method: 'PATCH',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -77,7 +77,7 @@ export function WorkspaceSettings() {
     if (!inviteEmail.trim() || !workspaceId) return;
     setInviting(true);
     try {
-      const res = await fetch(`/api/workspaces/${workspaceId}/members`, {
+      const res = await fetch(`/api/v1/workspaces/${workspaceId}/members`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -100,7 +100,7 @@ export function WorkspaceSettings() {
   const handleRemove = async (userId: string) => {
     if (!workspaceId || !confirm('Are you sure you want to remove this member?')) return;
     try {
-      const res = await fetch(`/api/workspaces/${workspaceId}/members/${userId}`, {
+      const res = await fetch(`/api/v1/workspaces/${workspaceId}/members/${userId}`, {
         method: 'DELETE',
         credentials: 'include',
       });

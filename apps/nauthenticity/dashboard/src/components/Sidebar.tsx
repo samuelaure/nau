@@ -34,7 +34,7 @@ function WorkspaceSelector() {
   const active = workspaces.find((w) => w.id === activeId);
 
   useEffect(() => {
-    fetch('/api/workspaces', { credentials: 'include' })
+    fetch('/api/v1/workspaces', { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : []))
       .then((data: Workspace[]) => {
         setWorkspaces(data);
@@ -65,7 +65,7 @@ function WorkspaceSelector() {
     if (!newName.trim()) return;
     setSaving(true);
     try {
-      const res = await fetch('/api/workspaces', {
+      const res = await fetch('/api/v1/workspaces', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

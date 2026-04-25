@@ -2,12 +2,13 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
+import { COOKIE_ACCESS_TOKEN } from '@nau/auth'
 
 const NAU_API_URL = process.env.NAU_API_URL ?? 'http://9nau-api:3000'
 
 async function getToken() {
   const cookieStore = await cookies()
-  return cookieStore.get('nau_token')?.value ?? ''
+  return cookieStore.get(COOKIE_ACCESS_TOKEN)?.value ?? ''
 }
 
 export async function PATCH(
