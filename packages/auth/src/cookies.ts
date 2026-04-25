@@ -24,7 +24,7 @@ export function buildAccessTokenCookie(token: string, opts: SetCookieOptions = {
 export function buildRefreshTokenCookie(token: string, opts: SetCookieOptions = {}): string {
   const parts = [
     `${COOKIE_REFRESH_TOKEN}=${token}`,
-    'Path=/auth/refresh',
+    'Path=/',
     'HttpOnly',
     'SameSite=Strict',
     `Max-Age=${30 * 24 * 60 * 60}`,
@@ -39,7 +39,7 @@ export function buildClearCookies(opts: SetCookieOptions = {}): string[] {
   const secure = opts.secure ?? true ? '; Secure' : ''
   return [
     `${COOKIE_ACCESS_TOKEN}=; Path=/; ${domain}HttpOnly; SameSite=Lax; Max-Age=0${secure}`,
-    `${COOKIE_REFRESH_TOKEN}=; Path=/auth/refresh; ${domain}HttpOnly; SameSite=Strict; Max-Age=0${secure}`,
+    `${COOKIE_REFRESH_TOKEN}=; Path=/; ${domain}HttpOnly; SameSite=Strict; Max-Age=0${secure}`,
     `${COOKIE_CSRF}=; Path=/; SameSite=Lax; Max-Age=0`,
   ]
 }
