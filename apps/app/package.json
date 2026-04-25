@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@nau/types": "workspace:*",
+    "@nau/auth": "workspace:*",
     "@9nau/ui": "workspace:^",
     "@tanstack/react-query": "^5.51.1",
     "@tanstack/react-query-devtools": "^5.51.1",

@@ -244,6 +244,9 @@ importers:
       '@9nau/ui':
         specifier: workspace:^
         version: link:../../packages/nau-ui
+      '@nau/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@nau/types':
         specifier: workspace:*
         version: link:../../packages/types
