@@ -17,6 +17,7 @@ import { SchedulerModule } from './scheduler/scheduler.module'
 import { BenchmarkModule } from './benchmark/benchmark.module'
 import { ScrapingModule } from './scraping/scraping.module'
 import { HealthController } from './health/health.controller'
+import { AuthCallbackController } from './auth/auth-callback.controller'
 
 @Module({
   imports: [
@@ -45,7 +46,7 @@ import { HealthController } from './health/health.controller'
     BenchmarkModule,
     ScrapingModule,
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, AuthCallbackController],
   providers: [
     {
       provide: APP_PIPE,
