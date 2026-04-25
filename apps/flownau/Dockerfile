@@ -13,9 +13,11 @@ FROM ghcr.io/$REPO/base:latest
 WORKDIR /app
 
 # Copy the pre-built Next.js standalone output (built in GHA runner)
+# In a monorepo without outputFileTracingRoot, standalone puts server.js
+# at apps/flownau/server.js (mirrors the source tree), not at root.
 COPY .next/standalone ./
-COPY .next/static ./.next/static
-COPY public ./public
+COPY .next/static ./apps/flownau/.next/static
+COPY public ./apps/flownau/public
 
 # Copy Prisma schema + migrations + config for runtime migrate deploy
 COPY prisma ./prisma
@@ -29,5 +31,5 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["node", "server.js"]
+CMD ["node", "apps/flownau/server.js"]
 
