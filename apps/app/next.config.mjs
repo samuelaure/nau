@@ -25,10 +25,6 @@ const securityHeaders = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-  // Expose server-only env vars to the Edge runtime (middleware)
-  env: {
-    ACCOUNTS_URL: process.env.ACCOUNTS_URL ?? '',
-  },
   async headers() {
     return [{ source: '/(.*)', headers: securityHeaders }]
   },
