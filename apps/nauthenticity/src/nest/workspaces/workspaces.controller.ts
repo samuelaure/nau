@@ -16,7 +16,7 @@ import { ConfigService } from '@nestjs/config'
 import { AnyAuthGuard } from '../auth/any-auth.guard'
 import { COOKIE_ACCESS_TOKEN } from '@nau/auth'
 
-const CENTRAL_API_URL = 'https://api.9nau.com'
+const CENTRAL_API_URL = process.env['NAU_API_URL'] ?? 'https://api.9nau.com'
 
 @Controller('workspaces')
 @UseGuards(AnyAuthGuard)

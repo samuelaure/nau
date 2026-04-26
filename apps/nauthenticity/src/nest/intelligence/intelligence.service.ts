@@ -25,8 +25,7 @@ export class IntelligenceService {
         },
       },
     })
-    if (!intelligence) throw new NotFoundException('Brand intelligence not found')
-    return intelligence
+    return intelligence ?? null
   }
 
   async upsertIntelligence(brandId: string, data: Record<string, unknown>) {

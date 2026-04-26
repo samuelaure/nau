@@ -132,7 +132,7 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
           targets: {
             select: {
               id: true,
-              username: true,
+              socialProfile: { select: { username: true } },
               targetType: true,
               isActive: true,
               profileStrategy: true,
@@ -205,7 +205,7 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
     const intelligence = await prisma.brandIntelligence.findUnique({
       where: { brandId },
       include: {
-        targets: { select: { username: true, profileStrategy: true } },
+        targets: { select: { socialProfile: { select: { username: true } }, profileStrategy: true } },
         syntheses: { orderBy: { createdAt: 'desc' }, take: 1 },
       },
     });
@@ -257,7 +257,7 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
       include: {
         targets: {
           select: {
-            username: true,
+            socialProfile: { select: { username: true } },
             profileStrategy: true,
             targetType: true,
           },
