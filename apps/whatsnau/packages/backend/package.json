@@ -6,6 +6,7 @@
   "main": "dist/index.js",
   "private": true,
   "scripts": {
+    "predev": "prisma generate && prisma migrate deploy",
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",

@@ -2,13 +2,18 @@
 # Apps run directly on the host via their dev scripts (no containers needed).
 #
 # Port map:
-#   api postgres    → localhost:5432
-#   flownau postgres → localhost:5433
-#   nauthenticity pg → localhost:5434
-#   zazu postgres   → localhost:5435
-#   api redis       → localhost:6379
-#   flownau redis   → localhost:6380
-#   nauthenticity r → localhost:6381
+#   api postgres       → localhost:5432
+#   flownau postgres   → localhost:5433
+#   nauthenticity pg   → localhost:5434
+#   zazu postgres      → localhost:5435
+#   api redis          → localhost:6379
+#   flownau redis      → localhost:6380
+#   nauthenticity r    → localhost:6381
+#   whatsnau postgres  → localhost:5436
+#   whatsnau redis     → localhost:6382
+#
+# All postgres instances use trust auth (docker/dev/pg_hba.conf) so that
+# connections from the Windows host work without SCRAM negotiation issues.
 
 services:
 
@@ -21,10 +26,12 @@ services:
       POSTGRES_USER: nau_api
       POSTGRES_PASSWORD: dev_api_password
       POSTGRES_DB: nau_api
+    command: postgres -c hba_file=/etc/postgresql/pg_hba.conf
     ports:
       - "5432:5432"
     volumes:
       - dev-api-postgres:/var/lib/postgresql/data
+      - ./docker/dev/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U nau_api -d nau_api"]
       interval: 5s
@@ -50,10 +57,12 @@ services:
       POSTGRES_USER: flownau
       POSTGRES_PASSWORD: dev_flownau_password
       POSTGRES_DB: flownau
+    command: postgres -c hba_file=/etc/postgresql/pg_hba.conf
     ports:
       - "5433:5432"
     volumes:
       - dev-flownau-postgres:/var/lib/postgresql/data
+      - ./docker/dev/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U flownau -d flownau"]
       interval: 5s
@@ -79,10 +88,12 @@ services:
       POSTGRES_USER: nauthenticity
       POSTGRES_PASSWORD: dev_nauthenticity_password
       POSTGRES_DB: nauthenticity
+    command: postgres -c hba_file=/etc/postgresql/pg_hba.conf
     ports:
       - "5434:5432"
     volumes:
       - dev-nauthenticity-postgres:/var/lib/postgresql/data
+      - ./docker/dev/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U nauthenticity -d nauthenticity"]
       interval: 5s
@@ -99,6 +110,37 @@ services:
     volumes:
       - dev-nauthenticity-redis:/data
 
+  # ── Whatsnau ─────────────────────────────────────────────────────────────────
+  whatsnau-postgres:
+    image: postgres:16-alpine
+    container_name: dev-whatsnau-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: whatsnau
+      POSTGRES_PASSWORD: dev_whatsnau_password
+      POSTGRES_DB: whatsnau
+    command: postgres -c hba_file=/etc/postgresql/pg_hba.conf
+    ports:
+      - "5436:5432"
+    volumes:
+      - dev-whatsnau-postgres:/var/lib/postgresql/data
+      - ./docker/dev/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U whatsnau -d whatsnau"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  whatsnau-redis:
+    image: redis:7-alpine
+    container_name: dev-whatsnau-redis
+    restart: unless-stopped
+    command: redis-server --requirepass "dev_redis_password"
+    ports:
+      - "6382:6379"
+    volumes:
+      - dev-whatsnau-redis:/data
+
   # ── Zazu ─────────────────────────────────────────────────────────────────────
   zazu-postgres:
     image: postgres:16-alpine
@@ -108,10 +150,12 @@ services:
       POSTGRES_USER: zazu
       POSTGRES_PASSWORD: dev_zazu_password
       POSTGRES_DB: zazu
+    command: postgres -c hba_file=/etc/postgresql/pg_hba.conf
     ports:
       - "5435:5432"
     volumes:
       - dev-zazu-postgres:/var/lib/postgresql/data
+      - ./docker/dev/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U zazu -d zazu"]
       interval: 5s
@@ -125,4 +169,6 @@ volumes:
   dev-flownau-redis:
   dev-nauthenticity-postgres:
   dev-nauthenticity-redis:
+  dev-whatsnau-postgres:
+  dev-whatsnau-redis:
   dev-zazu-postgres:
