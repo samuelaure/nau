@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { loginAction } from '../actions'
 
-const DEFAULT_REDIRECT = process.env['NEXT_PUBLIC_APP_URL'] ?? 'https://app.9nau.com'
+const DEFAULT_REDIRECT = '/choose'
 
 function LoginFormInner() {
   const [email, setEmail] = useState('')

@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation'
 import { getSessionFromCookieStore } from '@nau/auth'
 import { LoginForm } from './LoginForm'
 
-const DEFAULT_REDIRECT = process.env['NEXT_PUBLIC_APP_URL'] ?? 'https://app.9nau.com'
+const DEFAULT_REDIRECT = '/choose'
 
 export default async function LoginPage({
   searchParams,

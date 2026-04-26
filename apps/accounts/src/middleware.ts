@@ -3,7 +3,7 @@ import { getOrRefreshSession } from '@nau/auth'
 
 const WINDOW_MS = 60_000
 const MAX_REQUESTS = 20
-const DEFAULT_REDIRECT = process.env['NEXT_PUBLIC_APP_URL'] ?? 'https://app.9nau.com'
+const DEFAULT_REDIRECT = '/choose'
 
 const store = new Map<string, { count: number; resetAt: number }>()
 
