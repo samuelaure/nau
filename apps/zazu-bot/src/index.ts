@@ -4,9 +4,8 @@ import { ProactiveDeliverySystem } from './proactive-delivery';
 import { logger } from './lib/logger';
 import { buildServiceHeaders } from './lib/service-auth';
 
-// Load environment variables for local development
-const envFile = process.env.NODE_ENV === 'development' ? '.env.development' : '.env';
-dotenv.config({ path: path.resolve(__dirname, '..', envFile) });
+// Fallback env load for when the process is started without dotenv-cli
+dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
 import { Telegraf, session } from 'telegraf';
 import prisma, { OnboardingState } from '@zazu/db';

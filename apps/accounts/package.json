@@ -7,7 +7,7 @@
   "author": "Samuel Aure",
   "scripts": {
     "build": "next build",
-    "dev:on": "dotenv -e ../../.env.development -e .env.development next dev --port 3002",
+    "dev": "dotenv -e ../../.env.development -e .env.development -- next dev --port 3002",
     "lint": "next lint",
     "prod:on": "dotenv -e ../../.env -e .env next dev --port 3002",
     "start": "next start",
@@ -32,6 +32,7 @@
     "@vitejs/plugin-react": "^4.3.1",
     "@vitest/coverage-v8": "^2.1.9",
     "autoprefixer": "^10.4.21",
+    "dotenv-cli": "^7.4.4",
     "eslint-config-next": "15.4.4",
     "jsdom": "^25.0.1",
     "postcss": "^8",

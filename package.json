@@ -6,7 +6,9 @@
   "packageManager": "pnpm@10.14.0",
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev --parallel",
+    "dev": "docker compose -f docker-compose.dev.yml up -d && turbo run dev --parallel",
+    "infra:up": "docker compose -f docker-compose.dev.yml up -d",
+    "infra:down": "docker compose -f docker-compose.dev.yml down",
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
     "build:packages": "pnpm -r --filter './packages/**' build",

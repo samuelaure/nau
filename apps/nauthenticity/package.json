@@ -10,7 +10,8 @@
   "scripts": {
     "build": "nest build",
     "start": "node dist/main",
-    "dev:on": "dotenv -e ../../.env.development -e .env.development -- nest start --watch",
+    "dev": "dotenv -e ../../.env.development -e .env.development -- nest start --watch",
+    "predev": "dotenv -e ../../.env.development -e .env.development -- npx prisma generate --schema=src/db/schema.prisma",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "lint": "eslint src --ext .ts",
