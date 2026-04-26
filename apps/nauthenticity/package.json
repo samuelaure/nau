@@ -10,6 +10,7 @@
   "scripts": {
     "build": "nest build",
     "start": "node dist/main",
+    "dev:on": "dotenv -e ../../.env.development -e .env.development -- nest start --watch",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "lint": "eslint src --ext .ts",
@@ -75,6 +76,7 @@
     "prisma": "5.22.0",
     "supertest": "^7.0.0",
     "ts-jest": "^29.1.0",
+    "dotenv-cli": "^7.4.4",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
   }

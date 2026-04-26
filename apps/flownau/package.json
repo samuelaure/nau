@@ -17,7 +17,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "npm run db:bootstrap -- && next dev",
+    "dev": "npm run db:bootstrap -- && next dev --port 3003",
     "build": "next build",
     "start": "npm run db:bootstrap && next start",
     "lint": "eslint .",

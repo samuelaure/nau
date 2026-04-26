@@ -5,7 +5,8 @@ import { logger } from './lib/logger';
 import { buildServiceHeaders } from './lib/service-auth';
 
 // Load environment variables for local development
-dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+const envFile = process.env.NODE_ENV === 'development' ? '.env.development' : '.env';
+dotenv.config({ path: path.resolve(__dirname, '..', envFile) });
 
 import { Telegraf, session } from 'telegraf';
 import prisma, { OnboardingState } from '@zazu/db';
