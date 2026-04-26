@@ -7,7 +7,7 @@ import {
   Logger,
 } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
-import { Prisma } from '@prisma/client'
+import { Prisma } from '../../../../node_modules/.prisma/client'
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -34,10 +34,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
           : ((response as Record<string, unknown>).message as string) || exception.message
       error = exception.name
     } else if (exception instanceof Prisma.PrismaClientKnownRequestError) {
-      switch (exception.code) {
+      const dbErr = exception as Prisma.PrismaClientKnownRequestError
+      switch (dbErr.code) {
         case 'P2002':
           httpStatus = HttpStatus.CONFLICT
-          message = `Unique constraint violation on: ${(exception.meta?.target as string[])?.join(', ') || 'unknown field'}`
+          message = `Unique constraint violation on: ${(dbErr.meta?.target as string[])?.join(', ') || 'unknown field'}`
           error = 'ConflictError'
           break
         case 'P2025':
@@ -46,7 +47,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
           error = 'NotFoundError'
           break
         default:
-          message = `Database error: ${exception.code}`
+          message = `Database error: ${dbErr.code}`
       }
     } else if (exception instanceof Prisma.PrismaClientValidationError) {
       httpStatus = HttpStatus.BAD_REQUEST

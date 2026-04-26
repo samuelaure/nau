@@ -1,5 +1,5 @@
 import { prisma } from '../db/prisma';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../../node_modules/.prisma/client';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import { optimizeImage, optimizeVideo } from '../utils/media';
