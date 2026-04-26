@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "predev": "dotenv -e ../../.env.development -e .env.development -- sh -c 'cd ../../packages/zazu-db && npx prisma migrate deploy' && dotenv -e ../../.env.development -e .env.development -- npx prisma generate --schema=../../packages/zazu-db/prisma/schema.prisma",
+    "predev": "dotenv -e ../../.env.development -e .env.development -- pnpm --filter @zazu/db exec prisma migrate deploy && dotenv -e ../../.env.development -e .env.development -- pnpm --filter @zazu/db exec prisma generate",
     "dev": "dotenv -e ../../.env.development -e .env.development -- ts-node src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
