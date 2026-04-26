@@ -19,8 +19,14 @@
     "clean": "rm -rf node_modules packages/*/node_modules"
   },
   "devDependencies": {
+    "@types/pg": "^8.20.0",
     "concurrently": "^8.2.0",
+    "dotenv-cli": "^11.0.0",
     "standard-version": "^9.5.0",
     "turbo": "^2.8.3"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.8.0",
+    "pg": "^8.20.0"
   }
 }

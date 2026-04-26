@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "private": true,
   "scripts": {
-    "predev": "dotenv-cli -e .env -- prisma migrate deploy && dotenv-cli -e .env -- prisma generate",
+    "predev": "npx dotenv-cli -e .env -- prisma migrate deploy && npx dotenv-cli -e .env -- prisma generate",
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
@@ -47,6 +47,7 @@
     "cors": "^2.8.6",
     "csv-parse": "^6.1.0",
     "dotenv": "^16.3.1",
+    "dotenv-cli": "^11.0.0",
     "express": "^5.2.1",
     "express-rate-limit": "^8.2.1",
     "helmet": "^8.1.0",
