@@ -3,3 +3,5 @@ packages:
   - 'packages/*'
   # All application services (flat)
   - 'apps/*'
+  # Nested sub-apps
+  - 'apps/nauthenticity/dashboard'
