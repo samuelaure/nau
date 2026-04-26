@@ -160,26 +160,33 @@ bot.on('message', async (ctx) => {
   return ctx.reply('Entendido. ¿Necesitas algo más?');
 });
 
-bot.launch().then(() => {
-  logger.info('Zazŭ Bot Nucleus is online (Modular Mode)');
-  const domain = process.env.BOT_DOMAIN || 'zazu.9nau.com';
-  
-  // Set the default Menu Button
-  fetch(`https://api.telegram.org/bot${token}/setChatMenuButton`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      menu_button: {
-        type: 'web_app',
-        text: 'Panel',
-        web_app: { url: `https://${domain}/` }
-      }
-    })
-  }).catch(e => logger.error({ err: e }, 'Error setting menu button'));
-}).catch((err: unknown) => {
-  logger.fatal({ err }, 'Failed to launch bot — exiting')
-  process.exit(1)
-});
+async function launchBot(retries = 5): Promise<void> {
+  try {
+    logger.info('Zazŭ Bot Nucleus is online (Modular Mode)');
+    const domain = process.env.BOT_DOMAIN || 'zazu.9nau.com';
+    fetch(`https://api.telegram.org/bot${token}/setChatMenuButton`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ menu_button: { type: 'web_app', text: 'Panel', web_app: { url: `https://${domain}/` } } })
+    }).catch(e => logger.error({ err: e }, 'Error setting menu button'));
+    await bot.launch();
+  } catch (err: unknown) {
+    const is409 = err instanceof Error && err.message.includes('409');
+    if (is409 && retries > 0) {
+      logger.warn({ retries }, 'Telegram 409 conflict — previous instance still active, retrying in 65s');
+      await new Promise(r => setTimeout(r, 65_000));
+      return launchBot(retries - 1);
+    }
+    logger.fatal({ err }, 'Failed to launch bot — exiting');
+    process.exit(1);
+  }
+}
+
+if (process.env.SKIP_TELEGRAM_POLLING === 'true') {
+  logger.warn('SKIP_TELEGRAM_POLLING=true — Telegram polling disabled (dev mode). Proactive delivery still active.');
+} else {
+  launchBot();
+}
 
 // --- 6. Proactive Delivery Queue ---
 // Replaces the old webhook format with a robust grouped queue that obeys user Delivery Windows
