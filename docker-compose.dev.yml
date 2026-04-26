@@ -12,8 +12,15 @@
 #   whatsnau postgres  → localhost:5436
 #   whatsnau redis     → localhost:6382
 #
-# All postgres instances use trust auth (docker/dev/pg_hba.conf) so that
-# connections from the Windows host work without SCRAM negotiation issues.
+# All postgres instances use trust auth (docker/dev/pg_hba.conf).
+#
+# ⚠ Windows Docker Desktop networking quirk:
+#   A local Windows PostgreSQL service also listens on ::1 (IPv6 loopback) on
+#   ports 5432, 5434, 5435. Node.js/pnpm tools on Windows prefer ::1, so they
+#   connect to the LOCAL service (not Docker) on those ports — trust auth works.
+#   Ports 5433 (flownau) and 5436 (whatsnau) are Docker-only; pg driver hits the
+#   Docker proxy which uses SCRAM. Workaround: run `prisma migrate deploy` for
+#   flownau/whatsnau via `scripts/dev-migrate.sh` which uses `docker exec` instead.
 
 services:
 
