@@ -15,21 +15,21 @@ export class ContentService {
   async listAccounts(page: number, limit: number) {
     const skip = (page - 1) * limit
     const [accounts, total] = await Promise.all([
-      this.prisma.igProfile.findMany({
+      this.prisma.socialProfile.findMany({
         where: { posts: { some: {} } },
         orderBy: { lastScrapedAt: 'desc' },
         include: { _count: { select: { posts: true } } },
         skip,
         take: limit,
       }),
-      this.prisma.igProfile.count({ where: { posts: { some: {} } } }),
+      this.prisma.socialProfile.count({ where: { posts: { some: {} } } }),
     ])
     return { accounts, pagination: { total, page, limit, totalPages: Math.ceil(total / limit) } }
   }
 
   async getAccount(username: string) {
-    const account = await this.prisma.igProfile.findUnique({
-      where: { username },
+    const account = await this.prisma.socialProfile.findUnique({
+      where: { platform_username: { platform: 'instagram', username } },
       include: {
         posts: {
           orderBy: { postedAt: 'desc' },
@@ -37,18 +37,18 @@ export class ContentService {
         },
       },
     })
-    if (!account) throw new NotFoundException('IgProfile not found')
+    if (!account) throw new NotFoundException('SocialProfile not found')
     return account
   }
 
   async exportAccountTxt(username: string): Promise<string> {
-    const account = await this.prisma.igProfile.findUnique({
-      where: { username },
+    const account = await this.prisma.socialProfile.findUnique({
+      where: { platform_username: { platform: 'instagram', username } },
       include: {
         posts: { orderBy: { postedAt: 'desc' }, include: { transcripts: true } },
       },
     })
-    if (!account) throw new NotFoundException('IgProfile not found')
+    if (!account) throw new NotFoundException('SocialProfile not found')
 
     let output = `DATA EXPORT FOR: ${account.username}\n`
     output += `Generated on: ${new Date().toISOString()}\n`
@@ -66,7 +66,7 @@ export class ContentService {
   async getPost(id: string) {
     const post = await this.prisma.post.findUnique({
       where: { id },
-      include: { media: true, transcripts: true, igProfile: true },
+      include: { media: true, transcripts: true, socialProfile: true },
     })
     if (!post) throw new NotFoundException('Post not found')
 

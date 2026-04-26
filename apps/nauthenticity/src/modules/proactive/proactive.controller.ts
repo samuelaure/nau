@@ -17,7 +17,7 @@ import { authenticate } from '../../utils/auth';
 
 const BrandIntelligenceUpsertSchema = z.object({
   workspaceId: z.string().min(1),
-  mainIgUsername: z.string().optional().nullable(),
+  mainUsername: z.string().optional().nullable(),
   voicePrompt: z.string().min(1),
   commentStrategy: z.string().optional().nullable(),
   suggestionsCount: z.number().int().min(1).max(10).default(3),
@@ -177,7 +177,7 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
       const { brandId } = request.params as { brandId: string };
       try {
         const body = request.body as Record<string, unknown>;
-        const allowed = ['workspaceId', 'mainIgUsername', 'voicePrompt', 'commentStrategy', 'suggestionsCount', 'windowStart', 'windowEnd', 'timezone'];
+        const allowed = ['workspaceId', 'mainUsername', 'voicePrompt', 'commentStrategy', 'suggestionsCount', 'windowStart', 'windowEnd', 'timezone'];
         const patch: Record<string, unknown> = {};
         for (const key of allowed) {
           if (key in body) patch[key] = body[key];
@@ -278,7 +278,7 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
       const { brandId } = request.params as { brandId: string };
       const schema = z.object({
         workspaceId: z.string().optional(),
-        mainIgUsername: z.string().optional(),
+        mainUsername: z.string().optional(),
       });
 
       try {
@@ -311,17 +311,17 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
       } = TargetCreateSchema.parse(request.body);
 
       for (const username of usernames) {
-        await prisma.igProfile.upsert({
-          where: { username },
-          create: { username },
+        const profile = await prisma.socialProfile.upsert({
+          where: { platform_username: { platform: 'instagram', username } },
+          create: { platform: 'instagram', username },
           update: {},
         });
 
-        await prisma.brandTarget.upsert({
-          where: { brandId_username: { brandId, username } },
+        await prisma.socialProfileTarget.upsert({
+          where: { brandId_socialProfileId: { brandId, socialProfileId: profile.id } },
           create: {
             brandId,
-            username,
+            socialProfileId: profile.id,
             targetType,
             profileStrategy: profileStrategy ?? null,
             isActive,
@@ -353,8 +353,12 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
       const { brandId, username } = request.params as { brandId: string; username: string };
       try {
         const data = TargetUpdateSchema.parse(request.body);
-        const target = await prisma.brandTarget.update({
-          where: { brandId_username: { brandId, username } },
+        const profile = await prisma.socialProfile.findUnique({
+          where: { platform_username: { platform: 'instagram', username } },
+        });
+        if (!profile) return reply.status(404).send({ error: 'SocialProfile not found' });
+        const target = await prisma.socialProfileTarget.update({
+          where: { brandId_socialProfileId: { brandId, socialProfileId: profile.id } },
           data,
         });
         return reply.send(target);
@@ -370,8 +374,12 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
     if (!brandId || !username) {
       return reply.status(400).send({ error: 'Missing required query params: brandId, username' });
     }
-    await prisma.brandTarget.delete({
-      where: { brandId_username: { brandId, username } },
+    const profile = await prisma.socialProfile.findUnique({
+      where: { platform_username: { platform: 'instagram', username } },
+    });
+    if (!profile) return reply.status(404).send({ error: 'SocialProfile not found' });
+    await prisma.socialProfileTarget.delete({
+      where: { brandId_socialProfileId: { brandId, socialProfileId: profile.id } },
     });
     return reply.send({ success: true });
   });

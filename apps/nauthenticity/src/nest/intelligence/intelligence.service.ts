@@ -14,7 +14,7 @@ export class IntelligenceService {
         targets: {
           select: {
             id: true,
-            username: true,
+            socialProfile: { select: { username: true } },
             targetType: true,
             isActive: true,
             profileStrategy: true,
@@ -30,7 +30,7 @@ export class IntelligenceService {
   }
 
   async upsertIntelligence(brandId: string, data: Record<string, unknown>) {
-    const allowed = ['workspaceId', 'mainIgUsername', 'voicePrompt', 'commentStrategy', 'suggestionsCount', 'windowStart', 'windowEnd', 'timezone']
+    const allowed = ['workspaceId', 'mainUsername', 'voicePrompt', 'commentStrategy', 'suggestionsCount', 'windowStart', 'windowEnd', 'timezone']
     const patch: Record<string, unknown> = {}
     for (const key of allowed) {
       if (key in data) patch[key] = data[key]
@@ -51,7 +51,7 @@ export class IntelligenceService {
     const intelligence = await this.prisma.brandIntelligence.findUnique({
       where: { brandId },
       include: {
-        targets: { select: { username: true, profileStrategy: true } },
+        targets: { select: { socialProfile: { select: { username: true } }, profileStrategy: true } },
         syntheses: { orderBy: { createdAt: 'desc' }, take: 1 },
       },
     })
@@ -62,7 +62,7 @@ export class IntelligenceService {
       commentStrategy: intelligence.commentStrategy,
       suggestionsCount: intelligence.suggestionsCount,
       targets: intelligence.targets,
-      latestSynthesis: (intelligence as { syntheses?: unknown[] }).syntheses?.[0] ?? null,
+      latestSynthesis: (intelligence as unknown as { syntheses: unknown[] }).syntheses[0] ?? null,
     }
   }
 
@@ -79,12 +79,12 @@ export class IntelligenceService {
     return this.prisma.brandIntelligence.findMany({
       where: { workspaceId },
       include: {
-        targets: { select: { username: true, profileStrategy: true, targetType: true } },
+        targets: { select: { socialProfile: { select: { username: true } }, profileStrategy: true, targetType: true } },
       },
     })
   }
 
-  async syncServiceBrand(brandId: string, data: { workspaceId?: string; mainIgUsername?: string }) {
+  async syncServiceBrand(brandId: string, data: { workspaceId?: string; mainUsername?: string }) {
     return this.prisma.brandIntelligence.update({ where: { brandId }, data })
   }
 
@@ -100,16 +100,16 @@ export class IntelligenceService {
     },
   ) {
     for (const username of usernames) {
-      await this.prisma.igProfile.upsert({
-        where: { username },
-        create: { username },
+      const profile = await this.prisma.socialProfile.upsert({
+        where: { platform_username: { platform: 'instagram', username } },
+        create: { platform: 'instagram', username },
         update: {},
       })
-      await this.prisma.brandTarget.upsert({
-        where: { brandId_username: { brandId, username } },
+      await this.prisma.socialProfileTarget.upsert({
+        where: { brandId_socialProfileId: { brandId, socialProfileId: profile.id } },
         create: {
           brandId,
-          username,
+          socialProfileId: profile.id,
           targetType: opts.targetType ?? 'monitored',
           profileStrategy: opts.profileStrategy ?? null,
           isActive: opts.isActive ?? true,
@@ -128,17 +128,12 @@ export class IntelligenceService {
     return { success: true }
   }
 
-  async updateTarget(brandId: string, username: string, data: Record<string, unknown>) {
-    return this.prisma.brandTarget.update({
-      where: { brandId_username: { brandId, username } },
-      data,
-    })
+  async updateTarget(id: string, data: Record<string, unknown>) {
+    return this.prisma.socialProfileTarget.update({ where: { id }, data })
   }
 
-  async deleteTarget(brandId: string, username: string) {
-    await this.prisma.brandTarget.delete({
-      where: { brandId_username: { brandId, username } },
-    })
+  async deleteTarget(id: string) {
+    await this.prisma.socialProfileTarget.delete({ where: { id } })
     return { success: true }
   }
 
@@ -162,10 +157,10 @@ export class IntelligenceService {
   }
 
   async getTargets(brandId: string, targetType?: string) {
-    return this.prisma.brandTarget.findMany({
+    return this.prisma.socialProfileTarget.findMany({
       where: { brandId, targetType: targetType ?? undefined },
       include: {
-        igProfile: { include: { _count: { select: { posts: true } } } },
+        socialProfile: { include: { _count: { select: { posts: true } } } },
       },
       orderBy: { createdAt: 'desc' },
     })
@@ -176,6 +171,6 @@ export class IntelligenceService {
     if (data.isActive !== undefined) patch.isActive = data.isActive
     if (data.autoUpdate !== undefined) patch.autoUpdate = data.autoUpdate
     if (data.initialDownloadCount !== undefined) patch.initialDownloadCount = data.initialDownloadCount
-    return this.prisma.brandTarget.update({ where: { id }, data: patch })
+    return this.prisma.socialProfileTarget.update({ where: { id }, data: patch })
   }
 }

@@ -7,14 +7,14 @@ import { dispatchToZazu } from './zazu.dispatcher';
 import { logger } from '../../utils/logger';
 import { prisma } from '../../db/prisma';
 import { toZonedTime } from 'date-fns-tz';
-import type { BrandIntelligence, BrandTarget, IgProfile } from '@prisma/client';
+import type { BrandIntelligence, SocialProfileTarget, SocialProfile } from '@prisma/client';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 type BrandWithTargets = BrandIntelligence & {
-  targets: (BrandTarget & { igProfile: IgProfile })[];
+  targets: (SocialProfileTarget & { socialProfile: SocialProfile })[];
 };
 
 // ---------------------------------------------------------------------------
@@ -50,7 +50,7 @@ export const runProactiveFanout = async (now: Date = new Date()): Promise<void> 
     include: {
       targets: {
         where: { targetType: 'monitored', isActive: true },
-        include: { igProfile: true },
+        include: { socialProfile: true },
       },
     },
   })) as BrandWithTargets[];
@@ -68,12 +68,13 @@ export const runProactiveFanout = async (now: Date = new Date()): Promise<void> 
     const cutoff = new Date(now.getTime() - thresholdMs);
 
     for (const target of brand.targets) {
-      const lastScrape = target.igProfile.lastScrapedAt;
+      const lastScrape = target.socialProfile.lastScrapedAt;
+      const profileUsername = target.socialProfile.username;
       if (!lastScrape || lastScrape < cutoff) {
-        if (!eligibleTargets.has(target.username)) {
-          eligibleTargets.set(target.username, new Set());
+        if (!eligibleTargets.has(profileUsername)) {
+          eligibleTargets.set(profileUsername, new Set());
         }
-        eligibleTargets.get(target.username)!.add(brand.brandId);
+        eligibleTargets.get(profileUsername)!.add(brand.brandId);
       }
     }
   }
@@ -98,7 +99,7 @@ export const runProactiveFanout = async (now: Date = new Date()): Promise<void> 
     return;
   }
 
-  await prisma.igProfile.updateMany({
+  await prisma.socialProfile.updateMany({
     where: { username: { in: usernames } },
     data: { lastScrapedAt: now },
   });
@@ -151,7 +152,7 @@ export const runProactiveFanout = async (now: Date = new Date()): Promise<void> 
       });
       const lastSelectedComments = lastSelectedFeedbacks.map((f) => f.commentText);
 
-      const brandTarget = brand.targets.find((t) => t.username === item.ownerUsername);
+      const brandTarget = brand.targets.find((t) => t.socialProfile.username === item.ownerUsername);
 
       logger.info(
         `[FanoutProcessor] Generating ${brand.suggestionsCount} comment(s) for brand ${brandId} on @${item.ownerUsername}...`,

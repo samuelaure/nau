@@ -147,7 +147,7 @@ export const BrandMonitoredView = () => {
                 onClick={(e) => {
                   // Only open if they didn't click the toggle button
                   if ((e.target as HTMLElement).closest('button')) return;
-                  setSelectedUsername(target.username);
+                  setSelectedUsername(target.socialProfile?.username);
                 }}
               >
                 <div>
@@ -160,7 +160,7 @@ export const BrandMonitoredView = () => {
                       gap: '8px',
                     }}
                   >
-                    @{target.username}
+                    @{target.socialProfile?.username}
                   </h3>
                   <p
                     style={{
@@ -173,7 +173,7 @@ export const BrandMonitoredView = () => {
                     }}
                   >
                     <Activity size={12} />
-                    {target.igProfile?._count?.posts || 0} posts captured
+                    {target.socialProfile?._count?.posts || 0} posts captured
                   </p>
                 </div>
 

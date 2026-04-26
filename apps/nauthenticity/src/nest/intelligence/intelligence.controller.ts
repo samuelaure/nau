@@ -65,7 +65,7 @@ export class IntelligenceController {
   @Patch('service/brands/:brandId')
   syncServiceBrand(
     @Param('brandId') brandId: string,
-    @Body() body: { workspaceId?: string; mainIgUsername?: string },
+    @Body() body: { workspaceId?: string; mainUsername?: string },
   ) {
     return this.intelligenceService.syncServiceBrand(brandId, body)
   }
@@ -99,13 +99,12 @@ export class IntelligenceController {
     return this.intelligenceService.createTargets(body.brandId, body.usernames, body)
   }
 
-  @Put('targets/:brandId/:username')
+  @Put('targets/:id')
   updateTarget(
-    @Param('brandId') brandId: string,
-    @Param('username') username: string,
+    @Param('id') id: string,
     @Body() body: Record<string, unknown>,
   ) {
-    return this.intelligenceService.updateTarget(brandId, username, body)
+    return this.intelligenceService.updateTarget(id, body)
   }
 
   @Patch('targets/:id')
@@ -117,9 +116,9 @@ export class IntelligenceController {
   }
 
   @Delete('targets')
-  deleteTarget(@Query('brandId') brandId?: string, @Query('username') username?: string) {
-    if (!brandId || !username) throw new BadRequestException('Missing brandId or username')
-    return this.intelligenceService.deleteTarget(brandId, username)
+  deleteTarget(@Query('id') id?: string) {
+    if (!id) throw new BadRequestException('Missing target id')
+    return this.intelligenceService.deleteTarget(id)
   }
 
   // -------------------------------------------------------------------------

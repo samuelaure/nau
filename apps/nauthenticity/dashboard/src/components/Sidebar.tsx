@@ -3,7 +3,10 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { clearToken } from '../lib/auth';
 import {
   LayoutDashboard,
-  Activity,
+  Lightbulb,
+  Users,
+  MessageSquare,
+  BarChart2,
   LogOut,
   ChevronDown,
   Check,
@@ -11,8 +14,9 @@ import {
   X,
   Loader,
   Video,
+  Building2,
   Settings,
-  Shield,
+  ArrowLeft,
 } from 'lucide-react';
 
 type Workspace = { id: string; name: string };
@@ -26,7 +30,6 @@ function WorkspaceSelector() {
   const [saving, setSaving] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  // Persist selected workspace in localStorage
   const [activeId, setActiveId] = useState<string | null>(() =>
     localStorage.getItem('nau_workspace_id'),
   );
@@ -71,17 +74,12 @@ function WorkspaceSelector() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newName.trim() }),
       });
-      if (!res.ok) {
-        const err = await res.text();
-        console.error('[WorkspaceSelector] create failed', res.status, err);
-        throw new Error(err);
-      }
+      if (!res.ok) throw new Error(await res.text());
       const created: Workspace = await res.json();
       setWorkspaces((ws) => [...ws, created]);
       select(created.id);
       setCreating(false);
       setNewName('');
-      navigate(`/workspaces/${created.id}/brands`);
     } catch (e) {
       console.error('[WorkspaceSelector] create error', e);
     } finally {
@@ -90,179 +88,58 @@ function WorkspaceSelector() {
   };
 
   return (
-    <div ref={ref} style={{ position: 'relative', marginBottom: '16px' }}>
-      <button
-        onClick={() => setOpen((o) => !o)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          width: '100%',
-          padding: '10px 12px',
-          borderRadius: '8px',
-          background: 'rgba(255,255,255,0.05)',
-          border: '1px solid rgba(255,255,255,0.1)',
-          color: '#f0f6fc',
-          fontSize: '13px',
-          fontWeight: 600,
-          cursor: 'pointer',
-          gap: '8px',
-        }}
-      >
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {active?.name ?? 'Select workspace'}
-        </span>
-        <ChevronDown size={14} style={{ color: '#8b949e', flexShrink: 0 }} />
+    <div ref={ref} className="sidebar-workspace-selector">
+      <button className="sidebar-workspace-btn" onClick={() => setOpen((o) => !o)}>
+        <span className="sidebar-workspace-name">{active?.name ?? 'Select workspace'}</span>
+        <ChevronDown size={14} className="sidebar-workspace-chevron" />
       </button>
 
       {open && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: 0,
-            marginTop: '4px',
-            zIndex: 100,
-            background: '#161b22',
-            border: '1px solid #30363d',
-            borderRadius: '10px',
-            overflow: 'hidden',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-          }}
-        >
+        <div className="sidebar-dropdown">
           {workspaces.map((ws) => (
             <button
               key={ws.id}
               onClick={() => select(ws.id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                width: '100%',
-                padding: '10px 14px',
-                background: 'transparent',
-                border: 'none',
-                color: ws.id === activeId ? '#f0f6fc' : '#8b949e',
-                fontSize: '13px',
-                cursor: 'pointer',
-                textAlign: 'left',
-                fontWeight: ws.id === activeId ? 600 : 400,
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)';
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.background = 'transparent';
-              }}
+              className={`sidebar-dropdown-item${ws.id === activeId ? ' sidebar-dropdown-item--active' : ''}`}
             >
               <span>{ws.name}</span>
-              {ws.id === activeId && <Check size={13} style={{ color: '#58a6ff' }} />}
+              {ws.id === activeId && <Check size={13} className="sidebar-dropdown-check" />}
             </button>
           ))}
 
-          <div style={{ borderTop: '1px solid #21262d', padding: '4px 0' }}>
+          <div className="sidebar-dropdown-divider">
             {creating ? (
-              <div
-                style={{
-                  padding: '10px 12px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px',
-                }}
-              >
+              <div className="sidebar-create-form">
                 <input
                   autoFocus
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') handleCreate();
-                    if (e.key === 'Escape') {
-                      setCreating(false);
-                      setNewName('');
-                    }
+                    if (e.key === 'Escape') { setCreating(false); setNewName(''); }
                   }}
                   placeholder="Workspace name"
-                  style={{
-                    background: 'rgba(255,255,255,0.07)',
-                    border: '1px solid #30363d',
-                    borderRadius: '6px',
-                    padding: '6px 10px',
-                    color: '#f0f6fc',
-                    fontSize: '13px',
-                    outline: 'none',
-                    width: '100%',
-                  }}
+                  className="sidebar-create-input"
                 />
-                <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                <div className="sidebar-create-actions">
                   <button
-                    onClick={() => {
-                      setCreating(false);
-                      setNewName('');
-                    }}
-                    style={{
-                      padding: '4px 8px',
-                      borderRadius: '6px',
-                      border: '1px solid #30363d',
-                      background: 'transparent',
-                      color: '#8b949e',
-                      fontSize: '12px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                    }}
+                    onClick={() => { setCreating(false); setNewName(''); }}
+                    className="sidebar-create-cancel"
                   >
                     <X size={12} />
                   </button>
                   <button
                     onClick={handleCreate}
                     disabled={saving || !newName.trim()}
-                    style={{
-                      padding: '4px 10px',
-                      borderRadius: '6px',
-                      background: '#58a6ff',
-                      border: 'none',
-                      color: 'white',
-                      fontSize: '12px',
-                      cursor: saving ? 'not-allowed' : 'pointer',
-                      opacity: saving ? 0.6 : 1,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                    }}
+                    className="sidebar-create-submit"
                   >
-                    {saving ? (
-                      <Loader size={11} style={{ animation: 'spin 1s linear infinite' }} />
-                    ) : (
-                      'Create'
-                    )}
+                    {saving ? <Loader size={11} className="spin" /> : 'Create'}
                   </button>
                 </div>
               </div>
             ) : (
-              <button
-                onClick={() => setCreating(true)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  width: '100%',
-                  padding: '10px 14px',
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#58a6ff',
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)';
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.background = 'transparent';
-                }}
-              >
-                <Plus size={14} /> Create a new workspace
+              <button onClick={() => setCreating(true)} className="sidebar-dropdown-item sidebar-dropdown-item--create">
+                <Plus size={14} /> New workspace
               </button>
             )}
           </div>
@@ -272,87 +149,88 @@ function WorkspaceSelector() {
   );
 }
 
-const globalNavItems = [
-  { label: 'Overview', to: '/', icon: LayoutDashboard },
-  { label: 'Progress', to: '/progress', icon: Activity },
-  { label: 'Settings', to: '/workspace-settings', icon: Settings },
-];
-
 export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Extract context from URL
-  const brandMatch = location.pathname.match(/\/workspaces\/([^\/]+)\/brands\/([^\/]+)/);
-  const workspaceIdMatch = location.pathname.match(/\/workspaces\/([^\/]+)/);
+  const brandMatch = location.pathname.match(/\/workspaces\/([^/]+)\/brands\/([^/]+)/);
+  const workspaceMatch = location.pathname.match(/\/workspaces\/([^/]+)/);
 
-  const activeWorkspaceId = workspaceIdMatch
-    ? workspaceIdMatch[1]
+  const activeWorkspaceId = workspaceMatch
+    ? workspaceMatch[1]
     : localStorage.getItem('nau_workspace_id');
   const activeBrandId = brandMatch ? brandMatch[2] : null;
 
-  let navItems = globalNavItems;
-
-  if (activeBrandId && activeWorkspaceId) {
-    const baseUrl = `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}`;
-    navItems = [
-      { label: 'Content', to: `${baseUrl}/content`, icon: LayoutDashboard },
-      { label: 'InspoBase', to: `${baseUrl}/inspobase`, icon: Activity },
-      { label: 'Comments', to: `${baseUrl}/comments`, icon: Settings },
-      { label: 'Benchmark', to: `${baseUrl}/benchmark`, icon: Activity },
-    ];
-  } else if (activeWorkspaceId) {
-    navItems = [
-      { label: 'Brands', to: `/workspaces/${activeWorkspaceId}/brands`, icon: Shield },
-      { label: 'Settings', to: '/workspace-settings', icon: Settings },
-    ];
-  }
-
-  const resolvedNavItems = navItems.filter((item) => {
-    // Hide Settings if no workspace is selected
-    if (item.label === 'Settings' && !activeWorkspaceId) return false;
-    return true;
-  });
-
   const handleSignOut = () => {
     clearToken();
-    navigate('/auth/callback'); // will redirect to login since no token
     window.location.href = '/';
   };
 
+  const isActive = (to: string) =>
+    to === '/' ? location.pathname === '/' : location.pathname.startsWith(to);
+
   return (
     <aside className="sidebar">
-      {/* Logo */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '32px' }}>
-        <div
-          style={{ padding: '8px', background: '#58a6ff', borderRadius: '8px', display: 'flex' }}
-        >
+      <div className="sidebar-logo">
+        <div className="sidebar-logo-icon">
           <Video size={18} color="white" />
         </div>
-        <span style={{ fontWeight: 800, fontSize: '17px', letterSpacing: '-0.02em' }}>
-          naŭthenticity
-        </span>
+        <span className="sidebar-logo-text">naŭthenticity</span>
       </div>
 
-      {/* Workspace selector */}
       <WorkspaceSelector />
 
-      {/* Nav links */}
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
-        {resolvedNavItems.map(({ label, to, icon: Icon }) => {
-          const isActive =
-            to === '/' ? location.pathname === '/' : location.pathname.startsWith(to);
-          return (
+      <nav className="sidebar-nav">
+        {activeBrandId && activeWorkspaceId ? (
+          <>
             <Link
-              key={to}
-              to={to}
-              className={`sidebar-link${isActive ? ' sidebar-link--active' : ''}`}
+              to={`/workspaces/${activeWorkspaceId}/brands`}
+              className="sidebar-back"
             >
-              <Icon size={17} />
-              {label}
+              <ArrowLeft size={14} /> All Brands
             </Link>
-          );
-        })}
+
+            <span className="sidebar-section-label">Brand</span>
+
+            {[
+              { label: 'Content', to: `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}/content`, icon: LayoutDashboard },
+              { label: 'Inspo', to: `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}/inspo`, icon: Lightbulb },
+              { label: 'Social Profiles', to: `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}/profiles`, icon: Users },
+              { label: 'Comments', to: `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}/comments`, icon: MessageSquare },
+              { label: 'Benchmark', to: `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}/benchmark`, icon: BarChart2 },
+            ].map(({ label, to, icon: Icon }) => (
+              <Link
+                key={to}
+                to={to}
+                className={`sidebar-link${isActive(to) ? ' sidebar-link--active' : ''}`}
+              >
+                <Icon size={17} />
+                {label}
+              </Link>
+            ))}
+          </>
+        ) : activeWorkspaceId ? (
+          <>
+            <span className="sidebar-section-label">Workspace</span>
+            {[
+              { label: 'Brands', to: `/workspaces/${activeWorkspaceId}/brands`, icon: Building2 },
+              { label: 'Settings', to: '/workspace-settings', icon: Settings },
+            ].map(({ label, to, icon: Icon }) => (
+              <Link
+                key={to}
+                to={to}
+                className={`sidebar-link${isActive(to) ? ' sidebar-link--active' : ''}`}
+              >
+                <Icon size={17} />
+                {label}
+              </Link>
+            ))}
+          </>
+        ) : (
+          <Link to="/workspaces" className={`sidebar-link${isActive('/workspaces') ? ' sidebar-link--active' : ''}`}>
+            <Building2 size={17} /> Workspaces
+          </Link>
+        )}
       </nav>
 
       <button className="sidebar-signout" onClick={handleSignOut}>

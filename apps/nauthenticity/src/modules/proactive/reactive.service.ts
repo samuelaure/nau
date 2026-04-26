@@ -48,9 +48,16 @@ export const generateReactiveComments = async (
   }
 
   // 3. Fetch Profile Strategy
-  const target = await prisma.brandTarget.findUnique({
-    where: { brandId_username: { brandId, username: post.username || '' } },
-  });
+  const socialProfile = post.username
+    ? await prisma.socialProfile.findUnique({
+        where: { platform_username: { platform: 'instagram', username: post.username } },
+      })
+    : null
+  const target = socialProfile
+    ? await prisma.socialProfileTarget.findUnique({
+        where: { brandId_socialProfileId: { brandId, socialProfileId: socialProfile.id } },
+      })
+    : null
 
   // 4. Fetch Last Selected Comments
   const lastFeedbacks = await prisma.commentFeedback.findMany({

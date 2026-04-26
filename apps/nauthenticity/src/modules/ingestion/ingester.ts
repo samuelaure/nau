@@ -11,14 +11,12 @@ export const ingestProfile = async (
 ) => {
   logger.info(`[Ingester] Starting ingestion for ${username}`);
 
-  // 0. Ensure Account exists (Identity) - Placeholder
-  let account = await prisma.igProfile.findUnique({ where: { username } });
-  if (!account) {
-    logger.info(`[Ingester] Account ${username} not found. Creating placeholder.`);
-    account = await prisma.igProfile.create({
-      data: { username, lastScrapedAt: new Date() },
-    });
-  }
+  // 0. Ensure SocialProfile exists (Identity) - Placeholder
+  let account = await prisma.socialProfile.upsert({
+    where: { platform_username: { platform: 'instagram', username } },
+    create: { platform: 'instagram', username, lastScrapedAt: new Date() },
+    update: {},
+  });
 
   let oldestPostDate: string | undefined;
   if (options.updateSync) {
@@ -95,7 +93,7 @@ export const ingestProfile = async (
     if (scrapeResult.profile && scrapeResult.profile.username) {
       const hdUrl = scrapeResult.profile.profilePicUrlHD || scrapeResult.profile.profilePicUrl;
       if (hdUrl) {
-        await prisma.igProfile.updateMany({
+        await prisma.socialProfile.updateMany({
           where: { username: scrapeResult.profile.username },
           data: { profileImageUrl: hdUrl },
         });
@@ -188,20 +186,15 @@ export const ingestProfile = async (
         collaborators.push({ username: primaryOwner, profilePicUrl: p, role: 'origin' });
       }
 
-      // 2. Ensure all discovered collaborators have Accounts and local avatars
+      // 2. Ensure all discovered collaborators have SocialProfiles
       for (const collab of collaborators) {
-        let collabAccount = await prisma.igProfile.findUnique({
-          where: { username: collab.username },
-        });
-        if (!collabAccount && collab.username) {
-          collabAccount = await prisma.igProfile.create({
-            data: {
-              username: collab.username,
-              profileImageUrl: collab.profilePicUrl,
-              lastScrapedAt: new Date(),
-            },
-          });
-        }
+        let collabAccount = collab.username
+          ? await prisma.socialProfile.upsert({
+              where: { platform_username: { platform: 'instagram', username: collab.username } },
+              create: { platform: 'instagram', username: collab.username, profileImageUrl: collab.profilePicUrl, lastScrapedAt: new Date() },
+              update: {},
+            })
+          : null;
 
         // Queue collab profile image download if we have a URL and it's not local
         if (
@@ -230,21 +223,23 @@ export const ingestProfile = async (
       const videoUrl =
         item.video_links && item.video_links.length > 0 ? item.video_links[0] : item.videoUrl;
 
-      // 3. Upsert Post
+      // 3. Upsert Post — link to SocialProfile by id
       const post = await prisma.post.upsert({
         where: { instagramUrl: instagramUrl },
         update: {
           likes,
           comments,
           instagramId,
-          username: postUsername, // Link to processed account
+          username: postUsername,
+          socialProfileId: account.id,
           collaborators: collaborators.length > 0 ? collaborators : undefined,
-          runId: runId, // Link to the latest run
+          runId: runId,
         },
         create: {
           instagramId,
           instagramUrl: instagramUrl,
           username: postUsername,
+          socialProfileId: account.id,
           collaborators: collaborators.length > 0 ? collaborators : undefined,
           caption: item.caption,
           postedAt: takenAt,

@@ -190,7 +190,7 @@ export const BrandBenchmarkView = () => {
               <BenchmarkTargetCard
                 key={target.id}
                 target={target}
-                onSelect={() => setSelectedUsername(target.username)}
+                onSelect={() => setSelectedUsername(target.socialProfile?.username)}
                 onUpdate={(updates) => updateMutation.mutate({ id: target.id, updates })}
               />
             ))}
@@ -267,7 +267,7 @@ const BenchmarkTargetCard = ({
               gap: '8px',
             }}
           >
-            @{target.username}
+            @{target.socialProfile?.username}
           </h3>
           <p
             style={{
@@ -280,7 +280,7 @@ const BenchmarkTargetCard = ({
             }}
           >
             <Activity size={12} />
-            {target.igProfile?._count?.posts || 0} posts captured
+            {target.socialProfile?._count?.posts || 0} posts captured
           </p>
         </div>
         <button

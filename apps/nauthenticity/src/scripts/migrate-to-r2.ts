@@ -112,7 +112,7 @@ async function migrate() {
 
           // Update DB: If this is the context account's profile pic
           if (username === contextUsername) {
-            await prisma.igProfile.update({
+            await prisma.socialProfile.update({
               where: { username },
               data: { profileImageUrl: publicUrl },
             });

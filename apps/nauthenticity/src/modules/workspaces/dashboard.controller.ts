@@ -9,10 +9,10 @@ export const dashboardController = async (fastify: FastifyInstance) => {
     const { brandId, targetType } = request.query as { brandId?: string; targetType?: string };
     if (!brandId) return reply.status(400).send({ error: 'Missing brandId' });
 
-    const targets = await prisma.brandTarget.findMany({
+    const targets = await prisma.socialProfileTarget.findMany({
       where: { brandId, targetType: targetType || undefined },
       include: {
-        igProfile: { include: { _count: { select: { posts: true } } } },
+        socialProfile: { include: { _count: { select: { posts: true } } } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -29,7 +29,7 @@ export const dashboardController = async (fastify: FastifyInstance) => {
     if (initialDownloadCount !== undefined)
       dataToUpdate.initialDownloadCount = initialDownloadCount;
 
-    const updated = await prisma.brandTarget.update({
+    const updated = await prisma.socialProfileTarget.update({
       where: { id },
       data: dataToUpdate,
     });

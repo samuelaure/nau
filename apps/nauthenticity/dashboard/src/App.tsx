@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AccountsList } from './pages/AccountsList';
-import { AccountView } from './pages/AccountView';
+import { LandingPage } from './pages/LandingPage';
+import { ProfilesList } from './pages/ProfilesList';
+import { ProfileView } from './pages/ProfileView';
 import { PostView } from './pages/PostView';
 import { ProgressView } from './pages/ProgressView';
 import { AuthCallback } from './pages/AuthCallback';
@@ -20,6 +21,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
+          <Route path="/" element={<LandingPage />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/auth/complete" element={<AuthCallback />} />
           <Route
@@ -36,11 +38,13 @@ function App() {
                         path="/workspaces/:workspaceId/brands/:brandId/*"
                         element={<BrandLayout />}
                       />
-                      <Route path="/" element={<Navigate to="/workspaces" replace />} />
+                      <Route path="/dashboard" element={<Navigate to="/workspaces" replace />} />
 
-                      {/* Legacy Routes - kept for backwards compatibility during migration */}
-                      <Route path="/accounts" element={<AccountsList />} />
-                      <Route path="/accounts/:username" element={<AccountView />} />
+                      {/* Legacy routes */}
+                      <Route path="/accounts" element={<ProfilesList />} />
+                      <Route path="/accounts/:username" element={<ProfileView />} />
+                      <Route path="/profiles" element={<ProfilesList />} />
+                      <Route path="/profiles/:username" element={<ProfileView />} />
                       <Route path="/posts/:id" element={<PostView />} />
                       <Route path="/progress" element={<ProgressView />} />
                       <Route path="/workspace-settings" element={<WorkspaceSettings />} />

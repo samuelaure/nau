@@ -37,14 +37,19 @@ export const getMediaUrl = (url?: string) => {
   return url;
 };
 
-export interface Account {
+export interface SocialProfile {
+  id: string;
+  platform: string;
   username: string;
-  profileImageUrl: string;
+  profileImageUrl: string | null;
   lastScrapedAt: string;
   _count?: {
     posts: number;
   };
 }
+
+/** @deprecated Use SocialProfile */
+export type Account = SocialProfile;
 
 export interface Transcript {
   id: string;
@@ -69,9 +74,12 @@ export interface Post {
   olderPostId?: string | null;
 }
 
-export interface AccountDetails extends Account {
+export interface SocialProfileDetails extends SocialProfile {
   posts: Post[];
 }
+
+/** @deprecated Use SocialProfileDetails */
+export type AccountDetails = SocialProfileDetails;
 
 export interface Media {
   id: string;
@@ -115,16 +123,20 @@ export interface QueueStatus {
   ingestion: QueueMetrics;
 }
 
-export const getAccounts = async () => {
-  const { data } = await api.get<{ accounts: Account[] } | Account[]>('/accounts');
-  // Backend wraps in { accounts, pagination } — handle both shapes
-  return Array.isArray(data) ? data : (data as { accounts: Account[] }).accounts;
+export const getProfiles = async () => {
+  const { data } = await api.get<{ accounts: SocialProfile[] } | SocialProfile[]>('/accounts');
+  return Array.isArray(data) ? data : (data as { accounts: SocialProfile[] }).accounts;
 };
 
-export const getAccount = async (username: string) => {
-  const { data } = await api.get<AccountDetails>(`/accounts/${username}`);
+export const getProfile = async (username: string) => {
+  const { data } = await api.get<SocialProfileDetails>(`/accounts/${username}`);
   return data;
 };
+
+/** @deprecated Use getProfiles */
+export const getAccounts = getProfiles;
+/** @deprecated Use getProfile */
+export const getAccount = getProfile;
 
 export const getPost = async (id: string) => {
   const { data } = await api.get<Post>(`/posts/${id}`);
@@ -170,7 +182,7 @@ export interface PostProgress {
   transcriptPreview: string | null;
 }
 
-export interface AccountProgress {
+export interface ProfileProgress {
   summary: {
     totalPosts: number;
     totalMedia: number;
@@ -202,10 +214,13 @@ export interface AccountProgress {
   posts: PostProgress[];
 }
 
-export const getAccountProgress = async (username: string) => {
-  const { data } = await api.get<AccountProgress>(`/accounts/${username}/progress`);
+export const getProfileProgress = async (username: string) => {
+  const { data } = await api.get<ProfileProgress>(`/accounts/${username}/progress`);
   return data;
 };
+
+/** @deprecated Use getProfileProgress */
+export const getAccountProgress = getProfileProgress;
 
 export const abortIngestion = async (username: string) => {
   const { data } = await api.post('/abort', { username });
