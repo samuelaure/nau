@@ -20,7 +20,7 @@ export default async function WorkspaceOverviewPage({
   const { brandId } = await searchParams
   // Workspace details are now fetched from the 9naŭ Platform Service
   const nauApiUrl = process.env.NAU_API_URL || 'http://9nau-api:3000'
-  const workspaceResp = await fetch(`${nauApiUrl}/workspaces/${workspaceId}/service`, {
+  const workspaceResp = await fetch(`${nauApiUrl}/_service/workspaces/${workspaceId}`, {
     headers: { 'x-nau-service-key': process.env.NAU_SERVICE_KEY ?? '' },
     cache: 'no-store',
   })
@@ -38,7 +38,7 @@ export default async function WorkspaceOverviewPage({
     )
   }
 
-  const { workspace } = (await workspaceResp.json()) as { workspace: { name: string } }
+  const workspace = (await workspaceResp.json()) as { name: string }
 
   const accounts = await prisma.socialAccount.findMany({
     where: { workspaceId, ...(brandId ? { brandId } : {}) },
