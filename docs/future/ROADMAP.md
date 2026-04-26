@@ -194,6 +194,15 @@ Fill in the docs stubs with real code references now that code exists.
 
 ---
 
+## Deferred standardization items
+
+These are not blocking any phase but must not be forgotten:
+
+- **React 18 → 19 upgrade in `@9nau/ui`** — `packages/nau-ui` declares React 18 peer dependencies while `flownau`, `nauthenticity/dashboard`, and `whatsnau/frontend` use React 19. This causes pnpm peer warnings on every install. Fix: upgrade `@9nau/ui` to React 19, update peer dep declarations, verify all component consumers compile. Target: before Phase 6 (flownau refactor) since that's the primary UI consumer.
+- **whatsnau NestJS migration** — full plan at `apps/whatsnau/REFACTORING_PLAN.md`. Not blocking platform phases 1–7. Revisit after Phase 5 (nauthenticity NestJS migration) is done — the patterns from that migration can be directly reused.
+
+---
+
 ## Non-goals (explicitly out of scope for this roadmap)
 
 - whatsnaŭ integration into the platform (standalone SaaS, separate concern)
