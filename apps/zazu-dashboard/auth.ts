@@ -3,6 +3,7 @@ import Credentials from "next-auth/providers/credentials";
 import crypto from "crypto";
 import { jwtVerify } from "jose";
 import prisma from "@zazu/db";
+import { authConfig } from "./auth.config";
 
 declare module "next-auth" {
   interface Session {
@@ -17,6 +18,7 @@ declare module "next-auth" {
 const ADMIN_TELEGRAM_ID = process.env.ADMIN_TELEGRAM_ID || "5109114390";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  ...authConfig,
   providers: [
     Credentials({
       id: "telegram-login",
@@ -115,9 +117,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
-  pages: {
-    signIn: "/login",
-  },
   callbacks: {
     async jwt({ token, user, trigger }) {
       if (user) {
@@ -125,18 +124,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.isAdmin = (user as any).isAdminString === "true";
         token.nauUserId = (user as any).nauUserId ?? null;
       }
-      // Re-sync link status from DB when the session is explicitly updated
       if (trigger === "update" && token.id && typeof token.id === 'string') {
         try {
           if (/^\d+$/.test(token.id)) {
-            // Case: User is logged in via Telegram, check for nauUserId
             const dbUser = await prisma.user.findUnique({
               where: { telegramId: BigInt(token.id) },
               select: { nauUserId: true },
             });
             token.nauUserId = dbUser?.nauUserId ?? null;
           } else {
-            // Case: User is logged in via naŭ SSO (CUID), check if they just linked Telegram
             const dbUser = await prisma.user.findFirst({
               where: { nauUserId: token.id },
               select: { telegramId: true },
@@ -158,21 +154,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.nauUserId = (token.nauUserId as string | null) ?? null;
       }
       return session;
-    },
-    authorized({ auth, request: { nextUrl } }) {
-      const isLoggedIn = !!auth?.user;
-      const isAuthRoute =
-        nextUrl.pathname === "/login" ||
-        nextUrl.pathname.startsWith("/auth/callback") ||
-        nextUrl.pathname.startsWith("/auth/link-callback");
-
-      if (isAuthRoute) {
-        if (isLoggedIn && nextUrl.pathname === "/login")
-          return Response.redirect(new URL("/", nextUrl));
-        return true;
-      }
-
-      return isLoggedIn;
     },
   },
 });
