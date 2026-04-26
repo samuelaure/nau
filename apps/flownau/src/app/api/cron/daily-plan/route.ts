@@ -25,7 +25,7 @@ export async function GET(request: Request) {
 
   try {
     const results: Array<{
-      accountId: string
+      brandId: string
       status: string
       piecesCount?: number
       scriptsCount?: number
@@ -37,7 +37,7 @@ export async function GET(request: Request) {
     const tomorrow = new Date()
     tomorrow.setDate(tomorrow.getDate() + 1)
 
-    const accounts = await prisma.socialAccount.findMany({
+    const accounts = await prisma.socialProfile.findMany({
       where: { accessToken: { not: '' } },
       select: { id: true, username: true },
     })
@@ -49,7 +49,7 @@ export async function GET(request: Request) {
         const plan = await generateDailyPlan(account.id, tomorrow)
 
         results.push({
-          accountId: account.id,
+          brandId: account.id,
           status: 'success',
           piecesCount: plan.pieces.length,
           scriptsCount: plan.scripts.length,
@@ -62,7 +62,7 @@ export async function GET(request: Request) {
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         logError(`[DailyPlanCron] Failed for account ${account.id}`, err)
-        results.push({ accountId: account.id, status: 'failed', error: msg })
+        results.push({ brandId: account.id, status: 'failed', error: msg })
       }
     }
 

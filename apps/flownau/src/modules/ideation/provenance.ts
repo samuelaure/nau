@@ -13,31 +13,31 @@ export interface ResolvedProvenance extends IdeationProvenance {
   principlesSystemPrompt: string | null
 }
 
-async function resolvePersona(accountId: string, overrideId?: string | null) {
+async function resolvePersona(brandId: string, overrideId?: string | null) {
   if (overrideId) return prisma.brandPersona.findUnique({ where: { id: overrideId } })
   const defaultPersona = await prisma.brandPersona.findFirst({
-    where: { accountId, isDefault: true },
+    where: { brandId, isDefault: true },
   })
   if (defaultPersona) return defaultPersona
-  return prisma.brandPersona.findFirst({ where: { accountId } })
+  return prisma.brandPersona.findFirst({ where: { brandId } })
 }
 
-async function resolveFramework(accountId: string, overrideId?: string | null) {
+async function resolveFramework(brandId: string, overrideId?: string | null) {
   if (overrideId) return prisma.ideasFramework.findUnique({ where: { id: overrideId } })
   const def = await prisma.ideasFramework.findFirst({
-    where: { accountId, isDefault: true },
+    where: { brandId, isDefault: true },
   })
   if (def) return def
-  return prisma.ideasFramework.findFirst({ where: { accountId } })
+  return prisma.ideasFramework.findFirst({ where: { brandId } })
 }
 
-async function resolvePrinciples(accountId: string, overrideId?: string | null) {
+async function resolvePrinciples(brandId: string, overrideId?: string | null) {
   if (overrideId) return prisma.contentCreationPrinciples.findUnique({ where: { id: overrideId } })
   const def = await prisma.contentCreationPrinciples.findFirst({
-    where: { accountId, isDefault: true },
+    where: { brandId, isDefault: true },
   })
   if (def) return def
-  return prisma.contentCreationPrinciples.findFirst({ where: { accountId } })
+  return prisma.contentCreationPrinciples.findFirst({ where: { brandId } })
 }
 
 /**
@@ -46,13 +46,13 @@ async function resolvePrinciples(accountId: string, overrideId?: string | null) 
  * on ContentIdea) and content development (to carry forward the same narrative).
  */
 export async function resolveProvenance(
-  accountId: string,
+  brandId: string,
   overrides: Partial<IdeationProvenance> = {},
 ): Promise<ResolvedProvenance> {
   const [persona, framework, principles] = await Promise.all([
-    resolvePersona(accountId, overrides.brandPersonaId),
-    resolveFramework(accountId, overrides.ideasFrameworkId),
-    resolvePrinciples(accountId, overrides.contentPrinciplesId),
+    resolvePersona(brandId, overrides.brandPersonaId),
+    resolveFramework(brandId, overrides.ideasFrameworkId),
+    resolvePrinciples(brandId, overrides.contentPrinciplesId),
   ])
 
   return {

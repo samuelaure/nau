@@ -4,43 +4,43 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 
 /**
- * GET /api/account-templates?accountId=
+ * GET /api/account-templates?brandId=
  * Lists all templates visible to the account (own + workspace-shared) with their
- * AccountTemplateConfig settings for this account.
+ * BrandTemplateConfig settings for this account.
  *
  * PUT /api/account-templates
- * Body: { accountId, templateId, autoApprovePost?, enabled? }
- * Upserts AccountTemplateConfig for (accountId, templateId).
+ * Body: { brandId, templateId, autoApprovePost?, enabled? }
+ * Upserts BrandTemplateConfig for (brandId, templateId).
  *
  * POST /api/account-templates
- * Body: { accountId, templateId }
+ * Body: { brandId, templateId }
  * Enables a workspace-scoped template for an account (creates config row).
  */
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
-    const accountId = searchParams.get('accountId')
-    if (!accountId) return NextResponse.json({ error: 'Missing accountId' }, { status: 400 })
+    const brandId = searchParams.get('brandId')
+    if (!brandId) return NextResponse.json({ error: 'Missing brandId' }, { status: 400 })
 
-    const account = await prisma.socialAccount.findUnique({
-      where: { id: accountId },
+    const brand = await prisma.brand.findUnique({
+      where: { id: brandId },
       select: { workspaceId: true },
     })
-    if (!account) return NextResponse.json({ error: 'Account not found' }, { status: 404 })
+    if (!brand) return NextResponse.json({ error: 'Brand not found' }, { status: 404 })
 
     const siblingIds = (
-      await prisma.socialAccount.findMany({
-        where: { workspaceId: account.workspaceId },
+      await prisma.brand.findMany({
+        where: { workspaceId: brand.workspaceId },
         select: { id: true },
       })
-    ).map((a) => a.id)
+    ).map((b) => b.id)
 
     const templates = await prisma.template.findMany({
       where: {
-        OR: [{ accountId }, { accountId: { in: siblingIds }, scope: 'workspace' }],
+        OR: [{ brandId }, { brandId: { in: siblingIds }, scope: 'workspace' }],
       },
       include: {
-        accountConfigs: { where: { accountId } },
+        brandConfigs: { where: { brandId } },
       },
       orderBy: { createdAt: 'asc' },
     })
@@ -54,16 +54,16 @@ export async function GET(req: Request) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json()
-    const { accountId, templateId, autoApprovePost, enabled } = body
+    const { brandId, templateId, autoApprovePost, enabled } = body
 
-    if (!accountId || !templateId) {
-      return NextResponse.json({ error: 'Missing accountId or templateId' }, { status: 400 })
+    if (!brandId || !templateId) {
+      return NextResponse.json({ error: 'Missing brandId or templateId' }, { status: 400 })
     }
 
-    const config = await prisma.accountTemplateConfig.upsert({
-      where: { accountId_templateId: { accountId, templateId } },
+    const config = await prisma.brandTemplateConfig.upsert({
+      where: { brandId_templateId: { brandId, templateId } },
       create: {
-        accountId,
+        brandId,
         templateId,
         autoApprovePost: autoApprovePost ?? false,
         enabled: enabled ?? true,
@@ -83,15 +83,15 @@ export async function PUT(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { accountId, templateId } = body
+    const { brandId, templateId } = body
 
-    if (!accountId || !templateId) {
-      return NextResponse.json({ error: 'Missing accountId or templateId' }, { status: 400 })
+    if (!brandId || !templateId) {
+      return NextResponse.json({ error: 'Missing brandId or templateId' }, { status: 400 })
     }
 
-    const config = await prisma.accountTemplateConfig.upsert({
-      where: { accountId_templateId: { accountId, templateId } },
-      create: { accountId, templateId, autoApprovePost: false, enabled: true },
+    const config = await prisma.brandTemplateConfig.upsert({
+      where: { brandId_templateId: { brandId, templateId } },
+      create: { brandId, templateId, autoApprovePost: false, enabled: true },
       update: { enabled: true },
     })
 

@@ -4,12 +4,12 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 
 export async function GET(req: Request) {
-  // Using an optional accountId query param since personas are account-scoped
+  // Using an optional brandId query param since personas are account-scoped
   const { searchParams } = new URL(req.url)
-  const accountId = searchParams.get('accountId')
+  const brandId = searchParams.get('brandId')
 
   try {
-    const whereClause = accountId ? { accountId } : {}
+    const whereClause = brandId ? { brandId } : {}
     const personas = await prisma.brandPersona.findMany({
       where: whereClause,
     })
@@ -22,26 +22,25 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { accountId, brandId, workspaceId, name, systemPrompt, ...rest } = body
+    const { brandId, workspaceId, name, systemPrompt, ...rest } = body
 
-    if (!accountId || !brandId || !workspaceId || !name || !systemPrompt) {
+    if (!brandId || !brandId || !workspaceId || !name || !systemPrompt) {
       return NextResponse.json(
-        { error: 'Missing accountId, brandId, workspaceId, name, or systemPrompt' },
+        { error: 'Missing brandId, workspaceId, name, or systemPrompt' },
         { status: 400 },
       )
     }
 
     // If setting to default, clear others
-    if (rest.isDefault && accountId) {
+    if (rest.isDefault && brandId) {
       await prisma.brandPersona.updateMany({
-        where: { accountId },
+        where: { brandId },
         data: { isDefault: false },
       })
     }
 
     const persona = await prisma.brandPersona.create({
       data: {
-        accountId,
         brandId,
         workspaceId,
         name,

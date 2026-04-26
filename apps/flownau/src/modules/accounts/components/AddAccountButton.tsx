@@ -18,6 +18,7 @@ interface SimpleAccount {
 interface AddAccountButtonProps {
   existingAccounts?: SimpleAccount[]
   workspaceId?: string
+  brandId?: string
   /** 'brand' = name-only form, 'social-profile' = Instagram connect form */
   mode?: 'brand' | 'social-profile'
 }
@@ -25,6 +26,7 @@ interface AddAccountButtonProps {
 export default function AddAccountButton({
   existingAccounts = [],
   workspaceId,
+  brandId,
   mode = 'social-profile',
 }: AddAccountButtonProps) {
   const router = useRouter()
@@ -60,6 +62,7 @@ export default function AddAccountButton({
   const handleSocialProfileSubmit = async (formData: FormData) => {
     setError(null)
     if (workspaceId) formData.append('workspaceId', workspaceId)
+    if (brandId) formData.append('brandId', brandId)
     startTransition(async () => {
       try {
         await addAccount(formData)

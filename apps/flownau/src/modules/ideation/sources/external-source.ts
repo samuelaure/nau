@@ -31,7 +31,7 @@ function normalizeLegacySource(source: LegacySource | IdeaSource): IdeaSource {
 }
 
 interface ExternalIdeaInput {
-  accountId: string
+  brandId: string
   text: string
   source: LegacySource | IdeaSource
   sourceRef?: string
@@ -43,7 +43,7 @@ interface ExternalIdeaInput {
  * Prevents duplicates by checking for similar ideaText within the last 7 days.
  */
 export async function ingestExternalIdea(params: ExternalIdeaInput) {
-  const { accountId, text, sourceRef, aiLinked = false } = params
+  const { brandId, text, sourceRef, aiLinked = false } = params
   const source = normalizeLegacySource(params.source)
 
   // Check for near-duplicates in last 7 days
@@ -51,7 +51,7 @@ export async function ingestExternalIdea(params: ExternalIdeaInput) {
 
   const existingIdea = await prisma.contentIdea.findFirst({
     where: {
-      accountId,
+      brandId,
       ideaText: text,
       createdAt: { gte: sevenDaysAgo },
     },
@@ -59,7 +59,7 @@ export async function ingestExternalIdea(params: ExternalIdeaInput) {
 
   if (existingIdea) {
     logger.info(
-      `[ExternalSource] Duplicate idea skipped for account ${accountId}: "${text.slice(0, 50)}..."`,
+      `[ExternalSource] Duplicate idea skipped for account ${brandId}: "${text.slice(0, 50)}..."`,
     )
     return existingIdea
   }
@@ -67,11 +67,11 @@ export async function ingestExternalIdea(params: ExternalIdeaInput) {
   // AI-linked ideas always require human review regardless of source or autoApprove settings
   const status = aiLinked ? 'PENDING' : source === 'captured' ? 'APPROVED' : 'PENDING'
 
-  const provenance = await resolveProvenance(accountId)
+  const provenance = await resolveProvenance(brandId)
 
   const idea = await prisma.contentIdea.create({
     data: {
-      accountId,
+      brandId,
       ideaText: text,
       source,
       priority: SOURCE_PRIORITY[source],
@@ -85,7 +85,7 @@ export async function ingestExternalIdea(params: ExternalIdeaInput) {
   })
 
   logger.info(
-    `[ExternalSource] Ingested idea ${idea.id} for account ${accountId} (source: ${source}, priority: ${SOURCE_PRIORITY[source]})`,
+    `[ExternalSource] Ingested idea ${idea.id} for account ${brandId} (source: ${source}, priority: ${SOURCE_PRIORITY[source]})`,
   )
   return idea
 }
@@ -94,7 +94,7 @@ export async function ingestExternalIdea(params: ExternalIdeaInput) {
  * Bulk ingest external ideas with deduplication.
  */
 export async function ingestExternalIdeas(
-  accountId: string,
+  brandId: string,
   ideas: Array<{
     text: string
     source: LegacySource | IdeaSource
@@ -107,12 +107,12 @@ export async function ingestExternalIdeas(
 
   // Fetch recent idea texts for dedup
   const recentIdeas = await prisma.contentIdea.findMany({
-    where: { accountId, createdAt: { gte: sevenDaysAgo } },
+    where: { brandId, createdAt: { gte: sevenDaysAgo } },
     select: { ideaText: true },
   })
   const recentTexts = new Set(recentIdeas.map((i) => i.ideaText))
 
-  const provenance = await resolveProvenance(accountId)
+  const provenance = await resolveProvenance(brandId)
 
   const createdIds: string[] = []
 
@@ -134,7 +134,7 @@ export async function ingestExternalIdeas(
 
     const created = await prisma.contentIdea.create({
       data: {
-        accountId,
+        brandId,
         ideaText: idea.text,
         source,
         priority: SOURCE_PRIORITY[source],
@@ -152,7 +152,7 @@ export async function ingestExternalIdeas(
   }
 
   logger.info(
-    `[ExternalSource] Bulk ingested ${createdIds.length}/${ideas.length} ideas for account ${accountId}`,
+    `[ExternalSource] Bulk ingested ${createdIds.length}/${ideas.length} ideas for account ${brandId}`,
   )
 
   const hasCaptured = ideas.some((i) => normalizeLegacySource(i.source) === 'captured')

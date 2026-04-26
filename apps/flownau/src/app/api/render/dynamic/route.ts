@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth'
 import { prisma } from '@/modules/shared/prisma'
-import { checkAccountAccess } from '@/modules/shared/actions'
+import { checkBrandAccess } from '@/modules/shared/actions'
 import { renderAndUpload } from '@/modules/video/renderer'
 import { DynamicCompositionSchema } from '@/modules/rendering/DynamicComposition/schema'
 
@@ -15,9 +15,9 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json()
-    const { schema, compositionId, accountId } = body
+    const { schema, compositionId, brandId } = body
 
-    if (!schema || !compositionId || !accountId) {
+    if (!schema || !compositionId || !brandId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -26,21 +26,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid schema' }, { status: 400 })
     }
 
-    await checkAccountAccess(accountId)
+    await checkBrandAccess(brandId)
 
     const composition = await prisma.composition.findUnique({
-      where: { id: compositionId, accountId },
-      include: {
-        account: true,
-      },
+      where: { id: compositionId, brandId },
     })
 
-    if (!composition || !composition.account) {
+    if (!composition) {
       return NextResponse.json({ error: 'Composition not found or unauthorized' }, { status: 404 })
     }
 
     const renderId = `dyn-${compositionId}-${Date.now()}`
-    const projectFolder = composition.account.username || composition.account.id
+    const projectFolder = composition.brandId
 
     // Start rendering. Vercel development will allow this to block.
     const videoUrl = await renderAndUpload({

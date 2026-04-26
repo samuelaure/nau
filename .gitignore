@@ -59,3 +59,4 @@ lint_output.txt
 # Local scripts dependencies
 scripts/node_modules/
 scripts/package-lock.json
+tmp

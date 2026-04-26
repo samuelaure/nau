@@ -86,16 +86,16 @@ interface DailyPlanResult {
  * Generates a daily content plan for a given account + date.
  * Idempotent: if a plan already exists for that date, returns it.
  */
-export async function generateDailyPlan(accountId: string, date: Date): Promise<DailyPlanResult> {
+export async function generateDailyPlan(brandId: string, date: Date): Promise<DailyPlanResult> {
   const dateOnly = new Date(date.toISOString().split('T')[0])
 
   // 1. Fetch account info
-  const account = await prisma.socialAccount.findUnique({
-    where: { id: accountId },
+  const account = await prisma.socialProfile.findUnique({
+    where: { id: brandId },
   })
 
   if (!account) {
-    throw new Error(`[DailyPlan] Account ${accountId} not found`)
+    throw new Error(`[DailyPlan] Account ${brandId} not found`)
   }
 
   // 2. Get existing compositions for today
@@ -105,7 +105,7 @@ export async function generateDailyPlan(accountId: string, date: Date): Promise<
 
   const todayCompositions = await prisma.composition.findMany({
     where: {
-      accountId,
+      brandId,
       OR: [
         { scheduledAt: { gte: startOfDay, lt: endOfDay } },
         { createdAt: { gte: startOfDay, lt: endOfDay } },
@@ -146,7 +146,7 @@ export async function generateDailyPlan(accountId: string, date: Date): Promise<
   }
 
   // 5. Build head-talk scripts from pending ideas
-  const scripts = await getHeadTalkScripts(accountId)
+  const scripts = await getHeadTalkScripts(brandId)
 
   // 6. Generate alerts
   const alerts = await generateAlerts(account)
@@ -164,10 +164,10 @@ export async function generateDailyPlan(accountId: string, date: Date): Promise<
   // 8. Upsert ContentPlan record
   await prisma.contentPlan.upsert({
     where: {
-      accountId_date: { accountId, date: dateOnly },
+      brandId_date: { brandId, date: dateOnly },
     },
     create: {
-      accountId,
+      brandId,
       date: dateOnly,
       pieces: pieces as unknown as Prisma.InputJsonValue,
       scripts: scripts as unknown as Prisma.InputJsonValue,
@@ -187,11 +187,11 @@ export async function generateDailyPlan(accountId: string, date: Date): Promise<
 /**
  * Returns pending recording scripts for ideas that require face-to-camera content.
  */
-export async function getHeadTalkScripts(accountId: string): Promise<ScriptSummary[]> {
+export async function getHeadTalkScripts(brandId: string): Promise<ScriptSummary[]> {
   // Find approved ideas that look like head-talk content
   const approvedIdeas = await prisma.contentIdea.findMany({
     where: {
-      accountId,
+      brandId,
       status: { in: ['PENDING', 'APPROVED'] },
     },
     orderBy: { createdAt: 'desc' },
@@ -251,7 +251,7 @@ async function generateAlerts(account: {
   // Low asset pool check
   const unusedVideoAssetCount = await prisma.asset.count({
     where: {
-      accountId: account.id,
+      brandId: account.id,
       type: 'VID',
       usageCount: 0,
     },
@@ -267,11 +267,11 @@ async function generateAlerts(account: {
 
   // Low ideas check
   const pendingIdeasCount = await prisma.contentIdea.count({
-    where: { accountId: account.id, status: 'PENDING' },
+    where: { brandId: account.id, status: 'PENDING' },
   })
 
   const approvedIdeasCount = await prisma.contentIdea.count({
-    where: { accountId: account.id, status: 'APPROVED' },
+    where: { brandId: account.id, status: 'APPROVED' },
   })
 
   if (pendingIdeasCount + approvedIdeasCount < 3) {

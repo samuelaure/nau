@@ -16,13 +16,13 @@ const DynamicCompositionMock = dynamic(
 )
 import { Player } from '@remotion/player'
 
-export default function AccountDrafts({ accountId }: { accountId: string }) {
+export default function AccountDrafts({ brandId }: { brandId: string }) {
   const [compositions, setCompositions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   const fetchCompositions = async () => {
     try {
-      const res = await fetch(`/api/compositions?accountId=${accountId}`)
+      const res = await fetch(`/api/compositions?brandId=${brandId}`)
       const data = await res.json()
       setCompositions(data.compositions || [])
     } catch {
@@ -34,7 +34,7 @@ export default function AccountDrafts({ accountId }: { accountId: string }) {
 
   useEffect(() => {
     fetchCompositions()
-  }, [accountId])
+  }, [brandId])
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this composition?')) return

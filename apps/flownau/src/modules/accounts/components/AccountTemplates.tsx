@@ -5,13 +5,13 @@ import { Card } from '@/modules/shared/components/ui/Card'
 import { Button } from '@/modules/shared/components/ui/Button'
 import { toast } from 'sonner'
 
-export default function AccountTemplates({ accountId }: { accountId: string }) {
+export default function AccountTemplates({ brandId }: { brandId: string }) {
   const [templates, setTemplates] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   const fetchTemplates = async () => {
     try {
-      const res = await fetch(`/api/account-templates?accountId=${accountId}`)
+      const res = await fetch(`/api/account-templates?brandId=${brandId}`)
       const data = await res.json()
       setTemplates(data.templates || [])
     } catch {
@@ -23,7 +23,7 @@ export default function AccountTemplates({ accountId }: { accountId: string }) {
 
   useEffect(() => {
     fetchTemplates()
-  }, [accountId])
+  }, [brandId])
 
   const updateConfig = async (
     templateId: string,
@@ -33,7 +33,7 @@ export default function AccountTemplates({ accountId }: { accountId: string }) {
       const res = await fetch('/api/account-templates', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accountId, templateId, ...patch }),
+        body: JSON.stringify({ brandId, templateId, ...patch }),
       })
       if (!res.ok) throw new Error()
       toast.success('Updated')
@@ -73,8 +73,8 @@ export default function AccountTemplates({ accountId }: { accountId: string }) {
 
       <div className="grid gap-4">
         {templates.map((t) => {
-          const config = t.accountConfigs?.[0]
-          const isOwn = t.accountId === accountId
+          const config = t.brandConfigs?.[0]
+          const isOwn = t.brandId === brandId
           const isEnabled = config?.enabled ?? false
           const autoApprovePost = config?.autoApprovePost ?? false
 

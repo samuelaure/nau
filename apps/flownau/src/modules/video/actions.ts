@@ -10,7 +10,7 @@ import { TemplateSchema } from '@/types/video-schema'
 const TemplateFormSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   remotionId: z.string().min(1, 'Remotion ID is required'),
-  accountId: z
+  brandId: z
     .string()
     .optional()
     .nullable()
@@ -31,7 +31,7 @@ const IdSchema = z.string().min(1)
 
 const ToggleTemplateAssetsSchema = z.object({
   templateId: z.string().min(1),
-  useAccountAssets: z.boolean(),
+  useBrandAssets: z.boolean(),
 })
 
 export async function addTemplate(formData: FormData) {
@@ -40,15 +40,15 @@ export async function addTemplate(formData: FormData) {
   const rawData = {
     name: formData.get('name'),
     remotionId: formData.get('remotionId'),
-    accountId: formData.get('accountId'),
+    brandId: formData.get('brandId'),
   }
 
-  const { accountId, ...templateData } = TemplateFormSchema.parse(rawData)
+  const { brandId, ...templateData } = TemplateFormSchema.parse(rawData)
 
   await (prisma.template.create as any)({
     data: {
       ...templateData,
-      account: accountId ? { connect: { id: accountId } } : undefined,
+      account: brandId ? { connect: { id: brandId } } : undefined,
     },
   })
 
@@ -75,18 +75,18 @@ export async function updateTemplate(id: string, formData: FormData) {
   const rawData = {
     name: formData.get('name'),
     remotionId: formData.get('remotionId'),
-    accountId: formData.get('accountId'),
+    brandId: formData.get('brandId'),
     systemPrompt: formData.get('systemPrompt'),
     creationPrompt: formData.get('creationPrompt'),
   }
 
-  const { accountId, ...templateData } = TemplateFormSchema.parse(rawData)
+  const { brandId, ...templateData } = TemplateFormSchema.parse(rawData)
 
   await (prisma.template.update as any)({
     where: { id: parsedId },
     data: {
       ...templateData,
-      account: accountId ? { connect: { id: accountId } } : { disconnect: true },
+      account: brandId ? { connect: { id: brandId } } : { disconnect: true },
     },
   })
 
@@ -105,8 +105,8 @@ export async function duplicateTemplate(id: string) {
     data: {
       name: `${template.name} (Copy)`,
       remotionId: template.remotionId,
-      account: template.accountId ? { connect: { id: template.accountId } } : undefined,
-      useAccountAssets: template.useAccountAssets,
+      brand: template.brandId ? { connect: { id: template.brandId } } : undefined,
+      useBrandAssets: template.useBrandAssets,
       systemPrompt: (template as any).systemPrompt,
       creationPrompt: (template as any).creationPrompt,
     },
@@ -131,16 +131,16 @@ export async function saveTemplateConfig(id: string, config: unknown) {
   revalidatePath(`/dashboard/templates/${parsedId}`)
 }
 
-export async function toggleTemplateAssets(templateId: string, useAccountAssets: boolean) {
+export async function toggleTemplateAssets(templateId: string, useBrandAssets: boolean) {
   await checkAuth()
-  const { templateId: parsedId, useAccountAssets: parsedUse } = ToggleTemplateAssetsSchema.parse({
+  const { templateId: parsedId, useBrandAssets: parsedUse } = ToggleTemplateAssetsSchema.parse({
     templateId,
-    useAccountAssets,
+    useBrandAssets,
   })
 
   await prisma.template.update({
     where: { id: parsedId },
-    data: { useAccountAssets: parsedUse },
+    data: { useBrandAssets: parsedUse },
   })
   revalidatePath(`/dashboard/templates/${parsedId}`)
 }

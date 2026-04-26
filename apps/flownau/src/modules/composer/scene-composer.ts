@@ -18,7 +18,7 @@ const PLATFORM_DEFAULT_CREATIVE_PERSONA = {
 
 interface ComposeInput {
   ideaText: string
-  accountId: string
+  brandId: string
   format: ContentFormat
   personaId?: string
   // Phase 18: explicit provenance inputs (set by composer cron from ContentIdea)
@@ -48,7 +48,7 @@ interface ComposeResult {
 export async function compose(input: ComposeInput): Promise<ComposeResult> {
   const {
     ideaText,
-    accountId,
+    brandId,
     format,
     personaId,
     frameworkPrompt,
@@ -60,14 +60,14 @@ export async function compose(input: ComposeInput): Promise<ComposeResult> {
   // 1. Fetch Brand Persona
   const persona = personaId
     ? await prisma.brandPersona.findUnique({ where: { id: personaId } })
-    : ((await prisma.brandPersona.findFirst({ where: { accountId, isDefault: true } })) ??
-      (await prisma.brandPersona.findFirst({ where: { accountId } })))
+    : ((await prisma.brandPersona.findFirst({ where: { brandId, isDefault: true } })) ??
+      (await prisma.brandPersona.findFirst({ where: { brandId } })))
 
   const effectivePersona = persona ?? PLATFORM_DEFAULT_CREATIVE_PERSONA
 
   // 2. Fetch asset tag summary for context (not URLs, just metadata)
   const assets = await prisma.asset.findMany({
-    where: { accountId: accountId },
+    where: { brandId: brandId },
     select: { tags: true, type: true },
   })
 

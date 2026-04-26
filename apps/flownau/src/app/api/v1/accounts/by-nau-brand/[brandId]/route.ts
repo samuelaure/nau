@@ -6,8 +6,8 @@ import { prisma } from '@/modules/shared/prisma'
 
 /**
  * GET /api/v1/accounts/by-nau-brand/:brandId
- * Resolves a nauthenticity Brand.id to a local SocialAccount.id.
- * Called by: 9naŭ API (triage module) to find the correct accountId before ingesting ideas.
+ * Resolves a nauthenticity Brand.id to a local SocialProfile.id.
+ * Called by: 9naŭ API (triage module) to find the correct brandId before ingesting ideas.
  * Auth: NAU_SERVICE_KEY
  */
 export async function GET(req: Request, { params }: { params: Promise<{ brandId: string }> }) {
@@ -18,7 +18,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ brandId:
   const { brandId } = await params
 
   try {
-    const account = await prisma.socialAccount.findFirst({
+    const account = await prisma.socialProfile.findFirst({
       where: { brandId },
       select: {
         id: true,
@@ -31,7 +31,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ brandId:
 
     if (!account) {
       return NextResponse.json(
-        { error: `No SocialAccount found for brandId: ${brandId}` },
+        { error: `No SocialProfile found for brandId: ${brandId}` },
         { status: 404 },
       )
     }

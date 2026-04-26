@@ -10,7 +10,7 @@ import { logError } from '@/modules/shared/logger'
  * Called by: Zazŭ (to check rendering/publishing status)
  * Auth: NAU_SERVICE_KEY
  *
- * Query params: accountId (required), status, format, limit
+ * Query params: brandId (required), status, format, limit
  */
 export async function GET(req: Request) {
   if (!(await validateServiceToken(req))) {
@@ -19,16 +19,16 @@ export async function GET(req: Request) {
 
   try {
     const { searchParams } = new URL(req.url)
-    const accountId = searchParams.get('accountId')
+    const brandId = searchParams.get('brandId')
     const status = searchParams.get('status')
     const format = searchParams.get('format')
     const limit = Math.min(parseInt(searchParams.get('limit') ?? '20', 10), 100)
 
-    if (!accountId) {
-      return NextResponse.json({ error: 'accountId query param is required' }, { status: 400 })
+    if (!brandId) {
+      return NextResponse.json({ error: 'brandId query param is required' }, { status: 400 })
     }
 
-    const where: Record<string, unknown> = { accountId }
+    const where: Record<string, unknown> = { brandId }
     if (status) where.status = status
     if (format) where.format = format
 
@@ -38,7 +38,7 @@ export async function GET(req: Request) {
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
-        accountId: true,
+        brandId: true,
         format: true,
         status: true,
         caption: true,

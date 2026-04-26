@@ -34,7 +34,7 @@ const mockRequest = new Request('http://localhost/api/cron/publisher')
 function buildComp(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     id: 'comp1',
-    accountId: 'acc1',
+    brandId: 'acc1',
     templateId: 'tpl1',
     format: 'reel',
     status: 'RENDERED',
@@ -53,7 +53,7 @@ function buildComp(overrides: Partial<Record<string, unknown>> = {}) {
     },
     template: {
       id: 'tpl1',
-      accountConfigs: [{ accountId: 'acc1', templateId: 'tpl1', autoApprovePost: true }],
+      brandConfigs: [{ brandId: 'acc1', templateId: 'tpl1', autoApprovePost: true }],
     },
     ...overrides,
   }
@@ -64,7 +64,7 @@ describe('Publisher Cron API (Phase 18)', () => {
     vi.clearAllMocks()
   })
 
-  it('publishes compositions when AccountTemplateConfig.autoApprovePost is true', async () => {
+  it('publishes compositions when BrandTemplateConfig.autoApprovePost is true', async () => {
     const comp = buildComp()
     ;(prisma.composition.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([comp])
     ;(publishComposition as ReturnType<typeof vi.fn>).mockResolvedValue({
@@ -81,7 +81,7 @@ describe('Publisher Cron API (Phase 18)', () => {
     )
     expect(publishComposition).toHaveBeenCalledWith(comp)
     expect(prisma.contentPlanner.updateMany).toHaveBeenCalledWith({
-      where: { accountId: 'acc1', isDefault: true },
+      where: { brandId: 'acc1', isDefault: true },
       data: expect.objectContaining({ lastPostedAt: expect.any(Date) }),
     })
   })
@@ -90,7 +90,7 @@ describe('Publisher Cron API (Phase 18)', () => {
     const comp = buildComp({
       template: {
         id: 'tpl1',
-        accountConfigs: [{ accountId: 'acc1', templateId: 'tpl1', autoApprovePost: false }],
+        brandConfigs: [{ brandId: 'acc1', templateId: 'tpl1', autoApprovePost: false }],
       },
     })
     ;(prisma.composition.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([comp])
@@ -105,7 +105,7 @@ describe('Publisher Cron API (Phase 18)', () => {
       status: 'PUBLISHING',
       template: {
         id: 'tpl1',
-        accountConfigs: [{ accountId: 'acc1', templateId: 'tpl1', autoApprovePost: false }],
+        brandConfigs: [{ brandId: 'acc1', templateId: 'tpl1', autoApprovePost: false }],
       },
     })
     ;(prisma.composition.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([comp])

@@ -1,62 +1,46 @@
 import { Prisma } from '@prisma/client'
 
-// Template with relations
 export type TemplateWithRelations = Prisma.TemplateGetPayload<{
   include: {
     _count: { select: { renders: true } }
-    account: { select: { username: true; platform: true } }
+    brand: { select: { name: true } }
   }
 }>
 
-export type TemplateWithAccount = Prisma.TemplateGetPayload<{
-  include: {
-    account: { select: { username: true; platform: true } }
-  }
-}>
-
-// Composition with relations
 export type CompositionWithRelations = Prisma.CompositionGetPayload<{
   include: {
-    account: { select: { id: true; username: true } }
+    brand: { select: { id: true; name: true } }
     renderJob: true
     idea: { select: { id: true; ideaText: true; source: true; sourceRef: true } }
   }
 }>
 
-// Render with relations (DEPRECATED — legacy model)
 export type RenderWithTemplate = Prisma.RenderGetPayload<{
   include: { template: true }
 }>
 
-// Account with relations
-export type AccountWithCounts = Prisma.SocialAccountGetPayload<{
-  include: {
-    _count: { select: { templates: true; assets: true } }
-  }
+export type SocialProfileWithCounts = Prisma.SocialProfileGetPayload<{
+  include: Record<string, never>
 }>
 
-export type SimpleAccount = {
-  id: string
-  username: string | null
-  platform: string
-}
+// Keep for any remaining usage during transition
+export type AccountWithCounts = Prisma.SocialProfileGetPayload<{
+  include: Record<string, never>
+}>
 
-// Asset types
 export type AssetWithRelations = Prisma.AssetGetPayload<{
   include: {
-    account: true
+    brand: true
   }
 }>
 
-// Error types
 export type ApiError = {
   error: string
   details?: string
 }
 
-// Form data types
 export type UploadFormData = {
   file: File
-  accountId?: string
+  brandId?: string
   templateId?: string
 }

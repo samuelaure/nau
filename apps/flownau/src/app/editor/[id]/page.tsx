@@ -11,7 +11,7 @@ export default async function EditorPage({ params }: { params: Promise<{ id: str
   const template = await prisma.template.findUnique({
     where: { id },
     include: {
-      account: {
+      brand: {
         include: {
           assets: true,
         },
@@ -22,15 +22,15 @@ export default async function EditorPage({ params }: { params: Promise<{ id: str
 
   if (!template) notFound()
 
-  // Combine assets: template assets first, then account assets
+  // Combine assets: template assets first, then brand assets
   const combinedAssets = [
     ...template.assets,
-    ...(template.useAccountAssets && template.account ? template.account.assets : []),
-  ] as Asset[] // Prisma Asset model matches our Asset interface
+    ...(template.useBrandAssets && template.brand ? template.brand.assets : []),
+  ] as Asset[]
 
   const assetsRoot =
-    template.useAccountAssets && template.account?.assetsRoot
-      ? template.account.assetsRoot
+    template.useBrandAssets && template.brand?.assetsRoot
+      ? template.brand.assetsRoot
       : template.assetsRoot
 
   const initialConfig = template.config ? (template.config as unknown as VideoTemplate) : undefined

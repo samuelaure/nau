@@ -9,7 +9,7 @@ interface TemplateWithCount {
   id: string
   name: string
   remotionId: string
-  accountId?: string | null
+  brandId?: string | null
   useAccountAssets: boolean
   systemPrompt?: string | null
   creationPrompt?: string | null
@@ -134,8 +134,8 @@ export default function TemplateSettings({
           <div className="form-group">
             <label className="form-label">Template Scope</label>
             <select
-              name="accountId"
-              defaultValue={template.accountId || ''}
+              name="brandId"
+              defaultValue={template.brandId || ''}
               className="input-field"
             >
               <option value="">Global Template (Available to all)</option>

@@ -2,18 +2,18 @@ export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
-import { checkAccountAccess } from '@/modules/shared/actions'
+import { checkBrandAccess } from '@/modules/shared/actions'
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
-    const accountId = searchParams.get('accountId')
+    const brandId = searchParams.get('brandId')
 
-    if (!accountId) {
-      return NextResponse.json({ error: 'Missing accountId' }, { status: 400 })
+    if (!brandId) {
+      return NextResponse.json({ error: 'Missing brandId' }, { status: 400 })
     }
 
-    await checkAccountAccess(accountId)
+    await checkBrandAccess(brandId)
 
     const isCalendar = searchParams.get('calendar') === '1'
     const isPool = searchParams.get('pool') === '1'
@@ -21,18 +21,18 @@ export async function GET(req: Request) {
 
     const whereClause = isCalendar
       ? {
-          accountId,
+          brandId,
           status: { in: ['APPROVED', 'SCHEDULED', 'RENDERING', 'RENDERED'] },
         }
       : isPool
         ? {
-            accountId,
+            brandId,
             status: { in: ['DRAFT', 'APPROVED'] },
             scheduledAt: null,
           }
         : statusFilter
-          ? { accountId, status: statusFilter }
-          : { accountId }
+          ? { brandId, status: statusFilter }
+          : { brandId }
 
     const compositions = await prisma.composition.findMany({
       where: whereClause,

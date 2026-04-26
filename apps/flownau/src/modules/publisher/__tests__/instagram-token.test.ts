@@ -32,8 +32,8 @@ function daysAgo(days: number): Date {
 }
 
 const mockAxiosGet = axios.get as ReturnType<typeof vi.fn>
-const mockPrismaUpdate = prisma.socialAccount.update as ReturnType<typeof vi.fn>
-const mockPrismaFindMany = prisma.socialAccount.findMany as ReturnType<typeof vi.fn>
+const mockPrismaUpdate = prisma.socialProfile.update as ReturnType<typeof vi.fn>
+const mockPrismaFindMany = prisma.socialProfile.findMany as ReturnType<typeof vi.fn>
 
 // ─── refreshTokenIfNeeded ─────────────────────────────────────────
 
@@ -182,7 +182,7 @@ describe('checkAllTokens()', () => {
 
     expect(results).toHaveLength(1)
     expect(results[0].status).toBe('expired')
-    expect(results[0].accountId).toBe('acc-1')
+    expect(results[0].brandId).toBe('acc-1')
   })
 
   it('returns status "valid" for accounts with far-future expiry', async () => {

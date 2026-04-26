@@ -13,7 +13,7 @@ const DEFAULT_FORM = {
   isDefault: false,
 }
 
-export default function AccountContentPrinciples({ accountId }: { accountId: string }) {
+export default function AccountContentPrinciples({ brandId }: { brandId: string }) {
   const [principles, setPrinciples] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -21,7 +21,7 @@ export default function AccountContentPrinciples({ accountId }: { accountId: str
 
   const fetchPrinciples = async () => {
     try {
-      const res = await fetch(`/api/content-principles?accountId=${accountId}`)
+      const res = await fetch(`/api/content-principles?brandId=${brandId}`)
       const data = await res.json()
       setPrinciples(data.principles || [])
     } catch {
@@ -33,7 +33,7 @@ export default function AccountContentPrinciples({ accountId }: { accountId: str
 
   useEffect(() => {
     fetchPrinciples()
-  }, [accountId])
+  }, [brandId])
 
   const handleSave = async () => {
     if (!formData.name || !formData.systemPrompt) return toast.error('Name and prompt are required')
@@ -43,7 +43,7 @@ export default function AccountContentPrinciples({ accountId }: { accountId: str
         const res = await fetch(`/api/content-principles/${editingId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ accountId, ...formData }),
+          body: JSON.stringify({ brandId, ...formData }),
         })
         if (!res.ok) throw new Error()
         toast.success('Principles updated')
@@ -51,7 +51,7 @@ export default function AccountContentPrinciples({ accountId }: { accountId: str
         const res = await fetch('/api/content-principles', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ accountId, ...formData }),
+          body: JSON.stringify({ brandId, ...formData }),
         })
         if (!res.ok) throw new Error()
         toast.success('Principles created')

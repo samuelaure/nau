@@ -23,7 +23,7 @@ const DEFAULT_FORM = {
   automaticAutoApprove: false,
 }
 
-export default function AccountPersonas({ accountId }: { accountId: string }) {
+export default function AccountPersonas({ brandId }: { brandId: string }) {
   const [personas, setPersonas] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -31,7 +31,7 @@ export default function AccountPersonas({ accountId }: { accountId: string }) {
 
   const fetchPersonas = async () => {
     try {
-      const res = await fetch(`/api/personas?accountId=${accountId}`)
+      const res = await fetch(`/api/personas?brandId=${brandId}`)
       const data = await res.json()
       setPersonas(data.personas || [])
     } catch {
@@ -43,7 +43,7 @@ export default function AccountPersonas({ accountId }: { accountId: string }) {
 
   useEffect(() => {
     fetchPersonas()
-  }, [accountId])
+  }, [brandId])
 
   const handleSave = async () => {
     if (!formData.name) return toast.error('Name is required')
@@ -53,7 +53,7 @@ export default function AccountPersonas({ accountId }: { accountId: string }) {
         const res = await fetch(`/api/personas/${editingId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ accountId, ...formData }),
+          body: JSON.stringify({ brandId, ...formData }),
         })
         if (!res.ok) throw new Error()
         toast.success('Persona updated')
@@ -61,7 +61,7 @@ export default function AccountPersonas({ accountId }: { accountId: string }) {
         const res = await fetch(`/api/personas`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ accountId, ...formData }),
+          body: JSON.stringify({ brandId, ...formData }),
         })
         if (!res.ok) throw new Error()
         toast.success('Persona created')

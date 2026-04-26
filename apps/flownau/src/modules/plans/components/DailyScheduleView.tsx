@@ -34,7 +34,7 @@ interface Piece {
 }
 
 interface AccountPlan {
-  accountId: string
+  brandId: string
   username: string
   profileImage: string | null
   alerts: PlanAlert[]
@@ -101,7 +101,7 @@ export default function DailyScheduleView({
         </div>
       ) : (
         plans.map((plan) => (
-          <Card key={plan.accountId} className="p-6">
+          <Card key={plan.brandId} className="p-6">
             {/* Header (Only show if global) */}
             {context === 'global' && (
               <div className="flex items-center gap-4 mb-6 pb-4 border-b border-white/5">

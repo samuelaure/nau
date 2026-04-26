@@ -6,15 +6,15 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {
-    const { prefix, accountId, templateId } = await req.json()
+    const { prefix, brandId, templateId } = await req.json()
 
-    if (!prefix || (!accountId && !templateId)) {
+    if (!prefix || (!brandId && !templateId)) {
       return NextResponse.json({ error: 'Missing prefix or context' }, { status: 400 })
     }
 
     // Purge existing assets so the new folder is the absolute source of truth
-    if (accountId) {
-      await prisma.asset.deleteMany({ where: { accountId } })
+    if (brandId) {
+      await prisma.asset.deleteMany({ where: { brandId } })
     } else if (templateId) {
       await prisma.asset.deleteMany({ where: { templateId } })
     }
@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
 
       const asset = await prisma.asset.create({
         data: {
-          accountId: accountId || null,
+          brandId: brandId || null,
           templateId: templateId || null,
           originalFilename: filename,
           systemFilename: filename,
@@ -103,9 +103,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Update context with assetsRoot
-    if (accountId) {
-      await prisma.socialAccount.update({
-        where: { id: accountId },
+    if (brandId) {
+      await prisma.brand.update({
+        where: { id: brandId },
         data: { assetsRoot: prefix },
       })
     } else if (templateId) {

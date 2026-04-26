@@ -2,22 +2,22 @@ export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
-import { checkAccountAccess } from '@/modules/shared/actions'
+import { checkBrandAccess } from '@/modules/shared/actions'
 import { resolveProvenance } from '@/modules/ideation/provenance'
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
-    const accountId = searchParams.get('accountId')
+    const brandId = searchParams.get('brandId')
 
-    if (!accountId) {
-      return NextResponse.json({ error: 'Missing accountId' }, { status: 400 })
+    if (!brandId) {
+      return NextResponse.json({ error: 'Missing brandId' }, { status: 400 })
     }
 
-    await checkAccountAccess(accountId)
+    await checkBrandAccess(brandId)
 
     const ideas = await prisma.contentIdea.findMany({
-      where: { accountId },
+      where: { brandId },
       orderBy: { createdAt: 'desc' },
     })
 
@@ -31,23 +31,23 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { accountId, ideaText, source, status, format } = body
+    const { brandId, ideaText, source, status, format } = body
 
-    if (!accountId || !ideaText) {
-      return NextResponse.json({ error: 'Missing accountId or ideaText' }, { status: 400 })
+    if (!brandId || !ideaText) {
+      return NextResponse.json({ error: 'Missing brandId or ideaText' }, { status: 400 })
     }
 
-    await checkAccountAccess(accountId)
+    await checkBrandAccess(brandId)
 
     let priority = 3
     if (source === 'captured') priority = 1
     if (source === 'manual') priority = 2
 
-    const provenance = await resolveProvenance(accountId)
+    const provenance = await resolveProvenance(brandId)
 
     const idea = await prisma.contentIdea.create({
       data: {
-        accountId,
+        brandId,
         ideaText,
         format: format ?? null,
         source: source || 'manual',

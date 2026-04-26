@@ -27,7 +27,7 @@ import { Asset } from '@/types/video-schema'
 
 interface AssetsManagerProps {
   ownerId: string
-  ownerType: 'account' | 'template'
+  ownerType: 'brand' | 'template'
   assets: Asset[]
   basePath?: string
 }
@@ -101,8 +101,8 @@ export default function AssetsManager({
           formData.append('file', file)
           formData.append('hash', hash)
 
-          if (ownerType === 'account') {
-            formData.append('accountId', ownerId)
+          if (ownerType === 'brand') {
+            formData.append('brandId', ownerId)
           } else {
             formData.append('templateId', ownerId)
           }
@@ -153,7 +153,7 @@ export default function AssetsManager({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prefix,
-          accountId: ownerType === 'account' ? ownerId : null,
+          brandId: ownerType === 'brand' ? ownerId : null,
           templateId: ownerType === 'template' ? ownerId : null,
         }),
       })
@@ -187,7 +187,7 @@ export default function AssetsManager({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          accountId: ownerType === 'account' ? ownerId : null,
+          brandId: ownerType === 'brand' ? ownerId : null,
           templateId: ownerType === 'template' ? ownerId : null,
         }),
       })

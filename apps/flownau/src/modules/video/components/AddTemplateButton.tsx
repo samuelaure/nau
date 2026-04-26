@@ -70,7 +70,7 @@ export default function AddTemplateButton({
 
           <div className="form-group">
             <label className="form-label">Template Scope</label>
-            <select name="accountId" className="input-field" defaultValue={defaultAccountId || ''}>
+            <select name="brandId" className="input-field" defaultValue={defaultAccountId || ''}>
               <option value="">Global Template (Available to all)</option>
               {accounts.map((account) => (
                 <option key={account.id} value={account.id}>

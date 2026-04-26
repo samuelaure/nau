@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   try {
     const template = await prisma.template.findUnique({
       where: { id: templateId },
-      include: { account: true },
+      include: { brand: true },
     })
 
     if (!template) {
@@ -25,8 +25,8 @@ export async function POST(req: Request) {
     }
 
     let projectFolder = 'templates/global'
-    if (template.account) {
-      projectFolder = template.account.username || template.account.id
+    if (template.brand) {
+      projectFolder = template.brand.shortCode || template.brand.id
     }
 
     const render = await prisma.render.create({
@@ -52,7 +52,7 @@ export async function POST(req: Request) {
     })
 
     if (publish && instagramAccountId) {
-      const account = await prisma.socialAccount.findUnique({ where: { id: instagramAccountId } })
+      const account = await prisma.socialProfile.findUnique({ where: { id: instagramAccountId } })
 
       if (account && account.accessToken && account.platformId) {
         const mediaResult = await publishReel({

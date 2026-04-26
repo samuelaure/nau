@@ -8,7 +8,7 @@ import type { ContentFormat } from '@/types/content'
  * Selection rules:
  *   - Scope: account's own templates PLUS workspace-scoped templates from sibling
  *     accounts inside the same workspace.
- *   - Each candidate must have an `AccountTemplateConfig` row for this account with
+ *   - Each candidate must have an `BrandTemplateConfig` row for this account with
  *     `enabled = true`.
  *   - Format: Template.sceneType or Template.config.format (loose match) must align
  *     with the idea's format. If no template declares a format preference we fall
@@ -19,20 +19,20 @@ import type { ContentFormat } from '@/types/content'
  * Returns null if nothing matches (caller decides how to degrade).
  */
 export async function selectTemplateForIdea(params: {
-  accountId: string
+  brandId: string
   format: ContentFormat
 }): Promise<Template | null> {
-  const { accountId, format } = params
+  const { brandId, format } = params
 
-  const account = await prisma.socialAccount.findUnique({
-    where: { id: accountId },
+  const account = await prisma.socialProfile.findUnique({
+    where: { id: brandId },
     select: { workspaceId: true },
   })
   if (!account) return null
 
   // Candidate templates = own templates OR workspace-scoped templates from the same workspace.
   const siblingAccountIds = (
-    await prisma.socialAccount.findMany({
+    await prisma.socialProfile.findMany({
       where: { workspaceId: account.workspaceId },
       select: { id: true },
     })
@@ -41,14 +41,14 @@ export async function selectTemplateForIdea(params: {
   const candidates = await prisma.template.findMany({
     where: {
       OR: [
-        { accountId },
+        { brandId },
         {
-          accountId: { in: siblingAccountIds },
+          brandId: { in: siblingAccountIds },
           scope: 'workspace',
         },
       ],
-      accountConfigs: {
-        some: { accountId, enabled: true },
+      brandConfigs: {
+        some: { brandId, enabled: true },
       },
     },
     orderBy: { createdAt: 'asc' },

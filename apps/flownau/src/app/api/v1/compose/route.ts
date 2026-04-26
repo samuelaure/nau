@@ -14,7 +14,7 @@ import type { Prisma } from '@prisma/client'
 import type { ContentFormat } from '@/types/content'
 
 const ComposeRequestSchema = z.object({
-  accountId: z.string().min(1),
+  brandId: z.string().min(1),
   prompt: z.string().min(1),
   format: z.enum(['reel', 'trial_reel', 'carousel', 'static_post']).default('reel'),
   source: z.string().optional(),
@@ -39,18 +39,18 @@ export async function POST(req: Request) {
     const input = ComposeRequestSchema.parse(body)
 
     // 1. Verify account exists
-    const account = await prisma.socialAccount.findUnique({
-      where: { id: input.accountId },
+    const account = await prisma.socialProfile.findUnique({
+      where: { id: input.brandId },
     })
 
     if (!account) {
-      return NextResponse.json({ error: `Account ${input.accountId} not found` }, { status: 404 })
+      return NextResponse.json({ error: `Account ${input.brandId} not found` }, { status: 404 })
     }
 
     // 2. Create ContentIdea
     const idea = await prisma.contentIdea.create({
       data: {
-        accountId: input.accountId,
+        brandId: input.brandId,
         ideaText: input.prompt,
         source: input.source ?? 'reactive',
         sourceRef: input.sourceRef ?? null,
@@ -65,17 +65,17 @@ export async function POST(req: Request) {
 
     // 4. Auto-approve: run the full composition pipeline
     const persona = await prisma.brandPersona.findFirst({
-      where: { accountId: input.accountId, isDefault: true },
+      where: { brandId: input.brandId, isDefault: true },
     })
 
     const { creative } = await compose({
       ideaText: input.prompt,
-      accountId: input.accountId,
+      brandId: input.brandId,
       format: input.format as ContentFormat,
       personaId: persona?.id,
     })
 
-    const { sceneAssets, audioAsset } = await selectAssetsForCreative(creative, input.accountId, 30)
+    const { sceneAssets, audioAsset } = await selectAssetsForCreative(creative, input.brandId, 30)
 
     const brandStyle = {
       primaryColor: '#6C63FF',
@@ -90,7 +90,7 @@ export async function POST(req: Request) {
 
     const composition = await prisma.composition.create({
       data: {
-        accountId: input.accountId,
+        brandId: input.brandId,
         format: input.format,
         creative: creative as unknown as Prisma.InputJsonValue,
         payload: schema as unknown as Prisma.InputJsonValue,

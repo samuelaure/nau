@@ -5,12 +5,12 @@ import { prisma } from '@/modules/shared/prisma'
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
-  const accountId = searchParams.get('accountId')
-  if (!accountId) return NextResponse.json({ error: 'Missing accountId' }, { status: 400 })
+  const brandId = searchParams.get('brandId')
+  if (!brandId) return NextResponse.json({ error: 'Missing brandId' }, { status: 400 })
 
   try {
     const frameworks = await prisma.ideasFramework.findMany({
-      where: { accountId },
+      where: { brandId },
     })
     return NextResponse.json({ frameworks }, { status: 200 })
   } catch {
@@ -21,25 +21,24 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { accountId, brandId, workspaceId, name, systemPrompt, isDefault } = body
+    const { brandId, workspaceId, name, systemPrompt, isDefault } = body
 
-    if (!accountId || !brandId || !workspaceId || !name || !systemPrompt) {
+    if (!brandId || !brandId || !workspaceId || !name || !systemPrompt) {
       return NextResponse.json(
-        { error: 'Missing accountId, brandId, workspaceId, name, or systemPrompt' },
+        { error: 'Missing brandId, workspaceId, name, or systemPrompt' },
         { status: 400 },
       )
     }
 
-    if (isDefault && accountId) {
+    if (isDefault && brandId) {
       await prisma.ideasFramework.updateMany({
-        where: { accountId },
+        where: { brandId },
         data: { isDefault: false },
       })
     }
 
     const framework = await prisma.ideasFramework.create({
       data: {
-        accountId,
         brandId,
         workspaceId,
         name,

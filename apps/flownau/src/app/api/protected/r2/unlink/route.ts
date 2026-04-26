@@ -5,17 +5,17 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {
-    const { accountId, templateId } = await req.json()
+    const { brandId, templateId } = await req.json()
 
-    if (!accountId && !templateId) {
+    if (!brandId && !templateId) {
       return NextResponse.json({ error: 'Missing context' }, { status: 400 })
     }
 
     // Purge existing assets to clean up the scoped library
-    if (accountId) {
-      await prisma.asset.deleteMany({ where: { accountId } })
-      await prisma.socialAccount.update({
-        where: { id: accountId },
+    if (brandId) {
+      await prisma.asset.deleteMany({ where: { brandId } })
+      await prisma.brand.update({
+        where: { id: brandId },
         data: { assetsRoot: null },
       })
     } else if (templateId) {

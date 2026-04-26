@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
-import { checkAccountAccess } from '@/modules/shared/actions'
+import { checkBrandAccess } from '@/modules/shared/actions'
 import { generateContentIdeas } from '@/modules/ideation/ideation.service'
 import { logError } from '@/modules/shared/logger'
 import type { Prisma } from '@prisma/client'
@@ -11,7 +11,7 @@ export async function POST(req: Request) {
   try {
     const json = await req.json()
     const {
-      accountId,
+      brandId,
       personaId,
       frameworkId,
       concept,
@@ -19,20 +19,20 @@ export async function POST(req: Request) {
       source = 'manual',
     } = json
 
-    if (!accountId) {
-      return NextResponse.json({ error: 'Missing accountId' }, { status: 400 })
+    if (!brandId) {
+      return NextResponse.json({ error: 'Missing brandId' }, { status: 400 })
     }
 
-    await checkAccountAccess(accountId)
+    await checkBrandAccess(brandId)
 
     // 1. Fetch persona
     const persona = personaId
       ? await prisma.brandPersona.findUnique({ where: { id: personaId } })
       : ((await prisma.brandPersona.findFirst({
-          where: { accountId, isDefault: true },
+          where: { brandId, isDefault: true },
         })) ??
         (await prisma.brandPersona.findFirst({
-          where: { accountId },
+          where: { brandId },
         })))
 
     if (!persona) {
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
     // 2. Optionally fetch strategy framework (Strategy prompts are prioritized over Persona prompts for ideation)
     const framework = frameworkId
       ? await prisma.ideasFramework.findUnique({ where: { id: frameworkId } })
-      : await prisma.ideasFramework.findFirst({ where: { accountId, isDefault: true } })
+      : await prisma.ideasFramework.findFirst({ where: { brandId, isDefault: true } })
 
     // 3. Setup Context Based on Source
     let digest = undefined
@@ -53,7 +53,7 @@ export async function POST(req: Request) {
 
     if (source === 'automatic') {
       const { fetchBrandDigest } = await import('@/modules/ideation/sources/inspo-source')
-      digest = await fetchBrandDigest(accountId)
+      digest = await fetchBrandDigest(brandId)
       count =
         typeof countOverride === 'number' ? countOverride : ((persona as any).automaticCount ?? 5)
       autoApprove = (persona as any).automaticAutoApprove ?? false
@@ -90,7 +90,7 @@ export async function POST(req: Request) {
 
       return prisma.contentIdea.create({
         data: {
-          accountId,
+          brandId,
           ideaText,
           format: idea.format,
           status: autoApprove ? 'APPROVED' : 'PENDING',
@@ -125,13 +125,13 @@ export async function POST(req: Request) {
           try {
             const { creative } = await compose({
               ideaText: savedIdea.ideaText,
-              accountId,
+              brandId,
               format,
               personaId: persona.id,
             })
             const { sceneAssets, audioAsset } = await selectAssetsForCreative(
               creative,
-              accountId,
+              brandId,
               30,
             )
             const { schema } = compileTimeline(
@@ -143,7 +143,7 @@ export async function POST(req: Request) {
             )
             const newComposition = await prisma.composition.create({
               data: {
-                accountId,
+                brandId,
                 format,
                 creative: creative as unknown as Prisma.InputJsonValue,
                 payload: schema as unknown as Prisma.InputJsonValue,

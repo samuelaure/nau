@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 import type { Prisma } from '@prisma/client'
-import { checkAccountAccess } from '@/modules/shared/actions'
+import { checkBrandAccess } from '@/modules/shared/actions'
 import { z } from 'zod'
 import { logError, logger } from '@/modules/shared/logger'
 import { checkRateLimit } from '@/modules/shared/rate-limit'
@@ -14,7 +14,7 @@ import { compileTimeline } from '@/modules/composer/timeline-compiler'
 
 const ComposeRequestSchema = z.object({
   prompt: z.string().min(3),
-  accountId: z.string(),
+  brandId: z.string(),
   format: z
     .enum(['reel', 'trial_reel', 'head_talk', 'carousel', 'static_post', 'story'])
     .default('reel'),
@@ -34,11 +34,11 @@ export async function POST(req: Request) {
       )
     }
 
-    const { prompt, accountId, format, ideaId, personaId } = parsed.data
+    const { prompt, brandId, format, ideaId, personaId } = parsed.data
 
     // Rate limit: 10 compose requests per minute per account
     const rateLimit = await checkRateLimit({
-      key: `rate:compose:${accountId}`,
+      key: `rate:compose:${brandId}`,
       maxRequests: 10,
       windowSeconds: 60,
     })
@@ -52,13 +52,13 @@ export async function POST(req: Request) {
       )
     }
 
-    await checkAccountAccess(accountId)
+    await checkBrandAccess(brandId)
 
     // Fetch persona for auto-approve flags
     const persona = personaId
       ? await prisma.brandPersona.findUnique({ where: { id: personaId } })
-      : ((await prisma.brandPersona.findFirst({ where: { accountId, isDefault: true } })) ??
-        (await prisma.brandPersona.findFirst({ where: { accountId } })))
+      : ((await prisma.brandPersona.findFirst({ where: { brandId, isDefault: true } })) ??
+        (await prisma.brandPersona.findFirst({ where: { brandId } })))
 
     const isAutoApproveCompositions = persona?.autoApproveCompositions ?? false
     const isAutoApprovePool = (persona as any)?.autoApprovePool ?? false
@@ -69,11 +69,11 @@ export async function POST(req: Request) {
 
     if (format === 'head_talk') {
       // Head Talk: AI generates script + caption + hashtags only. No video/image assets.
-      const result = await composeHeadTalk({ ideaText: prompt, accountId, personaId })
+      const result = await composeHeadTalk({ ideaText: prompt, brandId, personaId })
 
       newComposition = await prisma.composition.create({
         data: {
-          accountId,
+          brandId,
           format,
           source: 'composed',
           payload: { type: 'head_talk', script: result.script } as unknown as Prisma.InputJsonValue,
@@ -87,9 +87,9 @@ export async function POST(req: Request) {
       logger.info(`[HeadTalkCompose] Created script composition ${newComposition.id}`)
     } else {
       // Standard scene-based compose pipeline
-      const { creative } = await compose({ ideaText: prompt, accountId, format, personaId })
+      const { creative } = await compose({ ideaText: prompt, brandId, format, personaId })
 
-      const { sceneAssets, audioAsset } = await selectAssetsForCreative(creative, accountId, 30)
+      const { sceneAssets, audioAsset } = await selectAssetsForCreative(creative, brandId, 30)
 
       const brandStyle = {
         primaryColor: '#6C63FF',
@@ -101,7 +101,7 @@ export async function POST(req: Request) {
 
       newComposition = await prisma.composition.create({
         data: {
-          accountId,
+          brandId,
           format,
           source: 'composed',
           creative: creative as unknown as Prisma.InputJsonValue,

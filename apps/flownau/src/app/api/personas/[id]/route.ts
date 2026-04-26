@@ -24,10 +24,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const body = await req.json()
 
     // If setting to default, clear others first
-    if (body.isDefault && body.accountId) {
+    if (body.isDefault && body.brandId) {
       await prisma.brandPersona.updateMany({
         where: {
-          accountId: body.accountId,
+          brandId: body.brandId,
           id: { not: resolvedParams.id },
         },
         data: { isDefault: false },

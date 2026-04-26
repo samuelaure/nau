@@ -24,17 +24,17 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData()
     const file = formData.get('file') as File | null
     const compositionId = formData.get('compositionId') as string | null
-    const accountId = formData.get('accountId') as string | null
+    const brandId = formData.get('brandId') as string | null
 
-    if (!file || !compositionId || !accountId) {
+    if (!file || !compositionId || !brandId) {
       return NextResponse.json(
-        { error: 'Missing file, compositionId, or accountId' },
+        { error: 'Missing file, compositionId, or brandId' },
         { status: 400 },
       )
     }
 
     const composition = await prisma.composition.findUnique({ where: { id: compositionId } })
-    if (!composition || composition.accountId !== accountId) {
+    if (!composition || composition.brandId !== brandId) {
       return NextResponse.json({ error: 'Composition not found' }, { status: 404 })
     }
     if (!USER_MANAGED_FORMATS.has(composition.format)) {
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     }
 
     const ext = file.name.split('.').pop() ?? 'mp4'
-    const key = `recordings/${accountId}/${compositionId}-${createId()}.${ext}`
+    const key = `recordings/${brandId}/${compositionId}-${createId()}.${ext}`
     const buffer = Buffer.from(await file.arrayBuffer())
 
     const mediaUrl = await storage.upload(key, buffer, {

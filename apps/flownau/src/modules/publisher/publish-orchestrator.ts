@@ -14,7 +14,7 @@ interface CompositionForPublish {
   coverUrl: string | null
   caption: string | null
   hashtags: string[]
-  account: {
+  socialProfile: {
     id: string
     accessToken: string
     platformId: string | null
@@ -42,10 +42,10 @@ function buildCaption(caption: string | null, hashtags: string[]): string {
 export async function publishComposition(
   composition: CompositionForPublish,
 ): Promise<PublishResult> {
-  const { account } = composition
+  const account = composition.socialProfile
 
   // Guard: platform ID required
-  if (!account.platformId) {
+  if (!account?.platformId) {
     return { success: false, error: `Account ${account.id} has no Instagram platformId` }
   }
 

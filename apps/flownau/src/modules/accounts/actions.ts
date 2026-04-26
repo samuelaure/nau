@@ -9,14 +9,19 @@ import { checkAuth, getUserPrimaryWorkspace } from '@/modules/shared/actions'
 import { z } from 'zod'
 import { COOKIE_ACCESS_TOKEN } from '@nau/auth'
 
-// --- HELPER SCHEMAS ---
-const AccountSchema = z.object({
+const SocialProfileSchema = z.object({
   username: z.string().min(1, 'Username is required'),
   accessToken: z.string().min(1, 'Access Token is required'),
   platformId: z.string().min(1, 'Platform ID is required'),
 })
 
-const AccountUpdateSchema = z.object({
+const BrandUpdateSchema = z.object({
+  directorPrompt: z.string().optional(),
+  creationPrompt: z.string().optional(),
+  shortCode: z.string().optional(),
+})
+
+const SocialProfileUpdateSchema = z.object({
   username: z.string().min(1, 'Username is required'),
   platformId: z.string().min(1, 'Platform ID is required'),
   accessToken: z
@@ -24,12 +29,10 @@ const AccountUpdateSchema = z.object({
     .optional()
     .or(z.literal(''))
     .transform((val) => val || undefined),
-  directorPrompt: z.string().optional(),
-  creationPrompt: z.string().optional(),
 })
 
 const PrepareUploadSchema = z.object({
-  accountId: z.string().min(1),
+  brandId: z.string().min(1),
   filename: z.string().min(1),
   size: z.number().positive(),
   contentType: z.string().min(1),
@@ -37,7 +40,7 @@ const PrepareUploadSchema = z.object({
 })
 
 const ConfirmUploadSchema = z.object({
-  accountId: z.string().min(1),
+  brandId: z.string().min(1),
   assetData: z.object({
     originalFilename: z.string(),
     systemFilename: z.string(),
@@ -51,13 +54,12 @@ const ConfirmUploadSchema = z.object({
 
 const IdSchema = z.string().min(1)
 
-// --- CONSTANTS ---
 const VIDEO_TYPES = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska']
 const AUDIO_TYPES = ['audio/mpeg', 'audio/wav', 'audio/aac', 'audio/ogg', 'audio/x-m4a']
 
-// --- ACCOUNT ACTIONS ---
+// ── Brand actions ──────────────────────────────────────────────────────────────
 
-/** Quick Setup: create a named brand in 9naŭ without requiring an Instagram connection. */
+/** Create a brand in 9naŭ API and upsert a local Brand record in flownau. */
 export async function addBrand(formData: FormData): Promise<{ id: string; workspaceId: string }> {
   const explicitWorkspaceId = (formData.get('workspaceId') as string | null) || null
   const { workspaceId: primaryWorkspaceId } = await getUserPrimaryWorkspace()
@@ -80,26 +82,95 @@ export async function addBrand(formData: FormData): Promise<{ id: string; worksp
     throw new Error(`Failed to create brand: ${text}`)
   }
 
-  const brand = await res.json() as { id: string }
+  const nauBrand = (await res.json()) as { id: string }
+
+  // Upsert local Brand record so content pipeline can anchor to it
+  await prisma.brand.upsert({
+    where: { id: nauBrand.id },
+    create: { id: nauBrand.id, workspaceId, name },
+    update: { name, workspaceId },
+  })
+
   revalidatePath('/dashboard')
-  return { id: brand.id, workspaceId }
+  return { id: nauBrand.id, workspaceId }
 }
 
-export async function addAccount(formData: FormData) {
-  const { workspaceId: primaryWorkspaceId } = await getUserPrimaryWorkspace()
+/** Update brand-level pipeline config (prompts, shortCode). */
+export async function updateBrand(brandId: string, formData: FormData) {
+  await checkAuth()
+  const parsedId = IdSchema.parse(brandId)
+  const { directorPrompt, creationPrompt, shortCode } = BrandUpdateSchema.parse({
+    directorPrompt: formData.get('directorPrompt'),
+    creationPrompt: formData.get('creationPrompt'),
+    shortCode: formData.get('shortCode'),
+  })
 
-  const rawData = {
+  await prisma.brand.update({
+    where: { id: parsedId },
+    data: { directorPrompt, creationPrompt, shortCode },
+  })
+
+  revalidatePath('/dashboard')
+}
+
+/** Move a brand to another workspace (updates both 9naŭ API and local record). */
+export async function moveBrandToWorkspace(brandId: string, targetWorkspaceId: string) {
+  await checkAuth()
+  const parsedId = IdSchema.parse(brandId)
+  const parsedWsId = IdSchema.parse(targetWorkspaceId)
+
+  const cookieStore = await import('next/headers').then((m) => m.cookies())
+  const token = cookieStore.get(COOKIE_ACCESS_TOKEN)?.value
+  const nauApiUrl = process.env.NAU_API_URL ?? 'http://9nau-api:3000'
+
+  const brand = await prisma.brand.findUnique({ where: { id: parsedId } })
+  if (!brand) throw new Error('Brand not found')
+
+  if (token) {
+    const res = await fetch(
+      `${nauApiUrl}/workspaces/${brand.workspaceId}/brands/${parsedId}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ workspaceId: parsedWsId }),
+      },
+    )
+    if (!res.ok) console.error(`Failed to move brand in 9naŭ-api: ${await res.text()}`)
+  }
+
+  await prisma.brand.update({
+    where: { id: parsedId },
+    data: { workspaceId: parsedWsId },
+  })
+
+  revalidatePath('/dashboard')
+}
+
+// ── Social Profile actions ─────────────────────────────────────────────────────
+
+/** Add a social profile (posting channel) to a brand. */
+export async function addSocialProfile(formData: FormData) {
+  const { workspaceId: primaryWorkspaceId } = await getUserPrimaryWorkspace()
+  const workspaceId = (formData.get('workspaceId') as string | null) || primaryWorkspaceId
+  const brandId = formData.get('brandId') as string | null
+  if (!brandId) throw new Error('brandId is required')
+
+  const data = SocialProfileSchema.parse({
     username: formData.get('username'),
     accessToken: formData.get('accessToken'),
     platformId: formData.get('platformId'),
-  }
+  })
 
-  const data = AccountSchema.parse(rawData)
-  // Use explicitly passed workspaceId if provided (e.g. from workspace overview page)
-  const workspaceId = (formData.get('workspaceId') as string | null) || primaryWorkspaceId
+  // Ensure local Brand record exists
+  await prisma.brand.upsert({
+    where: { id: brandId },
+    create: { id: brandId, workspaceId },
+    update: {},
+  })
 
-  const newAccount = await prisma.socialAccount.create({
+  const profile = await prisma.socialProfile.create({
     data: {
+      brandId,
       workspaceId,
       platform: 'instagram',
       username: data.username,
@@ -108,164 +179,91 @@ export async function addAccount(formData: FormData) {
     },
   })
 
-  await syncAccountProfile(newAccount.id)
+  await syncSocialProfile(profile.id)
   revalidatePath('/dashboard')
 }
 
-export async function deleteAccount(id: string) {
+/** @deprecated Use addSocialProfile */
+export const addAccount = addSocialProfile
+
+export async function deleteSocialProfile(id: string) {
   await checkAuth()
-  const parsedId = IdSchema.parse(id)
-
-  await prisma.socialAccount.delete({
-    where: { id: parsedId },
-  })
-
-  revalidatePath('/dashboard/accounts')
+  await prisma.socialProfile.delete({ where: { id: IdSchema.parse(id) } })
+  revalidatePath('/dashboard')
 }
 
-export async function updateAccount(id: string, formData: FormData) {
+/** @deprecated Use deleteSocialProfile */
+export const deleteAccount = deleteSocialProfile
+
+export async function updateSocialProfile(id: string, formData: FormData) {
   await checkAuth()
   const parsedId = IdSchema.parse(id)
-
-  const rawData = {
+  const { username, platformId, accessToken } = SocialProfileUpdateSchema.parse({
     username: formData.get('username'),
     platformId: formData.get('platformId'),
     accessToken: formData.get('accessToken'),
-    directorPrompt: formData.get('directorPrompt'),
-    creationPrompt: formData.get('creationPrompt'),
-  }
-
-  const { username, platformId, accessToken, directorPrompt, creationPrompt } =
-    AccountUpdateSchema.parse(rawData)
-
-  const data: {
-    username: string
-    platformId: string
-    accessToken?: string
-    directorPrompt?: string
-    creationPrompt?: string
-  } = {
-    username,
-    platformId,
-    directorPrompt,
-    creationPrompt,
-  }
-
-  if (accessToken) {
-    data.accessToken = accessToken
-  }
-
-  await prisma.socialAccount.update({
-    where: { id: parsedId },
-    data,
   })
 
-  await syncAccountProfile(parsedId)
-
-  revalidatePath('/dashboard/accounts')
-  revalidatePath(`/dashboard/accounts/${parsedId}`)
-}
-
-export async function moveAccountToWorkspace(accountId: string, targetWorkspaceId: string) {
-  await checkAuth()
-  const parsedId = IdSchema.parse(accountId)
-  const parsedWsId = IdSchema.parse(targetWorkspaceId)
-
-  // 1. Fetch current account state to check for linked Brand
-  const account = await prisma.socialAccount.findUnique({ where: { id: parsedId } })
-  if (!account) throw new Error('Account not found')
-
-  // 2. If this account is linked to a 9naŭ Brand, move the Brand in 9naŭ-api first.
-  // This will trigger the structural sync to Nauthenticity.
-  if (account.brandId) {
-    const cookieStore = await import('next/headers').then((m) => m.cookies())
-    const token = cookieStore.get(COOKIE_ACCESS_TOKEN)?.value
-    const nauApiUrl = process.env.NAU_API_URL ?? 'http://9nau-api:3000'
-
-    if (token) {
-      const res = await fetch(
-        `${nauApiUrl}/workspaces/${account.workspaceId}/brands/${account.brandId}`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ workspaceId: parsedWsId }),
-        },
-      )
-
-      if (!res.ok) {
-        const text = await res.text()
-        console.error(`Failed to move brand in 9naŭ-api: ${text}`)
-        // We continue anyway to at least update the local account,
-        // but ideally this should be atomic.
-      }
-    }
-  }
-
-  // 3. Update local SocialAccount workspaceId (flownaŭ domain)
-  await prisma.socialAccount.update({
+  await prisma.socialProfile.update({
     where: { id: parsedId },
-    data: { workspaceId: parsedWsId },
+    data: { username, platformId, ...(accessToken ? { accessToken } : {}) },
   })
 
+  await syncSocialProfile(parsedId)
   revalidatePath('/dashboard')
 }
 
-export async function syncAccountProfile(id: string) {
+export async function syncSocialProfile(id: string) {
   await checkAuth()
   const parsedId = IdSchema.parse(id)
 
-  const account = await prisma.socialAccount.findUnique({ where: { id: parsedId } })
-  if (!account || !account.username) return
+  const profile = await prisma.socialProfile.findUnique({ where: { id: parsedId } })
+  if (!profile || !profile.username) return
 
-  const result = await ApifyService.fetchProfile(account.username)
+  const result = await ApifyService.fetchProfile(profile.username)
 
   if (result.status === 'success') {
-    let finalProfileImage = account.profileImage
+    let finalProfileImage = profile.profileImage
 
     if (result.profileImage) {
-      const r2Url = await downloadAndUploadProfileImage(result.profileImage, account.username)
-      if (r2Url) {
-        finalProfileImage = r2Url
-      }
+      const r2Url = await downloadAndUploadProfileImage(result.profileImage, profile.username)
+      if (r2Url) finalProfileImage = r2Url
     }
 
-    await prisma.socialAccount.update({
+    await prisma.socialProfile.update({
       where: { id: parsedId },
       data: {
         profileImage: finalProfileImage,
-        platformId: result.id || account.platformId,
+        platformId: result.id || profile.platformId,
       },
     })
-    revalidatePath('/dashboard/accounts')
-    revalidatePath(`/dashboard/accounts/${parsedId}`)
+    revalidatePath('/dashboard')
   }
 }
 
-// --- ASSET ACTIONS ---
+/** @deprecated Use syncSocialProfile */
+export const syncAccountProfile = syncSocialProfile
+
+// ── Asset upload actions ───────────────────────────────────────────────────────
 
 export async function prepareUpload(
-  accountId: string,
+  brandId: string,
   filename: string,
   size: number,
   contentType: string,
   hash?: string,
 ) {
   await checkAuth()
-  const params = PrepareUploadSchema.parse({ accountId, filename, size, contentType, hash })
+  const params = PrepareUploadSchema.parse({ brandId, filename, size, contentType, hash })
 
-  const account = await prisma.socialAccount.findUnique({ where: { id: params.accountId } })
-  if (!account) throw new Error('Account not found')
+  const brand = await prisma.brand.findUnique({ where: { id: params.brandId } })
+  if (!brand) throw new Error('Brand not found')
 
   if (params.hash) {
     const existing = await prisma.asset.findFirst({
-      where: { accountId: params.accountId, hash: params.hash },
+      where: { brandId: params.brandId, hash: params.hash },
     })
-    if (existing) {
-      return { error: 'Duplicate file', existing }
-    }
+    if (existing) return { error: 'Duplicate file', existing }
   }
 
   let type: 'VID' | 'AUD' | 'IMG' = 'IMG'
@@ -274,22 +272,17 @@ export async function prepareUpload(
   else if (params.contentType.startsWith('image/')) type = 'IMG'
   else throw new Error('Unsupported file type')
 
-  let shortCode = account.shortCode
-  if (!shortCode && account.username) {
-    shortCode = account.username.substring(0, 2).toUpperCase()
-    await prisma.socialAccount.update({
-      where: { id: params.accountId },
-      data: { shortCode },
-    })
-  } else if (!shortCode) {
-    shortCode = 'XX'
+  let shortCode = brand.shortCode
+  if (!shortCode) {
+    shortCode = brand.name?.substring(0, 2).toUpperCase() ?? 'XX'
+    await prisma.brand.update({ where: { id: params.brandId }, data: { shortCode } })
   }
 
   const ext = filename.split('.').pop()?.toLowerCase() || ''
-  const systemFilename = await getNextSystemFilename(params.accountId, type, shortCode!, ext)
+  const systemFilename = await getNextSystemFilename(params.brandId, type, shortCode, ext)
 
   const folder = type === 'VID' ? 'videos' : type === 'AUD' ? 'audios' : 'images'
-  const projectFolder = account.username || account.id
+  const projectFolder = brand.assetsRoot || brand.shortCode || brand.id
   const r2Key = `${projectFolder}/${folder}/${systemFilename}`
 
   const { uploadUrl: url } = await storage.presignUpload(r2Key, params.contentType, 600)
@@ -298,7 +291,7 @@ export async function prepareUpload(
 }
 
 export async function confirmUpload(
-  accountId: string,
+  brandId: string,
   assetData: {
     originalFilename: string
     systemFilename: string
@@ -310,13 +303,12 @@ export async function confirmUpload(
   },
 ) {
   await checkAuth()
-  const params = ConfirmUploadSchema.parse({ accountId, assetData })
-
+  const params = ConfirmUploadSchema.parse({ brandId, assetData })
   const publicUrl = storage.cdnUrl(params.assetData.r2Key)
 
   await prisma.asset.create({
     data: {
-      accountId: params.accountId,
+      brandId: params.brandId,
       originalFilename: params.assetData.originalFilename,
       systemFilename: params.assetData.systemFilename,
       r2Key: params.assetData.r2Key,
@@ -328,22 +320,18 @@ export async function confirmUpload(
     },
   })
 
-  revalidatePath(`/dashboard/accounts/${params.accountId}`)
+  revalidatePath('/dashboard')
 }
 
 async function getNextSystemFilename(
-  accountId: string,
+  brandId: string,
   type: 'VID' | 'AUD' | 'IMG',
   shortCode: string,
   ext: string,
 ) {
   const prefix = `${shortCode}_${type}_`
-
   const lastAsset = await prisma.asset.findFirst({
-    where: {
-      accountId,
-      systemFilename: { startsWith: prefix },
-    },
+    where: { brandId, systemFilename: { startsWith: prefix } },
     orderBy: { systemFilename: 'desc' },
   })
 
@@ -351,9 +339,7 @@ async function getNextSystemFilename(
   if (lastAsset) {
     const parts = lastAsset.systemFilename.split('_')
     const numPart = parts.length > 2 ? parts[2].split('.')[0] : null
-    if (numPart && !isNaN(parseInt(numPart))) {
-      counter = parseInt(numPart) + 1
-    }
+    if (numPart && !isNaN(parseInt(numPart))) counter = parseInt(numPart) + 1
   }
 
   return `${prefix}${counter.toString().padStart(4, '0')}.${ext}`

@@ -43,18 +43,18 @@ export async function getUserPrimaryWorkspace() {
   return { workspaceId: primary.id, user }
 }
 
-export async function checkAccountAccess(accountId: string) {
+export async function checkBrandAccess(brandId: string) {
   const { user } = await checkAuth()
   const workspaces = await getNauWorkspaces()
   const workspaceIds = workspaces.map((w) => w.id)
 
-  const account = await prisma.socialAccount.findFirst({
-    where: { id: accountId, workspaceId: { in: workspaceIds } },
+  const brand = await prisma.brand.findFirst({
+    where: { id: brandId, workspaceId: { in: workspaceIds } },
   })
 
-  if (!account) throw new Error('Forbidden')
+  if (!brand) throw new Error('Forbidden')
 
-  return { account, user }
+  return { brand, user }
 }
 
 const DeleteAssetSchema = z.string().min(1)
@@ -74,6 +74,6 @@ export async function deleteAsset(assetId: string) {
 
   await prisma.asset.delete({ where: { id: parsedId } })
 
-  if (asset.accountId) revalidatePath(`/dashboard/accounts/${asset.accountId}`)
+  if (asset.brandId) revalidatePath(`/dashboard/workspace`)
   if (asset.templateId) revalidatePath(`/dashboard/templates/${asset.templateId}`)
 }

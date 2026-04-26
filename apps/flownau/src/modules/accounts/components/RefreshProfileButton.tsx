@@ -4,12 +4,12 @@ import { useTransition } from 'react'
 import { RotateCw } from 'lucide-react'
 import { syncAccountProfile } from '@/modules/accounts/actions'
 
-export default function RefreshProfileButton({ accountId }: { accountId: string }) {
+export default function RefreshProfileButton({ brandId }: { brandId: string }) {
   const [isPending, startTransition] = useTransition()
 
   const handleRefresh = () => {
     startTransition(async () => {
-      await syncAccountProfile(accountId)
+      await syncAccountProfile(brandId)
     })
   }
 

@@ -77,7 +77,7 @@ describe('Composer Cron (v2 Pipeline)', () => {
     const mockIdea = {
       id: 'idea1',
       ideaText: 'A video about nature',
-      accountId: 'acc1',
+      brandId: 'acc1',
       account: { id: 'acc1' },
       brandPersona: mockPersona,
     }
@@ -149,7 +149,7 @@ describe('Composer Cron (v2 Pipeline)', () => {
     const mockIdea = {
       id: 'idea2',
       ideaText: 'Cooking tips',
-      accountId: 'acc1',
+      brandId: 'acc1',
       account: { id: 'acc1' },
       brandPersona: mockPersona,
     }
@@ -198,7 +198,7 @@ describe('Composer Cron (v2 Pipeline)', () => {
     const mockIdea = {
       id: 'idea3',
       ideaText: 'Broken idea',
-      accountId: 'acc1',
+      brandId: 'acc1',
       account: { id: 'acc1' },
       brandPersona: mockPersona,
     }

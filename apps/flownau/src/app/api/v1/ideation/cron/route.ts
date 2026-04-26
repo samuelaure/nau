@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     const nauthUrl = process.env.NAUTHENTICITY_URL || 'http://nauthenticity:4000'
     const [nauthHeaders, account] = await Promise.all([
       serviceHeaders(),
-      prisma.socialAccount.findFirst({ where: { brandId } }),
+      prisma.socialProfile.findFirst({ where: { brandId } }),
     ])
 
     // Fetch inspo items from nauthenticity NestJS API
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
       try {
         await prisma.contentIdea.createMany({
           data: result.ideas.map((idea) => ({
-            accountId: account.id,
+            brandId: account.id,
             ideaText: `Hook: ${idea.hook}\nAngle: ${idea.angle}\nFormat: ${idea.format}\nScript: ${idea.script}\nCTA: ${idea.cta}`,
             source: 'automatic',
             status: 'PENDING',

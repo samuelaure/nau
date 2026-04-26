@@ -140,12 +140,12 @@ function fmtDateTime(iso: string) {
 
 function CompositionModal({
   comp,
-  accountId,
+  brandId,
   onClose,
   onRefresh,
 }: {
   comp: Composition
-  accountId: string
+  brandId: string
   onClose: () => void
   onRefresh: () => void
 }) {
@@ -478,7 +478,7 @@ function CompositionModal({
                       const fd = new FormData()
                       fd.append('file', file)
                       fd.append('compositionId', comp.id)
-                      fd.append('accountId', accountId)
+                      fd.append('brandId', brandId)
                       const res = await fetch('/api/compositions/upload-recording', {
                         method: 'POST',
                         body: fd,
@@ -559,7 +559,7 @@ function CompositionChip({ comp, onClick }: { comp: Composition; onClick: () => 
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function AccountCalendar({ accountId }: { accountId: string }) {
+export default function AccountCalendar({ brandId }: { brandId: string }) {
   const [compositions, setCompositions] = useState<Composition[]>([])
   const [loading, setLoading] = useState(true)
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()))
@@ -567,7 +567,7 @@ export default function AccountCalendar({ accountId }: { accountId: string }) {
 
   const fetchCompositions = useCallback(async () => {
     try {
-      const res = await fetch(`/api/compositions?accountId=${accountId}`)
+      const res = await fetch(`/api/compositions?brandId=${brandId}`)
       const data = await res.json()
       setCompositions(data.compositions || [])
     } catch {
@@ -575,7 +575,7 @@ export default function AccountCalendar({ accountId }: { accountId: string }) {
     } finally {
       setLoading(false)
     }
-  }, [accountId])
+  }, [brandId])
 
   useEffect(() => {
     fetchCompositions()
@@ -745,7 +745,7 @@ export default function AccountCalendar({ accountId }: { accountId: string }) {
       {selected && (
         <CompositionModal
           comp={selected}
-          accountId={accountId}
+          brandId={brandId}
           onClose={() => setSelected(null)}
           onRefresh={fetchCompositions}
         />

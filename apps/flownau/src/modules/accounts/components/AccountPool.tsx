@@ -57,7 +57,7 @@ const STATUS_STYLE: Record<string, string> = {
   FAILED: 'bg-red-900 text-red-400',
 }
 
-export default function AccountPool({ accountId }: { accountId: string }) {
+export default function AccountPool({ brandId }: { brandId: string }) {
   const [compositions, setCompositions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [actioningId, setActioningId] = useState<string | null>(null)
@@ -65,7 +65,7 @@ export default function AccountPool({ accountId }: { accountId: string }) {
 
   const fetchCompositions = async () => {
     try {
-      const res = await fetch(`/api/compositions?accountId=${accountId}&pool=1`)
+      const res = await fetch(`/api/compositions?brandId=${brandId}&pool=1`)
       const data = await res.json()
       setCompositions(data.compositions || [])
     } catch {
@@ -77,7 +77,7 @@ export default function AccountPool({ accountId }: { accountId: string }) {
 
   useEffect(() => {
     fetchCompositions()
-  }, [accountId])
+  }, [brandId])
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this composition?')) return
@@ -133,7 +133,7 @@ export default function AccountPool({ accountId }: { accountId: string }) {
       const formData = new FormData()
       formData.append('file', file)
       formData.append('compositionId', id)
-      formData.append('accountId', accountId)
+      formData.append('brandId', brandId)
 
       const res = await fetch('/api/compositions/upload-recording', {
         method: 'POST',

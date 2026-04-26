@@ -1,40 +1,54 @@
 import { prisma } from '@/modules/shared/prisma'
-import { Instagram, Tag, Lightbulb, CalendarDays, Send, BarChart2, AlertCircle } from 'lucide-react'
-import AddAccountButton from '@/modules/accounts/components/AddAccountButton'
-import { deleteAccount } from '@/modules/accounts/actions'
-import ActionMenu from '@/modules/shared/components/ActionMenu'
+import { Tag } from 'lucide-react'
+import { addBrand } from '@/modules/accounts/actions'
 import Link from 'next/link'
 import { Card } from '@/modules/shared/components/ui/Card'
-import type { AccountWithCounts } from '@/types'
 import { signServiceToken } from '@nau/auth'
+import { notFound } from 'next/navigation'
+import { cn } from '@/modules/shared/utils'
+import AccountCalendar from '@/modules/accounts/components/AccountCalendar'
+import AccountIdeas from '@/modules/accounts/components/AccountIdeas'
+import AccountPool from '@/modules/accounts/components/AccountPool'
+import AccountTemplates from '@/modules/accounts/components/AccountTemplates'
+import BrandProfiles from '@/modules/accounts/components/BrandProfiles'
+import BrandSettings from '@/modules/accounts/components/BrandSettings'
+import AddBrandButton from '@/modules/accounts/components/AddBrandButton'
+import AssetsManager from '@/modules/shared/components/AssetsManager'
 
 export const dynamic = 'force-dynamic'
 
 type NauBrand = { id: string; name: string; logoUrl?: string | null }
 
-const PIPELINE_STEPS = [
-  { icon: Lightbulb, label: 'Ideas', description: 'Capture and organise content ideas for this brand.' },
-  { icon: CalendarDays, label: 'Plans', description: 'Turn ideas into scheduled content plans.' },
-  { icon: Send, label: 'Schedule', description: 'Review and approve posts before they go live.' },
-  { icon: BarChart2, label: 'Analytics', description: 'Track performance once posts are published.' },
-]
+const TABS = [
+  { id: 'calendar', label: 'Calendar' },
+  { id: 'ideas', label: 'Ideas' },
+  { id: 'pool', label: 'Pool' },
+  { id: 'templates', label: 'Templates' },
+  { id: 'profiles', label: 'Profiles' },
+  { id: 'assets', label: 'Assets' },
+  { id: 'settings', label: 'Settings' },
+] as const
+
+type Tab = (typeof TABS)[number]['id']
 
 export default async function WorkspaceOverviewPage({
   params,
   searchParams,
 }: {
   params: Promise<{ workspaceId: string }>
-  searchParams: Promise<{ brandId?: string }>
+  searchParams: Promise<{ brandId?: string; tab?: string }>
 }) {
   const { workspaceId } = await params
-  const { brandId } = await searchParams
-  const nauApiUrl = process.env.NAU_API_URL || 'http://9nau-api:3000'
+  const { brandId, tab: tabParam } = await searchParams
+  const activeTab: Tab = (TABS.find((t) => t.id === tabParam)?.id ?? 'calendar') as Tab
 
+  const nauApiUrl = process.env.NAU_API_URL || 'http://9nau-api:3000'
   const serviceToken = await signServiceToken({
     iss: 'flownau',
     aud: '9nau-api',
     secret: process.env.AUTH_SECRET ?? '',
   })
+
   const workspaceResp = await fetch(`${nauApiUrl}/_service/workspaces/${workspaceId}`, {
     headers: { Authorization: `Bearer ${serviceToken}` },
     cache: 'no-store',
@@ -56,114 +70,101 @@ export default async function WorkspaceOverviewPage({
 
   // ── Brand dashboard ────────────────────────────────────────────────────────
   if (brandId) {
-    const activeBrand = brands.find((b) => b.id === brandId)
+    const nauBrand = brands.find((b) => b.id === brandId)
+    if (!nauBrand) notFound()
 
-    const socialProfiles = await prisma.socialAccount.findMany({
-      where: { workspaceId, brandId },
-      orderBy: { createdAt: 'desc' },
-      include: { _count: { select: { templates: true, assets: true } } },
+    // Upsert local Brand record so it always exists before rendering
+    const localBrand = await prisma.brand.upsert({
+      where: { id: brandId },
+      create: { id: brandId, workspaceId, name: nauBrand.name },
+      update: { name: nauBrand.name },
     })
 
-    const hasNoSocialProfile = socialProfiles.length === 0
+    const socialProfiles = await prisma.socialProfile.findMany({
+      where: { brandId },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    const assets = activeTab === 'assets'
+      ? await prisma.asset.findMany({
+          where: { brandId },
+          orderBy: { createdAt: 'desc' },
+          take: 48,
+        })
+      : []
+
+    const basePath = localBrand.assetsRoot || localBrand.shortCode || brandId
 
     return (
       <div className="animate-fade-in">
         {/* Breadcrumb + header */}
-        <header className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
-          <div>
-            <p className="text-text-secondary text-sm mb-1">
-              <Link href={`/dashboard/workspace/${workspaceId}`} className="hover:text-white transition-colors">
-                {workspace.name}
-              </Link>
-              {' / '}
-              <span className="text-white">{activeBrand?.name ?? 'Brand'}</span>
-            </p>
-            <h1 className="text-3xl font-heading font-semibold">{activeBrand?.name ?? 'Brand'}</h1>
-          </div>
-          <AddAccountButton
-            existingAccounts={socialProfiles.map((a) => ({ id: a.id, username: a.username, accessToken: a.accessToken }))}
-            workspaceId={workspaceId}
-            mode="social-profile"
-          />
+        <header className="mb-8">
+          <p className="text-text-secondary text-sm mb-1">
+            <Link href={`/dashboard/workspace/${workspaceId}`} className="hover:text-white transition-colors">
+              {workspace.name}
+            </Link>
+            {' / '}
+            <span className="text-white">{nauBrand.name}</span>
+          </p>
+          <h1 className="text-3xl font-heading font-semibold">{nauBrand.name}</h1>
         </header>
 
-        {/* Non-blocking social profile notice */}
-        {hasNoSocialProfile && (
-          <div className="flex items-start gap-3 px-4 py-3 mb-8 rounded-xl border border-amber-500/20 bg-amber-500/5 text-amber-400">
-            <AlertCircle size={18} className="shrink-0 mt-0.5" />
-            <p className="text-sm">
-              No social profile linked yet. You can configure the full pipeline now —{' '}
-              <span className="font-medium">publishing will be unlocked once you add a Social Profile.</span>
-            </p>
-          </div>
-        )}
+        {/* Tabs */}
+        <div className="flex border-b border-white/5 mb-8 overflow-x-auto no-scrollbar">
+          {TABS.map((t) => (
+            <Link
+              key={t.id}
+              href={`/dashboard/workspace/${workspaceId}?brandId=${brandId}&tab=${t.id}`}
+              className={cn(
+                'px-5 py-3 -mb-px flex items-center gap-2 border-b-2 text-sm transition-all whitespace-nowrap',
+                activeTab === t.id
+                  ? 'text-accent border-accent font-semibold'
+                  : 'text-text-secondary border-transparent hover:text-white',
+              )}
+            >
+              {t.label}
+              {t.id === 'profiles' && socialProfiles.length > 0 && (
+                <span className="text-xs opacity-50">({socialProfiles.length})</span>
+              )}
+            </Link>
+          ))}
+        </div>
 
-        {/* Pipeline steps */}
-        <section className="mb-10">
-          <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-4">Content Pipeline</h2>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
-            {PIPELINE_STEPS.map(({ icon: Icon, label, description }) => (
-              <Card key={label} className="p-5 flex flex-col gap-3 opacity-80 hover:opacity-100 transition-opacity">
-                <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center">
-                  <Icon size={18} className="text-accent" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-sm mb-1">{label}</h3>
-                  <p className="text-xs text-text-secondary leading-relaxed">{description}</p>
-                </div>
-              </Card>
-            ))}
-          </div>
-        </section>
-
-        {/* Social profiles section */}
-        <section>
-          <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-4">Social Profiles</h2>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-6">
-            {socialProfiles.map((account: AccountWithCounts) => (
-              <Card key={account.id} className="relative group hover:border-accent/40 transition-colors">
-                <Link href={`/dashboard/workspace/${workspaceId}/account/${account.id}`} className="absolute inset-0 z-[1]" />
-                <ActionMenu onDelete={deleteAccount.bind(null, account.id)} />
-                <div className="relative z-[2] pointer-events-none">
-                  <div className="flex items-center gap-4 mb-5">
-                    <div className="w-[60px] h-[60px] rounded-full p-[2px] bg-[linear-gradient(45deg,#f09433_0%,#e6683c_25%,#dc2743_50%,#cc2366_75%,#bc1888_100%)] overflow-hidden shrink-0">
-                      <div className="w-full h-full rounded-full bg-panel flex items-center justify-center overflow-hidden">
-                        {account.profileImage ? (
-                          <img src={account.profileImage} alt={account.username || 'Profile'} className="w-full h-full object-cover" />
-                        ) : (
-                          <Instagram size={28} />
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold">{account.username || 'Syncing...'}</h3>
-                      <p className="text-xs text-text-secondary">Added on {new Date(account.createdAt).toLocaleDateString()}</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-3">
-                    <div className="flex-1 p-3 bg-white/5 rounded-lg text-center">
-                      <p className="text-[10px] text-text-secondary uppercase tracking-wider mb-1">Status</p>
-                      <p className="text-sm font-semibold text-success">Connected</p>
-                    </div>
-                    <div className="flex-1 p-3 bg-white/5 rounded-lg text-center">
-                      <p className="text-[10px] text-text-secondary uppercase tracking-wider mb-1">Templates</p>
-                      <p className="text-sm font-semibold">{account._count?.templates || 0}</p>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            ))}
-
-            {hasNoSocialProfile && (
-              <Card className="col-span-full py-10 px-10 text-center border-dashed bg-transparent flex flex-col items-center">
-                <Instagram size={36} className="text-text-secondary mb-3 opacity-40" />
-                <h3 className="text-base font-semibold mb-1">No social profiles yet</h3>
-                <p className="text-text-secondary text-sm mb-5">Connect an Instagram Business account to enable publishing.</p>
-                <AddAccountButton workspaceId={workspaceId} mode="social-profile" />
-              </Card>
-            )}
-          </div>
-        </section>
+        {/* Tab content */}
+        <div className="min-h-[400px]">
+          {activeTab === 'calendar' && <AccountCalendar brandId={brandId} />}
+          {activeTab === 'ideas' && <AccountIdeas brandId={brandId} />}
+          {activeTab === 'pool' && <AccountPool brandId={brandId} />}
+          {activeTab === 'templates' && <AccountTemplates brandId={brandId} />}
+          {activeTab === 'profiles' && (
+            <BrandProfiles
+              brandId={brandId}
+              workspaceId={workspaceId}
+              initialProfiles={socialProfiles.map((p) => ({
+                id: p.id,
+                platform: p.platform,
+                username: p.username,
+                profileImage: p.profileImage,
+                platformId: p.platformId,
+                tokenExpiresAt: p.tokenExpiresAt?.toISOString() ?? null,
+                createdAt: p.createdAt.toISOString(),
+              }))}
+            />
+          )}
+          {activeTab === 'assets' && (
+            <AssetsManager ownerId={brandId} ownerType="brand" assets={assets} basePath={basePath} />
+          )}
+          {activeTab === 'settings' && (
+            <BrandSettings
+              brand={{
+                id: localBrand.id,
+                directorPrompt: localBrand.directorPrompt,
+                creationPrompt: localBrand.creationPrompt,
+                shortCode: localBrand.shortCode,
+              }}
+            />
+          )}
+        </div>
       </div>
     )
   }
@@ -176,7 +177,7 @@ export default async function WorkspaceOverviewPage({
           <h1 className="text-3xl font-heading font-semibold mb-2">{workspace.name}</h1>
           <p className="text-text-secondary">Select a brand to manage its content pipeline.</p>
         </div>
-        <AddAccountButton workspaceId={workspaceId} mode="brand" />
+        <AddBrandButton workspaceId={workspaceId} />
       </header>
 
       <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-6">
@@ -199,7 +200,7 @@ export default async function WorkspaceOverviewPage({
             <Tag size={48} className="text-text-secondary mb-4 opacity-50" />
             <h3 className="text-xl font-semibold mb-2">No brands yet</h3>
             <p className="text-text-secondary mb-6">Create your first brand to get started.</p>
-            <AddAccountButton workspaceId={workspaceId} mode="brand" />
+            <AddBrandButton workspaceId={workspaceId} />
           </Card>
         )}
       </div>

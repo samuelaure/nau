@@ -37,9 +37,9 @@ export async function syncR2Assets() {
 
   try {
     log('Fetching accounts...')
-    const accounts = await prisma.socialAccount.findMany()
+    const accounts = await prisma.socialProfile.findMany()
 
-    // accountId-keyed map for fast lookup
+    // brandId-keyed map for fast lookup
     const accountIds = new Set(accounts.map((a) => a.id))
 
     // List only flownau's prefix to avoid touching nauthenticity or 9nau objects
@@ -71,18 +71,18 @@ async function syncObject(
   const filename = key.split('/').pop() || ''
   if (filename === '.DS_Store' || filename === '') return
 
-  // Key schema: flownau/accounts/{accountId}/assets/{type}/{file}
-  //             flownau/accounts/{accountId}/outputs/{file}
+  // Key schema: flownau/accounts/{brandId}/assets/{type}/{file}
+  //             flownau/accounts/{brandId}/outputs/{file}
   //             flownau/templates/{templateId}/assets/{file}
   // Skip thumbnails and output files as standalone assets
   if (key.includes('/thumbnails/') || key.includes('/outputs/')) return
 
   const parts = key.split('/')
-  let accountId: string | undefined
+  let brandId: string | undefined
   let templateId: string | undefined
 
   if (parts[1] === 'accounts' && parts[2]) {
-    accountId = accountIds.has(parts[2]) ? parts[2] : undefined
+    brandId = accountIds.has(parts[2]) ? parts[2] : undefined
   } else if (parts[1] === 'templates' && parts[2]) {
     templateId = parts[2]
   } else {
@@ -102,9 +102,9 @@ async function syncObject(
         data: { size, url, mimeType, type },
       })
     }
-    if (!existing.accountId && accountId) {
-      log(`Linking orphan asset ${key} to account ${accountId}`)
-      await prisma.asset.update({ where: { id: existing.id }, data: { accountId } })
+    if (!existing.brandId && brandId) {
+      log(`Linking orphan asset ${key} to account ${brandId}`)
+      await prisma.asset.update({ where: { id: existing.id }, data: { brandId } })
     }
   } else {
     log(`Creating new asset: ${key}`)
@@ -117,7 +117,7 @@ async function syncObject(
         type,
         systemFilename: filename,
         originalFilename: filename,
-        accountId: accountId ?? null,
+        brandId: brandId ?? null,
         templateId: templateId ?? null,
       },
     })

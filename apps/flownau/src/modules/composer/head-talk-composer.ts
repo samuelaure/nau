@@ -16,7 +16,7 @@ export type HeadTalkOutput = z.infer<typeof HeadTalkOutputSchema>
 
 export interface HeadTalkInput {
   ideaText: string
-  accountId: string
+  brandId: string
   personaId?: string
 }
 
@@ -25,12 +25,12 @@ export interface HeadTalkInput {
  * No video/image assets. The user records themselves and uploads the result.
  */
 export async function composeHeadTalk(input: HeadTalkInput): Promise<HeadTalkOutput> {
-  const { ideaText, accountId, personaId } = input
+  const { ideaText, brandId, personaId } = input
 
   const persona = personaId
     ? await prisma.brandPersona.findUnique({ where: { id: personaId } })
-    : ((await prisma.brandPersona.findFirst({ where: { accountId, isDefault: true } })) ??
-      (await prisma.brandPersona.findFirst({ where: { accountId } })))
+    : ((await prisma.brandPersona.findFirst({ where: { brandId, isDefault: true } })) ??
+      (await prisma.brandPersona.findFirst({ where: { brandId } })))
 
   const dna = persona?.systemPrompt ?? ''
 

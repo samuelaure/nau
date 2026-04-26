@@ -13,7 +13,7 @@ export const maxDuration = 120 // 2 minutes — publishing only, no rendering
  * This cron ONLY handles Instagram API calls — rendering is decoupled (BullMQ)
  * and slot assignment is handled by /api/cron/scheduler.
  *
- * Phase 18: gate reads AccountTemplateConfig.autoApprovePost for (accountId, templateId).
+ * Phase 18: gate reads BrandTemplateConfig.autoApprovePost for (brandId, templateId).
  */
 import { validateCronSecret, unauthorizedCronResponse } from '@/modules/shared/nau-auth'
 
@@ -26,7 +26,7 @@ export async function GET(request: Request) {
     const results: Array<{
       type: string
       compositionId?: string
-      accountId?: string
+      brandId?: string
       status: string
       error?: string
     }> = []
@@ -40,10 +40,10 @@ export async function GET(request: Request) {
         publishAttempts: { lt: 3 },
       },
       include: {
-        account: true,
+        brand: { include: { socialProfiles: true } },
         template: {
           include: {
-            accountConfigs: true,
+            brandConfigs: true,
           },
         },
       },
@@ -51,17 +51,17 @@ export async function GET(request: Request) {
 
     for (const composition of dueCompositions) {
       if (
-        !composition.account ||
-        !composition.account.accessToken ||
-        !composition.account.platformId
+        !composition.brand?.socialProfiles?.[0] ||
+        !composition.brand.socialProfiles[0].accessToken ||
+        !composition.brand.socialProfiles[0].platformId
       ) {
         continue
       }
 
-      // Phase 18 gate: resolve AccountTemplateConfig.autoApprovePost for (accountId, templateId).
+      // Phase 18 gate: resolve BrandTemplateConfig.autoApprovePost for (brandId, templateId).
       // Fallback to false (manual Final Review) if no config row or no template.
-      const templateConfig = composition.template?.accountConfigs?.find(
-        (c) => c.accountId === composition.accountId,
+      const templateConfig = composition.template?.brandConfigs?.find(
+        (c) => c.brandId === composition.brandId,
       )
       const autoApprovePost = templateConfig?.autoApprovePost ?? false
 
@@ -71,10 +71,13 @@ export async function GET(request: Request) {
       }
 
       try {
-        const result = await publishComposition(composition)
+        const result = await publishComposition({
+          ...composition,
+          socialProfile: composition.brand.socialProfiles[0],
+        })
         if (result.success) {
           await prisma.contentPlanner.updateMany({
-            where: { accountId: composition.accountId, isDefault: true },
+            where: { brandId: composition.brandId, isDefault: true },
             data: { lastPostedAt: now },
           })
           results.push({ type: 'explicit', compositionId: composition.id, status: 'success' })

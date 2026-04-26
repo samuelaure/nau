@@ -6,10 +6,10 @@ import { prisma } from '@/modules/shared/prisma'
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
-    const accountId = searchParams.get('accountId')
+    const brandId = searchParams.get('brandId')
 
     const templates = await prisma.template.findMany({
-      where: accountId ? { accountId } : undefined,
+      where: brandId ? { brandId } : undefined,
       orderBy: { updatedAt: 'desc' },
     })
     return NextResponse.json({ templates }, { status: 200 })
@@ -22,9 +22,9 @@ export async function POST(req: Request) {
   try {
     const body = await req.json()
 
-    if (!body.accountId) {
+    if (!body.brandId) {
       return NextResponse.json(
-        { error: 'Missing accountId — templates are account-scoped' },
+        { error: 'Missing brandId — templates are account-scoped' },
         { status: 400 },
       )
     }
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
       data: {
         name: body.name,
         remotionId: body.remotionId ?? 'default',
-        accountId: body.accountId,
+        brandId: body.brandId,
         scope: body.scope ?? 'account',
         schemaJson: body.schemaJson ?? null,
         contentSchema: body.contentSchema ?? null,

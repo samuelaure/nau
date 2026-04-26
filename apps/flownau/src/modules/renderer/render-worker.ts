@@ -47,7 +47,7 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
   // 1. Fetch composition from DB
   const composition = await prisma.composition.findUnique({
     where: { id: compositionId },
-    include: { account: true },
+    include: { brand: true },
   })
 
   if (!composition) {
@@ -81,7 +81,7 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
       const creative = composition.creative as Record<string, unknown>
       const { sceneAssets } = await selectAssetsForCreative(
         creative as Parameters<typeof selectAssetsForCreative>[0],
-        composition.accountId,
+        composition.brandId,
         30,
       )
       logger.info(`[RenderWorker] Re-selected ${sceneAssets.size} assets for retry`)
@@ -155,7 +155,7 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
     throw new Error(`Remotion composition '${compositionId_}' not found in bundle`)
   }
 
-  const accountId = composition.accountId
+  const brandId = composition.brandId
 
   if (isVideo) {
     // ─── Video Render ────────────────────────────────────────
@@ -183,7 +183,7 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
       data: { status: 'uploading' },
     })
 
-    const videoR2Key = flownau.renderOutput(accountId, compositionId)
+    const videoR2Key = flownau.renderOutput(brandId, compositionId)
     const videoPublicUrl = await storage.upload(videoR2Key, fs.createReadStream(outputPath), {
       mimeType: 'video/mp4',
     })
@@ -219,7 +219,7 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
           jpegQuality: 85,
         })
 
-        const coverR2Key = flownau.renderCover(accountId, compositionId)
+        const coverR2Key = flownau.renderCover(brandId, compositionId)
         coverUrl = await storage.upload(coverR2Key, fs.createReadStream(coverPath), {
           mimeType: 'image/jpeg',
         })
@@ -269,7 +269,7 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
 
     await job.updateProgress(80)
 
-    const imageR2Key = flownau.renderStill(accountId, compositionId)
+    const imageR2Key = flownau.renderStill(brandId, compositionId)
     const imagePublicUrl = await storage.upload(imageR2Key, fs.createReadStream(outputPath), {
       mimeType: 'image/png',
     })

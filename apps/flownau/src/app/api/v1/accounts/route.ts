@@ -15,7 +15,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const accounts = await prisma.socialAccount.findMany({
+    const accounts = await prisma.socialProfile.findMany({
       select: {
         id: true,
         platform: true,

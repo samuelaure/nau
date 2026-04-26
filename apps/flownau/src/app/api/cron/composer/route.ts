@@ -23,7 +23,7 @@ const USER_MANAGED_FORMATS: ReadonlySet<string> = new Set(['head_talk', 'replica
  *
  * Phase 18: Processes APPROVED content ideas into Compositions.
  * - Pulls persona/framework/principles FKs from the idea (provenance carried forward).
- * - Selects a matching Template based on idea.format + AccountTemplateConfig.enabled.
+ * - Selects a matching Template based on idea.format + BrandTemplateConfig.enabled.
  * - Builds AI prompt from persona + framework + principles + template.contentSchema.
  * - Skips AI/asset-curation for user-managed formats (head_talk, replicate).
  */
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
   try {
     const results: Array<{
       ideaId: string
-      accountId: string
+      brandId: string
       status: string
       compositionId?: string
       error?: string
@@ -44,7 +44,6 @@ export async function GET(request: Request) {
     const approvedIdeas = await prisma.contentIdea.findMany({
       where: { status: 'APPROVED' },
       include: {
-        account: true,
         brandPersona: true,
         ideasFramework: true,
         contentPrinciples: true,
@@ -59,17 +58,15 @@ export async function GET(request: Request) {
     logger.info(`[Composer] Processing ${approvedIdeas.length} approved ideas`)
 
     for (const idea of approvedIdeas) {
-      if (!idea.account) continue
-
       const format: ContentFormat = (idea.format as ContentFormat) || 'reel'
       const persona = idea.brandPersona
       const framework = idea.ideasFramework
       const principles = idea.contentPrinciples
 
       try {
-        // Template selection: account-scoped + format-matching + enabled AccountTemplateConfig.
+        // Template selection: account-scoped + format-matching + enabled BrandTemplateConfig.
         const selectedTemplate = await selectTemplateForIdea({
-          accountId: idea.accountId,
+          brandId: idea.brandId,
           format,
         })
 
@@ -80,7 +77,7 @@ export async function GET(request: Request) {
         if (USER_MANAGED_FORMATS.has(format)) {
           const composition = await prisma.composition.create({
             data: {
-              accountId: idea.accountId,
+              brandId: idea.brandId,
               format,
               source: 'composed',
               payload: {} as unknown as Prisma.InputJsonValue,
@@ -97,7 +94,7 @@ export async function GET(request: Request) {
           await prisma.contentIdea.update({ where: { id: idea.id }, data: { status: 'USED' } })
           results.push({
             ideaId: idea.id,
-            accountId: idea.accountId,
+            brandId: idea.brandId,
             status: 'success',
             compositionId: composition.id,
           })
@@ -110,7 +107,7 @@ export async function GET(request: Request) {
         // 1. SceneComposer — AI Creative Direction with full provenance
         const { creative } = await compose({
           ideaText: idea.ideaText,
-          accountId: idea.accountId,
+          brandId: idea.brandId,
           format,
           personaId: persona?.id,
           frameworkPrompt: framework?.systemPrompt ?? null,
@@ -122,7 +119,7 @@ export async function GET(request: Request) {
         // 2. Asset selection + timeline compile
         const { sceneAssets, audioAsset } = await selectAssetsForCreative(
           creative,
-          idea.accountId,
+          idea.brandId,
           30,
         )
         const brandStyle = {
@@ -136,7 +133,7 @@ export async function GET(request: Request) {
         const sceneTypes = creative.scenes.map((s: { type: string }) => s.type)
         const composition = await prisma.composition.create({
           data: {
-            accountId: idea.accountId,
+            brandId: idea.brandId,
             format,
             creative: creative as unknown as Prisma.InputJsonValue,
             payload: schema as unknown as Prisma.InputJsonValue,
@@ -178,7 +175,7 @@ export async function GET(request: Request) {
 
         results.push({
           ideaId: idea.id,
-          accountId: idea.accountId,
+          brandId: idea.brandId,
           status: 'success',
           compositionId: composition.id,
         })
@@ -191,7 +188,7 @@ export async function GET(request: Request) {
         logError(`[Composer] Failed to compose idea ${idea.id}`, err)
         results.push({
           ideaId: idea.id,
-          accountId: idea.accountId,
+          brandId: idea.brandId,
           status: 'failed',
           error: msg,
         })

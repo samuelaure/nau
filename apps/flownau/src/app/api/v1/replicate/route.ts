@@ -9,7 +9,7 @@ import { resolveProvenance } from '@/modules/ideation/provenance'
 import type { Prisma } from '@prisma/client'
 
 const ReplicateRequestSchema = z.object({
-  accountId: z.string().min(1),
+  brandId: z.string().min(1),
   caption: z.string().min(1),
   mediaUrl: z.string().url().optional(),
   mediaType: z.enum(['video', 'image', 'carousel']).default('video'),
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     }
 
     const {
-      accountId,
+      brandId,
       caption,
       mediaUrl,
       mediaType,
@@ -48,7 +48,7 @@ export async function POST(req: Request) {
       transcription,
     } = parsed.data
 
-    const account = await prisma.socialAccount.findUnique({ where: { id: accountId } })
+    const account = await prisma.socialProfile.findUnique({ where: { id: brandId } })
     if (!account) {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 })
     }
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
     const format = 'replicate'
 
     // Resolve provenance (captured for audit — there's no idea for replicate flow)
-    const provenance = await resolveProvenance(accountId)
+    const provenance = await resolveProvenance(brandId)
 
     const persona = provenance.brandPersonaId
       ? await prisma.brandPersona.findUnique({ where: { id: provenance.brandPersonaId } })
@@ -75,7 +75,7 @@ export async function POST(req: Request) {
 
     const composition = await prisma.composition.create({
       data: {
-        accountId,
+        brandId,
         format,
         source: 'replicate',
         payload: payload as unknown as Prisma.InputJsonValue,
@@ -91,7 +91,7 @@ export async function POST(req: Request) {
     })
 
     logger.info(
-      `[Replicate] Created composition ${composition.id} for account ${accountId} (${format})`,
+      `[Replicate] Created composition ${composition.id} for account ${brandId} (${format})`,
     )
 
     return NextResponse.json({ composition }, { status: 201 })

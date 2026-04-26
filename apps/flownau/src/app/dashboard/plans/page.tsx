@@ -51,7 +51,7 @@ export default async function PlansPage({
         lt: new Date(targetDate.getTime() + 24 * 60 * 60 * 1000),
       },
     },
-    include: { account: { select: { id: true, username: true, profileImage: true } } },
+    include: { brand: { select: { id: true, name: true } } },
     orderBy: { createdAt: 'asc' },
   })
 
@@ -76,9 +76,9 @@ export default async function PlansPage({
     }))
 
     return {
-      accountId: plan.account.id,
-      username: plan.account.username || 'Unknown',
-      profileImage: plan.account.profileImage,
+      brandId: plan.brand.id,
+      username: plan.brand.name || 'Unknown',
+      profileImage: null,
       alerts: planAlerts,
       slots,
       pieces,

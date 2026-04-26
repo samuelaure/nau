@@ -23,13 +23,13 @@ export async function POST(req: NextRequest) {
   // 1. Parse FormData
   const formData = await req.formData()
   const file = formData.get('file') as File
-  const accountId = formData.get('accountId') as string | null
+  const brandId = formData.get('brandId') as string | null
   const templateId = formData.get('templateId') as string | null
   const clientHash = formData.get('hash') as string
 
-  if (!file || (!accountId && !templateId)) {
+  if (!file || (!brandId && !templateId)) {
     return NextResponse.json(
-      { error: 'Missing file or context (accountId/templateId)' },
+      { error: 'Missing file or context (brandId/templateId)' },
       { status: 400 },
     )
   }
@@ -38,32 +38,19 @@ export async function POST(req: NextRequest) {
   const assetId = createId()
 
   // 2. Determine Context
-  let contextAccountId: string | null = accountId
+  let contextAccountId: string | null = brandId
 
   if (templateId) {
     const template = await prisma.template.findUnique({
       where: { id: templateId },
-      include: { account: true },
     })
 
     if (!template) return NextResponse.json({ error: 'Template not found' }, { status: 404 })
 
-    if (template.account) {
-      contextAccountId = template.accountId
-    } else {
-      contextAccountId = null
-    }
-  } else if (accountId) {
-    const account = await prisma.socialAccount.findUnique({ where: { id: accountId } })
-    if (!account) return NextResponse.json({ error: 'Account not found' }, { status: 404 })
-
-    // Backfill shortCode if missing
-    if (!account.shortCode && account.username) {
-      await prisma.socialAccount.update({
-        where: { id: accountId },
-        data: { shortCode: account.username.substring(0, 2).toUpperCase() },
-      })
-    }
+    contextAccountId = template.brandId ?? null
+  } else if (brandId) {
+    const brand = await prisma.brand.findUnique({ where: { id: brandId } })
+    if (!brand) return NextResponse.json({ error: 'Brand not found' }, { status: 404 })
   }
 
   // 3. Duplicate Detection (content-hash, context-scoped)
@@ -71,7 +58,7 @@ export async function POST(req: NextRequest) {
     const duplicate = await prisma.asset.findFirst({
       where: {
         hash: clientHash,
-        ...(contextAccountId ? { accountId: contextAccountId } : {}),
+        ...(contextAccountId ? { brandId: contextAccountId } : {}),
         ...(templateId ? { templateId } : {}),
       },
     })
@@ -217,7 +204,7 @@ export async function POST(req: NextRequest) {
     const asset = await prisma.asset.create({
       data: {
         id: assetId,
-        accountId: contextAccountId,
+        brandId: contextAccountId,
         templateId: templateId || null,
         originalFilename: file.name,
         systemFilename,

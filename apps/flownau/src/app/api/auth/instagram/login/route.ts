@@ -2,16 +2,14 @@ export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
 
-export async function GET() {
+export async function GET(req: Request) {
   const appId = process.env.FB_APP_ID
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
   const redirectUri = `${baseUrl}/api/auth/instagram/callback`
 
-  // Scopes required for:
-  // - Reading Instagram account info (instagram_basic)
-  // - Publishing content (instagram_content_publish)
-  // - Finding the connected Page (pages_show_list, pages_read_engagement)
-  // - Business discovery (business_management)
+  const { searchParams } = new URL(req.url)
+  const brandId = searchParams.get('brandId')
+
   const scope = [
     'instagram_basic',
     'instagram_content_publish',
@@ -20,9 +18,10 @@ export async function GET() {
     'business_management',
   ].join(',')
 
-  const state = Math.random().toString(36).substring(7)
+  const state = JSON.stringify({ nonce: Math.random().toString(36).substring(7), brandId })
+  const encodedState = Buffer.from(state).toString('base64url')
 
-  const url = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&scope=${scope}&state=${state}&response_type=code`
+  const url = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&scope=${scope}&state=${encodedState}&response_type=code`
 
   return NextResponse.redirect(url)
 }

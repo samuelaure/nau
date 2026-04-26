@@ -375,7 +375,7 @@ export default function AIBuilderTab({
         body: JSON.stringify({
           schemaJson,
           prompt: chatPrompt,
-          accountId: template.accountId,
+          brandId: template.brandId,
           templateId: template.id,
           creationPrompt: template.creationPrompt || '',
         }),

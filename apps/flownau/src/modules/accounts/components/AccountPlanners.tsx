@@ -63,7 +63,7 @@ function TimeSlotList({
   )
 }
 
-export default function AccountPlanners({ accountId }: { accountId: string }) {
+export default function AccountPlanners({ brandId }: { brandId: string }) {
   const [planners, setPlanners] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -71,7 +71,7 @@ export default function AccountPlanners({ accountId }: { accountId: string }) {
 
   const fetchPlanners = async () => {
     try {
-      const res = await fetch(`/api/planners?accountId=${accountId}`)
+      const res = await fetch(`/api/planners?brandId=${brandId}`)
       const data = await res.json()
       setPlanners(data.planners || [])
     } catch {
@@ -83,7 +83,7 @@ export default function AccountPlanners({ accountId }: { accountId: string }) {
 
   useEffect(() => {
     fetchPlanners()
-  }, [accountId])
+  }, [brandId])
 
   const f = (key: keyof typeof formData, val: any) =>
     setFormData((prev) => ({ ...prev, [key]: val }))
@@ -95,7 +95,7 @@ export default function AccountPlanners({ accountId }: { accountId: string }) {
         const res = await fetch(`/api/planners/${editingId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ accountId, ...formData }),
+          body: JSON.stringify({ brandId, ...formData }),
         })
         if (!res.ok) throw new Error()
         toast.success('Planner updated')
@@ -103,7 +103,7 @@ export default function AccountPlanners({ accountId }: { accountId: string }) {
         const res = await fetch('/api/planners', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ accountId, ...formData }),
+          body: JSON.stringify({ brandId, ...formData }),
         })
         if (!res.ok) throw new Error()
         toast.success('Planner created')

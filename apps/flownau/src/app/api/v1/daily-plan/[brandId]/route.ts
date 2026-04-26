@@ -4,24 +4,24 @@ import { generateDailyPlan } from '@/modules/planning/daily-plan.service'
 import { logError } from '@/modules/shared/logger'
 
 /**
- * GET /api/v1/daily-plan/[accountId] — Get daily content plan.
+ * GET /api/v1/daily-plan/[brandId] — Get daily content plan.
  * Called by: Zazŭ
  * Auth: NAU_SERVICE_KEY
  *
  * Query params:
  *  - reminder=true: returns condensed version with only pending items
  */
-export async function GET(req: Request, { params }: { params: Promise<{ accountId: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ brandId: string }> }) {
   if (!(await validateServiceToken(req))) {
     return unauthorizedResponse()
   }
 
-  const { accountId } = await params
+  const { brandId } = await params
   const { searchParams } = new URL(req.url)
   const isReminder = searchParams.get('reminder') === 'true'
 
   try {
-    const plan = await generateDailyPlan(accountId, new Date())
+    const plan = await generateDailyPlan(brandId, new Date())
 
     if (isReminder) {
       // Condensed version: only pending items + alerts

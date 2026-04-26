@@ -28,7 +28,7 @@ import { resolveModelId } from '@/modules/composer/model-resolver'
 const mockPersona = {
   id: 'persona-1',
   name: 'Test Persona',
-  accountId: 'account-1',
+  brandId: 'account-1',
   isDefault: true,
   systemPrompt: 'You are a test creative director.',
   modelSelection: 'GROQ_LLAMA_3_3' as const,
@@ -76,7 +76,7 @@ describe('compose()', () => {
     ;(prisma.brandPersona.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(null)
     mockParseCompletion.mockResolvedValue({ data: validCreativeDirection })
 
-    const result = await compose({ ideaText: 'test idea', accountId: 'account-1', format: 'reel' })
+    const result = await compose({ ideaText: 'test idea', brandId: 'account-1', format: 'reel' })
     expect(result.personaName).toBe('Platform Default')
   })
 
@@ -84,7 +84,7 @@ describe('compose()', () => {
     ;(prisma.brandPersona.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(mockPersona)
     mockParseCompletion.mockResolvedValue({ data: validCreativeDirection })
 
-    const result = await compose({ ideaText: 'test idea', accountId: 'account-1', format: 'reel' })
+    const result = await compose({ ideaText: 'test idea', brandId: 'account-1', format: 'reel' })
 
     expect(result.creative.scenes).toHaveLength(2)
     expect(result.creative.caption).toBe('Test caption for the post.')
@@ -101,7 +101,7 @@ describe('compose()', () => {
       return Promise.resolve({ data: validCreativeDirection })
     })
 
-    const result = await compose({ ideaText: 'retry test idea', accountId: 'account-1', format: 'reel' })
+    const result = await compose({ ideaText: 'retry test idea', brandId: 'account-1', format: 'reel' })
 
     expect(result.creative.scenes).toHaveLength(2)
     expect(callCount).toBe(2)
@@ -112,7 +112,7 @@ describe('compose()', () => {
     mockParseCompletion.mockRejectedValue(new Error('LLM always fails'))
 
     await expect(
-      compose({ ideaText: 'failing idea', accountId: 'account-1', format: 'reel' }),
+      compose({ ideaText: 'failing idea', brandId: 'account-1', format: 'reel' }),
     ).rejects.toThrow(/after 2 attempts/)
   })
 
@@ -120,7 +120,7 @@ describe('compose()', () => {
     ;(prisma.brandPersona.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(mockPersona)
     mockParseCompletion.mockResolvedValue({ data: { ...validCreativeDirection, coverSceneIndex: 99 } })
 
-    const result = await compose({ ideaText: 'cover index test', accountId: 'account-1', format: 'reel' })
+    const result = await compose({ ideaText: 'cover index test', brandId: 'account-1', format: 'reel' })
 
     expect(result.creative.coverSceneIndex).toBe(0)
   })
@@ -129,7 +129,7 @@ describe('compose()', () => {
     ;(prisma.brandPersona.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(mockPersona)
     mockParseCompletion.mockResolvedValue({ data: validCreativeDirection })
 
-    const result = await compose({ ideaText: 'json parse test', accountId: 'account-1', format: 'reel' })
+    const result = await compose({ ideaText: 'json parse test', brandId: 'account-1', format: 'reel' })
 
     expect(result.creative).toBeDefined()
     expect(result.creative.hashtags).toContain('test')

@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
   const workspaceId = req.nextUrl.searchParams.get('workspaceId')
   if (!workspaceId) return NextResponse.json({ accounts: [] })
 
-  const accounts = await prisma.socialAccount.findMany({
+  const accounts = await prisma.socialProfile.findMany({
     where: { workspaceId },
     select: { id: true, username: true, profileImage: true },
     orderBy: { createdAt: 'asc' },

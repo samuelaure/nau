@@ -31,14 +31,14 @@ const FORMAT_LABEL: Record<string, string> = {
   single_image: 'Single Image',
 }
 
-export default function AccountFinalReview({ accountId }: { accountId: string }) {
+export default function AccountFinalReview({ brandId }: { brandId: string }) {
   const [compositions, setCompositions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [approvingId, setApprovingId] = useState<string | null>(null)
 
   const fetchCompositions = async () => {
     try {
-      const res = await fetch(`/api/compositions?accountId=${accountId}&status=RENDERED`)
+      const res = await fetch(`/api/compositions?brandId=${brandId}&status=RENDERED`)
       const data = await res.json()
       setCompositions(data.compositions || [])
     } catch {
@@ -50,7 +50,7 @@ export default function AccountFinalReview({ accountId }: { accountId: string })
 
   useEffect(() => {
     fetchCompositions()
-  }, [accountId])
+  }, [brandId])
 
   const handleApprove = async (compositionId: string) => {
     setApprovingId(compositionId)

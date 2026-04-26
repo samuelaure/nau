@@ -19,9 +19,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const { id } = await params
     const body = await req.json()
 
-    if (body.isDefault && body.accountId) {
+    if (body.isDefault && body.brandId) {
       await prisma.contentPlanner.updateMany({
-        where: { accountId: body.accountId, id: { not: id } },
+        where: { brandId: body.brandId, id: { not: id } },
         data: { isDefault: false },
       })
     }

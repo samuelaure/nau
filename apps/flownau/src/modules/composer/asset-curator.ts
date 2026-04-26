@@ -171,7 +171,7 @@ export async function commitAssetUsage(assetIds: string[]): Promise<void> {
  */
 export async function selectAssetsForCreative(
   creative: CreativeDirection,
-  accountId: string,
+  brandId: string,
   _fps: number,
 ): Promise<{
   sceneAssets: Map<number, Asset>
@@ -179,7 +179,7 @@ export async function selectAssetsForCreative(
 }> {
   // Fetch full asset pool for this account
   const assetPool = await prisma.asset.findMany({
-    where: { accountId },
+    where: { brandId },
   })
 
   const sceneAssets = new Map<number, Asset>()

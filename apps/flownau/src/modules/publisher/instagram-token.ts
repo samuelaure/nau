@@ -6,7 +6,7 @@ import { IG_BASE_URL } from './types'
 const REFRESH_BUFFER_DAYS = parseInt(process.env.TOKEN_REFRESH_DAYS_BEFORE_EXPIRY || '7', 10)
 
 interface TokenCheckResult {
-  accountId: string
+  brandId: string
   username: string | null
   status: 'refreshed' | 'valid' | 'expired' | 'error'
   daysUntilExpiry?: number
@@ -71,7 +71,7 @@ export async function refreshTokenIfNeeded(account: {
 
     const newExpiresAt = new Date(now.getTime() + expiresIn * 1000)
 
-    await prisma.socialAccount.update({
+    await prisma.socialProfile.update({
       where: { id: account.id },
       data: {
         accessToken: newToken,
@@ -99,7 +99,7 @@ export async function refreshTokenIfNeeded(account: {
 export async function checkAllTokens(): Promise<TokenCheckResult[]> {
   const results: TokenCheckResult[] = []
 
-  const accounts = await prisma.socialAccount.findMany({
+  const accounts = await prisma.socialProfile.findMany({
     where: { accessToken: { not: '' } },
     select: {
       id: true,
@@ -114,7 +114,7 @@ export async function checkAllTokens(): Promise<TokenCheckResult[]> {
   for (const account of accounts) {
     if (!account.tokenExpiresAt) {
       results.push({
-        accountId: account.id,
+        brandId: account.id,
         username: account.username,
         status: 'valid',
       })
@@ -126,7 +126,7 @@ export async function checkAllTokens(): Promise<TokenCheckResult[]> {
 
     if (daysUntilExpiry <= 0) {
       results.push({
-        accountId: account.id,
+        brandId: account.id,
         username: account.username,
         status: 'expired',
         daysUntilExpiry: Math.round(daysUntilExpiry),
@@ -138,7 +138,7 @@ export async function checkAllTokens(): Promise<TokenCheckResult[]> {
       try {
         await refreshTokenIfNeeded(account)
         results.push({
-          accountId: account.id,
+          brandId: account.id,
           username: account.username,
           status: 'refreshed',
           daysUntilExpiry: Math.round(daysUntilExpiry),
@@ -146,7 +146,7 @@ export async function checkAllTokens(): Promise<TokenCheckResult[]> {
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
         results.push({
-          accountId: account.id,
+          brandId: account.id,
           username: account.username,
           status: 'error',
           daysUntilExpiry: Math.round(daysUntilExpiry),
@@ -155,7 +155,7 @@ export async function checkAllTokens(): Promise<TokenCheckResult[]> {
       }
     } else {
       results.push({
-        accountId: account.id,
+        brandId: account.id,
         username: account.username,
         status: 'valid',
         daysUntilExpiry: Math.round(daysUntilExpiry),

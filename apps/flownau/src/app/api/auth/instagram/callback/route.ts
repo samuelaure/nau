@@ -27,6 +27,14 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const code = searchParams.get('code')
     const error = searchParams.get('error')
+    const stateParam = searchParams.get('state')
+    let brandIdFromState: string | null = null
+    if (stateParam) {
+      try {
+        const decoded = JSON.parse(Buffer.from(stateParam, 'base64url').toString())
+        brandIdFromState = decoded.brandId ?? null
+      } catch { /* legacy plain state — ignore */ }
+    }
 
     if (error || !code) {
       console.error('Instagram Auth Error Callback:', error)
@@ -81,7 +89,11 @@ export async function GET(req: NextRequest) {
     if (!workspaceId) {
       return NextResponse.redirect(new URL('/dashboard?error=no_workspace', req.url))
     }
-    await prisma.socialAccount.upsert({
+    if (!brandIdFromState) {
+      return NextResponse.redirect(new URL('/dashboard?error=no_brand', req.url))
+    }
+
+    await prisma.socialProfile.upsert({
       where: {
         platform_platformId: {
           platform: 'instagram',
@@ -89,7 +101,8 @@ export async function GET(req: NextRequest) {
         },
       },
       update: {
-        workspaceId, // Transfer to current user's workspace
+        workspaceId,
+        brandId: brandIdFromState,
         accessToken: encrypt(longLivedToken),
         username: igAccount.username,
         expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
@@ -98,6 +111,7 @@ export async function GET(req: NextRequest) {
       },
       create: {
         workspaceId,
+        brandId: brandIdFromState,
         platform: 'instagram',
         platformId: igAccount.id,
         username: igAccount.username,

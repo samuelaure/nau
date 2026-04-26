@@ -5,7 +5,7 @@ import { ingestExternalIdeas } from '@/modules/ideation/sources/external-source'
 import { logError } from '@/modules/shared/logger'
 
 const IngestRequestSchema = z.object({
-  accountId: z.string().min(1),
+  brandId: z.string().min(1),
   ideas: z
     .array(
       z.object({
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
     const body: unknown = await req.json()
     const input = IngestRequestSchema.parse(body)
 
-    const result = await ingestExternalIdeas(input.accountId, input.ideas, input.autoApprove)
+    const result = await ingestExternalIdeas(input.brandId, input.ideas, input.autoApprove)
 
     return NextResponse.json(result)
   } catch (error: unknown) {

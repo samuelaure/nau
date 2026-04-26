@@ -114,7 +114,7 @@ function FormatBadge({ format }: { format: string }) {
   )
 }
 
-export default function AccountIdeas({ accountId }: { accountId: string }) {
+export default function AccountIdeas({ brandId }: { brandId: string }) {
   const [ideas, setIdeas] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
@@ -160,7 +160,7 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
 
   const fetchFrameworks = async () => {
     try {
-      const res = await fetch(`/api/ideas-frameworks?accountId=${accountId}`)
+      const res = await fetch(`/api/ideas-frameworks?brandId=${brandId}`)
       const data = await res.json()
       setFrameworks(data.frameworks || [])
       const def = data.frameworks?.find((f: any) => f.isDefault)
@@ -176,7 +176,7 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
 
   const fetchPersonas = async () => {
     try {
-      const res = await fetch(`/api/personas?accountId=${accountId}`)
+      const res = await fetch(`/api/personas?brandId=${brandId}`)
       const data = await res.json()
       setPersonas(data.personas || [])
       const def = data.personas?.find((p: any) => p.isDefault) || data.personas?.[0]
@@ -196,7 +196,7 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accountId, ...frameworkForm }),
+        body: JSON.stringify({ brandId, ...frameworkForm }),
       })
       if (!res.ok) throw new Error()
       toast.success(
@@ -211,7 +211,7 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
 
   const fetchIdeas = async () => {
     try {
-      const res = await fetch(`/api/ideas?accountId=${accountId}`)
+      const res = await fetch(`/api/ideas?brandId=${brandId}`)
       const data = await res.json()
       const sorted = (data.ideas || []).sort((a: any, b: any) => {
         if (a.priority !== b.priority) return (a.priority ?? 3) - (b.priority ?? 3)
@@ -230,7 +230,7 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
       const res = await fetch(`/api/templates`)
       const data = await res.json()
       const accountTemplates = data.templates?.filter(
-        (t: any) => t.accountId === accountId || !t.accountId,
+        (t: any) => t.brandId === brandId || !t.brandId,
       )
       setTemplates(accountTemplates || [])
     } catch {
@@ -243,7 +243,7 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
     fetchFrameworks()
     fetchPersonas()
     fetchTemplates()
-  }, [accountId])
+  }, [brandId])
 
   const handleGenerate = async (concept?: string, countOverride?: number) => {
     setGenerating(true)
@@ -257,7 +257,7 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          accountId,
+          brandId,
           personaId: selectedPersonaId,
           frameworkId: selectedFrameworkId,
           concept: brainstormSource === 'manual' ? concept || undefined : undefined,
@@ -287,7 +287,7 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          accountId,
+          brandId,
           ideaText: manualIdeaText,
           source: 'manual',
           priority: 2,
@@ -403,7 +403,7 @@ export default function AccountIdeas({ accountId }: { accountId: string }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          accountId,
+          brandId,
           prompt: composingIdea.ideaText,
           format: composingIdea.format || 'reel',
           ideaId: composingIdea.id,

@@ -28,7 +28,7 @@ export async function GET(request: Request) {
 
   try {
     const results: Array<{
-      accountId: string
+      brandId: string
       status: string
       ideasGenerated?: number
       headTalkDetected?: number
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
       error?: string
     }> = []
 
-    const accounts = await prisma.socialAccount.findMany({
+    const accounts = await prisma.socialProfile.findMany({
       take: 10,
     })
 
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
 
       // Skip if there are any pending ideas — only generate when the pipeline is exhausted
       const pendingIdeasCount = await prisma.contentIdea.count({
-        where: { accountId: account.id, status: 'PENDING' },
+        where: { brandId: account.id, status: 'PENDING' },
       })
 
       if (pendingIdeasCount > 0) continue
@@ -68,7 +68,7 @@ export async function GET(request: Request) {
         const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)
         const recentCompositions = await prisma.composition.findMany({
           where: {
-            accountId: account.id,
+            brandId: account.id,
             createdAt: { gte: fourteenDaysAgo },
           },
           select: { caption: true, sceneTypes: true },
@@ -113,7 +113,7 @@ export async function GET(request: Request) {
 
           await prisma.contentIdea.create({
             data: {
-              accountId: account.id,
+              brandId: account.id,
               ideaText,
               format: idea.format,
               status: isHeadTalk
@@ -132,7 +132,7 @@ export async function GET(request: Request) {
         }
 
         results.push({
-          accountId: account.id,
+          brandId: account.id,
           status: 'success',
           ideasGenerated: output.ideas.length,
           headTalkDetected: headTalkCount,
@@ -145,7 +145,7 @@ export async function GET(request: Request) {
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         logError(`[Ideation] Failed for account ${account.id}`, err)
-        results.push({ accountId: account.id, status: 'failed', error: msg })
+        results.push({ brandId: account.id, status: 'failed', error: msg })
       }
     }
 
