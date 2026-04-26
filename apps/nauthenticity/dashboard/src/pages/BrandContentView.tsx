@@ -19,7 +19,7 @@ export const BrandContentView = () => {
     enabled: !!brandId,
   });
 
-  const mainIgUsername = intelligence?.mainIgUsername;
+  const mainIgUsername = intelligence?.mainUsername;
 
   // 2. Fetch Account Details if username exists
   const {
@@ -34,7 +34,7 @@ export const BrandContentView = () => {
 
   const linkIgMutation = useMutation({
     mutationFn: (username: string) =>
-      patchBrandIntelligence(brandId!, { mainIgUsername: username, workspaceId: workspaceId ?? '' }),
+      patchBrandIntelligence(brandId!, { mainUsername: username, workspaceId: workspaceId ?? '' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['brand-intelligence', brandId] });
       setIgInput('');

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { checkSession, redirectToLogin, type SessionUser } from '../lib/auth';
 
 export function LandingPage() {
+  const navigate = useNavigate();
   const [session, setSession] = useState<SessionUser | null | 'loading'>('loading');
 
   useEffect(() => {
@@ -10,7 +12,7 @@ export function LandingPage() {
 
   const handleCta = () => {
     if (session && session !== 'loading') {
-      window.location.href = '/';
+      navigate('/workspaces');
     } else {
       redirectToLogin();
     }

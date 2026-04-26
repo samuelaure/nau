@@ -29,10 +29,10 @@ export const BrandSinglePostsView = () => {
 
   // Fetch all accounts data for flat/grouped view if there are targets
   const { data: accountsData } = useQuery({
-    queryKey: ['accounts-bulk', targets?.map((t: any) => t.username)],
+    queryKey: ['accounts-bulk', targets?.map((t: any) => t.socialProfile?.username)],
     queryFn: async () => {
       if (!targets || targets.length === 0) return [];
-      const promises = targets.map((t: any) => getAccount(t.username).catch(() => null));
+      const promises = targets.map((t: any) => getAccount(t.socialProfile?.username).catch(() => null));
       const results = await Promise.all(promises);
       return results.filter(Boolean);
     },
@@ -280,7 +280,7 @@ export const BrandSinglePostsView = () => {
             }}
           >
             {targets?.map((target: any) => {
-              const targetAccount = accountsData?.find((a) => a?.username === target.username);
+              const targetAccount = accountsData?.find((a) => a?.username === target.socialProfile?.username);
               const postCount = targetAccount?.posts?.length || 0;
               return (
                 <div
@@ -299,7 +299,7 @@ export const BrandSinglePostsView = () => {
                       alignItems: 'center',
                     }}
                   >
-                    <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>@{target.username}</span>
+                    <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>@{target.socialProfile?.username}</span>
                     <span
                       style={{
                         fontSize: '0.8rem',

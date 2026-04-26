@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { checkSession, type SessionUser } from '../lib/auth';
-import { LandingPage } from '../pages/LandingPage';
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<SessionUser | null | 'loading'>('loading');
@@ -18,7 +18,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
   }
 
   if (!session) {
-    return <LandingPage />;
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;

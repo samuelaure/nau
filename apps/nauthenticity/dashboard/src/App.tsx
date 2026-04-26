@@ -14,7 +14,13 @@ import { RequireAuth } from './components/RequireAuth';
 import { Sidebar } from './components/Sidebar';
 import './index.css';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 function App() {
   return (
