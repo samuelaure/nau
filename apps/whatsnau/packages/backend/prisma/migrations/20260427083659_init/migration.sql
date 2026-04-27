@@ -377,7 +377,9 @@ CREATE TABLE "PerformanceMetric" (
 -- CreateTable
 CREATE TABLE "_LeadToTag" (
     "A" TEXT NOT NULL,
-    "B" TEXT NOT NULL
+    "B" TEXT NOT NULL,
+
+    CONSTRAINT "_LeadToTag_AB_pkey" PRIMARY KEY ("A","B")
 );
 
 -- CreateIndex
@@ -492,9 +494,6 @@ CREATE INDEX "SystemAlert_tenantId_idx" ON "SystemAlert"("tenantId");
 CREATE INDEX "PerformanceMetric_operation_createdAt_idx" ON "PerformanceMetric"("operation", "createdAt");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "_LeadToTag_AB_unique" ON "_LeadToTag"("A", "B");
-
--- CreateIndex
 CREATE INDEX "_LeadToTag_B_index" ON "_LeadToTag"("B");
 
 -- AddForeignKey
@@ -598,4 +597,3 @@ ALTER TABLE "_LeadToTag" ADD CONSTRAINT "_LeadToTag_A_fkey" FOREIGN KEY ("A") RE
 
 -- AddForeignKey
 ALTER TABLE "_LeadToTag" ADD CONSTRAINT "_LeadToTag_B_fkey" FOREIGN KEY ("B") REFERENCES "Tag"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
