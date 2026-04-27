@@ -3,14 +3,13 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { ChevronDown, Check, Globe } from 'lucide-react';
 
 type Brand = { id: string; name: string };
-type Workspace = { id: string; name: string; brands: Brand[] };
 
 export function BrandSwitcher() {
   const navigate = useNavigate();
   const location = useLocation();
   const ref = useRef<HTMLDivElement>(null);
 
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
   const [open, setOpen] = useState(false);
 
   const workspaceMatch = location.pathname.match(/\/workspaces\/([^/]+)/);
@@ -23,17 +22,8 @@ export function BrandSwitcher() {
     if (activeWorkspaceId) {
       fetch(`/api/v1/workspaces/${activeWorkspaceId}/brands`, { credentials: 'include' })
         .then((r) => (r.ok ? r.json() : []))
-        .then((brands: Brand[]) => {
-          const workspace = workspaces.find((w) => w.id === activeWorkspaceId);
-          if (workspace) {
-            setWorkspaces((ws) =>
-              ws.map((w) => (w.id === activeWorkspaceId ? { ...w, brands } : w))
-            );
-          } else {
-            setWorkspaces((ws) => [...ws, { id: activeWorkspaceId, name: '', brands }]);
-          }
-        })
-        .catch(() => {});
+        .then((data: Brand[]) => setBrands(data))
+        .catch(() => setBrands([]));
     }
   }, [activeWorkspaceId]);
 
@@ -45,9 +35,8 @@ export function BrandSwitcher() {
     return () => document.removeEventListener('mousedown', onClickOutside);
   }, []);
 
-  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
-  const activeBrand = activeWorkspace?.brands.find((b) => b.id === activeBrandId);
-  const label = activeBrand ? activeBrand.name : activeWorkspace ? 'All Brands' : 'Select Brand';
+  const activeBrand = brands.find((b) => b.id === activeBrandId);
+  const label = activeBrand ? activeBrand.name : 'All Brands';
 
   const handleSelect = (brandId: string | null) => {
     setOpen(false);
@@ -58,7 +47,7 @@ export function BrandSwitcher() {
     }
   };
 
-  if (!activeWorkspaceId || !activeWorkspace) return null;
+  if (!activeWorkspaceId) return null;
 
   return (
     <div ref={ref} style={{ marginBottom: '1rem' }}>
@@ -133,7 +122,7 @@ export function BrandSwitcher() {
             All Brands
           </button>
 
-          {activeWorkspace.brands.map((brand) => (
+          {brands.map((brand) => (
             <button
               key={brand.id}
               onClick={() => handleSelect(brand.id)}
@@ -173,7 +162,7 @@ export function BrandSwitcher() {
             </button>
           ))}
 
-          {activeWorkspace.brands.length === 0 && (
+          {brands.length === 0 && (
             <div
               style={{
                 padding: '0.75rem 1rem',

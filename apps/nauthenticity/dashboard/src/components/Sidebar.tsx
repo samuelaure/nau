@@ -218,19 +218,6 @@ export function Sidebar() {
         ) : activeWorkspaceId ? (
           <>
             <span className="sidebar-section-label">Workspace</span>
-            {[
-              { label: 'Brands', to: `/workspaces/${activeWorkspaceId}/brands`, icon: Building2 },
-              { label: 'Settings', to: '/workspace-settings', icon: Settings },
-            ].map(({ label, to, icon: Icon }) => (
-              <Link
-                key={to}
-                to={to}
-                className={`sidebar-link${isActive(to) ? ' sidebar-link--active' : ''}`}
-              >
-                <Icon size={17} />
-                {label}
-              </Link>
-            ))}
           </>
         ) : (
           <Link to="/workspaces" className={`sidebar-link${isActive('/workspaces') ? ' sidebar-link--active' : ''}`}>
@@ -238,6 +225,17 @@ export function Sidebar() {
           </Link>
         )}
       </nav>
+
+      {activeWorkspaceId && (
+        <Link
+          to="/workspace-settings"
+          className={`sidebar-link${isActive('/workspace-settings') ? ' sidebar-link--active' : ''}`}
+          style={{ marginBottom: '1rem' }}
+        >
+          <Settings size={17} />
+          Workspace Settings
+        </Link>
+      )}
 
       <button className="sidebar-signout" onClick={handleSignOut}>
         <LogOut size={17} /> Sign Out
