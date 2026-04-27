@@ -180,7 +180,7 @@ export const downloadWorker = new Worker(
             fs.writeFileSync(tempProfilePath, buffer);
             await optimizeImage(tempProfilePath, optimizedProfilePath);
 
-            const storageKey = nauthenticity.profilePic(contextUsername, 'jpg');
+            const storageKey = nauthenticity.profilePic(username, 'jpg');
             const publicUrl = await storage.upload(storageKey, fs.createReadStream(optimizedProfilePath), {
               mimeType: 'image/jpeg',
             });
@@ -188,6 +188,11 @@ export const downloadWorker = new Worker(
             if (fs.existsSync(tempProfilePath)) fs.unlinkSync(tempProfilePath);
             if (fs.existsSync(optimizedProfilePath)) fs.unlinkSync(optimizedProfilePath);
 
+            // Update the SocialProfile with the new profile image URL
+            await prisma.socialProfile.updateMany({
+              where: { platform: 'instagram', username },
+              data: { profileImageUrl: publicUrl },
+            });
 
             const allAccountPosts = await prisma.post.findMany({ where: { username: contextUsername } });
             for (const p of allAccountPosts.filter((p) => p.collaborators !== null)) {
