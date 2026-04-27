@@ -18,13 +18,17 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       status?: string
       scheduledAt?: Date | null
       caption?: string
+      hashtags?: string[]
       payload?: any
+      creative?: any
     } = {}
     if (body.status !== undefined) updateData.status = body.status
     if (body.scheduledAt !== undefined)
       updateData.scheduledAt = body.scheduledAt ? new Date(body.scheduledAt) : null
     if (body.caption !== undefined) updateData.caption = body.caption
+    if (body.hashtags !== undefined) updateData.hashtags = body.hashtags
     if (body.payload !== undefined) updateData.payload = body.payload
+    if (body.creative !== undefined) updateData.creative = body.creative
 
     const composition = await prisma.composition.update({
       where: { id },

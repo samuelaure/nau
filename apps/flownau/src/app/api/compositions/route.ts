@@ -38,12 +38,9 @@ export async function GET(req: Request) {
       where: whereClause,
       orderBy: isCalendar ? { scheduledAt: 'asc' } : { createdAt: 'desc' },
       include: {
-        template: {
-          select: { name: true },
-        },
-        renderJob: {
-          select: { outputUrl: true, outputType: true, status: true },
-        },
+        template: { select: { id: true, name: true, sceneType: true } },
+        renderJob: { select: { outputUrl: true, outputType: true, status: true } },
+        idea: { select: { ideaText: true } },
       },
     })
 

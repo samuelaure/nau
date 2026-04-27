@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card } from '@/modules/shared/components/ui/Card'
 import { Button } from '@/modules/shared/components/ui/Button'
 import { toast } from 'sonner'
@@ -16,17 +17,9 @@ import {
   ImageIcon,
   Loader2,
   AlertCircle,
+  Layers,
+  ChevronRight,
 } from 'lucide-react'
-import dynamic from 'next/dynamic'
-import { Player } from '@remotion/player'
-
-const DynamicCompositionMock = dynamic(
-  () =>
-    import('@/modules/rendering/DynamicCompositionMock/DynamicCompositionMock').then(
-      (mod) => mod.DynamicCompositionMock,
-    ),
-  { ssr: false },
-)
 
 const FORMAT_ICON: Record<string, React.ElementType> = {
   reel: Film,
@@ -47,18 +40,38 @@ const FORMAT_LABEL: Record<string, string> = {
 }
 
 const STATUS_STYLE: Record<string, string> = {
-  DRAFT: 'bg-orange-900 text-orange-400',
-  APPROVED: 'bg-green-900 text-green-400',
-  RENDERING: 'bg-blue-900 text-blue-400',
-  RENDERED: 'bg-cyan-900 text-cyan-400',
-  SCHEDULED: 'bg-purple-900 text-purple-400',
-  PUBLISHING: 'bg-yellow-900 text-yellow-400',
+  DRAFT: 'bg-orange-900/60 text-orange-400',
+  APPROVED: 'bg-green-900/60 text-green-400',
+  RENDERING: 'bg-blue-900/60 text-blue-400',
+  RENDERED: 'bg-cyan-900/60 text-cyan-400',
+  SCHEDULED: 'bg-purple-900/60 text-purple-400',
+  PUBLISHING: 'bg-yellow-900/60 text-yellow-400',
   PUBLISHED: 'bg-gray-700 text-gray-400',
-  FAILED: 'bg-red-900 text-red-400',
+  FAILED: 'bg-red-900/60 text-red-400',
 }
 
-export default function AccountPool({ brandId }: { brandId: string }) {
-  const [compositions, setCompositions] = useState<any[]>([])
+interface Composition {
+  id: string
+  status: string
+  format: string
+  source: string
+  caption: string | null
+  hashtags: string[]
+  creative: any
+  createdAt: string
+  template: { id: string; name: string; sceneType: string | null } | null
+  idea: { ideaText: string } | null
+}
+
+export default function AccountPool({
+  brandId,
+  workspaceId,
+}: {
+  brandId: string
+  workspaceId: string
+}) {
+  const router = useRouter()
+  const [compositions, setCompositions] = useState<Composition[]>([])
   const [loading, setLoading] = useState(true)
   const [actioningId, setActioningId] = useState<string | null>(null)
   const uploadRefs = useRef<Record<string, HTMLInputElement | null>>({})
@@ -69,7 +82,7 @@ export default function AccountPool({ brandId }: { brandId: string }) {
       const data = await res.json()
       setCompositions(data.compositions || [])
     } catch {
-      toast.error('Failed to load compositions')
+      toast.error('Failed to load pool')
     } finally {
       setLoading(false)
     }
@@ -80,12 +93,12 @@ export default function AccountPool({ brandId }: { brandId: string }) {
   }, [brandId])
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this composition?')) return
+    if (!confirm('Delete this draft?')) return
     try {
       await fetch(`/api/compositions/${id}`, { method: 'DELETE' })
       setCompositions((prev) => prev.filter((c) => c.id !== id))
     } catch {
-      toast.error('Failed to delete composition')
+      toast.error('Failed to delete draft')
     }
   }
 
@@ -98,17 +111,17 @@ export default function AccountPool({ brandId }: { brandId: string }) {
         body: JSON.stringify({ status: 'APPROVED' }),
       })
       if (!res.ok) throw new Error()
-      toast.success('Composition approved for scheduling!')
+      toast.success('Approved for scheduling')
       fetchCompositions()
     } catch {
-      toast.error('Failed to approve composition')
+      toast.error('Failed to approve')
     } finally {
       setActioningId(null)
     }
   }
 
   const handleMarkAsPosted = async (id: string) => {
-    if (!confirm('Mark this head_talk as already posted externally?')) return
+    if (!confirm('Mark this as already posted externally?')) return
     setActioningId(id)
     try {
       const res = await fetch(`/api/compositions/${id}`, {
@@ -117,7 +130,7 @@ export default function AccountPool({ brandId }: { brandId: string }) {
         body: JSON.stringify({ status: 'PUBLISHED' }),
       })
       if (!res.ok) throw new Error()
-      toast.success('Marked as published.')
+      toast.success('Marked as published')
       fetchCompositions()
     } catch {
       toast.error('Failed to mark as posted')
@@ -134,13 +147,9 @@ export default function AccountPool({ brandId }: { brandId: string }) {
       formData.append('file', file)
       formData.append('compositionId', id)
       formData.append('brandId', brandId)
-
-      const res = await fetch('/api/compositions/upload-recording', {
-        method: 'POST',
-        body: formData,
-      })
+      const res = await fetch('/api/compositions/upload-recording', { method: 'POST', body: formData })
       if (!res.ok) throw new Error((await res.json()).error || 'Upload failed')
-      toast.success('Recording uploaded! Composition moved to Rendered.', { id: toastId })
+      toast.success('Recording uploaded', { id: toastId })
       fetchCompositions()
     } catch (err: any) {
       toast.error(err.message, { id: toastId })
@@ -151,49 +160,56 @@ export default function AccountPool({ brandId }: { brandId: string }) {
 
   const draftCount = compositions.filter((c) => c.status === 'DRAFT').length
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-5 h-5 animate-spin text-text-secondary" />
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h3 className="text-xl font-heading font-semibold">Content Pool</h3>
-          <p className="text-xs text-gray-500">
-            Drafts awaiting review, then scheduled for publishing.
-          </p>
-        </div>
+      <div>
+        <h3 className="text-xl font-heading font-semibold">Pool</h3>
+        <p className="text-xs text-text-secondary mt-0.5">
+          Drafts awaiting review before scheduling.
+        </p>
       </div>
 
       {draftCount > 0 && (
         <div className="flex items-center gap-3 bg-orange-500/10 border border-orange-500/20 rounded-lg px-4 py-3">
           <AlertCircle className="w-4 h-4 text-orange-400 shrink-0" />
           <p className="text-sm text-orange-300">
-            <strong>{draftCount}</strong> {draftCount === 1 ? 'item' : 'items'} waiting for review
-            in the pool.
+            <strong>{draftCount}</strong> {draftCount === 1 ? 'draft' : 'drafts'} waiting for review
           </p>
         </div>
       )}
 
-      {!loading && compositions.length === 0 && (
-        <div className="text-center py-10 text-text-secondary border border-dashed border-gray-800 rounded-lg">
-          No compositions in the pool yet. Approve ideas from the Backlog to generate them here.
+      {compositions.length === 0 && (
+        <div className="text-center py-16 text-text-secondary border border-dashed border-gray-800 rounded-lg">
+          <Layers className="w-8 h-8 mx-auto mb-3 opacity-30" />
+          <p className="text-sm">No drafts in the pool yet.</p>
+          <p className="text-xs mt-1 opacity-60">Approve ideas from Ideas to generate drafts here.</p>
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+      <div className="flex flex-col gap-3">
         {compositions.map((comp) => {
           const isDraft = comp.status === 'DRAFT'
           const isHeadTalk = comp.format === 'head_talk'
-          const isReplicate = comp.source === 'replicate'
-          const script = isHeadTalk ? (comp.payload as any)?.script : null
           const FormatIcon = FORMAT_ICON[comp.format] ?? Film
           const busy = actioningId === comp.id
+          const scenes: any[] = comp.creative?.scenes ?? []
+          const draftUrl = `/dashboard/workspace/${workspaceId}/draft/${comp.id}?brandId=${brandId}`
 
           return (
             <Card
               key={comp.id}
-              className={`bg-gray-900 border ${isDraft ? 'border-orange-900/40' : 'border-gray-800'} p-4 flex flex-col gap-4`}
+              className={`border ${isDraft ? 'border-orange-900/30' : 'border-gray-800'} p-4 hover:border-gray-600 transition-colors`}
             >
-              {/* Header */}
-              <div className="flex justify-between items-center">
+              {/* Top row: badges + date */}
+              <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <span
                     className={`text-[10px] font-bold tracking-widest px-2 py-0.5 rounded-full uppercase ${STATUS_STYLE[comp.status] ?? 'bg-gray-800 text-gray-400'}`}
@@ -204,70 +220,65 @@ export default function AccountPool({ brandId }: { brandId: string }) {
                     <FormatIcon size={9} />
                     {FORMAT_LABEL[comp.format] ?? comp.format}
                   </span>
-                  {isReplicate && (
-                    <span className="text-[10px] font-bold tracking-widest px-2 py-0.5 rounded-full uppercase bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                      Replicate
-                    </span>
-                  )}
                 </div>
                 <span className="text-[10px] text-gray-600">
                   {new Date(comp.createdAt).toLocaleDateString()}
                 </span>
               </div>
 
-              {/* Content preview */}
-              {isHeadTalk ? (
-                <div className="bg-gray-950 rounded-lg p-3 border border-gray-800 max-h-[200px] overflow-y-auto">
-                  <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-2">
-                    Script
-                  </p>
-                  <p className="text-sm text-gray-300 whitespace-pre-wrap leading-relaxed">
-                    {script}
-                  </p>
-                </div>
-              ) : (
-                <div className="w-full aspect-[9/16] bg-black rounded-lg overflow-hidden relative shadow-lg">
-                  <Player
-                    component={DynamicCompositionMock as any}
-                    inputProps={{ schema: comp.payload }}
-                    durationInFrames={Math.max(1, (comp.payload as any)?.durationInFrames || 150)}
-                    fps={Math.max(1, (comp.payload as any)?.fps || 30)}
-                    compositionWidth={Math.max(1, (comp.payload as any)?.width || 1080)}
-                    compositionHeight={Math.max(1, (comp.payload as any)?.height || 1920)}
-                    style={{ width: '100%', height: '100%' }}
-                    controls
-                    loop
-                  />
-                </div>
+              {/* Idea text */}
+              {comp.idea?.ideaText && (
+                <p className="text-sm text-white leading-snug mb-2 line-clamp-2">
+                  {comp.idea.ideaText}
+                </p>
               )}
 
+              {/* Meta row */}
+              <div className="flex items-center gap-3 text-[11px] text-gray-500 mb-3">
+                {comp.template?.name && (
+                  <span className="flex items-center gap-1">
+                    <Layers size={10} />
+                    {comp.template.name}
+                  </span>
+                )}
+                {scenes.length > 0 && (
+                  <span>{scenes.length} scene{scenes.length !== 1 ? 's' : ''}</span>
+                )}
+              </div>
+
               {/* Caption preview */}
-              {comp.caption && <p className="text-xs text-gray-500 line-clamp-2">{comp.caption}</p>}
+              {comp.caption && (
+                <p className="text-[11px] text-gray-500 line-clamp-2 mb-3 italic">
+                  {comp.caption}
+                </p>
+              )}
 
               {/* Actions */}
-              <div className="flex gap-2 flex-wrap">
+              <div className="flex gap-2 items-center" onClick={(e) => e.stopPropagation()}>
+                {/* Open detail */}
+                <button
+                  onClick={() => router.push(draftUrl)}
+                  className="flex-1 flex items-center justify-between px-3 py-2 rounded-lg border border-gray-700 hover:border-gray-500 hover:bg-white/5 text-sm text-gray-300 transition-colors"
+                >
+                  <span>Open draft</span>
+                  <ChevronRight size={14} />
+                </button>
+
                 {isDraft && !isHeadTalk && (
                   <Button
                     disabled={busy}
                     onClick={() => handleApprove(comp.id)}
-                    className="flex-1 bg-accent hover:bg-accent/80 flex items-center gap-2 justify-center"
+                    className="bg-accent hover:bg-accent/80 px-3 flex items-center gap-1.5 text-sm"
                   >
-                    {busy ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <CheckCircle2 className="w-4 h-4" />
-                    )}
+                    {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
                     Approve
                   </Button>
                 )}
 
                 {isHeadTalk && comp.status !== 'PUBLISHED' && (
                   <>
-                    {/* Upload recording → RENDERED */}
                     <input
-                      ref={(el) => {
-                        uploadRefs.current[comp.id] = el
-                      }}
+                      ref={(el) => { uploadRefs.current[comp.id] = el }}
                       type="file"
                       accept="video/*"
                       className="hidden"
@@ -280,24 +291,19 @@ export default function AccountPool({ brandId }: { brandId: string }) {
                     <Button
                       disabled={busy}
                       onClick={() => uploadRefs.current[comp.id]?.click()}
-                      className="flex-1 bg-blue-700 hover:bg-blue-600 flex items-center gap-2 justify-center text-xs"
+                      className="bg-blue-700 hover:bg-blue-600 px-3 flex items-center gap-1.5 text-xs"
                     >
-                      {busy ? (
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                      ) : (
-                        <Upload className="w-3 h-3" />
-                      )}
-                      Upload Recording
+                      {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+                      Upload
                     </Button>
-                    {/* Mark as posted directly */}
                     <Button
                       disabled={busy}
                       variant="outline"
                       onClick={() => handleMarkAsPosted(comp.id)}
-                      className="flex-1 border-gray-700 text-gray-400 hover:text-white flex items-center gap-2 justify-center text-xs"
+                      className="border-gray-700 px-3 flex items-center gap-1.5 text-xs"
                     >
                       <Share2 className="w-3 h-3" />
-                      Mark as Posted
+                      Posted
                     </Button>
                   </>
                 )}
