@@ -1,0 +1,68 @@
+name: CI — init
+
+# Pre-deployment initialization workflow. Creates the nau-network Docker network,
+# sets up server directory structure, and pulls required base images.
+# Runs only when gateway config or CI workflows change, or on manual trigger.
+# All steps are idempotent — safe to run multiple times.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docker-compose.yml'
+      - '.github/workflows/ci-init.yml'
+      - '.github/workflows/ci-*.yml'
+  workflow_dispatch:
+    inputs:
+      verbose:
+        description: 'Enable verbose output'
+        required: false
+        default: 'false'
+
+jobs:
+  init:
+    name: Initialize deployment environment
+    runs-on: ubuntu-latest
+    permissions:
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize server and network
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_SSH_HOST }}
+          username: root
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            echo "✓ Initializing production environment"
+
+            # Create nau-network if it doesn't exist (idempotent)
+            echo "  → Creating Docker network nau-network"
+            docker network create nau-network 2>/dev/null || echo "    (network already exists)"
+
+            # Create app directories (idempotent, mkdir -p is safe)
+            echo "  → Creating directory structure"
+            mkdir -p ~/apps/{api,flownau,accounts,app,nauthenticity,zazu-bot,zazu-dashboard,whatsnau}
+            echo "    ✓ ~/apps/api"
+            echo "    ✓ ~/apps/flownau"
+            echo "    ✓ ~/apps/accounts"
+            echo "    ✓ ~/apps/app"
+            echo "    ✓ ~/apps/nauthenticity"
+            echo "    ✓ ~/apps/zazu-bot"
+            echo "    ✓ ~/apps/zazu-dashboard"
+            echo "    ✓ ~/apps/whatsnau"
+
+            # Pull pgvector image (required for nauthenticity)
+            echo "  → Pulling pgvector base image"
+            docker pull pgvector/pgvector:pg16 2>&1 | tail -1 || echo "    (image already cached)"
+
+            # Validate network creation
+            echo "  → Validating network"
+            if docker network ls | grep -q nau-network; then
+              echo "    ✓ nau-network is ready"
+            else
+              echo "    ✗ FAILED to create nau-network"
+              exit 1
+            fi
+
+            echo "✓ Environment initialized successfully"

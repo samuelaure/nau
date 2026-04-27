@@ -10,9 +10,28 @@ on:
       - '.github/workflows/ci-gateway.yml'
 
 jobs:
+  init:
+    name: Initialize deployment environment
+    runs-on: ubuntu-latest
+    permissions:
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialize server and network
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_SSH_HOST }}
+          username: root
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            docker network create nau-network 2>/dev/null || true
+            mkdir -p ~/apps/{api,flownau,accounts,app,nauthenticity,zazu-bot,zazu-dashboard,whatsnau}
+            docker pull pgvector/pgvector:pg16 2>/dev/null || true
+
   deploy:
     name: Deploy gateway
     runs-on: ubuntu-latest
+    needs: [init]
     permissions:
       packages: read
     steps:
