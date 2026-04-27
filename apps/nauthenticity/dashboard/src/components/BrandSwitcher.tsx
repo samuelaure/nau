@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ChevronDown, Check, Globe } from 'lucide-react';
+import { ChevronDown, Globe } from 'lucide-react';
 
 type Brand = { id: string; name: string };
+type Workspace = { id: string; name: string };
 
 export function BrandSwitcher() {
   const navigate = useNavigate();
@@ -19,6 +20,14 @@ export function BrandSwitcher() {
   const activeBrandId = brandMatch ? brandMatch[2] : null;
 
   useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, []);
+
+  useEffect(() => {
     if (activeWorkspaceId) {
       fetch(`/api/v1/workspaces/${activeWorkspaceId}/brands`, { credentials: 'include' })
         .then((r) => (r.ok ? r.json() : []))
@@ -26,14 +35,6 @@ export function BrandSwitcher() {
         .catch(() => setBrands([]));
     }
   }, [activeWorkspaceId]);
-
-  useEffect(() => {
-    function onClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
-  }, []);
 
   const activeBrand = brands.find((b) => b.id === activeBrandId);
   const label = activeBrand ? activeBrand.name : 'All Brands';
@@ -50,7 +51,7 @@ export function BrandSwitcher() {
   if (!activeWorkspaceId) return null;
 
   return (
-    <div ref={ref} style={{ marginBottom: '1rem' }}>
+    <div ref={ref} style={{ marginBottom: '1rem', position: 'relative' }}>
       <button
         onClick={() => setOpen((o) => !o)}
         style={{
@@ -58,7 +59,7 @@ export function BrandSwitcher() {
           alignItems: 'center',
           gap: '0.5rem',
           width: '100%',
-          padding: '0.75rem 0.75rem',
+          padding: '0.75rem',
           borderRadius: '6px',
           background: 'rgba(255, 255, 255, 0.05)',
           border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -90,7 +91,7 @@ export function BrandSwitcher() {
             left: 0,
             right: 0,
             marginTop: '4px',
-            zIndex: 100,
+            zIndex: 50,
             background: 'var(--card-bg)',
             border: '1px solid rgba(255, 255, 255, 0.1)',
             borderRadius: '8px',
@@ -137,7 +138,6 @@ export function BrandSwitcher() {
                 cursor: 'pointer',
                 fontWeight: activeBrandId === brand.id ? 600 : 400,
                 transition: 'background 0.2s',
-                position: 'relative',
               }}
               onMouseEnter={(e) => {
                 (e.currentTarget as HTMLElement).style.background = 'rgba(255, 255, 255, 0.05)';
@@ -147,18 +147,6 @@ export function BrandSwitcher() {
               }}
             >
               {brand.name}
-              {activeBrandId === brand.id && (
-                <Check
-                  size={13}
-                  style={{
-                    position: 'absolute',
-                    right: '1rem',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: '#58a6ff',
-                  }}
-                />
-              )}
             </button>
           ))}
 
