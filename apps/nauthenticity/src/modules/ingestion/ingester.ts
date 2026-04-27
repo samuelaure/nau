@@ -11,12 +11,22 @@ export const ingestProfile = async (
 ) => {
   logger.info(`[Ingester] Starting ingestion for ${username}`);
 
-  // 0. Ensure SocialProfile exists (Identity) - Placeholder
-  let account = await prisma.socialProfile.upsert({
-    where: { platform_username: { platform: 'instagram', username } },
-    create: { platform: 'instagram', username, lastScrapedAt: new Date() },
-    update: {},
+  // 0. Ensure SocialProfile exists (Identity)
+  let account = await prisma.socialProfile.findFirst({
+    where: { platform: 'instagram', username },
   });
+
+  if (!account) {
+    account = await prisma.socialProfile.create({
+      data: { platform: 'instagram', username, lastScrapedAt: new Date() },
+    });
+  } else {
+    // Update lastScrapedAt
+    account = await prisma.socialProfile.update({
+      where: { id: account.id },
+      data: { lastScrapedAt: new Date() },
+    });
+  }
 
   let oldestPostDate: string | undefined;
   if (options.updateSync) {

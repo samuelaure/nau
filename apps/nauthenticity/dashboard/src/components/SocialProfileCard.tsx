@@ -41,6 +41,7 @@ export const SocialProfileCard = ({
 
   return (
     <div
+      onClick={() => onSelect(profile.username)}
       style={{
         background: 'var(--card-bg)',
         border: '1px solid var(--border)',
@@ -160,7 +161,6 @@ export const SocialProfileCard = ({
       {/* View Content Button and Delete */}
       <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
         <button
-          onClick={() => onSelect(profile.username)}
           style={{
             flex: 1,
             display: 'flex',
@@ -183,6 +183,7 @@ export const SocialProfileCard = ({
           onMouseLeave={(e) => {
             (e.currentTarget as HTMLElement).style.background = '#58a6ff';
           }}
+          onClick={(e) => e.stopPropagation()}
         >
           View Content
         </button>
