@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
-  LayoutDashboard,
   Video,
   Settings,
   LogOut,
@@ -258,33 +257,41 @@ function WorkspaceSelector() {
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
-const navItems = [
-  { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Settings', href: '/dashboard/settings', icon: Settings },
-]
-
 export default function Sidebar() {
   const router = useRouter()
   const pathname = usePathname()
 
-  // If inside a workspace, Overview should point to that workspace
   const workspaceMatch = pathname.match(/^\/dashboard\/workspace\/([^/]+)/)
   const workspaceId = workspaceMatch?.[1] ?? null
 
-  const resolvedItems = navItems.map((item) => {
-    if (item.name === 'Overview' && workspaceId) {
-      return { ...item, href: `/dashboard/workspace/${workspaceId}` }
-    }
-    if (item.name === 'Settings' && workspaceId) {
-      return { ...item, href: `/dashboard/workspace/${workspaceId}/settings` }
-    }
-    return item
-  })
+  const settingsHref = workspaceId
+    ? `/dashboard/workspace/${workspaceId}/settings`
+    : '/dashboard/settings'
+
+  const isSettingsActive = pathname === settingsHref
 
   const handleSignOut = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
     router.push('/login')
   }
+
+  const bottomLinkStyle = (active: boolean) => ({
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '10px 12px',
+    borderRadius: '8px',
+    textDecoration: 'none',
+    color: active ? 'white' : 'var(--text-secondary)',
+    backgroundColor: active ? 'rgba(124, 58, 237, 0.1)' : 'transparent',
+    transition: 'all 0.2s',
+    fontWeight: active ? '600' : '400',
+    fontSize: '14px',
+    border: 'none',
+    cursor: 'pointer',
+    width: '100%',
+    textAlign: 'left' as const,
+  })
 
   return (
     <div
@@ -319,63 +326,38 @@ export default function Sidebar() {
       {/* Workspace selector */}
       <WorkspaceSelector />
 
-      {/* Brand filter (only visible inside a workspace) */}
+      {/* Brand switcher + brand section nav */}
       <Suspense fallback={null}>
         <BrandSwitcher />
       </Suspense>
 
-      {/* Nav */}
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
-        {resolvedItems.map((item) => {
-          const Icon = item.icon
-          const isActive =
-            item.name === 'Overview'
-              ? pathname === item.href || pathname.startsWith(item.href + '/')
-              : pathname === item.href
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                padding: '10px 12px',
-                borderRadius: '8px',
-                textDecoration: 'none',
-                color: isActive ? 'white' : 'var(--text-secondary)',
-                backgroundColor: isActive ? 'rgba(124, 58, 237, 0.1)' : 'transparent',
-                transition: 'all 0.2s',
-                fontWeight: isActive ? '600' : '400',
-                fontSize: '14px',
-              }}
-              onMouseEnter={(e) => {
-                if (!isActive) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) e.currentTarget.style.backgroundColor = 'transparent'
-              }}
-            >
-              <Icon size={18} color={isActive ? 'white' : 'currentColor'} />
-              {item.name}
-            </Link>
-          )
-        })}
-      </nav>
+      {/* Spacer */}
+      <div style={{ flex: 1 }} />
 
+      {/* Workspace Settings */}
+      <Link
+        href={settingsHref}
+        style={bottomLinkStyle(isSettingsActive)}
+        onMouseEnter={(e) => {
+          if (!isSettingsActive) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'
+        }}
+        onMouseLeave={(e) => {
+          if (!isSettingsActive) e.currentTarget.style.backgroundColor = 'transparent'
+        }}
+      >
+        <Settings size={18} color={isSettingsActive ? 'white' : 'currentColor'} />
+        Workspace Settings
+      </Link>
+
+      {/* Sign Out */}
       <button
         onClick={handleSignOut}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          padding: '10px 12px',
-          borderRadius: '8px',
-          color: 'var(--text-secondary)',
-          background: 'transparent',
-          border: 'none',
-          cursor: 'pointer',
-          fontSize: '14px',
+        style={bottomLinkStyle(false)}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'transparent'
         }}
       >
         <LogOut size={18} />

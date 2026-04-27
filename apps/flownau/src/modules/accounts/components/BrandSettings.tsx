@@ -8,13 +8,21 @@ import { Textarea } from '@/modules/shared/components/ui/Textarea'
 import AccountPersonas from './AccountPersonas'
 import AccountContentPrinciples from './AccountContentPrinciples'
 import AccountPlanners from './AccountPlanners'
+import AccountIdeasFrameworks from './AccountIdeasFrameworks'
 import { useState } from 'react'
 import { cn } from '@/modules/shared/utils'
 
-type BrandSettingsTab = 'settings' | 'personas' | 'principles' | 'planner'
+type BrandSettingsTab = 'settings' | 'personas' | 'strategy' | 'principles' | 'planner'
+
+const LANGUAGES = [
+  { value: 'Spanish', label: 'Spanish' },
+  { value: 'English', label: 'English' },
+  { value: 'Italian', label: 'Italian' },
+] as const
 
 type Brand = {
   id: string
+  language: string
   directorPrompt: string | null
   creationPrompt: string | null
   shortCode: string | null
@@ -27,6 +35,7 @@ export default function BrandSettings({ brand }: { brand: Brand }) {
   const tabs: { id: BrandSettingsTab; label: string }[] = [
     { id: 'settings', label: 'Settings' },
     { id: 'personas', label: 'Personas' },
+    { id: 'strategy', label: 'Strategy' },
     { id: 'principles', label: 'Principles' },
     { id: 'planner', label: 'Planner' },
   ]
@@ -61,6 +70,26 @@ export default function BrandSettings({ brand }: { brand: Brand }) {
           <h3 className="text-xl font-heading font-semibold mb-6">Brand Pipeline Config</h3>
           <form action={handleUpdate} className="flex flex-col gap-6">
             <div className="w-full">
+              <label className="form-label mb-1 block">
+                Content Language
+                <span className="text-xs font-normal ml-2 opacity-70">
+                  All AI-generated content will be written in this language.
+                </span>
+              </label>
+              <select
+                name="language"
+                defaultValue={brand.language}
+                className="bg-gray-950 border border-border text-white rounded p-2.5 text-sm w-48"
+              >
+                {LANGUAGES.map((l) => (
+                  <option key={l.value} value={l.value}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="w-full border-t border-border pt-6">
               <label className="form-label mb-1 block">
                 Director Prompt
                 <span className="text-xs font-normal ml-2 opacity-70">
@@ -102,6 +131,7 @@ export default function BrandSettings({ brand }: { brand: Brand }) {
       )}
 
       {tab === 'personas' && <AccountPersonas brandId={brand.id} />}
+      {tab === 'strategy' && <AccountIdeasFrameworks brandId={brand.id} />}
       {tab === 'principles' && <AccountContentPrinciples brandId={brand.id} />}
       {tab === 'planner' && <AccountPlanners brandId={brand.id} />}
     </div>

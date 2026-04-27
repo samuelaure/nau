@@ -124,15 +124,8 @@ export default function AccountIdeas({ brandId }: { brandId: string }) {
   const [templates, setTemplates] = useState<any[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('')
 
-  // Framework Management
+  // Framework dropdown (for brainstorm selection)
   const [frameworks, setFrameworks] = useState<any[]>([])
-  const [editingFramework, setEditingFramework] = useState<any | null>(null)
-  const [showSettings, setShowSettings] = useState(false)
-  const [frameworkForm, setFrameworkForm] = useState({
-    name: '',
-    systemPrompt: '',
-    isDefault: true,
-  })
 
   // Persona & Framework selection
   const [personas, setPersonas] = useState<any[]>([])
@@ -164,11 +157,7 @@ export default function AccountIdeas({ brandId }: { brandId: string }) {
       const data = await res.json()
       setFrameworks(data.frameworks || [])
       const def = data.frameworks?.find((f: any) => f.isDefault)
-      if (def) {
-        setFrameworkForm({ name: def.name, systemPrompt: def.systemPrompt, isDefault: true })
-        setEditingFramework(def)
-        setSelectedFrameworkId(def.id)
-      }
+      if (def) setSelectedFrameworkId(def.id)
     } catch {
       toast.error('Failed to load frameworks')
     }
@@ -183,29 +172,6 @@ export default function AccountIdeas({ brandId }: { brandId: string }) {
       if (def) setSelectedPersonaId(def.id)
     } catch {
       toast.error('Failed to load personas')
-    }
-  }
-
-  const handleSaveFramework = async () => {
-    try {
-      const method = editingFramework ? 'PUT' : 'POST'
-      const url = editingFramework
-        ? `/api/ideas-frameworks/${editingFramework.id}`
-        : '/api/ideas-frameworks'
-
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brandId, ...frameworkForm }),
-      })
-      if (!res.ok) throw new Error()
-      toast.success(
-        editingFramework ? 'Strategy framework updated' : 'New strategy framework created',
-      )
-      fetchFrameworks()
-      setShowSettings(false)
-    } catch {
-      toast.error('Failed to save strategy framework')
     }
   }
 
@@ -265,6 +231,11 @@ export default function AccountIdeas({ brandId }: { brandId: string }) {
           source: brainstormSource,
         }),
       })
+      if (res.status === 401) {
+        toast.dismiss(toastId)
+        window.location.href = '/login'
+        return
+      }
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed')
       toast.success(`Generated ${data.ideas?.length ?? 0} new ideas!`, { id: toastId })
@@ -466,10 +437,6 @@ export default function AccountIdeas({ brandId }: { brandId: string }) {
             ))}
           </select>
 
-          <Button variant="outline" size="sm" onClick={() => setShowSettings(!showSettings)}>
-            Settings
-          </Button>
-
           {usedCount > 0 && (
             <Button
               variant="outline"
@@ -507,7 +474,7 @@ export default function AccountIdeas({ brandId }: { brandId: string }) {
             size="sm"
             className="flex gap-2 bg-gray-800 text-white hover:bg-gray-700"
           >
-            + Manual
+            + Add Idea
           </Button>
 
           <Button
@@ -525,76 +492,6 @@ export default function AccountIdeas({ brandId }: { brandId: string }) {
           </Button>
         </div>
       </div>
-
-      {showSettings && (
-        <Card className="p-6 bg-gray-950 border-gray-800 mb-6 flex flex-col gap-4">
-          <div className="flex justify-between items-start">
-            <div>
-              <h4 className="text-sm font-bold text-gray-400 mb-1 uppercase tracking-tight">
-                Strategist Prompt Management
-              </h4>
-              <p className="text-xs text-gray-500 mb-4">
-                Multiple strategies can be saved. Select one from the dropdown above to use it
-                during brainstorming.
-              </p>
-            </div>
-            {editingFramework && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setEditingFramework(null)
-                  setFrameworkForm({ name: '', systemPrompt: '', isDefault: false })
-                }}
-                className="text-xs text-blue-400"
-              >
-                + Add New
-              </Button>
-            )}
-          </div>
-
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <label className="text-xs text-gray-400">Framework Name</label>
-              <input
-                className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-sm"
-                value={frameworkForm.name}
-                onChange={(e) => setFrameworkForm({ ...frameworkForm, name: e.target.value })}
-                placeholder="e.g. Viral Educational Strategy"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs text-gray-400 font-bold">
-                Ideation Instructions (Ideas Prompt)
-              </label>
-              <textarea
-                className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-sm min-h-[120px]"
-                value={frameworkForm.systemPrompt}
-                onChange={(e) =>
-                  setFrameworkForm({ ...frameworkForm, systemPrompt: e.target.value })
-                }
-                placeholder="Instruct the AI how to think about new ideas..."
-              />
-            </div>
-            <div className="flex justify-between items-center">
-              <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-400">
-                <input
-                  type="checkbox"
-                  checked={frameworkForm.isDefault}
-                  onChange={(e) =>
-                    setFrameworkForm({ ...frameworkForm, isDefault: e.target.checked })
-                  }
-                  className="rounded bg-gray-800 border-gray-700"
-                />
-                Set as Default Strategy
-              </label>
-              <Button onClick={handleSaveFramework} size="sm">
-                {editingFramework ? 'Update Strategy' : 'Create Strategy'}
-              </Button>
-            </div>
-          </div>
-        </Card>
-      )}
 
       {!loading && ideas.length === 0 && (
         <div className="text-center py-10 text-text-secondary border border-dashed border-gray-800 rounded-lg">
@@ -674,7 +571,7 @@ export default function AccountIdeas({ brandId }: { brandId: string }) {
                     onClick={() => setComposingIdea(idea)}
                   >
                     <Wand2 className="w-3 h-3 mr-1" />
-                    {isUsed ? 'Redo Composition' : 'Compose'}
+                    {isUsed ? 'Redo Draft' : 'Draft'}
                   </Button>
                 )}
               </div>
@@ -798,7 +695,7 @@ export default function AccountIdeas({ brandId }: { brandId: string }) {
         <Modal isOpen={true} onClose={() => !composing && setComposingIdea(null)}>
           <div className="space-y-4">
             <div className="flex items-center gap-2 mb-1">
-              <h2 className="text-xl font-heading font-semibold">Compose</h2>
+              <h2 className="text-xl font-heading font-semibold">Draft</h2>
               {composingIdea.source && <SourceBadge source={composingIdea.source} />}
               {composingIdea.format && <FormatBadge format={composingIdea.format} />}
             </div>
@@ -835,7 +732,7 @@ export default function AccountIdeas({ brandId }: { brandId: string }) {
                   </>
                 ) : (
                   <>
-                    <Wand2 className="w-4 h-4 mr-2" /> Start Composition
+                    <Wand2 className="w-4 h-4 mr-2" /> Generate Draft
                   </>
                 )}
               </Button>

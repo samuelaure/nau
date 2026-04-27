@@ -6,6 +6,15 @@ import { revalidatePath } from 'next/cache'
 import { ApifyService } from '@/modules/accounts/apify'
 import { downloadAndUploadProfileImage } from '@/modules/accounts/profile-image-service'
 import { checkAuth, getUserPrimaryWorkspace } from '@/modules/shared/actions'
+import {
+  DEFAULT_MODEL,
+  DEFAULT_PERSONA_NAME,
+  DEFAULT_PERSONA_PROMPT,
+  DEFAULT_FRAMEWORK_NAME,
+  DEFAULT_FRAMEWORK_PROMPT,
+  DEFAULT_PRINCIPLES_NAME,
+  DEFAULT_PRINCIPLES_PROMPT,
+} from '@/modules/shared/pipeline-defaults'
 import { z } from 'zod'
 import { COOKIE_ACCESS_TOKEN } from '@nau/auth'
 
@@ -19,6 +28,7 @@ const BrandUpdateSchema = z.object({
   directorPrompt: z.string().optional(),
   creationPrompt: z.string().optional(),
   shortCode: z.string().optional(),
+  language: z.string().optional(),
 })
 
 const SocialProfileUpdateSchema = z.object({
@@ -91,6 +101,43 @@ export async function addBrand(formData: FormData): Promise<{ id: string; worksp
     update: { name, workspaceId },
   })
 
+  // Seed starter pipeline records so the brand works out of the box.
+  // These are real, fully editable records — not system defaults.
+  // The user can modify or delete them at any time.
+  await Promise.all([
+    prisma.brandPersona.create({
+      data: {
+        brandId: nauBrand.id,
+        workspaceId,
+        name: DEFAULT_PERSONA_NAME,
+        systemPrompt: DEFAULT_PERSONA_PROMPT,
+        modelSelection: DEFAULT_MODEL,
+        isDefault: true,
+        manualCount: 5,
+        automaticCount: 5,
+        capturedCount: 3,
+      },
+    }),
+    prisma.ideasFramework.create({
+      data: {
+        brandId: nauBrand.id,
+        workspaceId,
+        name: DEFAULT_FRAMEWORK_NAME,
+        systemPrompt: DEFAULT_FRAMEWORK_PROMPT,
+        isDefault: true,
+      },
+    }),
+    prisma.contentCreationPrinciples.create({
+      data: {
+        brandId: nauBrand.id,
+        workspaceId,
+        name: DEFAULT_PRINCIPLES_NAME,
+        systemPrompt: DEFAULT_PRINCIPLES_PROMPT,
+        isDefault: true,
+      },
+    }),
+  ])
+
   revalidatePath('/dashboard')
   return { id: nauBrand.id, workspaceId }
 }
@@ -99,15 +146,16 @@ export async function addBrand(formData: FormData): Promise<{ id: string; worksp
 export async function updateBrand(brandId: string, formData: FormData) {
   await checkAuth()
   const parsedId = IdSchema.parse(brandId)
-  const { directorPrompt, creationPrompt, shortCode } = BrandUpdateSchema.parse({
+  const { directorPrompt, creationPrompt, shortCode, language } = BrandUpdateSchema.parse({
     directorPrompt: formData.get('directorPrompt'),
     creationPrompt: formData.get('creationPrompt'),
     shortCode: formData.get('shortCode'),
+    language: formData.get('language'),
   })
 
   await prisma.brand.update({
     where: { id: parsedId },
-    data: { directorPrompt, creationPrompt, shortCode },
+    data: { directorPrompt, creationPrompt, shortCode, language },
   })
 
   revalidatePath('/dashboard')
@@ -321,6 +369,41 @@ export async function confirmUpload(
   })
 
   revalidatePath('/dashboard')
+}
+
+export async function installDefaultTemplates(brandId: string): Promise<{ installed: number }> {
+  await checkAuth()
+  const { PLATFORM_TEMPLATES } = await import('@/../prisma/seeds/templates')
+
+  let installed = 0
+  for (const template of PLATFORM_TEMPLATES) {
+    const existing = await prisma.template.findFirst({ where: { brandId, name: template.name } })
+    if (existing) continue
+
+    const created = await prisma.template.create({
+      data: {
+        brandId,
+        name: template.name,
+        remotionId: template.remotionId,
+        sceneType: template.sceneType,
+        scope: template.scope,
+        systemPrompt: template.systemPrompt,
+        contentSchema: template.contentSchema,
+        useBrandAssets: true,
+      },
+    })
+
+    await prisma.brandTemplateConfig.upsert({
+      where: { brandId_templateId: { brandId, templateId: created.id } },
+      create: { brandId, templateId: created.id, enabled: true },
+      update: { enabled: true },
+    })
+
+    installed++
+  }
+
+  revalidatePath('/dashboard')
+  return { installed }
 }
 
 async function getNextSystemFilename(

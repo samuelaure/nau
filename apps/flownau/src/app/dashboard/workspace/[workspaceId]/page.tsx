@@ -1,5 +1,5 @@
 import { prisma } from '@/modules/shared/prisma'
-import { Tag } from 'lucide-react'
+import { Tag, Settings } from 'lucide-react'
 import { addBrand } from '@/modules/accounts/actions'
 import Link from 'next/link'
 import { Card } from '@/modules/shared/components/ui/Card'
@@ -9,6 +9,7 @@ import { cn } from '@/modules/shared/utils'
 import AccountCalendar from '@/modules/accounts/components/AccountCalendar'
 import AccountIdeas from '@/modules/accounts/components/AccountIdeas'
 import AccountPool from '@/modules/accounts/components/AccountPool'
+import AccountCompositions from '@/modules/accounts/components/AccountCompositions'
 import AccountTemplates from '@/modules/accounts/components/AccountTemplates'
 import BrandProfiles from '@/modules/accounts/components/BrandProfiles'
 import BrandSettings from '@/modules/accounts/components/BrandSettings'
@@ -22,8 +23,9 @@ type NauBrand = { id: string; name: string; logoUrl?: string | null }
 const TABS = [
   { id: 'calendar', label: 'Calendar' },
   { id: 'ideas', label: 'Ideas' },
-  { id: 'pool', label: 'Pool' },
   { id: 'templates', label: 'Templates' },
+  { id: 'pool', label: 'Pool' },
+  { id: 'compositions', label: 'Compositions' },
   { id: 'profiles', label: 'Profiles' },
   { id: 'assets', label: 'Assets' },
   { id: 'settings', label: 'Settings' },
@@ -31,16 +33,18 @@ const TABS = [
 
 type Tab = (typeof TABS)[number]['id']
 
+
 export default async function WorkspaceOverviewPage({
   params,
   searchParams,
 }: {
   params: Promise<{ workspaceId: string }>
-  searchParams: Promise<{ brandId?: string; tab?: string }>
+  searchParams: Promise<{ brandId?: string; tab?: string; returnTab?: string }>
 }) {
   const { workspaceId } = await params
-  const { brandId, tab: tabParam } = await searchParams
+  const { brandId, tab: tabParam, returnTab } = await searchParams
   const activeTab: Tab = (TABS.find((t) => t.id === tabParam)?.id ?? 'calendar') as Tab
+  const safeReturnTab = (TABS.find((t) => t.id === returnTab && t.id !== 'settings')?.id ?? 'calendar') as Tab
 
   const nauApiUrl = process.env.NAU_API_URL || 'http://9nau-api:3000'
   const serviceToken = await signServiceToken({
@@ -97,45 +101,40 @@ export default async function WorkspaceOverviewPage({
 
     return (
       <div className="animate-fade-in">
-        {/* Breadcrumb + header */}
-        <header className="mb-8">
-          <p className="text-text-secondary text-sm mb-1">
+        {/* Breadcrumb + Brand Settings button */}
+        <header className="mb-8 flex items-center justify-between gap-4">
+          <p className="text-text-secondary text-sm">
             <Link href={`/dashboard/workspace/${workspaceId}`} className="hover:text-white transition-colors">
               {workspace.name}
             </Link>
             {' / '}
             <span className="text-white">{nauBrand.name}</span>
           </p>
-          <h1 className="text-3xl font-heading font-semibold">{nauBrand.name}</h1>
+          <Link
+            href={
+              activeTab === 'settings'
+                ? `/dashboard/workspace/${workspaceId}?brandId=${brandId}&tab=${safeReturnTab}`
+                : `/dashboard/workspace/${workspaceId}?brandId=${brandId}&tab=settings&returnTab=${activeTab}`
+            }
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors whitespace-nowrap',
+              activeTab === 'settings'
+                ? 'bg-accent/10 text-accent font-semibold'
+                : 'text-text-secondary hover:text-white hover:bg-white/5',
+            )}
+          >
+            <Settings size={14} />
+            Brand Settings
+          </Link>
         </header>
-
-        {/* Tabs */}
-        <div className="flex border-b border-white/5 mb-8 overflow-x-auto no-scrollbar">
-          {TABS.map((t) => (
-            <Link
-              key={t.id}
-              href={`/dashboard/workspace/${workspaceId}?brandId=${brandId}&tab=${t.id}`}
-              className={cn(
-                'px-5 py-3 -mb-px flex items-center gap-2 border-b-2 text-sm transition-all whitespace-nowrap',
-                activeTab === t.id
-                  ? 'text-accent border-accent font-semibold'
-                  : 'text-text-secondary border-transparent hover:text-white',
-              )}
-            >
-              {t.label}
-              {t.id === 'profiles' && socialProfiles.length > 0 && (
-                <span className="text-xs opacity-50">({socialProfiles.length})</span>
-              )}
-            </Link>
-          ))}
-        </div>
 
         {/* Tab content */}
         <div className="min-h-[400px]">
           {activeTab === 'calendar' && <AccountCalendar brandId={brandId} />}
           {activeTab === 'ideas' && <AccountIdeas brandId={brandId} />}
-          {activeTab === 'pool' && <AccountPool brandId={brandId} />}
-          {activeTab === 'templates' && <AccountTemplates brandId={brandId} />}
+          {activeTab === 'pool' && <AccountPool brandId={brandId} workspaceId={workspaceId} />}
+          {activeTab === 'compositions' && <AccountCompositions brandId={brandId} />}
+          {activeTab === 'templates' && <AccountTemplates brandId={brandId} workspaceId={workspaceId} />}
           {activeTab === 'profiles' && (
             <BrandProfiles
               brandId={brandId}
@@ -158,6 +157,7 @@ export default async function WorkspaceOverviewPage({
             <BrandSettings
               brand={{
                 id: localBrand.id,
+                language: localBrand.language,
                 directorPrompt: localBrand.directorPrompt,
                 creationPrompt: localBrand.creationPrompt,
                 shortCode: localBrand.shortCode,
