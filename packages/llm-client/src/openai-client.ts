@@ -1,5 +1,5 @@
 import OpenAI from 'openai'
-import { zodResponseFormat } from 'openai/helpers/zod'
+import { z } from 'zod'
 import type {
   LLMClient,
   ChatCompletionOptions,
@@ -12,6 +12,39 @@ import type {
   TranscriptionResult,
   LLMUsage,
 } from './types'
+
+// Converts a Zod v4 schema to a JSON Schema compatible with OpenAI strict structured output.
+// OpenAI strict mode requires: additionalProperties:false on every object and all properties required.
+function toOpenAIStrictSchema(schema: z.ZodType): Record<string, unknown> {
+  const base = z.toJSONSchema(schema) as Record<string, unknown>
+  return enforceStrict(base)
+}
+
+function enforceStrict(node: Record<string, unknown>): Record<string, unknown> {
+  if (node.type === 'object') {
+    const props = (node.properties ?? {}) as Record<string, Record<string, unknown>>
+    return {
+      ...node,
+      additionalProperties: false,
+      required: Object.keys(props),
+      properties: Object.fromEntries(
+        Object.entries(props).map(([k, v]) => [k, enforceStrict(v)]),
+      ),
+    }
+  }
+  if (node.type === 'array' && node.items) {
+    return { ...node, items: enforceStrict(node.items as Record<string, unknown>) }
+  }
+  for (const key of ['anyOf', 'oneOf', 'allOf'] as const) {
+    if (Array.isArray(node[key])) {
+      return {
+        ...node,
+        [key]: (node[key] as Record<string, unknown>[]).map(enforceStrict),
+      }
+    }
+  }
+  return node
+}
 
 function makeUsage(
   model: string,
@@ -55,20 +88,33 @@ export class OpenAIClient implements LLMClient {
   }
 
   async parseCompletion<T>(options: ParsedCompletionOptions<T>): Promise<ParsedCompletionResult<T>> {
+    const strictSchema = toOpenAIStrictSchema(options.schema)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const completion: any = await (this.client.beta as any).chat.completions.parse(
+    const completion: any = await this.client.chat.completions.create(
       {
         model: options.model,
         messages: options.messages,
         temperature: options.temperature,
-        response_format: zodResponseFormat(options.schema, options.schemaName),
+        response_format: {
+          type: 'json_schema',
+          json_schema: {
+            name: options.schemaName,
+            strict: true,
+            schema: strictSchema,
+          },
+        },
       },
       options.timeoutMs ? { timeout: options.timeoutMs } : undefined,
     )
 
-    const parsed: unknown = completion.choices[0]?.message?.parsed
-    if (parsed === null || parsed === undefined) {
-      throw new Error('OpenAI returned empty parsed response')
+    const raw: string | null | undefined = completion.choices[0]?.message?.content
+    if (!raw) throw new Error('OpenAI returned empty content')
+
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(raw)
+    } catch {
+      throw new Error(`OpenAI returned invalid JSON: ${raw.slice(0, 200)}`)
     }
 
     return {
