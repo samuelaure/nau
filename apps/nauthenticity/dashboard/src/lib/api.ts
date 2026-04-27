@@ -37,6 +37,21 @@ export const getMediaUrl = (url?: string) => {
   return url;
 };
 
+export const getPlatformLogo = (platform: string = 'instagram') => {
+  // Instagram logo SVG as data URI
+  const logos: Record<string, string> = {
+    instagram: `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e1306c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2' y='2' width='20' height='20' rx='5' ry='5'%3E%3C/rect%3E%3Cpath d='M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z'%3E%3C/path%3E%3Ccircle cx='17.5' cy='6.5' r='1.5'%3E%3C/circle%3E%3C/svg%3E`,
+  };
+  return logos[platform] || logos.instagram;
+};
+
+export const getProfileImageUrl = (imageUrl?: string | null, platform: string = 'instagram') => {
+  if (imageUrl) {
+    return getMediaUrl(imageUrl);
+  }
+  return getPlatformLogo(platform);
+};
+
 export interface SocialProfile {
   id: string;
   platform: string;

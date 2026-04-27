@@ -1,14 +1,14 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import React from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { getBrandOwnedProfiles, getAccount, getMediaUrl } from '../lib/api';
-import { Database, ArrowRight } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import { getBrandOwnedProfiles, getAccount, getProfileImageUrl } from '../lib/api';
+import { Database } from 'lucide-react';
 import { PostGrid } from '../components/PostGrid';
 import { ProfileActionsBar } from '../components/ProfileActionsBar';
+import { SocialProfileCard } from '../components/SocialProfileCard';
 
 export const BrandContentView = () => {
   const { brandId } = useParams<{ brandId: string }>();
-  const navigate = useNavigate();
   const [selectedUsername, setSelectedUsername] = React.useState<string | null>(null);
   const [sort, setSort] = React.useState<'recent' | 'oldest' | 'likes' | 'comments'>('recent');
 
@@ -55,13 +55,15 @@ export const BrandContentView = () => {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', marginBottom: '2rem' }}>
           <img
-            src={getMediaUrl(selectedAccount.profileImageUrl) || 'https://via.placeholder.com/100'}
+            src={getProfileImageUrl(selectedAccount.profileImageUrl, selectedAccount.platform || 'instagram')}
             alt={selectedAccount.username}
             style={{
               width: '80px',
               height: '80px',
               borderRadius: '50%',
               border: '2px solid var(--border)',
+              backgroundColor: 'var(--card-bg)',
+              padding: selectedAccount.profileImageUrl ? '0' : '12px',
             }}
           />
           <div>
@@ -114,72 +116,16 @@ export const BrandContentView = () => {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
             gap: '1rem',
           }}
         >
           {ownedProfiles.map((profile) => (
-            <div
+            <SocialProfileCard
               key={profile.id}
-              onClick={() => setSelectedUsername(profile.username)}
-              style={{
-                background: 'var(--card-bg)',
-                border: '1px solid var(--border)',
-                borderRadius: '10px',
-                padding: '1.5rem',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '1rem',
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLElement).style.borderColor = '#58a6ff';
-                (e.currentTarget as HTMLElement).style.boxShadow = '0 0 10px rgba(88, 166, 255, 0.2)';
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)';
-                (e.currentTarget as HTMLElement).style.boxShadow = 'none';
-              }}
-            >
-              <img
-                src={getMediaUrl(profile.profileImageUrl) || 'https://via.placeholder.com/150'}
-                alt={profile.username}
-                style={{
-                  width: '80px',
-                  height: '80px',
-                  borderRadius: '50%',
-                  border: '2px solid var(--border)',
-                }}
-              />
-              <div>
-                <h3 style={{ margin: 0, marginBottom: '0.25rem' }}>@{profile.username}</h3>
-                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                  {profile._count?.posts || 0} posts
-                </p>
-                <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.8rem', color: '#8b949e' }}>
-                  Last: {new Date(profile.lastScrapedAt).toLocaleDateString()}
-                </p>
-              </div>
-              <button
-                style={{
-                  marginTop: 'auto',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '6px',
-                  background: '#58a6ff',
-                  color: 'white',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  fontWeight: 500,
-                }}
-              >
-                View Content <ArrowRight size={16} />
-              </button>
-            </div>
+              profile={profile}
+              onSelect={setSelectedUsername}
+            />
           ))}
         </div>
       ) : (
