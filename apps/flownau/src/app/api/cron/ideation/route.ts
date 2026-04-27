@@ -2,23 +2,11 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 import { generateContentIdeas } from '@/modules/ideation/ideation.service'
 import { fetchBrandDigest } from '@/modules/ideation/sources/inspo-source'
-import { getBrandDNA } from '@/modules/ideation/sources/brand-dna-source'
-import { resolveProvenance } from '@/modules/ideation/provenance'
-import { detectHeadTalk } from '@/modules/planning/daily-plan.service'
 import { logError, logger } from '@/modules/shared/logger'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 300 // 5 minutes max for AI generation timeout
+export const maxDuration = 300
 
-/**
- * GET /api/cron/ideation
- *
- * Generates content ideas for each active account using:
- * 1. InspoItems from nauthenticity (graceful degradation)
- * 2. Brand DNA as fallback
- * 3. Recent content history for diversity
- * 4. Head-talk detection for face-to-camera ideas
- */
 import { validateCronSecret, unauthorizedCronResponse } from '@/modules/shared/nau-auth'
 
 export async function GET(request: Request) {
@@ -31,102 +19,72 @@ export async function GET(request: Request) {
       brandId: string
       status: string
       ideasGenerated?: number
-      headTalkDetected?: number
       summary?: string
       error?: string
     }> = []
 
-    const accounts = await prisma.socialProfile.findMany({
-      take: 10,
-    })
+    const accounts = await prisma.socialProfile.findMany({ take: 10 })
 
     for (const account of accounts) {
-      // Phase 18: resolve provenance (persona + framework + principles) once per account
-      const provenance = await resolveProvenance(account.id)
-      if (!provenance.brandPersonaId) continue
-
-      const persona = await prisma.brandPersona.findUnique({
-        where: { id: provenance.brandPersonaId },
-      })
-      if (!persona) continue
-
-      // Skip if there are any pending ideas — only generate when the pipeline is exhausted
+      // Skip if pending ideas exist — only generate when pipeline is exhausted
       const pendingIdeasCount = await prisma.contentIdea.count({
         where: { brandId: account.id, status: 'PENDING' },
       })
-
       if (pendingIdeasCount > 0) continue
 
       try {
-        // 1. Fetch mechanical InspoBase Digest from nauthenticity (graceful degradation)
+        // Topic comes from nauthenticity digest — no digest = skip (no topic = blocked)
         const digest = await fetchBrandDigest(account.id)
 
-        // 2. Get Brand DNA
-        const brandDNA = await getBrandDNA(account.id)
+        if (!digest?.content?.trim()) {
+          logger.info(`[Ideation] Skipping ${account.id} — no digest available (topic required)`)
+          results.push({ brandId: account.id, status: 'skipped', error: 'No digest available' })
+          continue
+        }
 
-        // 3. Get recent content for diversity tracking
-        const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)
-        const recentCompositions = await prisma.composition.findMany({
-          where: {
-            brandId: account.id,
-            createdAt: { gte: fourteenDaysAgo },
-          },
-          select: { caption: true, sceneTypes: true },
-          take: 30,
+        const brand = await prisma.brand.findUnique({
+          where: { id: account.brandId },
+          select: { language: true, ideationCount: true },
         })
 
-        const recentPosts = recentCompositions
+        const language = brand?.language ?? 'Spanish'
+        const count = brand?.ideationCount ?? 9
+
+        // Recent content for diversity tracking
+        const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)
+        const recentCompositions = await prisma.composition.findMany({
+          where: { brandId: account.id, createdAt: { gte: fourteenDaysAgo } },
+          select: { caption: true },
+          take: 30,
+        })
+        const recentContent = recentCompositions
           .filter((c) => c.caption)
           .map((c) => c.caption!.slice(0, 100))
 
-        // 4. Per-origin settings
-        const automaticCount = persona.automaticCount ?? 5
-        const automaticAutoApprove = persona.automaticAutoApprove ?? persona.autoApproveIdeas
-
-        // 5. Generate ideas — Phase 18: includes framework as "strategy"
-        const output = await generateContentIdeas({
-          brandName: persona.name,
-          dna: brandDNA,
-          strategy: provenance.frameworkSystemPrompt ?? undefined,
-          count: automaticCount,
-          digest: digest ?? undefined,
-          recentContent: recentPosts,
-        })
-
-        // 6. Insert ideas with head-talk detection and lineage tracking
-        let headTalkCount = 0
-
-        // Lineage: store the primary attached URL (or JSON array) as sourceRef so the
-        // user can trace which original posts inspired this batch of generated ideas.
-        const digestSourceRef =
-          digest && digest.attachedUrls.length > 0
+        const sourceRef =
+          digest.attachedUrls.length > 0
             ? digest.attachedUrls.length === 1
               ? digest.attachedUrls[0]
               : JSON.stringify(digest.attachedUrls)
             : null
 
+        const output = await generateContentIdeas({
+          topic: digest.content,
+          language,
+          count,
+          recentContent,
+        })
+
         for (const idea of output.ideas) {
-          const ideaText = idea.concept
-
-          const isHeadTalk = detectHeadTalk(ideaText)
-          if (isHeadTalk) headTalkCount++
-
           await prisma.contentIdea.create({
             data: {
               brandId: account.id,
-              ideaText,
-              format: idea.format,
-              status: isHeadTalk
-                ? 'PENDING' // Head-talk ideas always require manual approval
-                : automaticAutoApprove
-                  ? 'APPROVED'
-                  : 'PENDING',
+              ideaText: idea.concept,
+              format: null,
+              status: 'PENDING',
               source: 'automatic',
               priority: 3,
-              sourceRef: digestSourceRef,
-              brandPersonaId: provenance.brandPersonaId,
-              ideasFrameworkId: provenance.ideasFrameworkId,
-              contentPrinciplesId: provenance.contentPrinciplesId,
+              sourceRef,
             },
           })
         }
@@ -135,12 +93,11 @@ export async function GET(request: Request) {
           brandId: account.id,
           status: 'success',
           ideasGenerated: output.ideas.length,
-          headTalkDetected: headTalkCount,
           summary: output.briefSummary,
         })
 
         logger.info(
-          `[Ideation] Generated ${output.ideas.length} ideas for ${account.username ?? account.id} (${headTalkCount} head-talk, digest: ${digest ? 'yes' : 'none'})`,
+          `[Ideation] Generated ${output.ideas.length} ideas for ${account.username ?? account.id}`,
         )
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)

@@ -55,20 +55,21 @@ export async function POST(request: NextRequest) {
 
     const brandName: string = account?.username ?? brandId
 
+    // Build topic from inspo items until Origin 3 is fully refactored
+    const topicLines = inspoData
+      .map((item) => [item.extractedTheme, item.extractedHook, item.note].filter(Boolean).join(' — '))
+      .filter(Boolean)
+    const topic = topicLines.join('\n')
+
+    const brand = await prisma.brand.findUnique({
+      where: { id: brandId },
+      select: { language: true, ideationCount: true },
+    })
+
     const result = await generateContentIdeas({
-      brandName,
-      dna: '',
-      count: 5,
-      inspoItems: inspoData.map((item) => ({
-        id: item.id,
-        type: item.type,
-        note: item.note ?? null,
-        extractedHook: item.extractedHook ?? null,
-        extractedTheme: item.extractedTheme ?? null,
-        adaptedScript: item.adaptedScript ?? null,
-        postCaption: null,
-        postTranscript: null,
-      })),
+      topic,
+      language: brand?.language ?? 'Spanish',
+      count: brand?.ideationCount ?? 9,
       recentContent: [],
     })
 
@@ -110,7 +111,7 @@ export async function POST(request: NextRequest) {
     let briefMd = `📋 *Brief de Contenido — ${dateStr}*\n_Marca: ${brandName}_\n\n`
     briefMd += `*💡 RESUMEN ESTRATÉGICO*\n${result.briefSummary}\n\n`
     result.ideas.forEach((idea, idx) => {
-      briefMd += `*IDEA ${idx + 1}* (${idea.format})\n`
+      briefMd += `*IDEA ${idx + 1}*\n`
       briefMd += `${idea.concept}\n\n`
     })
     briefMd += `_Basado en: ${inspoData.length} posts de Inspo Base._`

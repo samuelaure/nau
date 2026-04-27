@@ -18,6 +18,7 @@ model Brand {
   shortCode      String?
   assetsRoot     String?
   language       String   @default("Spanish")
+  ideationCount  Int      @default(9)
   directorPrompt String?  @db.Text
   creationPrompt String?  @db.Text
   createdAt      DateTime @default(now())

@@ -13,29 +13,16 @@ import { generateContentIdeas } from '../ideation.service'
 
 const validIdeationOutput = {
   ideas: [
-    {
-      hook: 'Did you know 90% of people fail at this?',
-      angle: 'Contrarian take on productivity',
-      script: 'Full script content here...',
-      cta: 'Follow for more tips',
-      format: 'reel' as const,
-    },
-    {
-      hook: 'Here is the framework I use',
-      angle: 'Practical framework breakdown',
-      script: 'Another full script...',
-      cta: 'Save this for later',
-      format: 'carousel' as const,
-    },
+    { concept: 'You are not bad at consistency — you just have a system built for someone else. Most productivity frameworks were designed for office workers, not creators. Your brain is not broken; the template is.' },
+    { concept: 'The brands that grow fastest right now are not posting more — they are posting with a point of view. One clear perspective beats ten generic updates every time. This is not a content volume problem.' },
   ],
-  briefSummary: 'Generated 2 ideas focused on productivity.',
+  briefSummary: 'Generated 2 ideas on brand positioning and creative systems.',
 }
 
-const baseContext = {
-  brandName: 'TestBrand',
-  dna: 'We help entrepreneurs build better systems.',
+const baseRequest = {
+  topic: 'personal brand growth for independent creators',
+  language: 'English',
   count: 2,
-  inspoItems: [],
 }
 
 describe('generateContentIdeas()', () => {
@@ -46,31 +33,53 @@ describe('generateContentIdeas()', () => {
   it('returns IdeationOutput on successful API call', async () => {
     mockParseCompletion.mockResolvedValue({ data: validIdeationOutput })
 
-    const result = await generateContentIdeas(baseContext)
+    const result = await generateContentIdeas(baseRequest)
 
     expect(result.ideas).toHaveLength(2)
-    expect(result.briefSummary).toBe('Generated 2 ideas focused on productivity.')
-    expect(result.ideas[0].format).toBe('reel')
+    expect(result.briefSummary).toBe('Generated 2 ideas on brand positioning and creative systems.')
   })
 
-  it('includes brand DNA in the messages sent to LLM', async () => {
+  it('throws when topic is missing', async () => {
+    await expect(
+      generateContentIdeas({ topic: '', language: 'Spanish', count: 5 }),
+    ).rejects.toThrow('Topic is required for idea generation.')
+  })
+
+  it('includes topic in the system prompt', async () => {
     let capturedMessages: unknown[] = []
     mockParseCompletion.mockImplementation((params: { messages: unknown[] }) => {
       capturedMessages = params.messages
       return Promise.resolve({ data: validIdeationOutput })
     })
 
-    await generateContentIdeas({ ...baseContext, dna: 'Unique brand DNA content for testing' })
+    await generateContentIdeas({ ...baseRequest, topic: 'unique-topic-string-for-test' })
 
-    const userMessage = capturedMessages.find((m: unknown) => {
+    const systemMessage = capturedMessages.find((m: unknown) => {
       const msg = m as { role: string; content: string }
-      return msg.role === 'user'
+      return msg.role === 'system'
     }) as { role: string; content: string } | undefined
 
-    expect(userMessage?.content).toContain('Unique brand DNA content for testing')
+    expect(systemMessage?.content).toContain('unique-topic-string-for-test')
   })
 
-  it('includes inspo items in the prompt when provided', async () => {
+  it('includes language in the system prompt', async () => {
+    let capturedMessages: unknown[] = []
+    mockParseCompletion.mockImplementation((params: { messages: unknown[] }) => {
+      capturedMessages = params.messages
+      return Promise.resolve({ data: validIdeationOutput })
+    })
+
+    await generateContentIdeas({ ...baseRequest, language: 'Italian' })
+
+    const systemMessage = capturedMessages.find((m: unknown) => {
+      const msg = m as { role: string; content: string }
+      return msg.role === 'system'
+    }) as { role: string; content: string } | undefined
+
+    expect(systemMessage?.content).toContain('Italian')
+  })
+
+  it('includes recent content in user message when provided', async () => {
     let capturedMessages: unknown[] = []
     mockParseCompletion.mockImplementation((params: { messages: unknown[] }) => {
       capturedMessages = params.messages
@@ -78,17 +87,8 @@ describe('generateContentIdeas()', () => {
     })
 
     await generateContentIdeas({
-      ...baseContext,
-      inspoItems: [
-        {
-          id: 'inspo-1',
-          type: 'reel',
-          note: 'Unique inspo note for testing',
-          extractedHook: 'Compelling hook from inspo',
-          extractedTheme: null,
-          adaptedScript: null,
-        },
-      ],
+      ...baseRequest,
+      recentContent: ['unique-recent-caption-for-test'],
     })
 
     const userMessage = capturedMessages.find((m: unknown) => {
@@ -96,16 +96,23 @@ describe('generateContentIdeas()', () => {
       return msg.role === 'user'
     }) as { role: string; content: string } | undefined
 
-    expect(userMessage?.content).toContain('Unique inspo note for testing')
-    expect(userMessage?.content).toContain('inspo-1')
+    expect(userMessage?.content).toContain('unique-recent-caption-for-test')
   })
 
-  it('works correctly with an empty inspo items array', async () => {
-    mockParseCompletion.mockResolvedValue({ data: validIdeationOutput })
+  it('sends no user message when recentContent is empty', async () => {
+    let capturedMessages: unknown[] = []
+    mockParseCompletion.mockImplementation((params: { messages: unknown[] }) => {
+      capturedMessages = params.messages
+      return Promise.resolve({ data: validIdeationOutput })
+    })
 
-    const result = await generateContentIdeas({ ...baseContext, inspoItems: [] })
+    await generateContentIdeas(baseRequest)
 
-    expect(result.ideas).toBeDefined()
-    expect(result.ideas.length).toBeGreaterThan(0)
+    const userMessage = capturedMessages.find((m: unknown) => {
+      const msg = m as { role: string; content: string }
+      return msg.role === 'user'
+    })
+
+    expect(userMessage).toBeUndefined()
   })
 })

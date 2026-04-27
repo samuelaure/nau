@@ -7,22 +7,17 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { brandName, dna, brandDNA, inspoItems, recentContent, recentPosts } = body
+    const { topic, language, count, recentContent } = body
 
-    const resolvedDna = dna || brandDNA
-    if (!brandName || !resolvedDna) {
-      return NextResponse.json(
-        { error: 'Missing required fields: brandName, dna' },
-        { status: 400 },
-      )
+    if (!topic?.trim()) {
+      return NextResponse.json({ error: 'Missing required field: topic' }, { status: 400 })
     }
 
     const result = await generateContentIdeas({
-      brandName,
-      dna: resolvedDna,
-      count: body.count ?? 5,
-      inspoItems: inspoItems || [],
-      recentContent: recentContent || recentPosts || [],
+      topic,
+      language: language ?? 'Spanish',
+      count: count ?? 9,
+      recentContent: recentContent ?? [],
     })
 
     return NextResponse.json({ success: true, ...result })
