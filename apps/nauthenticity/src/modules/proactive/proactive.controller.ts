@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
-import { prisma } from '../../db/prisma';
+import { prisma } from '../../modules/shared/prisma';
 import { logger } from '../../utils/logger';
 import { runProactiveFanout } from './fanout.processor';
 import { generateReactiveComments } from './reactive.service';

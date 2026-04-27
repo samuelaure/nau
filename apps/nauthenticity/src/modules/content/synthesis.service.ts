@@ -1,6 +1,6 @@
 import { getClientForFeature, reportUsage } from '@nau/llm-client';
 import { z } from 'zod';
-import { prisma } from '../../db/prisma';
+import { prisma } from '../../modules/shared/prisma';
 import { config } from '../../config';
 import { logger } from '../../utils/logger';
 import { estimateCostUsd } from '@nau/config';

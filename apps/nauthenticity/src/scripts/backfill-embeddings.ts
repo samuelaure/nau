@@ -1,4 +1,4 @@
-import { prisma } from '../db/prisma';
+import { prisma } from '../../modules/shared/prisma';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import { OpenAI } from 'openai';

@@ -5,7 +5,7 @@ import {
 } from '../../services/intelligence.service';
 import { dispatchToZazu } from './zazu.dispatcher';
 import { logger } from '../../utils/logger';
-import { prisma } from '../../db/prisma';
+import { prisma } from '../../modules/shared/prisma';
 import { toZonedTime } from 'date-fns-tz';
 import type { BrandIntelligence, SocialProfileTarget, SocialProfile } from '@prisma/client';
 

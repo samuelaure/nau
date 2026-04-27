@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { prisma } from '../../db/prisma';
+import { prisma } from '../../modules/shared/prisma';
 import { config } from '../../config';
 import { downloadQueue } from '../../queues/download.queue';
 import { computeQueue } from '../../queues/compute.queue';

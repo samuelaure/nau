@@ -7,7 +7,7 @@ import path from 'path';
 
 import { env } from './config/env';
 import { config } from './config';
-import { prisma } from './db/prisma';
+import { prisma } from './modules/shared/prisma';
 import { logger } from './utils/logger';
 import { errorHandler } from './utils/errorHandler';
 import { startScheduler } from './scheduler';

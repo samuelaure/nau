@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
-import { prisma } from '../../db/prisma';
+import { prisma } from '../../modules/shared/prisma';
 import { logger } from '../../utils/logger';
 import { config } from '../../config';
 import { getDigest } from './synthesis.service';

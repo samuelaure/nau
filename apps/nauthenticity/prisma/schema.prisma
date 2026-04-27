@@ -149,7 +149,7 @@ model KnowledgeChunk {
 // ── Brand Intelligence ────────────────────────────────────────────────────────
 
 model BrandIntelligence {
-  brandId           String   @id
+  brandId           String   @id                       // = flownau Brand.id
   workspaceId       String   @default("")
   mainUsername      String?
   voicePrompt       String
@@ -197,6 +197,10 @@ model SocialProfileTarget {
   isActive             Boolean           @default(true)
   initialDownloadCount Int?              @default(20)
   autoUpdate           Boolean?          @default(false)
+
+  // Mark profile as owned by brand — should sync to flownau as publishing profile
+  isPublishingProfile  Boolean           @default(false)
+  syncedToFlownauAt    DateTime?         // Track when synced to flownau
 
   createdAt            DateTime @default(now())
 

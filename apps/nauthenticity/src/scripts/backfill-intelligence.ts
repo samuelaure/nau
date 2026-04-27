@@ -1,4 +1,4 @@
-import { prisma } from '../db/prisma';
+import { prisma } from '../../modules/shared/prisma';
 import { logger } from '../utils/logger';
 import { extractPostIntelligence } from '../services/intelligence.service';
 

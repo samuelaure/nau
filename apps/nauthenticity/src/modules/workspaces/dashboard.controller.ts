@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { prisma } from '../../db/prisma';
+import { prisma } from '../../modules/shared/prisma';
 
 export const dashboardController = async (fastify: FastifyInstance) => {
   // -------------------------------------------------------------------------

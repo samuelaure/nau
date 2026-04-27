@@ -1,5 +1,5 @@
 import { runInstagramScraper } from '../../services/apify.service';
-import { prisma } from '../../db/prisma';
+import { prisma } from '../../modules/shared/prisma';
 import { downloadQueue } from '../../queues/download.queue';
 import { logger } from '../../utils/logger';
 

@@ -1,7 +1,7 @@
 import { Worker, Job } from 'bullmq';
 
 import { config } from '../config';
-import { prisma } from '../db/prisma';
+import { prisma } from '../../modules/shared/prisma';
 import { logger } from '../utils/logger';
 import fs from 'fs';
 import path from 'path';

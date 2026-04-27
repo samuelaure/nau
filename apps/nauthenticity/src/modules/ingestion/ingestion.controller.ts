@@ -3,7 +3,7 @@ import { ingestionQueue } from '../../queues/ingestion.queue';
 import { downloadQueue } from '../../queues/download.queue';
 import { computeQueue } from '../../queues/compute.queue';
 import { abortActorRun } from '../../services/apify.service';
-import { prisma } from '../../db/prisma';
+import { prisma } from '../../modules/shared/prisma';
 import { logger } from '../../utils/logger';
 import { PipelineStepName, PHASE_LABELS } from '../../queues/compute.worker';
 
