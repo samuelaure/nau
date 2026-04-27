@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Sanitize URL to remove accidental quotes, whitespace, or trailing semicolons
-const rawUrl = import.meta.env.VITE_API_URL || '/api';
+const rawUrl = import.meta.env.VITE_API_URL || '/api/v1';
 export const API_URL = rawUrl.replace(/['";]/g, '').trim();
 
 export const api = axios.create({

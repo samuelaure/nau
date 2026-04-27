@@ -33,7 +33,7 @@ async function syncToNauthenticity(username: string, profileImageUrl: string | n
     const nauthenticityUrl = process.env.NAUTHENTICITY_URL || 'http://localhost:3007'
     const serviceKey = process.env.NAU_SERVICE_KEY || ''
 
-    await fetch(`${nauthenticityUrl}/api/social-profiles/sync`, {
+    await fetch(`${nauthenticityUrl}/api/v1/social-profiles/sync`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -343,7 +343,7 @@ export async function syncProfileToNauthenticity(profileId: string) {
   const nauthenticityUrl = process.env.NAUTHENTICITY_URL || 'http://localhost:3007'
   const serviceKey = process.env.NAU_SERVICE_KEY || ''
 
-  const response = await fetch(`${nauthenticityUrl}/api/social-profiles/sync`, {
+  const response = await fetch(`${nauthenticityUrl}/api/v1/social-profiles/sync`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
