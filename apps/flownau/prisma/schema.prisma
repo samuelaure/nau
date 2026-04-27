@@ -44,11 +44,16 @@ model SocialProfile {
   platformId       String?
   username         String?
   profileImage     String?
-  accessToken      String
+  accessToken      String?   // Optional for soft-added profiles awaiting OAuth
   refreshToken     String?
   expiresAt        DateTime?
   tokenExpiresAt   DateTime?
   tokenRefreshedAt DateTime?
+
+  // Track if this profile was synced from nauthenticity
+  syncedFromNauthenticity Boolean @default(false)
+  nauthenticityProfileId  String? // Reference to nauthenticity SocialProfile.id if synced
+
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
