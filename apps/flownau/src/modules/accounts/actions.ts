@@ -37,7 +37,7 @@ async function syncToNauthenticity(username: string, profileImageUrl: string | n
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Service-Key': serviceKey,
+        'X-Nau-Service-Key': serviceKey,
       },
       body: JSON.stringify({
         username,
@@ -346,7 +346,7 @@ export async function syncProfileToNauthenticity(profileId: string) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Service-Key': serviceKey,
+      'X-Nau-Service-Key': serviceKey,
     },
     body: JSON.stringify({
       username: profile.username,

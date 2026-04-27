@@ -84,7 +84,7 @@ export async function POST(req: Request, { params }: { params: { brandId: string
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Service-Key': process.env.NAU_SERVICE_KEY || '',
+          'X-Nau-Service-Key': process.env.NAU_SERVICE_KEY || '',
         },
         body: JSON.stringify({
           username,
