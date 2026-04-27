@@ -9,6 +9,7 @@ export const BrandLayout = () => {
   return (
     <Routes>
       <Route path="content" element={<BrandContentView />} />
+      <Route path="profiles/:username" element={<BrandContentView />} />
       <Route path="inspo" element={<BrandInspoBaseView />} />
       <Route path="inspobase" element={<Navigate to="../inspo" replace />} />
       <Route path="profiles" element={<BrandProfilesView />} />

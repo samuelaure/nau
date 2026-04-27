@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import React from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { getBrandOwnedProfiles, getAccount, getProfileImageUrl } from '../lib/api';
 import { Database, TrendingUp } from 'lucide-react';
 import { PostGrid } from '../components/PostGrid';
@@ -8,9 +8,10 @@ import { ProfileActionsBar } from '../components/ProfileActionsBar';
 import { SocialProfileCard } from '../components/SocialProfileCard';
 
 export const BrandContentView = () => {
-  const { brandId } = useParams<{ brandId: string }>();
+  const { brandId, username } = useParams<{ brandId: string; username?: string }>();
   const navigate = useNavigate();
-  const [selectedUsername, setSelectedUsername] = React.useState<string | null>(null);
+  const location = useLocation();
+  const selectedUsername = username || null;
   const [sort, setSort] = React.useState<'recent' | 'oldest' | 'likes' | 'comments'>('recent');
 
   // Fetch owned profiles for this brand
@@ -37,7 +38,10 @@ export const BrandContentView = () => {
     return (
       <div className="fade-in">
         <button
-          onClick={() => setSelectedUsername(null)}
+          onClick={() => {
+            const workspaceId = location.pathname.match(/\/workspaces\/([^/]+)/)?.[1];
+            navigate(`/workspaces/${workspaceId}/brands/${brandId}/content`);
+          }}
           style={{
             background: 'none',
             border: 'none',
@@ -142,13 +146,18 @@ export const BrandContentView = () => {
             gap: '1rem',
           }}
         >
-          {ownedProfiles.map((profile) => (
-            <SocialProfileCard
-              key={profile.id}
-              profile={profile}
-              onSelect={setSelectedUsername}
-            />
-          ))}
+          {ownedProfiles.map((profile) => {
+            const workspaceId = location.pathname.match(/\/workspaces\/([^/]+)/)?.[1];
+            return (
+              <SocialProfileCard
+                key={profile.id}
+                profile={profile}
+                onSelect={setSelectedUsername}
+                brandId={brandId}
+                workspaceId={workspaceId}
+              />
+            );
+          })}
         </div>
       ) : (
         <div

@@ -1,5 +1,6 @@
 import React from 'react';
 import { ExternalLink, Trash2, Loader } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { getProfileImageUrl } from '../lib/api';
 
 interface SocialProfileCardProps {
@@ -15,13 +16,18 @@ interface SocialProfileCardProps {
   };
   onSelect: (username: string) => void;
   onDelete?: (id: string) => Promise<void>;
+  brandId?: string;
+  workspaceId?: string;
 }
 
 export const SocialProfileCard = ({
   profile,
   onSelect,
   onDelete,
+  brandId,
+  workspaceId,
 }: SocialProfileCardProps) => {
+  const navigate = useNavigate();
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
 
   const handleDelete = async () => {
@@ -39,9 +45,17 @@ export const SocialProfileCard = ({
   const postCount = profile._count?.posts || 0;
   const lastScraped = new Date(profile.lastScrapedAt).toLocaleDateString();
 
+  const handleSelect = () => {
+    if (brandId && workspaceId) {
+      navigate(`/workspaces/${workspaceId}/brands/${brandId}/profiles/${profile.username}`);
+    } else {
+      onSelect(profile.username);
+    }
+  };
+
   return (
     <div
-      onClick={() => onSelect(profile.username)}
+      onClick={handleSelect}
       style={{
         background: 'var(--card-bg)',
         border: '1px solid var(--border)',
