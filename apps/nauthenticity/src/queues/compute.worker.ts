@@ -443,9 +443,14 @@ const handleOptimizeBatch = async (
 ): Promise<{ paused: true } | void> => {
   logger.info(`[ComputeWorker] Phase: Optimizing Run ${runId}`);
   const mediaItems = await prisma.media.findMany({
-    where: { post: { runId } },
+    where: { post: { runId }, storageUrl: { contains: '/raw/' } },
     include: { post: true },
   });
+
+  if (mediaItems.length === 0) {
+    logger.info(`[ComputeWorker] No raw media to optimize. Skipping optimization phase.`);
+    return;
+  }
 
   for (let i = 0; i < mediaItems.length; i++) {
     // B4: Optimize Pause Check (only check every 50 items)
@@ -476,19 +481,27 @@ const handleOptimizeBatch = async (
         const optimizedPath = await optimizeMedia(m.id, filePath);
 
         if (m.storageUrl.startsWith('http') && r2Client && config.env.R2_BUCKET_NAME) {
-          // If remote, upload optimized and overwrite
+          // If remote, upload optimized to content location
           const url = new URL(m.storageUrl);
-          const actualKey = url.pathname.startsWith('/') ? url.pathname.slice(1) : url.pathname;
+          const pathname = url.pathname.startsWith('/') ? url.pathname.slice(1) : url.pathname;
+          const optimizedKey = pathname.replace('/raw/', '/content/');
 
           await r2Client.send(
             new PutObjectCommand({
               Bucket: config.env.R2_BUCKET_NAME,
-              Key: actualKey,
+              Key: optimizedKey,
               Body: fs.createReadStream(optimizedPath),
               ContentType: m.type === 'video' ? 'video/mp4' : 'image/jpeg',
             }),
           );
-          logger.info(`[ComputeWorker] Uploaded optimized media to R2: ${actualKey}`);
+
+          // Update media to point to optimized location
+          const optimizedUrl = `${config.env.R2_PUBLIC_URL}/${optimizedKey}`;
+          await prisma.media.update({
+            where: { id: m.id },
+            data: { storageUrl: optimizedUrl },
+          });
+          logger.info(`[ComputeWorker] Uploaded optimized media to R2: ${optimizedKey}`);
         } else {
           // If local, overwrite original
           atomicMove(optimizedPath, filePath);
