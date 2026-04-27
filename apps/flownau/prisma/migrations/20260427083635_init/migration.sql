@@ -1,37 +1,48 @@
--- CreateSchema
-CREATE SCHEMA IF NOT EXISTS "public";
-
 -- CreateEnum
 CREATE TYPE "AIModel" AS ENUM ('GROQ_LLAMA_3_3', 'GROQ_LLAMA_3_1_70B', 'GROQ_LLAMA_3_1_8B', 'GROQ_MIXTRAL_8X7B', 'GROQ_DEEPSEEK_R1_70B', 'OPENAI_GPT_4O', 'OPENAI_GPT_4O_MINI', 'OPENAI_GPT_4_TURBO', 'OPENAI_GPT_4_1', 'OPENAI_O1', 'OPENAI_O1_MINI');
 
 -- CreateTable
-CREATE TABLE "SocialAccount" (
+CREATE TABLE "Brand" (
     "id" TEXT NOT NULL,
     "workspaceId" TEXT NOT NULL,
-    "brandId" TEXT,
-    "platform" TEXT NOT NULL DEFAULT 'instagram',
-    "platformId" TEXT,
-    "username" TEXT,
-    "profileImage" TEXT,
-    "accessToken" TEXT NOT NULL,
-    "refreshToken" TEXT,
-    "expiresAt" TIMESTAMP(3),
+    "name" TEXT,
+    "shortCode" TEXT,
+    "assetsRoot" TEXT,
+    "language" TEXT NOT NULL DEFAULT 'Spanish',
     "directorPrompt" TEXT,
     "creationPrompt" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
-    "shortCode" TEXT,
-    "assetsRoot" TEXT,
+
+    CONSTRAINT "Brand_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "SocialProfile" (
+    "id" TEXT NOT NULL,
+    "brandId" TEXT NOT NULL,
+    "workspaceId" TEXT NOT NULL,
+    "platform" TEXT NOT NULL DEFAULT 'instagram',
+    "platformId" TEXT,
+    "username" TEXT,
+    "profileImage" TEXT,
+    "accessToken" TEXT,
+    "refreshToken" TEXT,
+    "expiresAt" TIMESTAMP(3),
     "tokenExpiresAt" TIMESTAMP(3),
     "tokenRefreshedAt" TIMESTAMP(3),
+    "syncedFromNauthenticity" BOOLEAN NOT NULL DEFAULT false,
+    "nauthenticityProfileId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "SocialAccount_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "SocialProfile_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "Asset" (
     "id" TEXT NOT NULL,
-    "accountId" TEXT,
+    "brandId" TEXT,
     "templateId" TEXT,
     "type" TEXT NOT NULL,
     "systemFilename" TEXT NOT NULL,
@@ -59,9 +70,9 @@ CREATE TABLE "Template" (
     "name" TEXT NOT NULL,
     "remotionId" TEXT NOT NULL,
     "config" JSONB,
-    "accountId" TEXT NOT NULL,
-    "scope" TEXT NOT NULL DEFAULT 'account',
-    "useAccountAssets" BOOLEAN NOT NULL DEFAULT true,
+    "brandId" TEXT NOT NULL,
+    "scope" TEXT NOT NULL DEFAULT 'brand',
+    "useBrandAssets" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "assetsRoot" TEXT,
@@ -78,16 +89,16 @@ CREATE TABLE "Template" (
 );
 
 -- CreateTable
-CREATE TABLE "AccountTemplateConfig" (
+CREATE TABLE "BrandTemplateConfig" (
     "id" TEXT NOT NULL,
-    "accountId" TEXT NOT NULL,
+    "brandId" TEXT NOT NULL,
     "templateId" TEXT NOT NULL,
     "autoApprovePost" BOOLEAN NOT NULL DEFAULT false,
     "enabled" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "AccountTemplateConfig_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "BrandTemplateConfig_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -123,7 +134,6 @@ CREATE TABLE "BrandPersona" (
     "id" TEXT NOT NULL,
     "brandId" TEXT NOT NULL,
     "workspaceId" TEXT NOT NULL,
-    "accountId" TEXT,
     "name" TEXT NOT NULL,
     "systemPrompt" TEXT NOT NULL,
     "modelSelection" "AIModel" NOT NULL DEFAULT 'GROQ_LLAMA_3_3',
@@ -146,7 +156,6 @@ CREATE TABLE "IdeasFramework" (
     "id" TEXT NOT NULL,
     "brandId" TEXT NOT NULL,
     "workspaceId" TEXT NOT NULL,
-    "accountId" TEXT,
     "name" TEXT NOT NULL,
     "systemPrompt" TEXT NOT NULL,
     "isDefault" BOOLEAN NOT NULL DEFAULT false,
@@ -161,7 +170,6 @@ CREATE TABLE "ContentCreationPrinciples" (
     "id" TEXT NOT NULL,
     "brandId" TEXT NOT NULL,
     "workspaceId" TEXT NOT NULL,
-    "accountId" TEXT,
     "name" TEXT NOT NULL,
     "systemPrompt" TEXT NOT NULL,
     "isDefault" BOOLEAN NOT NULL DEFAULT false,
@@ -174,7 +182,7 @@ CREATE TABLE "ContentCreationPrinciples" (
 -- CreateTable
 CREATE TABLE "ContentIdea" (
     "id" TEXT NOT NULL,
-    "accountId" TEXT NOT NULL,
+    "brandId" TEXT NOT NULL,
     "ideaText" TEXT NOT NULL,
     "format" TEXT,
     "status" TEXT NOT NULL DEFAULT 'PENDING',
@@ -193,7 +201,7 @@ CREATE TABLE "ContentIdea" (
 -- CreateTable
 CREATE TABLE "Composition" (
     "id" TEXT NOT NULL,
-    "accountId" TEXT NOT NULL,
+    "brandId" TEXT NOT NULL,
     "templateId" TEXT,
     "format" TEXT NOT NULL DEFAULT 'reel',
     "creative" JSONB,
@@ -246,7 +254,7 @@ CREATE TABLE "RenderJob" (
 -- CreateTable
 CREATE TABLE "ContentPlan" (
     "id" TEXT NOT NULL,
-    "accountId" TEXT NOT NULL,
+    "brandId" TEXT NOT NULL,
     "date" DATE NOT NULL,
     "pieces" JSONB NOT NULL,
     "scripts" JSONB,
@@ -263,7 +271,6 @@ CREATE TABLE "ContentPlanner" (
     "id" TEXT NOT NULL,
     "brandId" TEXT NOT NULL,
     "workspaceId" TEXT NOT NULL,
-    "accountId" TEXT,
     "name" TEXT NOT NULL,
     "isDefault" BOOLEAN NOT NULL DEFAULT false,
     "autoApproveSchedule" BOOLEAN NOT NULL DEFAULT false,
@@ -281,49 +288,43 @@ CREATE TABLE "ContentPlanner" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "SocialAccount_platform_platformId_key" ON "SocialAccount"("platform", "platformId");
+CREATE UNIQUE INDEX "SocialProfile_platform_platformId_key" ON "SocialProfile"("platform", "platformId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "AccountTemplateConfig_accountId_templateId_key" ON "AccountTemplateConfig"("accountId", "templateId");
+CREATE UNIQUE INDEX "BrandTemplateConfig_brandId_templateId_key" ON "BrandTemplateConfig"("brandId", "templateId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "RenderJob_compositionId_key" ON "RenderJob"("compositionId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "ContentPlan_accountId_date_key" ON "ContentPlan"("accountId", "date");
+CREATE UNIQUE INDEX "ContentPlan_brandId_date_key" ON "ContentPlan"("brandId", "date");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "ContentPlanner_brandId_name_key" ON "ContentPlanner"("brandId", "name");
 
 -- AddForeignKey
-ALTER TABLE "Asset" ADD CONSTRAINT "Asset_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "SocialAccount"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "SocialProfile" ADD CONSTRAINT "SocialProfile_brandId_fkey" FOREIGN KEY ("brandId") REFERENCES "Brand"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Asset" ADD CONSTRAINT "Asset_brandId_fkey" FOREIGN KEY ("brandId") REFERENCES "Brand"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Asset" ADD CONSTRAINT "Asset_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "Template"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Template" ADD CONSTRAINT "Template_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "SocialAccount"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "Template" ADD CONSTRAINT "Template_brandId_fkey" FOREIGN KEY ("brandId") REFERENCES "Brand"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "AccountTemplateConfig" ADD CONSTRAINT "AccountTemplateConfig_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "SocialAccount"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "BrandTemplateConfig" ADD CONSTRAINT "BrandTemplateConfig_brandId_fkey" FOREIGN KEY ("brandId") REFERENCES "Brand"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "AccountTemplateConfig" ADD CONSTRAINT "AccountTemplateConfig_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "Template"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "BrandTemplateConfig" ADD CONSTRAINT "BrandTemplateConfig_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "Template"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Render" ADD CONSTRAINT "Render_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "Template"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "BrandPersona" ADD CONSTRAINT "BrandPersona_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "SocialAccount"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "IdeasFramework" ADD CONSTRAINT "IdeasFramework_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "SocialAccount"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "ContentCreationPrinciples" ADD CONSTRAINT "ContentCreationPrinciples_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "SocialAccount"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "ContentIdea" ADD CONSTRAINT "ContentIdea_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "SocialAccount"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ContentIdea" ADD CONSTRAINT "ContentIdea_brandId_fkey" FOREIGN KEY ("brandId") REFERENCES "Brand"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ContentIdea" ADD CONSTRAINT "ContentIdea_brandPersonaId_fkey" FOREIGN KEY ("brandPersonaId") REFERENCES "BrandPersona"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -335,7 +336,7 @@ ALTER TABLE "ContentIdea" ADD CONSTRAINT "ContentIdea_ideasFrameworkId_fkey" FOR
 ALTER TABLE "ContentIdea" ADD CONSTRAINT "ContentIdea_contentPrinciplesId_fkey" FOREIGN KEY ("contentPrinciplesId") REFERENCES "ContentCreationPrinciples"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Composition" ADD CONSTRAINT "Composition_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "SocialAccount"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "Composition" ADD CONSTRAINT "Composition_brandId_fkey" FOREIGN KEY ("brandId") REFERENCES "Brand"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Composition" ADD CONSTRAINT "Composition_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "Template"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -356,8 +357,4 @@ ALTER TABLE "Composition" ADD CONSTRAINT "Composition_contentPrinciplesId_fkey" 
 ALTER TABLE "RenderJob" ADD CONSTRAINT "RenderJob_compositionId_fkey" FOREIGN KEY ("compositionId") REFERENCES "Composition"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ContentPlan" ADD CONSTRAINT "ContentPlan_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "SocialAccount"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "ContentPlanner" ADD CONSTRAINT "ContentPlanner_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "SocialAccount"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
+ALTER TABLE "ContentPlan" ADD CONSTRAINT "ContentPlan_brandId_fkey" FOREIGN KEY ("brandId") REFERENCES "Brand"("id") ON DELETE CASCADE ON UPDATE CASCADE;
