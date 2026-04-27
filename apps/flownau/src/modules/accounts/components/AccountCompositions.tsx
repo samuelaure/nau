@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Card } from '@/modules/shared/components/ui/Card'
 import { Button } from '@/modules/shared/components/ui/Button'
 import { toast } from 'sonner'
+import Modal from '@/modules/shared/components/Modal'
 import {
   Film,
   Play,
@@ -14,6 +15,7 @@ import {
   CheckCircle2,
   Video,
   Layers,
+  Send,
 } from 'lucide-react'
 
 const FORMAT_ICON: Record<string, React.ElementType> = {
@@ -56,20 +58,38 @@ interface Composition {
   idea: { ideaText: string } | null
 }
 
+interface SocialProfile {
+  id: string
+  username: string | null
+  platform: string
+  profileImage: string | null
+  accessToken: string | null
+}
+
 export default function AccountCompositions({ brandId }: { brandId: string }) {
   const [compositions, setCompositions] = useState<Composition[]>([])
+  const [socialProfiles, setSocialProfiles] = useState<SocialProfile[]>([])
   const [loading, setLoading] = useState(true)
   const [actioningId, setActioningId] = useState<string | null>(null)
+  const [publishingId, setPublishingId] = useState<string | null>(null)
+  const [publishModalOpen, setPublishModalOpen] = useState(false)
+  const [selectedProfiles, setSelectedProfiles] = useState<string[]>([])
+  const [publishInProgress, setPublishInProgress] = useState(false)
 
   const fetchCompositions = async () => {
     try {
-      const res = await fetch(`/api/compositions?brandId=${brandId}`)
-      const data = await res.json()
+      const [composRes, profileRes] = await Promise.all([
+        fetch(`/api/compositions?brandId=${brandId}`),
+        fetch(`/api/brands/${brandId}/social-profiles`),
+      ])
+      const compData = await composRes.json()
+      const profileData = await profileRes.json()
       // Filter to post-render statuses only — pool handles DRAFT/APPROVED
-      const rendered = (data.compositions ?? []).filter((c: Composition) =>
+      const rendered = (compData.compositions ?? []).filter((c: Composition) =>
         ['RENDERING', 'RENDERED', 'SCHEDULED', 'PUBLISHING', 'PUBLISHED', 'FAILED'].includes(c.status),
       )
       setCompositions(rendered)
+      setSocialProfiles(profileData.profiles ?? [])
     } catch {
       toast.error('Failed to load compositions')
     } finally {
@@ -96,6 +116,45 @@ export default function AccountCompositions({ brandId }: { brandId: string }) {
       toast.error('Failed to update')
     } finally {
       setActioningId(null)
+    }
+  }
+
+  const handlePublish = (id: string) => {
+    setPublishingId(id)
+    setSelectedProfiles([])
+    setPublishModalOpen(true)
+  }
+
+  const toggleProfile = (profileId: string) => {
+    setSelectedProfiles((prev) =>
+      prev.includes(profileId) ? prev.filter((p) => p !== profileId) : [...prev, profileId],
+    )
+  }
+
+  const confirmPublish = async () => {
+    if (selectedProfiles.length === 0) {
+      toast.error('Select at least one profile')
+      return
+    }
+    setPublishInProgress(true)
+    try {
+      const res = await fetch(`/api/compositions/${publishingId}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profileIds: selectedProfiles }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Publish failed')
+      }
+      toast.success('Published to selected profiles')
+      setPublishModalOpen(false)
+      setPublishingId(null)
+      await fetchCompositions()
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to publish')
+    } finally {
+      setPublishInProgress(false)
     }
   }
 
@@ -189,24 +248,107 @@ export default function AccountCompositions({ brandId }: { brandId: string }) {
 
                 {/* Actions */}
                 {comp.status === 'RENDERED' && (
-                  <Button
-                    disabled={busy}
-                    onClick={() => handleMarkPublished(comp.id)}
-                    className="shrink-0 bg-green-800 hover:bg-green-700 gap-1.5 text-xs"
-                  >
-                    {busy ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <CheckCircle2 className="w-3 h-3" />
-                    )}
-                    Mark published
-                  </Button>
+                  <div className="shrink-0 flex gap-2">
+                    <Button
+                      disabled={busy || publishingId === comp.id}
+                      onClick={() => handlePublish(comp.id)}
+                      className="bg-accent hover:bg-accent/80 gap-1.5 text-xs"
+                    >
+                      {publishingId === comp.id ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Send className="w-3 h-3" />
+                      )}
+                      Publish
+                    </Button>
+                    <Button
+                      disabled={busy}
+                      onClick={() => handleMarkPublished(comp.id)}
+                      className="bg-green-800 hover:bg-green-700 gap-1.5 text-xs"
+                    >
+                      {busy ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="w-3 h-3" />
+                      )}
+                      Mark published
+                    </Button>
+                  </div>
                 )}
               </div>
             </Card>
           )
         })}
       </div>
+
+      {/* Publish Modal */}
+      <Modal isOpen={publishModalOpen} onClose={() => { setPublishModalOpen(false); setPublishingId(null) }}>
+        <div className="text-center mb-8">
+          <div className="w-20 h-20 bg-accent/10 rounded-3xl flex items-center justify-center mx-auto mb-6 text-accent">
+            <Send size={36} />
+          </div>
+          <h2 className="text-3xl font-heading font-bold mb-3">Publish Composition</h2>
+          <p className="text-text-secondary text-base max-w-[320px] mx-auto">
+            Select the social profiles where you want to publish this content.
+          </p>
+        </div>
+
+        <div className="space-y-3 mb-8 max-h-64 overflow-y-auto">
+          {socialProfiles.length === 0 ? (
+            <p className="text-center text-text-secondary text-sm py-8">
+              No social profiles added yet. Add profiles in the Publishing Channels section first.
+            </p>
+          ) : (
+            socialProfiles.map((profile) => (
+              <label
+                key={profile.id}
+                className="flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 rounded-lg cursor-pointer transition-colors"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedProfiles.includes(profile.id)}
+                  onChange={() => toggleProfile(profile.id)}
+                  className="w-4 h-4 rounded cursor-pointer"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">@{profile.username ?? 'unnamed'}</p>
+                  <p className="text-xs text-text-secondary capitalize">
+                    {profile.accessToken ? '✓ Authorized' : '⚠ Needs authorization'}
+                  </p>
+                </div>
+              </label>
+            ))
+          )}
+        </div>
+
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            onClick={() => { setPublishModalOpen(false); setPublishingId(null) }}
+            disabled={publishInProgress}
+            className="flex-1"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={confirmPublish}
+            disabled={publishInProgress || selectedProfiles.length === 0}
+            className="flex-1 bg-accent hover:bg-accent/80"
+          >
+            {publishInProgress ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                Publishing…
+              </>
+            ) : (
+              <>
+                <Send className="w-4 h-4 mr-2" />
+                Publish to {selectedProfiles.length} {selectedProfiles.length === 1 ? 'profile' : 'profiles'}
+              </>
+            )}
+          </Button>
+        </div>
+      </Modal>
     </div>
   )
 }

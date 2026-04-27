@@ -19,6 +19,7 @@ import {
   AlertCircle,
   Layers,
   ChevronRight,
+  Wand2,
 } from 'lucide-react'
 
 const FORMAT_ICON: Record<string, React.ElementType> = {
@@ -58,6 +59,7 @@ interface Composition {
   caption: string | null
   hashtags: string[]
   creative: any
+  payload: any
   createdAt: string
   template: { id: string; name: string; sceneType: string | null } | null
   idea: { ideaText: string } | null
@@ -115,6 +117,28 @@ export default function AccountPool({
       fetchCompositions()
     } catch {
       toast.error('Failed to approve')
+    } finally {
+      setActioningId(null)
+    }
+  }
+
+  const handleCompose = async (comp: Composition) => {
+    setActioningId(comp.id)
+    const toastId = toast.loading('Composing…')
+    try {
+      const res = await fetch('/api/render/dynamic', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schema: (comp as any).payload, compositionId: comp.id, brandId }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Render failed')
+      }
+      toast.success('Composition rendered and moved to Compositions', { id: toastId })
+      fetchCompositions()
+    } catch (err: any) {
+      toast.error(err.message, { id: toastId })
     } finally {
       setActioningId(null)
     }
@@ -272,6 +296,17 @@ export default function AccountPool({
                   >
                     {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
                     Approve
+                  </Button>
+                )}
+
+                {comp.status === 'APPROVED' && !isHeadTalk && (
+                  <Button
+                    disabled={busy}
+                    onClick={() => handleCompose(comp)}
+                    className="bg-purple-700 hover:bg-purple-600 px-3 flex items-center gap-1.5 text-sm"
+                  >
+                    {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+                    Compose
                   </Button>
                 )}
 

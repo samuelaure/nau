@@ -6,7 +6,7 @@ import { Card } from '@/modules/shared/components/ui/Card'
 import { Button } from '@/modules/shared/components/ui/Button'
 import { Input } from '@/modules/shared/components/ui/Input'
 import Modal from '@/modules/shared/components/Modal'
-import { addSocialProfile, deleteSocialProfile, syncSocialProfile } from '@/modules/accounts/actions'
+import { addSocialProfile, deleteSocialProfile, syncSocialProfile, syncProfileToNauthenticity } from '@/modules/accounts/actions'
 import { toast } from 'sonner'
 import { cn } from '@/modules/shared/utils'
 import { useRouter } from 'next/navigation'
@@ -80,6 +80,19 @@ export default function BrandProfiles({
     }
   }
 
+  const handleSyncToNauthenticity = async (id: string) => {
+    setSyncingId(id)
+    try {
+      await syncProfileToNauthenticity(id)
+      toast.success('Profile synced to nauthenticity')
+      router.refresh()
+    } catch (error: any) {
+      toast.error(error.message || 'Sync failed')
+    } finally {
+      setSyncingId(null)
+    }
+  }
+
   return (
     <div className="animate-fade-in space-y-6">
       <div className="flex items-start justify-between">
@@ -101,6 +114,7 @@ export default function BrandProfiles({
             ? Math.ceil((new Date(profile.tokenExpiresAt).getTime() - now) / 86_400_000)
             : null
           const tokenOk = daysLeft === null || daysLeft > 7
+          const cleanUsername = profile.username?.replace(/^@/, '') ?? 'syncing…'
 
           return (
             <Card key={profile.id} className="p-5 flex flex-col gap-4">
@@ -116,7 +130,7 @@ export default function BrandProfiles({
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="font-semibold truncate">@{profile.username ?? 'syncing…'}</p>
+                    <p className="font-semibold truncate">@{cleanUsername}</p>
                     {profile.username && (
                       <a
                         href={`https://instagram.com/${profile.username}`}
@@ -141,7 +155,7 @@ export default function BrandProfiles({
                 </div>
                 <div className="flex-1 p-2.5 bg-white/5 rounded-lg text-center">
                   <p className="text-[10px] text-text-secondary uppercase tracking-wider mb-0.5">Added</p>
-                  <p className="text-xs font-semibold">{new Date(profile.createdAt).toLocaleDateString()}</p>
+                  <p className="text-xs font-semibold">{new Date(profile.createdAt).toLocaleDateString('en-US')}</p>
                 </div>
               </div>
 
@@ -152,9 +166,20 @@ export default function BrandProfiles({
                   className="flex-1 gap-1.5"
                   disabled={syncingId === profile.id}
                   onClick={() => handleSync(profile.id)}
+                  title="Sync profile info from Instagram"
                 >
                   {syncingId === profile.id ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
                   Sync
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  disabled={syncingId === profile.id}
+                  onClick={() => handleSyncToNauthenticity(profile.id)}
+                  title="Sync this profile to nauthenticity"
+                >
+                  {syncingId === profile.id ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
                 </Button>
                 <Button
                   variant="outline"
