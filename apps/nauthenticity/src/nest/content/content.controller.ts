@@ -19,6 +19,11 @@ import { AnyAuthGuard } from '../auth/any-auth.guard'
 export class ContentController {
   constructor(private readonly contentService: ContentService) {}
 
+  @Get('brands/:brandId/owned-profiles')
+  getOwnedProfiles(@Param('brandId') brandId: string) {
+    return this.contentService.getOwnedProfiles(brandId)
+  }
+
   @Get('accounts')
   listAccounts(
     @Query('page') page = '1',

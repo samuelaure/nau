@@ -218,4 +218,12 @@ export class ContentService {
     }
     return { results }
   }
+
+  async getOwnedProfiles(brandId: string) {
+    return this.prisma.socialProfile.findMany({
+      where: { ownerId: brandId },
+      orderBy: { lastScrapedAt: 'desc' },
+      include: { _count: { select: { posts: true } } },
+    })
+  }
 }

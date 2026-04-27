@@ -391,19 +391,4 @@ export const contentController = async (fastify: FastifyInstance) => {
       return reply.status(500).send({ error: 'Search failed' });
     }
   });
-
-  fastify.get('/brands/:brandId/owned-profiles', async (request: FastifyRequest, reply: FastifyReply) => {
-    const { brandId } = request.params as { brandId: string };
-    try {
-      const profiles = await prisma.socialProfile.findMany({
-        where: { ownerId: brandId },
-        orderBy: { lastScrapedAt: 'desc' },
-        include: { _count: { select: { posts: true } } },
-      });
-      return profiles;
-    } catch (e) {
-      request.log.error(e);
-      return reply.status(500).send({ error: 'Failed to fetch owned profiles' });
-    }
-  });
 };
