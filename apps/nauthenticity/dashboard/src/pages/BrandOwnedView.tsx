@@ -1,42 +1,27 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
-import { useAuth } from '../lib/auth';
+import { api } from '../lib/api';
 import { Loader, Send } from 'lucide-react';
 
 export const BrandOwnedView = () => {
   const { brandId } = useParams<{ brandId: string }>();
-  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   // Fetch owned profiles
   const { data: profiles, isLoading } = useQuery({
     queryKey: ['owned-profiles', brandId],
     queryFn: async () => {
-      const response = await fetch(`/api/v1/targets?brandId=${brandId}&monitoringType=content`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!response.ok) throw new Error('Failed to fetch profiles');
-      const data = await response.json();
-      return data.filter((t: any) => t.socialProfile?.owner?.id === brandId);
+      const { data } = await api.get(`/targets?brandId=${brandId}`);
+      return data.filter((t: any) => t.socialProfile?.ownerId === brandId);
     },
-    enabled: !!brandId && !!token,
+    enabled: !!brandId,
   });
 
   // Sync to flownau mutation
   const syncMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`/api/v1/brands/${brandId}/sync-owned-to-flownau`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to sync profiles');
-      }
-      return response.json();
+      const { data } = await api.post(`/brands/${brandId}/sync-owned-to-flownau`);
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['owned-profiles', brandId] });
