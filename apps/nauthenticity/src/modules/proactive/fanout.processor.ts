@@ -7,7 +7,7 @@ import { dispatchToZazu } from './zazu.dispatcher';
 import { logger } from '../../utils/logger';
 import { prisma } from '../../modules/shared/prisma';
 import { toZonedTime } from 'date-fns-tz';
-import type { Brand, SocialProfileMonitor, SocialProfile } from '@prisma/client';
+import type { Brand, SocialProfileMonitor, SocialProfile } from '../../../node_modules/.prisma/client';
 
 // ---------------------------------------------------------------------------
 // Types

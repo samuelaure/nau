@@ -14,11 +14,7 @@
     "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
     "incremental": true,
-    "sourceMap": true,
-    "paths": {
-      "@prisma/client": ["./node_modules/.prisma/client"],
-      "@prisma/client/*": ["./node_modules/.prisma/client/*"]
-    }
+    "sourceMap": true
   },
   "include": ["src/main.ts", "src/nest/**/*"],
   "exclude": ["node_modules", "dist"]
