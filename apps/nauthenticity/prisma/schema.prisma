@@ -15,18 +15,18 @@ datasource db {
 // ownerId: the Brand that owns/publishes to this profile (one brand per profile per platform)
 
 model SocialProfile {
-  id              String    @id @default(uuid())
-  platform        String    @default("instagram")
+  id              String   @id @default(uuid())
+  platform        String   @default("instagram")
   username        String
   profileImageUrl String?
-  lastScrapedAt   DateTime  @default(now())
+  lastScrapedAt   DateTime @default(now())
 
   // Ownership — the ONE brand that publishes to this profile
-  ownerId         String?
-  owner           Brand?    @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  ownerId String?
+  owner   Brand?  @relation(fields: [ownerId], references: [id], onDelete: SetNull)
 
-  posts           Post[]
-  monitors        SocialProfileMonitor[]
+  posts    Post[]
+  monitors SocialProfileMonitor[]
 
   @@unique([platform, username])
   @@index([platform, username])
@@ -36,81 +36,81 @@ model SocialProfile {
 // ── Scraped Content ───────────────────────────────────────────────────────────
 
 model Post {
-  id                String         @id @default(uuid())
-  platformId        String?        @unique
-  url               String         @unique
-  username          String?
-  socialProfileId   String?
-  socialProfile     SocialProfile? @relation(fields: [socialProfileId], references: [id])
-  caption           String?
-  originalCaption   String?
-  postedAt          DateTime
-  likes             Int            @default(0)
-  comments          Int            @default(0)
-  views             Int?
-  engagementScore   Float?
-  collaborators     Json?
-  intelligence      Json?
+  id              String         @id @default(uuid())
+  platformId      String?        @unique
+  url             String         @unique
+  username        String?
+  socialProfileId String?
+  socialProfile   SocialProfile? @relation(fields: [socialProfileId], references: [id])
+  caption         String?
+  originalCaption String?
+  postedAt        DateTime
+  likes           Int            @default(0)
+  comments        Int            @default(0)
+  views           Int?
+  engagementScore Float?
+  collaborators   Json?
+  intelligence    Json?
 
-  runId             String?
-  run               ScrapingRun?   @relation(fields: [runId], references: [id])
+  runId String?
+  run   ScrapingRun? @relation(fields: [runId], references: [id])
 
-  media             Media[]
-  transcripts       Transcript[]
-  feedbacks         CommentFeedback[]
-  inspoItems        InspoItem[]
+  media       Media[]
+  transcripts Transcript[]
+  feedbacks   CommentFeedback[]
+  inspoItems  InspoItem[]
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([socialProfileId, postedAt(sort: Desc)])
   @@index([username, postedAt(sort: Desc)])
 }
 
 model ScrapingRun {
-  id          String   @id @default(uuid())
-  username    String
-  actorRunId  String?  @unique
-  datasetId   String?
-  rawData     Json?
-  status      String   @default("completed")
-  phase       String   @default("finished")
-  isPaused    Boolean  @default(false)
+  id         String  @id @default(uuid())
+  username   String
+  actorRunId String? @unique
+  datasetId  String?
+  rawData    Json?
+  status     String  @default("completed")
+  phase      String  @default("finished")
+  isPaused   Boolean @default(false)
 
-  posts       Post[]
+  posts Post[]
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 }
 
 model Media {
-  id           String      @id @default(uuid())
+  id           String  @id @default(uuid())
   postId       String
-  post         Post        @relation(fields: [postId], references: [id])
+  post         Post    @relation(fields: [postId], references: [id])
   type         String
   url          String?
   storageUrl   String
   thumbnailUrl String?
   duration     Float?
-  index        Int         @default(0)
+  index        Int     @default(0)
 
-  transcript   Transcript?
+  transcript Transcript?
 
-  createdAt    DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([postId])
 }
 
 model Transcript {
-  id           String     @id @default(uuid())
+  id           String  @id @default(uuid())
   postId       String
-  post         Post       @relation(fields: [postId], references: [id])
-  mediaId      String?    @unique
-  media        Media?     @relation(fields: [mediaId], references: [id])
+  post         Post    @relation(fields: [postId], references: [id])
+  mediaId      String? @unique
+  media        Media?  @relation(fields: [mediaId], references: [id])
   text         String
   originalText String?
   json         Json?
 
-  createdAt    DateTime @default(now())
+  createdAt DateTime @default(now())
 
   embeddings      Embedding[]
   knowledgeChunks KnowledgeChunk[]
@@ -119,33 +119,33 @@ model Transcript {
 }
 
 model Embedding {
-  id           String     @id @default(uuid())
-  transcriptId String     @unique
-  transcript   Transcript @relation(fields: [transcriptId], references: [id])
+  id           String                      @id @default(uuid())
+  transcriptId String                      @unique
+  transcript   Transcript                  @relation(fields: [transcriptId], references: [id])
   vector       Unsupported("vector(1536)")
-  model        String     @default("text-embedding-3-small")
+  model        String                      @default("text-embedding-3-small")
 
-  createdAt    DateTime @default(now())
+  createdAt DateTime @default(now())
 }
 
 // ── Knowledge / RAG ───────────────────────────────────────────────────────────
 
 model KnowledgeChunk {
-  id           String   @id @default(uuid())
-  platform     String
-  platformId   String
-  brandId      String?
-  sourceType   String   @default("transcript")
-  sourceId     String?
-  chunkIndex   Int      @default(0)
-  text         String
-  vector       Unsupported("vector(1536)")
-  model        String   @default("text-embedding-3-small")
+  id         String                      @id @default(uuid())
+  platform   String
+  platformId String
+  brandId    String?
+  sourceType String                      @default("transcript")
+  sourceId   String?
+  chunkIndex Int                         @default(0)
+  text       String
+  vector     Unsupported("vector(1536)")
+  model      String                      @default("text-embedding-3-small")
 
   transcriptId String?
   transcript   Transcript? @relation(fields: [transcriptId], references: [id])
 
-  createdAt    DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([platform, platformId])
   @@index([brandId])
@@ -156,38 +156,38 @@ model KnowledgeChunk {
 // id = flownau Brand.id (same as API Brand.id)
 
 model Brand {
-  id                String   @id                       // = flownau Brand.id = API Brand.id
-  workspaceId       String   @default("")
+  id                String  @id // = flownau Brand.id = API Brand.id
+  workspaceId       String  @default("")
   mainUsername      String?
   voicePrompt       String
   commentStrategy   String?
-  suggestionsCount  Int      @default(3)
+  suggestionsCount  Int     @default(3)
   windowStart       String?
   windowEnd         String?
-  timezone          String   @default("UTC")
-  inspoRequestCount Int      @default(0)
+  timezone          String  @default("UTC")
+  inspoRequestCount Int     @default(0)
 
-  ownedProfiles  SocialProfile[]
-  monitors       SocialProfileMonitor[]
-  syntheses      BrandSynthesis[]
-  feedbacks      CommentFeedback[]
-  inspoItems     InspoItem[]
+  ownedProfiles SocialProfile[]
+  monitors      SocialProfileMonitor[]
+  syntheses     BrandSynthesis[]
+  feedbacks     CommentFeedback[]
+  inspoItems    InspoItem[]
 
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([workspaceId])
 }
 
 model BrandSynthesis {
-  id           String   @id @default(uuid())
+  id           String @id @default(uuid())
   brandId      String
-  brand        Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  brand        Brand  @relation(fields: [brandId], references: [id], onDelete: Cascade)
   type         String
-  content      String   @db.Text
-  attachedUrls Json     @default("[]")
+  content      String @db.Text
+  attachedUrls Json   @default("[]")
 
-  createdAt    DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([brandId, type])
 }
@@ -204,22 +204,22 @@ model SocialProfileMonitor {
   isActive        Boolean       @default(true)
   settings        Json?
 
-  createdAt       DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([brandId, socialProfileId])
   @@index([brandId])
 }
 
 model CommentFeedback {
-  id          String   @id @default(uuid())
+  id          String  @id @default(uuid())
   brandId     String
-  brand       Brand @relation(fields: [brandId], references: [id])
+  brand       Brand   @relation(fields: [brandId], references: [id])
   postId      String
-  post        Post     @relation(fields: [postId], references: [id])
-  commentText String   @db.Text
-  isSelected  Boolean  @default(false)
+  post        Post    @relation(fields: [postId], references: [id])
+  commentText String  @db.Text
+  isSelected  Boolean @default(false)
 
-  sentAt      DateTime @default(now())
+  sentAt DateTime @default(now())
 
   @@index([brandId])
 }
@@ -227,22 +227,22 @@ model CommentFeedback {
 // ── Inspo ─────────────────────────────────────────────────────────────────────
 
 model InspoItem {
-  id              String   @id @default(uuid())
+  id              String  @id @default(uuid())
   brandId         String
-  brand           Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  brand           Brand   @relation(fields: [brandId], references: [id], onDelete: Cascade)
   postId          String?
-  post            Post?    @relation(fields: [postId], references: [id])
+  post            Post?   @relation(fields: [postId], references: [id])
   sourceUrl       String?
   type            String
-  note            String?  @db.Text
-  status          String   @default("pending")
-  extractedHook   String?  @db.Text
+  note            String? @db.Text
+  status          String  @default("pending")
+  extractedHook   String? @db.Text
   extractedTheme  String?
-  adaptedScript   String?  @db.Text
-  injectedContext String?  @db.Text
+  adaptedScript   String? @db.Text
+  injectedContext String? @db.Text
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([brandId])
   @@index([brandId, status])
