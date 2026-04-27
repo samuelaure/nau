@@ -4,21 +4,20 @@ import { z } from 'zod'
 const IdeationOutputSchema = z.object({
   ideas: z.array(
     z.object({
-      hook: z.string().describe('A compelling opening hook for the content piece.'),
-      angle: z.string().describe('The unique angle or perspective for this idea.'),
-      script: z.string().describe('A full content script or narrative, ready for recording.'),
-      cta: z.string().describe('A call-to-action suggestion.'),
+      concept: z
+        .string()
+        .describe(
+          'The content idea as a short plain-text concept (2–4 sentences max). No scripts, no CTAs, not an explanation of the idea — just the core concept and angle expressed as a hook.',
+        ),
       format: z
         .enum(['reel', 'trial_reel', 'head_talk', 'carousel', 'static_post', 'story'])
-        .describe('Recommended content format.'),
+        .describe('Best format for this idea.'),
       inspoItemId: z
         .string()
-        .nullable()
-        .optional()
-        .describe('ID of the InspoItem that inspired this idea.'),
+        .describe('ID of the InspoItem that inspired this idea, or empty string if none.'),
     }),
   ),
-  briefSummary: z.string().describe('A brief meta-summary of the ideation session.'),
+  briefSummary: z.string().describe('One sentence summarising the session.'),
 })
 
 export type IdeationOutput = z.infer<typeof IdeationOutputSchema>
@@ -33,6 +32,7 @@ export interface GenerationRequest {
   brandName: string
   dna: string // Brand DNA (persona system prompt)
   strategy?: string // Optional IdeasFramework prompt for creative direction
+  language?: string // Brand content language (e.g. 'Spanish', 'English', 'Italian')
   count: number // How many ideas to generate
   concept?: string // Source concept driving this generation (captured/manual origin)
   digest?: { content: string; attachedUrls: string[] } // Phase 11: mechanical InspoBase digest
@@ -108,16 +108,20 @@ export async function generateContentIdeas(req: GenerationRequest): Promise<Idea
       {
         role: 'system',
         content: `You are the Content Ideation Engine for "${req.brandName}".
-Generate exactly ${req.count} fresh, high-quality content ideas.
+Generate exactly ${req.count} ideas.
+
+WHAT AN IDEA IS:
+The content idea as a short plain-text concept (2–4 sentences max). No scripts, no CTAs, not an explanation of the idea — just the core concept and angle expressed as a hook.
 
 RULES:
-1. Each idea must have a compelling hook, a unique angle, a full script, and a CTA.
-2. Reference inspoItemIds when an idea is directly inspired by a specific InspoItem.
-3. Recommend the best format for each idea: reel (short video), trial_reel (test/experimental reel), head_talk (talking-head script — no video assets, user records themselves), carousel (swipeable slides), static_post (single image), story (Instagram/TikTok story).
-4. Avoid repeating topics from "Recent Published Content".
-5. Honor the Brand DNA for tone, voice, and values.
-6. If a Source Concept is provided, all ideas must be directly inspired by it.
-7. Write scripts in the brand's natural language (typically Spanish).
+1. Each idea must be written as plain natural language. No headers, no labels like "Hook:", "Script:", "CTA:" — just the concept.
+2. Keep each idea to 2–4 sentences maximum.
+3. Pick the best format: reel (short video), trial_reel (experimental/test reel), head_talk (talking-head, no extra footage), carousel (swipeable slides), static_post (single image), story (Instagram/TikTok story).
+4. Set inspoItemId to the ID of the inspiring InspoItem, or empty string if none.
+5. Avoid repeating topics from "Recent Published Content".
+6. Honor the Brand DNA for tone, voice, and values.
+7. If a Source Concept is provided, expand on it — generate ideas directly inspired by it.
+8. Write every idea in ${req.language ?? 'Spanish'}.
 
 Return valid JSON matching the schema.`,
       },

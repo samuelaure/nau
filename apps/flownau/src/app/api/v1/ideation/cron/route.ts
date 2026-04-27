@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
         await prisma.contentIdea.createMany({
           data: result.ideas.map((idea) => ({
             brandId: account.id,
-            ideaText: `Hook: ${idea.hook}\nAngle: ${idea.angle}\nFormat: ${idea.format}\nScript: ${idea.script}\nCTA: ${idea.cta}`,
+            ideaText: idea.concept,
             source: 'automatic',
             status: 'PENDING',
             priority: 3,
@@ -110,11 +110,8 @@ export async function POST(request: NextRequest) {
     let briefMd = `📋 *Brief de Contenido — ${dateStr}*\n_Marca: ${brandName}_\n\n`
     briefMd += `*💡 RESUMEN ESTRATÉGICO*\n${result.briefSummary}\n\n`
     result.ideas.forEach((idea, idx) => {
-      briefMd += `*IDEA ${idx + 1}: ${idea.hook}*\n`
-      briefMd += `📌 *Ángulo:* ${idea.angle}\n`
-      briefMd += `🎬 *Formato:* ${idea.format}\n`
-      briefMd += `📝 *Script:* ${idea.script}\n`
-      briefMd += `🎯 *Call to Action:* ${idea.cta}\n\n`
+      briefMd += `*IDEA ${idx + 1}* (${idea.format})\n`
+      briefMd += `${idea.concept}\n\n`
     })
     briefMd += `_Basado en: ${inspoData.length} posts de Inspo Base._`
 

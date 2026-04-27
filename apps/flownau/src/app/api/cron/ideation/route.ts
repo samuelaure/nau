@@ -106,7 +106,7 @@ export async function GET(request: Request) {
             : null
 
         for (const idea of output.ideas) {
-          const ideaText = `[${idea.format.toUpperCase()}] Hook: ${idea.hook}\nAngle: ${idea.angle}\nScript: ${idea.script}\nCTA: ${idea.cta}`
+          const ideaText = idea.concept
 
           const isHeadTalk = detectHeadTalk(ideaText)
           if (isHeadTalk) headTalkCount++

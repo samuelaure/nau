@@ -17,6 +17,7 @@ model Brand {
   name           String?                 // cached from 9naŭ API
   shortCode      String?
   assetsRoot     String?
+  language       String   @default("Spanish")
   directorPrompt String?  @db.Text
   creationPrompt String?  @db.Text
   createdAt      DateTime @default(now())

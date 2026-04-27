@@ -19,6 +19,10 @@ export async function POST(req: Request) {
       source = 'manual',
     } = json
 
+    // Fetch brand language preference
+    const brand = await prisma.brand.findUnique({ where: { id: brandId }, select: { language: true } })
+    const language = brand?.language ?? 'Spanish'
+
     if (!brandId) {
       return NextResponse.json({ error: 'Missing brandId' }, { status: 400 })
     }
@@ -77,6 +81,7 @@ export async function POST(req: Request) {
       brandName: persona.name,
       dna: persona.systemPrompt,
       strategy: framework?.systemPrompt,
+      language,
       concept: concept ?? undefined,
       count,
       digest: digest ?? undefined,
@@ -86,12 +91,10 @@ export async function POST(req: Request) {
 
     // 5. Save ideas with correct source/priority/format
     const ops = output.ideas.map((idea) => {
-      const ideaText = `[${idea.format.toUpperCase()}] Hook: ${idea.hook}\nAngle: ${idea.angle}\nScript: ${idea.script}\nCTA: ${idea.cta}`
-
       return prisma.contentIdea.create({
         data: {
           brandId,
-          ideaText,
+          ideaText: idea.concept,
           format: idea.format,
           status: autoApprove ? 'APPROVED' : 'PENDING',
           source,
@@ -177,6 +180,15 @@ export async function POST(req: Request) {
       { status: 200 },
     )
   } catch (error: unknown) {
+    // NEXT_REDIRECT is thrown by redirect() in requireAuth when session is missing.
+    // In an API route it must not be re-thrown (no browser navigation), so surface as 401.
+    if (
+      error instanceof Error &&
+      typeof (error as any).digest === 'string' &&
+      (error as any).digest.startsWith('NEXT_REDIRECT')
+    ) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     logError('IDEA_GENERATION_ROUTE_ERROR', error)
     const message = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json({ error: 'Failed to generate ideas', message }, { status: 500 })

@@ -124,7 +124,7 @@ export const CTASlideSlots = z.object({
 
 export const SceneDefinitionSchema = z.object({
   type: VideoSceneTypeEnum,
-  slots: z.record(z.string(), z.unknown()),
+  slots: z.record(z.string(), z.unknown()).optional().default({}),
   mood: z.string().max(40).optional().nullable(),
   assetHint: z.string().max(80).optional().nullable(),
   duration: z.number().min(0.3).max(30).optional().nullable(),
