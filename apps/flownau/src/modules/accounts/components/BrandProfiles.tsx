@@ -67,24 +67,14 @@ export default function BrandProfiles({
     }
   }
 
-  const handleSync = async (id: string) => {
+  const handleSyncAll = async (id: string) => {
     setSyncingId(id)
     try {
+      // First sync from Instagram to refresh data
       await syncSocialProfile(id)
-      toast.success('Profile synced')
-      router.refresh()
-    } catch {
-      toast.error('Sync failed')
-    } finally {
-      setSyncingId(null)
-    }
-  }
-
-  const handleSyncToNauthenticity = async (id: string) => {
-    setSyncingId(id)
-    try {
+      // Then sync to nauthenticity
       await syncProfileToNauthenticity(id)
-      toast.success('Profile synced to nauthenticity')
+      toast.success('Profile synced from Instagram and nauthenticity')
       router.refresh()
     } catch (error: any) {
       toast.error(error.message || 'Sync failed')
@@ -165,21 +155,11 @@ export default function BrandProfiles({
                   size="sm"
                   className="flex-1 gap-1.5"
                   disabled={syncingId === profile.id}
-                  onClick={() => handleSync(profile.id)}
-                  title="Sync profile info from Instagram"
+                  onClick={() => handleSyncAll(profile.id)}
+                  title="Refresh from Instagram and sync to nauthenticity"
                 >
                   {syncingId === profile.id ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
-                  Sync
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  disabled={syncingId === profile.id}
-                  onClick={() => handleSyncToNauthenticity(profile.id)}
-                  title="Sync this profile to nauthenticity"
-                >
-                  {syncingId === profile.id ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+                  Sync All
                 </Button>
                 <Button
                   variant="outline"
