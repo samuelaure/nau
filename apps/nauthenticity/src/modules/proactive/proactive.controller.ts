@@ -4,6 +4,7 @@ import { prisma } from '../../modules/shared/prisma';
 import { logger } from '../../utils/logger';
 import { runProactiveFanout } from './fanout.processor';
 import { generateReactiveComments } from './reactive.service';
+import axios from 'axios';
 
 // ---------------------------------------------------------------------------
 // Auth middleware — NAU_SERVICE_KEY (inter-service)
@@ -370,4 +371,82 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
     });
     return reply.send({ success: true });
   });
+
+  // -------------------------------------------------------------------------
+  // 7. Sync owned profiles to flownau
+  // -------------------------------------------------------------------------
+  fastify.post(
+    '/brands/:brandId/sync-owned-to-flownau',
+    { preHandler: authenticate },
+    async (request, reply) => {
+      const { brandId } = request.params as { brandId: string };
+      try {
+        const brand = await prisma.brand.findUnique({ where: { id: brandId } });
+        if (!brand) return reply.status(404).send({ error: 'Brand not found' });
+
+        const profiles = await prisma.socialProfile.findMany({
+          where: { ownerId: brandId },
+        });
+
+        if (profiles.length === 0) {
+          return reply.send({
+            success: true,
+            synced: 0,
+            message: 'No owned profiles to sync',
+          });
+        }
+
+        const flownauUrl = process.env.FLOWNAU_URL || 'http://localhost:3003';
+        const serviceKey = process.env.NAU_SERVICE_KEY || '';
+
+        let synced = 0;
+        const errors: Array<{ username: string; error: string }> = [];
+
+        for (const profile of profiles) {
+          try {
+            const response = await axios.post(
+              `${flownauUrl}/api/brands/${brandId}/social-profiles`,
+              {
+                username: profile.username,
+                platform: profile.platform,
+                profileImageUrl: profile.profileImageUrl,
+                nauthenticityProfileId: profile.id,
+                syncedFromNauthenticity: true,
+              },
+              {
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-Nau-Service-Key': serviceKey,
+                },
+                timeout: 10_000,
+              },
+            );
+
+            if (response.status === 201 || response.status === 200) {
+              synced++;
+              logger.log(
+                `[SyncToFlownau] Synced profile ${profile.username} (${profile.platform}) for brand ${brandId}`,
+              );
+            }
+          } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            errors.push({ username: profile.username, error: msg });
+            logger.error(
+              `[SyncToFlownau] Failed to sync profile ${profile.username}: ${msg}`,
+            );
+          }
+        }
+
+        return reply.send({
+          success: synced > 0,
+          synced,
+          total: profiles.length,
+          errors: errors.length > 0 ? errors : undefined,
+        });
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        return reply.status(500).send({ error: msg });
+      }
+    },
+  );
 };
