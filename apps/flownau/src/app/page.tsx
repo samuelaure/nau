@@ -21,7 +21,7 @@ export default async function LandingPage() {
         <div className="flex items-center gap-4">
           {!user ? (
             <a
-              href={`${process.env.NEXT_PUBLIC_ACCOUNTS_URL ?? 'https://accounts.9nau.com'}/login?continue=${encodeURIComponent(`${process.env.NEXT_PUBLIC_APP_URL ?? 'https://flownau.9nau.com'}/auth/callback`)}`}
+              href={`${process.env.NEXT_PUBLIC_ACCOUNTS_URL ?? 'https://accounts.9nau.com'}/login?continue=${encodeURIComponent(`${process.env.NEXT_PUBLIC_FLOWNAU_URL ?? 'https://flownau.9nau.com'}/auth/callback`)}`}
               className="btn-primary px-4 py-2"
             >
               Log in with naŭ
@@ -54,7 +54,7 @@ export default async function LandingPage() {
           <div className="flex gap-4">
             {!user ? (
               <a
-                href={`${process.env.NEXT_PUBLIC_ACCOUNTS_URL ?? 'https://accounts.9nau.com'}/login?continue=${encodeURIComponent(`${process.env.NEXT_PUBLIC_APP_URL ?? 'https://flownau.9nau.com'}/auth/callback`)}`}
+                href={`${process.env.NEXT_PUBLIC_ACCOUNTS_URL ?? 'https://accounts.9nau.com'}/login?continue=${encodeURIComponent(`${process.env.NEXT_PUBLIC_FLOWNAU_URL ?? 'https://flownau.9nau.com'}/auth/callback`)}`}
                 className="btn-primary px-8 py-4 text-lg inline-flex items-center gap-2"
               >
                 Get Started <ArrowRight size={20} />

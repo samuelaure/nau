@@ -8,7 +8,7 @@ export interface AuthUser {
 }
 
 const ACCOUNTS_URL = process.env.NEXT_PUBLIC_ACCOUNTS_URL ?? 'https://accounts.9nau.com'
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://flownau.9nau.com'
+const FLOWNAU_URL = process.env.NEXT_PUBLIC_FLOWNAU_URL ?? 'https://flownau.9nau.com'
 
 export async function getAuthUser(): Promise<AuthUser | null> {
   const cookieStore = await cookies()
@@ -20,7 +20,7 @@ export async function getAuthUser(): Promise<AuthUser | null> {
 export async function requireAuth(): Promise<AuthUser> {
   const user = await getAuthUser()
   if (!user) {
-    const callbackUrl = `${APP_URL}/auth/callback`
+    const callbackUrl = `${FLOWNAU_URL}/auth/callback`
     redirect(`${ACCOUNTS_URL}/login?continue=${encodeURIComponent(callbackUrl)}`)
   }
   return user

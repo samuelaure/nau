@@ -161,11 +161,11 @@ export async function ingestExternalIdeas(
       `[ExternalSource] Captured idea detected. Triggering immediate composer generation.`,
     )
     // Fire and forget — non-blocking
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const flownauUrl = process.env.NEXT_PUBLIC_FLOWNAU_URL || 'http://localhost:3003'
     const cronSecret = process.env.CRON_SECRET
 
     // Trigger immediate composer generation with cron-secret auth
-    fetch(new URL('/api/cron/composer', appUrl).toString(), {
+    fetch(new URL('/api/cron/composer', flownauUrl).toString(), {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${cronSecret}`,

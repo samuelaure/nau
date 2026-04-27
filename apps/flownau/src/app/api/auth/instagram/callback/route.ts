@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
 
     const appId = process.env.FB_APP_ID
     const appSecret = process.env.FB_APP_SECRET
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const baseUrl = process.env.NEXT_PUBLIC_FLOWNAU_URL || 'http://localhost:3003'
     const redirectUri = `${baseUrl}/api/auth/instagram/callback`
 
     // 1. Exchange code for short-lived token

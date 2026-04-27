@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getOrRefreshSession } from '@nau/auth/nextjs'
 
 const ACCOUNTS_URL = process.env.NEXT_PUBLIC_ACCOUNTS_URL ?? 'https://accounts.9nau.com'
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://flownau.9nau.com'
+const FLOWNAU_URL = process.env.NEXT_PUBLIC_FLOWNAU_URL ?? 'https://flownau.9nau.com'
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -21,7 +21,7 @@ export async function middleware(request: NextRequest) {
   // Protected routes.
   if (pathname.startsWith('/dashboard') && !session) {
     const loginUrl = new URL('/login', ACCOUNTS_URL)
-    loginUrl.searchParams.set('continue', `${APP_URL}/auth/callback`)
+    loginUrl.searchParams.set('continue', `${FLOWNAU_URL}/auth/callback`)
     return NextResponse.redirect(loginUrl)
   }
 

@@ -10,6 +10,7 @@ const EnvSchema = z
     NAUTHENTICITY_URL: z.string().url(),
     CRON_SECRET: z.string().min(1),
     NAU_API_URL: z.string().url(),
+    NEXT_PUBLIC_FLOWNAU_URL: z.string().url(),
     NEXT_PUBLIC_APP_URL: z.string().url(),
     NEXT_PUBLIC_ACCOUNTS_URL: z.string().url(),
     AUTH_URL: z.string().url().optional(),

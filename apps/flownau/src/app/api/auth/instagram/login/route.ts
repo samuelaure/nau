@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server'
 
 export async function GET(req: Request) {
   const appId = process.env.FB_APP_ID
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const baseUrl = process.env.NEXT_PUBLIC_FLOWNAU_URL || 'http://localhost:3003'
   const redirectUri = `${baseUrl}/api/auth/instagram/callback`
 
   const { searchParams } = new URL(req.url)
