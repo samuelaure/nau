@@ -152,7 +152,7 @@ export const BrandContentView = () => {
               <SocialProfileCard
                 key={profile.id}
                 profile={profile}
-                onSelect={setSelectedUsername}
+                onSelect={() => {}} // Navigation handled by component
                 brandId={brandId}
                 workspaceId={workspaceId}
               />
