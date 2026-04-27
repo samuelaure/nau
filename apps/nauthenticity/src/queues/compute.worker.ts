@@ -278,19 +278,19 @@ const createEmbedding = async (text: string, transcriptId: string): Promise<void
     input: text.replace(/\n/g, ' '),
   });
 
-  const embedding = result.embedding;
+  const vectorStr = `[${Array.from(result.embedding).join(',')}]`;
 
   await prisma.$executeRaw`
     INSERT INTO "Embedding" ("id", "transcriptId", "vector", "model", "createdAt")
     VALUES (
-      gen_random_uuid(), 
-      ${transcriptId}, 
-      ${embedding}::vector, 
-      'text-embedding-3-small', 
+      gen_random_uuid(),
+      ${transcriptId},
+      ${vectorStr}::vector,
+      'text-embedding-3-small',
       NOW()
     )
     ON CONFLICT ("transcriptId") DO UPDATE SET
-      "vector" = ${embedding}::vector,
+      "vector" = ${vectorStr}::vector,
       "createdAt" = NOW();
   `;
 };
