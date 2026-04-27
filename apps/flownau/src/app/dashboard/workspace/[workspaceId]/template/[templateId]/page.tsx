@@ -16,7 +16,7 @@ export default async function TemplateDetailPage({
 
   const template = await prisma.template.findUnique({
     where: { id: templateId },
-    include: { _count: { select: { compositions: true } } },
+    include: { _count: { select: { posts: true } } },
   })
 
   if (!template) notFound()

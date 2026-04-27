@@ -13,7 +13,7 @@ export async function addSocialProfile(
   platform: string = 'instagram',
   nauthenticityProfileId?: string,
 ) {
-  const user = await checkAuth()
+  const { user } = await checkAuth()
   if (!user?.id) throw new Error('Unauthorized')
 
   const brand = await prisma.brand.findUnique({ where: { id: brandId } })
@@ -73,7 +73,7 @@ export async function updateSocialProfileTokens(
   refreshToken?: string,
   expiresAt?: Date,
 ) {
-  const user = await checkAuth()
+  const { user } = await checkAuth()
   if (!user?.id) throw new Error('Unauthorized')
 
   const profile = await prisma.socialProfile.findUnique({
@@ -108,7 +108,7 @@ export async function updateSocialProfileTokens(
  * Delete a social profile
  */
 export async function deleteSocialProfile(profileId: string) {
-  const user = await checkAuth()
+  const { user } = await checkAuth()
   if (!user?.id) throw new Error('Unauthorized')
 
   const profile = await prisma.socialProfile.findUnique({

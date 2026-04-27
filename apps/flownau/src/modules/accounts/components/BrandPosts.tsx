@@ -114,7 +114,7 @@ function FormatBadge({ format }: { format: string }) {
   )
 }
 
-export default function AccountIdeas({ brandId }: { brandId: string }) {
+export default function BrandPosts({ brandId }: { brandId: string }) {
   const [ideas, setIdeas] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
@@ -247,7 +247,7 @@ export default function AccountIdeas({ brandId }: { brandId: string }) {
           ideaText: manualIdeaText,
           source: 'manual',
           priority: 2,
-          status: 'PENDING',
+          status: 'IDEA_PENDING',
         }),
       })
       if (!res.ok) throw new Error('Failed to create manual idea')
@@ -276,7 +276,7 @@ export default function AccountIdeas({ brandId }: { brandId: string }) {
       const res = await fetch(`/api/ideas/${idea.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'APPROVED' }),
+        body: JSON.stringify({ status: 'IDEA_APPROVED' }),
       })
       if (!res.ok) throw new Error('Failed to approve')
       toast.success('Idea approved!')
@@ -289,7 +289,7 @@ export default function AccountIdeas({ brandId }: { brandId: string }) {
   }
 
   const handleApproveAll = async () => {
-    const pending = ideas.filter((i) => i.status === 'PENDING')
+    const pending = ideas.filter((i) => i.status === 'IDEA_PENDING')
     if (pending.length === 0) return toast.info('No pending ideas to approve')
     setBulkApproving(true)
     const toastId = toast.loading(`Approving ${pending.length} ideas...`)
@@ -299,7 +299,7 @@ export default function AccountIdeas({ brandId }: { brandId: string }) {
           fetch(`/api/ideas/${idea.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: 'APPROVED' }),
+            body: JSON.stringify({ status: 'IDEA_APPROVED' }),
           }),
         ),
       )
@@ -379,7 +379,7 @@ export default function AccountIdeas({ brandId }: { brandId: string }) {
     }
   }
 
-  const pendingCount = ideas.filter((i) => i.status === 'PENDING').length
+  const pendingCount = ideas.filter((i) => i.status === 'IDEA_PENDING').length
   const usedCount = ideas.filter((i) => i.status === 'USED').length
 
   return (
@@ -458,8 +458,8 @@ export default function AccountIdeas({ brandId }: { brandId: string }) {
       <div className="grid gap-4">
         {ideas.map((idea) => {
           const isUsed = idea.status === 'USED'
-          const isPending = idea.status === 'PENDING'
-          const isApproved = idea.status === 'APPROVED'
+          const isPending = idea.status === 'IDEA_PENDING'
+          const isApproved = idea.status === 'IDEA_APPROVED'
 
           return (
             <Card
@@ -471,7 +471,7 @@ export default function AccountIdeas({ brandId }: { brandId: string }) {
                   <span
                     className={`text-[10px] font-bold tracking-widest px-2 py-0.5 rounded-full uppercase ${isUsed ? 'bg-gray-800 text-gray-500' : isApproved ? 'bg-green-900 text-green-400' : 'bg-orange-900 text-orange-400'}`}
                   >
-                    {idea.status}
+                    {isApproved ? 'Approved' : isPending ? 'Pending' : idea.status}
                   </span>
                   {idea.source && <SourceBadge source={idea.source} />}
                   {idea.format && <FormatBadge format={idea.format} />}

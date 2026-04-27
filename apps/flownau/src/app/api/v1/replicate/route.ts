@@ -73,9 +73,10 @@ export async function POST(req: Request) {
     if (mediaUrl) payload.mediaUrl = mediaUrl
     if (transcription) payload.transcription = transcription
 
-    const composition = await prisma.composition.create({
+    const post = await prisma.post.create({
       data: {
         brandId,
+        ideaText: transcription ?? caption.slice(0, 500),
         format,
         source: 'replicate',
         payload: payload as unknown as Prisma.InputJsonValue,
@@ -83,18 +84,15 @@ export async function POST(req: Request) {
         externalPostId: externalPostId ?? null,
         externalPostUrl: externalPostUrl ?? null,
         userUploadedMediaUrl: mediaUrl ?? null,
-        status: autoApprovePool ? 'APPROVED' : 'DRAFT',
+        status: autoApprovePool ? 'DRAFT_APPROVED' : 'DRAFT_PENDING',
         brandPersonaId: provenance.brandPersonaId,
-        ideasFrameworkId: provenance.ideasFrameworkId,
-        contentPrinciplesId: provenance.contentPrinciplesId,
+        priority: 1,
       },
     })
 
-    logger.info(
-      `[Replicate] Created composition ${composition.id} for account ${brandId} (${format})`,
-    )
+    logger.info(`[Replicate] Created post ${post.id} for account ${brandId} (${format})`)
 
-    return NextResponse.json({ composition }, { status: 201 })
+    return NextResponse.json({ post }, { status: 201 })
   } catch (error) {
     logError('REPLICATE_INGEST_ERROR', error)
     const message = error instanceof Error ? error.message : 'Ingest failed'

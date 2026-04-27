@@ -47,23 +47,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `Account ${input.brandId} not found` }, { status: 404 })
     }
 
-    // 2. Create ContentIdea
-    const idea = await prisma.contentIdea.create({
+    // 2. Create Post at idea stage
+    const post = await prisma.post.create({
       data: {
         brandId: input.brandId,
         ideaText: input.prompt,
         source: input.source ?? 'reactive',
         sourceRef: input.sourceRef ?? null,
-        status: input.autoApprove ? 'APPROVED' : 'PENDING',
+        status: input.autoApprove ? 'IDEA_APPROVED' : 'IDEA_PENDING',
+        priority: 2,
       },
     })
 
-    // 3. If not auto-approve, return early — idea sits in queue
     if (!input.autoApprove) {
-      return NextResponse.json({ compositionId: null, ideaId: idea.id, status: 'pending_approval' })
+      return NextResponse.json({ postId: post.id, status: 'pending_approval' })
     }
 
-    // 4. Auto-approve: run the full composition pipeline
+    // Auto-approve: run the full composition pipeline
     const persona = await prisma.brandPersona.findFirst({
       where: { brandId: input.brandId, isDefault: true },
     })
@@ -77,63 +77,43 @@ export async function POST(req: Request) {
 
     const { sceneAssets, audioAsset } = await selectAssetsForCreative(creative, input.brandId, 30)
 
-    const brandStyle = {
-      primaryColor: '#6C63FF',
-      accentColor: '#FF6584',
-      fontFamily: 'sans-serif',
-    }
-
+    const brandStyle = { primaryColor: '#6C63FF', accentColor: '#FF6584', fontFamily: 'sans-serif' }
     const { schema } = compileTimeline(creative, sceneAssets, audioAsset, brandStyle, input.format)
 
     const sceneTypes = creative.scenes.map((s: { type: string }) => s.type)
     const topicHash = generateTopicHash(input.prompt)
 
-    const composition = await prisma.composition.create({
+    const updatedPost = await prisma.post.update({
+      where: { id: post.id },
       data: {
-        brandId: input.brandId,
         format: input.format,
         creative: creative as unknown as Prisma.InputJsonValue,
         payload: schema as unknown as Prisma.InputJsonValue,
         caption: creative.caption,
         hashtags: creative.hashtags,
-        ideaId: idea.id,
         sceneTypes,
         topicHash,
-        status: 'APPROVED',
+        status: 'RENDERING',
+        brandPersonaId: persona?.id ?? null,
       },
     })
 
-    // 5. Mark idea as USED
-    await prisma.contentIdea.update({
-      where: { id: idea.id },
-      data: { status: 'USED' },
-    })
-
-    // 6. Commit asset usage
     const usedAssetIds = [...sceneAssets.values()].map((a) => a.id)
     if (audioAsset) usedAssetIds.push(audioAsset.id)
     await commitAssetUsage(usedAssetIds)
 
-    // 7. Enqueue for rendering
     await prisma.renderJob.create({
       data: {
-        compositionId: composition.id,
+        postId: updatedPost.id,
         status: 'queued',
-        outputType:
-          input.format === 'carousel' || input.format === 'static_post' ? 'image' : 'video',
+        outputType: input.format === 'carousel' || input.format === 'static_post' ? 'image' : 'video',
       },
     })
-    await addRenderJob(composition.id)
-    await prisma.composition.update({
-      where: { id: composition.id },
-      data: { status: 'rendering' },
-    })
+    await addRenderJob(updatedPost.id)
 
-    logger.info(
-      `[ComposeAPI] Reactive composition ${composition.id} created from idea ${idea.id} (${creative.scenes.length} scenes, auto-approved)`,
-    )
+    logger.info(`[ComposeAPI] Reactive post ${updatedPost.id} created and enqueued (${creative.scenes.length} scenes)`)
 
-    return NextResponse.json({ compositionId: composition.id, status: 'rendering' })
+    return NextResponse.json({ postId: updatedPost.id, status: 'rendering' })
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error)
     logError('[ComposeAPI] Failed', error)

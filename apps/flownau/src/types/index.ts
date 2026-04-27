@@ -7,11 +7,11 @@ export type TemplateWithRelations = Prisma.TemplateGetPayload<{
   }
 }>
 
-export type CompositionWithRelations = Prisma.CompositionGetPayload<{
+export type PostWithRelations = Prisma.PostGetPayload<{
   include: {
     brand: { select: { id: true; name: true } }
     renderJob: true
-    idea: { select: { id: true; ideaText: true; source: true; sourceRef: true } }
+    template: { select: { id: true; name: true } }
   }
 }>
 

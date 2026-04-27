@@ -10,156 +10,108 @@ import { selectAssetsForCreative } from '@/modules/composer/asset-curator'
 import { logger, logError } from '@/modules/shared/logger'
 import { redisConnection, type RenderJobData } from './render-queue'
 
-// ─── Constants ─────────────────────────────────────────────────────
-
 const CONCURRENCY = parseInt(process.env.RENDER_CONCURRENCY || '1', 10)
 const OUTPUT_DIR = path.join(process.cwd(), 'out')
 const ENTRY_POINT = path.join(process.cwd(), 'src/modules/video/remotion/index.tsx')
 
-// ─── Helpers ───────────────────────────────────────────────────────
-
 function ensureOutputDir(): void {
-  if (!fs.existsSync(OUTPUT_DIR)) {
-    fs.mkdirSync(OUTPUT_DIR, { recursive: true })
-  }
+  if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true })
 }
 
 function cleanupFile(filePath: string): void {
   try {
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
   } catch (err) {
-    logger.warn(
-      `[RenderWorker] Failed to clean up temp file ${filePath}: ${err instanceof Error ? err.message : String(err)}`,
-    )
+    logger.warn(`[RenderWorker] Failed to clean up temp file ${filePath}: ${err instanceof Error ? err.message : String(err)}`)
   }
 }
 
-// ─── Worker Processor ──────────────────────────────────────────────
-
 async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
-  const { compositionId } = job.data
+  const { postId } = job.data
   const startTime = Date.now()
 
-  logger.info(
-    `[RenderWorker] Processing job ${job.id} for composition ${compositionId} (attempt ${job.attemptsMade + 1})`,
-  )
+  logger.info(`[RenderWorker] Processing job ${job.id} for post ${postId} (attempt ${job.attemptsMade + 1})`)
 
-  // 1. Fetch composition from DB
-  const composition = await prisma.composition.findUnique({
-    where: { id: compositionId },
+  const post = await prisma.post.findUnique({
+    where: { id: postId },
     include: { brand: true },
   })
 
-  if (!composition) {
-    throw new Error(`Composition ${compositionId} not found in DB`)
-  }
+  if (!post) throw new Error(`Post ${postId} not found in DB`)
 
-  // 2. Create/update RenderJob record
   const renderJob = await prisma.renderJob.upsert({
-    where: { compositionId },
-    update: {
-      status: 'rendering',
-      attempts: job.attemptsMade + 1,
-      startedAt: new Date(),
-      error: null,
-    },
+    where: { postId },
+    update: { status: 'rendering', attempts: job.attemptsMade + 1, startedAt: new Date(), error: null },
     create: {
-      compositionId,
+      postId,
       status: 'rendering',
       attempts: 1,
       startedAt: new Date(),
-      outputType:
-        composition.format === 'reel' || composition.format === 'trial_reel' ? 'video' : 'image',
+      outputType: post.format === 'reel' || post.format === 'trial_reel' ? 'video' : 'image',
     },
   })
 
-  // 3. On retry (attempt > 1), re-select assets for variety
-  const payload = composition.payload as Record<string, unknown>
-  if (job.attemptsMade > 0 && composition.creative) {
+  const payload = post.payload as Record<string, unknown>
+
+  if (job.attemptsMade > 0 && post.creative) {
     logger.info(`[RenderWorker] Retry attempt ${job.attemptsMade + 1} — re-selecting assets`)
     try {
-      const creative = composition.creative as Record<string, unknown>
+      const creative = post.creative as Record<string, unknown>
       const { sceneAssets } = await selectAssetsForCreative(
         creative as Parameters<typeof selectAssetsForCreative>[0],
-        composition.brandId,
+        post.brandId,
         30,
       )
       logger.info(`[RenderWorker] Re-selected ${sceneAssets.size} assets for retry`)
     } catch (retryErr) {
-      logError(
-        '[RenderWorker] Asset re-selection failed, proceeding with original assets',
-        retryErr,
-      )
+      logError('[RenderWorker] Asset re-selection failed, proceeding with original assets', retryErr)
     }
   }
 
   await job.updateProgress(10)
 
-  // Phase 18: passthrough branch for user-managed formats (head_talk / replicate).
   const USER_MANAGED_FORMATS = new Set(['head_talk', 'replicate'])
-  if (USER_MANAGED_FORMATS.has(composition.format) && composition.userUploadedMediaUrl) {
+  if (USER_MANAGED_FORMATS.has(post.format ?? '') && post.userUploadedMediaUrl) {
     const renderTimeMs = Date.now() - startTime
     await prisma.renderJob.update({
       where: { id: renderJob.id },
-      data: {
-        status: 'done',
-        progress: 100,
-        outputUrl: composition.userUploadedMediaUrl,
-        outputType: 'video',
-        completedAt: new Date(),
-        renderTimeMs,
-      },
+      data: { status: 'done', progress: 100, outputUrl: post.userUploadedMediaUrl, outputType: 'video', completedAt: new Date(), renderTimeMs },
     })
-    await prisma.composition.update({
-      where: { id: compositionId },
-      data: {
-        videoUrl: composition.userUploadedMediaUrl,
-        status: 'rendered',
-      },
+    await prisma.post.update({
+      where: { id: postId },
+      data: { videoUrl: post.userUploadedMediaUrl, status: 'RENDERED_PENDING' },
     })
     await job.updateProgress(100)
-    logger.info(`[RenderWorker] Passthrough complete for ${compositionId} (${composition.format})`)
+    logger.info(`[RenderWorker] Passthrough complete for ${postId} (${post.format})`)
     return
   }
 
-  // 4. Determine render type
-  const format = composition.format || 'reel'
+  const format = post.format || 'reel'
   const isVideo = format === 'reel' || format === 'trial_reel'
-  const compositionId_ = isVideo ? 'SceneSequence' : 'DynamicTemplateMaster'
+  const remotionCompId = isVideo ? 'SceneSequence' : 'DynamicTemplateMaster'
 
   ensureOutputDir()
 
-  // 5. Bundle Remotion entry
   logger.info(`[RenderWorker] Bundling Remotion composition...`)
   const bundleLocation = await bundle(ENTRY_POINT, () => {}, {
     webpackOverride: (config) => ({
       ...config,
       resolve: {
         ...config.resolve,
-        alias: {
-          ...config.resolve?.alias,
-          '@': path.resolve(process.cwd(), 'src'),
-        },
+        alias: { ...config.resolve?.alias, '@': path.resolve(process.cwd(), 'src') },
       },
     }),
   })
   await job.updateProgress(30)
 
-  // 6. Resolve composition from bundle
-  const comps = await getCompositions(bundleLocation, {
-    inputProps: { schema: payload },
-  })
-  const remotionComp = comps.find((c) => c.id === compositionId_)
+  const comps = await getCompositions(bundleLocation, { inputProps: { schema: payload } })
+  const remotionComp = comps.find((c) => c.id === remotionCompId)
+  if (!remotionComp) throw new Error(`Remotion composition '${remotionCompId}' not found in bundle`)
 
-  if (!remotionComp) {
-    throw new Error(`Remotion composition '${compositionId_}' not found in bundle`)
-  }
-
-  const brandId = composition.brandId
+  const brandId = post.brandId
 
   if (isVideo) {
-    // ─── Video Render ────────────────────────────────────────
-    const outputPath = path.join(OUTPUT_DIR, `render-${compositionId}.mp4`)
+    const outputPath = path.join(OUTPUT_DIR, `render-${postId}.mp4`)
 
     logger.info(`[RenderWorker] Rendering video (${remotionComp.durationInFrames} frames)...`)
     await renderMedia({
@@ -170,30 +122,21 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
       codec: 'h264',
       concurrency: CONCURRENCY,
       jpegQuality: 80,
-      onProgress: ({ progress }) => {
-        job.updateProgress(30 + Math.round(progress * 50)).catch(() => {})
-      },
+      onProgress: ({ progress }) => { job.updateProgress(30 + Math.round(progress * 50)).catch(() => {}) },
     })
 
     await job.updateProgress(80)
-
     logger.info(`[RenderWorker] Uploading video to R2...`)
-    await prisma.renderJob.update({
-      where: { id: renderJob.id },
-      data: { status: 'uploading' },
-    })
+    await prisma.renderJob.update({ where: { id: renderJob.id }, data: { status: 'uploading' } })
 
-    const videoR2Key = flownau.renderOutput(brandId, compositionId)
-    const videoPublicUrl = await storage.upload(videoR2Key, fs.createReadStream(outputPath), {
-      mimeType: 'video/mp4',
-    })
+    const videoR2Key = flownau.renderOutput(brandId, postId)
+    const videoPublicUrl = await storage.upload(videoR2Key, fs.createReadStream(outputPath), { mimeType: 'video/mp4' })
     cleanupFile(outputPath)
 
     await job.updateProgress(90)
 
-    // 8. Extract cover image
     let coverUrl: string | null = null
-    const creative = composition.creative as Record<string, unknown> | null
+    const creative = post.creative as Record<string, unknown> | null
 
     if (creative && typeof creative === 'object') {
       const coverIdx = (creative as { coverSceneIndex?: number }).coverSceneIndex ?? 0
@@ -207,7 +150,7 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
       }
       coverFrame = Math.min(coverFrame, totalFrames - 1)
 
-      const coverPath = path.join(OUTPUT_DIR, `cover-${compositionId}.jpg`)
+      const coverPath = path.join(OUTPUT_DIR, `cover-${postId}.jpg`)
       try {
         await renderStill({
           composition: remotionComp,
@@ -218,11 +161,8 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
           imageFormat: 'jpeg',
           jpegQuality: 85,
         })
-
-        const coverR2Key = flownau.renderCover(brandId, compositionId)
-        coverUrl = await storage.upload(coverR2Key, fs.createReadStream(coverPath), {
-          mimeType: 'image/jpeg',
-        })
+        const coverR2Key = flownau.renderCover(brandId, postId)
+        coverUrl = await storage.upload(coverR2Key, fs.createReadStream(coverPath), { mimeType: 'image/jpeg' })
         cleanupFile(coverPath)
       } catch (coverErr) {
         logError('[RenderWorker] Cover extraction failed, proceeding without cover', coverErr)
@@ -234,28 +174,16 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
     const renderTimeMs = Date.now() - startTime
     await prisma.renderJob.update({
       where: { id: renderJob.id },
-      data: {
-        status: 'done',
-        progress: 100,
-        outputUrl: videoPublicUrl,
-        completedAt: new Date(),
-        renderTimeMs,
-      },
+      data: { status: 'done', progress: 100, outputUrl: videoPublicUrl, completedAt: new Date(), renderTimeMs },
+    })
+    await prisma.post.update({
+      where: { id: postId },
+      data: { videoUrl: videoPublicUrl, coverUrl, status: 'RENDERED_PENDING' },
     })
 
-    await prisma.composition.update({
-      where: { id: compositionId },
-      data: {
-        videoUrl: videoPublicUrl,
-        coverUrl,
-        status: 'rendered',
-      },
-    })
-
-    logger.info(`[RenderWorker] Video render complete: ${compositionId} (${renderTimeMs}ms)`)
+    logger.info(`[RenderWorker] Video render complete: ${postId} (${renderTimeMs}ms)`)
   } else {
-    // ─── Still Render ─────────────────────────────────────────
-    const outputPath = path.join(OUTPUT_DIR, `render-${compositionId}.png`)
+    const outputPath = path.join(OUTPUT_DIR, `render-${postId}.png`)
 
     logger.info(`[RenderWorker] Rendering still image...`)
     await renderStill({
@@ -269,101 +197,57 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
 
     await job.updateProgress(80)
 
-    const imageR2Key = flownau.renderStill(brandId, compositionId)
-    const imagePublicUrl = await storage.upload(imageR2Key, fs.createReadStream(outputPath), {
-      mimeType: 'image/png',
-    })
+    const imageR2Key = flownau.renderStill(brandId, postId)
+    const imagePublicUrl = await storage.upload(imageR2Key, fs.createReadStream(outputPath), { mimeType: 'image/png' })
     cleanupFile(outputPath)
 
     const renderTimeMs = Date.now() - startTime
     await prisma.renderJob.update({
       where: { id: renderJob.id },
-      data: {
-        status: 'done',
-        progress: 100,
-        outputUrl: imagePublicUrl,
-        outputType: 'image',
-        completedAt: new Date(),
-        renderTimeMs,
-      },
+      data: { status: 'done', progress: 100, outputUrl: imagePublicUrl, outputType: 'image', completedAt: new Date(), renderTimeMs },
+    })
+    await prisma.post.update({
+      where: { id: postId },
+      data: { videoUrl: imagePublicUrl, status: 'RENDERED_PENDING' },
     })
 
-    await prisma.composition.update({
-      where: { id: compositionId },
-      data: {
-        videoUrl: imagePublicUrl,
-        status: 'rendered',
-      },
-    })
-
-    logger.info(`[RenderWorker] Still render complete: ${compositionId} (${renderTimeMs}ms)`)
+    logger.info(`[RenderWorker] Still render complete: ${postId} (${renderTimeMs}ms)`)
   }
 
   await job.updateProgress(100)
 }
 
-// ─── Worker Lifecycle ──────────────────────────────────────────────
-
 function handleFailedJob(job: Job<RenderJobData> | undefined, error: Error): void {
   if (!job) return
-  const { compositionId } = job.data
+  const { postId } = job.data
 
   logError(`[RenderWorker] Job ${job.id} failed`, error)
 
   if (job.attemptsMade >= (job.opts.attempts ?? 3) - 1) {
     prisma.renderJob
-      .update({
-        where: { compositionId },
-        data: {
-          status: 'failed',
-          error: error.message,
-          completedAt: new Date(),
-        },
-      })
-      .then(() =>
-        prisma.composition.update({
-          where: { id: compositionId },
-          data: { status: 'failed' },
-        }),
-      )
+      .update({ where: { postId }, data: { status: 'failed', error: error.message, completedAt: new Date() } })
+      .then(() => prisma.post.update({ where: { id: postId }, data: { status: 'RENDERING' } }))
       .catch((dbErr) => logError('[RenderWorker] Failed to update failed status in DB', dbErr))
   }
 }
-
-// ─── Start Worker ──────────────────────────────────────────────────
 
 export function startRenderWorker(): Worker<RenderJobData> {
   const worker = new Worker<RenderJobData>('flownau-render', processRenderJob, {
     connection: redisConnection,
     concurrency: 1,
-    limiter: {
-      max: 5,
-      duration: 60_000,
-    },
+    limiter: { max: 5, duration: 60_000 },
   })
 
-  worker.on('completed', (job) => {
-    logger.info(`[RenderWorker] Job ${job.id} completed successfully`)
-  })
-
-  worker.on('failed', (job, error) => {
-    handleFailedJob(job, error)
-  })
-
-  worker.on('error', (error) => {
-    logError('[RenderWorker] Worker error', error)
-  })
+  worker.on('completed', (job) => { logger.info(`[RenderWorker] Job ${job.id} completed successfully`) })
+  worker.on('failed', (job, error) => { handleFailedJob(job, error) })
+  worker.on('error', (error) => { logError('[RenderWorker] Worker error', error) })
 
   logger.info('[RenderWorker] Render worker started, listening for jobs...')
-
   return worker
 }
 
-// ─── Standalone Entry Point ────────────────────────────────────────
-
 import { fileURLToPath } from 'node:url'
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])
-
 if (isMain) {
   logger.info('[RenderWorker] Starting standalone render worker...')
   startRenderWorker()

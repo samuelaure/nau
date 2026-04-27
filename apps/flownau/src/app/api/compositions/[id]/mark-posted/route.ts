@@ -23,29 +23,30 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const body = await req.json().catch(() => ({}))
     const externalPostUrl: string | undefined = body.externalPostUrl
 
-    const composition = await prisma.composition.findUnique({ where: { id } })
-    if (!composition) {
-      return NextResponse.json({ error: 'Composition not found' }, { status: 404 })
+    const post = await prisma.post.findUnique({ where: { id } })
+    if (!post) {
+      return NextResponse.json({ error: 'Post not found' }, { status: 404 })
     }
 
     const USER_MANAGED_FORMATS = new Set(['head_talk', 'replicate'])
-    if (!USER_MANAGED_FORMATS.has(composition.format)) {
+    if (!USER_MANAGED_FORMATS.has(post.format ?? '')) {
       return NextResponse.json(
         { error: 'mark-posted is only allowed for head_talk and replicate formats' },
         { status: 422 },
       )
     }
 
-    const updated = await prisma.composition.update({
+    const updated = await prisma.post.update({
       where: { id },
       data: {
         status: 'PUBLISHED',
         userPostedManually: true,
-        externalPostUrl: externalPostUrl ?? composition.externalPostUrl,
+        publishedAt: new Date(),
+        externalPostUrl: externalPostUrl ?? post.externalPostUrl,
       },
     })
 
-    return NextResponse.json({ composition: updated }, { status: 200 })
+    return NextResponse.json({ post: updated }, { status: 200 })
   } catch (error) {
     console.error('[MARK_POSTED_ERROR]', error)
     return NextResponse.json({ error: 'Failed to mark composition as posted' }, { status: 500 })

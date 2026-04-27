@@ -19,7 +19,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (body.ideaText !== undefined) updateData.ideaText = body.ideaText
     if (body.format !== undefined) updateData.format = body.format
 
-    const idea = await prisma.contentIdea.update({
+    const idea = await prisma.post.update({
       where: { id },
       data: updateData,
     })
@@ -40,7 +40,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 
     const { id } = await params
 
-    await prisma.contentIdea.delete({ where: { id } })
+    await prisma.post.delete({ where: { id } })
 
     return NextResponse.json({ success: true }, { status: 200 })
   } catch (error) {

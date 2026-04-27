@@ -16,7 +16,7 @@ interface Template {
   systemPrompt: string | null
   contentSchema: any
   useBrandAssets: boolean
-  _count?: { compositions: number }
+  _count?: { posts: number }
 }
 
 interface Props {
@@ -121,7 +121,7 @@ export default function TemplateDetailClient({ template, backUrl }: Props) {
         <div>
           <h1 className="text-2xl font-heading font-semibold">{template.name}</h1>
           <div className="flex items-center gap-3 mt-1 text-xs text-text-secondary">
-            <span>{template._count?.compositions ?? 0} compositions generated</span>
+            <span>{template._count?.posts ?? 0} posts generated</span>
             <span className="flex items-center gap-1">
               {scope === 'workspace' ? (
                 <><Globe size={10} /> Workspace-shared</>

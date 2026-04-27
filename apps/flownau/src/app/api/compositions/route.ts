@@ -1,3 +1,4 @@
+// TODO: remove when confirmed unused — replaced by /api/posts
 export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
@@ -34,19 +35,18 @@ export async function GET(req: Request) {
           ? { brandId, status: statusFilter }
           : { brandId }
 
-    const compositions = await prisma.composition.findMany({
+    const posts = await prisma.post.findMany({
       where: whereClause,
       orderBy: isCalendar ? { scheduledAt: 'asc' } : { createdAt: 'desc' },
       include: {
         template: { select: { id: true, name: true, sceneType: true } },
         renderJob: { select: { outputUrl: true, outputType: true, status: true } },
-        idea: { select: { ideaText: true } },
       },
     })
 
-    const mapped = compositions.map((c) => ({
-      ...c,
-      renderedVideoUrl: c.renderJob?.outputUrl ?? null,
+    const mapped = posts.map((p) => ({
+      ...p,
+      renderedVideoUrl: p.renderJob?.outputUrl ?? null,
     }))
 
     return NextResponse.json({ compositions: mapped }, { status: 200 })

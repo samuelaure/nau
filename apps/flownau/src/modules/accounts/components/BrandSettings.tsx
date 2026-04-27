@@ -24,6 +24,7 @@ type Brand = {
   id: string
   language: string
   ideationCount: number
+  autoApproveIdeas: boolean
   directorPrompt: string | null
   creationPrompt: string | null
   shortCode: string | null
@@ -105,6 +106,24 @@ export default function BrandSettings({ brand }: { brand: Brand }) {
                 defaultValue={brand.ideationCount}
                 className="bg-gray-950 border border-border text-white rounded p-2.5 text-sm w-24"
               />
+            </div>
+
+            <div className="w-full">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="autoApproveIdeas"
+                  value="true"
+                  defaultChecked={brand.autoApproveIdeas}
+                  className="w-4 h-4 accent-accent"
+                />
+                <span className="form-label">
+                  Auto-approve ideas
+                  <span className="text-xs font-normal ml-2 opacity-70">
+                    Ideas go directly to Approved without manual review.
+                  </span>
+                </span>
+              </label>
             </div>
 
             <div className="w-full border-t border-border pt-6">

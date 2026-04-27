@@ -30,17 +30,15 @@ export async function POST(
       )
     }
 
-    // Get composition
-    const composition = await prisma.composition.findUnique({
+    const composition = await prisma.post.findUnique({
       where: { id: params.id },
       include: { brand: true },
     })
 
     if (!composition) {
-      return NextResponse.json({ error: 'Composition not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Post not found' }, { status: 404 })
     }
 
-    // Check access
     await checkBrandAccess(composition.brandId)
 
     // Verify all profiles belong to this brand
@@ -126,13 +124,9 @@ export async function POST(
       )
     }
 
-    // Update composition status to PUBLISHED
-    await prisma.composition.update({
+    await prisma.post.update({
       where: { id: params.id },
-      data: {
-        status: 'PUBLISHED',
-        updatedAt: new Date(),
-      },
+      data: { status: 'PUBLISHED', publishedAt: new Date() },
     })
 
     logger.info(
@@ -149,7 +143,7 @@ export async function POST(
       results: publishResults,
     })
   } catch (error: unknown) {
-    logger.error('[PUBLISH_ERROR]', error)
+    console.error('[PUBLISH_ERROR]', error instanceof Error ? error.message : String(error))
     const msg = error instanceof Error ? error.message : 'Unknown publish failure'
     return NextResponse.json({ error: msg }, { status: 500 })
   }

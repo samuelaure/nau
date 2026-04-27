@@ -17,19 +17,20 @@ model Brand {
   name           String?                 // cached from 9naŭ API
   shortCode      String?
   assetsRoot     String?
-  language       String   @default("Spanish")
-  ideationCount  Int      @default(9)
-  directorPrompt String?  @db.Text
-  creationPrompt String?  @db.Text
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  language             String   @default("Spanish")
+  ideationCount        Int      @default(9)
+  autoApproveIdeas     Boolean  @default(false)
+  coverageHorizonDays  Int      @default(7)
+  directorPrompt       String?  @db.Text
+  creationPrompt       String?  @db.Text
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   socialProfiles       SocialProfile[]
   assets               Asset[]
   templates            Template[]
   brandTemplateConfigs BrandTemplateConfig[]
-  contentIdeas         ContentIdea[]
-  compositions         Composition[]
+  posts                Post[]
   contentPlans         ContentPlan[]
 }
 
@@ -108,19 +109,20 @@ model Template {
 
   renders      Render[]
   assets       Asset[]
-  compositions Composition[]
+  posts        Post[]
   brandConfigs BrandTemplateConfig[]
   brand        Brand  @relation(fields: [brandId], references: [id], onDelete: Cascade)
 }
 
 model BrandTemplateConfig {
-  id              String   @id @default(cuid())
-  brandId         String
-  templateId      String
-  autoApprovePost Boolean  @default(false)
-  enabled         Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id               String   @id @default(cuid())
+  brandId          String
+  templateId       String
+  autoApproveDraft Boolean  @default(false)
+  autoApprovePost  Boolean  @default(false)  // autoApproveRendered — kept as autoApprovePost
+  enabled          Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   brand    Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
   template Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
@@ -184,8 +186,7 @@ model BrandPersona {
   automaticAutoApprove    Boolean  @default(false)
   automaticCount          Int      @default(5)
 
-  ideas        ContentIdea[]
-  compositions Composition[]
+  posts        Post[]
 }
 
 model IdeasFramework {
@@ -197,9 +198,6 @@ model IdeasFramework {
   isDefault    Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-
-  ideas        ContentIdea[]
-  compositions Composition[]
 }
 
 model ContentCreationPrinciples {
@@ -211,88 +209,88 @@ model ContentCreationPrinciples {
   isDefault    Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-
-  ideas        ContentIdea[]
-  compositions Composition[]
 }
 
-model ContentIdea {
-  id                  String    @id @default(cuid())
-  brandId             String
-  ideaText            String    @db.Text
-  format              String?
-  status              String    @default("PENDING")
-  source              String    @default("automatic")
-  sourceRef           String?
-  priority            Int       @default(3)
-  aiLinked            Boolean   @default(false)
-  createdAt           DateTime  @default(now())
-  brandPersonaId      String?
-  ideasFrameworkId    String?
-  contentPrinciplesId String?
+// ── Post ───────────────────────────────────────────────────────────────────────
+// Single evolving entity for the entire content pipeline.
+// Starts as an idea (IDEA_PENDING) and progresses through draft, scheduling,
+// rendering, and publishing — accumulating data at each stage.
+//
+// Status machine:
+//   IDEA_PENDING → IDEA_APPROVED → DRAFT_PENDING → DRAFT_APPROVED
+//   → SCHEDULED → RENDERING → RENDERED_PENDING → RENDERED_APPROVED → PUBLISHED
+model Post {
+  id        String @id @default(cuid())
+  brandId   String
 
-  compositions      Composition[]
-  brand             Brand                      @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  brandPersona      BrandPersona?              @relation(fields: [brandPersonaId], references: [id])
-  ideasFramework    IdeasFramework?            @relation(fields: [ideasFrameworkId], references: [id])
-  contentPrinciples ContentCreationPrinciples? @relation(fields: [contentPrinciplesId], references: [id])
-}
+  // Combined stage + review status
+  status    String @default("IDEA_PENDING")
+  // IDEA_PENDING | IDEA_APPROVED | DRAFT_PENDING | DRAFT_APPROVED
+  // | SCHEDULED | RENDERING | RENDERED_PENDING | RENDERED_APPROVED | PUBLISHED
 
-model Composition {
-  id                   String    @id @default(cuid())
-  brandId              String
+  // ── Stage 1: Idea ──────────────────────────────────────────────────────────
+  ideaText          String    @db.Text
+  language          String?
+  source            String    @default("manual")   // manual | capture | automatic
+  sourceRef         String?                         // digest URLs, inspo lineage
+  priority          Int       @default(3)           // 1=capture, 2=manual, 3=automatic
+  generationBatchId String?                         // groups ideas from the same ideation request
+
+  // ── Stage 2: Draft (set when IDEA_APPROVED → DRAFT_PENDING) ───────────────
   templateId           String?
-  format               String    @default("reel")
-  creative             Json?
-  payload              Json
-  videoUrl             String?
-  coverUrl             String?
+  format               String?                      // set at draft creation from template
+  creative             Json?                        // format-agnostic scene/script/slide data
+  payload              Json?                        // compiled rendering timeline
   caption              String?   @db.Text
   hashtags             String[]  @default([])
-  externalPostId       String?
-  externalPostUrl      String?
-  source               String    @default("composed")
-  status               String    @default("DRAFT")
-  scheduledAt          DateTime?
-  publishAttempts      Int       @default(0)
-  lastPublishError     String?   @db.Text
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
-  ideaId               String?
   sceneTypes           String[]  @default([])
   topicHash            String?
-  brandPersonaId       String?
-  ideasFrameworkId     String?
-  contentPrinciplesId  String?
   userUploadedMediaUrl String?
-  userPostedManually   Boolean   @default(false)
+  brandPersonaId       String?                      // persona used by the composer
 
-  brand             Brand                      @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  template          Template?                  @relation(fields: [templateId], references: [id])
-  idea              ContentIdea?               @relation(fields: [ideaId], references: [id])
-  brandPersona      BrandPersona?              @relation(fields: [brandPersonaId], references: [id])
-  ideasFramework    IdeasFramework?            @relation(fields: [ideasFrameworkId], references: [id])
-  contentPrinciples ContentCreationPrinciples? @relation(fields: [contentPrinciplesId], references: [id])
-  renderJob         RenderJob?
+  // ── Stage 3: Scheduling ────────────────────────────────────────────────────
+  scheduledAt          DateTime?
+
+  // ── Stage 4: Publishing ────────────────────────────────────────────────────
+  videoUrl           String?
+  coverUrl           String?
+  externalPostId     String?
+  externalPostUrl    String?
+  publishAttempts    Int       @default(0)
+  lastPublishError   String?   @db.Text
+  userPostedManually Boolean   @default(false)
+  publishedAt        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  brand         Brand         @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  template      Template?     @relation(fields: [templateId], references: [id])
+  brandPersona  BrandPersona? @relation(fields: [brandPersonaId], references: [id])
+  renderJob     RenderJob?
+
+  @@index([brandId, status])
+  @@index([generationBatchId])
+  @@index([scheduledAt])
 }
 
 model RenderJob {
-  id            String      @id @default(cuid())
-  compositionId String      @unique
-  status        String      @default("queued")
-  progress      Float       @default(0)
-  outputUrl     String?
-  outputType    String      @default("video")
-  error         String?     @db.Text
-  attempts      Int         @default(0)
-  maxAttempts   Int         @default(3)
-  startedAt     DateTime?
-  completedAt   DateTime?
-  renderTimeMs  Int?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  id        String @id @default(cuid())
+  postId    String @unique
+  status    String @default("queued")
+  progress  Float  @default(0)
+  outputUrl String?
+  outputType String @default("video")
+  error     String? @db.Text
+  attempts  Int     @default(0)
+  maxAttempts Int   @default(3)
+  startedAt   DateTime?
+  completedAt DateTime?
+  renderTimeMs Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  composition Composition @relation(fields: [compositionId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 }
 
 model ContentPlan {

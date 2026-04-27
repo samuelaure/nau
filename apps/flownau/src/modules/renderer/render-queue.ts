@@ -1,13 +1,10 @@
 import { Queue, type ConnectionOptions } from 'bullmq'
 import { logger } from '@/modules/shared/logger'
 
-// ─── Redis Connection ──────────────────────────────────────────────
-
 function getRedisConnection(): ConnectionOptions {
   if (process.env.REDIS_URL) {
     return { url: process.env.REDIS_URL }
   }
-
   return {
     host: process.env.REDIS_HOST || 'localhost',
     port: parseInt(process.env.REDIS_PORT || '6379', 10),
@@ -17,64 +14,39 @@ function getRedisConnection(): ConnectionOptions {
 
 export const redisConnection = getRedisConnection()
 
-// ─── Queue ─────────────────────────────────────────────────────────
-
 const QUEUE_NAME = 'flownau-render'
 
 export const renderQueue = new Queue(QUEUE_NAME, {
   connection: redisConnection,
   defaultJobOptions: {
     attempts: 3,
-    backoff: {
-      type: 'exponential',
-      delay: 30_000, // 30s initial backoff
-    },
-    removeOnComplete: { count: 100 }, // Keep last 100 completed
-    removeOnFail: { count: 200 }, // Keep last 200 failed for debugging
+    backoff: { type: 'exponential', delay: 30_000 },
+    removeOnComplete: { count: 100 },
+    removeOnFail: { count: 200 },
   },
 })
 
-// ─── Public API ────────────────────────────────────────────────────
-
 export interface RenderJobData {
-  compositionId: string
+  postId: string
 }
 
-/**
- * Enqueue a composition for rendering.
- * Priority: lower number = higher priority (1 = highest).
- */
-export async function addRenderJob(compositionId: string, priority?: number): Promise<string> {
-  const job = await renderQueue.add('render', { compositionId } satisfies RenderJobData, {
-    jobId: `render-${compositionId}`,
+export async function addRenderJob(postId: string, priority?: number): Promise<string> {
+  const job = await renderQueue.add('render', { postId } satisfies RenderJobData, {
+    jobId: `render-${postId}`,
     priority: priority ?? 10,
   })
-
-  logger.info(`[RenderQueue] Enqueued render job ${job.id} for composition ${compositionId}`)
-
-  return job.id ?? compositionId
+  logger.info(`[RenderQueue] Enqueued render job ${job.id} for post ${postId}`)
+  return job.id ?? postId
 }
 
-/**
- * Get aggregated render status for a composition.
- */
-export async function getRenderJobStatus(compositionId: string): Promise<{
+export async function getRenderJobStatus(postId: string): Promise<{
   state: string
   progress: number
   failedReason?: string
 }> {
-  const job = await renderQueue.getJob(`render-${compositionId}`)
-
-  if (!job) {
-    return { state: 'unknown', progress: 0 }
-  }
-
+  const job = await renderQueue.getJob(`render-${postId}`)
+  if (!job) return { state: 'unknown', progress: 0 }
   const state = await job.getState()
   const progress = typeof job.progress === 'number' ? job.progress : 0
-
-  return {
-    state,
-    progress,
-    failedReason: job.failedReason ?? undefined,
-  }
+  return { state, progress, failedReason: job.failedReason ?? undefined }
 }

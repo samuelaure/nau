@@ -34,13 +34,13 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const composition = await prisma.composition.findUnique({ where: { id: compositionId } })
-    if (!composition || composition.brandId !== brandId) {
-      return NextResponse.json({ error: 'Composition not found' }, { status: 404 })
+    const post = await prisma.post.findUnique({ where: { id: compositionId } })
+    if (!post || post.brandId !== brandId) {
+      return NextResponse.json({ error: 'Post not found' }, { status: 404 })
     }
-    if (!USER_MANAGED_FORMATS.has(composition.format)) {
+    if (!USER_MANAGED_FORMATS.has(post.format ?? '')) {
       return NextResponse.json(
-        { error: 'Only head_talk and replicate compositions accept media uploads' },
+        { error: 'Only head_talk and replicate posts accept media uploads' },
         { status: 400 },
       )
     }
@@ -50,22 +50,18 @@ export async function POST(req: NextRequest) {
     const key = flownau.renderOutput(brandId, recordingId).replace('.mp4', `.${ext}`)
     const buffer = Buffer.from(await file.arrayBuffer())
 
-    const mediaUrl = await storage.upload(key, buffer, {
-      mimeType: file.type || 'video/mp4',
-    })
+    const mediaUrl = await storage.upload(key, buffer, { mimeType: file.type || 'video/mp4' })
 
-    // Phase 18: set userUploadedMediaUrl — renderer will do a passthrough job.
-    // Also update videoUrl for backward compatibility with playback.
-    await prisma.composition.update({
+    await prisma.post.update({
       where: { id: compositionId },
       data: {
         userUploadedMediaUrl: mediaUrl,
         videoUrl: mediaUrl,
-        status: 'RENDERED',
+        status: 'RENDERED_PENDING',
       },
     })
 
-    return NextResponse.json({ videoUrl: mediaUrl, status: 'RENDERED' }, { status: 200 })
+    return NextResponse.json({ videoUrl: mediaUrl, status: 'RENDERED_PENDING' }, { status: 200 })
   } catch (error) {
     logError('UPLOAD_RECORDING_ERROR', error)
     const message = error instanceof Error ? error.message : 'Upload failed'

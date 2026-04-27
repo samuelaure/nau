@@ -27,8 +27,8 @@ export async function GET(request: Request) {
 
     for (const account of accounts) {
       // Skip if pending ideas exist — only generate when pipeline is exhausted
-      const pendingIdeasCount = await prisma.contentIdea.count({
-        where: { brandId: account.id, status: 'PENDING' },
+      const pendingIdeasCount = await prisma.post.count({
+        where: { brandId: account.id, status: { in: ['IDEA_PENDING', 'IDEA_APPROVED'] } },
       })
       if (pendingIdeasCount > 0) continue
 
@@ -44,7 +44,7 @@ export async function GET(request: Request) {
 
         const brand = await prisma.brand.findUnique({
           where: { id: account.brandId },
-          select: { language: true, ideationCount: true },
+          select: { language: true, ideationCount: true, autoApproveIdeas: true },
         })
 
         const language = brand?.language ?? 'Spanish'
@@ -52,14 +52,12 @@ export async function GET(request: Request) {
 
         // Recent content for diversity tracking
         const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)
-        const recentCompositions = await prisma.composition.findMany({
-          where: { brandId: account.id, createdAt: { gte: fourteenDaysAgo } },
+        const recentPosts = await prisma.post.findMany({
+          where: { brandId: account.id, createdAt: { gte: fourteenDaysAgo }, caption: { not: null } },
           select: { caption: true },
           take: 30,
         })
-        const recentContent = recentCompositions
-          .filter((c) => c.caption)
-          .map((c) => c.caption!.slice(0, 100))
+        const recentContent = recentPosts.map((p) => p.caption!.slice(0, 100))
 
         const sourceRef =
           digest.attachedUrls.length > 0
@@ -75,16 +73,18 @@ export async function GET(request: Request) {
           recentContent,
         })
 
+        const autoApprove = brand?.autoApproveIdeas ?? false
+        const batchId = crypto.randomUUID()
         for (const idea of output.ideas) {
-          await prisma.contentIdea.create({
+          await prisma.post.create({
             data: {
               brandId: account.id,
               ideaText: idea.concept,
-              format: null,
-              status: 'PENDING',
+              status: autoApprove ? 'IDEA_APPROVED' : 'IDEA_PENDING',
               source: 'automatic',
               priority: 3,
               sourceRef,
+              generationBatchId: batchId,
             },
           })
         }

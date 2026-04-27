@@ -14,10 +14,9 @@ export default async function DraftDetailPage({
   const { workspaceId, compositionId } = await params
   const { brandId } = await searchParams
 
-  const composition = await prisma.composition.findUnique({
+  const composition = await prisma.post.findUnique({
     where: { id: compositionId },
     include: {
-      idea: { select: { ideaText: true } },
       template: { select: { name: true } },
     },
   })
@@ -32,11 +31,11 @@ export default async function DraftDetailPage({
         composition={{
           id: composition.id,
           status: composition.status,
-          format: composition.format,
+          format: composition.format ?? null,
           caption: composition.caption,
           hashtags: composition.hashtags,
           creative: composition.creative,
-          idea: composition.idea,
+          idea: { ideaText: composition.ideaText },
           template: composition.template,
         }}
         backUrl={backUrl}

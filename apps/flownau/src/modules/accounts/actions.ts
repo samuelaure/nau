@@ -59,6 +59,7 @@ const BrandUpdateSchema = z.object({
   shortCode: z.string().nullable().optional(),
   language: z.string().nullable().optional(),
   ideationCount: z.coerce.number().int().min(1).max(30).optional().nullable(),
+  autoApproveIdeas: z.string().optional().transform((v) => v === 'true'),
 })
 
 const SocialProfileUpdateSchema = z.object({
@@ -176,17 +177,25 @@ export async function addBrand(formData: FormData): Promise<{ id: string; worksp
 export async function updateBrand(brandId: string, formData: FormData) {
   await checkAuth()
   const parsedId = IdSchema.parse(brandId)
-  const { directorPrompt, creationPrompt, shortCode, language, ideationCount } = BrandUpdateSchema.parse({
+  const { directorPrompt, creationPrompt, shortCode, language, ideationCount, autoApproveIdeas } = BrandUpdateSchema.parse({
     directorPrompt: formData.get('directorPrompt'),
     creationPrompt: formData.get('creationPrompt'),
     shortCode: formData.get('shortCode'),
     language: formData.get('language'),
     ideationCount: formData.get('ideationCount'),
+    autoApproveIdeas: formData.get('autoApproveIdeas'),
   })
 
   await prisma.brand.update({
     where: { id: parsedId },
-    data: { directorPrompt, creationPrompt, shortCode, language, ...(ideationCount !== undefined && { ideationCount }) },
+    data: {
+      directorPrompt: directorPrompt ?? undefined,
+      creationPrompt: creationPrompt ?? undefined,
+      shortCode: shortCode ?? undefined,
+      language: language ?? undefined,
+      autoApproveIdeas,
+      ...(ideationCount != null && { ideationCount }),
+    },
   })
 
   revalidatePath('/dashboard')
@@ -253,13 +262,13 @@ export async function addSocialProfile(formData: FormData) {
       workspaceId,
       platform: 'instagram',
       username: data.username,
-      accessToken: data.accessToken,
+      accessToken: data.accessToken || null,
       platformId: data.platformId,
     },
   })
 
   // Sync profile to nauthenticity so it's discoverable there
-  await syncToNauthenticity(profile.username, profile.profileImage)
+  if (profile.username) await syncToNauthenticity(profile.username, profile.profileImage)
 
   await syncSocialProfile(profile.id)
   revalidatePath('/dashboard')

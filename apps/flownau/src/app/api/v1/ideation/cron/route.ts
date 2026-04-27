@@ -84,21 +84,25 @@ export async function POST(request: NextRequest) {
       ),
     )
 
-    // Persist as ContentIdea records
+    // Persist as Post records
     if (account) {
       try {
-        await prisma.contentIdea.createMany({
+        const brand2 = await prisma.brand.findUnique({ where: { id: brandId }, select: { autoApproveIdeas: true } })
+        const autoApprove = brand2?.autoApproveIdeas ?? false
+        const batchId = crypto.randomUUID()
+        await prisma.post.createMany({
           data: result.ideas.map((idea) => ({
             brandId: account.id,
             ideaText: idea.concept,
             source: 'automatic',
-            status: 'PENDING',
+            status: autoApprove ? 'IDEA_APPROVED' : 'IDEA_PENDING',
             priority: 3,
+            generationBatchId: batchId,
           })),
           skipDuplicates: true,
         })
       } catch (e) {
-        console.warn('[Ideation Cron] Could not persist ContentIdea records', e)
+        console.warn('[Ideation Cron] Could not persist Post records', e)
       }
     }
 

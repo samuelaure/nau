@@ -20,23 +20,23 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const { id } = await params
 
-    const composition = await prisma.composition.findUnique({ where: { id } })
-    if (!composition) {
-      return NextResponse.json({ error: 'Composition not found' }, { status: 404 })
+    const post = await prisma.post.findUnique({ where: { id } })
+    if (!post) {
+      return NextResponse.json({ error: 'Post not found' }, { status: 404 })
     }
-    if (!['RENDERED', 'rendered'].includes(composition.status)) {
+    if (post.status !== 'RENDERED_PENDING') {
       return NextResponse.json(
-        { error: 'Composition must be in RENDERED status to approve for posting' },
+        { error: 'Post must be in RENDERED_PENDING status to approve for posting' },
         { status: 422 },
       )
     }
 
-    const updated = await prisma.composition.update({
+    const updated = await prisma.post.update({
       where: { id },
-      data: { status: 'PUBLISHING' },
+      data: { status: 'RENDERED_APPROVED' },
     })
 
-    return NextResponse.json({ composition: updated }, { status: 200 })
+    return NextResponse.json({ post: updated }, { status: 200 })
   } catch (error) {
     console.error('[APPROVE_POST_ERROR]', error)
     return NextResponse.json(

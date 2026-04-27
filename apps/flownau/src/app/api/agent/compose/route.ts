@@ -18,7 +18,7 @@ const ComposeRequestSchema = z.object({
   format: z
     .enum(['reel', 'trial_reel', 'head_talk', 'carousel', 'static_post', 'story'])
     .default('reel'),
-  ideaId: z.string().optional(),
+  postId: z.string().optional(),
   personaId: z.string().optional(),
 })
 
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
       )
     }
 
-    const { prompt, brandId, format, ideaId, personaId } = parsed.data
+    const { prompt, brandId, format, postId, personaId } = parsed.data
 
     // Rate limit: 10 compose requests per minute per account
     const rateLimit = await checkRateLimit({
@@ -60,33 +60,56 @@ export async function POST(req: Request) {
       : ((await prisma.brandPersona.findFirst({ where: { brandId, isDefault: true } })) ??
         (await prisma.brandPersona.findFirst({ where: { brandId } })))
 
-    const isAutoApproveCompositions = persona?.autoApproveCompositions ?? false
-    const isAutoApprovePool = (persona as any)?.autoApprovePool ?? false
+    // Check template auto-approve if postId has a template
+    let autoApproveDraft = persona?.autoApproveCompositions ?? false
+    if (!autoApproveDraft && postId) {
+      const existingPost = await prisma.post.findUnique({ where: { id: postId }, select: { templateId: true } })
+      if (existingPost?.templateId) {
+        const config = await prisma.brandTemplateConfig.findUnique({
+          where: { brandId_templateId: { brandId, templateId: existingPost.templateId } },
+          select: { autoApproveDraft: true },
+        })
+        autoApproveDraft = config?.autoApproveDraft ?? false
+      }
+    }
 
-    const finalStatus = isAutoApproveCompositions || isAutoApprovePool ? 'APPROVED' : 'DRAFT'
+    const draftStatus = autoApproveDraft ? 'DRAFT_APPROVED' : 'DRAFT_PENDING'
 
-    let newComposition
+    let updatedPost
 
     if (format === 'head_talk') {
-      // Head Talk: AI generates script + caption + hashtags only. No video/image assets.
       const result = await composeHeadTalk({ ideaText: prompt, brandId, personaId })
 
-      newComposition = await prisma.composition.create({
-        data: {
-          brandId,
-          format,
-          source: 'composed',
-          payload: { type: 'head_talk', script: result.script } as unknown as Prisma.InputJsonValue,
-          caption: result.caption,
-          hashtags: result.hashtags,
-          ideaId: ideaId ?? null,
-          status: finalStatus,
-        },
-      })
+      if (postId) {
+        updatedPost = await prisma.post.update({
+          where: { id: postId },
+          data: {
+            format,
+            payload: { type: 'head_talk', script: result.script } as unknown as Prisma.InputJsonValue,
+            caption: result.caption,
+            hashtags: result.hashtags,
+            status: draftStatus,
+            brandPersonaId: persona?.id ?? null,
+          },
+        })
+      } else {
+        updatedPost = await prisma.post.create({
+          data: {
+            brandId,
+            ideaText: prompt,
+            format,
+            payload: { type: 'head_talk', script: result.script } as unknown as Prisma.InputJsonValue,
+            caption: result.caption,
+            hashtags: result.hashtags,
+            status: draftStatus,
+            source: 'manual',
+            brandPersonaId: persona?.id ?? null,
+          },
+        })
+      }
 
-      logger.info(`[HeadTalkCompose] Created script composition ${newComposition.id}`)
+      logger.info(`[HeadTalkCompose] Updated post ${updatedPost.id}`)
     } else {
-      // Standard scene-based compose pipeline
       const { creative } = await compose({ ideaText: prompt, brandId, format, personaId })
 
       const { sceneAssets, audioAsset } = await selectAssetsForCreative(creative, brandId, 30)
@@ -99,19 +122,35 @@ export async function POST(req: Request) {
 
       const { schema } = compileTimeline(creative, sceneAssets, audioAsset, brandStyle, format)
 
-      newComposition = await prisma.composition.create({
-        data: {
-          brandId,
-          format,
-          source: 'composed',
-          creative: creative as unknown as Prisma.InputJsonValue,
-          payload: schema as unknown as Prisma.InputJsonValue,
-          caption: creative.caption,
-          hashtags: creative.hashtags,
-          ideaId: ideaId ?? null,
-          status: finalStatus,
-        },
-      })
+      if (postId) {
+        updatedPost = await prisma.post.update({
+          where: { id: postId },
+          data: {
+            format,
+            creative: creative as unknown as Prisma.InputJsonValue,
+            payload: schema as unknown as Prisma.InputJsonValue,
+            caption: creative.caption,
+            hashtags: creative.hashtags,
+            status: draftStatus,
+            brandPersonaId: persona?.id ?? null,
+          },
+        })
+      } else {
+        updatedPost = await prisma.post.create({
+          data: {
+            brandId,
+            ideaText: prompt,
+            format,
+            creative: creative as unknown as Prisma.InputJsonValue,
+            payload: schema as unknown as Prisma.InputJsonValue,
+            caption: creative.caption,
+            hashtags: creative.hashtags,
+            status: draftStatus,
+            source: 'manual',
+            brandPersonaId: persona?.id ?? null,
+          },
+        })
+      }
 
       // Track asset usage
       const usedAssetIds = [...sceneAssets.values()].map((a) => a.id)
@@ -119,19 +158,11 @@ export async function POST(req: Request) {
       await commitAssetUsage(usedAssetIds)
 
       logger.info(
-        `[DashboardCompose] Created composition ${newComposition.id} (${creative.scenes.length} scenes)`,
+        `[DashboardCompose] Updated post ${updatedPost.id} (${creative.scenes.length} scenes)`,
       )
     }
 
-    // Mark idea as USED after successful compose
-    if (ideaId) {
-      await prisma.contentIdea.update({
-        where: { id: ideaId },
-        data: { status: 'USED' },
-      })
-    }
-
-    return NextResponse.json({ composition: newComposition }, { status: 200 })
+    return NextResponse.json({ post: updatedPost }, { status: 200 })
   } catch (error: unknown) {
     logError('AGENT_COMPOSE_ROUTE_ERROR', error)
     const message = error instanceof Error ? error.message : 'Unknown error'

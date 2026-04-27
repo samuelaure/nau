@@ -63,16 +63,19 @@ export async function POST(req: Request) {
     // Recent content for diversity (manual skip for speed; cron handles this for automatic)
     const output = await generateContentIdeas({ topic, language, count })
 
+    const autoApprove = (await prisma.brand.findUnique({ where: { id: brandId }, select: { autoApproveIdeas: true } }))?.autoApproveIdeas ?? false
+    const batchId = crypto.randomUUID()
+
     const ops = output.ideas.map((idea) =>
-      prisma.contentIdea.create({
+      prisma.post.create({
         data: {
           brandId,
           ideaText: idea.concept,
-          format: null,
-          status: 'PENDING',
+          status: autoApprove ? 'IDEA_APPROVED' : 'IDEA_PENDING',
           source,
           priority,
           sourceRef,
+          generationBatchId: batchId,
         },
       }),
     )

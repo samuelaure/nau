@@ -32,7 +32,7 @@ export async function GET(req: Request) {
     if (status) where.status = status
     if (format) where.format = format
 
-    const compositions = await prisma.composition.findMany({
+    const compositions = await prisma.post.findMany({
       where,
       take: limit,
       orderBy: { createdAt: 'desc' },

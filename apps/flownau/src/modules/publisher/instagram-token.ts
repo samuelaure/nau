@@ -136,7 +136,8 @@ export async function checkAllTokens(): Promise<TokenCheckResult[]> {
 
     if (daysUntilExpiry <= REFRESH_BUFFER_DAYS) {
       try {
-        await refreshTokenIfNeeded(account)
+        if (!account.accessToken) continue
+        await refreshTokenIfNeeded({ ...account, accessToken: account.accessToken })
         results.push({
           brandId: account.id,
           username: account.username,

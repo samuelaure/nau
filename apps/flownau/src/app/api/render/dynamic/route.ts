@@ -28,35 +28,34 @@ export async function POST(req: Request) {
 
     await checkBrandAccess(brandId)
 
-    const composition = await prisma.composition.findUnique({
+    const post = await prisma.post.findUnique({
       where: { id: compositionId, brandId },
     })
 
-    if (!composition) {
-      return NextResponse.json({ error: 'Composition not found or unauthorized' }, { status: 404 })
+    if (!post) {
+      return NextResponse.json({ error: 'Post not found or unauthorized' }, { status: 404 })
     }
 
     const renderId = `dyn-${compositionId}-${Date.now()}`
 
-    await prisma.composition.update({
+    await prisma.post.update({
       where: { id: compositionId },
       data: { status: 'RENDERING' },
     })
 
-    // Start rendering. Vercel development will allow this to block.
     const videoUrl = await renderAndUpload({
       templateId: 'DynamicTemplateMaster',
       inputProps: { schema: parsedSchema.data },
       renderId,
-      accountId: composition.brandId,
+      accountId: post.brandId,
     })
 
-    await prisma.composition.update({
+    await prisma.post.update({
       where: { id: compositionId },
       data: {
         payload: parsedSchema.data as unknown as import('@prisma/client').Prisma.InputJsonValue,
         videoUrl,
-        status: 'RENDERED',
+        status: 'RENDERED_PENDING',
       },
     })
 

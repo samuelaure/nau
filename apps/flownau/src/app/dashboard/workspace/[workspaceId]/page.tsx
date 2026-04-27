@@ -7,7 +7,7 @@ import { signServiceToken } from '@nau/auth'
 import { notFound } from 'next/navigation'
 import { cn } from '@/modules/shared/utils'
 import AccountCalendar from '@/modules/accounts/components/AccountCalendar'
-import AccountIdeas from '@/modules/accounts/components/AccountIdeas'
+import BrandPosts from '@/modules/accounts/components/BrandPosts'
 import AccountPool from '@/modules/accounts/components/AccountPool'
 import AccountCompositions from '@/modules/accounts/components/AccountCompositions'
 import AccountTemplates from '@/modules/accounts/components/AccountTemplates'
@@ -131,7 +131,7 @@ export default async function WorkspaceOverviewPage({
         {/* Tab content */}
         <div className="min-h-[400px]">
           {activeTab === 'calendar' && <AccountCalendar brandId={brandId} />}
-          {activeTab === 'ideas' && <AccountIdeas brandId={brandId} />}
+          {activeTab === 'ideas' && <BrandPosts brandId={brandId} />}
           {activeTab === 'pool' && <AccountPool brandId={brandId} workspaceId={workspaceId} />}
           {activeTab === 'compositions' && <AccountCompositions brandId={brandId} />}
           {activeTab === 'templates' && <AccountTemplates brandId={brandId} workspaceId={workspaceId} />}
@@ -159,6 +159,7 @@ export default async function WorkspaceOverviewPage({
                 id: localBrand.id,
                 language: localBrand.language,
                 ideationCount: localBrand.ideationCount,
+                autoApproveIdeas: localBrand.autoApproveIdeas,
                 directorPrompt: localBrand.directorPrompt,
                 creationPrompt: localBrand.creationPrompt,
                 shortCode: localBrand.shortCode,

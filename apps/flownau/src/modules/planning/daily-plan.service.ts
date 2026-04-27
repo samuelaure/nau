@@ -103,7 +103,7 @@ export async function generateDailyPlan(brandId: string, date: Date): Promise<Da
   const endOfDay = new Date(dateOnly)
   endOfDay.setUTCDate(endOfDay.getUTCDate() + 1)
 
-  const todayCompositions = await prisma.composition.findMany({
+  const todayCompositions = await prisma.post.findMany({
     where: {
       brandId,
       OR: [
@@ -111,7 +111,6 @@ export async function generateDailyPlan(brandId: string, date: Date): Promise<Da
         { createdAt: { gte: startOfDay, lt: endOfDay } },
       ],
     },
-    include: { idea: true },
     orderBy: { scheduledAt: 'asc' },
   })
 
@@ -123,7 +122,7 @@ export async function generateDailyPlan(brandId: string, date: Date): Promise<Da
 
     return {
       id: comp.id,
-      format: comp.format,
+      format: comp.format ?? 'reel',
       status: comp.status,
       scheduledAt: comp.scheduledAt?.toISOString() ?? null,
       caption: comp.caption
@@ -189,10 +188,10 @@ export async function generateDailyPlan(brandId: string, date: Date): Promise<Da
  */
 export async function getHeadTalkScripts(brandId: string): Promise<ScriptSummary[]> {
   // Find approved ideas that look like head-talk content
-  const approvedIdeas = await prisma.contentIdea.findMany({
+  const approvedIdeas = await prisma.post.findMany({
     where: {
       brandId,
-      status: { in: ['PENDING', 'APPROVED'] },
+      status: { in: ['IDEA_PENDING', 'IDEA_APPROVED'] },
     },
     orderBy: { createdAt: 'desc' },
     take: 20,
@@ -266,12 +265,12 @@ async function generateAlerts(account: {
   }
 
   // Low ideas check
-  const pendingIdeasCount = await prisma.contentIdea.count({
-    where: { brandId: account.id, status: 'PENDING' },
+  const pendingIdeasCount = await prisma.post.count({
+    where: { brandId: account.id, status: 'IDEA_PENDING' },
   })
 
-  const approvedIdeasCount = await prisma.contentIdea.count({
-    where: { brandId: account.id, status: 'APPROVED' },
+  const approvedIdeasCount = await prisma.post.count({
+    where: { brandId: account.id, status: 'IDEA_APPROVED' },
   })
 
   if (pendingIdeasCount + approvedIdeasCount < 3) {

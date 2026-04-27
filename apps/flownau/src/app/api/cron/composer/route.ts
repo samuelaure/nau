@@ -12,21 +12,10 @@ import { validateCronSecret, unauthorizedCronResponse } from '@/modules/shared/n
 import type { ContentFormat } from '@/types/content'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 300 // 5 minutes max for AI generation timeout
+export const maxDuration = 300
 
-// Formats that are user-managed (head_talk / replicate) — composer still creates the
-// placeholder Composition (with provenance) but does NOT run AI scene-composition.
 const USER_MANAGED_FORMATS: ReadonlySet<string> = new Set(['head_talk', 'replicate'])
 
-/**
- * GET /api/cron/composer
- *
- * Phase 18: Processes APPROVED content ideas into Compositions.
- * - Pulls persona/framework/principles FKs from the idea (provenance carried forward).
- * - Selects a matching Template based on idea.format + BrandTemplateConfig.enabled.
- * - Builds AI prompt from persona + framework + principles + template.contentSchema.
- * - Skips AI/asset-curation for user-managed formats (head_talk, replicate).
- */
 export async function GET(request: Request) {
   if (!validateCronSecret(request)) {
     return unauthorizedCronResponse()
@@ -34,164 +23,118 @@ export async function GET(request: Request) {
 
   try {
     const results: Array<{
-      ideaId: string
+      postId: string
       brandId: string
       status: string
-      compositionId?: string
       error?: string
     }> = []
 
-    const approvedIdeas = await prisma.contentIdea.findMany({
-      where: { status: 'APPROVED' },
-      include: {
-        brandPersona: true,
-        ideasFramework: true,
-        contentPrinciples: true,
-      },
+    const approvedPosts = await prisma.post.findMany({
+      where: { status: 'IDEA_APPROVED' },
+      include: { brandPersona: true },
       take: 20,
     })
 
-    if (approvedIdeas.length === 0) {
+    if (approvedPosts.length === 0) {
       return NextResponse.json({ message: 'No approved ideas to process', results: [] })
     }
 
-    logger.info(`[Composer] Processing ${approvedIdeas.length} approved ideas`)
+    logger.info(`[Composer] Processing ${approvedPosts.length} approved posts`)
 
-    for (const idea of approvedIdeas) {
-      const format: ContentFormat = (idea.format as ContentFormat) || 'reel'
-      const persona = idea.brandPersona
-      const framework = idea.ideasFramework
-      const principles = idea.contentPrinciples
+    for (const post of approvedPosts) {
+      const format: ContentFormat = (post.format as ContentFormat) || 'reel'
+      const persona = post.brandPersona
 
       try {
-        // Template selection: account-scoped + format-matching + enabled BrandTemplateConfig.
-        const selectedTemplate = await selectTemplateForIdea({
-          brandId: idea.brandId,
-          format,
-        })
+        const selectedTemplate = await selectTemplateForIdea({ brandId: post.brandId, format })
 
-        const isAutoApprove = persona?.autoApprovePool ?? false
-        const topicHash = generateTopicHash(idea.ideaText)
+        // Check auto-approve: persona flag or BrandTemplateConfig
+        let autoApproveDraft = persona?.autoApproveCompositions ?? false
+        if (!autoApproveDraft && selectedTemplate) {
+          const config = await prisma.brandTemplateConfig.findUnique({
+            where: { brandId_templateId: { brandId: post.brandId, templateId: selectedTemplate.id } },
+            select: { autoApproveDraft: true },
+          })
+          autoApproveDraft = config?.autoApproveDraft ?? false
+        }
 
-        // User-managed formats bypass scene composition — they need media from the user.
+        const draftStatus = autoApproveDraft ? 'DRAFT_APPROVED' : 'DRAFT_PENDING'
+        const topicHash = generateTopicHash(post.ideaText)
+
         if (USER_MANAGED_FORMATS.has(format)) {
-          const composition = await prisma.composition.create({
+          await prisma.post.update({
+            where: { id: post.id },
             data: {
-              brandId: idea.brandId,
               format,
-              source: 'composed',
               payload: {} as unknown as Prisma.InputJsonValue,
-              caption: idea.ideaText.slice(0, 2000),
-              ideaId: idea.id,
+              caption: post.ideaText.slice(0, 2000),
               templateId: selectedTemplate?.id ?? null,
               topicHash,
-              status: isAutoApprove ? 'APPROVED' : 'DRAFT',
-              brandPersonaId: persona?.id ?? null,
-              ideasFrameworkId: framework?.id ?? null,
-              contentPrinciplesId: principles?.id ?? null,
+              status: draftStatus,
             },
           })
-          await prisma.contentIdea.update({ where: { id: idea.id }, data: { status: 'USED' } })
-          results.push({
-            ideaId: idea.id,
-            brandId: idea.brandId,
-            status: 'success',
-            compositionId: composition.id,
-          })
-          logger.info(
-            `[Composer] Created user-managed ${format} composition ${composition.id} from idea ${idea.id}`,
-          )
+          results.push({ postId: post.id, brandId: post.brandId, status: 'success' })
+          logger.info(`[Composer] Updated post ${post.id} as user-managed ${format}`)
           continue
         }
 
-        // 1. SceneComposer — AI Creative Direction with full provenance
         const { creative } = await compose({
-          ideaText: idea.ideaText,
-          brandId: idea.brandId,
+          ideaText: post.ideaText,
+          brandId: post.brandId,
           format,
           personaId: persona?.id,
-          frameworkPrompt: framework?.systemPrompt ?? null,
-          principlesPrompt: principles?.systemPrompt ?? null,
           templateContentSchema: selectedTemplate?.contentSchema ?? null,
           templateSystemPrompt: selectedTemplate?.systemPrompt ?? null,
         })
 
-        // 2. Asset selection + timeline compile
-        const { sceneAssets, audioAsset } = await selectAssetsForCreative(
-          creative,
-          idea.brandId,
-          30,
-        )
-        const brandStyle = {
-          primaryColor: '#6C63FF',
-          accentColor: '#FF6584',
-          fontFamily: 'sans-serif',
-        }
+        const { sceneAssets, audioAsset } = await selectAssetsForCreative(creative, post.brandId, 30)
+        const brandStyle = { primaryColor: '#6C63FF', accentColor: '#FF6584', fontFamily: 'sans-serif' }
         const { schema } = compileTimeline(creative, sceneAssets, audioAsset, brandStyle, format)
 
-        // 3. Persist Composition with full provenance + template
         const sceneTypes = creative.scenes.map((s: { type: string }) => s.type)
-        const composition = await prisma.composition.create({
+
+        const updatedPost = await prisma.post.update({
+          where: { id: post.id },
           data: {
-            brandId: idea.brandId,
             format,
             creative: creative as unknown as Prisma.InputJsonValue,
             payload: schema as unknown as Prisma.InputJsonValue,
             caption: creative.caption,
             hashtags: creative.hashtags,
-            ideaId: idea.id,
             templateId: selectedTemplate?.id ?? null,
             sceneTypes,
             topicHash,
-            status: isAutoApprove ? 'APPROVED' : 'DRAFT',
+            status: draftStatus,
             brandPersonaId: persona?.id ?? null,
-            ideasFrameworkId: framework?.id ?? null,
-            contentPrinciplesId: principles?.id ?? null,
           },
         })
-
-        // 4. Mark idea USED & commit asset usage
-        await prisma.contentIdea.update({ where: { id: idea.id }, data: { status: 'USED' } })
 
         const usedAssetIds = [...sceneAssets.values()].map((a) => a.id)
         if (audioAsset) usedAssetIds.push(audioAsset.id)
         await commitAssetUsage(usedAssetIds)
 
-        // 5. If auto-approved, enqueue for rendering
-        if (isAutoApprove) {
+        // If auto-approved draft, also check autoApprovePost (rendered) and enqueue
+        const autoApprovePost = selectedTemplate
+          ? ((await prisma.brandTemplateConfig.findUnique({
+              where: { brandId_templateId: { brandId: post.brandId, templateId: selectedTemplate.id } },
+              select: { autoApprovePost: true },
+            }))?.autoApprovePost ?? false)
+          : false
+
+        if (autoApproveDraft && autoApprovePost) {
+          await prisma.post.update({ where: { id: updatedPost.id }, data: { status: 'RENDERING' } })
           await prisma.renderJob.create({
-            data: {
-              compositionId: composition.id,
-              status: 'queued',
-              outputType: 'video',
-            },
+            data: { postId: updatedPost.id, status: 'queued', outputType: 'video' },
           })
-          await addRenderJob(composition.id)
-          await prisma.composition.update({
-            where: { id: composition.id },
-            data: { status: 'rendering' },
-          })
+          await addRenderJob(updatedPost.id)
         }
 
-        results.push({
-          ideaId: idea.id,
-          brandId: idea.brandId,
-          status: 'success',
-          compositionId: composition.id,
-        })
-
-        logger.info(
-          `[Composer] Created composition ${composition.id} from idea ${idea.id} (${creative.scenes.length} scenes, template=${selectedTemplate?.id ?? 'none'}, ${isAutoApprove ? 'auto-approved' : 'draft'})`,
-        )
+        results.push({ postId: post.id, brandId: post.brandId, status: 'success' })
+        logger.info(`[Composer] Updated post ${post.id} (${creative.scenes.length} scenes, ${draftStatus})`)
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
-        logError(`[Composer] Failed to compose idea ${idea.id}`, err)
-        results.push({
-          ideaId: idea.id,
-          brandId: idea.brandId,
-          status: 'failed',
-          error: msg,
-        })
+        logError(`[Composer] Failed to compose post ${post.id}`, err)
+        results.push({ postId: post.id, brandId: post.brandId, status: 'failed', error: msg })
       }
     }
 

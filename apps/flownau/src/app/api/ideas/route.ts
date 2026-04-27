@@ -1,3 +1,4 @@
+// TODO: remove when confirmed unused — replaced by /api/posts
 export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
@@ -16,8 +17,8 @@ export async function GET(req: Request) {
 
     await checkBrandAccess(brandId)
 
-    const ideas = await prisma.contentIdea.findMany({
-      where: { brandId },
+    const ideas = await prisma.post.findMany({
+      where: { brandId, status: { in: ['IDEA_PENDING', 'IDEA_APPROVED'] } },
       orderBy: { createdAt: 'desc' },
     })
 
@@ -45,17 +46,14 @@ export async function POST(req: Request) {
 
     const provenance = await resolveProvenance(brandId)
 
-    const idea = await prisma.contentIdea.create({
+    const idea = await prisma.post.create({
       data: {
         brandId,
         ideaText,
-        format: format ?? null,
         source: source || 'manual',
-        status: status || 'PENDING',
+        status: status || 'IDEA_PENDING',
         priority,
         brandPersonaId: provenance.brandPersonaId,
-        ideasFrameworkId: provenance.ideasFrameworkId,
-        contentPrinciplesId: provenance.contentPrinciplesId,
       },
     })
 

@@ -74,9 +74,9 @@ export async function selectTemplateForIdea(params: {
   const filtered = candidates.filter(matchesFormat)
   const pool = filtered.length > 0 ? filtered : candidates
 
-  // Usage-weighted: count recent Composition usage per template and prefer the least-used.
+  // Usage-weighted: count recent Post usage per template and prefer the least-used.
   const recentWindow = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-  const usageCounts = await prisma.composition.groupBy({
+  const usageCounts = await prisma.post.groupBy({
     by: ['templateId'],
     where: {
       templateId: { in: pool.map((t) => t.id) },

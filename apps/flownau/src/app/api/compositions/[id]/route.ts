@@ -30,7 +30,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (body.payload !== undefined) updateData.payload = body.payload
     if (body.creative !== undefined) updateData.creative = body.creative
 
-    const composition = await prisma.composition.update({
+    const composition = await prisma.post.update({
       where: { id },
       data: updateData,
     })
@@ -51,7 +51,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 
     const { id } = await params
 
-    await prisma.composition.delete({ where: { id } })
+    await prisma.post.delete({ where: { id } })
 
     return NextResponse.json({ success: true }, { status: 200 })
   } catch (error) {

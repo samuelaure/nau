@@ -7,9 +7,9 @@ import { publishCarousel } from './instagram-carousel'
 import { publishPhoto } from './instagram-photo'
 import type { PublishResult } from './types'
 
-interface CompositionForPublish {
+interface PostForPublish {
   id: string
-  format: string
+  format: string | null
   videoUrl: string | null
   coverUrl: string | null
   caption: string | null
@@ -22,9 +22,6 @@ interface CompositionForPublish {
   }
 }
 
-/**
- * Build a full caption string from composition caption + hashtags.
- */
 function buildCaption(caption: string | null, hashtags: string[]): string {
   let result = caption || 'New content'
   if (hashtags.length > 0) {
@@ -34,27 +31,17 @@ function buildCaption(caption: string | null, hashtags: string[]): string {
   return result
 }
 
-/**
- * Unified publish orchestrator.
- * Routes to the correct Instagram publisher based on composition format.
- * Handles token refresh, caption building, and DB status updates.
- */
-export async function publishComposition(
-  composition: CompositionForPublish,
-): Promise<PublishResult> {
-  const account = composition.socialProfile
+export async function publishComposition(post: PostForPublish): Promise<PublishResult> {
+  const account = post.socialProfile
 
-  // Guard: platform ID required
   if (!account?.platformId) {
     return { success: false, error: `Account ${account.id} has no Instagram platformId` }
   }
 
-  // Guard: rendered content required
-  if (!composition.videoUrl) {
-    return { success: false, error: `Composition ${composition.id} has no rendered output URL` }
+  if (!post.videoUrl) {
+    return { success: false, error: `Post ${post.id} has no rendered output URL` }
   }
 
-  // Pre-publish: refresh token if needed
   let validToken: string
   try {
     validToken = await refreshTokenIfNeeded({
@@ -67,74 +54,43 @@ export async function publishComposition(
     return { success: false, error: `Token refresh failed: ${msg}` }
   }
 
-  const caption = buildCaption(composition.caption, composition.hashtags)
+  const caption = buildCaption(post.caption, post.hashtags)
   const igUserId = account.platformId
 
-  logger.info(
-    `[PublishOrchestrator] Publishing ${composition.format} composition ${composition.id}`,
-  )
+  logger.info(`[PublishOrchestrator] Publishing ${post.format} post ${post.id}`)
 
   let result: PublishResult
 
-  switch (composition.format) {
+  switch (post.format) {
     case 'reel':
-      result = await publishReel({
-        accessToken: validToken,
-        igUserId,
-        videoUrl: composition.videoUrl,
-        caption,
-        coverUrl: composition.coverUrl ?? undefined,
-      })
+      result = await publishReel({ accessToken: validToken, igUserId, videoUrl: post.videoUrl, caption, coverUrl: post.coverUrl ?? undefined })
       break
-
     case 'trial_reel':
-      result = await publishTrialReel({
-        accessToken: validToken,
-        igUserId,
-        videoUrl: composition.videoUrl,
-        caption,
-      })
+      result = await publishTrialReel({ accessToken: validToken, igUserId, videoUrl: post.videoUrl, caption })
       break
-
     case 'carousel': {
-      // For carousels, videoUrl contains comma-separated image URLs
-      // (set by the render worker when uploading multiple slides)
-      const imageUrls = composition.videoUrl.split(',').map((u) => u.trim())
-      result = await publishCarousel({
-        accessToken: validToken,
-        igUserId,
-        imageUrls,
-        caption,
-      })
+      const imageUrls = post.videoUrl.split(',').map((u) => u.trim())
+      result = await publishCarousel({ accessToken: validToken, igUserId, imageUrls, caption })
       break
     }
-
     case 'single_image':
-      result = await publishPhoto({
-        accessToken: validToken,
-        igUserId,
-        imageUrl: composition.videoUrl,
-        caption,
-      })
+      result = await publishPhoto({ accessToken: validToken, igUserId, imageUrl: post.videoUrl, caption })
       break
-
     default:
-      result = { success: false, error: `Unknown format: ${composition.format}` }
+      result = { success: false, error: `Unknown format: ${post.format}` }
   }
 
-  // Update DB based on result
   if (result.success) {
-    await prisma.composition.update({
-      where: { id: composition.id },
+    await prisma.post.update({
+      where: { id: post.id },
       data: {
         status: 'PUBLISHED',
         externalPostId: result.externalId ?? null,
         externalPostUrl: result.permalink ?? null,
+        publishedAt: new Date(),
       },
     })
-    logger.info(
-      `[PublishOrchestrator] Published ${composition.id} → ${result.permalink ?? result.externalId}`,
-    )
+    logger.info(`[PublishOrchestrator] Published ${post.id} → ${result.permalink ?? result.externalId}`)
   }
 
   return result

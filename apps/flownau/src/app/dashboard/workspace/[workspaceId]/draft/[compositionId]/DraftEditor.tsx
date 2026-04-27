@@ -102,7 +102,7 @@ interface Props {
   composition: {
     id: string
     status: string
-    format: string
+    format: string | null
     caption: string | null
     hashtags: string[]
     creative: any
@@ -123,7 +123,7 @@ export default function DraftEditor({ composition, backUrl }: Props) {
   const [scenes, setScenes] = useState<any[]>(composition.creative?.scenes ?? [])
 
   const isDraft = composition.status === 'DRAFT'
-  const FormatIcon = FORMAT_ICON[composition.format] ?? Film
+  const FormatIcon = (composition.format ? FORMAT_ICON[composition.format] : null) ?? Film
 
   const updateSlot = (sceneIdx: number, key: string, value: string) => {
     setScenes((prev) =>
@@ -222,7 +222,7 @@ export default function DraftEditor({ composition, backUrl }: Props) {
             </span>
             <span className="inline-flex items-center gap-1 text-[10px] font-bold tracking-widest px-2 py-0.5 rounded-full uppercase bg-gray-800 text-gray-400">
               <FormatIcon size={9} />
-              {FORMAT_LABEL[composition.format] ?? composition.format}
+              {(composition.format ? FORMAT_LABEL[composition.format] : null) ?? composition.format}
             </span>
             {composition.template?.name && (
               <span className="text-[10px] text-gray-500">{composition.template.name}</span>

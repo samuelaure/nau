@@ -49,7 +49,7 @@ export async function ingestExternalIdea(params: ExternalIdeaInput) {
   // Check for near-duplicates in last 7 days
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
 
-  const existingIdea = await prisma.contentIdea.findFirst({
+  const existingIdea = await prisma.post.findFirst({
     where: {
       brandId,
       ideaText: text,
@@ -65,22 +65,19 @@ export async function ingestExternalIdea(params: ExternalIdeaInput) {
   }
 
   // AI-linked ideas always require human review regardless of source or autoApprove settings
-  const status = aiLinked ? 'PENDING' : source === 'captured' ? 'APPROVED' : 'PENDING'
+  const status = aiLinked ? 'IDEA_PENDING' : source === 'captured' ? 'IDEA_APPROVED' : 'IDEA_PENDING'
 
   const provenance = await resolveProvenance(brandId)
 
-  const idea = await prisma.contentIdea.create({
+  const idea = await prisma.post.create({
     data: {
       brandId,
       ideaText: text,
       source,
       priority: SOURCE_PRIORITY[source],
       sourceRef: sourceRef ?? null,
-      aiLinked,
       status,
       brandPersonaId: provenance.brandPersonaId,
-      ideasFrameworkId: provenance.ideasFrameworkId,
-      contentPrinciplesId: provenance.contentPrinciplesId,
     },
   })
 
@@ -106,7 +103,7 @@ export async function ingestExternalIdeas(
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
 
   // Fetch recent idea texts for dedup
-  const recentIdeas = await prisma.contentIdea.findMany({
+  const recentIdeas = await prisma.post.findMany({
     where: { brandId, createdAt: { gte: sevenDaysAgo } },
     select: { ideaText: true },
   })
@@ -127,23 +124,20 @@ export async function ingestExternalIdeas(
 
     // AI-linked ideas always require human review — bypass autoApprove and captured auto-approve
     const status = isAiLinked
-      ? 'PENDING'
+      ? 'IDEA_PENDING'
       : autoApprove || source === 'captured'
-        ? 'APPROVED'
-        : 'PENDING'
+        ? 'IDEA_APPROVED'
+        : 'IDEA_PENDING'
 
-    const created = await prisma.contentIdea.create({
+    const created = await prisma.post.create({
       data: {
         brandId,
         ideaText: idea.text,
         source,
         priority: SOURCE_PRIORITY[source],
         sourceRef: idea.sourceRef ?? null,
-        aiLinked: isAiLinked,
         status,
         brandPersonaId: provenance.brandPersonaId,
-        ideasFrameworkId: provenance.ideasFrameworkId,
-        contentPrinciplesId: provenance.contentPrinciplesId,
       },
     })
 

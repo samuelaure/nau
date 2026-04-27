@@ -60,7 +60,7 @@ export async function deleteTemplate(id: string) {
   const parsedId = IdSchema.parse(id)
 
   // Delete dependants in order before deleting the template
-  await prisma.composition.deleteMany({ where: { templateId: parsedId } })
+  await prisma.post.updateMany({ where: { templateId: parsedId }, data: { templateId: null } })
   await prisma.render.deleteMany({ where: { templateId: parsedId } })
   await prisma.asset.deleteMany({ where: { templateId: parsedId } })
   await prisma.template.delete({ where: { id: parsedId } })

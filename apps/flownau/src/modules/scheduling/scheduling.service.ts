@@ -39,30 +39,22 @@ export async function runAutonomousScheduler(): Promise<{
 
     const autoApprove = planner.autoApproveSchedule
 
-    const approved = await prisma.composition.findMany({
+    const approved = await prisma.post.findMany({
       where: {
         brandId: planner.brandId,
-        status: 'APPROVED',
+        status: 'DRAFT_APPROVED',
         scheduledAt: null,
       },
-      select: { id: true, format: true, ideaId: true },
+      select: { id: true, format: true, ideaText: true },
       orderBy: { createdAt: 'asc' },
     })
 
     if (approved.length === 0) continue
 
-    // Fetch idea text for the AI strategist (minimal payload — token-economic)
-    const ideaIds = approved.map((c) => c.ideaId).filter(Boolean) as string[]
-    const ideas = await prisma.contentIdea.findMany({
-      where: { id: { in: ideaIds } },
-      select: { id: true, ideaText: true },
-    })
-    const ideaTextMap = new Map(ideas.map((i) => [i.id, i.ideaText]))
-
     const pieces = approved.map((c) => ({
       id: c.id,
-      format: c.format,
-      ideaText: c.ideaId ? (ideaTextMap.get(c.ideaId) ?? '') : '',
+      format: c.format ?? 'reel',
+      ideaText: c.ideaText,
     }))
 
     // AI strategist: returns ordered composition IDs
@@ -77,18 +69,16 @@ export async function runAutonomousScheduler(): Promise<{
       })
     }
 
-    // Rebuild ordered list (AI may reorder)
-    const compositionMap = new Map(approved.map((c) => [c.id, c]))
+    const postMap = new Map(approved.map((c) => [c.id, c]))
     const orderedComps = orderedIds
-      .map((id) => compositionMap.get(id))
+      .map((id) => postMap.get(id))
       .filter((c): c is NonNullable<typeof c> => Boolean(c))
 
-    // Baseline: latest already-assigned slot in the future, or now
-    const latestSlotted = await prisma.composition.findFirst({
+    const latestSlotted = await prisma.post.findFirst({
       where: {
         brandId: planner.brandId,
         scheduledAt: { not: null },
-        status: { in: ['APPROVED', 'SCHEDULED', 'RENDERING', 'RENDERED', 'PUBLISHING'] },
+        status: { in: ['DRAFT_APPROVED', 'SCHEDULED', 'RENDERING', 'RENDERED_PENDING', 'RENDERED_APPROVED', 'PUBLISHING'] },
       },
       orderBy: { scheduledAt: 'desc' },
       select: { scheduledAt: true },
@@ -105,11 +95,11 @@ export async function runAutonomousScheduler(): Promise<{
 
       const nextSlot = calculateNextSlot(baseline, timesToUse, planner.timezone)
 
-      await prisma.composition.update({
+      await prisma.post.update({
         where: { id: comp.id },
         data: {
           scheduledAt: nextSlot,
-          status: autoApprove ? 'SCHEDULED' : 'APPROVED',
+          status: autoApprove ? 'SCHEDULED' : 'DRAFT_APPROVED',
         },
       })
 
