@@ -283,6 +283,11 @@ export const patchBrandIntelligence = async (brandId: string, patch: Record<stri
   return data;
 };
 
+export const getBrandOwnedProfiles = async (brandId: string) => {
+  const { data } = await api.get<SocialProfile[]>(`/brands/${brandId}/owned-profiles`);
+  return data;
+};
+
 export const getInspoItems = async (brandId: string) => {
   const { data } = await api.get(`/brands/${brandId}/inspo`);
   return data;

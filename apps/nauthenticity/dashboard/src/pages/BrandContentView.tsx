@@ -1,237 +1,199 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getAccount, getBrandIntelligence, patchBrandIntelligence, ingestAccount, getMediaUrl } from '../lib/api';
-import { RefreshCw, Database, AlertCircle } from 'lucide-react';
+import { getBrandOwnedProfiles, getAccount, getMediaUrl } from '../lib/api';
+import { Database, ArrowRight } from 'lucide-react';
 import { PostGrid } from '../components/PostGrid';
 
 export const BrandContentView = () => {
-  const { brandId, workspaceId } = useParams<{ brandId: string; workspaceId: string }>();
+  const { brandId } = useParams<{ brandId: string }>();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const [igInput, setIgInput] = React.useState('');
-  const [igError, setIgError] = React.useState('');
+  const [selectedUsername, setSelectedUsername] = React.useState<string | null>(null);
+  const [sort, setSort] = React.useState<'recent' | 'oldest' | 'likes' | 'comments'>('recent');
 
-  // 1. Fetch Brand Intelligence to get mainIgUsername
-  const { data: intelligence, isLoading: loadingIntel } = useQuery({
-    queryKey: ['brand-intelligence', brandId],
-    queryFn: () => getBrandIntelligence(brandId!),
+  // Fetch owned profiles for this brand
+  const { data: ownedProfiles, isLoading: loadingProfiles } = useQuery({
+    queryKey: ['owned-profiles', brandId],
+    queryFn: () => getBrandOwnedProfiles(brandId!),
     enabled: !!brandId,
   });
 
-  const mainIgUsername = intelligence?.mainUsername;
-
-  // 2. Fetch Account Details if username exists
+  // Fetch selected profile's posts
   const {
-    data: account,
+    data: selectedAccount,
     isLoading: loadingAccount,
-    isError: accountError,
   } = useQuery({
-    queryKey: ['account', mainIgUsername],
-    queryFn: () => getAccount(mainIgUsername!),
-    enabled: !!mainIgUsername,
+    queryKey: ['account', selectedUsername],
+    queryFn: () => getAccount(selectedUsername!),
+    enabled: !!selectedUsername,
   });
 
-  const linkIgMutation = useMutation({
-    mutationFn: (username: string) =>
-      patchBrandIntelligence(brandId!, { mainUsername: username, workspaceId: workspaceId ?? '' }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['brand-intelligence', brandId] });
-      setIgInput('');
-      setIgError('');
-    },
-    onError: (err: any) => {
-      setIgError(err?.response?.data?.error || err.message || 'Failed to link account');
-    },
-  });
+  if (loadingProfiles) return <div>Loading Brand Profiles...</div>;
 
-  const handleLinkIg = (e: React.FormEvent) => {
-    e.preventDefault();
-    const username = igInput.trim().replace(/^@/, '');
-    if (!username) { setIgError('Instagram username is required'); return; }
-    linkIgMutation.mutate(username);
-  };
-
-  const [sort, setSort] = React.useState<'recent' | 'oldest' | 'likes' | 'comments'>('recent');
-  const [scrapeLimit, setScrapeLimit] = React.useState<number>(50);
-
-  const ingestMutation = useMutation({
-    mutationFn: ingestAccount,
-    onSuccess: () => navigate(`/progress?username=${mainIgUsername}`),
-  });
-
-  if (loadingIntel) return <div>Loading Brand Settings...</div>;
-
-  if (!mainIgUsername) {
+  // Show profile detail view if selected
+  if (selectedUsername && selectedAccount) {
     return (
-      <div
-        style={{
-          textAlign: 'center',
-          padding: '4rem 2rem',
-          background: 'var(--card-bg)',
-          borderRadius: '12px',
-          border: '1px solid var(--border)',
-          maxWidth: '480px',
-          margin: '0 auto',
-        }}
-      >
-        <AlertCircle size={48} style={{ color: '#8b949e', marginBottom: '1rem' }} />
-        <h2 style={{ marginBottom: '0.5rem' }}>Link Instagram Account</h2>
-        <p style={{ color: '#8b949e', marginBottom: '2rem' }}>
-          Enter this brand's official Instagram username to see and manage its content.
-        </p>
-        <form onSubmit={handleLinkIg} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <input
-              type="text"
-              value={igInput}
-              onChange={(e) => { setIgInput(e.target.value); setIgError(''); }}
-              placeholder="@username"
-              autoFocus
-              style={{
-                flex: 1,
-                padding: '10px 12px',
-                background: 'var(--bg-primary, #0d1117)',
-                border: `1px solid ${igError ? '#f85149' : 'var(--border-color, #30363d)'}`,
-                borderRadius: '6px',
-                color: 'var(--text-primary, #e6edf3)',
-                fontSize: '14px',
-              }}
-            />
-            <button
-              type="submit"
-              className="btn-primary"
-              disabled={linkIgMutation.isPending}
-              style={{ whiteSpace: 'nowrap' }}
-            >
-              {linkIgMutation.isPending ? 'Linking…' : 'Link Account'}
-            </button>
-          </div>
-          {igError && (
-            <p style={{ color: '#f85149', fontSize: '13px', margin: 0, textAlign: 'left' }}>{igError}</p>
-          )}
-        </form>
-      </div>
-    );
-  }
-
-  if (loadingAccount) return <div>Loading Content...</div>;
-
-  if (accountError || !account) {
-    return (
-      <div style={{ textAlign: 'center', padding: '4rem 2rem' }}>
-        <h2 style={{ color: 'red' }}>Error loading account @{mainIgUsername}</h2>
-        <p>Ensure this account has been added to the system.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="fade-in">
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', marginBottom: '2rem' }}>
-        <img
-          src={getMediaUrl(account.profileImageUrl) || 'https://via.placeholder.com/100'}
-          alt={account.username}
-          style={{
-            width: '80px',
-            height: '80px',
-            borderRadius: '50%',
-            border: '2px solid var(--border)',
-          }}
-        />
-        <div>
-          <h1 style={{ margin: 0, fontSize: '2rem' }}>@{account.username}</h1>
-          <span style={{ color: 'var(--text-secondary)' }}>
-            Main Brand Profile • Last scraped: {new Date(account.lastScrapedAt).toLocaleString()}
-          </span>
-        </div>
-      </div>
-
-      <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-        <select
-          value={sort}
-          onChange={(e) => setSort(e.target.value as any)}
-          style={{
-            padding: '0.5rem',
-            borderRadius: '4px',
-            background: 'var(--card-bg)',
-            color: 'var(--text-primary)',
-            border: '1px solid var(--border)',
-          }}
-        >
-          <option value="recent">Most Recent</option>
-          <option value="oldest">Oldest First</option>
-          <option value="likes">Most Likes</option>
-          <option value="comments">Most Comments</option>
-        </select>
-
+      <div className="fade-in">
         <button
-          className="btn-secondary"
-          onClick={() =>
-            ingestMutation.mutate({ username: account.username, limit: 50, updateSync: true })
-          }
-          disabled={ingestMutation.isPending}
+          onClick={() => setSelectedUsername(null)}
           style={{
+            background: 'none',
+            border: 'none',
+            color: '#58a6ff',
+            cursor: 'pointer',
+            marginBottom: '1rem',
             display: 'flex',
             alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.5rem 1rem',
-            fontSize: '0.875rem',
-            borderRadius: '4px',
-            background: 'var(--accent-primary)',
-            color: 'white',
-            border: 'none',
-            cursor: 'pointer',
+            gap: '4px',
+            padding: 0,
+            fontWeight: 500,
           }}
         >
-          <RefreshCw size={16} /> Update Sync
+          &larr; Back to Profiles
         </button>
 
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            ingestMutation.mutate({ username: account.username, limit: scrapeLimit });
-          }}
-          style={{ display: 'flex', gap: '0.5rem' }}
-        >
-          <input
-            type="number"
-            value={scrapeLimit}
-            onChange={(e) => setScrapeLimit(Number(e.target.value))}
-            min={1}
-            max={10000}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', marginBottom: '2rem' }}>
+          <img
+            src={getMediaUrl(selectedAccount.profileImageUrl) || 'https://via.placeholder.com/100'}
+            alt={selectedAccount.username}
             style={{
-              background: 'var(--card-bg)',
-              border: '1px solid var(--border)',
-              color: 'var(--text-primary)',
-              padding: '0.5rem',
-              borderRadius: '4px',
               width: '80px',
+              height: '80px',
+              borderRadius: '50%',
+              border: '2px solid var(--border)',
             }}
           />
-          <button
-            type="submit"
-            className="btn-secondary"
-            disabled={ingestMutation.isPending}
+          <div>
+            <h1 style={{ margin: 0, fontSize: '2rem' }}>@{selectedAccount.username}</h1>
+            <span style={{ color: 'var(--text-secondary)' }}>
+              {selectedAccount._count?.posts || 0} posts
+            </span>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as any)}
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.5rem 1rem',
-              fontSize: '0.875rem',
+              padding: '0.5rem',
               borderRadius: '4px',
-              background: '#444',
-              color: 'white',
-              border: 'none',
-              cursor: 'pointer',
+              background: 'var(--card-bg)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border)',
             }}
           >
-            <Database size={16} /> Scrape
-          </button>
-        </form>
+            <option value="recent">Most Recent</option>
+            <option value="oldest">Oldest First</option>
+            <option value="likes">Most Likes</option>
+            <option value="comments">Most Comments</option>
+          </select>
+        </div>
+
+        {loadingAccount ? <div>Loading posts...</div> : <PostGrid posts={selectedAccount.posts} sort={sort} />}
+      </div>
+    );
+  }
+
+  // Show profiles grid
+  return (
+    <div className="fade-in">
+      <div style={{ marginBottom: '2rem' }}>
+        <h2 style={{ margin: 0, marginBottom: '0.5rem' }}>Social Profiles</h2>
+        <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
+          {ownedProfiles?.length === 0
+            ? 'No social profiles linked yet. Create one in flownau to get started.'
+            : `${ownedProfiles?.length} profile(s) ready for content management.`}
+        </p>
       </div>
 
-      <PostGrid posts={account.posts} sort={sort} />
+      {ownedProfiles && ownedProfiles.length > 0 ? (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+            gap: '1rem',
+          }}
+        >
+          {ownedProfiles.map((profile) => (
+            <div
+              key={profile.id}
+              onClick={() => setSelectedUsername(profile.username)}
+              style={{
+                background: 'var(--card-bg)',
+                border: '1px solid var(--border)',
+                borderRadius: '10px',
+                padding: '1.5rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1rem',
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.borderColor = '#58a6ff';
+                (e.currentTarget as HTMLElement).style.boxShadow = '0 0 10px rgba(88, 166, 255, 0.2)';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)';
+                (e.currentTarget as HTMLElement).style.boxShadow = 'none';
+              }}
+            >
+              <img
+                src={getMediaUrl(profile.profileImageUrl) || 'https://via.placeholder.com/150'}
+                alt={profile.username}
+                style={{
+                  width: '80px',
+                  height: '80px',
+                  borderRadius: '50%',
+                  border: '2px solid var(--border)',
+                }}
+              />
+              <div>
+                <h3 style={{ margin: 0, marginBottom: '0.25rem' }}>@{profile.username}</h3>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                  {profile._count?.posts || 0} posts
+                </p>
+                <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.8rem', color: '#8b949e' }}>
+                  Last: {new Date(profile.lastScrapedAt).toLocaleDateString()}
+                </p>
+              </div>
+              <button
+                style={{
+                  marginTop: 'auto',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '6px',
+                  background: '#58a6ff',
+                  color: 'white',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                }}
+              >
+                View Content <ArrowRight size={16} />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div
+          style={{
+            padding: '3rem',
+            textAlign: 'center',
+            background: 'var(--card-bg)',
+            borderRadius: '12px',
+            border: '1px dashed var(--border)',
+            color: '#8b949e',
+          }}
+        >
+          <Database size={48} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
+          <p style={{ margin: 0 }}>No profiles yet. Sync from flownau or add manually.</p>
+        </div>
+      )}
     </div>
   );
 };
