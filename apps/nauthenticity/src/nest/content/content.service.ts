@@ -16,13 +16,12 @@ export class ContentService {
     const skip = (page - 1) * limit
     const [accounts, total] = await Promise.all([
       this.prisma.socialProfile.findMany({
-        where: { posts: { some: {} } },
         orderBy: { lastScrapedAt: 'desc' },
         include: { _count: { select: { posts: true } } },
         skip,
         take: limit,
       }),
-      this.prisma.socialProfile.count({ where: { posts: { some: {} } } }),
+      this.prisma.socialProfile.count(),
     ])
     return { accounts, pagination: { total, page, limit, totalPages: Math.ceil(total / limit) } }
   }
