@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { clearToken } from '../lib/auth';
+import { BrandSwitcher } from './BrandSwitcher';
 import {
   LayoutDashboard,
   Lightbulb,
@@ -96,6 +97,16 @@ function WorkspaceSelector() {
 
       {open && (
         <div className="sidebar-dropdown">
+          <button
+            onClick={() => {
+              navigate('/workspaces');
+              setOpen(false);
+            }}
+            className="sidebar-dropdown-item"
+          >
+            <span>All Workspaces</span>
+          </button>
+
           {workspaces.map((ws) => (
             <button
               key={ws.id}
@@ -180,17 +191,12 @@ export function Sidebar() {
 
       <WorkspaceSelector />
 
+      <BrandSwitcher />
+
       <nav className="sidebar-nav">
         {activeBrandId && activeWorkspaceId ? (
           <>
-            <Link
-              to={`/workspaces/${activeWorkspaceId}/brands`}
-              className="sidebar-back"
-            >
-              <ArrowLeft size={14} /> All Brands
-            </Link>
-
-            <span className="sidebar-section-label">Brand</span>
+            <span className="sidebar-section-label">Brand Pages</span>
 
             {[
               { label: 'Content', to: `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}/content`, icon: LayoutDashboard },
