@@ -48,21 +48,27 @@ export class SocialProfilesController {
 
     // If brandId is provided, link this profile to the brand as a publishing profile
     if (body.brandId) {
-      await this.prisma.socialProfileTarget.upsert({
-        where: {
-          brandId_socialProfileId: { brandId: body.brandId, socialProfileId: profile.id },
-        },
-        create: {
-          brandId: body.brandId,
-          socialProfileId: profile.id,
-          targetType: body.targetType || 'publishing',
-          isPublishingProfile: true,
-        },
-        update: {
-          targetType: body.targetType || 'publishing',
-          isPublishingProfile: true,
-        },
-      })
+      try {
+        await this.prisma.socialProfileTarget.upsert({
+          where: {
+            brandId_socialProfileId: { brandId: body.brandId, socialProfileId: profile.id },
+          },
+          create: {
+            brandId: body.brandId,
+            socialProfileId: profile.id,
+            targetType: body.targetType || 'publishing',
+            isPublishingProfile: true,
+          },
+          update: {
+            targetType: body.targetType || 'publishing',
+            isPublishingProfile: true,
+          },
+        })
+      } catch (err: any) {
+        // If brand doesn't exist yet, just log warning and continue
+        // The profile will be synced, but not yet linked to a brand
+        console.warn(`[SyncProfile] Brand ${body.brandId} not found in nauthenticity, profile synced without brand link`)
+      }
     }
 
     return { profile, synced: true }
