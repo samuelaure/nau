@@ -58,6 +58,7 @@ const BrandUpdateSchema = z.object({
   creationPrompt: z.string().optional(),
   shortCode: z.string().optional(),
   language: z.string().optional(),
+  ideationCount: z.coerce.number().int().min(1).max(30).optional(),
 })
 
 const SocialProfileUpdateSchema = z.object({
@@ -175,16 +176,17 @@ export async function addBrand(formData: FormData): Promise<{ id: string; worksp
 export async function updateBrand(brandId: string, formData: FormData) {
   await checkAuth()
   const parsedId = IdSchema.parse(brandId)
-  const { directorPrompt, creationPrompt, shortCode, language } = BrandUpdateSchema.parse({
+  const { directorPrompt, creationPrompt, shortCode, language, ideationCount } = BrandUpdateSchema.parse({
     directorPrompt: formData.get('directorPrompt'),
     creationPrompt: formData.get('creationPrompt'),
     shortCode: formData.get('shortCode'),
     language: formData.get('language'),
+    ideationCount: formData.get('ideationCount'),
   })
 
   await prisma.brand.update({
     where: { id: parsedId },
-    data: { directorPrompt, creationPrompt, shortCode, language },
+    data: { directorPrompt, creationPrompt, shortCode, language, ...(ideationCount !== undefined && { ideationCount }) },
   })
 
   revalidatePath('/dashboard')

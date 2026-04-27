@@ -23,6 +23,7 @@ const LANGUAGES = [
 type Brand = {
   id: string
   language: string
+  ideationCount: number
   directorPrompt: string | null
   creationPrompt: string | null
   shortCode: string | null
@@ -87,6 +88,23 @@ export default function BrandSettings({ brand }: { brand: Brand }) {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div className="w-full">
+              <label className="form-label mb-1 block">
+                Ideas per generation
+                <span className="text-xs font-normal ml-2 opacity-70">
+                  Default number of ideas generated per brainstorm session.
+                </span>
+              </label>
+              <input
+                type="number"
+                name="ideationCount"
+                min={1}
+                max={30}
+                defaultValue={brand.ideationCount}
+                className="bg-gray-950 border border-border text-white rounded p-2.5 text-sm w-24"
+              />
             </div>
 
             <div className="w-full border-t border-border pt-6">

@@ -124,13 +124,9 @@ export default function AccountIdeas({ brandId }: { brandId: string }) {
   const [templates, setTemplates] = useState<any[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('')
 
-  // Framework dropdown (for brainstorm selection)
-  const [frameworks, setFrameworks] = useState<any[]>([])
-
-  // Persona & Framework selection
+  // Persona selection — used only for compose flow (idea → draft)
   const [personas, setPersonas] = useState<any[]>([])
   const [selectedPersonaId, setSelectedPersonaId] = useState<string>('')
-  const [selectedFrameworkId, setSelectedFrameworkId] = useState<string>('')
 
   // Brainstorm modal
   const [brainstormModalOpen, setBrainstormModalOpen] = useState(false)
@@ -150,18 +146,6 @@ export default function AccountIdeas({ brandId }: { brandId: string }) {
   // Bulk actions
   const [bulkApproving, setBulkApproving] = useState(false)
   const [bulkClearing, setBulkClearing] = useState(false)
-
-  const fetchFrameworks = async () => {
-    try {
-      const res = await fetch(`/api/ideas-frameworks?brandId=${brandId}`)
-      const data = await res.json()
-      setFrameworks(data.frameworks || [])
-      const def = data.frameworks?.find((f: any) => f.isDefault)
-      if (def) setSelectedFrameworkId(def.id)
-    } catch {
-      toast.error('Failed to load frameworks')
-    }
-  }
 
   const fetchPersonas = async () => {
     try {
@@ -206,7 +190,6 @@ export default function AccountIdeas({ brandId }: { brandId: string }) {
 
   useEffect(() => {
     fetchIdeas()
-    fetchFrameworks()
     fetchPersonas()
     fetchTemplates()
   }, [brandId])
@@ -405,40 +388,11 @@ export default function AccountIdeas({ brandId }: { brandId: string }) {
         <div>
           <h3 className="text-xl font-heading font-semibold">Content Backlog</h3>
           <p className="text-xs text-gray-500">
-            Captured ideas first, then manual, then automatic. Pick a persona/strategy to
-            brainstorm.
+            Captured ideas first, then manual, then automatic.
           </p>
         </div>
 
         <div className="flex flex-wrap gap-2 items-center">
-          <select
-            className="bg-gray-900 border border-gray-800 rounded p-1.5 text-xs text-gray-300 w-[120px]"
-            value={selectedPersonaId}
-            onChange={(e) => setSelectedPersonaId(e.target.value)}
-          >
-            <option value="">Default Persona</option>
-            {personas.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.isDefault ? '⭐ ' : ''}
-                {p.name}
-              </option>
-            ))}
-          </select>
-
-          <select
-            className="bg-gray-900 border border-gray-800 rounded p-1.5 text-xs text-gray-300 w-[120px]"
-            value={selectedFrameworkId}
-            onChange={(e) => setSelectedFrameworkId(e.target.value)}
-          >
-            <option value="">Default Strategy</option>
-            {frameworks.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.isDefault ? '⭐ ' : ''}
-                {f.name}
-              </option>
-            ))}
-          </select>
-
           {usedCount > 0 && (
             <Button
               variant="outline"

@@ -158,6 +158,7 @@ export default async function WorkspaceOverviewPage({
               brand={{
                 id: localBrand.id,
                 language: localBrand.language,
+                ideationCount: localBrand.ideationCount,
                 directorPrompt: localBrand.directorPrompt,
                 creationPrompt: localBrand.creationPrompt,
                 shortCode: localBrand.shortCode,
