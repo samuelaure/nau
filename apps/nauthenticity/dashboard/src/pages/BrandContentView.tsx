@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { getBrandOwnedProfiles, getAccount, getMediaUrl } from '../lib/api';
 import { Database, ArrowRight } from 'lucide-react';
 import { PostGrid } from '../components/PostGrid';
+import { ProfileActionsBar } from '../components/ProfileActionsBar';
 
 export const BrandContentView = () => {
   const { brandId } = useParams<{ brandId: string }>();
@@ -70,6 +71,8 @@ export const BrandContentView = () => {
             </span>
           </div>
         </div>
+
+        <ProfileActionsBar username={selectedUsername} />
 
         <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
           <select
