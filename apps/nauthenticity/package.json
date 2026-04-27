@@ -11,7 +11,7 @@
     "build": "nest build",
     "start": "node dist/main",
     "dev": "dotenv -e ../../.env.development -e .env.development -- nest start --watch",
-    "predev": "dotenv -e ../../.env.development -e .env.development -- npx prisma migrate deploy && dotenv -e ../../.env.development -e .env.development -- npx prisma generate --schema=src/db/schema.prisma && node -e \"const fs=require('fs');try{fs.unlinkSync('tsconfig.tsbuildinfo')}catch(e){}\" && npx nest build",
+    "predev": "dotenv -e ../../.env.development -e .env.development -- npx prisma migrate deploy && dotenv -e ../../.env.development -e .env.development -- npx prisma generate && node -e \"const fs=require('fs');try{fs.unlinkSync('tsconfig.tsbuildinfo')}catch(e){}\" && npx nest build",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "lint": "eslint src --ext .ts",
@@ -60,7 +60,7 @@
     "zod": "^3.23.8"
   },
   "prisma": {
-    "schema": "src/db/schema.prisma"
+    "schema": "prisma/schema.prisma"
   },
   "devDependencies": {
     "@aws-sdk/client-s3": "*",
