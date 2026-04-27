@@ -478,8 +478,7 @@ const handleOptimizeBatch = async (
         if (m.storageUrl.startsWith('http') && r2Client && config.env.R2_BUCKET_NAME) {
           // If remote, upload optimized and overwrite
           const url = new URL(m.storageUrl);
-          const key = url.pathname.startsWith('/') ? url.pathname.slice(1) : url.pathname;
-          const actualKey = key.includes('content/') ? key.substring(key.indexOf('content/')) : key;
+          const actualKey = url.pathname.startsWith('/') ? url.pathname.slice(1) : url.pathname;
 
           await r2Client.send(
             new PutObjectCommand({
