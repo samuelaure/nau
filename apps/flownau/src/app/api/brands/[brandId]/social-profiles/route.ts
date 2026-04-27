@@ -90,6 +90,7 @@ export async function POST(req: Request, { params }: { params: { brandId: string
           username,
           platform: 'instagram',
           brandId: params.brandId,
+          workspaceId: brand.workspaceId,
         }),
       }).catch((err) => {
         // Silently fail — sync is nice-to-have

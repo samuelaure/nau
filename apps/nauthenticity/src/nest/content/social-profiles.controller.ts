@@ -21,6 +21,7 @@ export class SocialProfilesController {
       platform?: string
       profileImageUrl?: string | null
       brandId?: string
+      workspaceId?: string
       targetType?: string
     },
   ) {
@@ -29,6 +30,20 @@ export class SocialProfilesController {
     }
 
     const platform = body.platform || 'instagram'
+
+    // If brandId is provided, ensure the Brand exists in nauthenticity first
+    // (Brand identity is managed by 9naŭ API, but nauthenticity needs local record)
+    if (body.brandId) {
+      await this.prisma.brand.upsert({
+        where: { id: body.brandId },
+        update: {},
+        create: {
+          id: body.brandId,
+          workspaceId: body.workspaceId || '',
+          voicePrompt: '',
+        },
+      })
+    }
 
     // Upsert: create if not exists, otherwise return existing
     // If brandId is provided, set the owner; otherwise leave ownerId as-is

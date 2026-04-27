@@ -354,6 +354,7 @@ export async function syncProfileToNauthenticity(profileId: string) {
       platform: profile.platform || 'instagram',
       profileImageUrl: profile.profileImage,
       brandId: profile.brandId,
+      workspaceId: profile.workspaceId,
     }),
   })
 
