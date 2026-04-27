@@ -3,6 +3,7 @@ import { Worker, Job } from 'bullmq';
 import { config } from '../config';
 import { prisma } from '../modules/shared/prisma';
 import { logger } from '../utils/logger';
+import { wlog } from '../utils/worker-logger';
 import fs from 'fs';
 import path from 'path';
 import ffmpeg from 'fluent-ffmpeg';
@@ -227,11 +228,11 @@ const generateThumbnail = async (
       ? `${config.env.R2_PUBLIC_URL}/${storageKey}`
       : thumbPublicUrl;
 
-    // Cleanup local thumb after upload
     if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
   }
 
   await prisma.media.update({ where: { id: mediaId }, data: { thumbnailUrl: finalThumbUrl } });
+  wlog.thumbnail.done(mediaId, finalThumbUrl);
 };
 
 const transcribeVideo = async (
@@ -251,7 +252,7 @@ const transcribeVideo = async (
         .save(audioPath);
     });
     const transcription = await transcribeAudio(audioPath);
-    const jsonPayload = transcription as any; // Final fallback for pervasive type issue
+    const jsonPayload = transcription as any;
     await prisma.transcript.upsert({
       where: { mediaId },
       update: { text: transcription.text, json: jsonPayload },
@@ -262,6 +263,7 @@ const transcribeVideo = async (
         json: jsonPayload,
       },
     });
+    wlog.transcribe.done(mediaId, transcription.text.split(' ').length);
   } finally {
     if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
   }
@@ -305,7 +307,7 @@ const handleVisualizeBatch = async (
   username: string,
   checkPaused: PauseChecker,
 ): Promise<{ paused: true } | void> => {
-  logger.info(`[ComputeWorker] Phase: Visualizing Run ${runId}`);
+  wlog.phase('visualizing', runId);
   const mediaItems = await prisma.media.findMany({
     where: { post: { runId } },
     include: { post: true },
@@ -314,22 +316,21 @@ const handleVisualizeBatch = async (
   ensureDir(userDir);
 
   for (let i = 0; i < mediaItems.length; i++) {
-    // B4: Optimize Pause Check (only check every 50 items)
     if (i % 50 === 0) {
       if (await checkPaused(runId)) {
-        logger.info(`[ComputeWorker] Run ${runId} PAUSED during Visualization. Stopping batch.`);
+        wlog.phase('paused', runId, 'visualization stopped');
         return { paused: true };
       }
     }
     const m = mediaItems[i];
 
     if (m.thumbnailUrl) {
-      logger.info(`[ComputeWorker] Thumbnail already exists for ${m.id}, skipping.`);
+      wlog.thumbnail.skip(m.id, 'already exists');
       continue;
     }
 
     const currentItem = {
-      username: m.post.username,
+      username: m.post.username ?? '',
       postedAt: m.post.postedAt.toISOString().split('T')[0],
       type: m.type,
     };
@@ -341,17 +342,17 @@ const handleVisualizeBatch = async (
     });
 
     try {
-      const { path: filePath, isTemp } = await ensureLocalFile(m.storageUrl, m.id);
+      const { path: filePath, isTemp } = await ensureLocalFile(m.storageUrl ?? '', m.id);
       try {
-        logger.info(`[ComputeWorker] Thumbnail for ${m.id} (@${currentItem.username})`);
+        wlog.thumbnail.start(currentItem.username, m.id, m.type, m.storageUrl ?? '');
         await generateThumbnail(m.id, filePath, userDir, username, m.type);
       } catch (err) {
-        logger.error(`[ComputeWorker] Failed to generate thumbnail for ${m.id}: ${err}`);
+        wlog.thumbnail.error(m.id, err);
       } finally {
         if (isTemp && fs.existsSync(filePath)) fs.unlinkSync(filePath);
       }
     } catch (err) {
-      logger.error(`[ComputeWorker] Failed to ensure local file for thumbnail ${m.id}: ${err}`);
+      wlog.thumbnail.error(m.id, `ensure local file failed: ${err}`);
     }
   }
 };
@@ -362,7 +363,7 @@ const handleProfileSyncBatch = async (
   username: string,
   checkPaused: PauseChecker,
 ): Promise<{ paused: true } | void> => {
-  logger.info(`[ComputeWorker] Phase: Profiling Run ${runId}`);
+  wlog.phase('profiling', runId);
 
   if (await checkPaused(runId)) return { paused: true };
 
@@ -398,13 +399,11 @@ const handleProfileSyncBatch = async (
 
   const usernamesArray = Array.from(usernamesToScrape);
   if (usernamesArray.length > 0) {
-    logger.info(
-      `[ComputeWorker] Fetching fresh HD profile info for ${usernamesArray.length} collaborators in batch...`,
-    );
+    wlog.profile.start(`(${usernamesArray.length} collaborators)`, '');
 
     try {
       const profiles = await getProfilesInfo(usernamesArray, async (msg: string) => {
-        logger.info(`[ComputeWorker-Profiles] ${msg}`);
+        wlog.ingest.info(msg);
       });
 
       for (let i = 0; i < profiles.length; i++) {
@@ -428,10 +427,10 @@ const handleProfileSyncBatch = async (
         });
       }
     } catch (e) {
-      logger.warn(`[ComputeWorker] Failed to sync batch profiles: ${e}`);
+      wlog.warn(`Failed to sync batch profiles: ${e}`);
     }
   } else {
-    logger.info(`[ComputeWorker] No new collaborators to sync.`);
+    wlog.phase('profiling', runId, 'no collaborators found');
   }
 };
 
@@ -441,14 +440,14 @@ const handleOptimizeBatch = async (
   username: string,
   checkPaused: PauseChecker,
 ): Promise<{ paused: true } | void> => {
-  logger.info(`[ComputeWorker] Phase: Optimizing Run ${runId}`);
+  wlog.phase('optimizing', runId);
   const mediaItems = await prisma.media.findMany({
     where: { post: { runId }, storageUrl: { contains: '/raw/' } },
     include: { post: true },
   });
 
   if (mediaItems.length === 0) {
-    logger.info(`[ComputeWorker] No raw media to optimize. Skipping optimization phase.`);
+    wlog.phase('optimizing', runId, 'no raw media — skipping');
     return;
   }
 
@@ -456,14 +455,14 @@ const handleOptimizeBatch = async (
     // B4: Optimize Pause Check (only check every 50 items)
     if (i % 50 === 0) {
       if (await checkPaused(runId)) {
-        logger.info(`[ComputeWorker] Run ${runId} PAUSED during Optimization. Stopping batch.`);
+        wlog.phase('paused', runId, 'optimization stopped');
         return { paused: true };
       }
     }
 
     const m = mediaItems[i];
     const currentItem = {
-      username: m.post.username,
+      username: m.post.username ?? '',
       postedAt: m.post.postedAt.toISOString().split('T')[0],
       type: m.type,
     };
@@ -475,12 +474,12 @@ const handleOptimizeBatch = async (
     });
 
     try {
-      const { path: filePath, isTemp } = await ensureLocalFile(m.storageUrl, m.id);
+      const { path: filePath, isTemp } = await ensureLocalFile(m.storageUrl ?? '', m.id);
       try {
-        logger.info(`[ComputeWorker] Optimizing ${m.id} for @${currentItem.username}`);
+        wlog.optimize.start(currentItem.username, m.id, m.type, m.storageUrl ?? '', (m.storageUrl ?? '').replace('/raw/', '/content/'));
         const optimizedPath = await optimizeMedia(m.id, filePath);
 
-        if (m.storageUrl.startsWith('http') && r2Client && config.env.R2_BUCKET_NAME) {
+        if (m.storageUrl?.startsWith('http') && r2Client && config.env.R2_BUCKET_NAME) {
           // If remote, upload optimized to content location
           const url = new URL(m.storageUrl);
           const pathname = url.pathname.startsWith('/') ? url.pathname.slice(1) : url.pathname;
@@ -501,7 +500,7 @@ const handleOptimizeBatch = async (
             where: { id: m.id },
             data: { storageUrl: optimizedUrl },
           });
-          logger.info(`[ComputeWorker] Uploaded optimized media to R2: ${optimizedKey}`);
+          wlog.optimize.done(m.id, optimizedUrl);
         } else {
           // If local, overwrite original
           atomicMove(optimizedPath, filePath);
@@ -509,12 +508,12 @@ const handleOptimizeBatch = async (
 
         if (fs.existsSync(optimizedPath)) fs.unlinkSync(optimizedPath);
       } catch (err) {
-        logger.error(`[ComputeWorker] Failed to optimize media ${m.id}: ${err}`);
+        wlog.optimize.error(m.id, err);
       } finally {
         if (isTemp && fs.existsSync(filePath)) fs.unlinkSync(filePath);
       }
     } catch (err) {
-      logger.error(`[ComputeWorker] Failed to ensure local file for optimization ${m.id}: ${err}`);
+      wlog.optimize.error(m.id, `ensure local file failed: ${err}`);
     }
   }
 };
@@ -525,7 +524,7 @@ const handleTranscribeBatch = async (
   _username: string,
   checkPaused: PauseChecker,
 ): Promise<{ paused: true } | void> => {
-  logger.info(`[ComputeWorker] Phase: Transcribing Run ${runId}`);
+  wlog.phase('transcribing', runId);
   const mediaItems = await prisma.media.findMany({
     where: { post: { runId }, type: 'video' },
     include: { post: true, transcript: true },
@@ -535,19 +534,19 @@ const handleTranscribeBatch = async (
     // B4: Optimize Pause Check (only check every 50 items)
     if (i % 50 === 0) {
       if (await checkPaused(runId)) {
-        logger.info(`[ComputeWorker] Run ${runId} PAUSED during Transcription. Stopping batch.`);
+        wlog.phase('paused', runId, 'transcription stopped');
         return { paused: true };
       }
     }
     const m = mediaItems[i];
 
     if (m.transcript) {
-      logger.info(`[ComputeWorker] Transcript already exists for ${m.id}, skipping.`);
+      wlog.transcribe.skip(m.id, 'already exists');
       continue;
     }
 
     const currentItem = {
-      username: m.post.username,
+      username: m.post.username ?? '',
       postedAt: m.post.postedAt.toISOString().split('T')[0],
       type: m.type,
     };
@@ -559,17 +558,17 @@ const handleTranscribeBatch = async (
     });
 
     try {
-      const { path: filePath, isTemp } = await ensureLocalFile(m.storageUrl, m.id);
+      const { path: filePath, isTemp } = await ensureLocalFile(m.storageUrl ?? '', m.id);
       try {
-        logger.info(`[ComputeWorker] Transcribing ${m.id} (@${currentItem.username})`);
+        wlog.transcribe.start(currentItem.username, m.id, m.storageUrl ?? '');
         await transcribeVideo(m.id, m.postId, filePath);
       } catch (err) {
-        logger.error(`[ComputeWorker] Failed to transcribe media ${m.id}: ${err}`);
+        wlog.transcribe.error(m.id, err);
       } finally {
         if (isTemp && fs.existsSync(filePath)) fs.unlinkSync(filePath);
       }
     } catch (err) {
-      logger.error(`[ComputeWorker] Failed to ensure local file for transcription ${m.id}: ${err}`);
+      wlog.transcribe.error(m.id, `ensure local file failed: ${err}`);
     }
   }
 };
@@ -580,7 +579,7 @@ const handleEmbedBatch = async (
   _username: string,
   checkPaused: PauseChecker,
 ): Promise<{ paused: true } | void> => {
-  logger.info(`[ComputeWorker] Phase: Embedding Run ${runId}`);
+  wlog.phase('embedding', runId);
   const transcripts = await prisma.transcript.findMany({
     where: { post: { runId }, knowledgeChunks: { none: {} } },
     include: { post: true },
@@ -589,7 +588,7 @@ const handleEmbedBatch = async (
   for (let i = 0; i < transcripts.length; i++) {
     if (i % 50 === 0) {
       if (await checkPaused(runId)) {
-        logger.info(`[ComputeWorker] Run ${runId} PAUSED during Embedding. Stopping batch.`);
+        wlog.phase('paused', runId, 'embedding stopped');
         return { paused: true };
       }
     }
@@ -606,10 +605,11 @@ const handleEmbedBatch = async (
     });
 
     try {
-      logger.info(`[ComputeWorker] Generating embedding for transcript ${t.id}`);
+      wlog.embed.start(t.id);
       await createEmbedding(t.text, t.id);
+      wlog.embed.done(t.id);
     } catch (e) {
-      logger.error(`[ComputeWorker] Failed to embed transcript ${t.id}: ${e}`);
+      wlog.embed.error(t.id, e);
     }
   }
 };
@@ -652,7 +652,7 @@ export const computeWorker = new Worker(
       const handler = STEP_HANDLERS[stepName];
 
       if (!handler) {
-        logger.warn(`[ComputeWorker] Unknown job name: "${job.name}". Skipping.`);
+        wlog.warn(`Unknown job name: "${job.name}". Skipping.`);
         return;
       }
 
@@ -670,5 +670,5 @@ export const computeWorker = new Worker(
 );
 
 computeWorker.on('failed', (job, err) => {
-  logger.error(`[ComputeWorker] Job ${job?.id} failed: ${err.message}`);
+  wlog.warn(`Compute job ${job?.id} failed: ${err.message}`);
 });

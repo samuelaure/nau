@@ -2,6 +2,7 @@ import { Worker, Job } from 'bullmq';
 import { config } from '../config';
 import { prisma } from '../modules/shared/prisma';
 import { logger } from '../utils/logger';
+import { wlog } from '../utils/worker-logger';
 import fs from 'fs';
 import path from 'path';
 import { createStorage, nauthenticity } from 'nau-storage';
@@ -40,50 +41,43 @@ export const optimizationWorker = new Worker(
     return logContextStorage.run({ jobId: job.id, ...job.data }, async () => {
       if (job.name === 'optimize-media') {
         const { runId, mediaId, username, rawUrl, type, fileExt } = job.data;
-        logger.info(`[OptimizationWorker] Optimizing Media (${type}) for ${username}`);
+        const rawStorageKey = nauthenticity.rawPost(username, mediaId, fileExt);
+        const finalStorageKey = nauthenticity.post(username, mediaId, fileExt);
+
+        wlog.optimize.start(username, mediaId, type, rawUrl, finalStorageKey);
 
         ensureDir(config.paths.temp);
 
         const tempRawPath = path.join(config.paths.temp, `${mediaId}_raw_opt.${fileExt}`);
         const tempOptimizedPath = path.join(config.paths.temp, `${mediaId}_final_opt.${fileExt}`);
 
-        const rawStorageKey = nauthenticity.rawPost(username, mediaId, fileExt);
-        const finalStorageKey = nauthenticity.post(username, mediaId, fileExt);
-
         try {
           if (storage) {
-            // 1. Download raw file from R2
-            logger.info(`[OptimizationWorker] Downloading raw media ${mediaId} from R2`);
             const response = await fetch(rawUrl);
             if (!response.ok) throw new Error(`Failed to fetch raw from R2: ${response.status}`);
             const buffer = Buffer.from(await response.arrayBuffer());
             fs.writeFileSync(tempRawPath, buffer);
 
-            // 2. Optimize
-            logger.info(`[OptimizationWorker] Optimizing media ${mediaId}`);
             if (type === 'video') {
               await optimizeVideo(tempRawPath, tempOptimizedPath);
             } else {
               await optimizeImage(tempRawPath, tempOptimizedPath);
             }
 
-            // 3. Upload optimized to R2
-            logger.info(`[OptimizationWorker] Uploading optimized media ${mediaId} to R2`);
             const publicUrl = await storage.upload(
               finalStorageKey,
               fs.createReadStream(tempOptimizedPath),
               { mimeType: type === 'video' ? 'video/mp4' : 'image/jpeg' },
             );
 
-            // 4. Delete raw from R2 — raw/ is temporary by design
-            logger.info(`[OptimizationWorker] Deleting raw media ${mediaId} from R2`);
             await storage.delete(rawStorageKey);
 
-            // 5. Update DB
             await prisma.media.update({
               where: { id: mediaId },
               data: { storageUrl: publicUrl },
             });
+
+            wlog.optimize.done(mediaId, publicUrl);
           } else {
             // Fallback: local storage
             const localRawPath = path.join(
@@ -118,7 +112,7 @@ export const optimizationWorker = new Worker(
           if (countPendingOptimization === 0) {
             const run = await prisma.scrapingRun.findUnique({ where: { id: runId } });
             if (run?.phase === 'optimizing') {
-              logger.info(`[OptimizationWorker] Run ${runId} fully optimized. Transitioning to VISUALIZING.`);
+              wlog.phase('visualizing', runId, 'all optimized → starting visualize batch');
               await prisma.scrapingRun.update({
                 where: { id: runId },
                 data: { phase: 'visualizing' },
@@ -127,7 +121,7 @@ export const optimizationWorker = new Worker(
             }
           }
         } catch (error) {
-          logger.error(`[OptimizationWorker] Failed to optimize media ${mediaId}: ${error}`);
+          wlog.optimize.error(mediaId, error);
           throw error;
         } finally {
           if (fs.existsSync(tempRawPath)) fs.unlinkSync(tempRawPath);
@@ -140,5 +134,5 @@ export const optimizationWorker = new Worker(
 );
 
 optimizationWorker.on('failed', (job, err) => {
-  logger.error(`[OptimizationWorker] Job ${job?.id} failed: ${err.message}`);
+  wlog.optimize.error(job?.id ?? '?', err.message);
 });

@@ -2,6 +2,7 @@ import { Worker, Job } from 'bullmq';
 import { config } from '../config';
 import { prisma } from '../modules/shared/prisma';
 import { logger } from '../utils/logger';
+import { wlog } from '../utils/worker-logger';
 import fs from 'fs';
 import path from 'path';
 import { pipeline } from 'stream/promises';
@@ -49,7 +50,6 @@ export const downloadWorker = new Worker(
     return logContextStorage.run({ jobId: job.id, ...job.data }, async () => {
       if (job.name === 'process-media') {
         const { postId, mediaId, runId, url, type, username } = job.data as ProcessMediaData;
-        logger.info(`[DownloadWorker] Downloading Media (${type}) for ${username}`);
 
         ensureDir(config.paths.temp);
 
@@ -60,11 +60,13 @@ export const downloadWorker = new Worker(
           `${mediaId}_raw${path.extname(new URL(url).pathname) || (type === 'video' ? '.mp4' : '.jpg')}`,
         );
 
+        wlog.download.start(username, mediaId, type, url, storageKey);
+
         try {
           if (runId) {
             const run = await prisma.scrapingRun.findUnique({ where: { id: runId } });
             if (run?.isPaused) {
-              logger.info(`[DownloadWorker] Run ${runId} is PAUSED. Skipping item processing.`);
+              wlog.download.skip(mediaId, 'run paused');
               return { paused: true };
             }
           }
@@ -100,6 +102,8 @@ export const downloadWorker = new Worker(
             data: { storageUrl: publicUrl },
           });
 
+          wlog.download.done(mediaId, publicUrl);
+
           if (runId) {
             const run = await prisma.scrapingRun.findUnique({ where: { id: runId } });
             if (run?.isPaused) return { paused: true };
@@ -114,9 +118,7 @@ export const downloadWorker = new Worker(
             if (pendingCount === 0) {
               const runState = await prisma.scrapingRun.findUnique({ where: { id: runId } });
               if (runState?.phase === 'downloading') {
-                logger.info(
-                  `[DownloadWorker] Run ${runId} fully downloaded. Transitioning to OPTIMIZING.`,
-                );
+                wlog.phase('optimizing', runId, 'all downloaded → queuing optimization');
 
                 await prisma.scrapingRun.update({
                   where: { id: runId },
@@ -143,9 +145,7 @@ export const downloadWorker = new Worker(
                     );
                   }
                 } else {
-                  logger.warn(
-                    `[DownloadWorker] Reached optimization transition but found no raw media. Skipping to visualizing.`,
-                  );
+                  wlog.warn('No raw media found at optimization transition — skipping to visualizing');
                   await prisma.scrapingRun.update({
                     where: { id: runId },
                     data: { phase: 'visualizing' },
@@ -155,19 +155,15 @@ export const downloadWorker = new Worker(
               }
             }
           }
-
-          logger.info(`[DownloadWorker] Download complete: ${publicUrl}`);
         } catch (postError) {
-          logger.error(`[DownloadWorker] Failed to process media for post ${postId}: ${postError}`);
+          wlog.download.error(mediaId, postError);
           throw postError;
         } finally {
           if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
         }
       } else if (job.name === 'process-profile-image') {
         const { username, url, contextUsername } = job.data as ProcessProfileImageData;
-        logger.info(
-          `[DownloadWorker] Processing Profile Image for ${username} (Context: ${contextUsername})`,
-        );
+        wlog.profile.start(username, url);
 
         try {
           if (storage) {
@@ -188,7 +184,6 @@ export const downloadWorker = new Worker(
             if (fs.existsSync(tempProfilePath)) fs.unlinkSync(tempProfilePath);
             if (fs.existsSync(optimizedProfilePath)) fs.unlinkSync(optimizedProfilePath);
 
-            // Update the SocialProfile with the new profile image URL
             await prisma.socialProfile.updateMany({
               where: { platform: 'instagram', username },
               data: { profileImageUrl: publicUrl },
@@ -205,7 +200,7 @@ export const downloadWorker = new Worker(
               }
             }
 
-            logger.info(`[DownloadWorker] Profile image for ${username} complete: ${publicUrl}`);
+            wlog.profile.done(username, publicUrl);
           } else {
             // Fallback
             const profilesDir = path.join(config.paths.storage, contextUsername, 'profiles');
@@ -224,7 +219,7 @@ export const downloadWorker = new Worker(
             }
           }
         } catch (error) {
-          logger.error(`[DownloadWorker] Profile Image Job Failed: ${error}`);
+          wlog.profile.error(username, error);
           throw error;
         }
       }
@@ -234,5 +229,5 @@ export const downloadWorker = new Worker(
 );
 
 downloadWorker.on('failed', (job, err) => {
-  logger.error(`[DownloadWorker] Job ${job?.id} failed: ${err.message}`);
+  wlog.download.error(job?.id ?? '?', err.message);
 });
