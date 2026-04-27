@@ -15,14 +15,14 @@ export const generateReactiveComments = async (
   );
 
   // 1. Fetch Brand Intelligence
-  const intelligence = await prisma.brandIntelligence.findUnique({
-    where: { brandId },
+  const intelligence = await prisma.brand.findUnique({
+    where: { id: brandId },
   });
   if (!intelligence) throw new Error('Brand intelligence not found');
 
   // 2. Resolve Post
   let post = await prisma.post.findUnique({
-    where: { instagramUrl: targetUrl },
+    where: { url: targetUrl },
     include: { transcripts: { orderBy: { createdAt: 'desc' }, take: 1 } },
   });
 
@@ -32,11 +32,11 @@ export const generateReactiveComments = async (
     if (!scraped) throw new Error('Failed to scrape post');
 
     post = await prisma.post.upsert({
-      where: { instagramUrl: targetUrl },
+      where: { url: targetUrl },
       update: {},
       create: {
-        instagramId: scraped.id || scraped.shortcode,
-        instagramUrl: targetUrl,
+        platformId: scraped.id || scraped.shortcode,
+        url: targetUrl,
         username: scraped.author.username,
         caption: scraped.caption,
         postedAt: new Date(scraped.takenAt),
@@ -54,7 +54,7 @@ export const generateReactiveComments = async (
       })
     : null
   const target = socialProfile
-    ? await prisma.socialProfileTarget.findUnique({
+    ? await prisma.socialProfileMonitor.findUnique({
         where: { brandId_socialProfileId: { brandId, socialProfileId: socialProfile.id } },
       })
     : null
@@ -71,7 +71,7 @@ export const generateReactiveComments = async (
     post: {
       caption: post.caption || '',
       transcriptText: post.transcripts[0]?.text || '',
-      instagramUrl: post.instagramUrl,
+      url: post.url,
       targetUsername: post.username || 'unknown',
     },
     brand: {
@@ -79,7 +79,7 @@ export const generateReactiveComments = async (
       commentStrategy: intelligence.commentStrategy,
       suggestionsCount: intelligence.suggestionsCount,
     },
-    profileStrategy: target?.profileStrategy || null,
+    // profileStrategy: target?.settings || null,
     lastSelectedComments: lastFeedbacks.map((f) => f.commentText),
   };
 

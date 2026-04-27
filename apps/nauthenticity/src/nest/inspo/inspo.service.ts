@@ -41,7 +41,7 @@ export class InspoService {
 
   async digest(brandId: string): Promise<{ content: string; attachedUrls: string[] }> {
     const items = await this.prisma.inspoItem.findMany({
-      where: { brandId },
+      where: { id: brandId },
       orderBy: { createdAt: 'desc' },
       take: 50,
     })
@@ -59,11 +59,11 @@ export class InspoService {
   }
 
   async repost(brandId: string, postUrl: string) {
-    const brand = await this.prisma.brandIntelligence.findUnique({ where: { brandId } })
+    const brand = await this.prisma.brand.findUnique({ where: { id: brandId } })
     if (!brand) throw new NotFoundException('Brand not found')
 
     const post = await this.prisma.post.findUnique({
-      where: { instagramUrl: postUrl },
+      where: { url: postUrl },
       include: { media: true },
     })
     if (!post) throw new NotFoundException('Post not found in database. Scrape it first.')

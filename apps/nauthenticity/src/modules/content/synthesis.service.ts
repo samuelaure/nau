@@ -123,7 +123,7 @@ Return the synthesis text, the Instagram URLs of posts that most influenced this
 // ---------------------------------------------------------------------------
 
 interface NewPost {
-  instagramUrl: string | null;
+  url: string | null;
   caption: string | null;
 }
 
@@ -169,7 +169,7 @@ Identify which specific post URLs most influenced this direction and include the
     userContent += `## NEW INSPIRATION POSTS (${newPosts.length} items)\n`;
     newPosts.forEach((post, i) => {
       userContent += `### Post ${i + 1}\n`;
-      if (post.instagramUrl) userContent += `URL: ${post.instagramUrl}\n`;
+      if (post.url) userContent += `URL: ${post.url}\n`;
       if (post.caption) userContent += `Caption: ${post.caption.slice(0, 300)}\n`;
       userContent += '\n';
     });
@@ -197,8 +197,8 @@ Identify which specific post URLs most influenced this direction and include the
  */
 export async function getDigest(brandId: string): Promise<BrandDigest> {
   // Atomically increment and read count
-  const brand = await prisma.brandIntelligence.update({
-    where: { brandId },
+  const brand = await prisma.brand.update({
+    where: { id: brandId },
     data: { inspoRequestCount: { increment: 1 } },
     select: {
       brandId: true,
@@ -249,7 +249,7 @@ export async function getDigest(brandId: string): Promise<BrandDigest> {
     prisma.inspoItem.findMany({
       where: { brandId, status: 'pending' },
       include: {
-        post: { select: { instagramUrl: true, caption: true } },
+        post: { select: { url: true, caption: true } },
       },
       orderBy: { createdAt: 'desc' },
       take: 10,
@@ -290,7 +290,7 @@ export async function getDigest(brandId: string): Promise<BrandDigest> {
   // ── Recent Synthesis ──────────────────────────────────────────────────────
 
   const newPostsForContext: NewPost[] = newInspoItems.map((item: any) => ({
-    instagramUrl: item.post?.instagramUrl ?? null,
+    url: item.post?.url ?? null,
     caption: item.post?.caption ?? null,
   }));
 

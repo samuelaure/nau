@@ -67,14 +67,14 @@ export const runProactiveFanout = async (now: Date = new Date()): Promise<void> 
     const thresholdMs = inWindow ? 15 * 60 * 1000 : 60 * 60 * 1000;
     const cutoff = new Date(now.getTime() - thresholdMs);
 
-    for (const target of brand.targets) {
+    for (const target of brand.monitors) {
       const lastScrape = target.socialProfile.lastScrapedAt;
       const profileUsername = target.socialProfile.username;
       if (!lastScrape || lastScrape < cutoff) {
         if (!eligibleTargets.has(profileUsername)) {
           eligibleTargets.set(profileUsername, new Set());
         }
-        eligibleTargets.get(profileUsername)!.add(brand.brandId);
+        eligibleTargets.get(profileUsername)!.add(brand.id);
       }
     }
   }
@@ -104,7 +104,7 @@ export const runProactiveFanout = async (now: Date = new Date()): Promise<void> 
     data: { lastScrapedAt: now },
   });
 
-  const brandMap = new Map(allBrands.map((b) => [b.brandId, b]));
+  const brandMap = new Map(allBrands.map((b) => [b.id, b]));
 
   for (const item of scrapedItems) {
     const interestedBrandIds = eligibleTargets.get(item.ownerUsername);
@@ -116,15 +116,15 @@ export const runProactiveFanout = async (now: Date = new Date()): Promise<void> 
 
       let localPost = await prisma.post.findFirst({
         where: {
-          OR: [{ instagramId: item.id }, { instagramUrl: item.url }],
+          OR: [{ platformId: item.id }, { url: item.url }],
         },
       });
 
       if (!localPost) {
         localPost = await prisma.post.create({
           data: {
-            instagramId: item.id,
-            instagramUrl: item.url,
+            platformId: item.id,
+            url: item.url,
             username: item.ownerUsername,
             caption: item.caption ?? '',
             postedAt: new Date(item.timestamp),
@@ -152,7 +152,7 @@ export const runProactiveFanout = async (now: Date = new Date()): Promise<void> 
       });
       const lastSelectedComments = lastSelectedFeedbacks.map((f) => f.commentText);
 
-      const brandTarget = brand.targets.find((t) => t.socialProfile.username === item.ownerUsername);
+      const brandTarget = brand.monitors.find((t) => t.socialProfile.username === item.ownerUsername);
 
       logger.info(
         `[FanoutProcessor] Generating ${brand.suggestionsCount} comment(s) for brand ${brandId} on @${item.ownerUsername}...`,
@@ -163,7 +163,7 @@ export const runProactiveFanout = async (now: Date = new Date()): Promise<void> 
           post: {
             caption: item.caption ?? '',
             transcriptText: undefined,
-            instagramUrl: item.url,
+            url: item.url,
             targetUsername: item.ownerUsername,
           },
           brand: {
@@ -171,7 +171,7 @@ export const runProactiveFanout = async (now: Date = new Date()): Promise<void> 
             commentStrategy: brand.commentStrategy,
             suggestionsCount: brand.suggestionsCount,
           },
-          profileStrategy: brandTarget?.profileStrategy ?? null,
+          // profileStrategy: brandTarget?.settings ?? null,
           lastSelectedComments,
         };
 

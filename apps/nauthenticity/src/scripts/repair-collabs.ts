@@ -26,9 +26,9 @@ async function repair() {
 
   for (let idx = 0; idx < items.length; idx++) {
     const item = items[idx];
-    const instagramUrl =
+    const url =
       item.url || (item.shortcode ? `https://www.instagram.com/p/${item.shortcode}/` : null);
-    if (!instagramUrl) continue;
+    if (!post.url) continue;
 
     const collaborators: any[] = [];
     const coauthors = item.coauthorProducers || item.coauthor_producers || [];
@@ -47,7 +47,7 @@ async function repair() {
       totalPostsWithCollabs++;
 
       await prisma.post.update({
-        where: { instagramUrl },
+        where: { url },
         data: { collaborators },
       });
 

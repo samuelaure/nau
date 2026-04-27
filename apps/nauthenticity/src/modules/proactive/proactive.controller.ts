@@ -125,15 +125,13 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
       const intelligence = await prisma.brand.findUnique({
         where: { id: brandId },
         include: {
-          targets: {
+          monitors: {
             select: {
               id: true,
               socialProfile: { select: { username: true } },
-              targetType: true,
+              monitoringType: true,
               isActive: true,
-              profileStrategy: true,
-              initialDownloadCount: true,
-              autoUpdate: true,
+              settings: true,
               createdAt: true,
             },
           },
@@ -153,7 +151,7 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
         const data = BrandUpsertSchema.parse(request.body);
         const intelligence = await prisma.brand.upsert({
           where: { id: brandId },
-          create: { brandId, ...data },
+          create: { id: brandId, ...data },
           update: data,
         });
         return reply.send(intelligence);
@@ -181,7 +179,7 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
         const intelligence = await prisma.brand.upsert({
           where: { id: brandId },
           update: patch,
-          create: { brandId, workspaceId: (patch.workspaceId as string) ?? '', voicePrompt: (patch.voicePrompt as string) ?? '', ...patch },
+          create: { id: brandId, workspaceId: (patch.workspaceId as string) ?? '', voicePrompt: (patch.voicePrompt as string) ?? '', ...patch },
         });
         return reply.send(intelligence);
       } catch (e: unknown) {
@@ -201,18 +199,18 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
     const intelligence = await prisma.brand.findUnique({
       where: { id: brandId },
       include: {
-        targets: { select: { socialProfile: { select: { username: true } }, profileStrategy: true } },
+        monitors: { select: { socialProfile: { select: { username: true } }, settings: true } },
         syntheses: { orderBy: { createdAt: 'desc' }, take: 1 },
       },
     });
     if (!intelligence) return reply.status(404).send({ error: 'Brand intelligence not found' });
 
     return reply.send({
-      brandId: intelligence.brandId,
+      brandId: intelligence.id,
       voicePrompt: intelligence.voicePrompt,
       commentStrategy: intelligence.commentStrategy,
       suggestionsCount: intelligence.suggestionsCount,
-      targets: intelligence.targets,
+      targets: intelligence.monitors,
       latestSynthesis: intelligence.syntheses[0] ?? null,
     });
   });
@@ -225,12 +223,12 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
       const { brandId } = request.params as { brandId: string };
       const intelligence = await prisma.brand.findUnique({
         where: { id: brandId },
-        select: { brandId: true, voicePrompt: true },
+        select: { id: true, voicePrompt: true },
       });
       if (!intelligence) return reply.status(404).send({ error: 'Brand intelligence not found' });
 
       return reply.send({
-        brandId: intelligence.brandId,
+        brandId: intelligence.id,
         voicePrompt: intelligence.voicePrompt.slice(0, 500),
       });
     },
@@ -251,11 +249,11 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
     const brands = await prisma.brand.findMany({
       where: { workspaceId },
       include: {
-        targets: {
+        monitors: {
           select: {
             socialProfile: { select: { username: true } },
-            profileStrategy: true,
-            targetType: true,
+            settings: true,
+            monitoringType: true,
           },
         },
       },

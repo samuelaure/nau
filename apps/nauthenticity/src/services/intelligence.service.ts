@@ -66,7 +66,7 @@ export interface CommentSuggestionParams {
   post: {
     caption: string
     transcriptText?: string
-    instagramUrl: string
+    url: string
     targetUsername: string
   }
   brand: {
@@ -74,7 +74,7 @@ export interface CommentSuggestionParams {
     commentStrategy: string | null
     suggestionsCount: number
   }
-  profileStrategy: string | null
+  profileStrategy?: string | null
   lastSelectedComments: string[]
 }
 
@@ -115,7 +115,7 @@ function buildCommentSystemPrompt(params: CommentSuggestionParams): string {
 }
 
 function buildPostUserMessage(post: CommentSuggestionParams['post']): string {
-  const lines: string[] = [`POST TO COMMENT ON:`, `URL: ${post.instagramUrl}`]
+  const lines: string[] = [`POST TO COMMENT ON:`, `URL: ${post.url}`]
 
   if (post.caption?.trim()) {
     lines.push(`\nCaption:\n${post.caption.trim()}`)

@@ -6,11 +6,11 @@ export const dashboardController = async (fastify: FastifyInstance) => {
   // TARGETS UI ENDPOINTS
   // -------------------------------------------------------------------------
   fastify.get('/targets', async (request: FastifyRequest, reply: FastifyReply) => {
-    const { brandId, targetType } = request.query as { brandId?: string; targetType?: string };
+    const { brandId, monitoringType } = request.query as { brandId?: string; monitoringType?: string };
     if (!brandId) return reply.status(400).send({ error: 'Missing brandId' });
 
-    const targets = await prisma.socialProfileTarget.findMany({
-      where: { brandId, targetType: targetType || undefined },
+    const targets = await prisma.socialProfileMonitor.findMany({
+      where: { brandId, monitoringType: monitoringType || undefined },
       include: {
         socialProfile: { include: { _count: { select: { posts: true } } } },
       },
@@ -21,15 +21,13 @@ export const dashboardController = async (fastify: FastifyInstance) => {
 
   fastify.patch('/targets/:id', async (request: FastifyRequest, reply: FastifyReply) => {
     const { id } = request.params as { id: string };
-    const { isActive, autoUpdate, initialDownloadCount } = request.body as any;
+    const { isActive, settings } = request.body as any;
 
     const dataToUpdate: any = {};
     if (isActive !== undefined) dataToUpdate.isActive = isActive;
-    if (autoUpdate !== undefined) dataToUpdate.autoUpdate = autoUpdate;
-    if (initialDownloadCount !== undefined)
-      dataToUpdate.initialDownloadCount = initialDownloadCount;
+    if (settings !== undefined) dataToUpdate.settings = settings;
 
-    const updated = await prisma.socialProfileTarget.update({
+    const updated = await prisma.socialProfileMonitor.update({
       where: { id },
       data: dataToUpdate,
     });

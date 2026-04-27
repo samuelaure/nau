@@ -2,24 +2,23 @@ import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { runProactiveFanout } from '../../modules/proactive/fanout.processor'
 import { generateReactiveComments } from '../../modules/proactive/reactive.service'
+import { Prisma } from '@prisma/client'
 
 @Injectable()
 export class IntelligenceService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getIntelligence(brandId: string) {
-    const intelligence = await this.prisma.brandIntelligence.findUnique({
-      where: { brandId },
+    const intelligence = await this.prisma.brand.findUnique({
+      where: { id: brandId },
       include: {
-        targets: {
+        monitors: {
           select: {
             id: true,
             socialProfile: { select: { username: true } },
-            targetType: true,
+            monitoringType: true,
             isActive: true,
-            profileStrategy: true,
-            initialDownloadCount: true,
-            autoUpdate: true,
+            settings: true,
             createdAt: true,
           },
         },
@@ -34,10 +33,10 @@ export class IntelligenceService {
     for (const key of allowed) {
       if (key in data) patch[key] = data[key]
     }
-    return this.prisma.brandIntelligence.upsert({
-      where: { brandId },
+    return this.prisma.brand.upsert({
+      where: { id: brandId },
       create: {
-        brandId,
+        id: brandId,
         workspaceId: (patch.workspaceId as string) ?? '',
         voicePrompt: (patch.voicePrompt as string) ?? '',
         ...patch,
@@ -47,55 +46,53 @@ export class IntelligenceService {
   }
 
   async getDna(brandId: string) {
-    const intelligence = await this.prisma.brandIntelligence.findUnique({
-      where: { brandId },
+    const intelligence = await this.prisma.brand.findUnique({
+      where: { id: brandId },
       include: {
-        targets: { select: { socialProfile: { select: { username: true } }, profileStrategy: true } },
+        monitors: { select: { socialProfile: { select: { username: true } }, settings: true } },
         syntheses: { orderBy: { createdAt: 'desc' }, take: 1 },
       },
     })
     if (!intelligence) throw new NotFoundException('Brand intelligence not found')
     return {
-      brandId: intelligence.brandId,
+      brandId: intelligence.id,
       voicePrompt: intelligence.voicePrompt,
       commentStrategy: intelligence.commentStrategy,
       suggestionsCount: intelligence.suggestionsCount,
-      targets: intelligence.targets,
+      targets: intelligence.monitors,
       latestSynthesis: (intelligence as unknown as { syntheses: unknown[] }).syntheses[0] ?? null,
     }
   }
 
   async getDnaLight(brandId: string) {
-    const intelligence = await this.prisma.brandIntelligence.findUnique({
-      where: { brandId },
-      select: { brandId: true, voicePrompt: true },
+    const intelligence = await this.prisma.brand.findUnique({
+      where: { id: brandId },
+      select: { id: true, voicePrompt: true },
     })
     if (!intelligence) throw new NotFoundException('Brand intelligence not found')
-    return { brandId: intelligence.brandId, voicePrompt: intelligence.voicePrompt.slice(0, 500) }
+    return { brandId: intelligence.id, voicePrompt: intelligence.voicePrompt.slice(0, 500) }
   }
 
   async listServiceBrands(workspaceId: string) {
-    return this.prisma.brandIntelligence.findMany({
+    return this.prisma.brand.findMany({
       where: { workspaceId },
       include: {
-        targets: { select: { socialProfile: { select: { username: true } }, profileStrategy: true, targetType: true } },
+        monitors: { select: { socialProfile: { select: { username: true } }, settings: true, monitoringType: true } },
       },
     })
   }
 
   async syncServiceBrand(brandId: string, data: { workspaceId?: string; mainUsername?: string }) {
-    return this.prisma.brandIntelligence.update({ where: { brandId }, data })
+    return this.prisma.brand.update({ where: { id: brandId }, data })
   }
 
   async createTargets(
     brandId: string,
     usernames: string[],
     opts: {
-      targetType?: string
-      profileStrategy?: string | null
+      monitoringType?: string
+      settings?: Record<string, unknown>
       isActive?: boolean
-      initialDownloadCount?: number | null
-      autoUpdate?: boolean | null
     },
   ) {
     for (const username of usernames) {
@@ -104,40 +101,41 @@ export class IntelligenceService {
         create: { platform: 'instagram', username },
         update: {},
       })
-      await this.prisma.socialProfileTarget.upsert({
+      const createData: any = {
+        brandId,
+        socialProfileId: profile.id,
+        monitoringType: opts.monitoringType ?? 'content',
+        isActive: opts.isActive ?? true,
+      }
+      if (opts.settings) {
+        createData.settings = opts.settings
+      }
+
+      const updateData: any = {}
+      if (opts.monitoringType) updateData.monitoringType = opts.monitoringType
+      if (opts.settings) updateData.settings = opts.settings
+      if (opts.isActive !== undefined) updateData.isActive = opts.isActive
+
+      await this.prisma.socialProfileMonitor.upsert({
         where: { brandId_socialProfileId: { brandId, socialProfileId: profile.id } },
-        create: {
-          brandId,
-          socialProfileId: profile.id,
-          targetType: opts.targetType ?? 'monitored',
-          profileStrategy: opts.profileStrategy ?? null,
-          isActive: opts.isActive ?? true,
-          initialDownloadCount: opts.initialDownloadCount ?? null,
-          autoUpdate: opts.autoUpdate ?? null,
-        },
-        update: {
-          targetType: opts.targetType,
-          profileStrategy: opts.profileStrategy !== undefined ? opts.profileStrategy : undefined,
-          isActive: opts.isActive,
-          initialDownloadCount: opts.initialDownloadCount !== undefined ? opts.initialDownloadCount : undefined,
-          autoUpdate: opts.autoUpdate !== undefined ? opts.autoUpdate : undefined,
-        },
+        create: createData,
+        update: updateData,
       })
     }
     return { success: true }
   }
 
   async updateTarget(id: string, data: Record<string, unknown>) {
-    return this.prisma.socialProfileTarget.update({ where: { id }, data })
+    return this.prisma.socialProfileMonitor.update({ where: { id }, data })
   }
 
   async deleteTarget(id: string) {
-    await this.prisma.socialProfileTarget.delete({ where: { id } })
+    await this.prisma.socialProfileMonitor.delete({ where: { id } })
     return { success: true }
   }
 
   async generateComment(targetUrl: string, brandId: string) {
-    const intelligence = await this.prisma.brandIntelligence.findUnique({ where: { brandId } })
+    const intelligence = await this.prisma.brand.findUnique({ where: { id: brandId } })
     if (!intelligence) throw new NotFoundException('Brand intelligence not found')
     const suggestions = await generateReactiveComments(targetUrl, brandId)
     return { success: true, suggestions }
@@ -155,9 +153,9 @@ export class IntelligenceService {
     return { success: true, message: 'Fanout initiated in background.' }
   }
 
-  async getTargets(brandId: string, targetType?: string) {
-    return this.prisma.socialProfileTarget.findMany({
-      where: { brandId, targetType: targetType ?? undefined },
+  async getTargets(brandId: string, monitoringType?: string) {
+    return this.prisma.socialProfileMonitor.findMany({
+      where: { brandId, monitoringType: monitoringType ?? undefined },
       include: {
         socialProfile: { include: { _count: { select: { posts: true } } } },
       },
@@ -165,11 +163,10 @@ export class IntelligenceService {
     })
   }
 
-  async patchTarget(id: string, data: { isActive?: boolean; autoUpdate?: boolean; initialDownloadCount?: number }) {
+  async patchTarget(id: string, data: { isActive?: boolean; settings?: Record<string, unknown> }) {
     const patch: Record<string, unknown> = {}
     if (data.isActive !== undefined) patch.isActive = data.isActive
-    if (data.autoUpdate !== undefined) patch.autoUpdate = data.autoUpdate
-    if (data.initialDownloadCount !== undefined) patch.initialDownloadCount = data.initialDownloadCount
-    return this.prisma.socialProfileTarget.update({ where: { id }, data: patch })
+    if (data.settings !== undefined) patch.settings = data.settings
+    return this.prisma.socialProfileMonitor.update({ where: { id }, data: patch })
   }
 }

@@ -75,9 +75,9 @@ export class IntelligenceController {
   // -------------------------------------------------------------------------
 
   @Get('targets')
-  getTargets(@Query('brandId') brandId?: string, @Query('targetType') targetType?: string) {
+  getTargets(@Query('brandId') brandId?: string, @Query('monitoringType') monitoringType?: string) {
     if (!brandId) throw new BadRequestException('Missing brandId')
-    return this.intelligenceService.getTargets(brandId, targetType)
+    return this.intelligenceService.getTargets(brandId, monitoringType)
   }
 
   @Post('targets')
@@ -86,11 +86,9 @@ export class IntelligenceController {
     body: {
       brandId?: string
       usernames?: string[]
-      targetType?: string
-      profileStrategy?: string
+      monitoringType?: string
+      settings?: Record<string, unknown>
       isActive?: boolean
-      initialDownloadCount?: number
-      autoUpdate?: boolean
     },
   ) {
     if (!body.brandId || !body.usernames?.length) {
@@ -110,7 +108,7 @@ export class IntelligenceController {
   @Patch('targets/:id')
   patchTarget(
     @Param('id') id: string,
-    @Body() body: { isActive?: boolean; autoUpdate?: boolean; initialDownloadCount?: number },
+    @Body() body: { isActive?: boolean; settings?: Record<string, unknown> },
   ) {
     return this.intelligenceService.patchTarget(id, body)
   }

@@ -145,15 +145,15 @@ export const ingestProfile = async (
         });
       }
       // 2. Data Mapping (Resiliency for different actors)
-      const instagramUrl =
+      const url =
         item.url || (item.shortcode ? `https://www.instagram.com/p/${item.shortcode}/` : null);
 
-      if (!instagramUrl) {
+      if (!url) {
         logger.warn(`[Ingester] Skipping item without URL/Shortcode: ${JSON.stringify(item)}`);
         continue;
       }
 
-      const instagramId = item.id || item.shortcode;
+      const platformId = item.id || item.shortcode;
       // Force the post to belong to the account we are scraping (User Request)
       const postUsername = username;
 
@@ -225,19 +225,19 @@ export const ingestProfile = async (
 
       // 3. Upsert Post — link to SocialProfile by id
       const post = await prisma.post.upsert({
-        where: { instagramUrl: instagramUrl },
+        where: { url },
         update: {
           likes,
           comments,
-          instagramId,
+          platformId,
           username: postUsername,
           socialProfileId: account.id,
           collaborators: collaborators.length > 0 ? collaborators : undefined,
           runId: runId,
         },
         create: {
-          instagramId,
-          instagramUrl: instagramUrl,
+          platformId,
+          url,
           username: postUsername,
           socialProfileId: account.id,
           collaborators: collaborators.length > 0 ? collaborators : undefined,
@@ -273,7 +273,7 @@ export const ingestProfile = async (
       }
 
       if (mediaItems.length === 0) {
-        logger.warn(`[Ingester] Post ${instagramId} has NO media items.`);
+        logger.warn(`[Ingester] Post ${platformId} has NO media items.`);
       }
 
       for (let i = 0; i < mediaItems.length; i++) {

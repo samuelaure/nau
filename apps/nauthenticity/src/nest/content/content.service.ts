@@ -54,7 +54,7 @@ export class ContentService {
     output += `Total Posts: ${account.posts.length}\n`
     output += `==================================================\n\n`
     for (const post of account.posts) {
-      output += `Post ID: ${post.id}\nURL: ${post.instagramUrl}\nPosted At: ${post.postedAt.toISOString()}\nCaption:\n${post.caption ?? '(No caption)'}\n\n`
+      output += `Post ID: ${post.id}\nURL: ${post.url}\nPosted At: ${post.postedAt.toISOString()}\nCaption:\n${post.caption ?? '(No caption)'}\n\n`
       const t = post.transcripts[0]
       output += t ? `Transcription:\n${t.text}\n` : `Transcription: N/A\n`
       output += `\n--------------------------------------------------\n\n`
@@ -130,7 +130,7 @@ export class ContentService {
       take: 200,
       select: {
         id: true,
-        instagramId: true,
+        platformId: true,
         postedAt: true,
         caption: true,
         media: { select: { id: true, type: true, storageUrl: true } },
@@ -172,7 +172,7 @@ export class ContentService {
       activeJobs,
       posts: posts.map((p) => ({
         id: p.id,
-        instagramId: p.instagramId,
+        platformId: p.platformId,
         postedAt: p.postedAt,
         caption: p.caption?.slice(0, 80),
         mediaCount: p.media.length,

@@ -15,27 +15,36 @@ export class PublishingController {
 
   /**
    * PUT /social-profile-targets/{targetId}/publishing
-   * Toggle a social profile as publishing (owned) and sync to flownau
+   * Mark a profile as owned by a brand and sync to flownau
    */
   @Put('social-profile-targets/:targetId/publishing')
   @HttpCode(HttpStatus.OK)
   async setPublishing(
     @Param('targetId') targetId: string,
-    @Body() body: { isPublishingProfile: boolean },
+    @Body() body: { isOwned: boolean },
   ) {
-    const target = await this.prisma.socialProfileTarget.update({
+    const monitor = await this.prisma.socialProfileMonitor.findUnique({
       where: { id: targetId },
-      data: { isPublishingProfile: body.isPublishingProfile },
       include: { socialProfile: true, brand: true },
     })
+    if (!monitor) throw new Error('Monitor not found')
 
-    // If being marked as publishing, sync to flownau
-    if (body.isPublishingProfile && !target.syncedToFlownauAt) {
+    if (body.isOwned) {
+      await this.prisma.socialProfile.update({
+        where: { id: monitor.socialProfileId },
+        data: { ownerId: monitor.brandId },
+      })
+
       const serviceKey = this.config.get('NAU_SERVICE_KEY') || ''
-      await this.syncService.syncToFlownau(targetId, serviceKey)
+      await this.syncService.syncToFlownau(monitor.socialProfileId, serviceKey)
+    } else {
+      await this.prisma.socialProfile.update({
+        where: { id: monitor.socialProfileId },
+        data: { ownerId: null },
+      })
     }
 
-    return { target, synced: target.syncedToFlownauAt ? true : false }
+    return { success: true, isOwned: body.isOwned }
   }
 
   /**

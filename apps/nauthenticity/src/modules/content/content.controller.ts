@@ -89,7 +89,7 @@ export const contentController = async (fastify: FastifyInstance) => {
 
         for (const post of account.posts) {
           output += `Post ID: ${post.id}\n`;
-          output += `URL: ${post.instagramUrl}\n`;
+          output += `URL: ${post.url}\n`;
           output += `Posted At: ${post.postedAt.toISOString()}\n`;
           output += `Caption:\n${post.caption || '(No caption)'}\n\n`;
 
@@ -245,7 +245,7 @@ export const contentController = async (fastify: FastifyInstance) => {
           take: 200,
           select: {
             id: true,
-            instagramId: true,
+            platformId: true,
             postedAt: true,
             caption: true,
             media: {
@@ -307,7 +307,7 @@ export const contentController = async (fastify: FastifyInstance) => {
           activeJobs,
           posts: posts.map((p: any) => ({
             id: p.id,
-            instagramId: p.instagramId,
+            platformId: p.platformId,
             postedAt: p.postedAt,
             caption: p.caption?.slice(0, 80),
             mediaCount: p.media.length,

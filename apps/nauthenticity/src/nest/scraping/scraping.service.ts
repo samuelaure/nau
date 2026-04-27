@@ -74,9 +74,9 @@ export class ScrapingService {
     let saved = 0
     for (const post of dto.posts) {
       await this.prisma.post.upsert({
-        where: { instagramUrl: post.url ?? '' },
+        where: { url: post.url ?? '' },
         create: {
-          instagramUrl: post.url ?? '',
+          url: post.url ?? '',
           username: post.username,
           caption: post.caption,
           postedAt: post.postedAt ? new Date(post.postedAt) : new Date(),

@@ -39,7 +39,7 @@ export const inspoController: FastifyPluginAsync = async (fastify: FastifyInstan
       const { brandId, postUrl, postId, note, type } = InspoCreateSchema.parse(request.body);
 
       // Verify brand intelligence record exists
-      const brand = await prisma.brandIntelligence.findUnique({ where: { brandId } });
+      const brand = await prisma.brand.findUnique({ where: { id: brandId } });
       if (!brand) return reply.status(404).send({ error: 'Brand not found' });
 
       // Resolve post reference
@@ -47,7 +47,7 @@ export const inspoController: FastifyPluginAsync = async (fastify: FastifyInstan
 
       if (!resolvedPostId && postUrl) {
         // Try to find existing post by URL
-        const existingPost = await prisma.post.findUnique({ where: { instagramUrl: postUrl } });
+        const existingPost = await prisma.post.findUnique({ where: { url: postUrl } });
         if (existingPost) {
           resolvedPostId = existingPost.id;
         }
@@ -92,7 +92,7 @@ export const inspoController: FastifyPluginAsync = async (fastify: FastifyInstan
       where,
       include: {
         brand: { select: { workspaceId: true } },
-        post: { select: { instagramUrl: true, caption: true, username: true } },
+        post: { select: { url: true, caption: true, username: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -181,7 +181,7 @@ export const inspoController: FastifyPluginAsync = async (fastify: FastifyInstan
       return reply.status(400).send({ error: 'Missing required query parameter: brandId' });
     }
 
-    const brand = await prisma.brandIntelligence.findUnique({ where: { brandId } });
+    const brand = await prisma.brand.findUnique({ where: { id: brandId } });
     if (!brand) return reply.status(404).send({ error: 'Brand not found' });
 
     try {
@@ -203,12 +203,12 @@ export const inspoController: FastifyPluginAsync = async (fastify: FastifyInstan
       return reply.status(400).send({ error: 'Missing required fields: brandId, postUrl' });
     }
 
-    const brand = await prisma.brandIntelligence.findUnique({ where: { brandId } });
+    const brand = await prisma.brand.findUnique({ where: { id: brandId } });
     if (!brand) return reply.status(404).send({ error: 'Brand not found' });
 
     // Find the post
     const post = await prisma.post.findUnique({
-      where: { instagramUrl: postUrl },
+      where: { url: postUrl },
       include: { media: true },
     });
 
