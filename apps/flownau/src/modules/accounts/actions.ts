@@ -333,6 +333,7 @@ export async function syncProfileToNauthenticity(profileId: string) {
 
   const profile = await prisma.socialProfile.findUnique({
     where: { id: profileId },
+    include: { brand: true },
   })
 
   if (!profile || !profile.username) {
@@ -352,6 +353,8 @@ export async function syncProfileToNauthenticity(profileId: string) {
       username: profile.username,
       platform: profile.platform || 'instagram',
       profileImageUrl: profile.profileImage,
+      brandId: profile.brandId,
+      targetType: 'publishing',
     }),
   })
 
