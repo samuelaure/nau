@@ -10,12 +10,19 @@ export class SocialProfilesController {
   /**
    * POST /social-profiles/sync
    * Sync a social profile from flownau (or any external source)
-   * Creates the SocialProfile if it doesn't exist
+   * Creates the SocialProfile if it doesn't exist, and optionally links it to a brand
    */
   @Post('social-profiles/sync')
   @HttpCode(HttpStatus.OK)
   async syncProfile(
-    @Body() body: { username: string; platform?: string; profileImageUrl?: string | null },
+    @Body()
+    body: {
+      username: string
+      platform?: string
+      profileImageUrl?: string | null
+      brandId?: string
+      targetType?: string
+    },
   ) {
     if (!body.username) {
       throw new BadRequestException('Username is required')
@@ -38,6 +45,25 @@ export class SocialProfilesController {
         lastScrapedAt: new Date(),
       },
     })
+
+    // If brandId is provided, link this profile to the brand as a publishing profile
+    if (body.brandId) {
+      await this.prisma.socialProfileTarget.upsert({
+        where: {
+          brandId_socialProfileId: { brandId: body.brandId, socialProfileId: profile.id },
+        },
+        create: {
+          brandId: body.brandId,
+          socialProfileId: profile.id,
+          targetType: body.targetType || 'publishing',
+          isPublishingProfile: true,
+        },
+        update: {
+          targetType: body.targetType || 'publishing',
+          isPublishingProfile: true,
+        },
+      })
+    }
 
     return { profile, synced: true }
   }
