@@ -215,15 +215,11 @@ export function Sidebar() {
               </Link>
             ))}
           </>
-        ) : activeWorkspaceId ? (
-          <>
-            <span className="sidebar-section-label">Workspace</span>
-          </>
-        ) : (
+        ) : !activeWorkspaceId ? (
           <Link to="/workspaces" className={`sidebar-link${isActive('/workspaces') ? ' sidebar-link--active' : ''}`}>
             <Building2 size={17} /> Workspaces
           </Link>
-        )}
+        ) : null}
       </nav>
 
       {activeWorkspaceId && (
