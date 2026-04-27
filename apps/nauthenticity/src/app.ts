@@ -116,13 +116,13 @@ fastify.setNotFoundHandler((request, reply) => {
 // Register Auth Controller (before API routes)
 fastify.register(authController);
 
-fastify.register(ingestionController, { prefix: '/api' });
-fastify.register(contentController, { prefix: '/api' });
-fastify.register(analyticsController, { prefix: '/api' });
-fastify.register(proactiveController, { prefix: '/api' });
-fastify.register(inspoController, { prefix: '/api' });
-fastify.register(workspacesController, { prefix: '/api' });
-fastify.register(dashboardController, { prefix: '/api' });
+fastify.register(ingestionController, { prefix: '/api/v1' });
+fastify.register(contentController, { prefix: '/api/v1' });
+fastify.register(analyticsController, { prefix: '/api/v1' });
+fastify.register(proactiveController, { prefix: '/api/v1' });
+fastify.register(inspoController, { prefix: '/api/v1' });
+fastify.register(workspacesController, { prefix: '/api/v1' });
+fastify.register(dashboardController, { prefix: '/api/v1' });
 
 const start = async () => {
   try {
