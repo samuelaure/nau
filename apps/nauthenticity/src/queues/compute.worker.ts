@@ -220,7 +220,7 @@ const generateThumbnail = async (
 
   // 2. Upload to R2 if enabled
   if (r2Client && config.env.R2_BUCKET_NAME) {
-    const storageKey = `content/${username}/posts/${thumbFilename}`;
+    const storageKey = `nauthenticity/content/${username}/posts/${thumbFilename}`;
     await r2Client.send(
       new PutObjectCommand({
         Bucket: config.env.R2_BUCKET_NAME,
