@@ -37,8 +37,8 @@ model SocialProfile {
 
 model Post {
   id                String         @id @default(uuid())
-  instagramId       String?        @unique
-  instagramUrl      String         @unique
+  platformId        String?        @unique
+  url               String         @unique
   username          String?
   socialProfileId   String?
   socialProfile     SocialProfile? @relation(fields: [socialProfileId], references: [id])
