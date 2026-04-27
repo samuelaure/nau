@@ -2,6 +2,7 @@
 
 import { prisma } from '@/modules/shared/prisma'
 import { storage } from '@/modules/shared/r2'
+import { flownau, assetTypeFromMime } from 'nau-storage'
 import { revalidatePath } from 'next/cache'
 import { ApifyService } from '@/modules/accounts/apify'
 import { downloadAndUploadProfileImage } from '@/modules/accounts/profile-image-service'
@@ -19,10 +20,38 @@ import { z } from 'zod'
 import { COOKIE_ACCESS_TOKEN } from '@nau/auth'
 
 const SocialProfileSchema = z.object({
-  username: z.string().min(1, 'Username is required'),
+  username: z.string().min(1, 'Username is required').transform((val) => val.replace(/^@/, '')),
   accessToken: z.string().min(1, 'Access Token is required'),
   platformId: z.string().min(1, 'Platform ID is required'),
 })
+
+/**
+ * Sync a social profile to nauthenticity so it's discoverable from nauthenticity's content section
+ */
+async function syncToNauthenticity(username: string, profileImageUrl: string | null = null) {
+  try {
+    const nauthenticityUrl = process.env.NAUTHENTICITY_URL || 'http://localhost:3007'
+    const serviceKey = process.env.NAU_SERVICE_KEY || ''
+
+    await fetch(`${nauthenticityUrl}/api/v1/social-profiles/sync`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Service-Key': serviceKey,
+      },
+      body: JSON.stringify({
+        username,
+        platform: 'instagram',
+        profileImageUrl,
+      }),
+    }).catch((err) => {
+      // Log but don't fail — sync to nauthenticity is nice-to-have
+      console.warn('[SyncToNauthenticity] Failed to sync profile:', err)
+    })
+  } catch (error) {
+    console.warn('[SyncToNauthenticity] Error:', error)
+  }
+}
 
 const BrandUpdateSchema = z.object({
   directorPrompt: z.string().optional(),
@@ -227,6 +256,9 @@ export async function addSocialProfile(formData: FormData) {
     },
   })
 
+  // Sync profile to nauthenticity so it's discoverable there
+  await syncToNauthenticity(profile.username, profile.profileImage)
+
   await syncSocialProfile(profile.id)
   revalidatePath('/dashboard')
 }
@@ -292,6 +324,46 @@ export async function syncSocialProfile(id: string) {
 /** @deprecated Use syncSocialProfile */
 export const syncAccountProfile = syncSocialProfile
 
+/**
+ * Manually sync a social profile to nauthenticity
+ * Useful for profiles created before auto-sync was implemented
+ */
+export async function syncProfileToNauthenticity(profileId: string) {
+  await checkAuth()
+
+  const profile = await prisma.socialProfile.findUnique({
+    where: { id: profileId },
+  })
+
+  if (!profile || !profile.username) {
+    throw new Error('Profile not found or has no username')
+  }
+
+  const nauthenticityUrl = process.env.NAUTHENTICITY_URL || 'http://localhost:3007'
+  const serviceKey = process.env.NAU_SERVICE_KEY || ''
+
+  const response = await fetch(`${nauthenticityUrl}/api/v1/social-profiles/sync`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Service-Key': serviceKey,
+    },
+    body: JSON.stringify({
+      username: profile.username,
+      platform: profile.platform || 'instagram',
+      profileImageUrl: profile.profileImage,
+    }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}))
+    throw new Error(error.message || 'Failed to sync to nauthenticity')
+  }
+
+  revalidatePath('/dashboard')
+  return { success: true, message: 'Profile synced to nauthenticity' }
+}
+
 // ── Asset upload actions ───────────────────────────────────────────────────────
 
 export async function prepareUpload(
@@ -328,10 +400,10 @@ export async function prepareUpload(
 
   const ext = filename.split('.').pop()?.toLowerCase() || ''
   const systemFilename = await getNextSystemFilename(params.brandId, type, shortCode, ext)
+  const assetId = systemFilename.replace(`.${ext}`, '')
 
-  const folder = type === 'VID' ? 'videos' : type === 'AUD' ? 'audios' : 'images'
-  const projectFolder = brand.assetsRoot || brand.shortCode || brand.id
-  const r2Key = `${projectFolder}/${folder}/${systemFilename}`
+  const assetFolder = assetTypeFromMime(params.contentType)
+  const r2Key = flownau.accountAsset(params.brandId, assetFolder, assetId, ext)
 
   const { uploadUrl: url } = await storage.presignUpload(r2Key, params.contentType, 600)
 
