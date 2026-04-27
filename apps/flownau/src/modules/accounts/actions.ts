@@ -54,11 +54,11 @@ async function syncToNauthenticity(username: string, profileImageUrl: string | n
 }
 
 const BrandUpdateSchema = z.object({
-  directorPrompt: z.string().optional(),
-  creationPrompt: z.string().optional(),
-  shortCode: z.string().optional(),
-  language: z.string().optional(),
-  ideationCount: z.coerce.number().int().min(1).max(30).optional(),
+  directorPrompt: z.string().nullable().optional(),
+  creationPrompt: z.string().nullable().optional(),
+  shortCode: z.string().nullable().optional(),
+  language: z.string().nullable().optional(),
+  ideationCount: z.coerce.number().int().min(1).max(30).optional().nullable(),
 })
 
 const SocialProfileUpdateSchema = z.object({
