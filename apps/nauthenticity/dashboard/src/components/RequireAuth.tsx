@@ -7,6 +7,13 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     checkSession().then(setSession);
+
+    // Refresh session every 8 minutes to keep access token alive
+    const interval = setInterval(() => {
+      checkSession().then(setSession);
+    }, 8 * 60 * 1000);
+
+    return () => clearInterval(interval);
   }, []);
 
   if (session === 'loading') {

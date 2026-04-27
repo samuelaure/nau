@@ -49,7 +49,7 @@ async function tryRefresh(rt: string): Promise<{ at: string; newSetCookies: stri
 
     const isSecure = process.env['NODE_ENV'] === 'production';
     const newSetCookies = [
-      `nau_at=${data.accessToken}; Path=/; Domain=${COOKIE_DOMAIN}; Max-Age=${24 * 60 * 60}; HttpOnly; SameSite=Lax${isSecure ? '; Secure' : ''}`,
+      `nau_at=${data.accessToken}; Path=/; Domain=${COOKIE_DOMAIN}; Max-Age=900; HttpOnly; SameSite=Lax${isSecure ? '; Secure' : ''}`,
     ];
     if (data.refreshToken) {
       newSetCookies.push(

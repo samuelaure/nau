@@ -38,7 +38,7 @@ export class AuthCallbackController {
       if (!data.accessToken) return null
 
       const cookies = [
-        `nau_at=${data.accessToken}; Path=/; Domain=${cookieDomain}; Max-Age=${24 * 60 * 60}; HttpOnly; SameSite=Lax${isSecure ? '; Secure' : ''}`,
+        `nau_at=${data.accessToken}; Path=/; Domain=${cookieDomain}; Max-Age=900; HttpOnly; SameSite=Lax${isSecure ? '; Secure' : ''}`,
       ]
       if (data.refreshToken) {
         cookies.push(
