@@ -89,6 +89,8 @@ export async function POST(req: Request, { params }: { params: { brandId: string
         body: JSON.stringify({
           username,
           platform: 'instagram',
+          brandId: params.brandId,
+          targetType: 'publishing',
         }),
       }).catch((err) => {
         // Silently fail — sync is nice-to-have
