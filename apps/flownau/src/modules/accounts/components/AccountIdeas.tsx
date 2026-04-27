@@ -211,12 +211,16 @@ export default function AccountIdeas({ brandId }: { brandId: string }) {
     fetchTemplates()
   }, [brandId])
 
-  const handleGenerate = async (concept?: string, countOverride?: number) => {
+  const handleGenerate = async (topic?: string, countOverride?: number) => {
+    if (brainstormSource === 'manual' && !topic?.trim()) {
+      toast.error('Please enter a topic to generate ideas.')
+      return
+    }
     setGenerating(true)
     const toastId = toast.loading(
-      concept
-        ? `Generating ideas from concept: "${concept.slice(0, 40)}..."`
-        : 'Consulting Brand Persona & generating ideas...',
+      brainstormSource === 'automatic'
+        ? 'Fetching InspoBase digest & generating ideas...'
+        : `Generating ideas about: "${topic!.slice(0, 40)}..."`,
     )
     try {
       const res = await fetch('/api/agent/idea-generation', {
@@ -224,9 +228,7 @@ export default function AccountIdeas({ brandId }: { brandId: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           brandId,
-          personaId: selectedPersonaId,
-          frameworkId: selectedFrameworkId,
-          concept: brainstormSource === 'manual' ? concept || undefined : undefined,
+          topic: brainstormSource === 'manual' ? topic : undefined,
           count: countOverride || undefined,
           source: brainstormSource,
         }),
@@ -615,7 +617,7 @@ export default function AccountIdeas({ brandId }: { brandId: string }) {
             {brainstormSource === 'manual' ? (
               <div className="space-y-1">
                 <label className="text-xs text-gray-400">
-                  Concept Prompt <span className="text-gray-600 font-normal">(optional)</span>
+                  Topic <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   autoFocus
@@ -640,7 +642,7 @@ export default function AccountIdeas({ brandId }: { brandId: string }) {
               <label className="text-xs text-gray-400">
                 Number of ideas to spawn{' '}
                 <span className="text-gray-600 font-normal">
-                  (leave blank to use persona default)
+                  (leave blank to use brand default)
                 </span>
               </label>
               <input

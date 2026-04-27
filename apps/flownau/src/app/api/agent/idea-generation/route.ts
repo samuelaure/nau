@@ -5,24 +5,19 @@ import { prisma } from '@/modules/shared/prisma'
 import { checkBrandAccess } from '@/modules/shared/actions'
 import { generateContentIdeas } from '@/modules/ideation/ideation.service'
 import { logError } from '@/modules/shared/logger'
-import type { Prisma } from '@prisma/client'
 
 export async function POST(req: Request) {
   try {
     const json = await req.json()
     const {
       brandId,
-      topic,
+      topic: topicFromBody,
       count: countOverride,
       source = 'manual',
     } = json
 
     if (!brandId) {
       return NextResponse.json({ error: 'Missing brandId' }, { status: 400 })
-    }
-
-    if (!topic?.trim()) {
-      return NextResponse.json({ error: 'Topic is required.' }, { status: 400 })
     }
 
     await checkBrandAccess(brandId)
@@ -35,28 +30,46 @@ export async function POST(req: Request) {
     const language = brand?.language ?? 'Spanish'
     const count = typeof countOverride === 'number' ? countOverride : (brand?.ideationCount ?? 9)
 
-    // Determine source metadata
+    // Resolve topic: for automatic source fetch digest from nauthenticity; for manual require it from body
+    let topic: string = topicFromBody?.trim() ?? ''
     let sourceRef: string | null = null
-    let autoApprove = false
     let priority = 2
 
     if (source === 'automatic') {
-      // Automatic source: topic comes from digest, sourceRef tracks it
-      sourceRef = topic.length < 300 ? topic : null
+      const { fetchBrandDigest } = await import('@/modules/ideation/sources/inspo-source')
+      const digest = await fetchBrandDigest(brandId)
+
+      if (!digest?.content?.trim()) {
+        return NextResponse.json(
+          { error: 'No InspoBase digest available. Run a nauthenticity scrape first.' },
+          { status: 422 },
+        )
+      }
+
+      topic = digest.content
       priority = 3
+      sourceRef =
+        digest.attachedUrls.length > 0
+          ? digest.attachedUrls.length === 1
+            ? digest.attachedUrls[0]
+            : JSON.stringify(digest.attachedUrls)
+          : null
     }
 
-    // Generate ideas
+    if (!topic) {
+      return NextResponse.json({ error: 'Topic is required.' }, { status: 400 })
+    }
+
+    // Recent content for diversity (manual skip for speed; cron handles this for automatic)
     const output = await generateContentIdeas({ topic, language, count })
 
-    // Save ideas
     const ops = output.ideas.map((idea) =>
       prisma.contentIdea.create({
         data: {
           brandId,
           ideaText: idea.concept,
           format: null,
-          status: autoApprove ? 'APPROVED' : 'PENDING',
+          status: 'PENDING',
           source,
           priority,
           sourceRef,
@@ -67,10 +80,7 @@ export async function POST(req: Request) {
     const generatedIdeas = await Promise.all(ops)
 
     return NextResponse.json(
-      {
-        ideas: generatedIdeas,
-        summary: output.briefSummary,
-      },
+      { ideas: generatedIdeas, summary: output.briefSummary },
       { status: 200 },
     )
   } catch (error: unknown) {
