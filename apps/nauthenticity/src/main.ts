@@ -11,7 +11,7 @@ async function bootstrap() {
   app.enableShutdownHooks()
   app.use(helmet())
   app.use(cookieParser())
-  app.setGlobalPrefix('api/v1', { exclude: ['health', 'auth/(.*)'] })
+  app.setGlobalPrefix('api', { exclude: ['health', 'auth/(.*)'] })
 
   const httpAdapter = app.get(HttpAdapterHost)
   app.useGlobalFilters(new AllExceptionsFilter(httpAdapter))
