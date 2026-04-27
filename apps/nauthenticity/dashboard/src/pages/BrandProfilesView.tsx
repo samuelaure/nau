@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { BrandMonitoredView } from './BrandMonitoredView';
 import { BrandBenchmarkView } from './BrandBenchmarkView';
+import { BrandOwnedView } from './BrandOwnedView';
 import { Users } from 'lucide-react';
 
-type Tab = 'monitored' | 'benchmark';
+type Tab = 'monitored' | 'benchmark' | 'owned';
 
 export const BrandProfilesView = () => {
-  const [activeTab, setActiveTab] = useState<Tab>('monitored');
+  const [activeTab, setActiveTab] = useState<Tab>('owned');
 
   return (
     <div className="fade-in">
@@ -20,7 +21,7 @@ export const BrandProfilesView = () => {
       </div>
 
       <div style={{ display: 'flex', gap: '0', marginBottom: '2rem', borderBottom: '1px solid var(--border)' }}>
-        {(['monitored', 'benchmark'] as Tab[]).map((tab) => (
+        {(['owned', 'monitored', 'benchmark'] as Tab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -38,11 +39,12 @@ export const BrandProfilesView = () => {
               textTransform: 'capitalize',
             }}
           >
-            {tab === 'monitored' ? 'Monitored' : 'Benchmark'}
+            {tab === 'monitored' ? 'Monitored' : tab === 'benchmark' ? 'Benchmark' : 'Owned'}
           </button>
         ))}
       </div>
 
+      {activeTab === 'owned' && <BrandOwnedView />}
       {activeTab === 'monitored' && <BrandMonitoredView />}
       {activeTab === 'benchmark' && <BrandBenchmarkView />}
     </div>
