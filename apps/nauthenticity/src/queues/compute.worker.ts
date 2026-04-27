@@ -162,13 +162,7 @@ const ensureLocalFile = async (
   }
 
   const url = new URL(storageUrl);
-  const key = url.pathname.startsWith('/') ? url.pathname.slice(1) : url.pathname;
-  // If the PUBLIC_URL is used, it might contain the bucket name or a custom domain.
-  // We need to extract the key properly.
-  // Let's assume the key is simply the part after the last slash if it's a simple CDN,
-  // or use the pathname if it's a direct R2 URL.
-  // For naŭthenticity, the key is usually 'content/{username}/posts/{mediaId}.{ext}'
-  const actualKey = key.includes('content/') ? key.substring(key.indexOf('content/')) : key;
+  const actualKey = url.pathname.startsWith('/') ? url.pathname.slice(1) : url.pathname;
 
   const response = await r2Client.send(
     new GetObjectCommand({
