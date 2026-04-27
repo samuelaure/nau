@@ -2,6 +2,7 @@ import { bundle } from '@remotion/bundler'
 import { renderMedia, getCompositions } from '@remotion/renderer'
 import path from 'path'
 import { storage } from '@/modules/shared/r2'
+import { flownau } from 'nau-storage'
 import fs from 'fs'
 import { logger } from '@/lib/logger'
 
@@ -9,12 +10,12 @@ export async function renderAndUpload({
   templateId,
   inputProps,
   renderId,
-  projectFolder,
+  accountId,
 }: {
   templateId: string
   inputProps: Record<string, unknown>
   renderId: string
-  projectFolder: string
+  accountId: string
 }) {
   const entry = path.join(process.cwd(), 'src/modules/video/remotion/index.tsx')
   const outputDir = path.join(process.cwd(), 'out')
@@ -26,7 +27,18 @@ export async function renderAndUpload({
   const outputLocation = path.join(outputDir, `render-${renderId}.mp4`)
 
   logger.info({ renderId, templateId }, 'Bundling Remotion composition...')
-  const bundleLocation = await bundle(entry)
+  const bundleLocation = await bundle(entry, undefined, {
+    webpackOverride: (config) => ({
+      ...config,
+      resolve: {
+        ...config.resolve,
+        alias: {
+          ...(config.resolve?.alias as Record<string, string> | undefined),
+          '@': path.join(process.cwd(), 'src'),
+        },
+      },
+    }),
+  })
 
   const comps = await getCompositions(bundleLocation, { inputProps })
   const composition = comps.find((c) => c.id === templateId)
@@ -44,17 +56,14 @@ export async function renderAndUpload({
     codec: 'h264',
   })
 
-  logger.info(
-    { renderId, r2Key: `${projectFolder}/outputs/${renderId}.mp4` },
-    'Uploading render to R2...',
-  )
+  const r2Key = flownau.renderOutput(accountId, renderId)
+  logger.info({ renderId, r2Key }, 'Uploading render to R2...')
   const fileStream = fs.createReadStream(outputLocation)
-  const r2Key = `${projectFolder}/outputs/${renderId}.mp4`
 
-  await storage.upload(r2Key, fileStream, { mimeType: 'video/mp4' })
+  const publicUrl = await storage.upload(r2Key, fileStream, { mimeType: 'video/mp4' })
 
   // Cleanup
   fs.unlinkSync(outputLocation)
 
-  return r2Key
+  return publicUrl
 }

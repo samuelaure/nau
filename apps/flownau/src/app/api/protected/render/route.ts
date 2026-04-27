@@ -24,10 +24,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Template not found' }, { status: 404 })
     }
 
-    let projectFolder = 'templates/global'
-    if (template.brand) {
-      projectFolder = template.brand.shortCode || template.brand.id
-    }
+    const accountId = template.brand?.id ?? 'global'
 
     const render = await prisma.render.create({
       data: {
@@ -37,14 +34,14 @@ export async function POST(req: Request) {
       },
     })
 
-    const r2Path = await renderAndUpload({
+    const videoUrl = await renderAndUpload({
       templateId: template.remotionId,
       inputProps: inputData,
       renderId: render.id,
-      projectFolder,
+      accountId,
     })
 
-    const fullUrl = `${process.env.R2_PUBLIC_URL}/${r2Path}`
+    const fullUrl = videoUrl
 
     await prisma.render.update({
       where: { id: render.id },

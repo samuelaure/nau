@@ -37,22 +37,26 @@ export async function POST(req: Request) {
     }
 
     const renderId = `dyn-${compositionId}-${Date.now()}`
-    const projectFolder = composition.brandId
+
+    await prisma.composition.update({
+      where: { id: compositionId },
+      data: { status: 'RENDERING' },
+    })
 
     // Start rendering. Vercel development will allow this to block.
     const videoUrl = await renderAndUpload({
       templateId: 'DynamicTemplateMaster',
       inputProps: { schema: parsedSchema.data },
       renderId,
-      projectFolder,
+      accountId: composition.brandId,
     })
 
-    // Update the schema and the video URL in the db. We assert it as Prisma.InputJsonValue.
     await prisma.composition.update({
       where: { id: compositionId },
       data: {
         payload: parsedSchema.data as unknown as import('@prisma/client').Prisma.InputJsonValue,
         videoUrl,
+        status: 'RENDERED',
       },
     })
 

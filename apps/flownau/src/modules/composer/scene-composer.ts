@@ -98,7 +98,7 @@ export async function compose(input: ComposeInput): Promise<ComposeResult> {
 1. Use ONLY image scene types from the catalog.
 2. For carousel: start with 'cover-slide', end with 'cta-slide'. Middle slides are content-slide, quote-slide, or list-slide.
 3. For single_image: compose exactly 1 scene (cover-slide or content-slide work best).
-4. Fill each scene's text slots. Respect max character limits strictly.
+4. CRITICAL: For every scene, copy the exact slot keys shown in the catalog and fill them with real content. Never output an empty slots object {}.
 5. Write a compelling Instagram caption (max 2000 chars). Use line breaks.
 6. Suggest 5-15 relevant hashtags (without the # symbol).
 7. Set coverSceneIndex to 0 (first slide is always the cover).
@@ -107,7 +107,7 @@ export async function compose(input: ComposeInput): Promise<ComposeResult> {
     : `RULES:
 1. Start with a hook scene (hook-text or text-over-media with a hook). End with a cta-card.
 2. Use 'text-over-media' scenes heavily — they work best with B-roll content.
-3. Fill each scene's text slots according to the slot schema. Respect max character limits strictly.
+3. CRITICAL: For every scene, copy the exact slot keys shown in the catalog and fill them with real content. Never output an empty slots object {}. Only media-only and transition may have empty slots.
 4. Suggest a mood keyword per scene for asset matching (e.g. "nature", "urban", "food", "workspace").
 5. Write a compelling Instagram caption (max 2000 chars). Use line breaks for readability.
 6. Suggest 5-15 relevant hashtags (without the # symbol).

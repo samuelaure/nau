@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 import { storage } from '@/modules/shared/r2'
+import { flownau, extFromMime } from 'nau-storage'
 import { getAuthUser } from '@/lib/auth'
 import { logError } from '@/modules/shared/logger'
 import { createId } from '@paralleldrive/cuid2'
@@ -44,8 +45,9 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const ext = file.name.split('.').pop() ?? 'mp4'
-    const key = `recordings/${brandId}/${compositionId}-${createId()}.${ext}`
+    const ext = extFromMime(file.type) || file.name.split('.').pop() || 'mp4'
+    const recordingId = `${compositionId}-${createId()}`
+    const key = flownau.renderOutput(brandId, recordingId).replace('.mp4', `.${ext}`)
     const buffer = Buffer.from(await file.arrayBuffer())
 
     const mediaUrl = await storage.upload(key, buffer, {
