@@ -1,14 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import React from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { getBrandOwnedProfiles, getAccount, getProfileImageUrl } from '../lib/api';
-import { Database } from 'lucide-react';
+import { Database, TrendingUp } from 'lucide-react';
 import { PostGrid } from '../components/PostGrid';
 import { ProfileActionsBar } from '../components/ProfileActionsBar';
 import { SocialProfileCard } from '../components/SocialProfileCard';
 
 export const BrandContentView = () => {
   const { brandId } = useParams<{ brandId: string }>();
+  const navigate = useNavigate();
   const [selectedUsername, setSelectedUsername] = React.useState<string | null>(null);
   const [sort, setSort] = React.useState<'recent' | 'oldest' | 'likes' | 'comments'>('recent');
 
@@ -74,7 +75,28 @@ export const BrandContentView = () => {
           </div>
         </div>
 
-        <ProfileActionsBar username={selectedUsername} />
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <ProfileActionsBar username={selectedUsername} />
+          <button
+            onClick={() => navigate(`/progress?username=${selectedUsername}`)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.5rem 1rem',
+              borderRadius: '4px',
+              background: '#58a6ff',
+              color: 'white',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+            }}
+          >
+            <TrendingUp size={16} />
+            Progress Overview
+          </button>
+        </div>
 
         <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
           <select
