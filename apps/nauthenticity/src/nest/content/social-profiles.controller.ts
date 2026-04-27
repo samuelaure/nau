@@ -10,7 +10,7 @@ export class SocialProfilesController {
   /**
    * POST /social-profiles/sync
    * Sync a social profile from flownau (or any external source)
-   * Creates the SocialProfile if it doesn't exist, and optionally links it to a brand
+   * Creates or updates the SocialProfile and optionally sets its owner
    */
   @Post('social-profiles/sync')
   @HttpCode(HttpStatus.OK)
@@ -31,6 +31,7 @@ export class SocialProfilesController {
     const platform = body.platform || 'instagram'
 
     // Upsert: create if not exists, otherwise return existing
+    // If brandId is provided, set the owner; otherwise leave ownerId as-is
     const profile = await this.prisma.socialProfile.upsert({
       where: {
         platform_username: { platform, username: body.username },
@@ -39,37 +40,14 @@ export class SocialProfilesController {
         platform,
         username: body.username,
         profileImageUrl: body.profileImageUrl || null,
+        ownerId: body.brandId || null,
       },
       update: {
         profileImageUrl: body.profileImageUrl || undefined,
         lastScrapedAt: new Date(),
+        ownerId: body.brandId || undefined,
       },
     })
-
-    // If brandId is provided, link this profile to the brand as a publishing profile
-    if (body.brandId) {
-      try {
-        await this.prisma.socialProfileTarget.upsert({
-          where: {
-            brandId_socialProfileId: { brandId: body.brandId, socialProfileId: profile.id },
-          },
-          create: {
-            brandId: body.brandId,
-            socialProfileId: profile.id,
-            targetType: body.targetType || 'publishing',
-            isPublishingProfile: true,
-          },
-          update: {
-            targetType: body.targetType || 'publishing',
-            isPublishingProfile: true,
-          },
-        })
-      } catch (err: any) {
-        // If brand doesn't exist yet, just log warning and continue
-        // The profile will be synced, but not yet linked to a brand
-        console.warn(`[SyncProfile] Brand ${body.brandId} not found in nauthenticity, profile synced without brand link`)
-      }
-    }
 
     return { profile, synced: true }
   }

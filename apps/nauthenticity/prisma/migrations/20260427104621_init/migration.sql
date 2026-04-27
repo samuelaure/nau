@@ -8,6 +8,7 @@ CREATE TABLE "SocialProfile" (
     "username" TEXT NOT NULL,
     "profileImageUrl" TEXT,
     "lastScrapedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "ownerId" TEXT,
 
     CONSTRAINT "SocialProfile_pkey" PRIMARY KEY ("id")
 );
@@ -108,8 +109,8 @@ CREATE TABLE "KnowledgeChunk" (
 );
 
 -- CreateTable
-CREATE TABLE "BrandIntelligence" (
-    "brandId" TEXT NOT NULL,
+CREATE TABLE "Brand" (
+    "id" TEXT NOT NULL,
     "workspaceId" TEXT NOT NULL DEFAULT '',
     "mainUsername" TEXT,
     "voicePrompt" TEXT NOT NULL,
@@ -122,7 +123,7 @@ CREATE TABLE "BrandIntelligence" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "BrandIntelligence_pkey" PRIMARY KEY ("brandId")
+    CONSTRAINT "Brand_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -138,20 +139,16 @@ CREATE TABLE "BrandSynthesis" (
 );
 
 -- CreateTable
-CREATE TABLE "SocialProfileTarget" (
+CREATE TABLE "SocialProfileMonitor" (
     "id" TEXT NOT NULL,
     "brandId" TEXT NOT NULL,
     "socialProfileId" TEXT NOT NULL,
-    "profileStrategy" TEXT,
-    "targetType" TEXT NOT NULL DEFAULT 'monitored',
+    "monitoringType" TEXT NOT NULL DEFAULT 'content',
     "isActive" BOOLEAN NOT NULL DEFAULT true,
-    "initialDownloadCount" INTEGER DEFAULT 20,
-    "autoUpdate" BOOLEAN DEFAULT false,
-    "isPublishingProfile" BOOLEAN NOT NULL DEFAULT false,
-    "syncedToFlownauAt" TIMESTAMP(3),
+    "settings" JSONB,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "SocialProfileTarget_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "SocialProfileMonitor_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -187,6 +184,9 @@ CREATE TABLE "InspoItem" (
 
 -- CreateIndex
 CREATE INDEX "SocialProfile_platform_username_idx" ON "SocialProfile"("platform", "username");
+
+-- CreateIndex
+CREATE INDEX "SocialProfile_ownerId_idx" ON "SocialProfile"("ownerId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "SocialProfile_platform_username_key" ON "SocialProfile"("platform", "username");
@@ -225,16 +225,16 @@ CREATE INDEX "KnowledgeChunk_platform_platformId_idx" ON "KnowledgeChunk"("platf
 CREATE INDEX "KnowledgeChunk_brandId_idx" ON "KnowledgeChunk"("brandId");
 
 -- CreateIndex
-CREATE INDEX "BrandIntelligence_workspaceId_idx" ON "BrandIntelligence"("workspaceId");
+CREATE INDEX "Brand_workspaceId_idx" ON "Brand"("workspaceId");
 
 -- CreateIndex
 CREATE INDEX "BrandSynthesis_brandId_type_idx" ON "BrandSynthesis"("brandId", "type");
 
 -- CreateIndex
-CREATE INDEX "SocialProfileTarget_brandId_targetType_idx" ON "SocialProfileTarget"("brandId", "targetType");
+CREATE INDEX "SocialProfileMonitor_brandId_idx" ON "SocialProfileMonitor"("brandId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "SocialProfileTarget_brandId_socialProfileId_key" ON "SocialProfileTarget"("brandId", "socialProfileId");
+CREATE UNIQUE INDEX "SocialProfileMonitor_brandId_socialProfileId_key" ON "SocialProfileMonitor"("brandId", "socialProfileId");
 
 -- CreateIndex
 CREATE INDEX "CommentFeedback_brandId_idx" ON "CommentFeedback"("brandId");
@@ -244,6 +244,9 @@ CREATE INDEX "InspoItem_brandId_idx" ON "InspoItem"("brandId");
 
 -- CreateIndex
 CREATE INDEX "InspoItem_brandId_status_idx" ON "InspoItem"("brandId", "status");
+
+-- AddForeignKey
+ALTER TABLE "SocialProfile" ADD CONSTRAINT "SocialProfile_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "Brand"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Post" ADD CONSTRAINT "Post_socialProfileId_fkey" FOREIGN KEY ("socialProfileId") REFERENCES "SocialProfile"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -267,22 +270,22 @@ ALTER TABLE "Embedding" ADD CONSTRAINT "Embedding_transcriptId_fkey" FOREIGN KEY
 ALTER TABLE "KnowledgeChunk" ADD CONSTRAINT "KnowledgeChunk_transcriptId_fkey" FOREIGN KEY ("transcriptId") REFERENCES "Transcript"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "BrandSynthesis" ADD CONSTRAINT "BrandSynthesis_brandId_fkey" FOREIGN KEY ("brandId") REFERENCES "BrandIntelligence"("brandId") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "BrandSynthesis" ADD CONSTRAINT "BrandSynthesis_brandId_fkey" FOREIGN KEY ("brandId") REFERENCES "Brand"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "SocialProfileTarget" ADD CONSTRAINT "SocialProfileTarget_brandId_fkey" FOREIGN KEY ("brandId") REFERENCES "BrandIntelligence"("brandId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "SocialProfileMonitor" ADD CONSTRAINT "SocialProfileMonitor_brandId_fkey" FOREIGN KEY ("brandId") REFERENCES "Brand"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "SocialProfileTarget" ADD CONSTRAINT "SocialProfileTarget_socialProfileId_fkey" FOREIGN KEY ("socialProfileId") REFERENCES "SocialProfile"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "SocialProfileMonitor" ADD CONSTRAINT "SocialProfileMonitor_socialProfileId_fkey" FOREIGN KEY ("socialProfileId") REFERENCES "SocialProfile"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "CommentFeedback" ADD CONSTRAINT "CommentFeedback_brandId_fkey" FOREIGN KEY ("brandId") REFERENCES "BrandIntelligence"("brandId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "CommentFeedback" ADD CONSTRAINT "CommentFeedback_brandId_fkey" FOREIGN KEY ("brandId") REFERENCES "Brand"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "CommentFeedback" ADD CONSTRAINT "CommentFeedback_postId_fkey" FOREIGN KEY ("postId") REFERENCES "Post"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "InspoItem" ADD CONSTRAINT "InspoItem_brandId_fkey" FOREIGN KEY ("brandId") REFERENCES "BrandIntelligence"("brandId") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "InspoItem" ADD CONSTRAINT "InspoItem_brandId_fkey" FOREIGN KEY ("brandId") REFERENCES "Brand"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "InspoItem" ADD CONSTRAINT "InspoItem_postId_fkey" FOREIGN KEY ("postId") REFERENCES "Post"("id") ON DELETE SET NULL ON UPDATE CASCADE;

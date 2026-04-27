@@ -7,21 +7,21 @@ import { dispatchToZazu } from './zazu.dispatcher';
 import { logger } from '../../utils/logger';
 import { prisma } from '../../modules/shared/prisma';
 import { toZonedTime } from 'date-fns-tz';
-import type { BrandIntelligence, SocialProfileTarget, SocialProfile } from '@prisma/client';
+import type { Brand, SocialProfileMonitor, SocialProfile } from '@prisma/client';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type BrandWithTargets = BrandIntelligence & {
-  targets: (SocialProfileTarget & { socialProfile: SocialProfile })[];
+type BrandWithMonitors = Brand & {
+  monitors: (SocialProfileMonitor & { socialProfile: SocialProfile })[];
 };
 
 // ---------------------------------------------------------------------------
 // Window logic
 // ---------------------------------------------------------------------------
 
-export function isInWindow(brand: BrandIntelligence, now: Date): boolean {
+export function isInWindow(brand: Brand, now: Date): boolean {
   if (!brand.windowStart || !brand.windowEnd) return false;
 
   const zoned = toZonedTime(now, brand.timezone);
@@ -46,14 +46,14 @@ export function isInWindow(brand: BrandIntelligence, now: Date): boolean {
 export const runProactiveFanout = async (now: Date = new Date()): Promise<void> => {
   logger.info(`[FanoutProcessor] Starting smart fanout cycle at ${now.toISOString()}...`);
 
-  const allBrands = (await prisma.brandIntelligence.findMany({
+  const allBrands = (await prisma.brand.findMany({
     include: {
-      targets: {
-        where: { targetType: 'monitored', isActive: true },
+      monitors: {
+        where: { monitoringType: 'content', isActive: true },
         include: { socialProfile: true },
       },
     },
-  })) as BrandWithTargets[];
+  })) as BrandWithMonitors[];
 
   if (allBrands.length === 0) {
     logger.info(`[FanoutProcessor] No active brands. Exiting.`);

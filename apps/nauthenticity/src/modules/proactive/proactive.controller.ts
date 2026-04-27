@@ -15,7 +15,7 @@ import { authenticate } from '../../utils/auth';
 // Zod Schemas — intelligence-only fields (structural fields removed)
 // ---------------------------------------------------------------------------
 
-const BrandIntelligenceUpsertSchema = z.object({
+const BrandUpsertSchema = z.object({
   workspaceId: z.string().min(1),
   mainUsername: z.string().optional().nullable(),
   voicePrompt: z.string().min(1),
@@ -33,24 +33,20 @@ const BrandIntelligenceUpsertSchema = z.object({
     .nullable(),
 });
 
-const TargetTypeEnum = z.enum(['monitored', 'benchmark', 'single_post']);
+const MonitoringTypeEnum = z.enum(['content', 'benchmark', 'inspiration']);
 
-const TargetCreateSchema = z.object({
+const MonitorCreateSchema = z.object({
   brandId: z.string().min(1),
   usernames: z.array(z.string().min(1)),
-  targetType: TargetTypeEnum.default('monitored'),
-  profileStrategy: z.string().optional().nullable(),
+  monitoringType: MonitoringTypeEnum.default('content'),
   isActive: z.boolean().default(true),
-  initialDownloadCount: z.number().int().min(1).max(500).optional().nullable(),
-  autoUpdate: z.boolean().optional().nullable(),
+  settings: z.record(z.any()).optional().nullable(),
 });
 
-const TargetUpdateSchema = z.object({
-  profileStrategy: z.string().optional().nullable(),
-  targetType: TargetTypeEnum.optional(),
+const MonitorUpdateSchema = z.object({
+  monitoringType: MonitoringTypeEnum.optional(),
   isActive: z.boolean().optional(),
-  initialDownloadCount: z.number().int().min(1).max(500).optional().nullable(),
-  autoUpdate: z.boolean().optional().nullable(),
+  settings: z.record(z.any()).optional().nullable(),
 });
 
 const FeedbackSchema = z.object({
@@ -73,8 +69,8 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
       const { targetUrl, brandId } = request.body as { targetUrl?: string; brandId?: string };
       if (!targetUrl || !brandId) throw new Error('Missing required fields: targetUrl and brandId');
 
-      const intelligence = await prisma.brandIntelligence.findUnique({ where: { brandId } });
-      if (!intelligence) return reply.status(404).send({ error: 'Brand intelligence not found' });
+      const brand = await prisma.brand.findUnique({ where: { id: brandId } });
+      if (!brand) return reply.status(404).send({ error: 'Brand not found' });
 
       const suggestions = await generateReactiveComments(targetUrl, brandId);
 
@@ -126,8 +122,8 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
     { preHandler: authenticate },
     async (request, reply) => {
       const { brandId } = request.params as { brandId: string };
-      const intelligence = await prisma.brandIntelligence.findUnique({
-        where: { brandId },
+      const intelligence = await prisma.brand.findUnique({
+        where: { id: brandId },
         include: {
           targets: {
             select: {
@@ -154,9 +150,9 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
     async (request, reply) => {
       const { brandId } = request.params as { brandId: string };
       try {
-        const data = BrandIntelligenceUpsertSchema.parse(request.body);
-        const intelligence = await prisma.brandIntelligence.upsert({
-          where: { brandId },
+        const data = BrandUpsertSchema.parse(request.body);
+        const intelligence = await prisma.brand.upsert({
+          where: { id: brandId },
           create: { brandId, ...data },
           update: data,
         });
@@ -182,8 +178,8 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
         for (const key of allowed) {
           if (key in body) patch[key] = body[key];
         }
-        const intelligence = await prisma.brandIntelligence.upsert({
-          where: { brandId },
+        const intelligence = await prisma.brand.upsert({
+          where: { id: brandId },
           update: patch,
           create: { brandId, workspaceId: (patch.workspaceId as string) ?? '', voicePrompt: (patch.voicePrompt as string) ?? '', ...patch },
         });
@@ -202,8 +198,8 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
   // Full DNA — for ideation / composition (high-token)
   fastify.get('/brands/:brandId/dna', { preHandler: authenticate }, async (request, reply) => {
     const { brandId } = request.params as { brandId: string };
-    const intelligence = await prisma.brandIntelligence.findUnique({
-      where: { brandId },
+    const intelligence = await prisma.brand.findUnique({
+      where: { id: brandId },
       include: {
         targets: { select: { socialProfile: { select: { username: true } }, profileStrategy: true } },
         syntheses: { orderBy: { createdAt: 'desc' }, take: 1 },
@@ -227,8 +223,8 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
     { preHandler: authenticate },
     async (request, reply) => {
       const { brandId } = request.params as { brandId: string };
-      const intelligence = await prisma.brandIntelligence.findUnique({
-        where: { brandId },
+      const intelligence = await prisma.brand.findUnique({
+        where: { id: brandId },
         select: { brandId: true, voicePrompt: true },
       });
       if (!intelligence) return reply.status(404).send({ error: 'Brand intelligence not found' });
@@ -252,7 +248,7 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
     const { workspaceId } = request.query as { workspaceId?: string };
     if (!workspaceId) return reply.status(400).send({ error: 'Missing workspaceId' });
 
-    const brands = await prisma.brandIntelligence.findMany({
+    const brands = await prisma.brand.findMany({
       where: { workspaceId },
       include: {
         targets: {
@@ -283,8 +279,8 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
 
       try {
         const data = schema.parse(request.body);
-        const updated = await prisma.brandIntelligence.update({
-          where: { brandId },
+        const updated = await prisma.brand.update({
+          where: { id: brandId },
           data,
         });
         return reply.send(updated);
@@ -303,12 +299,10 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
       const {
         brandId,
         usernames,
-        targetType,
-        profileStrategy,
+        monitoringType,
         isActive,
-        initialDownloadCount,
-        autoUpdate,
-      } = TargetCreateSchema.parse(request.body);
+        settings,
+      } = MonitorCreateSchema.parse(request.body);
 
       for (const username of usernames) {
         const profile = await prisma.socialProfile.upsert({
@@ -317,24 +311,19 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
           update: {},
         });
 
-        await prisma.socialProfileTarget.upsert({
+        await prisma.socialProfileMonitor.upsert({
           where: { brandId_socialProfileId: { brandId, socialProfileId: profile.id } },
           create: {
             brandId,
             socialProfileId: profile.id,
-            targetType,
-            profileStrategy: profileStrategy ?? null,
+            monitoringType,
             isActive,
-            initialDownloadCount: initialDownloadCount ?? null,
-            autoUpdate: autoUpdate ?? null,
+            settings: settings ?? null,
           },
           update: {
-            targetType,
-            profileStrategy: profileStrategy !== undefined ? profileStrategy : undefined,
+            monitoringType,
             isActive,
-            initialDownloadCount:
-              initialDownloadCount !== undefined ? initialDownloadCount : undefined,
-            autoUpdate: autoUpdate !== undefined ? autoUpdate : undefined,
+            settings: settings !== undefined ? settings : undefined,
           },
         });
       }
@@ -352,12 +341,12 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
     async (request, reply) => {
       const { brandId, username } = request.params as { brandId: string; username: string };
       try {
-        const data = TargetUpdateSchema.parse(request.body);
+        const data = MonitorUpdateSchema.parse(request.body);
         const profile = await prisma.socialProfile.findUnique({
           where: { platform_username: { platform: 'instagram', username } },
         });
         if (!profile) return reply.status(404).send({ error: 'SocialProfile not found' });
-        const target = await prisma.socialProfileTarget.update({
+        const target = await prisma.socialProfileMonitor.update({
           where: { brandId_socialProfileId: { brandId, socialProfileId: profile.id } },
           data,
         });
@@ -378,7 +367,7 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
       where: { platform_username: { platform: 'instagram', username } },
     });
     if (!profile) return reply.status(404).send({ error: 'SocialProfile not found' });
-    await prisma.socialProfileTarget.delete({
+    await prisma.socialProfileMonitor.delete({
       where: { brandId_socialProfileId: { brandId, socialProfileId: profile.id } },
     });
     return reply.send({ success: true });

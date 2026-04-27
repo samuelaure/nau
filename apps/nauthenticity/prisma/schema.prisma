@@ -12,7 +12,7 @@ datasource db {
 // ── Social Profiles ───────────────────────────────────────────────────────────
 // A SocialProfile is any external social media account we scrape/monitor.
 // platform: instagram | tiktok | youtube | ...
-// targetType on SocialProfileTarget captures the brand's purpose for tracking it.
+// ownerId: the Brand that owns/publishes to this profile (one brand per profile per platform)
 
 model SocialProfile {
   id              String    @id @default(uuid())
@@ -21,11 +21,16 @@ model SocialProfile {
   profileImageUrl String?
   lastScrapedAt   DateTime  @default(now())
 
+  // Ownership — the ONE brand that publishes to this profile
+  ownerId         String?
+  owner           Brand?    @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
   posts           Post[]
-  targets         SocialProfileTarget[]
+  monitors        SocialProfileMonitor[]
 
   @@unique([platform, username])
   @@index([platform, username])
+  @@index([ownerId])
 }
 
 // ── Scraped Content ───────────────────────────────────────────────────────────
@@ -146,10 +151,12 @@ model KnowledgeChunk {
   @@index([brandId])
 }
 
-// ── Brand Intelligence ────────────────────────────────────────────────────────
+// ── Brand ─────────────────────────────────────────────────────────────────────
+// Brand represents a brand's intelligence/configuration in nauthenticity.
+// id = flownau Brand.id (same as API Brand.id)
 
-model BrandIntelligence {
-  brandId           String   @id                       // = flownau Brand.id
+model Brand {
+  id                String   @id                       // = flownau Brand.id = API Brand.id
   workspaceId       String   @default("")
   mainUsername      String?
   voicePrompt       String
@@ -160,10 +167,11 @@ model BrandIntelligence {
   timezone          String   @default("UTC")
   inspoRequestCount Int      @default(0)
 
-  targets    SocialProfileTarget[]
-  syntheses  BrandSynthesis[]
-  feedbacks  CommentFeedback[]
-  inspoItems InspoItem[]
+  ownedProfiles  SocialProfile[]
+  monitors       SocialProfileMonitor[]
+  syntheses      BrandSynthesis[]
+  feedbacks      CommentFeedback[]
+  inspoItems     InspoItem[]
 
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -174,7 +182,7 @@ model BrandIntelligence {
 model BrandSynthesis {
   id           String   @id @default(uuid())
   brandId      String
-  brand        BrandIntelligence @relation(fields: [brandId], references: [brandId], onDelete: Cascade)
+  brand        Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
   type         String
   content      String   @db.Text
   attachedUrls Json     @default("[]")
@@ -184,34 +192,28 @@ model BrandSynthesis {
   @@index([brandId, type])
 }
 
-// A SocialProfileTarget links a Brand to a SocialProfile it wants to track.
-// targetType: "monitored" (comment generation) | "benchmark" (analytics) | "single_post"
-model SocialProfileTarget {
-  id                   String            @id @default(uuid())
-  brandId              String
-  brand                BrandIntelligence @relation(fields: [brandId], references: [brandId])
-  socialProfileId      String
-  socialProfile        SocialProfile     @relation(fields: [socialProfileId], references: [id])
-  profileStrategy      String?
-  targetType           String            @default("monitored")
-  isActive             Boolean           @default(true)
-  initialDownloadCount Int?              @default(20)
-  autoUpdate           Boolean?          @default(false)
+// A SocialProfileMonitor links a Brand to a SocialProfile it monitors.
+// monitoringType: "content" (comment generation) | "benchmark" (analytics) | "inspiration"
+model SocialProfileMonitor {
+  id              String        @id @default(uuid())
+  brandId         String
+  brand           Brand         @relation(fields: [brandId], references: [id])
+  socialProfileId String
+  socialProfile   SocialProfile @relation(fields: [socialProfileId], references: [id])
+  monitoringType  String        @default("content")
+  isActive        Boolean       @default(true)
+  settings        Json?
 
-  // Mark profile as owned by brand — should sync to flownau as publishing profile
-  isPublishingProfile  Boolean           @default(false)
-  syncedToFlownauAt    DateTime?         // Track when synced to flownau
-
-  createdAt            DateTime @default(now())
+  createdAt       DateTime @default(now())
 
   @@unique([brandId, socialProfileId])
-  @@index([brandId, targetType])
+  @@index([brandId])
 }
 
 model CommentFeedback {
   id          String   @id @default(uuid())
   brandId     String
-  brand       BrandIntelligence @relation(fields: [brandId], references: [brandId])
+  brand       Brand @relation(fields: [brandId], references: [id])
   postId      String
   post        Post     @relation(fields: [postId], references: [id])
   commentText String   @db.Text
@@ -227,7 +229,7 @@ model CommentFeedback {
 model InspoItem {
   id              String   @id @default(uuid())
   brandId         String
-  brand           BrandIntelligence @relation(fields: [brandId], references: [brandId], onDelete: Cascade)
+  brand           Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
   postId          String?
   post            Post?    @relation(fields: [postId], references: [id])
   sourceUrl       String?
