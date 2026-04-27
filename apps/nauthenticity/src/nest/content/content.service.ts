@@ -12,6 +12,26 @@ export class ContentService {
     private readonly config: ConfigService,
   ) {}
 
+  private sanitizeCollaborators(collaborators: any[] | null | undefined): any[] {
+    if (!Array.isArray(collaborators)) return [];
+    return collaborators
+      .map((c) => {
+        // Remove Instagram CDN URLs to prevent CORS errors
+        if (c.profilePicUrl && c.profilePicUrl.includes('cdninstagram.com')) {
+          return { ...c, profilePicUrl: null };
+        }
+        return c;
+      })
+      .filter((c) => c.username); // Keep only valid entries
+  }
+
+  private sanitizePostCollaborators(post: any): any {
+    return {
+      ...post,
+      collaborators: this.sanitizeCollaborators(post.collaborators),
+    };
+  }
+
   async listAccounts(page: number, limit: number) {
     const skip = (page - 1) * limit
     const [accounts, total] = await Promise.all([
@@ -37,7 +57,11 @@ export class ContentService {
       },
     })
     if (!account) throw new NotFoundException('SocialProfile not found')
-    return account
+    // Sanitize collaborators to remove Instagram CDN URLs
+    return {
+      ...account,
+      posts: account.posts.map((post) => this.sanitizePostCollaborators(post)),
+    }
   }
 
   async exportAccountTxt(username: string): Promise<string> {
