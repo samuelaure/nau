@@ -78,7 +78,17 @@ export class InspoService {
         orderBy: { createdAt: 'desc' },
         select: { content: true },
       })
-      ownedContentSynthesis = ownedSynthesis?.content ?? null
+      
+      if (ownedSynthesis) {
+        ownedContentSynthesis = ownedSynthesis.content
+      } else {
+        try {
+          const generated = await this.generateOwnedSynthesis(brandId)
+          ownedContentSynthesis = generated.content_summary
+        } catch (err) {
+          // Auto generation fallback failed, proceed with null
+        }
+      }
     }
 
     let finalContent = parts.join('\n')
