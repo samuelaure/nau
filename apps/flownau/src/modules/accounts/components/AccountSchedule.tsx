@@ -20,15 +20,22 @@ interface AccountScheduleProps {
   initialSchedule: PostSchedule | null
 }
 
-// ── Available formats ─────────────────────────────────────────────────────────
+// ── Format metadata ───────────────────────────────────────────────────────────
 
-const FORMATS = [
-  { id: 'reel', label: 'Reel' },
-  { id: 'head_talk', label: 'Head Talk' },
-  { id: 'carousel', label: 'Carousel' },
-] as const
+// Maps a template format to the scheduling formats it unlocks.
+// reel templates also enable trial_reel slots in the chain.
+const FORMAT_EXPANSIONS: Record<string, string[]> = {
+  reel: ['reel', 'trial_reel'],
+  head_talk: ['head_talk'],
+  carousel: ['carousel'],
+}
 
-type FormatId = (typeof FORMATS)[number]['id']
+const FORMAT_LABEL: Record<string, string> = {
+  reel: 'Reel',
+  trial_reel: 'Trial Reel',
+  head_talk: 'Head Talk',
+  carousel: 'Carousel',
+}
 
 // ── Chain builder: amounts per format → randomized chain ──────────────────────
 
@@ -73,6 +80,30 @@ export default function AccountSchedule({ brandId, initialSchedule }: AccountSch
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [availableFormats, setAvailableFormats] = useState<string[]>([])
+
+  // Fetch enabled template formats, then expand to scheduling formats
+  useEffect(() => {
+    fetch(`/api/account-templates?brandId=${brandId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const templateFormats = new Set<string>(
+          (data.templates ?? [])
+            .filter((t: { brandConfigs?: Array<{ enabled: boolean }> }) => t.brandConfigs?.[0]?.enabled)
+            .map((t: { format: string }) => t.format),
+        )
+        const formats: string[] = []
+        for (const [templateFmt, expanded] of Object.entries(FORMAT_EXPANSIONS)) {
+          if (templateFormats.has(templateFmt)) {
+            for (const f of expanded) {
+              if (!formats.includes(f)) formats.push(f)
+            }
+          }
+        }
+        setAvailableFormats(formats)
+      })
+      .catch(() => setAvailableFormats([]))
+  }, [brandId])
 
   // Schedule fields
   const [isActive, setIsActive] = useState(initialSchedule?.isActive ?? true)
@@ -162,9 +193,10 @@ export default function AccountSchedule({ brandId, initialSchedule }: AccountSch
 
   // ── Format label helpers ──────────────────────────────────────────────────────
 
-  const formatLabel = (f: string) => FORMATS.find((fmt) => fmt.id === f)?.label ?? f
+  const formatLabel = (f: string) => FORMAT_LABEL[f] ?? f
   const formatColor: Record<string, string> = {
     reel: 'bg-accent/20 text-accent border-accent/30',
+    trial_reel: 'bg-accent/10 text-accent/70 border-accent/20',
     head_talk: 'bg-violet-500/20 text-violet-300 border-violet-500/30',
     carousel: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
   }
@@ -255,10 +287,15 @@ export default function AccountSchedule({ brandId, initialSchedule }: AccountSch
         </p>
 
         {/* Amounts per format */}
+        {availableFormats.length === 0 && (
+          <p className="text-sm text-amber-400/80">
+            No enabled templates found. Install templates first to build a format chain.
+          </p>
+        )}
         <div className="flex flex-wrap gap-4">
-          {FORMATS.map(({ id, label }) => (
+          {availableFormats.map((id) => (
             <div key={id} className="flex flex-col gap-1.5">
-              <label className="text-xs text-text-secondary">{label}</label>
+              <label className="text-xs text-text-secondary">{FORMAT_LABEL[id] ?? id}</label>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handleAmountChange(id, (amounts[id] ?? 0) - 1)}

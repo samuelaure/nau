@@ -4,25 +4,16 @@ import { logger } from '@/modules/shared/logger'
 import { materializeSlots } from './slot-materializer'
 import { composeDraft } from '@/modules/composer/draft-composer'
 import { HeadTalkCreativeSchema } from '@/modules/composer/head-talk-composer'
-import { z } from 'zod'
+import { CreativeDirectionSchema } from '@/types/scenes'
 
-// ─── Shared reel creative schema (minimal — enough for scheduling) ────────────
-const ReelCreativeSchema = z.object({
-  scenes: z.array(z.any()),
-  caption: z.string(),
-  hashtags: z.array(z.string()),
-  coverSceneIndex: z.number().optional(),
-  audioMood: z.string().optional(),
-})
-
-function schemaForFormat(format: string): z.ZodTypeAny {
+function schemaForFormat(format: string) {
   if (format === 'head_talk') return HeadTalkCreativeSchema
-  return ReelCreativeSchema
+  return CreativeDirectionSchema
 }
 
 function schemaNameForFormat(format: string): string {
   if (format === 'head_talk') return 'HeadTalkCreative'
-  return 'ReelCreative'
+  return 'CreativeDirection'
 }
 
 // ─── Main entry point ─────────────────────────────────────────────────────────

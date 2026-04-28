@@ -212,59 +212,6 @@ Engineer for this. Not for likes. Likes are a lagging indicator of resonance.
     },
   },
 
-  // ─── Reel: Storytelling Arc ───────────────────────────────────────────────
-  {
-    name: 'Reel — Storytelling Arc',
-    format: 'reel',
-    remotionId: 'story-reel',
-    sceneType: 'reel',
-    scope: 'system',
-    systemPrompt: `Use a three-act narrative arc: hook (create tension or curiosity) → insight (a powerful quote or turning point) → resolution (the takeaway) → CTA (invite the viewer in). Prioritize emotional resonance over information density. The quote-card is the emotional centerpiece — make it powerful, memorable, and attributable if possible. B-roll should be atmospheric and mood-driven. Aim for 4-5 scenes. The viewer should feel something, not just learn something.`,
-    contentSchema: {
-      format: 'reel',
-      totalScenes: '4-5',
-      structure: [
-        {
-          position: 1,
-          type: 'hook-text',
-          purpose: 'Open a loop — create tension or curiosity',
-          guidance:
-            'A provocative question, a counter-intuitive statement, or a "most people think X but..." setup. Max 80 chars.',
-        },
-        {
-          position: 2,
-          type: 'text-over-media',
-          purpose: 'Establish the stakes or context',
-          guidance:
-            'Describe the tension or problem in one sentence. B-roll mood: atmospheric, emotional, relevant. Max 150 chars.',
-        },
-        {
-          position: 3,
-          type: 'quote-card',
-          purpose: 'The emotional turning point',
-          guidance:
-            'A powerful insight, truth, or reframe expressed as a quote. If attributable, include attribution. This is the scene viewers screenshot. Max 200 chars.',
-        },
-        {
-          position: 4,
-          type: 'text-over-media',
-          purpose: 'Deliver the resolution or takeaway',
-          guidance:
-            'Close the loop opened by the hook. One clear, actionable or inspiring sentence. Max 150 chars.',
-        },
-        {
-          position: 'last',
-          type: 'cta-card',
-          purpose: 'Invite engagement',
-          guidance:
-            'Drive a comment or share — "Does this resonate?", "Share with someone who needs this". Max 60 chars.',
-        },
-      ],
-      captionStyle:
-        'Narrative paragraph in first or second person — tell a story, not a list. End with an open question to drive comments.',
-      hashtagCount: '8-12 hashtags — emotional/topic mix',
-    },
-  },
 ]
 
 // ─── SEED FUNCTIONS ───────────────────────────────────────────────────────────
@@ -274,7 +221,20 @@ Engineer for this. Not for likes. Likes are a lagging indicator of resonance.
  * These are available to all brands via BrandTemplateConfig.
  * Safe to re-run — upserts on (name, scope).
  */
+// Names of system templates that have been removed — delete them on next seed run
+const REMOVED_TEMPLATE_NAMES = ['Reel — Storytelling Arc']
+
 export async function seedSystemTemplates(prisma: PrismaClient): Promise<void> {
+  // Remove any retired system templates
+  for (const name of REMOVED_TEMPLATE_NAMES) {
+    const stale = await prisma.template.findFirst({ where: { name, scope: 'system' } })
+    if (stale) {
+      await prisma.brandTemplateConfig.deleteMany({ where: { templateId: stale.id } })
+      await prisma.template.delete({ where: { id: stale.id } })
+      console.log(`  ✗ Removed retired system template: "${name}"`)
+    }
+  }
+
   for (const t of SYSTEM_TEMPLATES) {
     await prisma.template.upsert({
       where: {

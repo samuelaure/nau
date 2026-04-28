@@ -7,8 +7,16 @@ import { prisma } from '@/modules/shared/prisma'
 import { storage } from '@/modules/shared/r2'
 import { flownau } from 'nau-storage'
 import { selectAssetsForCreative } from '@/modules/composer/asset-curator'
+import { compileTimeline } from '@/modules/composer/timeline-compiler'
 import { logger, logError } from '@/modules/shared/logger'
 import { redisConnection, type RenderJobData } from './render-queue'
+import type { CreativeDirection, BrandStyle } from '@/types/scenes'
+
+const DEFAULT_BRAND_STYLE: BrandStyle = {
+  primaryColor: '#6C63FF',
+  accentColor: '#FF6584',
+  fontFamily: 'sans-serif',
+}
 
 const CONCURRENCY = parseInt(process.env.RENDER_CONCURRENCY || '1', 10)
 const OUTPUT_DIR = path.join(process.cwd(), 'out')
@@ -51,25 +59,9 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
     },
   })
 
-  const payload = post.payload as Record<string, unknown>
-
-  if (job.attemptsMade > 0 && post.creative) {
-    logger.info(`[RenderWorker] Retry attempt ${job.attemptsMade + 1} — re-selecting assets`)
-    try {
-      const creative = post.creative as Record<string, unknown>
-      const { sceneAssets } = await selectAssetsForCreative(
-        creative as Parameters<typeof selectAssetsForCreative>[0],
-        post.brandId,
-        30,
-      )
-      logger.info(`[RenderWorker] Re-selected ${sceneAssets.size} assets for retry`)
-    } catch (retryErr) {
-      logError('[RenderWorker] Asset re-selection failed, proceeding with original assets', retryErr)
-    }
-  }
-
   await job.updateProgress(10)
 
+  // ── Passthrough: user-managed formats (head_talk, replicate) ──────────────────
   const USER_MANAGED_FORMATS = new Set(['head_talk', 'replicate'])
   if (USER_MANAGED_FORMATS.has(post.format ?? '') && post.userUploadedMediaUrl) {
     const renderTimeMs = Date.now() - startTime
@@ -89,6 +81,42 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
   const format = post.format || 'reel'
   const isVideo = format === 'reel' || format === 'trial_reel'
   const remotionCompId = isVideo ? 'SceneSequence' : 'DynamicTemplateMaster'
+  const brandId = post.brandId
+
+  // ── Build Remotion inputProps ─────────────────────────────────────────────────
+  let inputProps: Record<string, unknown>
+
+  if (isVideo) {
+    // Reel: resolve assets + compile timeline from Post.creative (CreativeDirection)
+    const creative = post.creative as CreativeDirection | null
+    if (!creative || !creative.scenes || creative.scenes.length === 0) {
+      throw new Error(`Post ${postId} has no creative direction — cannot render reel`)
+    }
+
+    logger.info(`[RenderWorker] Curating assets for ${creative.scenes.length} scenes...`)
+    const { sceneAssets, audioAsset } = await selectAssetsForCreative(creative, brandId, 30)
+    logger.info(`[RenderWorker] Assets: ${sceneAssets.size} scene assets, audio: ${!!audioAsset}`)
+
+    const { resolvedScenes, audio } = compileTimeline(
+      creative,
+      sceneAssets,
+      audioAsset,
+      DEFAULT_BRAND_STYLE,
+      format as 'reel' | 'trial_reel',
+    )
+
+    inputProps = {
+      scenes: resolvedScenes,
+      audio: audio ?? null,
+      brandStyle: DEFAULT_BRAND_STYLE,
+      handle: post.brand?.shortCode ? `@${post.brand.shortCode}` : undefined,
+    }
+  } else {
+    // Legacy: pass payload directly to DynamicTemplateMaster
+    inputProps = { schema: post.payload as Record<string, unknown> }
+  }
+
+  await job.updateProgress(20)
 
   ensureOutputDir()
 
@@ -102,13 +130,11 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
       },
     }),
   })
-  await job.updateProgress(30)
+  await job.updateProgress(35)
 
-  const comps = await getCompositions(bundleLocation, { inputProps: { schema: payload } })
+  const comps = await getCompositions(bundleLocation, { inputProps })
   const remotionComp = comps.find((c) => c.id === remotionCompId)
   if (!remotionComp) throw new Error(`Remotion composition '${remotionCompId}' not found in bundle`)
-
-  const brandId = post.brandId
 
   if (isVideo) {
     const outputPath = path.join(OUTPUT_DIR, `render-${postId}.mp4`)
@@ -118,11 +144,11 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
       composition: remotionComp,
       serveUrl: bundleLocation,
       outputLocation: outputPath,
-      inputProps: { schema: payload },
+      inputProps,
       codec: 'h264',
       concurrency: CONCURRENCY,
       jpegQuality: 80,
-      onProgress: ({ progress }) => { job.updateProgress(30 + Math.round(progress * 50)).catch(() => {}) },
+      onProgress: ({ progress }) => { job.updateProgress(35 + Math.round(progress * 45)).catch(() => {}) },
     })
 
     await job.updateProgress(80)
@@ -135,38 +161,35 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
 
     await job.updateProgress(90)
 
+    // Extract cover frame from the resolved scenes
     let coverUrl: string | null = null
-    const creative = post.creative as Record<string, unknown> | null
+    const scenes = inputProps.scenes as Array<{ startFrame: number; durationInFrames: number }> | undefined
+    const creative = post.creative as { coverSceneIndex?: number } | null
+    const coverIdx = creative?.coverSceneIndex ?? 0
 
-    if (creative && typeof creative === 'object') {
-      const coverIdx = (creative as { coverSceneIndex?: number }).coverSceneIndex ?? 0
-      const scenes = (payload as { scenes?: unknown[] }).scenes
-      const totalFrames = remotionComp.durationInFrames
+    let coverFrame = 0
+    if (scenes && coverIdx < scenes.length) {
+      const s = scenes[coverIdx]
+      coverFrame = s.startFrame + Math.floor(s.durationInFrames / 2)
+    }
+    coverFrame = Math.min(coverFrame, remotionComp.durationInFrames - 1)
 
-      let coverFrame = 0
-      if (scenes && Array.isArray(scenes) && coverIdx < scenes.length) {
-        const scene = scenes[coverIdx] as { startFrame?: number; durationInFrames?: number }
-        coverFrame = (scene.startFrame ?? 0) + Math.floor((scene.durationInFrames ?? 30) / 2)
-      }
-      coverFrame = Math.min(coverFrame, totalFrames - 1)
-
-      const coverPath = path.join(OUTPUT_DIR, `cover-${postId}.jpg`)
-      try {
-        await renderStill({
-          composition: remotionComp,
-          serveUrl: bundleLocation,
-          output: coverPath,
-          inputProps: { schema: payload },
-          frame: coverFrame,
-          imageFormat: 'jpeg',
-          jpegQuality: 85,
-        })
-        const coverR2Key = flownau.renderCover(brandId, postId)
-        coverUrl = await storage.upload(coverR2Key, fs.createReadStream(coverPath), { mimeType: 'image/jpeg' })
-        cleanupFile(coverPath)
-      } catch (coverErr) {
-        logError('[RenderWorker] Cover extraction failed, proceeding without cover', coverErr)
-      }
+    const coverPath = path.join(OUTPUT_DIR, `cover-${postId}.jpg`)
+    try {
+      await renderStill({
+        composition: remotionComp,
+        serveUrl: bundleLocation,
+        output: coverPath,
+        inputProps,
+        frame: coverFrame,
+        imageFormat: 'jpeg',
+        jpegQuality: 85,
+      })
+      const coverR2Key = flownau.renderCover(brandId, postId)
+      coverUrl = await storage.upload(coverR2Key, fs.createReadStream(coverPath), { mimeType: 'image/jpeg' })
+      cleanupFile(coverPath)
+    } catch (coverErr) {
+      logError('[RenderWorker] Cover extraction failed, proceeding without cover', coverErr)
     }
 
     await job.updateProgress(95)
@@ -190,7 +213,7 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
       composition: remotionComp,
       serveUrl: bundleLocation,
       output: outputPath,
-      inputProps: { schema: payload },
+      inputProps,
       frame: 0,
       imageFormat: 'png',
     })
