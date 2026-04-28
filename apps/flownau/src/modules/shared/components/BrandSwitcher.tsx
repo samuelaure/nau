@@ -8,11 +8,9 @@ import {
   Globe,
   Calendar,
   Lightbulb,
-  Layers,
   FileText,
   Users,
   Image,
-  Video,
 } from 'lucide-react'
 
 type NauBrand = { id: string; name: string }
@@ -22,8 +20,6 @@ const BRAND_NAV = [
   { id: 'calendar', label: 'Calendar', icon: Calendar },
   { id: 'ideas', label: 'Ideas', icon: Lightbulb },
   { id: 'templates', label: 'Templates', icon: FileText },
-  { id: 'pool', label: 'Pool', icon: Layers },
-  { id: 'compositions', label: 'Compositions', icon: Video },
   { id: 'profiles', label: 'Profiles', icon: Users },
   { id: 'assets', label: 'Assets', icon: Image },
 ] as const
