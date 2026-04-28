@@ -30,6 +30,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     await checkBrandAccess(post.brandId)
 
     const {
+      slotId,
       status,
       ideaText,
       format,
@@ -79,6 +80,14 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         ...(userUploadedMediaUrl !== undefined && { userUploadedMediaUrl }),
       },
     })
+
+    // If dropped onto a specific empty slot, mark it filled
+    if (slotId) {
+      await prisma.postSlot.update({
+        where: { id: slotId },
+        data: { status: 'filled', postId: params.id },
+      })
+    }
 
     return NextResponse.json({ post: updated })
   } catch (error) {

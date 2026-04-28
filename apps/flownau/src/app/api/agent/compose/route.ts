@@ -35,7 +35,7 @@ export async function POST(req: Request) {
       )
     }
 
-    const { prompt, brandId, format, postId, personaId, templateId } = parsed.data
+    const { prompt, brandId, format: requestedFormat, postId, personaId, templateId } = parsed.data
 
     // Rate limit: 10 compose requests per minute per account
     const rateLimit = await checkRateLimit({
@@ -55,9 +55,51 @@ export async function POST(req: Request) {
 
     await checkBrandAccess(brandId)
 
-    // Resolve templateId: explicit > from existing post > none
+    // ── Slot-aware format + template resolution ───────────────────────────────
+    // If templateId is given: format = template's format, find next slot of that format.
+    // If no templateId: find next empty slot (any format), derive format from slot,
+    //   then pick a random enabled template for that format.
+    // If no slot found for chosen format: post remains unscheduled (ok).
+
+    let format = requestedFormat
+    let targetSlotId: string | null = null
+    let targetSlotScheduledAt: Date | null = null
+
+    // Get template's format if templateId is explicit
+    const templateFormat = templateId
+      ? (await prisma.template.findUnique({ where: { id: templateId }, select: { format: true } }))?.format ?? null
+      : null
+
+    if (templateId && templateFormat) {
+      // Find next empty slot of the template's format
+      const slot = await prisma.postSlot.findFirst({
+        where: { brandId, status: 'empty', format: templateFormat, scheduledAt: { gt: new Date() } },
+        orderBy: { scheduledAt: 'asc' },
+      })
+      if (slot) { targetSlotId = slot.id; targetSlotScheduledAt = slot.scheduledAt; format = templateFormat as typeof format }
+    } else if (!templateId) {
+      // Auto mode: find next empty slot of any format
+      const slot = await prisma.postSlot.findFirst({
+        where: { brandId, status: 'empty', scheduledAt: { gt: new Date() } },
+        orderBy: { scheduledAt: 'asc' },
+      })
+      if (slot) {
+        targetSlotId = slot.id
+        targetSlotScheduledAt = slot.scheduledAt
+        format = slot.format as typeof format
+      }
+    }
+
+    // Resolve templateId: explicit > auto-pick for slot format > from existing post > none
     const resolvedTemplateId =
       templateId ??
+      (targetSlotId && !templateId
+        ? (await prisma.brandTemplateConfig.findFirst({
+            where: { brandId, enabled: true, template: { format } },
+            include: { template: { select: { id: true } } },
+            orderBy: { updatedAt: 'desc' },
+          }))?.template.id ?? undefined
+        : undefined) ??
       (postId
         ? (await prisma.post.findUnique({ where: { id: postId }, select: { templateId: true } }))
             ?.templateId ?? undefined
@@ -175,6 +217,20 @@ export async function POST(req: Request) {
       logger.info(
         `[DashboardCompose] Updated post ${updatedPost.id} (${creative.scenes.length} scenes)`,
       )
+    }
+
+    // Assign to slot if one was resolved
+    if (targetSlotId && targetSlotScheduledAt && updatedPost) {
+      await prisma.post.update({
+        where: { id: updatedPost.id },
+        data: { scheduledAt: targetSlotScheduledAt },
+      })
+      await prisma.postSlot.update({
+        where: { id: targetSlotId },
+        data: { status: 'filled', postId: updatedPost.id },
+      })
+      updatedPost = { ...updatedPost, scheduledAt: targetSlotScheduledAt }
+      logger.info({ postId: updatedPost.id, slotId: targetSlotId }, '[COMPOSE] Post assigned to slot')
     }
 
     return NextResponse.json({ post: updatedPost }, { status: 200 })
