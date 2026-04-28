@@ -67,6 +67,18 @@ export class InspoController {
     return this.inspoService.digest(brandId)
   }
 
+  @Get('brands/:brandId/owned-synthesis/latest')
+  @UseGuards(JwtAuthGuard)
+  getLatestOwnedSynthesis(@Param('brandId') brandId: string) {
+    return this.inspoService.getLatestOwnedSynthesis(brandId)
+  }
+
+  @Post('brands/:brandId/owned-synthesis')
+  @UseGuards(JwtAuthGuard)
+  generateOwnedSynthesis(@Param('brandId') brandId: string) {
+    return this.inspoService.generateOwnedSynthesis(brandId)
+  }
+
   @Post('repost')
   @UseGuards(JwtAuthGuard)
   repost(@Body() body: { brandId?: string; postUrl?: string }) {
@@ -97,6 +109,18 @@ export class InspoController {
   @UseGuards(ServiceAuthGuard)
   digestByService(@Param('brandId') brandId: string) {
     return this.inspoService.digest(brandId)
+  }
+
+  @Get('_service/brands/:brandId/owned-synthesis/latest')
+  @UseGuards(ServiceAuthGuard)
+  getLatestOwnedSynthesisByService(@Param('brandId') brandId: string) {
+    return this.inspoService.getLatestOwnedSynthesis(brandId)
+  }
+
+  @Post('_service/brands/:brandId/owned-synthesis')
+  @UseGuards(ServiceAuthGuard)
+  generateOwnedSynthesisByService(@Param('brandId') brandId: string) {
+    return this.inspoService.generateOwnedSynthesis(brandId)
   }
 
   @Patch('_service/brands/:brandId/inspo/:id')

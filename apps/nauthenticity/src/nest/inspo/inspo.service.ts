@@ -1,7 +1,17 @@
-import { Injectable, NotFoundException, BadGatewayException } from '@nestjs/common'
+import { Injectable, NotFoundException, BadGatewayException, UnprocessableEntityException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
 import { CreateInspoItemDto, UpdateInspoItemDto } from './inspo.dto'
+import { getClientForFeature, reportUsage } from '@nau/llm-client'
+import { z } from 'zod'
+
+const SynthesisOutputSchema = z.object({
+  content: z.string(),
+  attachedUrls: z.array(z.string()),
+  reasoning: z.string(),
+})
+
+const DEFAULT_OWNED_POST_LIMIT = 20
 
 @Injectable()
 export class InspoService {
@@ -39,9 +49,9 @@ export class InspoService {
     await this.prisma.inspoItem.delete({ where: { id } })
   }
 
-  async digest(brandId: string): Promise<{ content: string; attachedUrls: string[] }> {
+  async digest(brandId: string): Promise<{ content: string; attachedUrls: string[]; ownedContentSynthesis?: string | null }> {
     const items = await this.prisma.inspoItem.findMany({
-      where: { id: brandId },
+      where: { brandId },
       orderBy: { createdAt: 'desc' },
       take: 50,
     })
@@ -55,7 +65,22 @@ export class InspoService {
       if (item.sourceUrl) attachedUrls.push(item.sourceUrl)
     }
 
-    return { content: parts.join('\n'), attachedUrls }
+    const hasInspoBaseSynthesis = await this.prisma.brandSynthesis.findFirst({
+      where: { brandId, type: { in: ['recent', 'global'] } },
+      select: { id: true },
+    })
+
+    let ownedContentSynthesis: string | null = null
+    if (!hasInspoBaseSynthesis) {
+      const ownedSynthesis = await this.prisma.brandSynthesis.findFirst({
+        where: { brandId, type: 'owned_content' },
+        orderBy: { createdAt: 'desc' },
+        select: { content: true },
+      })
+      ownedContentSynthesis = ownedSynthesis?.content ?? null
+    }
+
+    return { content: parts.join('\n'), attachedUrls, ownedContentSynthesis }
   }
 
   async repost(brandId: string, postUrl: string) {
@@ -83,6 +108,122 @@ export class InspoService {
     }
 
     return { success: true, message: 'Repost forwarded to flownaŭ' }
+  }
+
+  async getLatestOwnedSynthesis(brandId: string) {
+    const brand = await this.prisma.brand.findUnique({ where: { id: brandId } })
+    if (!brand) throw new NotFoundException('Brand not found')
+
+    return this.prisma.brandSynthesis.findFirst({
+      where: { brandId, type: 'owned_content' },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, content: true, attachedUrls: true, createdAt: true },
+    })
+  }
+
+  async generateOwnedSynthesis(brandId: string) {
+    const brand = await this.prisma.brand.findUnique({
+      where: { id: brandId },
+      include: { ownedProfiles: { select: { id: true } } },
+    })
+    if (!brand) throw new NotFoundException('Brand not found')
+
+    const profileIds = brand.ownedProfiles.map((p) => p.id)
+    if (profileIds.length === 0) {
+      throw new UnprocessableEntityException('No owned profiles assigned to this brand.')
+    }
+
+    const posts = await this.prisma.post.findMany({
+      where: { socialProfileId: { in: profileIds } },
+      select: { url: true, caption: true, postedAt: true },
+      orderBy: { postedAt: 'desc' },
+      take: DEFAULT_OWNED_POST_LIMIT,
+    })
+
+    if (posts.length === 0) {
+      throw new UnprocessableEntityException('No posts found for the owned profiles. Scrape them first.')
+    }
+
+    const systemPrompt = `Eres un estratega de marca experto. Se te proporcionan publicaciones reales de una marca en redes sociales.
+Tu tarea: responder a la pregunta "¿De qué trata esta marca?" generando una síntesis clara, profunda y accionable.
+
+La síntesis debe:
+- Identificar los temas recurrentes, el tono y los valores visibles en las publicaciones.
+- Describir la personalidad de la marca tal como se expresa en su contenido real.
+- Ser útil como contexto creativo para generar nuevas ideas de contenido.
+- Estar escrita en español, en un párrafo rico de 150 a 300 palabras.
+
+Devuelve un JSON con los campos:
+- "content": la síntesis en texto.
+- "attachedUrls": lista de URLs de las publicaciones que más influyeron (vacía si no hay URLs).
+- "reasoning": breve explicación de los temas detectados.`
+
+    const postsText = posts
+      .map((p, i) => {
+        let entry = `### Publicación ${i + 1}`
+        if (p.url) entry += `\nURL: ${p.url}`
+        if (p.caption) entry += `\nCaption: ${p.caption.slice(0, 400)}`
+        return entry
+      })
+      .join('\n\n')
+
+    const userContent = `## ADN DE MARCA\n${brand.voicePrompt}\n\n## PUBLICACIONES PROPIAS (${posts.length} más recientes)\n${postsText}\n\nResponde: ¿De qué trata esta marca?`
+
+    const { client, model, provider } = getClientForFeature('synthesis')
+
+    const result = await client.chatCompletion({
+      model,
+      temperature: 0.7,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userContent },
+      ],
+      responseFormat: { type: 'json_object' },
+    })
+
+    const apiURL = this.config.get<string>('NAU_API_URL')
+    const authSecret = this.config.get<string>('AUTH_SECRET')
+
+    if (apiURL && authSecret) {
+      const { signServiceToken } = await import('@nau/auth')
+      signServiceToken({ secret: authSecret, iss: 'nauthenticity', aud: 'api' })
+        .then((token) => {
+          reportUsage({
+            apiUrl: apiURL,
+            serviceToken: token,
+            workspaceId: brand.workspaceId || '',
+            brandId,
+            service: 'nauthenticity',
+            operation: 'chat_completion',
+            usage: result.usage,
+          })
+        })
+        .catch(() => {})
+    }
+
+    let parsed: any
+    try {
+      parsed = JSON.parse(result.content)
+      const validated = SynthesisOutputSchema.parse(parsed)
+      
+      const saved = await this.prisma.brandSynthesis.create({
+        data: {
+          brandId,
+          type: 'owned_content',
+          content: validated.content,
+          attachedUrls: validated.attachedUrls,
+        }
+      })
+
+      return {
+        id: saved.id,
+        content: saved.content,
+        attachedUrls: saved.attachedUrls,
+        createdAt: saved.createdAt,
+      }
+    } catch (err) {
+      throw new BadGatewayException('LLM response was not valid JSON.')
+    }
   }
 
   private async assertOwnership(id: string, brandId: string) {
