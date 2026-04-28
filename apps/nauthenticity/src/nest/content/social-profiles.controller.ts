@@ -139,4 +139,15 @@ export class SocialProfilesController {
       errors: errors.length > 0 ? errors : undefined,
     }
   }
+
+  /**
+   * GET /brands/:brandId/owned-profiles
+   * Get all owned social profiles for a brand
+   */
+  @Get('brands/:brandId/owned-profiles')
+  async getOwnedProfiles(@Param('brandId') brandId: string) {
+    return this.prisma.socialProfile.findMany({
+      where: { ownerId: brandId },
+    })
+  }
 }

@@ -11,8 +11,8 @@ export const BrandOwnedView = () => {
   const { data: profiles, isLoading } = useQuery({
     queryKey: ['owned-profiles', brandId],
     queryFn: async () => {
-      const { data } = await api.get(`/targets?brandId=${brandId}`);
-      return data.filter((t: any) => t.socialProfile?.ownerId === brandId);
+      const { data } = await api.get(`/brands/${brandId}/owned-profiles`);
+      return data;
     },
     enabled: !!brandId,
   });
