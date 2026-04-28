@@ -6,7 +6,8 @@ import { getClientForFeature, reportUsage } from '@nau/llm-client'
 import { z } from 'zod'
 
 const SynthesisOutputSchema = z.object({
-  content: z.string(),
+  content_summary: z.string(),
+  brand_voice: z.string(),
   attachedUrls: z.array(z.string()),
   reasoning: z.string(),
 })
@@ -126,6 +127,17 @@ export class InspoService {
     })
   }
 
+  async getLatestOwnedVoice(brandId: string) {
+    const brand = await this.prisma.brand.findUnique({ where: { id: brandId } })
+    if (!brand) throw new NotFoundException('Brand not found')
+
+    return this.prisma.brandSynthesis.findFirst({
+      where: { brandId, type: 'owned_voice' },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, content: true, attachedUrls: true, createdAt: true },
+    })
+  }
+
   async generateOwnedSynthesis(brandId: string) {
     const brand = await this.prisma.brand.findUnique({
       where: { id: brandId },
@@ -149,23 +161,21 @@ export class InspoService {
       throw new UnprocessableEntityException('No posts found for the owned profiles. Scrape them first.')
     }
 
-    const systemPrompt = `Eres un estratega de contenido experto. Se te proporcionan publicaciones reales de redes sociales.
-Tu tarea: extraer y presentar directamente los temas de contenido abordados en las publicaciones.
+    const systemPrompt = `Eres un estratega de contenido y director creativo experto. Se te proporcionan publicaciones reales de redes sociales.
+Tu tarea consiste en dos cosas:
+1. Extraer y presentar directamente los temas de contenido abordados en las publicaciones.
+2. Extraer y definir el tono y la voz de marca utilizados en las publicaciones.
 
-CRÍTICO: Está terminantemente PROHIBIDO usar lenguaje interpretativo, introducciones o contexto (NO uses "La marca se centra en", "Los temas abordados incluyen", "El contenido habla de", "Se observa un tono", "Estas publicaciones tratan de", "Las publicaciones abordan").
+CRÍTICO para el resumen de contenido (content_summary): Está terminantemente PROHIBIDO usar lenguaje interpretativo, introducciones o contexto (NO uses "La marca se centra en", "Los temas abordados incluyen", "El contenido habla de", "Se observa un tono", "Estas publicaciones tratan de", "Las publicaciones abordan"). Comienza INMEDIATAMENTE con los conceptos y temas de forma directa y cruda.
 
-Comienza INMEDIATAMENTE con los conceptos y temas de forma directa y cruda. 
-
-EJEMPLO DE INICIO CORRECTO:
+EJEMPLO DE INICIO CORRECTO para content_summary:
 "El Diseño Humano aplicado a la crianza consciente. Estrategias de comunicación familiar personalizadas basadas en el tipo energético..."
 
-El texto debe:
-- Presentar directamente los conceptos, ideas y temas recurrentes tratados en las publicaciones.
-- Ser útil directamente como temática para la generación de nuevo contenido.
-- Estar escrito en español, en un párrafo continuo y rico de 150 a 300 palabras.
+CRÍTICO para la voz de marca (brand_voice): Define directamente las pautas del tono, adjetivos de personalidad y estilo lingüístico que se desprenden de las publicaciones de forma accionable para replicar la voz.
 
 Devuelve un JSON con los campos:
-- "content": la síntesis directa del contenido.
+- "content_summary": la síntesis directa del contenido (en español, de 150 a 300 palabras).
+- "brand_voice": la pauta del tono y voz de la marca (en español, de 100 a 200 palabras).
 - "attachedUrls": lista de URLs de las publicaciones que más influyeron (vacía si no hay URLs).
 - "reasoning": breve explicación de los temas detectados.`
 
@@ -217,20 +227,31 @@ Devuelve un JSON con los campos:
       parsed = JSON.parse(result.content)
       const validated = SynthesisOutputSchema.parse(parsed)
       
-      const saved = await this.prisma.brandSynthesis.create({
-        data: {
-          brandId,
-          type: 'owned_content',
-          content: validated.content,
-          attachedUrls: validated.attachedUrls,
-        }
-      })
+      const [savedContent, savedVoice] = await Promise.all([
+        this.prisma.brandSynthesis.create({
+          data: {
+            brandId,
+            type: 'owned_content',
+            content: validated.content_summary,
+            attachedUrls: validated.attachedUrls,
+          }
+        }),
+        this.prisma.brandSynthesis.create({
+          data: {
+            brandId,
+            type: 'owned_voice',
+            content: validated.brand_voice,
+            attachedUrls: validated.attachedUrls,
+          }
+        })
+      ])
 
       return {
-        id: saved.id,
-        content: saved.content,
-        attachedUrls: saved.attachedUrls,
-        createdAt: saved.createdAt,
+        id: savedContent.id,
+        content_summary: savedContent.content,
+        brand_voice: savedVoice.content,
+        attachedUrls: savedContent.attachedUrls,
+        createdAt: savedContent.createdAt,
       }
     } catch (err) {
       throw new BadGatewayException('LLM response was not valid JSON.')

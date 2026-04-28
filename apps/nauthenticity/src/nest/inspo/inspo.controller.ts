@@ -73,6 +73,12 @@ export class InspoController {
     return this.inspoService.getLatestOwnedSynthesis(brandId)
   }
 
+  @Get('brands/:brandId/owned-voice/latest')
+  @UseGuards(JwtAuthGuard)
+  getLatestOwnedVoice(@Param('brandId') brandId: string) {
+    return this.inspoService.getLatestOwnedVoice(brandId)
+  }
+
   @Post('brands/:brandId/owned-synthesis')
   @UseGuards(JwtAuthGuard)
   generateOwnedSynthesis(@Param('brandId') brandId: string) {
@@ -115,6 +121,12 @@ export class InspoController {
   @UseGuards(ServiceAuthGuard)
   getLatestOwnedSynthesisByService(@Param('brandId') brandId: string) {
     return this.inspoService.getLatestOwnedSynthesis(brandId)
+  }
+
+  @Get('_service/brands/:brandId/owned-voice/latest')
+  @UseGuards(ServiceAuthGuard)
+  getLatestOwnedVoiceByService(@Param('brandId') brandId: string) {
+    return this.inspoService.getLatestOwnedVoice(brandId)
   }
 
   @Post('_service/brands/:brandId/owned-synthesis')
