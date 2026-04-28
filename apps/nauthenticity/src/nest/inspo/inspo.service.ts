@@ -145,16 +145,16 @@ export class InspoService {
     }
 
     const systemPrompt = `Eres un estratega de marca experto. Se te proporcionan publicaciones reales de una marca en redes sociales.
-Tu tarea: responder a la pregunta "¿De qué trata esta marca?" generando una síntesis clara, profunda y accionable.
+Tu tarea: generar un resumen claro, profundo y accionable del contenido de la marca basándote en sus publicaciones.
 
-La síntesis debe:
+El resumen debe:
 - Identificar los temas recurrentes, el tono y los valores visibles en las publicaciones.
-- Describir la personalidad de la marca tal como se expresa en su contenido real.
+- Describir de qué habla la marca tal como se expresa en su contenido real.
 - Ser útil como contexto creativo para generar nuevas ideas de contenido.
 - Estar escrita en español, en un párrafo rico de 150 a 300 palabras.
 
 Devuelve un JSON con los campos:
-- "content": la síntesis en texto.
+- "content": el resumen en texto.
 - "attachedUrls": lista de URLs de las publicaciones que más influyeron (vacía si no hay URLs).
 - "reasoning": breve explicación de los temas detectados.`
 
@@ -167,7 +167,7 @@ Devuelve un JSON con los campos:
       })
       .join('\n\n')
 
-    const userContent = `## ADN DE MARCA\n${brand.voicePrompt}\n\n## PUBLICACIONES PROPIAS (${posts.length} más recientes)\n${postsText}\n\nResponde: ¿De qué trata esta marca?`
+    const userContent = `## ADN DE MARCA\n${brand.voicePrompt}\n\n## PUBLICACIONES PROPIAS (${posts.length} más recientes)\n${postsText}\n\nGenera el resumen de contenido.`
 
     const { client, model, provider } = getClientForFeature('synthesis')
 
