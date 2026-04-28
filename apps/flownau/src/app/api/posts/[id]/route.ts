@@ -3,10 +3,11 @@ import { prisma } from '@/modules/shared/prisma'
 import { checkBrandAccess } from '@/modules/shared/actions'
 import { logError } from '@/modules/shared/logger'
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const post = await prisma.post.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         template: true,
         renderJob: true,
@@ -21,11 +22,12 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   }
 }
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const body = await req.json()
 
-    const post = await prisma.post.findUnique({ where: { id: params.id } })
+    const post = await prisma.post.findUnique({ where: { id } })
     if (!post) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     await checkBrandAccess(post.brandId)
 
@@ -55,7 +57,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     } = body
 
     const updated = await prisma.post.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         ...(status !== undefined && { status }),
         ...(ideaText !== undefined && { ideaText }),
@@ -85,7 +87,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (slotId) {
       await prisma.postSlot.update({
         where: { id: slotId },
-        data: { status: 'filled', postId: params.id },
+        data: { status: 'filled', postId: id },
       })
     }
 
@@ -96,12 +98,13 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   }
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const post = await prisma.post.findUnique({ where: { id: params.id } })
+    const { id } = await params
+    const post = await prisma.post.findUnique({ where: { id } })
     if (!post) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     await checkBrandAccess(post.brandId)
-    await prisma.post.delete({ where: { id: params.id } })
+    await prisma.post.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (error) {
     logError('DELETE /api/posts/[id]', error)
