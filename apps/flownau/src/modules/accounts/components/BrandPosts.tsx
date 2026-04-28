@@ -13,107 +13,51 @@ import {
   Zap,
   User,
   Bot,
-  Pencil,
   Brain,
   Film,
   ImageIcon,
   LayoutGrid,
   Mic,
   Play,
+  Square,
+  CheckSquare,
 } from 'lucide-react'
-
 import Modal from '@/modules/shared/components/Modal'
 import { cn } from '@/modules/shared/utils'
 
-// Source badge config
-const SOURCE_CONFIG: Record<string, { label: string; icon: React.ElementType; className: string }> =
-  {
-    captured: {
-      label: 'Captured',
-      icon: Zap,
-      className: 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20',
-    },
-    manual: {
-      label: 'Manual',
-      icon: User,
-      className: 'bg-blue-500/10 text-blue-400 border border-blue-500/20',
-    },
-    automatic: {
-      label: 'Auto',
-      icon: Bot,
-      className: 'bg-purple-500/10 text-purple-400 border border-purple-500/20',
-    },
-  }
+// ── Badge configs ─────────────────────────────────────────────────────────────
 
-function SourceBadge({ source }: { source: string }) {
-  const config = SOURCE_CONFIG[source] ?? SOURCE_CONFIG.automatic
-  const Icon = config.icon
+const SOURCE_CONFIG: Record<string, { label: string; icon: React.ElementType; className: string }> = {
+  captured: { label: 'Captured', icon: Zap, className: 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' },
+  manual: { label: 'Manual', icon: User, className: 'bg-blue-500/10 text-blue-400 border border-blue-500/20' },
+  automatic: { label: 'Auto', icon: Bot, className: 'bg-purple-500/10 text-purple-400 border border-purple-500/20' },
+}
+
+const FORMAT_CONFIG: Record<string, { label: string; icon: React.ElementType; className: string }> = {
+  reel: { label: 'Reel', icon: Film, className: 'bg-pink-500/10 text-pink-400 border border-pink-500/20' },
+  trial_reel: { label: 'Trial Reel', icon: Play, className: 'bg-orange-500/10 text-orange-400 border border-orange-500/20' },
+  head_talk: { label: 'Head Talk', icon: Mic, className: 'bg-teal-500/10 text-teal-400 border border-teal-500/20' },
+  carousel: { label: 'Carousel', icon: LayoutGrid, className: 'bg-blue-500/10 text-blue-400 border border-blue-500/20' },
+  static_post: { label: 'Static Post', icon: ImageIcon, className: 'bg-gray-500/10 text-gray-400 border border-gray-500/20' },
+  story: { label: 'Story', icon: Play, className: 'bg-violet-500/10 text-violet-400 border border-violet-500/20' },
+}
+
+const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
+  IDEA_PENDING: { label: 'Pending', className: 'bg-orange-500/10 text-orange-400 border border-orange-500/20' },
+  IDEA_APPROVED: { label: 'Approved', className: 'bg-green-500/10 text-green-400 border border-green-500/20' },
+  USED: { label: 'Used', className: 'bg-gray-500/10 text-gray-500 border border-gray-700' },
+}
+
+function Badge({ label, icon: Icon, className }: { label: string; icon?: React.ElementType; className: string }) {
   return (
-    <span
-      className={`inline-flex items-center gap-1 text-[10px] font-bold tracking-widest px-2 py-0.5 rounded-full uppercase ${config.className}`}
-    >
-      <Icon size={10} />
-      {config.label}
+    <span className={cn('inline-flex items-center gap-1 text-[10px] font-bold tracking-widest px-2 py-0.5 rounded-full uppercase', className)}>
+      {Icon && <Icon size={10} />}
+      {label}
     </span>
   )
 }
 
-function AiLinkedBadge() {
-  return (
-    <span className="inline-flex items-center gap-1 text-[10px] font-bold tracking-widest px-2 py-0.5 rounded-full uppercase bg-rose-500/10 text-rose-400 border border-rose-500/20">
-      <Brain size={10} />
-      AI-Linked
-    </span>
-  )
-}
-
-const FORMAT_CONFIG: Record<string, { label: string; icon: React.ElementType; className: string }> =
-  {
-    reel: {
-      label: 'Reel',
-      icon: Film,
-      className: 'bg-pink-500/10 text-pink-400 border border-pink-500/20',
-    },
-    trial_reel: {
-      label: 'Trial Reel',
-      icon: Play,
-      className: 'bg-orange-500/10 text-orange-400 border border-orange-500/20',
-    },
-    head_talk: {
-      label: 'Head Talk',
-      icon: Mic,
-      className: 'bg-teal-500/10 text-teal-400 border border-teal-500/20',
-    },
-    carousel: {
-      label: 'Carousel',
-      icon: LayoutGrid,
-      className: 'bg-blue-500/10 text-blue-400 border border-blue-500/20',
-    },
-    static_post: {
-      label: 'Static Post',
-      icon: ImageIcon,
-      className: 'bg-gray-500/10 text-gray-400 border border-gray-500/20',
-    },
-    story: {
-      label: 'Story',
-      icon: Play,
-      className: 'bg-violet-500/10 text-violet-400 border border-violet-500/20',
-    },
-  }
-
-function FormatBadge({ format }: { format: string }) {
-  const config = FORMAT_CONFIG[format]
-  if (!config) return null
-  const Icon = config.icon
-  return (
-    <span
-      className={`inline-flex items-center gap-1 text-[10px] font-bold tracking-widest px-2 py-0.5 rounded-full uppercase ${config.className}`}
-    >
-      <Icon size={10} />
-      {config.label}
-    </span>
-  )
-}
+// ── Main component ────────────────────────────────────────────────────────────
 
 export default function BrandPosts({ brandId }: { brandId: string }) {
   const [ideas, setIdeas] = useState<any[]>([])
@@ -121,45 +65,33 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
   const [generating, setGenerating] = useState(false)
   const [approving, setApproving] = useState<string | null>(null)
   const [composingIdea, setComposingIdea] = useState<any | null>(null)
-  const [composing, setComposing] = useState<boolean>(false)
+  const [composing, setComposing] = useState(false)
   const [templates, setTemplates] = useState<any[]>([])
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('')
+  const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [headTalkDraftPost, setHeadTalkDraftPost] = useState<any | null>(null)
-
-  // Persona selection — used only for compose flow (idea → draft)
   const [personas, setPersonas] = useState<any[]>([])
-  const [selectedPersonaId, setSelectedPersonaId] = useState<string>('')
+  const [selectedPersonaId, setSelectedPersonaId] = useState('')
+
+  // Selection
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkApproving, setBulkApproving] = useState(false)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
 
   // Brainstorm modal
-  const [brainstormModalOpen, setBrainstormModalOpen] = useState(false)
+  const [brainstormOpen, setBrainstormOpen] = useState(false)
   const [brainstormConcept, setBrainstormConcept] = useState('')
   const [brainstormCount, setBrainstormCount] = useState<number | ''>('')
   const [brainstormSource, setBrainstormSource] = useState<'manual' | 'automatic'>('manual')
 
   // Manual idea modal
-  const [manualIdeaModalOpen, setManualIdeaModalOpen] = useState(false)
-  const [manualIdeaText, setManualIdeaText] = useState('')
+  const [manualOpen, setManualOpen] = useState(false)
+  const [manualText, setManualText] = useState('')
 
-  // Edit idea modal
-  const [editingIdea, setEditingIdea] = useState<any | null>(null)
-  const [editIdeaText, setEditIdeaText] = useState('')
+  // Idea detail modal
+  const [openIdea, setOpenIdea] = useState<any | null>(null)
+  const [editText, setEditText] = useState('')
   const [savingEdit, setSavingEdit] = useState(false)
-
-  // Bulk actions
-  const [bulkApproving, setBulkApproving] = useState(false)
-  const [bulkClearing, setBulkClearing] = useState(false)
-
-  const fetchPersonas = async () => {
-    try {
-      const res = await fetch(`/api/personas?brandId=${brandId}`)
-      const data = await res.json()
-      setPersonas(data.personas || [])
-      const def = data.personas?.find((p: any) => p.isDefault) || data.personas?.[0]
-      if (def) setSelectedPersonaId(def.id)
-    } catch {
-      toast.error('Failed to load personas')
-    }
-  }
+  const [deletingIdea, setDeletingIdea] = useState(false)
 
   const fetchIdeas = async () => {
     try {
@@ -177,98 +109,45 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
     }
   }
 
-  const fetchTemplates = async () => {
-    try {
-      const res = await fetch(`/api/templates`)
-      const data = await res.json()
-      const accountTemplates = data.templates?.filter(
-        (t: any) => t.brandId === brandId || !t.brandId,
-      )
-      setTemplates(accountTemplates || [])
-    } catch {
-      console.error('Failed to parse templates')
-    }
-  }
-
   useEffect(() => {
     fetchIdeas()
-    fetchPersonas()
-    fetchTemplates()
+    fetch(`/api/personas?brandId=${brandId}`).then(r => r.json()).then(d => {
+      setPersonas(d.personas || [])
+      const def = d.personas?.find((p: any) => p.isDefault) || d.personas?.[0]
+      if (def) setSelectedPersonaId(def.id)
+    }).catch(() => {})
+    fetch('/api/templates').then(r => r.json()).then(d => {
+      setTemplates((d.templates || []).filter((t: any) => t.brandId === brandId || !t.brandId))
+    }).catch(() => {})
   }, [brandId])
 
-  const handleGenerate = async (topic?: string, countOverride?: number) => {
-    if (brainstormSource === 'manual' && !topic?.trim()) {
-      toast.error('Please enter a topic to generate ideas.')
-      return
-    }
-    setGenerating(true)
-    const toastId = toast.loading(
-      brainstormSource === 'automatic'
-        ? 'Fetching InspoBase digest & generating ideas...'
-        : `Generating ideas about: "${topic!.slice(0, 40)}..."`,
-    )
-    try {
-      const res = await fetch('/api/agent/idea-generation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          brandId,
-          topic: brainstormSource === 'manual' ? topic : undefined,
-          count: countOverride || undefined,
-          source: brainstormSource,
-        }),
-      })
-      if (res.status === 401) {
-        toast.dismiss(toastId)
-        window.location.href = '/login'
-        return
-      }
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed')
-      toast.success(`Generated ${data.ideas?.length ?? 0} new ideas!`, { id: toastId })
-      fetchIdeas()
-    } catch (err: any) {
-      toast.error(err.message, { id: toastId })
-    } finally {
-      setGenerating(false)
-      setBrainstormModalOpen(false)
-      setBrainstormConcept('')
-      setBrainstormCount('')
-    }
+  // ── Selection helpers ───────────────────────────────────────────────────────
+
+  const toggleSelect = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
   }
 
-  const handleCreateManualIdea = async () => {
-    if (!manualIdeaText.trim()) return
-    const toastId = toast.loading('Creating manual concept idea...')
-    try {
-      const res = await fetch('/api/ideas', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          brandId,
-          ideaText: manualIdeaText,
-          source: 'manual',
-          priority: 2,
-          status: 'IDEA_PENDING',
-        }),
-      })
-      if (!res.ok) throw new Error('Failed to create manual idea')
-      toast.success('Idea created!', { id: toastId })
-      setManualIdeaText('')
-      setManualIdeaModalOpen(false)
-      fetchIdeas()
-    } catch (err: any) {
-      toast.error(err.message, { id: toastId })
-    }
-  }
+  const clearSelection = () => setSelected(new Set())
+
+  const selectAll = () => setSelected(new Set(ideas.map(i => i.id)))
+
+  // ── Actions ─────────────────────────────────────────────────────────────────
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this idea?')) return
+    setDeletingIdea(true)
     try {
       await fetch(`/api/ideas/${id}`, { method: 'DELETE' })
-      setIdeas(ideas.filter((i) => i.id !== id))
+      setIdeas(prev => prev.filter(i => i.id !== id))
+      setOpenIdea(null)
     } catch {
       toast.error('Failed to delete idea')
+    } finally {
+      setDeletingIdea(false)
     }
   }
 
@@ -282,7 +161,8 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
       })
       if (!res.ok) throw new Error('Failed to approve')
       toast.success('Idea approved!')
-      fetchIdeas()
+      await fetchIdeas()
+      setOpenIdea((prev: any) => prev?.id === idea.id ? { ...prev, status: 'IDEA_APPROVED' } : prev)
     } catch (err: any) {
       toast.error(err.message)
     } finally {
@@ -290,22 +170,18 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
     }
   }
 
-  const handleApproveAll = async () => {
-    const pending = ideas.filter((i) => i.status === 'IDEA_PENDING')
-    if (pending.length === 0) return toast.info('No pending ideas to approve')
+  const handleBulkApprove = async () => {
+    const ids = [...selected].filter(id => ideas.find(i => i.id === id)?.status === 'IDEA_PENDING')
+    if (!ids.length) return toast.info('No pending ideas in selection')
     setBulkApproving(true)
-    const toastId = toast.loading(`Approving ${pending.length} ideas...`)
+    const toastId = toast.loading(`Approving ${ids.length} ideas…`)
     try {
-      await Promise.all(
-        pending.map((idea) =>
-          fetch(`/api/ideas/${idea.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: 'IDEA_APPROVED' }),
-          }),
-        ),
-      )
-      toast.success(`Approved ${pending.length} ideas`, { id: toastId })
+      await Promise.all(ids.map(id => fetch(`/api/ideas/${id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'IDEA_APPROVED' }),
+      })))
+      toast.success(`Approved ${ids.length} ideas`, { id: toastId })
+      clearSelection()
       fetchIdeas()
     } catch {
       toast.error('Some approvals failed', { id: toastId })
@@ -314,35 +190,34 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
     }
   }
 
-  const handleClearUsed = async () => {
-    const used = ideas.filter((i) => i.status === 'USED')
-    if (used.length === 0) return toast.info('No used ideas to clear')
-    if (!confirm(`Delete ${used.length} used ideas?`)) return
-    setBulkClearing(true)
-    const toastId = toast.loading(`Clearing ${used.length} used ideas...`)
+  const handleBulkDelete = async () => {
+    if (!confirm(`Delete ${selected.size} selected ideas?`)) return
+    setBulkDeleting(true)
+    const toastId = toast.loading(`Deleting ${selected.size} ideas…`)
     try {
-      await Promise.all(used.map((idea) => fetch(`/api/ideas/${idea.id}`, { method: 'DELETE' })))
-      toast.success(`Cleared ${used.length} used ideas`, { id: toastId })
+      await Promise.all([...selected].map(id => fetch(`/api/ideas/${id}`, { method: 'DELETE' })))
+      toast.success(`Deleted ${selected.size} ideas`, { id: toastId })
+      clearSelection()
       fetchIdeas()
     } catch {
       toast.error('Some deletions failed', { id: toastId })
     } finally {
-      setBulkClearing(false)
+      setBulkDeleting(false)
     }
   }
 
   const handleSaveEdit = async () => {
-    if (!editingIdea || !editIdeaText.trim()) return
+    if (!openIdea || !editText.trim()) return
     setSavingEdit(true)
     try {
-      const res = await fetch(`/api/ideas/${editingIdea.id}`, {
+      const res = await fetch(`/api/ideas/${openIdea.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ideaText: editIdeaText }),
+        body: JSON.stringify({ ideaText: editText }),
       })
-      if (!res.ok) throw new Error('Failed to save edit')
+      if (!res.ok) throw new Error('Failed to save')
       toast.success('Idea updated')
-      setEditingIdea(null)
+      setOpenIdea((prev: any) => prev ? { ...prev, ideaText: editText } : prev)
       fetchIdeas()
     } catch (err: any) {
       toast.error(err.message)
@@ -351,37 +226,72 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
     }
   }
 
+  const handleCreateManualIdea = async () => {
+    if (!manualText.trim()) return
+    const toastId = toast.loading('Creating idea…')
+    try {
+      const res = await fetch('/api/ideas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brandId, ideaText: manualText, source: 'manual', priority: 2, status: 'IDEA_PENDING' }),
+      })
+      if (!res.ok) throw new Error('Failed to create idea')
+      toast.success('Idea created!', { id: toastId })
+      setManualText('')
+      setManualOpen(false)
+      fetchIdeas()
+    } catch (err: any) {
+      toast.error(err.message, { id: toastId })
+    }
+  }
+
+  const handleGenerate = async () => {
+    if (brainstormSource === 'manual' && !brainstormConcept.trim()) {
+      toast.error('Please enter a topic.')
+      return
+    }
+    setGenerating(true)
+    const toastId = toast.loading(brainstormSource === 'automatic' ? 'Fetching InspoBase digest…' : `Generating ideas about: "${brainstormConcept.slice(0, 40)}…"`)
+    try {
+      const res = await fetch('/api/agent/idea-generation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brandId, topic: brainstormSource === 'manual' ? brainstormConcept : undefined, count: brainstormCount || undefined, source: brainstormSource }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed')
+      toast.success(`Generated ${data.ideas?.length ?? 0} new ideas!`, { id: toastId })
+      fetchIdeas()
+    } catch (err: any) {
+      toast.error(err.message, { id: toastId })
+    } finally {
+      setGenerating(false)
+      setBrainstormOpen(false)
+      setBrainstormConcept('')
+      setBrainstormCount('')
+    }
+  }
+
   const handleCompose = async () => {
     if (!composingIdea) return
-
     setComposing(true)
-    const toastId = toast.loading('Converting Idea into a Composition Template Layout...')
+    const toastId = toast.loading('Converting idea into draft…')
     try {
       const finalFormat = selectedTemplateId
-        ? templates.find((t) => t.id === selectedTemplateId)?.format || composingIdea.format || 'head_talk'
+        ? templates.find(t => t.id === selectedTemplateId)?.format || composingIdea.format || 'head_talk'
         : composingIdea.format || 'head_talk'
-
       const res = await fetch('/api/agent/compose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          brandId,
-          prompt: composingIdea.ideaText,
-          format: finalFormat,
-          postId: composingIdea.id,
-          personaId: selectedPersonaId || undefined,
-          templateId: selectedTemplateId || undefined,
-        }),
+        body: JSON.stringify({ brandId, prompt: composingIdea.ideaText, format: finalFormat, postId: composingIdea.id, personaId: selectedPersonaId || undefined, templateId: selectedTemplateId || undefined }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Composition failed')
       toast.success('Draft generated!', { id: toastId })
       setComposingIdea(null)
+      setOpenIdea(null)
       fetchIdeas()
-      // Open head talk modal immediately after compose
-      if (finalFormat === 'head_talk' && data.post) {
-        setHeadTalkDraftPost(data.post)
-      }
+      if (finalFormat === 'head_talk' && data.post) setHeadTalkDraftPost(data.post)
     } catch (err: any) {
       toast.error(err.message, { id: toastId })
     } finally {
@@ -389,156 +299,140 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
     }
   }
 
-  const pendingCount = ideas.filter((i) => i.status === 'IDEA_PENDING').length
-  const usedCount = ideas.filter((i) => i.status === 'USED').length
+  const pendingCount = ideas.filter(i => i.status === 'IDEA_PENDING').length
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h3 className="text-xl font-heading font-semibold">Content Backlog</h3>
-          <p className="text-xs text-gray-500">
-            Captured ideas first, then manual, then automatic.
-          </p>
+          <p className="text-xs text-text-secondary">Captured ideas first, then manual, then automatic.</p>
         </div>
-
         <div className="flex flex-wrap gap-2 items-center">
-          {usedCount > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={bulkClearing}
-              onClick={handleClearUsed}
-              className="text-gray-500 border-gray-700 hover:border-red-800 hover:text-red-400"
-            >
-              {bulkClearing ? (
-                <Loader2 className="w-3 h-3 animate-spin" />
-              ) : (
-                `Clear Used (${usedCount})`
-              )}
-            </Button>
-          )}
-
-          {pendingCount > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={bulkApproving}
-              onClick={handleApproveAll}
-              className="text-green-500 border-green-900 hover:bg-green-950"
-            >
-              {bulkApproving ? (
-                <Loader2 className="w-3 h-3 animate-spin" />
-              ) : (
-                `Approve All (${pendingCount})`
-              )}
-            </Button>
-          )}
-
-          <Button
-            onClick={() => setManualIdeaModalOpen(true)}
-            size="sm"
-            className="flex gap-2 bg-gray-800 text-white hover:bg-gray-700"
-          >
+          <Button onClick={() => setManualOpen(true)} size="sm" variant="outline">
             + Add Idea
           </Button>
-
           <Button
-            onClick={() => setBrainstormModalOpen(true)}
+            onClick={() => setBrainstormOpen(true)}
             disabled={generating}
             size="sm"
-            className="flex gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
           >
-            {generating ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Wand2 className="w-4 h-4" />
-            )}
+            {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
             Brainstorm
           </Button>
         </div>
       </div>
 
-      {!loading && ideas.length === 0 && (
-        <div className="text-center py-10 text-text-secondary border border-dashed border-gray-800 rounded-lg">
-          No ideas available. Click Brainstorm to automatically consult your Brand Persona.
+      {/* Bulk action bar */}
+      {selected.size > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-accent/10 border border-accent/20 text-sm">
+          <span className="text-accent font-medium">{selected.size} selected</span>
+          <button onClick={selectAll} className="text-text-secondary hover:text-white text-xs transition-colors">Select all</button>
+          <button onClick={clearSelection} className="text-text-secondary hover:text-white text-xs transition-colors">Clear</button>
+          <div className="flex-1" />
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={bulkApproving}
+            onClick={handleBulkApprove}
+            className="text-green-400 border-green-900 hover:bg-green-950 text-xs"
+          >
+            {bulkApproving ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+            Approve
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={bulkDeleting}
+            onClick={handleBulkDelete}
+            className="text-red-400 border-red-900 hover:bg-red-950 text-xs"
+          >
+            {bulkDeleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+            Delete
+          </Button>
         </div>
       )}
 
-      <div className="grid gap-4">
+      {/* Empty state */}
+      {!loading && ideas.length === 0 && (
+        <div className="text-center py-16 text-text-secondary border border-dashed border-white/10 rounded-lg">
+          <Brain size={40} className="mx-auto mb-4 opacity-30" />
+          <p className="text-sm">No ideas yet. Hit <strong>Brainstorm</strong> to generate some.</p>
+        </div>
+      )}
+
+      {/* Grid */}
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
         {ideas.map((idea) => {
           const isUsed = idea.status === 'USED'
           const isPending = idea.status === 'IDEA_PENDING'
-          const isApproved = idea.status === 'IDEA_APPROVED'
+          const isSelected = selected.has(idea.id)
+          const statusCfg = STATUS_CONFIG[idea.status]
+          const sourceCfg = SOURCE_CONFIG[idea.source] ?? SOURCE_CONFIG.automatic
 
           return (
             <Card
               key={idea.id}
-              className={`p-4 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between border ${isUsed ? 'border-gray-800 opacity-50 text-gray-400 bg-gray-950' : 'border-gray-700 bg-gray-900'}`}
+              onClick={() => { setOpenIdea(idea); setEditText(idea.ideaText) }}
+              className={cn(
+                'relative p-4 flex flex-col gap-3 cursor-pointer transition-all select-none',
+                isSelected
+                  ? 'border-accent/50 bg-accent/5'
+                  : isUsed
+                    ? 'opacity-50 border-white/5'
+                    : 'hover:border-white/20',
+              )}
             >
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2 flex-wrap">
-                  <span
-                    className={`text-[10px] font-bold tracking-widest px-2 py-0.5 rounded-full uppercase ${isUsed ? 'bg-gray-800 text-gray-500' : isApproved ? 'bg-green-900 text-green-400' : 'bg-orange-900 text-orange-400'}`}
-                  >
-                    {isApproved ? 'Approved' : isPending ? 'Pending' : idea.status}
-                  </span>
-                  {idea.source && <SourceBadge source={idea.source} />}
-                  {idea.format && <FormatBadge format={idea.format} />}
-                  {idea.aiLinked && <AiLinkedBadge />}
-                </div>
-                <p className="text-sm whitespace-pre-wrap">{idea.ideaText}</p>
+              {/* Select checkbox */}
+              <button
+                onClick={(e) => toggleSelect(idea.id, e)}
+                className="absolute top-3 right-3 text-text-secondary hover:text-white transition-colors"
+              >
+                {isSelected ? <CheckSquare size={15} className="text-accent" /> : <Square size={15} className="opacity-30 hover:opacity-100" />}
+              </button>
+
+              {/* Tags */}
+              <div className="flex flex-wrap gap-1.5 pr-6">
+                {statusCfg && <Badge label={statusCfg.label} className={statusCfg.className} />}
+                <Badge label={sourceCfg.label} icon={sourceCfg.icon} className={sourceCfg.className} />
+                {idea.format && (() => {
+                  const fc = FORMAT_CONFIG[idea.format]
+                  return fc ? <Badge label={fc.label} icon={fc.icon} className={fc.className} /> : null
+                })()}
+                {idea.aiLinked && <Badge label="AI-Linked" icon={Brain} className="bg-rose-500/10 text-rose-400 border border-rose-500/20" />}
               </div>
 
-              <div className="flex gap-2 shrink-0 w-full md:w-auto mt-2 md:mt-0 justify-end items-center">
-                {isUsed && (
-                  <span className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mr-2">
-                    Already Drafted
-                  </span>
-                )}
+              {/* Idea text */}
+              <p className="text-sm text-white/90 leading-relaxed line-clamp-4">{idea.ideaText}</p>
 
-                <Button
-                  variant="outline"
-                  className="border-gray-700 text-gray-400 hover:text-white"
-                  onClick={() => {
-                    setEditingIdea(idea)
-                    setEditIdeaText(idea.ideaText)
-                  }}
-                >
-                  <Pencil className="w-4 h-4" />
-                </Button>
-
-                <Button
-                  variant="outline"
-                  className="border-red-900 text-red-500 hover:bg-red-950"
-                  onClick={() => handleDelete(idea.id)}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-
+              {/* Footer */}
+              <div className="flex items-center justify-between mt-auto pt-1">
+                <span className="text-[10px] text-text-secondary">
+                  {new Date(idea.createdAt).toLocaleDateString('en-GB')}
+                </span>
                 {isPending && (
-                  <Button
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleApprove(idea) }}
                     disabled={approving === idea.id}
-                    className="bg-green-700/80 text-white hover:bg-green-700 transition-all text-xs h-8"
-                    onClick={() => handleApprove(idea)}
+                    className="flex items-center gap-1 text-[11px] font-semibold text-green-400 hover:text-green-300 transition-colors disabled:opacity-50"
                   >
-                    {approving === idea.id ? (
-                      <Loader2 className="w-3 h-3 animate-spin mr-1" />
-                    ) : (
-                      <CheckCircle2 className="w-3 h-3 mr-1" />
-                    )}
+                    {approving === idea.id ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle2 size={11} />}
                     Approve
-                  </Button>
+                  </button>
                 )}
-
-                {(isApproved || isUsed) && (
-                  <Button
-                    className={`${isUsed ? 'bg-gray-800 text-gray-400 border-gray-700' : 'bg-accent text-white hover:bg-accent/80'} transition-all text-xs h-8`}
-                    onClick={() => setComposingIdea(idea)}
+                {(idea.status === 'IDEA_APPROVED' || isUsed) && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setComposingIdea(idea) }}
+                    className={cn(
+                      'flex items-center gap-1 text-[11px] font-semibold transition-colors',
+                      isUsed ? 'text-text-secondary hover:text-white' : 'text-accent hover:text-accent/80',
+                    )}
                   >
-                    <Wand2 className="w-3 h-3 mr-1" />
+                    <Wand2 size={11} />
                     {isUsed ? 'Redo Draft' : 'Draft'}
-                  </Button>
+                  </button>
                 )}
               </div>
             </Card>
@@ -546,197 +440,199 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
         })}
       </div>
 
-      {/* Brainstorm Modal — supports optional concept for targeted generation or InspoBase flow */}
-      {brainstormModalOpen && (
-        <Modal isOpen={true} onClose={() => !generating && setBrainstormModalOpen(false)}>
-          <div className="space-y-4">
-            <h2 className="text-xl font-heading font-semibold mb-1">Brainstorm Ideas</h2>
-
-            <div className="flex bg-gray-900 p-1 rounded-lg border border-gray-800 mb-4">
-              <button
-                onClick={() => setBrainstormSource('manual')}
-                className={cn(
-                  'flex-1 py-1.5 text-xs font-bold rounded-md transition-all',
-                  brainstormSource === 'manual'
-                    ? 'bg-gray-800 text-white shadow-sm'
-                    : 'text-gray-500 hover:text-gray-300',
-                )}
-              >
-                Manual Concept
-              </button>
-              <button
-                onClick={() => setBrainstormSource('automatic')}
-                className={cn(
-                  'flex-1 py-1.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-2',
-                  brainstormSource === 'automatic'
-                    ? 'bg-gray-800 text-white shadow-sm'
-                    : 'text-gray-500 hover:text-gray-300',
-                )}
-              >
-                <Bot size={12} />
-                InspoBase
-              </button>
+      {/* ── Idea detail modal ─────────────────────────────────────────────────── */}
+      {openIdea && (
+        <Modal isOpen={true} onClose={() => !savingEdit && !deletingIdea && setOpenIdea(null)}>
+          <div className="flex flex-col gap-5">
+            {/* Title + tags */}
+            <div className="flex flex-col gap-2">
+              <h2 className="text-xl font-heading font-semibold">Idea</h2>
+              <div className="flex flex-wrap gap-1.5">
+                {(() => {
+                  const s = STATUS_CONFIG[openIdea.status]
+                  return s ? <Badge label={s.label} className={s.className} /> : null
+                })()}
+                {(() => {
+                  const sc = SOURCE_CONFIG[openIdea.source] ?? SOURCE_CONFIG.automatic
+                  return <Badge label={sc.label} icon={sc.icon} className={sc.className} />
+                })()}
+                {openIdea.format && (() => {
+                  const fc = FORMAT_CONFIG[openIdea.format]
+                  return fc ? <Badge label={fc.label} icon={fc.icon} className={fc.className} /> : null
+                })()}
+                {openIdea.aiLinked && <Badge label="AI-Linked" icon={Brain} className="bg-rose-500/10 text-rose-400 border border-rose-500/20" />}
+              </div>
             </div>
 
-            {brainstormSource === 'manual' ? (
-              <div className="space-y-1">
-                <label className="text-xs text-gray-400">
-                  Topic <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  autoFocus
-                  className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-sm min-h-[100px]"
-                  value={brainstormConcept}
-                  onChange={(e) => setBrainstormConcept(e.target.value)}
-                  placeholder="e.g. 'How AI is changing content creation' or a trending topic..."
-                  disabled={generating}
-                />
+            {/* Editable text */}
+            <textarea
+              className="w-full bg-gray-950 border border-border text-white rounded-lg p-3 text-sm min-h-[180px] resize-y focus:outline-none focus:border-accent/50"
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              disabled={savingEdit || deletingIdea}
+            />
+
+            {/* Delete / Cancel / Save */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                disabled={deletingIdea || savingEdit}
+                onClick={() => handleDelete(openIdea.id)}
+                className="text-red-400 border-red-900 hover:bg-red-950"
+              >
+                {deletingIdea ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                Delete
+              </Button>
+              <div className="flex-1" />
+              <Button
+                variant="outline"
+                disabled={savingEdit || deletingIdea}
+                onClick={() => setOpenIdea(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={savingEdit || deletingIdea || !editText.trim() || editText === openIdea.ideaText}
+                onClick={handleSaveEdit}
+                className="bg-accent text-white hover:bg-accent/80"
+              >
+                {savingEdit ? <><Loader2 className="w-4 h-4 animate-spin mr-1" /> Saving…</> : 'Save Changes'}
+              </Button>
+            </div>
+
+            {/* Action button */}
+            {openIdea.status === 'IDEA_PENDING' && (
+              <div className="pt-2 border-t border-white/5">
+                <Button
+                  disabled={approving === openIdea.id}
+                  onClick={() => handleApprove(openIdea)}
+                  className="w-full bg-green-700/80 hover:bg-green-700 text-white"
+                >
+                  {approving === openIdea.id ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+                  Approve
+                </Button>
               </div>
+            )}
+            {(openIdea.status === 'IDEA_APPROVED' || openIdea.status === 'USED') && (
+              <div className="pt-2 border-t border-white/5">
+                <Button
+                  onClick={() => { setComposingIdea(openIdea); setOpenIdea(null) }}
+                  className={cn('w-full text-white', openIdea.status === 'USED' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-accent hover:bg-accent/80')}
+                >
+                  <Wand2 className="w-4 h-4 mr-2" />
+                  {openIdea.status === 'USED' ? 'Redo Draft' : 'Draft'}
+                </Button>
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Brainstorm modal ──────────────────────────────────────────────────── */}
+      {brainstormOpen && (
+        <Modal isOpen={true} onClose={() => !generating && setBrainstormOpen(false)}>
+          <div className="space-y-4">
+            <h2 className="text-xl font-heading font-semibold">Brainstorm Ideas</h2>
+            <div className="flex bg-gray-900 p-1 rounded-lg border border-gray-800">
+              {(['manual', 'automatic'] as const).map(src => (
+                <button
+                  key={src}
+                  onClick={() => setBrainstormSource(src)}
+                  className={cn(
+                    'flex-1 py-1.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-1.5',
+                    brainstormSource === src ? 'bg-gray-800 text-white' : 'text-text-secondary hover:text-white',
+                  )}
+                >
+                  {src === 'automatic' && <Bot size={12} />}
+                  {src === 'manual' ? 'Manual Concept' : 'InspoBase'}
+                </button>
+              ))}
+            </div>
+            {brainstormSource === 'manual' ? (
+              <textarea
+                autoFocus
+                className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-sm min-h-[100px]"
+                value={brainstormConcept}
+                onChange={e => setBrainstormConcept(e.target.value)}
+                placeholder="e.g. 'How AI is changing content creation'…"
+                disabled={generating}
+              />
             ) : (
               <div className="bg-purple-500/5 border border-purple-500/10 rounded-lg p-4">
                 <p className="text-xs text-purple-200/70 leading-relaxed">
-                  The AI will consume the latest <strong>Mechanical Digest</strong> from
-                  Nauthenticity&apos;s InspoBase. It will combine the Global synthesis with recent
-                  inspirations to generate non-repetitive ideas.
+                  The AI will consume the latest <strong>Mechanical Digest</strong> from Nauthenticity&apos;s InspoBase and generate non-repetitive ideas.
                 </p>
               </div>
             )}
-
-            <div className="space-y-1">
-              <label className="text-xs text-gray-400">
-                Number of ideas to spawn{' '}
-                <span className="text-gray-600 font-normal">
-                  (leave blank to use brand default)
-                </span>
-              </label>
+            <div className="flex items-center gap-3">
+              <label className="text-xs text-text-secondary whitespace-nowrap">Count (leave blank for default)</label>
               <input
-                type="number"
-                min={1}
-                max={20}
+                type="number" min={1} max={20}
                 value={brainstormCount}
-                onChange={(e) =>
-                  setBrainstormCount(e.target.value === '' ? '' : Number(e.target.value))
-                }
+                onChange={e => setBrainstormCount(e.target.value === '' ? '' : Number(e.target.value))}
                 placeholder="e.g. 5"
                 disabled={generating}
-                className="w-24 bg-gray-900 border border-gray-800 text-white rounded p-2 text-sm"
+                className="w-20 bg-gray-900 border border-gray-800 text-white rounded p-2 text-sm"
               />
             </div>
-
-            <div className="flex justify-end gap-2 mt-4">
-              <Button
-                variant="outline"
-                disabled={generating}
-                onClick={() => setBrainstormModalOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                disabled={generating}
-                onClick={() =>
-                  handleGenerate(
-                    brainstormConcept.trim() || undefined,
-                    brainstormCount !== '' ? brainstormCount : undefined,
-                  )
-                }
-                className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white"
-              >
-                {generating ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" /> Generating...
-                  </>
-                ) : (
-                  <>
-                    <Wand2 className="w-4 h-4 mr-2" /> Generate Ideas
-                  </>
-                )}
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" disabled={generating} onClick={() => setBrainstormOpen(false)}>Cancel</Button>
+              <Button disabled={generating} onClick={handleGenerate} className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+                {generating ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Generating…</> : <><Wand2 className="w-4 h-4 mr-2" />Generate Ideas</>}
               </Button>
             </div>
           </div>
         </Modal>
       )}
 
-      {/* Compose Modal */}
+      {/* ── Compose modal ─────────────────────────────────────────────────────── */}
       {composingIdea && (
         <Modal isOpen={true} onClose={() => !composing && setComposingIdea(null)}>
           <div className="space-y-4">
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2">
               <h2 className="text-xl font-heading font-semibold">Draft</h2>
-              {composingIdea.source && <SourceBadge source={composingIdea.source} />}
-              {composingIdea.format && <FormatBadge format={composingIdea.format} />}
+              {composingIdea.source && (() => { const sc = SOURCE_CONFIG[composingIdea.source]; return sc ? <Badge label={sc.label} icon={sc.icon} className={sc.className} /> : null })()}
             </div>
-
             <div className="bg-gray-900 rounded-lg p-3 border border-gray-800 max-h-[120px] overflow-y-auto">
               <p className="text-xs text-gray-400 whitespace-pre-wrap">{composingIdea.ideaText}</p>
             </div>
-
-            <div className="space-y-1">
-              <label className="text-xs text-gray-400">Target Template</label>
+            <div>
+              <label className="text-xs text-text-secondary block mb-1">Target Template</label>
               <select
                 className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-sm"
                 value={selectedTemplateId}
-                onChange={(e) => setSelectedTemplateId(e.target.value)}
+                onChange={e => setSelectedTemplateId(e.target.value)}
                 disabled={composing}
               >
                 <option value="">Auto Select (Director Mode)</option>
-                {templates.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
+                {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </div>
-
-            <div className="flex justify-end gap-2 mt-6">
-              <Button variant="outline" disabled={composing} onClick={() => setComposingIdea(null)}>
-                Cancel
-              </Button>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" disabled={composing} onClick={() => setComposingIdea(null)}>Cancel</Button>
               <Button disabled={composing} onClick={handleCompose} className="bg-accent text-white">
-                {composing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" /> Composing...
-                  </>
-                ) : (
-                  <>
-                    <Wand2 className="w-4 h-4 mr-2" /> Generate Draft
-                  </>
-                )}
+                {composing ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Composing…</> : <><Wand2 className="w-4 h-4 mr-2" />Generate Draft</>}
               </Button>
             </div>
           </div>
         </Modal>
       )}
 
-      {/* Manual Idea Modal */}
-      {manualIdeaModalOpen && (
-        <Modal isOpen={true} onClose={() => setManualIdeaModalOpen(false)}>
+      {/* ── Manual idea modal ─────────────────────────────────────────────────── */}
+      {manualOpen && (
+        <Modal isOpen={true} onClose={() => setManualOpen(false)}>
           <div className="space-y-4">
-            <h2 className="text-xl font-heading font-semibold mb-4">Manual Concept Idea</h2>
-            <p className="text-sm text-gray-400">
-              Record a specific concept idea you have in mind. It will be added as{' '}
-              <span className="text-orange-400">PENDING</span> for review.
-            </p>
-
-            <div className="space-y-1">
-              <label className="text-xs text-gray-400">Concept Description</label>
-              <textarea
-                autoFocus
-                className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-sm min-h-[120px]"
-                value={manualIdeaText}
-                onChange={(e) => setManualIdeaText(e.target.value)}
-                placeholder="Write the concept format, the hook, the educational value..."
-              />
-            </div>
-
-            <div className="flex justify-end gap-2 mt-6">
-              <Button variant="outline" onClick={() => setManualIdeaModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={handleCreateManualIdea}
-                className="bg-accent text-white"
-                disabled={!manualIdeaText.trim()}
-              >
+            <h2 className="text-xl font-heading font-semibold">Add Idea</h2>
+            <textarea
+              autoFocus
+              className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-sm min-h-[120px]"
+              value={manualText}
+              onChange={e => setManualText(e.target.value)}
+              placeholder="Write the concept — hook, angle, educational value…"
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setManualOpen(false)}>Cancel</Button>
+              <Button onClick={handleCreateManualIdea} className="bg-accent text-white" disabled={!manualText.trim()}>
                 Save Idea
               </Button>
             </div>
@@ -744,60 +640,13 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
         </Modal>
       )}
 
-      {/* Edit Idea Modal */}
-      {editingIdea && (
-        <Modal isOpen={true} onClose={() => !savingEdit && setEditingIdea(null)}>
-          <div className="space-y-4">
-            <h2 className="text-xl font-heading font-semibold mb-1">Edit Idea</h2>
-            <p className="text-sm text-gray-400">
-              Refine the AI-generated or captured idea text before approving or composing.
-            </p>
-
-            <div className="space-y-1">
-              <label className="text-xs text-gray-400">Idea Text</label>
-              <textarea
-                autoFocus
-                className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-sm min-h-[200px]"
-                value={editIdeaText}
-                onChange={(e) => setEditIdeaText(e.target.value)}
-                disabled={savingEdit}
-              />
-            </div>
-
-            <div className="flex justify-end gap-2 mt-4">
-              <Button variant="outline" disabled={savingEdit} onClick={() => setEditingIdea(null)}>
-                Cancel
-              </Button>
-              <Button
-                disabled={savingEdit || !editIdeaText.trim()}
-                onClick={handleSaveEdit}
-                className="bg-accent text-white"
-              >
-                {savingEdit ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" /> Saving...
-                  </>
-                ) : (
-                  'Save Changes'
-                )}
-              </Button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {/* Head Talk Draft Modal */}
+      {/* ── Head Talk draft modal ─────────────────────────────────────────────── */}
       {headTalkDraftPost && (
         <HeadTalkDraftModal
           post={headTalkDraftPost}
           onClose={() => setHeadTalkDraftPost(null)}
-          onMarkedPosted={() => {
-            setHeadTalkDraftPost(null)
-            fetchIdeas()
-          }}
-          onVideoUploaded={(videoUrl) => {
-            setHeadTalkDraftPost((p: any) => p ? { ...p, status: 'RENDERED_PENDING', videoUrl } : null)
-          }}
+          onMarkedPosted={() => { setHeadTalkDraftPost(null); fetchIdeas() }}
+          onVideoUploaded={(videoUrl) => setHeadTalkDraftPost((p: any) => p ? { ...p, status: 'RENDERED_PENDING', videoUrl } : null)}
         />
       )}
     </div>
