@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Card } from '@/modules/shared/components/ui/Card'
 import { Button } from '@/modules/shared/components/ui/Button'
 import { toast } from 'sonner'
+import HeadTalkDraftModal from './HeadTalkDraftModal'
 import {
   Loader2,
   Wand2,
@@ -123,6 +124,7 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
   const [composing, setComposing] = useState<boolean>(false)
   const [templates, setTemplates] = useState<any[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('')
+  const [headTalkDraftPost, setHeadTalkDraftPost] = useState<any | null>(null)
 
   // Persona selection — used only for compose flow (idea → draft)
   const [personas, setPersonas] = useState<any[]>([])
@@ -361,17 +363,21 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
         body: JSON.stringify({
           brandId,
           prompt: composingIdea.ideaText,
-          format: composingIdea.format || 'reel',
-          ideaId: composingIdea.id,
-          personaId: selectedPersonaId,
+          format: composingIdea.format || 'head_talk',
+          postId: composingIdea.id,
+          personaId: selectedPersonaId || undefined,
           templateId: selectedTemplateId || undefined,
         }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Composition failed')
-      toast.success('Idea structurally mapped into a Draft Composition!', { id: toastId })
+      toast.success('Draft generated!', { id: toastId })
       setComposingIdea(null)
       fetchIdeas()
+      // Open head talk modal immediately after compose
+      if ((composingIdea.format || 'head_talk') === 'head_talk' && data.post) {
+        setHeadTalkDraftPost(data.post)
+      }
     } catch (err: any) {
       toast.error(err.message, { id: toastId })
     } finally {
@@ -774,6 +780,21 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* Head Talk Draft Modal */}
+      {headTalkDraftPost && (
+        <HeadTalkDraftModal
+          post={headTalkDraftPost}
+          onClose={() => setHeadTalkDraftPost(null)}
+          onMarkedPosted={() => {
+            setHeadTalkDraftPost(null)
+            fetchIdeas()
+          }}
+          onVideoUploaded={(videoUrl) => {
+            setHeadTalkDraftPost((p: any) => p ? { ...p, status: 'RENDERED_PENDING', videoUrl } : null)
+          }}
+        />
       )}
     </div>
   )

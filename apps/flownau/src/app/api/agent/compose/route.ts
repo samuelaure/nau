@@ -20,6 +20,7 @@ const ComposeRequestSchema = z.object({
     .default('reel'),
   postId: z.string().optional(),
   personaId: z.string().optional(),
+  templateId: z.string().optional(),
 })
 
 export async function POST(req: Request) {
@@ -34,7 +35,7 @@ export async function POST(req: Request) {
       )
     }
 
-    const { prompt, brandId, format, postId, personaId } = parsed.data
+    const { prompt, brandId, format, postId, personaId, templateId } = parsed.data
 
     // Rate limit: 10 compose requests per minute per account
     const rateLimit = await checkRateLimit({
@@ -54,23 +55,28 @@ export async function POST(req: Request) {
 
     await checkBrandAccess(brandId)
 
+    // Resolve templateId: explicit > from existing post > none
+    const resolvedTemplateId =
+      templateId ??
+      (postId
+        ? (await prisma.post.findUnique({ where: { id: postId }, select: { templateId: true } }))
+            ?.templateId ?? undefined
+        : undefined)
+
     // Fetch persona for auto-approve flags
     const persona = personaId
       ? await prisma.brandPersona.findUnique({ where: { id: personaId } })
       : ((await prisma.brandPersona.findFirst({ where: { brandId, isDefault: true } })) ??
         (await prisma.brandPersona.findFirst({ where: { brandId } })))
 
-    // Check template auto-approve if postId has a template
+    // Check template auto-approve
     let autoApproveDraft = persona?.autoApproveCompositions ?? false
-    if (!autoApproveDraft && postId) {
-      const existingPost = await prisma.post.findUnique({ where: { id: postId }, select: { templateId: true } })
-      if (existingPost?.templateId) {
-        const config = await prisma.brandTemplateConfig.findUnique({
-          where: { brandId_templateId: { brandId, templateId: existingPost.templateId } },
-          select: { autoApproveDraft: true },
-        })
-        autoApproveDraft = config?.autoApproveDraft ?? false
-      }
+    if (!autoApproveDraft && resolvedTemplateId) {
+      const config = await prisma.brandTemplateConfig.findUnique({
+        where: { brandId_templateId: { brandId, templateId: resolvedTemplateId } },
+        select: { autoApproveDraft: true },
+      })
+      autoApproveDraft = config?.autoApproveDraft ?? false
     }
 
     const draftStatus = autoApproveDraft ? 'DRAFT_APPROVED' : 'DRAFT_PENDING'
@@ -78,18 +84,24 @@ export async function POST(req: Request) {
     let updatedPost
 
     if (format === 'head_talk') {
-      const result = await composeHeadTalk({ ideaText: prompt, brandId, personaId })
+      const result = await composeHeadTalk({
+        ideaText: prompt,
+        brandId,
+        personaId,
+        templateId: resolvedTemplateId,
+      })
 
       if (postId) {
         updatedPost = await prisma.post.update({
           where: { id: postId },
           data: {
             format,
-            payload: { type: 'head_talk', script: result.script } as unknown as Prisma.InputJsonValue,
+            creative: result.creative as unknown as Prisma.InputJsonValue,
             caption: result.caption,
             hashtags: result.hashtags,
             status: draftStatus,
-            brandPersonaId: persona?.id ?? null,
+            templateId: result.templateId ?? resolvedTemplateId ?? null,
+            brandPersonaId: result.personaId ?? persona?.id ?? null,
           },
         })
       } else {
@@ -98,12 +110,13 @@ export async function POST(req: Request) {
             brandId,
             ideaText: prompt,
             format,
-            payload: { type: 'head_talk', script: result.script } as unknown as Prisma.InputJsonValue,
+            creative: result.creative as unknown as Prisma.InputJsonValue,
             caption: result.caption,
             hashtags: result.hashtags,
             status: draftStatus,
             source: 'manual',
-            brandPersonaId: persona?.id ?? null,
+            templateId: result.templateId ?? resolvedTemplateId ?? null,
+            brandPersonaId: result.personaId ?? persona?.id ?? null,
           },
         })
       }

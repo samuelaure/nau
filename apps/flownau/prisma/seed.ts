@@ -1,33 +1,27 @@
 import { PrismaClient } from '@prisma/client'
-import { seedTemplatesForBrand } from './seeds/templates'
+import { PrismaPg } from '@prisma/adapter-pg'
+import pg from 'pg'
+import { seedSystemTemplates, seedTemplatesForBrand } from './seeds/templates'
 
-const prisma = new PrismaClient()
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL })
+const adapter = new PrismaPg(pool)
+const prisma = new PrismaClient({ adapter })
 
 async function main() {
-  const adminEmail = process.env.INITIAL_ADMIN_EMAIL
-  const adminPassword = process.env.INITIAL_ADMIN_PASSWORD
+  // Seed system-scoped platform templates (available to all brands)
+  console.log('\n📐 Seeding system templates…')
+  await seedSystemTemplates(prisma)
 
-  if (!adminEmail || !adminPassword) {
-    console.log(
-      'ℹ️ Skipping admin creation: INITIAL_ADMIN_EMAIL or INITIAL_ADMIN_PASSWORD not set. Use 9naŭ API to create users.',
-    )
-  } else {
-    console.log(
-      'ℹ️ Admin users are now managed by 9naŭ API. Register via POST /api/auth/register on the 9naŭ service.',
-    )
+  // Activate system templates for all existing brands
+  const brands = await prisma.brand.findMany()
+  for (const brand of brands) {
+    console.log(`\n🔗 Activating system templates for brand "${brand.name}" (${brand.id})…`)
+    await seedTemplatesForBrand(prisma, brand.id)
   }
 
-  // Seed platform-default templates for the first brand found.
-  // Templates are workspace-scoped so all brands in the workspace can use them.
-  // If no brands exist yet, seeding is deferred — run again after first brand is created,
-  // or call seedTemplatesForBrand(prisma, brandId) directly from a setup script.
-  const firstBrand = await prisma.brand.findFirst()
-  if (firstBrand) {
-    console.log(`\n📐 Seeding platform templates for brand "${firstBrand.name}" (${firstBrand.id})…`)
-    await seedTemplatesForBrand(prisma, firstBrand.id)
-  } else {
+  if (brands.length === 0) {
     console.log(
-      'ℹ️ No brands found — template seeding deferred. Run seed again after creating the first brand.',
+      'ℹ️ No brands found — system templates seeded. Run seed again after creating the first brand to activate them.',
     )
   }
 }
@@ -39,4 +33,5 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect()
+    await pool.end()
   })

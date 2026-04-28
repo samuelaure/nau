@@ -1,61 +1,38 @@
-import { getClientForFeature } from '@nau/llm-client'
 import { z } from 'zod'
-import { prisma } from '@/modules/shared/prisma'
+import { composeDraft } from './draft-composer'
 
-const HeadTalkOutputSchema = z.object({
-  script: z
-    .string()
-    .describe('A clean, structured teleprompter-ready script for the talking-head recording.'),
-  caption: z
-    .string()
-    .describe('A compelling social media caption for when the video is published.'),
-  hashtags: z.array(z.string()).describe('Relevant hashtags (without # prefix).'),
+// ─── Typed output schema for the Hook-First head talk template ────────────────
+
+export const HeadTalkCreativeSchema = z.object({
+  hook: z.string().describe('Opening hook — max 2 sentences. Wins attention in the first 2 seconds.'),
+  body: z.string().describe('Main content body — max 150 words. Short paragraphs, one idea each.'),
+  cta: z.string().describe('Call to action — max 2 sentences. Closes the loop the hook opened.'),
+  caption: z.string().describe('Social media caption for when the video is published.'),
+  hashtags: z.array(z.string()).describe('8-12 relevant hashtags without # prefix.'),
 })
 
-export type HeadTalkOutput = z.infer<typeof HeadTalkOutputSchema>
+export type HeadTalkCreative = z.infer<typeof HeadTalkCreativeSchema>
 
 export interface HeadTalkInput {
   ideaText: string
   brandId: string
+  templateId?: string
   personaId?: string
 }
 
-/**
- * HeadTalkComposer — produces a teleprompter script + caption + hashtags.
- * No video/image assets. The user records themselves and uploads the result.
- */
+export interface HeadTalkOutput {
+  creative: HeadTalkCreative
+  caption: string
+  hashtags: string[]
+  templateId: string | null
+  personaId: string | null
+}
+
 export async function composeHeadTalk(input: HeadTalkInput): Promise<HeadTalkOutput> {
-  const { ideaText, brandId, personaId } = input
-
-  const persona = personaId
-    ? await prisma.brandPersona.findUnique({ where: { id: personaId } })
-    : ((await prisma.brandPersona.findFirst({ where: { brandId, isDefault: true } })) ??
-      (await prisma.brandPersona.findFirst({ where: { brandId } })))
-
-  const dna = persona?.systemPrompt ?? ''
-
-  const { client: llm, model } = getClientForFeature('composition')
-  const result = await llm.parseCompletion({
-    model,
-    temperature: 0.6,
-    schema: HeadTalkOutputSchema as any,
-    schemaName: 'HeadTalkOutput',
-    messages: [
-      {
-        role: 'system',
-        content: `You are a scriptwriter for a talking-head video format.
-${dna ? `BRAND VOICE:\n${dna}\n\n` : ''}
-Given an idea, produce:
-1. A clean teleprompter script — conversational, direct-to-camera, paragraph form. No stage directions.
-2. A social media caption for publishing (can include emoji).
-3. 5–10 relevant hashtags.
-
-Write in the brand's natural language (typically Spanish unless otherwise specified).`,
-      },
-      { role: 'user', content: ideaText },
-    ],
-    timeoutMs: 30_000,
+  return composeDraft<HeadTalkCreative>({
+    ...input,
+    format: 'head_talk',
+    outputSchema: HeadTalkCreativeSchema,
+    schemaName: 'HeadTalkCreative',
   })
-
-  return result.data as HeadTalkOutput
 }

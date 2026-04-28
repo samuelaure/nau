@@ -90,10 +90,11 @@ model Asset {
 model Template {
   id               String    @id @default(cuid())
   name             String
-  remotionId       String
+  format           String    @default("reel")   // reel | head_talk | carousel | static_post
+  remotionId       String    @default("")
   config           Json?
-  brandId          String
-  scope            String    @default("brand")
+  brandId          String?               // null for system-scoped templates
+  scope            String    @default("system")  // system | brand
   useBrandAssets   Boolean   @default(true)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
@@ -111,7 +112,7 @@ model Template {
   assets       Asset[]
   posts        Post[]
   brandConfigs BrandTemplateConfig[]
-  brand        Brand  @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  brand        Brand?  @relation(fields: [brandId], references: [id], onDelete: Cascade)
 }
 
 model BrandTemplateConfig {

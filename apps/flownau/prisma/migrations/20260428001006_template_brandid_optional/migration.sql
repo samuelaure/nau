@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Template" ALTER COLUMN "brandId" DROP NOT NULL,
+ALTER COLUMN "brandId" DROP DEFAULT;

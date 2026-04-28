@@ -1,34 +1,171 @@
 import type { PrismaClient } from '@prisma/client'
 
 /**
- * Platform-default template definitions.
+ * System template definitions — available to all brands.
  *
- * These are workspace-scoped so every brand in the same workspace can use them.
- * Each template shapes how the AI Creative Director structures and writes scenes.
+ * scope = "system"  → shared platform templates, brandId = "system"
+ * scope = "brand"   → custom templates tied to a specific brand (future)
  *
- * Fields used by scene-composer.ts:
- *   systemPrompt   → "TEMPLATE NARRATIVE GUIDANCE" block in the AI system prompt
- *   contentSchema  → "TEMPLATE CONTENT SCHEMA" block — exact slot guidance per scene
- *   sceneType      → matched by template-selector.ts (loose match on format)
- *   remotionId     → identifier the render service uses to pick the Remotion composition
+ * Brands activate/deactivate templates via BrandTemplateConfig.
  */
 
 interface TemplateDefinition {
   name: string
+  format: string
   remotionId: string
   sceneType: string
   scope: string
   systemPrompt: string
   contentSchema: object
+  schemaJson?: object
 }
 
-export const PLATFORM_TEMPLATES: TemplateDefinition[] = [
-  // ─── Template 1: Reel — Hook & Value ──────────────────────────────
+// ─── SYSTEM TEMPLATES ─────────────────────────────────────────────────────────
+
+export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
+
+  // ─── Head Talk: Hook-First ────────────────────────────────────────────────
+  {
+    name: 'Head Talk — Hook First',
+    format: 'head_talk',
+    remotionId: '',
+    sceneType: 'head_talk',
+    scope: 'system',
+    systemPrompt: `You are a content creator who understands one fundamental truth about human attention: people do not stop scrolling for feeling — they stop for feeling.
+
+Your job is to manufacture that feeling, then justify it.
+
+---
+
+**PSYCHOLOGICAL FOUNDATION**
+
+Human decisions run on two systems. System 1 is fast, emotional, reflexive — it reacts before the brain consciously processes. System 2 is slow, rational, deliberate — it justifies what System 1 already decided.
+
+Viral content wins System 1 in the first two seconds, then gives System 2 enough to feel good about sharing it. Every piece must work this way:
+
+* Hook → activates System 1 through one of four triggers (see below)
+* Body → satisfies System 2 with insight, proof, story resolution, or concrete value
+* CTA → closes the loop the hook opened. Feels inevitable, not appended.
+
+---
+
+**THE FOUR HOOK TRIGGERS**
+
+Every scroll-stopping hook runs on one of these. Know which one you're using before you write the first word.
+
+1. **NOVELTY** — something the viewer has never seen framed this way.
+   "The advice that made me 2X revenue was the one I almost ignored."
+
+2. **TENSION** — an unresolved conflict or stakes that feel personal.
+   "You're doing X right. It's still holding you back."
+
+3. **IDENTITY SIGNAL** — content that lets them say something about who they are by sharing it.
+   "This is for people who [specific belief they hold]."
+
+4. **STATUS THREAT** — something that implies they're behind, missing something, or wrong.
+   "Everyone doing X is making the same mistake."
+
+The strongest hooks combine two. The weakest use none — they just announce a topic.
+
+---
+
+**VOICE**
+
+Speak like the smartest person in the room who doesn't need anyone to know it. Confident without arrogance. Direct without coldness. Curious without performing curiosity.
+
+You are talking to one specific person: someone who is already thinking about this topic, doesn't need it explained from zero, and will leave the moment they feel condescended to or sold at. They've heard the generic version. Give them the real one.
+
+The test: does this sound like something a person would actually say, or like content?
+
+---
+
+**WHAT MAKES CONTENT SPREAD**
+
+People share what makes them feel smart, seen, or right. Specifically:
+
+* Content that says something they believe but couldn't articulate
+* Content that challenges something they accepted without questioning it
+* Content that gives them language for an experience they've already had
+
+Engineer for this. Not for likes. Likes are a lagging indicator of resonance.
+
+---
+
+**CRAFT RULES**
+
+**STRUCTURE:** One idea. One angle. One resolution. The piece is finished not when nothing can be added, but when nothing can be removed.
+
+**LANGUAGE:** Short sentences. Active verbs. Concrete nouns. No qualifications in the hook — save nuance for the body. One clause per sentence. Split or cut the rest.
+
+**SPECIFICITY:** "17%" beats "many". A named street beats "a city". A specific failure beats "struggle". Vagueness is the enemy of resonance.
+
+**PERSPECTIVE:** Speak to one person. "You" not "people". "You probably think…" not "Many people think…". If the piece could be addressed to anyone, it will land for no one.
+
+**HOOK:** Never open with "Today I want to talk about…", "In this video…", or the brand name. Win the reflex before the brain engages.
+
+**CTA:** One action. Closes the loop the hook opened. Follow / save / comment [specific prompt] / visit [link]. The CTA is the natural end of the idea — not a request.
+
+---
+
+**NEVER**
+
+* "Follow for more content like this" — generic, earns nothing
+* "Hope this helps!" — closes with neediness
+* Rhetorical questions the viewer can answer "no" to
+* Disclaimers or caveats in the hook
+* A confident tone wrapped around a generic idea — the voice doesn't save weak content. The idea has to work first.`,
+
+    contentSchema: {
+      format: 'head_talk',
+      structure: 'hook → tension/body → cta',
+      sections: [
+        {
+          key: 'hook',
+          label: 'Hook',
+          guidance:
+            'The first sentence spoken on camera. Wins System 1 in 2 seconds. Use one of the four triggers: NOVELTY, TENSION, IDENTITY SIGNAL, or STATUS THREAT. Never start with "Today I want to talk about". Max 2 sentences.',
+          maxWords: 30,
+        },
+        {
+          key: 'body',
+          label: 'Body',
+          guidance:
+            'Delivers on the hook. Short paragraphs — one idea each. Concrete, specific, no filler. Use numbers, named examples, and real specifics. This satisfies System 2. Max 150 words.',
+          maxWords: 150,
+        },
+        {
+          key: 'cta',
+          label: 'Call to Action',
+          guidance:
+            'One action. Closes the loop the hook opened. Feels like a natural ending, not an appended request. Max 2 sentences.',
+          maxWords: 25,
+        },
+      ],
+      captionStyle:
+        'Mirror the hook as the opening line. Expand with 2-3 value sentences. End with a comment prompt or save nudge. Keep it tight — captions are read by people who already stopped.',
+      hashtagCount: '8-12 targeted hashtags — specific niche first, broad topic last',
+    },
+
+    schemaJson: {
+      type: 'object',
+      required: ['hook', 'body', 'cta', 'caption', 'hashtags'],
+      properties: {
+        hook: { type: 'string', description: 'Opening hook — max 2 sentences' },
+        body: { type: 'string', description: 'Main content body — max 150 words' },
+        cta: { type: 'string', description: 'Call to action — max 2 sentences' },
+        caption: { type: 'string', description: 'Social media caption for publishing' },
+        hashtags: { type: 'array', items: { type: 'string' }, description: 'Hashtags without # prefix' },
+      },
+    },
+  },
+
+  // ─── Reel: Hook & Value ───────────────────────────────────────────────────
   {
     name: 'Reel — Hook & Value',
+    format: 'reel',
     remotionId: 'standard-reel',
     sceneType: 'reel',
-    scope: 'workspace',
+    scope: 'system',
     systemPrompt: `Use a hook-first structure: open with a single punchy question or bold statement (hook-text scene), follow with 2-3 text-over-media scenes each delivering one concrete insight, and close with a direct CTA. Every scene must earn its place — cut anything that doesn't add value. B-roll should feel aspirational and relevant to the brand's world. Aim for 4-5 scenes total. Keep the pacing tight: the viewer should feel they got real value in under 20 seconds.`,
     contentSchema: {
       format: 'reel',
@@ -52,8 +189,7 @@ export const PLATFORM_TEMPLATES: TemplateDefinition[] = [
           position: 3,
           type: 'text-over-media',
           purpose: 'Deliver the core value or solution',
-          guidance:
-            'The main insight or key takeaway. Concrete and actionable — not vague. Max 150 chars.',
+          guidance: 'The main insight or key takeaway. Concrete and actionable — not vague. Max 150 chars.',
         },
         {
           position: '4 (optional)',
@@ -71,63 +207,18 @@ export const PLATFORM_TEMPLATES: TemplateDefinition[] = [
         },
       ],
       captionStyle:
-        'Short hook sentence + 3-4 value bullets + one-line CTA. Line breaks between sections. No hashtag stuffing in the caption body.',
+        'Short hook sentence + 3-4 value bullets + one-line CTA. Line breaks between sections.',
       hashtagCount: '8-12 targeted hashtags — niche first, then broad',
     },
   },
 
-  // ─── Template 2: Carousel — Step-by-Step Guide ────────────────────
-  {
-    name: 'Carousel — Step-by-Step Guide',
-    remotionId: 'edu-carousel',
-    sceneType: 'carousel',
-    scope: 'workspace',
-    systemPrompt: `Structure this as a step-by-step educational carousel. The cover slide sets a clear promise ("How to X in Y steps"). Each content-slide teaches exactly one point with a clear heading and 2-3 sentence body — no slide should have two ideas. Use a list-slide near the end as a quick-win recap. End with a strong save CTA. Voice should be a knowledgeable friend explaining, not a textbook. Aim for 6-8 slides total. Every slide should make the viewer want to swipe to the next.`,
-    contentSchema: {
-      format: 'carousel',
-      totalSlides: '6-8',
-      structure: [
-        {
-          position: 1,
-          type: 'cover-slide',
-          purpose: 'Hook the swipe',
-          guidance:
-            'Title: the promise or topic — "X steps to Y" or "How to Z". Subtitle: who this is for or a teaser that creates curiosity. Make them swipe. Max title 80 chars, subtitle 120 chars.',
-        },
-        {
-          position: '2-5',
-          type: 'content-slide',
-          purpose: 'Teach one point per slide',
-          guidance:
-            'Heading: the step/point name (short and scannable, max 80 chars). Body: 2-3 sentences explaining it — concrete, specific, no filler. Max body 300 chars.',
-        },
-        {
-          position: 'second-to-last',
-          type: 'list-slide',
-          purpose: 'Quick-win recap',
-          guidance:
-            'Title: "Quick Summary" or "The Short Version". Items: 3-5 bullets distilling the key actions from the slides. Each item max 80 chars.',
-        },
-        {
-          position: 'last',
-          type: 'cta-slide',
-          purpose: 'Drive saves and follows',
-          guidance:
-            'CTA: "Save this for later" or "Follow for more [topic]". Include brand handle. Max CTA 60 chars.',
-        },
-      ],
-      captionStyle:
-        'Expand on the topic with one personal insight or example. Invite saves and shares. End with a question to drive comments.',
-      hashtagCount: '10-15 hashtags — niche-specific + broad topic mix',
-    },
-  },
-
-  // ─── Template 3: Reel — Storytelling Arc ──────────────────────────
+  // ─── Reel: Storytelling Arc ───────────────────────────────────────────────
   {
     name: 'Reel — Storytelling Arc',
+    format: 'reel',
     remotionId: 'story-reel',
     sceneType: 'reel',
-    scope: 'workspace',
+    scope: 'system',
     systemPrompt: `Use a three-act narrative arc: hook (create tension or curiosity) → insight (a powerful quote or turning point) → resolution (the takeaway) → CTA (invite the viewer in). Prioritize emotional resonance over information density. The quote-card is the emotional centerpiece — make it powerful, memorable, and attributable if possible. B-roll should be atmospheric and mood-driven. Aim for 4-5 scenes. The viewer should feel something, not just learn something.`,
     contentSchema: {
       format: 'reel',
@@ -152,7 +243,7 @@ export const PLATFORM_TEMPLATES: TemplateDefinition[] = [
           type: 'quote-card',
           purpose: 'The emotional turning point',
           guidance:
-            'A powerful insight, truth, or reframe expressed as a quote. If attributable (person, source, brand voice), include attribution. This is the scene viewers screenshot. Max 200 chars.',
+            'A powerful insight, truth, or reframe expressed as a quote. If attributable, include attribution. This is the scene viewers screenshot. Max 200 chars.',
         },
         {
           position: 4,
@@ -166,7 +257,7 @@ export const PLATFORM_TEMPLATES: TemplateDefinition[] = [
           type: 'cta-card',
           purpose: 'Invite engagement',
           guidance:
-            'Drive a comment or share — "Does this resonate?", "Share with someone who needs this", "Save for when you need it". Max 60 chars.',
+            'Drive a comment or share — "Does this resonate?", "Share with someone who needs this". Max 60 chars.',
         },
       ],
       captionStyle:
@@ -176,47 +267,57 @@ export const PLATFORM_TEMPLATES: TemplateDefinition[] = [
   },
 ]
 
+// ─── SEED FUNCTIONS ───────────────────────────────────────────────────────────
+
 /**
- * Seeds platform-default templates for a given brand.
- * Templates are workspace-scoped so all brands in the workspace can use them.
- * Uses upsert on (brandId + name) to be safe to re-run.
+ * Seeds system-scoped platform templates (brandId = "system").
+ * These are available to all brands via BrandTemplateConfig.
+ * Safe to re-run — upserts on (name, scope).
  */
-export async function seedTemplatesForBrand(prisma: PrismaClient, brandId: string): Promise<void> {
-  for (const template of PLATFORM_TEMPLATES) {
-    const existing = await prisma.template.findFirst({
-      where: { brandId, name: template.name },
-    })
-
-    if (existing) {
-      console.log(`  ↳ Template already exists: "${template.name}" — skipping`)
-      continue
-    }
-
-    await prisma.template.create({
-      data: {
-        brandId,
-        name: template.name,
-        remotionId: template.remotionId,
-        sceneType: template.sceneType,
-        scope: template.scope,
-        systemPrompt: template.systemPrompt,
-        contentSchema: template.contentSchema,
-        useBrandAssets: true,
+export async function seedSystemTemplates(prisma: PrismaClient): Promise<void> {
+  for (const t of SYSTEM_TEMPLATES) {
+    await prisma.template.upsert({
+      where: {
+        // use name+scope as logical unique key via findFirst + create/update pattern
+        // since there's no unique constraint on those fields, we use id from findFirst
+        id: (await prisma.template.findFirst({ where: { name: t.name, scope: 'system' } }))?.id ?? 'noop',
+      },
+      create: {
+        brandId: null,
+        name: t.name,
+        format: t.format,
+        remotionId: t.remotionId,
+        sceneType: t.sceneType,
+        scope: 'system',
+        systemPrompt: t.systemPrompt,
+        contentSchema: t.contentSchema,
+        schemaJson: t.schemaJson ?? undefined,
+        useBrandAssets: false,
+      },
+      update: {
+        systemPrompt: t.systemPrompt,
+        contentSchema: t.contentSchema,
+        schemaJson: t.schemaJson ?? undefined,
+        format: t.format,
       },
     })
+    console.log(`  ✓ Seeded system template: "${t.name}" (${t.format})`)
+  }
+}
 
-    // Enable for the brand by default
-    const created = await prisma.template.findFirst({
-      where: { brandId, name: template.name },
+/**
+ * Seeds brand-scoped templates for a given brand (legacy / brand-custom).
+ * @deprecated — prefer seedSystemTemplates. Kept for backward compat.
+ */
+export async function seedTemplatesForBrand(prisma: PrismaClient, brandId: string): Promise<void> {
+  // Activate all system templates for this brand
+  const systemTemplates = await prisma.template.findMany({ where: { scope: 'system' } })
+  for (const t of systemTemplates) {
+    await prisma.brandTemplateConfig.upsert({
+      where: { brandId_templateId: { brandId, templateId: t.id } },
+      create: { brandId, templateId: t.id, enabled: true },
+      update: {},
     })
-    if (created) {
-      await prisma.brandTemplateConfig.upsert({
-        where: { brandId_templateId: { brandId, templateId: created.id } },
-        create: { brandId, templateId: created.id, enabled: true },
-        update: { enabled: true },
-      })
-    }
-
-    console.log(`  ✓ Seeded template: "${template.name}" (${template.sceneType})`)
+    console.log(`  ✓ Activated system template "${t.name}" for brand ${brandId}`)
   }
 }

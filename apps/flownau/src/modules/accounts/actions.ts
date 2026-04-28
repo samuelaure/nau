@@ -459,35 +459,9 @@ export async function confirmUpload(
 
 export async function installDefaultTemplates(brandId: string): Promise<{ installed: number }> {
   await checkAuth()
-  const { PLATFORM_TEMPLATES } = await import('@/../prisma/seeds/templates')
-
-  let installed = 0
-  for (const template of PLATFORM_TEMPLATES) {
-    const existing = await prisma.template.findFirst({ where: { brandId, name: template.name } })
-    if (existing) continue
-
-    const created = await prisma.template.create({
-      data: {
-        brandId,
-        name: template.name,
-        remotionId: template.remotionId,
-        sceneType: template.sceneType,
-        scope: template.scope,
-        systemPrompt: template.systemPrompt,
-        contentSchema: template.contentSchema,
-        useBrandAssets: true,
-      },
-    })
-
-    await prisma.brandTemplateConfig.upsert({
-      where: { brandId_templateId: { brandId, templateId: created.id } },
-      create: { brandId, templateId: created.id, enabled: true },
-      update: { enabled: true },
-    })
-
-    installed++
-  }
-
+  const { seedTemplatesForBrand } = await import('@/../prisma/seeds/templates')
+  await seedTemplatesForBrand(prisma, brandId)
+  const installed = await prisma.brandTemplateConfig.count({ where: { brandId, enabled: true } })
   revalidatePath('/dashboard')
   return { installed }
 }
