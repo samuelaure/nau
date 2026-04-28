@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 import { getAuthUser } from '@/lib/auth'
+import { onPostPublished } from '@/modules/scheduling/post-published'
 
 /**
  * POST /api/compositions/[id]/mark-posted
@@ -45,6 +46,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         externalPostUrl: externalPostUrl ?? post.externalPostUrl,
       },
     })
+
+    await onPostPublished(id, post.brandId)
 
     return NextResponse.json({ post: updated }, { status: 200 })
   } catch (error) {
