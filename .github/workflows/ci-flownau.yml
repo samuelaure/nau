@@ -56,7 +56,8 @@ jobs:
     env:
       # NEXT_PUBLIC_* vars are baked into the Next.js bundle at build time — set them here.
       NEXT_PUBLIC_ACCOUNTS_URL: https://accounts.9nau.com
-      NEXT_PUBLIC_APP_URL: https://flownau.9nau.com
+      NEXT_PUBLIC_APP_URL: https://app.9nau.com
+      NEXT_PUBLIC_FLOWNAU_URL: https://flownau.9nau.com
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -157,6 +158,16 @@ jobs:
     permissions:
       packages: read
     steps:
+      - uses: actions/checkout@v4
+      - name: Sync docker-compose to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_SSH_HOST }}
+          username: root
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: apps/flownau/docker-compose.yml
+          target: ~/apps/flownau/
+          strip_components: 2
       - uses: appleboy/ssh-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

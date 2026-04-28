@@ -126,6 +126,16 @@ jobs:
     permissions:
       packages: read
     steps:
+      - uses: actions/checkout@v4
+      - name: Sync docker-compose to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_SSH_HOST }}
+          username: root
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: apps/nauthenticity/docker-compose.yml
+          target: ~/apps/nauthenticity/
+          strip_components: 2
       - uses: appleboy/ssh-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
