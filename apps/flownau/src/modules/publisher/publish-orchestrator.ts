@@ -6,9 +6,11 @@ import { publishTrialReel } from './instagram-trial-reels'
 import { publishCarousel } from './instagram-carousel'
 import { publishPhoto } from './instagram-photo'
 import type { PublishResult } from './types'
+import { onPostPublished } from '@/modules/scheduling/post-published'
 
 interface PostForPublish {
   id: string
+  brandId: string
   format: string | null
   videoUrl: string | null
   coverUrl: string | null
@@ -91,6 +93,7 @@ export async function publishComposition(post: PostForPublish): Promise<PublishR
       },
     })
     logger.info(`[PublishOrchestrator] Published ${post.id} → ${result.permalink ?? result.externalId}`)
+    await onPostPublished(post.id, post.brandId)
   }
 
   return result

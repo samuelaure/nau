@@ -89,6 +89,10 @@ export default async function WorkspaceOverviewPage({
       orderBy: { createdAt: 'desc' },
     })
 
+    const postSchedule = activeTab === 'settings'
+      ? await prisma.postSchedule.findUnique({ where: { brandId } })
+      : null
+
     const assets = activeTab === 'assets'
       ? await prisma.asset.findMany({
           where: { brandId },
@@ -164,6 +168,14 @@ export default async function WorkspaceOverviewPage({
                 creationPrompt: localBrand.creationPrompt,
                 shortCode: localBrand.shortCode,
               }}
+              initialSchedule={postSchedule ? {
+                formatChain: postSchedule.formatChain,
+                dailyFrequency: postSchedule.dailyFrequency,
+                windowStart: postSchedule.windowStart,
+                windowEnd: postSchedule.windowEnd,
+                timezone: postSchedule.timezone,
+                isActive: postSchedule.isActive,
+              } : null}
             />
           )}
         </div>

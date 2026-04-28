@@ -82,7 +82,39 @@ const FORMAT_LABEL: Record<string, string> = {
   story: 'Story',
 }
 
+// ─── Slot chip (empty PostSlot placeholder) ───────────────────────────────────
+
+function SlotChip({ format, time }: { format: string; time: string }) {
+  const FormatIcon = FORMAT_ICON[format] ?? Film
+  return (
+    <div className="w-full rounded p-1.5 flex flex-col gap-0.5 text-[10px] border border-dashed border-white/10 text-white/25">
+      <div className="flex items-center gap-1">
+        <FormatIcon size={9} className="shrink-0" />
+        <span className="font-medium truncate">{FORMAT_LABEL[format] ?? format}</span>
+      </div>
+      <span className="text-[9px] opacity-60 pl-3">{time}</span>
+      <span className="text-[9px] pl-3">Empty slot</span>
+    </div>
+  )
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+type PostSlot = {
+  id: string
+  format: string
+  status: string
+  scheduledAt: string
+  post: {
+    id: string
+    status: string
+    format: string | null
+    caption: string | null
+    scheduledAt: string | null
+    createdAt: string
+    userUploadedMediaUrl: string | null
+  } | null
+}
 
 type Composition = {
   id: string
@@ -561,15 +593,21 @@ function CompositionChip({ comp, onClick }: { comp: Composition; onClick: () => 
 
 export default function AccountCalendar({ brandId }: { brandId: string }) {
   const [compositions, setCompositions] = useState<Composition[]>([])
+  const [slots, setSlots] = useState<PostSlot[]>([])
   const [loading, setLoading] = useState(true)
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()))
   const [selected, setSelected] = useState<Composition | null>(null)
 
   const fetchCompositions = useCallback(async () => {
     try {
-      const res = await fetch(`/api/compositions?brandId=${brandId}`)
-      const data = await res.json()
-      setCompositions(data.compositions || [])
+      const [compRes, slotRes] = await Promise.all([
+        fetch(`/api/compositions?brandId=${brandId}`),
+        fetch(`/api/brands/${brandId}/slots`),
+      ])
+      const compData = await compRes.json()
+      const slotData = await slotRes.json()
+      setCompositions(compData.compositions || [])
+      setSlots(slotData.slots || [])
     } catch {
       toast.error('Failed to load calendar')
     } finally {
@@ -588,6 +626,9 @@ export default function AccountCalendar({ brandId }: { brandId: string }) {
     compositions
       .filter((c) => c.scheduledAt && isSameDay(new Date(c.scheduledAt), day))
       .sort((a, b) => (a.scheduledAt! < b.scheduledAt! ? -1 : 1))
+
+  const emptySlotsForDay = (day: Date) =>
+    slots.filter((s) => s.status === 'empty' && isSameDay(new Date(s.scheduledAt), day))
 
   const unscheduled = compositions.filter((c) => !c.scheduledAt)
 
@@ -662,6 +703,7 @@ export default function AccountCalendar({ brandId }: { brandId: string }) {
           {weekDays.map((day) => {
             const isToday = isSameDay(day, today)
             const dayComps = forDay(day)
+            const dayEmptySlots = emptySlotsForDay(day)
             return (
               <div
                 key={day.toISOString()}
@@ -679,7 +721,7 @@ export default function AccountCalendar({ brandId }: { brandId: string }) {
                   </p>
                 </div>
 
-                {dayComps.length === 0 ? (
+                {dayComps.length === 0 && dayEmptySlots.length === 0 ? (
                   <div className="flex-1 flex items-center justify-center">
                     <span className="text-[10px] text-gray-700">—</span>
                   </div>
@@ -691,6 +733,9 @@ export default function AccountCalendar({ brandId }: { brandId: string }) {
                         comp={comp}
                         onClick={() => setSelected(comp)}
                       />
+                    ))}
+                    {dayEmptySlots.map((slot) => (
+                      <SlotChip key={slot.id} format={slot.format} time={fmtTime(slot.scheduledAt)} />
                     ))}
                   </div>
                 )}

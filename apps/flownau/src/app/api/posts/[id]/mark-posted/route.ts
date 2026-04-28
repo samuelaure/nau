@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 import { checkBrandAccess } from '@/modules/shared/actions'
 import { logger } from '@/lib/logger'
+import { onPostPublished } from '@/modules/scheduling/post-published'
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -23,6 +24,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     })
 
     logger.info({ postId: id, format: post.format }, '[MARK_POSTED] Post manually marked as published')
+    await onPostPublished(id, post.brandId)
 
     return NextResponse.json({ success: true })
   } catch (error) {

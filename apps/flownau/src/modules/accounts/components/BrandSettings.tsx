@@ -9,10 +9,20 @@ import AccountPersonas from './AccountPersonas'
 import AccountContentPrinciples from './AccountContentPrinciples'
 import AccountPlanners from './AccountPlanners'
 import AccountIdeasFrameworks from './AccountIdeasFrameworks'
+import AccountSchedule from './AccountSchedule'
 import { useState } from 'react'
 import { cn } from '@/modules/shared/utils'
 
-type BrandSettingsTab = 'settings' | 'personas' | 'strategy' | 'principles' | 'planner'
+type BrandSettingsTab = 'settings' | 'personas' | 'strategy' | 'principles' | 'planner' | 'schedule'
+
+interface PostSchedule {
+  formatChain: string[]
+  dailyFrequency: number
+  windowStart: string
+  windowEnd: string
+  timezone: string
+  isActive: boolean
+}
 
 const LANGUAGES = [
   { value: 'Spanish', label: 'Spanish' },
@@ -30,12 +40,13 @@ type Brand = {
   shortCode: string | null
 }
 
-export default function BrandSettings({ brand }: { brand: Brand }) {
+export default function BrandSettings({ brand, initialSchedule }: { brand: Brand; initialSchedule: PostSchedule | null }) {
   const [tab, setTab] = useState<BrandSettingsTab>('settings')
   const [isPending, startTransition] = useTransition()
 
   const tabs: { id: BrandSettingsTab; label: string }[] = [
     { id: 'settings', label: 'Settings' },
+    { id: 'schedule', label: 'Schedule' },
     { id: 'personas', label: 'Personas' },
     { id: 'strategy', label: 'Strategy' },
     { id: 'principles', label: 'Principles' },
@@ -167,6 +178,7 @@ export default function BrandSettings({ brand }: { brand: Brand }) {
         </Card>
       )}
 
+      {tab === 'schedule' && <AccountSchedule brandId={brand.id} initialSchedule={initialSchedule} />}
       {tab === 'personas' && <AccountPersonas brandId={brand.id} />}
       {tab === 'strategy' && <AccountIdeasFrameworks brandId={brand.id} />}
       {tab === 'principles' && <AccountContentPrinciples brandId={brand.id} />}
