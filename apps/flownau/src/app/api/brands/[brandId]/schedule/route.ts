@@ -6,6 +6,7 @@ import { getAuthUser } from '@/lib/auth'
 import { checkBrandAccess } from '@/modules/shared/actions'
 import { logError } from '@/modules/shared/logger'
 import { z } from 'zod'
+import { materializeSlots } from '@/modules/scheduling/slot-materializer'
 
 const ScheduleUpsertSchema = z.object({
   formatChain: z.array(z.string()).min(1),
@@ -50,6 +51,15 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ bran
       create: { brandId, ...data },
       update: data,
     })
+
+    // Re-materialize slots so calendar reflects the new schedule immediately.
+    // Delete future empty slots first so stale ones from old settings don't linger.
+    if (data.isActive) {
+      await prisma.postSlot.deleteMany({
+        where: { brandId, status: 'empty', scheduledAt: { gt: new Date() } },
+      })
+      materializeSlots(brandId, 31).catch(() => {})
+    }
 
     return NextResponse.json({ schedule })
   } catch (error) {

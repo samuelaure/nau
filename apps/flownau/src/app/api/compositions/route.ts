@@ -20,20 +20,29 @@ export async function GET(req: Request) {
     const isPool = searchParams.get('pool') === '1'
     const statusFilter = searchParams.get('status')
 
+    // Statuses that represent actionable content (past the idea stage)
+    const CONTENT_STATUSES = [
+      'DRAFT_PENDING', 'DRAFT_APPROVED',
+      'RENDERING', 'RENDERED_PENDING', 'RENDERED_APPROVED',
+      'PUBLISHING', 'PUBLISHED', 'FAILED',
+      // legacy values kept for backwards compat
+      'DRAFT', 'APPROVED', 'SCHEDULED', 'RENDERED',
+    ]
+
     const whereClause = isCalendar
       ? {
           brandId,
-          status: { in: ['APPROVED', 'SCHEDULED', 'RENDERING', 'RENDERED'] },
+          status: { in: CONTENT_STATUSES },
         }
       : isPool
         ? {
             brandId,
-            status: { in: ['DRAFT', 'APPROVED'] },
+            status: { in: ['DRAFT', 'DRAFT_PENDING', 'DRAFT_APPROVED', 'APPROVED'] },
             scheduledAt: null,
           }
         : statusFilter
           ? { brandId, status: statusFilter }
-          : { brandId }
+          : { brandId, status: { in: CONTENT_STATUSES } }
 
     const posts = await prisma.post.findMany({
       where: whereClause,

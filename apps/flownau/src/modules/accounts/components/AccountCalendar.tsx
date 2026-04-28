@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { Button } from '@/modules/shared/components/ui/Button'
 import { toast } from 'sonner'
 import {
@@ -17,6 +18,7 @@ import {
   CheckCircle2,
   Send,
   AlertCircle,
+  CalendarClock,
 } from 'lucide-react'
 import { cn } from '@/modules/shared/utils'
 
@@ -82,18 +84,76 @@ const FORMAT_LABEL: Record<string, string> = {
   story: 'Story',
 }
 
-// ─── Slot chip (empty PostSlot placeholder) ───────────────────────────────────
+// ─── Slot chip (empty PostSlot placeholder) — droppable ──────────────────────
 
-function SlotChip({ format, time }: { format: string; time: string }) {
-  const FormatIcon = FORMAT_ICON[format] ?? Film
+function SlotChip({
+  slot,
+  dragState,
+  onDrop,
+}: {
+  slot: PostSlot
+  dragState: DragState | null
+  onDrop: (slotId: string, scheduledAt: string) => void
+}) {
+  const FormatIcon = FORMAT_ICON[slot.format] ?? Film
+  const canDrop = dragState?.format === slot.format
+  const [over, setOver] = useState(false)
+
   return (
-    <div className="w-full rounded p-1.5 flex flex-col gap-0.5 text-[10px] border border-dashed border-white/10 text-white/25">
+    <div
+      onDragOver={(e) => { if (canDrop) { e.preventDefault(); setOver(true) } }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => { e.preventDefault(); setOver(false); if (canDrop) onDrop(slot.id, slot.scheduledAt) }}
+      className={cn(
+        'w-full rounded p-1.5 flex flex-col gap-0.5 text-[10px] border border-dashed transition-colors',
+        over && canDrop
+          ? 'border-accent bg-accent/10 text-accent'
+          : canDrop && dragState
+            ? 'border-accent/40 text-accent/50'
+            : 'border-white/10 text-white/25',
+      )}
+    >
       <div className="flex items-center gap-1">
         <FormatIcon size={9} className="shrink-0" />
-        <span className="font-medium truncate">{FORMAT_LABEL[format] ?? format}</span>
+        <span className="font-medium truncate">{FORMAT_LABEL[slot.format] ?? slot.format}</span>
       </div>
-      <span className="text-[9px] opacity-60 pl-3">{time}</span>
-      <span className="text-[9px] pl-3">Empty slot</span>
+      <span className="text-[9px] opacity-60 pl-3">{fmtTime(slot.scheduledAt)}</span>
+      <span className="text-[9px] pl-3">{over && canDrop ? 'Drop here' : 'Empty slot'}</span>
+    </div>
+  )
+}
+
+// ─── Between-slot drop zone ───────────────────────────────────────────────────
+
+function BetweenDropZone({
+  beforeTime,
+  afterTime,
+  dragState,
+  onDrop,
+}: {
+  beforeTime: string | null
+  afterTime: string | null
+  dragState: DragState | null
+  onDrop: (scheduledAt: string) => void
+}) {
+  const [over, setOver] = useState(false)
+  if (!dragState) return null
+
+  const midTime = beforeTime && afterTime
+    ? new Date((new Date(beforeTime).getTime() + new Date(afterTime).getTime()) / 2).toISOString()
+    : afterTime ?? beforeTime ?? new Date().toISOString()
+
+  return (
+    <div
+      onDragOver={(e) => { e.preventDefault(); setOver(true) }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => { e.preventDefault(); setOver(false); onDrop(midTime) }}
+      className={cn(
+        'w-full h-1.5 rounded transition-all',
+        over ? 'h-6 bg-accent/20 border border-dashed border-accent flex items-center justify-center' : 'hover:h-3 bg-white/5',
+      )}
+    >
+      {over && <span className="text-[9px] text-accent">Drop here · {fmtTime(midTime)}</span>}
     </div>
   )
 }
@@ -129,6 +189,11 @@ type Composition = {
   payload?: Record<string, unknown> | null
 }
 
+type DragState = {
+  postId: string
+  format: string
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -155,18 +220,16 @@ function isSameDay(a: Date, b: Date): boolean {
 }
 
 function fmtTime(iso: string) {
-  return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+  return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
 function fmtDateTime(iso: string) {
-  return new Date(iso).toLocaleString(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  const d = new Date(iso)
+  const date = d.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })
+  const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })
+  return `${date} ${time}`
 }
+
 
 // ─── Composition detail modal ─────────────────────────────────────────────────
 
@@ -311,7 +374,7 @@ function CompositionModal({
             <div>
               <p className="font-semibold">{FORMAT_LABEL[comp.format] ?? comp.format}</p>
               <p className="text-xs text-text-secondary">
-                Created {new Date(comp.createdAt).toLocaleDateString()}
+                Created {new Date(comp.createdAt).toLocaleDateString('en-GB')}
               </p>
             </div>
           </div>
@@ -591,9 +654,10 @@ function CompositionChip({ comp, onClick }: { comp: Composition; onClick: () => 
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function AccountCalendar({ brandId }: { brandId: string }) {
+export default function AccountCalendar({ brandId, workspaceId }: { brandId: string; workspaceId?: string }) {
   const [compositions, setCompositions] = useState<Composition[]>([])
   const [slots, setSlots] = useState<PostSlot[]>([])
+  const [dragState, setDragState] = useState<DragState | null>(null)
   const [loading, setLoading] = useState(true)
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()))
   const [selected, setSelected] = useState<Composition | null>(null)
@@ -632,6 +696,30 @@ export default function AccountCalendar({ brandId }: { brandId: string }) {
 
   const unscheduled = compositions.filter((c) => !c.scheduledAt)
 
+  const handleDrop = async (postId: string, scheduledAt: string, slotId?: string) => {
+    setDragState(null)
+    // Optimistic update
+    setCompositions((prev) =>
+      prev.map((c) => c.id === postId ? { ...c, scheduledAt } : c),
+    )
+    if (slotId) {
+      setSlots((prev) =>
+        prev.map((s) => s.id === slotId ? { ...s, status: 'filled', post: null } : s),
+      )
+    }
+    try {
+      await fetch(`/api/posts/${postId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scheduledAt, ...(slotId ? { slotId } : {}) }),
+      })
+      fetchCompositions()
+    } catch {
+      toast.error('Failed to schedule post')
+      fetchCompositions()
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
@@ -643,6 +731,15 @@ export default function AccountCalendar({ brandId }: { brandId: string }) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {workspaceId && (
+            <Link
+              href={`/dashboard/workspace/${workspaceId}?brandId=${brandId}&tab=settings&settingsTab=schedule`}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-accent bg-accent/10 hover:bg-accent/20 border border-accent/30 hover:border-accent/50 transition-colors whitespace-nowrap"
+            >
+              <CalendarClock size={13} />
+              Schedule Setup
+            </Link>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -660,10 +757,10 @@ export default function AccountCalendar({ brandId }: { brandId: string }) {
             <ChevronLeft size={16} />
           </Button>
           <span className="text-sm text-white min-w-[160px] text-center">
-            {weekStart.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} –{' '}
-            {addDays(weekStart, 6).toLocaleDateString(undefined, {
-              month: 'short',
+            {weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} –{' '}
+            {addDays(weekStart, 6).toLocaleDateString('en-GB', {
               day: 'numeric',
+              month: 'short',
               year: 'numeric',
             })}
           </span>
@@ -723,20 +820,57 @@ export default function AccountCalendar({ brandId }: { brandId: string }) {
 
                 {dayComps.length === 0 && dayEmptySlots.length === 0 ? (
                   <div className="flex-1 flex items-center justify-center">
-                    <span className="text-[10px] text-gray-700">—</span>
+                    {dragState ? (
+                      <BetweenDropZone
+                        beforeTime={null}
+                        afterTime={`${day.toISOString().slice(0, 10)}T12:00:00.000Z`}
+                        dragState={dragState}
+                        onDrop={(t) => handleDrop(dragState.postId, t)}
+                      />
+                    ) : (
+                      <span className="text-[10px] text-gray-700">—</span>
+                    )}
                   </div>
                 ) : (
                   <div className="flex flex-col gap-1">
-                    {dayComps.map((comp) => (
-                      <CompositionChip
-                        key={comp.id}
-                        comp={comp}
-                        onClick={() => setSelected(comp)}
-                      />
-                    ))}
-                    {dayEmptySlots.map((slot) => (
-                      <SlotChip key={slot.id} format={slot.format} time={fmtTime(slot.scheduledAt)} />
-                    ))}
+                    {/* Merge and sort all chips by time for accurate between-drop zones */}
+                    {(() => {
+                      type ChipItem =
+                        | { kind: 'comp'; data: Composition; time: string }
+                        | { kind: 'slot'; data: PostSlot; time: string }
+                      const items: ChipItem[] = [
+                        ...dayComps.map(c => ({ kind: 'comp' as const, data: c, time: c.scheduledAt! })),
+                        ...dayEmptySlots.map(s => ({ kind: 'slot' as const, data: s, time: s.scheduledAt })),
+                      ].sort((a, b) => a.time < b.time ? -1 : 1)
+
+                      return items.map((item, idx) => (
+                        <div key={item.kind === 'comp' ? item.data.id : item.data.id}>
+                          <BetweenDropZone
+                            beforeTime={idx > 0 ? items[idx - 1].time : null}
+                            afterTime={item.time}
+                            dragState={dragState}
+                            onDrop={(t) => handleDrop(dragState!.postId, t)}
+                          />
+                          {item.kind === 'comp' ? (
+                            <CompositionChip comp={item.data} onClick={() => setSelected(item.data)} />
+                          ) : (
+                            <SlotChip
+                              slot={item.data}
+                              dragState={dragState}
+                              onDrop={(slotId, scheduledAt) => handleDrop(dragState!.postId, scheduledAt, slotId)}
+                            />
+                          )}
+                          {idx === items.length - 1 && (
+                            <BetweenDropZone
+                              beforeTime={item.time}
+                              afterTime={null}
+                              dragState={dragState}
+                              onDrop={(t) => handleDrop(dragState!.postId, t)}
+                            />
+                          )}
+                        </div>
+                      ))
+                    })()}
                   </div>
                 )}
               </div>
@@ -748,20 +882,28 @@ export default function AccountCalendar({ brandId }: { brandId: string }) {
       {/* Unscheduled compositions */}
       {!loading && unscheduled.length > 0 && (
         <div>
-          <p className="text-xs text-text-secondary font-bold uppercase tracking-widest mb-3">
+          <p className="text-xs text-text-secondary font-bold uppercase tracking-widest mb-1">
             Unscheduled
+          </p>
+          <p className="text-[11px] text-text-secondary mb-3">
+            Drag a card onto a matching empty slot in the calendar, or between two slots to set a custom time.
           </p>
           <div className="flex flex-wrap gap-2">
             {unscheduled.map((comp) => {
               const FormatIcon = FORMAT_ICON[comp.format] ?? Film
               const display = getDisplayStatus(comp.status)
               const tag = getSecondaryTag(comp.format, display)
+              const isDragging = dragState?.postId === comp.id
               return (
                 <button
                   key={comp.id}
+                  draggable
+                  onDragStart={() => setDragState({ postId: comp.id, format: comp.format })}
+                  onDragEnd={() => setDragState(null)}
                   onClick={() => setSelected(comp)}
                   className={cn(
-                    'flex items-center gap-2 rounded-lg px-3 py-2 text-xs border transition-opacity hover:opacity-80',
+                    'flex items-center gap-2 rounded-lg px-3 py-2 text-xs border transition-all cursor-grab active:cursor-grabbing',
+                    isDragging ? 'opacity-40 scale-95' : 'hover:opacity-80',
                     DISPLAY_COLOR[display],
                   )}
                 >
