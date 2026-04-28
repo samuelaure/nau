@@ -54,12 +54,8 @@ async function syncToNauthenticity(username: string, profileImageUrl: string | n
 }
 
 const BrandUpdateSchema = z.object({
-  directorPrompt: z.string().nullable().optional(),
-  creationPrompt: z.string().nullable().optional(),
   shortCode: z.string().nullable().optional(),
   language: z.string().nullable().optional(),
-  ideationCount: z.coerce.number().int().min(1).max(30).optional().nullable(),
-  autoApproveIdeas: z.string().optional().transform((v) => v === 'true'),
 })
 
 const SocialProfileUpdateSchema = z.object({
@@ -173,28 +169,20 @@ export async function addBrand(formData: FormData): Promise<{ id: string; worksp
   return { id: nauBrand.id, workspaceId }
 }
 
-/** Update brand-level pipeline config (prompts, shortCode). */
+/** Update brand-level pipeline config (language, shortCode). */
 export async function updateBrand(brandId: string, formData: FormData) {
   await checkAuth()
   const parsedId = IdSchema.parse(brandId)
-  const { directorPrompt, creationPrompt, shortCode, language, ideationCount, autoApproveIdeas } = BrandUpdateSchema.parse({
-    directorPrompt: formData.get('directorPrompt'),
-    creationPrompt: formData.get('creationPrompt'),
+  const { shortCode, language } = BrandUpdateSchema.parse({
     shortCode: formData.get('shortCode'),
     language: formData.get('language'),
-    ideationCount: formData.get('ideationCount'),
-    autoApproveIdeas: formData.get('autoApproveIdeas'),
   })
 
   await prisma.brand.update({
     where: { id: parsedId },
     data: {
-      directorPrompt: directorPrompt ?? undefined,
-      creationPrompt: creationPrompt ?? undefined,
       shortCode: shortCode ?? undefined,
       language: language ?? undefined,
-      autoApproveIdeas,
-      ...(ideationCount != null && { ideationCount }),
     },
   })
 

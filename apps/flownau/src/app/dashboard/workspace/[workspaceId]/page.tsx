@@ -39,10 +39,10 @@ export default async function WorkspaceOverviewPage({
   searchParams,
 }: {
   params: Promise<{ workspaceId: string }>
-  searchParams: Promise<{ brandId?: string; tab?: string; returnTab?: string }>
+  searchParams: Promise<{ brandId?: string; tab?: string; returnTab?: string; settingsTab?: string }>
 }) {
   const { workspaceId } = await params
-  const { brandId, tab: tabParam, returnTab } = await searchParams
+  const { brandId, tab: tabParam, returnTab, settingsTab } = await searchParams
   const activeTab: Tab = (TABS.find((t) => t.id === tabParam)?.id ?? 'calendar') as Tab
   const safeReturnTab = (TABS.find((t) => t.id === returnTab && t.id !== 'settings')?.id ?? 'calendar') as Tab
 
@@ -134,7 +134,7 @@ export default async function WorkspaceOverviewPage({
 
         {/* Tab content */}
         <div className="min-h-[400px]">
-          {activeTab === 'calendar' && <AccountCalendar brandId={brandId} />}
+          {activeTab === 'calendar' && <AccountCalendar brandId={brandId} workspaceId={workspaceId} />}
           {activeTab === 'ideas' && <BrandPosts brandId={brandId} />}
           {activeTab === 'pool' && <AccountPool brandId={brandId} workspaceId={workspaceId} />}
           {activeTab === 'compositions' && <AccountCompositions brandId={brandId} />}
@@ -164,10 +164,9 @@ export default async function WorkspaceOverviewPage({
                 language: localBrand.language,
                 ideationCount: localBrand.ideationCount,
                 autoApproveIdeas: localBrand.autoApproveIdeas,
-                directorPrompt: localBrand.directorPrompt,
-                creationPrompt: localBrand.creationPrompt,
                 shortCode: localBrand.shortCode,
               }}
+              initialTab={settingsTab as 'general' | 'personas' | 'strategy' | 'principles' | 'planner' | 'schedule' | undefined}
               initialSchedule={postSchedule ? {
                 formatChain: postSchedule.formatChain,
                 dailyFrequency: postSchedule.dailyFrequency,

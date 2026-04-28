@@ -4,7 +4,6 @@ import { useTransition } from 'react'
 import { updateBrand, updateOwnedSynthesis } from '@/modules/accounts/actions'
 import { Card } from '@/modules/shared/components/ui/Card'
 import { Button } from '@/modules/shared/components/ui/Button'
-import { Textarea } from '@/modules/shared/components/ui/Textarea'
 import AccountPersonas from './AccountPersonas'
 import AccountContentPrinciples from './AccountContentPrinciples'
 import AccountPlanners from './AccountPlanners'
@@ -13,7 +12,7 @@ import AccountSchedule from './AccountSchedule'
 import { useState } from 'react'
 import { cn } from '@/modules/shared/utils'
 
-type BrandSettingsTab = 'settings' | 'personas' | 'strategy' | 'principles' | 'planner' | 'schedule'
+type BrandSettingsTab = 'general' | 'personas' | 'strategy' | 'principles' | 'planner' | 'schedule'
 
 interface PostSchedule {
   formatChain: string[]
@@ -35,18 +34,16 @@ type Brand = {
   language: string
   ideationCount: number
   autoApproveIdeas: boolean
-  directorPrompt: string | null
-  creationPrompt: string | null
   shortCode: string | null
 }
 
-export default function BrandSettings({ brand, initialSchedule }: { brand: Brand; initialSchedule: PostSchedule | null }) {
-  const [tab, setTab] = useState<BrandSettingsTab>('settings')
+export default function BrandSettings({ brand, initialSchedule, initialTab }: { brand: Brand; initialSchedule: PostSchedule | null; initialTab?: BrandSettingsTab }) {
+  const [tab, setTab] = useState<BrandSettingsTab>(initialTab ?? 'general')
   const [isPending, startTransition] = useTransition()
   const [isGenerating, setIsGenerating] = useState(false)
 
   const tabs: { id: BrandSettingsTab; label: string }[] = [
-    { id: 'settings', label: 'Settings' },
+    { id: 'general', label: 'General' },
     { id: 'schedule', label: 'Schedule' },
     { id: 'personas', label: 'Personas' },
     { id: 'strategy', label: 'Strategy' },
@@ -79,7 +76,7 @@ export default function BrandSettings({ brand, initialSchedule }: { brand: Brand
         ))}
       </div>
 
-      {tab === 'settings' && (
+      {tab === 'general' && (
         <Card className="p-8 max-w-2xl">
           <h3 className="text-xl font-heading font-semibold mb-6">Brand Pipeline Config</h3>
           <form action={handleUpdate} className="flex flex-col gap-6">
@@ -101,73 +98,6 @@ export default function BrandSettings({ brand, initialSchedule }: { brand: Brand
                   </option>
                 ))}
               </select>
-            </div>
-
-            <div className="w-full">
-              <label className="form-label mb-1 block">
-                Ideas per generation
-                <span className="text-xs font-normal ml-2 opacity-70">
-                  Default number of ideas generated per brainstorm session.
-                </span>
-              </label>
-              <input
-                type="number"
-                name="ideationCount"
-                min={1}
-                max={30}
-                defaultValue={brand.ideationCount}
-                className="bg-gray-950 border border-border text-white rounded p-2.5 text-sm w-24"
-              />
-            </div>
-
-            <div className="w-full">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  name="autoApproveIdeas"
-                  value="true"
-                  defaultChecked={brand.autoApproveIdeas}
-                  className="w-4 h-4 accent-accent"
-                />
-                <span className="form-label">
-                  Auto-approve ideas
-                  <span className="text-xs font-normal ml-2 opacity-70">
-                    Ideas go directly to Approved without manual review.
-                  </span>
-                </span>
-              </label>
-            </div>
-
-            <div className="w-full border-t border-border pt-6">
-              <label className="form-label mb-1 block">
-                Director Prompt
-                <span className="text-xs font-normal ml-2 opacity-70">
-                  How the AI selects the best template for a given idea.
-                </span>
-              </label>
-              <Textarea
-                name="directorPrompt"
-                defaultValue={brand.directorPrompt || ''}
-                rows={5}
-                className="bg-gray-950 border border-border text-white w-full rounded p-3 text-sm"
-                placeholder="Explain how the AI should choose the best template for a given idea…"
-              />
-            </div>
-
-            <div className="w-full">
-              <label className="form-label mb-1 block">
-                Creation Prompt
-                <span className="text-xs font-normal ml-2 opacity-70">
-                  Brand-specific instructions for template iteration and building.
-                </span>
-              </label>
-              <Textarea
-                name="creationPrompt"
-                defaultValue={brand.creationPrompt || ''}
-                rows={5}
-                className="bg-gray-950 border border-border text-white w-full rounded p-3 text-sm"
-                placeholder="Override the native structural rules with brand-specific iteration logic…"
-              />
             </div>
 
             <div className="w-full border-t border-white/5 pt-6 flex flex-col gap-3">
@@ -208,7 +138,7 @@ export default function BrandSettings({ brand, initialSchedule }: { brand: Brand
         </Card>
       )}
 
-      {tab === 'schedule' && <AccountSchedule brandId={brand.id} initialSchedule={initialSchedule} />}
+      {tab === 'schedule' && <AccountSchedule brandId={brand.id} initialSchedule={initialSchedule} initialIdeationCount={brand.ideationCount} initialAutoApproveIdeas={brand.autoApproveIdeas} />}
       {tab === 'personas' && <AccountPersonas brandId={brand.id} />}
       {tab === 'strategy' && <AccountIdeasFrameworks brandId={brand.id} />}
       {tab === 'principles' && <AccountContentPrinciples brandId={brand.id} />}

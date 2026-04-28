@@ -18,6 +18,8 @@ interface PostSchedule {
 interface AccountScheduleProps {
   brandId: string
   initialSchedule: PostSchedule | null
+  initialIdeationCount: number
+  initialAutoApproveIdeas: boolean
 }
 
 // ── Format metadata ───────────────────────────────────────────────────────────
@@ -76,11 +78,13 @@ const TIMEZONES = [
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function AccountSchedule({ brandId, initialSchedule }: AccountScheduleProps) {
+export default function AccountSchedule({ brandId, initialSchedule, initialIdeationCount, initialAutoApproveIdeas }: AccountScheduleProps) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [availableFormats, setAvailableFormats] = useState<string[]>([])
+  const [ideationCount, setIdeationCount] = useState(initialIdeationCount)
+  const [autoApproveIdeas, setAutoApproveIdeas] = useState(initialAutoApproveIdeas)
 
   // Fetch enabled template formats, then expand to scheduling formats
   useEffect(() => {
@@ -173,14 +177,25 @@ export default function AccountSchedule({ brandId, initialSchedule }: AccountSch
     setSaving(true)
     setError(null)
     try {
-      const res = await fetch(`/api/brands/${brandId}/schedule`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ formatChain: chain, dailyFrequency, windowStart, windowEnd, timezone, isActive }),
-      })
-      if (!res.ok) {
-        const data = await res.json()
+      const [scheduleRes, brandRes] = await Promise.all([
+        fetch(`/api/brands/${brandId}/schedule`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ formatChain: chain, dailyFrequency, windowStart, windowEnd, timezone, isActive }),
+        }),
+        fetch(`/api/brands/${brandId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ideationCount, autoApproveIdeas }),
+        }),
+      ])
+      if (!scheduleRes.ok) {
+        const data = await scheduleRes.json()
         throw new Error(data.error ?? 'Save failed')
+      }
+      if (!brandRes.ok) {
+        const data = await brandRes.json()
+        throw new Error(data.error ?? 'Brand update failed')
       }
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
@@ -267,6 +282,43 @@ export default function AccountSchedule({ brandId, initialSchedule }: AccountSch
                 </option>
               ))}
             </select>
+          </div>
+        </div>
+      </Card>
+
+      {/* Idea generation */}
+      <Card className="p-6 flex flex-col gap-5">
+        <h3 className="font-semibold text-white">Idea Generation</h3>
+        <div className="flex gap-6 flex-wrap items-end">
+          <div>
+            <label className="form-label block mb-1">
+              Ideas per generation
+              <span className="text-xs font-normal ml-2 opacity-70">Ideas generated per brainstorm session.</span>
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={30}
+              value={ideationCount}
+              onChange={(e) => setIdeationCount(Number(e.target.value))}
+              className="bg-gray-950 border border-border text-white rounded p-2.5 text-sm w-24"
+            />
+          </div>
+          <div className="pb-1">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={autoApproveIdeas}
+                onChange={(e) => setAutoApproveIdeas(e.target.checked)}
+                className="w-4 h-4 accent-accent"
+              />
+              <span className="form-label">
+                Auto-approve ideas
+                <span className="text-xs font-normal ml-2 opacity-70">
+                  Ideas go directly to Approved without manual review.
+                </span>
+              </span>
+            </label>
           </div>
         </div>
       </Card>
