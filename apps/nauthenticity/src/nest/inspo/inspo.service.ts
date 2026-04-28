@@ -80,7 +80,12 @@ export class InspoService {
       ownedContentSynthesis = ownedSynthesis?.content ?? null
     }
 
-    return { content: parts.join('\n'), attachedUrls, ownedContentSynthesis }
+    let finalContent = parts.join('\n')
+    if (!finalContent.trim() && ownedContentSynthesis) {
+      finalContent = ownedContentSynthesis
+    }
+
+    return { content: finalContent, attachedUrls, ownedContentSynthesis }
   }
 
   async repost(brandId: string, postUrl: string) {
