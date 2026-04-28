@@ -60,10 +60,11 @@ export async function materializeSlots(brandId: string, daysAhead?: number): Pro
   while (dayStart < cutoff) {
     for (let i = 0; i < freq; i++) {
       const offsetMins = windowStartMins + i * spacingMins
-      const slotTime = new Date(dayStart)
+      const localH = Math.floor(offsetMins / 60)
+      const localM = offsetMins % 60
 
-      // Apply window time (treat windowStart/End as local time in brand timezone — approximated as UTC offset)
-      slotTime.setUTCHours(Math.floor(offsetMins / 60), offsetMins % 60, 0, 0)
+      // Convert local HH:MM in brand timezone to a UTC Date for this calendar day
+      const slotTime = localTimeToUTC(dayStart, localH, localM, schedule.timezone)
 
       if (slotTime < startFrom || slotTime < now) {
         totalSlotIndex++
@@ -106,6 +107,39 @@ export async function materializeSlots(brandId: string, daysAhead?: number): Pro
   }
 
   return created
+}
+
+/**
+ * Converts a local HH:MM time on a given UTC calendar day to its UTC equivalent.
+ *
+ * Strategy: start with a candidate where the UTC clock shows those hours/mins,
+ * then read back what local time that candidate actually is in the timezone,
+ * compute the delta, and correct. Handles DST transitions correctly.
+ */
+function localTimeToUTC(utcDay: Date, localH: number, localM: number, timezone: string): Date {
+  // Candidate: same calendar date, UTC hours = local hours (ignores offset)
+  const candidate = new Date(utcDay)
+  candidate.setUTCHours(localH, localM, 0, 0)
+
+  try {
+    // Read the candidate back in the target timezone
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false,
+    }).formatToParts(candidate)
+
+    const displayH = parseInt(parts.find((p) => p.type === 'hour')?.value ?? String(localH))
+    const displayM = parseInt(parts.find((p) => p.type === 'minute')?.value ?? String(localM))
+
+    // Offset = UTC time shown - local time desired; subtract to correct
+    const diffMins = displayH * 60 + displayM - (localH * 60 + localM)
+    const result = new Date(candidate.getTime() - diffMins * 60_000)
+    return result
+  } catch {
+    return candidate
+  }
 }
 
 /**
