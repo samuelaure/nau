@@ -350,3 +350,22 @@ export const generateComment = async (payload: { brandId: string; targetUrl: str
   const { data } = await api.post(`/generate-comment`, payload);
   return data;
 };
+
+export interface OwnedSynthesis {
+  id: string;
+  content: string;
+  attachedUrls: string[];
+  createdAt: string;
+}
+
+/** Fetch the latest owned content synthesis for a brand (if any). */
+export const getLatestOwnedSynthesis = async (brandId: string): Promise<OwnedSynthesis | null> => {
+  const { data } = await api.get<OwnedSynthesis | null>(`/brands/${brandId}/owned-synthesis/latest`);
+  return data;
+};
+
+/** Manually trigger (re)generation of owned content synthesis. */
+export const triggerOwnedSynthesis = async (brandId: string): Promise<OwnedSynthesis> => {
+  const { data } = await api.post<OwnedSynthesis>(`/brands/${brandId}/owned-synthesis`);
+  return data;
+};
