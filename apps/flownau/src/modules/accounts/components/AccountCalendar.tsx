@@ -618,17 +618,34 @@ function CompositionModal({
   )
 }
 
-// ─── Mini composition card (inside calendar day) ──────────────────────────────
+// ─── Mini composition card (inside calendar day) — draggable ───────────────────
 
-function CompositionChip({ comp, onClick }: { comp: Composition; onClick: () => void }) {
+function CompositionChip({
+  comp,
+  onClick,
+  dragState,
+  onDragStart,
+  onDragEnd,
+}: {
+  comp: Composition
+  onClick: () => void
+  dragState: DragState | null
+  onDragStart: () => void
+  onDragEnd: () => void
+}) {
   const FormatIcon = FORMAT_ICON[comp.format] ?? Film
   const display = getDisplayStatus(comp.status)
   const tag = getSecondaryTag(comp.format, display)
+  const isDragging = dragState?.postId === comp.id
   return (
     <button
+      draggable
       onClick={onClick}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
       className={cn(
-        'w-full text-left rounded p-1.5 flex flex-col gap-0.5 text-[10px] border transition-opacity hover:opacity-80',
+        'w-full text-left rounded p-1.5 flex flex-col gap-0.5 text-[10px] border transition-all cursor-grab active:cursor-grabbing',
+        isDragging ? 'opacity-40 scale-95' : 'hover:opacity-80',
         DISPLAY_COLOR[display],
       )}
     >
@@ -852,7 +869,13 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
                             onDrop={(t) => handleDrop(dragState!.postId, t)}
                           />
                           {item.kind === 'comp' ? (
-                            <CompositionChip comp={item.data} onClick={() => setSelected(item.data)} />
+                            <CompositionChip
+                              comp={item.data}
+                              onClick={() => setSelected(item.data)}
+                              dragState={dragState}
+                              onDragStart={() => setDragState({ postId: item.data.id, format: item.data.format })}
+                              onDragEnd={() => setDragState(null)}
+                            />
                           ) : (
                             <SlotChip
                               slot={item.data}
@@ -886,7 +909,7 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
             Unscheduled
           </p>
           <p className="text-[11px] text-text-secondary mb-3">
-            Drag a card onto a matching empty slot in the calendar, or between two slots to set a custom time.
+            Drag any post (scheduled or unscheduled) onto a matching empty slot, or between slots to set a custom time.
           </p>
           <div className="flex flex-wrap gap-2">
             {unscheduled.map((comp) => {
