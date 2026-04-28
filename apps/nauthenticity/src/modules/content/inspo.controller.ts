@@ -3,12 +3,16 @@ import { z } from 'zod';
 import { prisma } from '../../modules/shared/prisma';
 import { logger } from '../../utils/logger';
 import { config } from '../../config';
-import { getDigest } from './synthesis.service';
+import { getDigest, generateOwnedContentSynthesis } from './synthesis.service';
 
 // ---------------------------------------------------------------------------
 // Auth middleware — NAU_SERVICE_KEY
 // ---------------------------------------------------------------------------
 import { authenticate } from '../../utils/auth';
+
+// Default number of owned posts to feed to the synthesis LLM.
+// Enough for a representative sample; avoids schema bloat.
+const DEFAULT_OWNED_POST_LIMIT = 20;
 
 // ---------------------------------------------------------------------------
 // Zod Schemas
@@ -173,6 +177,8 @@ export const inspoController: FastifyPluginAsync = async (fastify: FastifyInstan
 
   // -------------------------------------------------------------------------
   // 5. Digest — Mechanical InspoBase Synthesis (Phase 11)
+  //    Includes ownedContentSynthesis as a fallback when no InspoBase
+  //    synthesis (recent/global) exists yet for the brand.
   // -------------------------------------------------------------------------
   fastify.get('/inspo/digest', { preHandler: authenticate }, async (request, reply) => {
     const { brandId } = request.query as { brandId?: string };
@@ -186,11 +192,129 @@ export const inspoController: FastifyPluginAsync = async (fastify: FastifyInstan
 
     try {
       const digest = await getDigest(brandId);
-      return reply.send(digest);
+
+      // Check whether any InspoBase synthesis (recent or global) exists.
+      // If not, attach the latest owned_content synthesis as a fallback
+      // so that flownau always has some topic context to work with.
+      const hasInspoBaseSynthesis = await (prisma as any).brandSynthesis.findFirst({
+        where: { brandId, type: { in: ['recent', 'global'] } },
+        select: { id: true },
+      });
+
+      let ownedContentSynthesis: string | null = null;
+      if (!hasInspoBaseSynthesis) {
+        const ownedSynthesis = await (prisma as any).brandSynthesis.findFirst({
+          where: { brandId, type: 'owned_content' },
+          orderBy: { createdAt: 'desc' },
+          select: { content: true },
+        });
+        ownedContentSynthesis = (ownedSynthesis?.content as string) ?? null;
+      }
+
+      return reply.send({ ...digest, ownedContentSynthesis });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       logger.error(`[InspoDigest] Error generating digest for brand ${brandId}: ${msg}`);
       return reply.status(500).send({ error: `Digest generation failed: ${msg}` });
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // 5b. Owned Content Synthesis — GET latest (cached)
+  //     GET /api/v1/brands/:id/owned-synthesis/latest
+  //     Returns the most recent owned_content BrandSynthesis, or null if none.
+  //     Used by the dashboard to display the cached synthesis without triggering generation.
+  // -------------------------------------------------------------------------
+  fastify.get('/brands/:id/owned-synthesis/latest', { preHandler: authenticate }, async (request, reply) => {
+    const { id: brandId } = request.params as { id: string };
+
+    const brand = await prisma.brand.findUnique({ where: { id: brandId }, select: { id: true } });
+    if (!brand) return reply.status(404).send({ error: 'Brand not found' });
+
+    const latest = await (prisma as any).brandSynthesis.findFirst({
+      where: { brandId, type: 'owned_content' },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, content: true, attachedUrls: true, createdAt: true },
+    });
+
+    return reply.send(latest ?? null);
+  });
+
+  // -------------------------------------------------------------------------
+  // 5c. Owned Content Synthesis — Manual trigger (POST)
+  //     POST /api/v1/brands/:id/owned-synthesis
+  //     Fetches the brand's owned SocialProfile posts and prompts the LLM in
+  //     Spanish to answer "¿De qué trata esta marca?". Persists the result
+  //     as a BrandSynthesis of type 'owned_content'.
+  // -------------------------------------------------------------------------
+  fastify.post('/brands/:id/owned-synthesis', { preHandler: authenticate }, async (request, reply) => {
+    const { id: brandId } = request.params as { id: string };
+
+    const brand = await prisma.brand.findUnique({
+      where: { id: brandId },
+      select: {
+        id: true,
+        voicePrompt: true,
+        ownedProfiles: {
+          select: { id: true },
+        },
+      },
+    });
+
+    if (!brand) return reply.status(404).send({ error: 'Brand not found' });
+
+    const ownedProfileIds: string[] = brand.ownedProfiles.map((p) => p.id);
+
+    if (ownedProfileIds.length === 0) {
+      return reply.status(422).send({
+        error: 'No owned social profiles found for this brand. Assign a SocialProfile.ownerId to this brand first.',
+      });
+    }
+
+    const ownedPosts = await prisma.post.findMany({
+      where: { socialProfileId: { in: ownedProfileIds } },
+      select: { url: true, caption: true, postedAt: true },
+      orderBy: { postedAt: 'desc' },
+      take: DEFAULT_OWNED_POST_LIMIT,
+    });
+
+    if (ownedPosts.length === 0) {
+      return reply.status(422).send({
+        error: `No posts found for the brand's owned social profiles. Scrape posts for the owned profiles first.`,
+      });
+    }
+
+    logger.info(
+      `[OwnedSynthesis] Triggering synthesis for brand "${brandId}" using ${ownedPosts.length} owned posts`,
+    );
+
+    try {
+      const result = await generateOwnedContentSynthesis(
+        brandId,
+        brand.voicePrompt,
+        ownedPosts,
+      );
+
+      const saved = await (prisma as any).brandSynthesis.create({
+        data: {
+          brandId,
+          type: 'owned_content',
+          content: result.content,
+          attachedUrls: result.attachedUrls,
+        },
+      });
+
+      logger.info(`[OwnedSynthesis] Synthesis created (ID: ${saved.id}) for brand "${brandId}"`);
+      return reply.status(201).send({
+        id: saved.id,
+        content: result.content,
+        attachedUrls: result.attachedUrls,
+        createdAt: saved.createdAt,
+      });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      logger.error(`[OwnedSynthesis] Generation failed for brand "${brandId}": ${msg}`);
+      return reply.status(500).send({ error: `Owned content synthesis failed: ${msg}` });
     }
   });
 

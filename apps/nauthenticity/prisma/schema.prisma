@@ -156,16 +156,16 @@ model KnowledgeChunk {
 // id = flownau Brand.id (same as API Brand.id)
 
 model Brand {
-  id                String  @id // = flownau Brand.id = API Brand.id
-  workspaceId       String  @default("")
-  mainUsername      String?
-  voicePrompt       String
-  commentStrategy   String?
-  suggestionsCount  Int     @default(3)
-  windowStart       String?
-  windowEnd         String?
-  timezone          String  @default("UTC")
-  inspoRequestCount Int     @default(0)
+  id                      String  @id // = flownau Brand.id = API Brand.id
+  workspaceId             String  @default("")
+  mainUsername            String?
+  voicePrompt             String
+  commentStrategy         String?
+  suggestionsCount        Int     @default(3)
+  windowStart             String?
+  windowEnd               String?
+  timezone                String  @default("UTC")
+  inspoRequestCount       Int     @default(0)
 
   ownedProfiles SocialProfile[]
   monitors      SocialProfileMonitor[]

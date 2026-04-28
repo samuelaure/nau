@@ -13,7 +13,7 @@ Node.js, Fastify, Prisma, PostgreSQL (`pgvector`), OpenAI, Apify, node-cron, dat
 - Mapping extracted data against active configured Brand constraints.
 - **5-Level Prompt Comment Generation**: Generates brand-voice-consistent, language-aware Instagram comment suggestions using a structured multi-level prompt (Brand DNA → Comment Strategy → Profile Strategy → Recent Comments Context → Post).
 - **Smart Fanout Scheduler**: Internal cron (every 15 min) evaluates each brand's delivery window to apply either a 15-min (in-window) or 60-min (out-of-window) scraping threshold per account — minimizing Apify API calls.
-- **InspoBase & Synthesis Engine**: Mechanical rolling synthesis of inspiration items into Brand Digests for flownaŭ's ideation engine.
+- **InspoBase & Synthesis Engine**: Mechanical rolling synthesis of inspiration items into Brand Digests (Recent/Global) and Owned Content Synthesis (based on the brand's own published posts) for flownaŭ's ideation engine.
 - **Pipeline Resilience**: Distributed batch processing with item-level error isolation. Failures in one media item (e.g., thumbnail generation or corrupted files) do not stall the entire scraping run.
 - **Soft Delete & Recovery**: Brands support soft delete (recoverable), review of deleted brands, and explicit permanent deletion.
 
@@ -46,7 +46,8 @@ Node.js, Fastify, Prisma, PostgreSQL (`pgvector`), OpenAI, Apify, node-cron, dat
 - `POST /api/v1/trigger-fanout` — Manual fanout trigger (debug/emergency). Requires `NAU_SERVICE_KEY`.
 - `POST /api/v1/inspo` — Create InspoItem for a brand. Requires `NAU_SERVICE_KEY`.
 - `GET /api/v1/inspo?brandId=` — List InspoItems. Requires `NAU_SERVICE_KEY`.
-- `GET /api/v1/inspo/digest?brandId=` — Get mechanical InspoBase Synthesis digest. Requires `NAU_SERVICE_KEY`.
+- `GET /api/v1/inspo/digest?brandId=` — Get mechanical InspoBase Synthesis digest (includes `ownedContentSynthesis: string | null` as fallback). Requires `NAU_SERVICE_KEY`.
+- `POST /api/v1/brands/:id/owned-synthesis` — Manually trigger Owned Content Synthesis ("¿De qué trata esta marca?") using the brand's owned profile posts. Requires `NAU_SERVICE_KEY`.
 
 ### Targets
 - `POST /api/v1/targets` — Upsert monitored profiles. Requires `NAU_SERVICE_KEY`.
@@ -84,6 +85,7 @@ Node.js, Fastify, Prisma, PostgreSQL (`pgvector`), OpenAI, Apify, node-cron, dat
 - **[2026-04-10] 4 posts per account per cycle:** Conservative limit while Apify actor is still maturing. Dedup by `instagramId` prevents reprocessing.
 - **[2026-04-21] Two-Stage Cloud-First Pipeline**: Decoupled download from optimization. Raw files are secured in R2 `raw/` paths immediately to prevent Apify URL expiry. Optimization (ffmpeg) runs on a single-concurrency queue to protect VPS resources.
 - **[2026-04-21] Media Optimization**: Integrated `ffmpeg` for video normalization (720p H.264) and image compression (JPEG) to ensure premium feel and storage efficiency.
+- **[2026-04-28] Owned Content Synthesis**: Added mechanical generation of `owned_content` synthesis derived from a brand's owned `SocialProfile` posts, returned in the InspoBase digest to provide "What's the brand about" context for ideation.
 
 ## naŭ Platform Dependencies
 - `zazu` — Receives dispatched comment suggestions via `POST /api/internal/notify`. Brand CRUD from Zazŭ dashboard.

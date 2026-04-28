@@ -26,6 +26,7 @@ type SynthesisOutput = z.infer<typeof SynthesisOutputSchema>;
 export interface BrandDigest {
   content: string;
   attachedUrls: string[];
+  ownedContentSynthesis?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -178,6 +179,61 @@ Identify which specific post URLs most influenced this direction and include the
   }
 
   userContent += `Generate a fresh Recent Synthesis for "${brandId}" that reflects current creative momentum.`;
+
+  const result = await runSynthesisLLM(systemPrompt, userContent, brandId);
+  return { content: result.content, attachedUrls: result.attachedUrls };
+}
+
+// ---------------------------------------------------------------------------
+// Owned Content Synthesis
+// ---------------------------------------------------------------------------
+
+interface OwnedPost {
+  url: string | null;
+  caption: string | null;
+  postedAt: Date;
+}
+
+/**
+ * Generates a synthesis answering "¿De qué trata esta marca?" based on the
+ * brand's own published posts scraped from its owned SocialProfile.
+ *
+ * The LLM is prompted in Spanish. Result is persisted as BrandSynthesis
+ * with type 'owned_content'.
+ */
+export async function generateOwnedContentSynthesis(
+  brandId: string,
+  brandDNA: string,
+  ownedPosts: OwnedPost[],
+): Promise<BrandDigest> {
+  logger.info(
+    `[SynthesisService] Generating Owned Content Synthesis for brand "${brandId}" with ${ownedPosts.length} posts`,
+  );
+
+  const systemPrompt = `Eres un estratega de marca experto. Se te proporcionan publicaciones reales de una marca en redes sociales.
+Tu tarea: responder a la pregunta "¿De qué trata esta marca?" generando una síntesis clara, profunda y accionable.
+
+La síntesis debe:
+- Identificar los temas recurrentes, el tono y los valores visibles en las publicaciones.
+- Describir la personalidad de la marca tal como se expresa en su contenido real.
+- Ser útil como contexto creativo para generar nuevas ideas de contenido.
+- Estar escrita en español, en un párrafo rico de 150 a 300 palabras.
+
+Devuelve un JSON con los campos:
+- "content": la síntesis en texto.
+- "attachedUrls": lista de URLs de las publicaciones que más influyeron (vacía si no hay URLs).
+- "reasoning": breve explicación de los temas detectados.`;
+
+  const postsText = ownedPosts
+    .map((p, i) => {
+      let entry = `### Publicación ${i + 1}`;
+      if (p.url) entry += `\nURL: ${p.url}`;
+      if (p.caption) entry += `\nCaption: ${p.caption.slice(0, 400)}`;
+      return entry;
+    })
+    .join('\n\n');
+
+  const userContent = `## ADN DE MARCA\n${brandDNA}\n\n## PUBLICACIONES PROPIAS (${ownedPosts.length} más recientes)\n${postsText}\n\nResponde: ¿De qué trata esta marca?`;
 
   const result = await runSynthesisLLM(systemPrompt, userContent, brandId);
   return { content: result.content, attachedUrls: result.attachedUrls };
