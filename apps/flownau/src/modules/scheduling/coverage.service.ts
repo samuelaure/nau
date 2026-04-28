@@ -276,20 +276,50 @@ async function runCheck2(brandId: string, halfHorizonDays: number): Promise<Chec
 
 async function triggerIdeaGeneration(brandId: string, ideationCount: number): Promise<boolean> {
   try {
-    // Fire-and-forget: call the internal ideation endpoint
-    const baseUrl = process.env.NEXTAUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3001'
-    const serviceSecret = process.env.AUTH_SECRET ?? ''
+    const { fetchBrandDigest } = await import('@/modules/ideation/sources/inspo-source')
+    const { generateContentIdeas } = await import('@/modules/ideation/ideation.service')
 
-    await fetch(`${baseUrl}/api/cron/ideation`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${serviceSecret}`,
-      },
-      body: JSON.stringify({ brandId, count: ideationCount, source: 'coverage_check' }),
+    const brand = await prisma.brand.findUnique({
+      where: { id: brandId },
+      select: { language: true, autoApproveIdeas: true },
     })
 
-    logger.info({ brandId, ideationCount }, '[COVERAGE] Triggered idea generation')
+    const digest = await fetchBrandDigest(brandId)
+    if (!digest?.content?.trim()) {
+      logger.warn({ brandId }, '[COVERAGE] Idea generation skipped — no digest/topic available')
+      return false
+    }
+
+    const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)
+    const recentPosts = await prisma.post.findMany({
+      where: { brandId, createdAt: { gte: fourteenDaysAgo }, caption: { not: null } },
+      select: { caption: true },
+      take: 30,
+    })
+
+    const output = await generateContentIdeas({
+      topic: digest.content,
+      language: brand?.language ?? 'Spanish',
+      count: ideationCount,
+      recentContent: recentPosts.map((p) => p.caption!.slice(0, 100)),
+    })
+
+    const autoApprove = brand?.autoApproveIdeas ?? false
+    const batchId = crypto.randomUUID()
+    for (const idea of output.ideas) {
+      await prisma.post.create({
+        data: {
+          brandId,
+          ideaText: idea.concept,
+          status: autoApprove ? 'IDEA_APPROVED' : 'IDEA_PENDING',
+          source: 'automatic',
+          priority: 3,
+          generationBatchId: batchId,
+        },
+      })
+    }
+
+    logger.info({ brandId, ideationCount: output.ideas.length }, '[COVERAGE] Triggered idea generation')
     return true
   } catch (err) {
     logger.error({ brandId, err }, '[COVERAGE] Failed to trigger idea generation')
