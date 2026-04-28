@@ -145,6 +145,7 @@ export async function POST(req: Request) {
             caption: creative.caption,
             hashtags: creative.hashtags,
             status: draftStatus,
+            templateId: resolvedTemplateId ?? null,
             brandPersonaId: persona?.id ?? null,
           },
         })
@@ -160,6 +161,7 @@ export async function POST(req: Request) {
             hashtags: creative.hashtags,
             status: draftStatus,
             source: 'manual',
+            templateId: resolvedTemplateId ?? null,
             brandPersonaId: persona?.id ?? null,
           },
         })

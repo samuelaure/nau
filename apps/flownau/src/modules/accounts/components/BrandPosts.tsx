@@ -357,13 +357,17 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
     setComposing(true)
     const toastId = toast.loading('Converting Idea into a Composition Template Layout...')
     try {
+      const finalFormat = selectedTemplateId
+        ? templates.find((t) => t.id === selectedTemplateId)?.format || composingIdea.format || 'head_talk'
+        : composingIdea.format || 'head_talk'
+
       const res = await fetch('/api/agent/compose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           brandId,
           prompt: composingIdea.ideaText,
-          format: composingIdea.format || 'head_talk',
+          format: finalFormat,
           postId: composingIdea.id,
           personaId: selectedPersonaId || undefined,
           templateId: selectedTemplateId || undefined,
@@ -375,7 +379,7 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
       setComposingIdea(null)
       fetchIdeas()
       // Open head talk modal immediately after compose
-      if ((composingIdea.format || 'head_talk') === 'head_talk' && data.post) {
+      if (finalFormat === 'head_talk' && data.post) {
         setHeadTalkDraftPost(data.post)
       }
     } catch (err: any) {

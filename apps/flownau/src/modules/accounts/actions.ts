@@ -215,7 +215,7 @@ export async function updateOwnedSynthesis(brandId: string) {
   const { signServiceToken } = await import('@nau/auth')
   const token = await signServiceToken({ secret: authSecret, iss: 'flownau', aud: 'nauthenticity' })
 
-  const res = await fetch(`${nauthenticityUrl}/_service/brands/${parsedId}/owned-synthesis`, {
+  const res = await fetch(`${nauthenticityUrl}/api/v1/_service/brands/${parsedId}/owned-synthesis`, {
     method: 'POST',
     headers: { 
       'Content-Type': 'application/json',
