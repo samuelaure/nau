@@ -24,7 +24,7 @@ export async function fetchBrandDigest(brandId: string): Promise<BrandDigest | n
   try {
     const token = await signServiceToken({ secret: authSecret, iss: 'flownau', aud: 'nauthenticity' })
     const response = await axios.get<BrandDigest>(
-      `${baseUrl}/_service/brands/${encodeURIComponent(brandId)}/inspo/digest`,
+      `${baseUrl}/api/v1/_service/brands/${encodeURIComponent(brandId)}/inspo/digest`,
       {
         headers: { Authorization: `Bearer ${token}` },
         timeout: NAUTHENTICITY_TIMEOUT_MS,
