@@ -102,12 +102,41 @@ async function runCheck1(
   let notifyUserApproveIdeas = false
 
   for (const slot of emptySlotRecords) {
-    // Try to find an eligible IDEA_APPROVED post (no format yet, or matching format)
+    // First: try to find an existing unscheduled draft (already composed, just needs a slot)
+    const existingDraft = await prisma.post.findFirst({
+      where: {
+        brandId,
+        status: { in: ['DRAFT_PENDING', 'DRAFT_APPROVED'] },
+        scheduledAt: null,
+        postSlot: null,
+        OR: [{ format: null }, { format: slot.format }],
+      },
+      orderBy: { createdAt: 'asc' },
+    })
+
+    if (existingDraft) {
+      await prisma.post.update({
+        where: { id: existingDraft.id },
+        data: { format: existingDraft.format ?? slot.format, scheduledAt: slot.scheduledAt },
+      })
+      await prisma.postSlot.update({
+        where: { id: slot.id },
+        data: { status: 'filled', postId: existingDraft.id },
+      })
+      slotsFilledNow++
+      logger.info(
+        { brandId, slotId: slot.id, postId: existingDraft.id },
+        '[COVERAGE] Slot filled by existing unscheduled draft',
+      )
+      continue
+    }
+
+    // Second: try to find an eligible IDEA_APPROVED post to compose into this slot
     const candidate = await prisma.post.findFirst({
       where: {
         brandId,
         status: 'IDEA_APPROVED',
-        postSlot: null, // not already assigned to a slot
+        postSlot: null,
         OR: [{ format: null }, { format: slot.format }],
       },
       orderBy: { createdAt: 'asc' },
