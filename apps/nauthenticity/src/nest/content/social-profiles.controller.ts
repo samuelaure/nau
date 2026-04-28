@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, HttpCode, HttpStatus, BadRequestException, Param } from '@nestjs/common'
+import { Controller, Post, Get, Body, UseGuards, HttpCode, HttpStatus, BadRequestException, Param } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { AnyAuthGuard } from '../auth/any-auth.guard'
 import axios from 'axios'
