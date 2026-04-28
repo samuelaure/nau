@@ -1,7 +1,7 @@
 'use client'
 
 import { useTransition } from 'react'
-import { updateBrand } from '@/modules/accounts/actions'
+import { updateBrand, updateOwnedSynthesis } from '@/modules/accounts/actions'
 import { Card } from '@/modules/shared/components/ui/Card'
 import { Button } from '@/modules/shared/components/ui/Button'
 import { Textarea } from '@/modules/shared/components/ui/Textarea'
@@ -43,6 +43,7 @@ type Brand = {
 export default function BrandSettings({ brand, initialSchedule }: { brand: Brand; initialSchedule: PostSchedule | null }) {
   const [tab, setTab] = useState<BrandSettingsTab>('settings')
   const [isPending, startTransition] = useTransition()
+  const [isGenerating, setIsGenerating] = useState(false)
 
   const tabs: { id: BrandSettingsTab; label: string }[] = [
     { id: 'settings', label: 'Settings' },
@@ -169,7 +170,36 @@ export default function BrandSettings({ brand, initialSchedule }: { brand: Brand
               />
             </div>
 
-            <div className="flex justify-end pt-4 border-t border-border">
+            <div className="w-full border-t border-white/5 pt-6 flex flex-col gap-3">
+              <label className="form-label block">
+                Owned Content Synthesis fallback
+                <span className="text-xs font-normal ml-2 opacity-70">
+                  Manually trigger (re)generation of content topics & brand voice from owned posts.
+                </span>
+              </label>
+              <div className="flex">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  disabled={isGenerating}
+                  onClick={async () => {
+                    setIsGenerating(true)
+                    try {
+                      await updateOwnedSynthesis(brand.id)
+                      alert('Synthesis updated successfully!')
+                    } catch (err: any) {
+                      alert(`Error: ${err.message}`)
+                    } finally {
+                      setIsGenerating(false)
+                    }
+                  }}
+                >
+                  {isGenerating ? 'Generating…' : 'Update Synthesis'}
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-4 border-t border-white/5">
               <Button type="submit" disabled={isPending}>
                 {isPending ? 'Saving…' : 'Save Changes'}
               </Button>

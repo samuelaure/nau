@@ -4,6 +4,7 @@ import { BrandInspoBaseView } from './BrandInspoBaseView';
 import { BrandCommentsLayout } from './BrandCommentsLayout';
 import { BrandBenchmarkView } from './BrandBenchmarkView';
 import { BrandProfilesView } from './BrandProfilesView';
+import { BrandOwnedView } from './BrandOwnedView';
 
 export const BrandLayout = () => {
   return (
@@ -15,6 +16,7 @@ export const BrandLayout = () => {
       <Route path="profiles" element={<BrandProfilesView />} />
       <Route path="comments/*" element={<BrandCommentsLayout />} />
       <Route path="benchmark" element={<BrandBenchmarkView />} />
+      <Route path="settings" element={<BrandOwnedView />} />
       <Route path="*" element={<Navigate to="content" replace />} />
     </Routes>
   );

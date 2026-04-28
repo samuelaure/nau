@@ -204,6 +204,7 @@ export function Sidebar() {
               { label: 'Social Profiles', to: `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}/profiles`, icon: Users },
               { label: 'Comments', to: `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}/comments`, icon: MessageSquare },
               { label: 'Benchmark', to: `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}/benchmark`, icon: BarChart2 },
+              { label: 'Settings', to: `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}/settings`, icon: Settings },
             ].map(({ label, to, icon: Icon }) => (
               <Link
                 key={to}

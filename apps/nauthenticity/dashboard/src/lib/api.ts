@@ -364,8 +364,14 @@ export const getLatestOwnedSynthesis = async (brandId: string): Promise<OwnedSyn
   return data;
 };
 
+/** Fetch the latest owned voice synthesis for a brand (if any). */
+export const getLatestOwnedVoice = async (brandId: string): Promise<OwnedSynthesis | null> => {
+  const { data } = await api.get<OwnedSynthesis | null>(`/brands/${brandId}/owned-voice/latest`);
+  return data;
+};
+
 /** Manually trigger (re)generation of owned content synthesis. */
-export const triggerOwnedSynthesis = async (brandId: string): Promise<OwnedSynthesis> => {
-  const { data } = await api.post<OwnedSynthesis>(`/brands/${brandId}/owned-synthesis`);
+export const triggerOwnedSynthesis = async (brandId: string): Promise<any> => {
+  const { data } = await api.post<any>(`/brands/${brandId}/owned-synthesis`);
   return data;
 };

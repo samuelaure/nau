@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
-import { api, getLatestOwnedSynthesis, triggerOwnedSynthesis, type OwnedSynthesis } from '../lib/api';
-import { Loader, Send, RefreshCw, Sparkles, Link as LinkIcon } from 'lucide-react';
+import { api, getLatestOwnedSynthesis, getLatestOwnedVoice, triggerOwnedSynthesis, type OwnedSynthesis } from '../lib/api';
+import { Loader, Send, RefreshCw, Sparkles, Link as LinkIcon, Volume2 } from 'lucide-react';
 
 export const BrandOwnedView = () => {
   const { brandId } = useParams<{ brandId: string }>();
@@ -17,10 +17,17 @@ export const BrandOwnedView = () => {
     enabled: !!brandId,
   });
 
-  // Fetch latest cached synthesis (display only — does not trigger generation)
+  // Fetch latest cached synthesis
   const { data: synthesis, isLoading: synthLoading } = useQuery<OwnedSynthesis | null>({
     queryKey: ['owned-synthesis', brandId],
     queryFn: () => getLatestOwnedSynthesis(brandId!),
+    enabled: !!brandId,
+  });
+
+  // Fetch latest cached voice
+  const { data: voice, isLoading: voiceLoading } = useQuery<OwnedSynthesis | null>({
+    queryKey: ['owned-voice', brandId],
+    queryFn: () => getLatestOwnedVoice(brandId!),
     enabled: !!brandId,
   });
 
@@ -40,6 +47,7 @@ export const BrandOwnedView = () => {
     mutationFn: () => triggerOwnedSynthesis(brandId!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['owned-synthesis', brandId] });
+      queryClient.invalidateQueries({ queryKey: ['owned-voice', brandId] });
     },
   });
 
@@ -197,6 +205,74 @@ export const BrandOwnedView = () => {
             {ownedProfiles.length > 0
               ? 'Click "Update Synthesis" to generate one from the owned posts.'
               : 'Assign an owned profile and scrape its posts first.'}
+          </p>
+        )}
+      </div>
+
+      {/* ── Brand Voice ─────────────────────────────────────── */}
+      <div
+        style={{
+          background: 'var(--card-bg)',
+          border: '1px solid var(--border)',
+          borderRadius: '10px',
+          padding: '1.5rem',
+          marginBottom: '2rem',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            marginBottom: '1rem',
+            gap: '1rem',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div>
+            <h3
+              style={{
+                margin: '0 0 0.25rem 0',
+                fontSize: '1rem',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+              }}
+            >
+              <Volume2 size={16} style={{ color: 'var(--accent)' }} />
+              Brand Voice Guidelines
+            </h3>
+            <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.85rem' }}>
+              ¿Cómo habla esta marca? — Derived directly from the published content.
+              {voice?.createdAt && (
+                <span style={{ marginLeft: '0.5rem', color: '#6b7280' }}>
+                  Last updated: {new Date(voice.createdAt).toLocaleDateString()}
+                </span>
+              )}
+            </p>
+          </div>
+        </div>
+
+        {voiceLoading ? (
+          <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Loading voice guidelines…</div>
+        ) : voice ? (
+          <div>
+            <p
+              style={{
+                margin: '0',
+                color: 'var(--text-primary)',
+                fontSize: '0.9rem',
+                lineHeight: 1.7,
+                whiteSpace: 'pre-wrap',
+              }}
+            >
+              {voice.content}
+            </p>
+          </div>
+        ) : (
+          <p style={{ color: '#6b7280', fontSize: '0.875rem', margin: 0 }}>
+            No voice guidelines extracted yet.
           </p>
         )}
       </div>
