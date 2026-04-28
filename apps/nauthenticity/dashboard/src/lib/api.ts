@@ -375,3 +375,13 @@ export const triggerOwnedSynthesis = async (brandId: string): Promise<any> => {
   const { data } = await api.post<any>(`/brands/${brandId}/owned-synthesis`);
   return data;
 };
+
+export const syncSocialProfile = async (payload: { username: string; brandId?: string; workspaceId?: string }) => {
+  const { data } = await api.post(`/social-profiles/sync`, payload);
+  return data;
+};
+
+export const syncProfilesToFlownau = async (brandId: string) => {
+  const { data } = await api.post(`/brands/${brandId}/social-profiles/sync-to-flownau`);
+  return data;
+};

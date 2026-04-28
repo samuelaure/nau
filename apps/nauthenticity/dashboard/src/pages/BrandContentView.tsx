@@ -14,12 +14,40 @@ export const BrandContentView = () => {
   const selectedUsername = username || null;
   const [sort, setSort] = React.useState<'recent' | 'oldest' | 'likes' | 'comments'>('recent');
 
+  const [usernameToLink, setUsernameToLink] = React.useState('');
+  const [isLinking, setIsLinking] = React.useState(false);
+
   // Fetch owned profiles for this brand
-  const { data: ownedProfiles, isLoading: loadingProfiles } = useQuery({
+  const { data: ownedProfiles, isLoading: loadingProfiles, refetch: refetchProfiles } = useQuery({
     queryKey: ['owned-profiles', brandId],
     queryFn: () => getBrandOwnedProfiles(brandId!),
     enabled: !!brandId,
   });
+
+  const handleLinkProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!usernameToLink.trim() || !brandId) return;
+    setIsLinking(true);
+    try {
+      const workspaceId = location.pathname.match(/\/workspaces\/([^/]+)/)?.[1];
+      // 1. Sync to nauthenticity
+      await import('../lib/api').then(api => api.syncSocialProfile({
+        username: usernameToLink.trim(),
+        brandId,
+        workspaceId,
+      }));
+      // 2. Sync to flownau
+      await import('../lib/api').then(api => api.syncProfilesToFlownau(brandId));
+      
+      setUsernameToLink('');
+      refetchProfiles();
+    } catch (err) {
+      console.error('Failed to link profile:', err);
+      alert('Failed to link profile. Ensure the brand exists and is accessible.');
+    } finally {
+      setIsLinking(false);
+    }
+  };
 
   // Fetch selected profile's posts
   const {
@@ -129,13 +157,47 @@ export const BrandContentView = () => {
   // Show profiles grid
   return (
     <div className="fade-in">
-      <div style={{ marginBottom: '2rem' }}>
-        <h2 style={{ margin: 0, marginBottom: '0.5rem' }}>Social Profiles</h2>
-        <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
-          {ownedProfiles?.length === 0
-            ? 'No social profiles linked yet. Create one in flownau to get started.'
-            : `${ownedProfiles?.length} profile(s) ready for content management.`}
-        </p>
+      <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <h2 style={{ margin: 0, marginBottom: '0.5rem' }}>Social Profiles</h2>
+          <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
+            {ownedProfiles?.length === 0
+              ? 'No social profiles linked yet. Link one below.'
+              : `${ownedProfiles?.length} profile(s) ready for content management.`}
+          </p>
+        </div>
+        <form onSubmit={handleLinkProfile} style={{ display: 'flex', gap: '0.5rem' }}>
+          <input
+            type="text"
+            placeholder="@username"
+            value={usernameToLink}
+            onChange={(e) => setUsernameToLink(e.target.value.replace(/^@/, ''))}
+            style={{
+              padding: '0.5rem',
+              borderRadius: '4px',
+              border: '1px solid var(--border)',
+              background: 'var(--card-bg)',
+              color: 'var(--text-primary)',
+            }}
+            disabled={isLinking}
+          />
+          <button
+            type="submit"
+            disabled={isLinking || !usernameToLink.trim()}
+            style={{
+              padding: '0.5rem 1rem',
+              borderRadius: '4px',
+              border: 'none',
+              background: '#58a6ff',
+              color: 'white',
+              fontWeight: 500,
+              cursor: (isLinking || !usernameToLink.trim()) ? 'not-allowed' : 'pointer',
+              opacity: (isLinking || !usernameToLink.trim()) ? 0.6 : 1,
+            }}
+          >
+            {isLinking ? 'Linking...' : 'Link Profile'}
+          </button>
+        </form>
       </div>
 
       {ownedProfiles && ownedProfiles.length > 0 ? (
@@ -171,7 +233,7 @@ export const BrandContentView = () => {
           }}
         >
           <Database size={48} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
-          <p style={{ margin: 0 }}>No profiles yet. Sync from flownau or add manually.</p>
+          <p style={{ margin: 0 }}>No profiles yet. Link one using the input above.</p>
         </div>
       )}
     </div>
