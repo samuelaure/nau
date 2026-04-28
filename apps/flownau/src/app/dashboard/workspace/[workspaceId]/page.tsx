@@ -8,8 +8,6 @@ import { notFound } from 'next/navigation'
 import { cn } from '@/modules/shared/utils'
 import AccountCalendar from '@/modules/accounts/components/AccountCalendar'
 import BrandPosts from '@/modules/accounts/components/BrandPosts'
-import AccountPool from '@/modules/accounts/components/AccountPool'
-import AccountCompositions from '@/modules/accounts/components/AccountCompositions'
 import AccountTemplates from '@/modules/accounts/components/AccountTemplates'
 import BrandProfiles from '@/modules/accounts/components/BrandProfiles'
 import BrandSettings from '@/modules/accounts/components/BrandSettings'
@@ -24,8 +22,6 @@ const TABS = [
   { id: 'calendar', label: 'Calendar' },
   { id: 'ideas', label: 'Ideas' },
   { id: 'templates', label: 'Templates' },
-  { id: 'pool', label: 'Pool' },
-  { id: 'compositions', label: 'Compositions' },
   { id: 'profiles', label: 'Profiles' },
   { id: 'assets', label: 'Assets' },
   { id: 'settings', label: 'Settings' },
@@ -136,8 +132,6 @@ export default async function WorkspaceOverviewPage({
         <div className="min-h-[400px]">
           {activeTab === 'calendar' && <AccountCalendar brandId={brandId} workspaceId={workspaceId} />}
           {activeTab === 'ideas' && <BrandPosts brandId={brandId} />}
-          {activeTab === 'pool' && <AccountPool brandId={brandId} workspaceId={workspaceId} />}
-          {activeTab === 'compositions' && <AccountCompositions brandId={brandId} />}
           {activeTab === 'templates' && <AccountTemplates brandId={brandId} workspaceId={workspaceId} />}
           {activeTab === 'profiles' && (
             <BrandProfiles
