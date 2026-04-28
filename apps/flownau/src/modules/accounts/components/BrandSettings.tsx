@@ -35,6 +35,7 @@ type Brand = {
   ideationCount: number
   autoApproveIdeas: boolean
   shortCode: string | null
+  coverageHorizonDays: number
 }
 
 export default function BrandSettings({ brand, initialSchedule, initialTab }: { brand: Brand; initialSchedule: PostSchedule | null; initialTab?: BrandSettingsTab }) {
@@ -138,7 +139,7 @@ export default function BrandSettings({ brand, initialSchedule, initialTab }: { 
         </Card>
       )}
 
-      {tab === 'schedule' && <AccountSchedule brandId={brand.id} initialSchedule={initialSchedule} initialIdeationCount={brand.ideationCount} initialAutoApproveIdeas={brand.autoApproveIdeas} />}
+      {tab === 'schedule' && <AccountSchedule brandId={brand.id} initialSchedule={initialSchedule} initialIdeationCount={brand.ideationCount} initialAutoApproveIdeas={brand.autoApproveIdeas} initialCoverageHorizonDays={brand.coverageHorizonDays} />}
       {tab === 'personas' && <AccountPersonas brandId={brand.id} />}
       {tab === 'strategy' && <AccountIdeasFrameworks brandId={brand.id} />}
       {tab === 'principles' && <AccountContentPrinciples brandId={brand.id} />}

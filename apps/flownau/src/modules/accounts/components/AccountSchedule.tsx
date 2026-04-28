@@ -20,6 +20,7 @@ interface AccountScheduleProps {
   initialSchedule: PostSchedule | null
   initialIdeationCount: number
   initialAutoApproveIdeas: boolean
+  initialCoverageHorizonDays: number
 }
 
 // ── Format metadata ───────────────────────────────────────────────────────────
@@ -78,13 +79,14 @@ const TIMEZONES = [
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function AccountSchedule({ brandId, initialSchedule, initialIdeationCount, initialAutoApproveIdeas }: AccountScheduleProps) {
+export default function AccountSchedule({ brandId, initialSchedule, initialIdeationCount, initialAutoApproveIdeas, initialCoverageHorizonDays }: AccountScheduleProps) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [availableFormats, setAvailableFormats] = useState<string[]>([])
   const [ideationCount, setIdeationCount] = useState(initialIdeationCount)
   const [autoApproveIdeas, setAutoApproveIdeas] = useState(initialAutoApproveIdeas)
+  const [coverageHorizonDays, setCoverageHorizonDays] = useState(initialCoverageHorizonDays)
 
   // Fetch enabled template formats, then expand to scheduling formats
   useEffect(() => {
@@ -186,7 +188,7 @@ export default function AccountSchedule({ brandId, initialSchedule, initialIdeat
         fetch(`/api/brands/${brandId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ideationCount, autoApproveIdeas }),
+          body: JSON.stringify({ ideationCount, autoApproveIdeas, coverageHorizonDays }),
         }),
       ])
       if (!scheduleRes.ok) {
@@ -282,6 +284,20 @@ export default function AccountSchedule({ brandId, initialSchedule, initialIdeat
                 </option>
               ))}
             </select>
+          </div>
+          <div>
+            <label className="form-label block mb-1">Coverage Horizon</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                max={30}
+                value={coverageHorizonDays}
+                onChange={(e) => setCoverageHorizonDays(Number(e.target.value))}
+                className="bg-gray-950 border border-border text-white rounded p-2.5 text-sm w-20"
+              />
+              <span className="text-sm text-text-secondary">days ahead</span>
+            </div>
           </div>
         </div>
       </Card>

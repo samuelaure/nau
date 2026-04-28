@@ -61,7 +61,7 @@ const DISPLAY_DOT: Record<DisplayStatus, string> = {
 
 const TAG_COLOR: Record<NonNullable<SecondaryTag>, string> = {
   Replicate: 'bg-amber-500/15 border-amber-500/30 text-amber-300',
-  Record: 'bg-sky-500/15 border-sky-500/30 text-sky-300',
+  Record: 'bg-amber-500/15 border-amber-500/30 text-amber-300',
 }
 
 // ─── Format config ────────────────────────────────────────────────────────────

@@ -10,6 +10,7 @@ import { z } from 'zod'
 const BrandPatchSchema = z.object({
   ideationCount: z.number().int().min(1).max(30).optional(),
   autoApproveIdeas: z.boolean().optional(),
+  coverageHorizonDays: z.number().int().min(1).max(30).optional(),
 })
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ brandId: string }> }) {
