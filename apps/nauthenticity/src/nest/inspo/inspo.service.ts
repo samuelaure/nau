@@ -144,17 +144,23 @@ export class InspoService {
       throw new UnprocessableEntityException('No posts found for the owned profiles. Scrape them first.')
     }
 
-    const systemPrompt = `Eres un estratega de marca experto. Se te proporcionan publicaciones reales de una marca en redes sociales.
-Tu tarea: generar un resumen claro, profundo y accionable del contenido de la marca basándote en sus publicaciones.
+    const systemPrompt = `Eres un estratega de contenido experto. Se te proporcionan publicaciones reales de redes sociales.
+Tu tarea: extraer y presentar directamente los temas de contenido abordados en las publicaciones.
 
-El resumen debe:
-- Identificar los temas recurrentes, el tono y los valores visibles en las publicaciones.
-- Describir de qué habla la marca tal como se expresa en su contenido real.
-- Ser útil como contexto creativo para generar nuevas ideas de contenido.
-- Estar escrita en español, en un párrafo rico de 150 a 300 palabras.
+CRÍTICO: Está terminantemente PROHIBIDO usar lenguaje interpretativo, introducciones o contexto (NO uses "La marca se centra en", "Los temas abordados incluyen", "El contenido habla de", "Se observa un tono", "Estas publicaciones tratan de", "Las publicaciones abordan").
+
+Comienza INMEDIATAMENTE con los conceptos y temas de forma directa y cruda. 
+
+EJEMPLO DE INICIO CORRECTO:
+"El Diseño Humano aplicado a la crianza consciente. Estrategias de comunicación familiar personalizadas basadas en el tipo energético..."
+
+El texto debe:
+- Presentar directamente los conceptos, ideas y temas recurrentes tratados en las publicaciones.
+- Ser útil directamente como temática para la generación de nuevo contenido.
+- Estar escrito en español, en un párrafo continuo y rico de 150 a 300 palabras.
 
 Devuelve un JSON con los campos:
-- "content": el resumen en texto.
+- "content": la síntesis directa del contenido.
 - "attachedUrls": lista de URLs de las publicaciones que más influyeron (vacía si no hay URLs).
 - "reasoning": breve explicación de los temas detectados.`
 
