@@ -459,7 +459,8 @@ export async function confirmUpload(
 
 export async function installDefaultTemplates(brandId: string): Promise<{ installed: number }> {
   await checkAuth()
-  const { seedTemplatesForBrand } = await import('@/../prisma/seeds/templates')
+  const { seedSystemTemplates, seedTemplatesForBrand } = await import('@/../prisma/seeds/templates')
+  await seedSystemTemplates(prisma)
   await seedTemplatesForBrand(prisma, brandId)
   const installed = await prisma.brandTemplateConfig.count({ where: { brandId, enabled: true } })
   revalidatePath('/dashboard')

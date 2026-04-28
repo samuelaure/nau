@@ -142,8 +142,15 @@ export default function AccountTemplates({
                         Workspace
                       </span>
                     )}
-                    {t.sceneType && (
-                      <span className="text-[10px] text-gray-500">{t.sceneType}</span>
+                    {t.format && (
+                      <span className="text-[10px] bg-white/5 text-gray-400 px-2 py-0.5 rounded-full border border-white/10">
+                        {t.format.replace('_', ' ')}
+                      </span>
+                    )}
+                    {t.scope === 'system' && (
+                      <span className="text-[10px] bg-accent/10 text-accent px-2 py-0.5 rounded-full">
+                        default
+                      </span>
                     )}
                   </div>
 

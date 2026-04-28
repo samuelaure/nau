@@ -37,7 +37,11 @@ export async function GET(req: Request) {
 
     const templates = await prisma.template.findMany({
       where: {
-        OR: [{ brandId }, { brandId: { in: siblingIds }, scope: 'workspace' }],
+        OR: [
+          { brandId },
+          { brandId: { in: siblingIds }, scope: 'workspace' },
+          { scope: 'system' },
+        ],
       },
       include: {
         brandConfigs: { where: { brandId } },
