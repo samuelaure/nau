@@ -86,15 +86,6 @@ const FORMAT_COLOR: Record<string, string> = {
   story: 'bg-orange-500/15 border-orange-500/30 text-orange-200',
 }
 
-const FORMAT_EMPTY_COLOR: Record<string, string> = {
-  reel: 'border-blue-500/20 text-blue-500/50 bg-blue-500/5 hover:bg-blue-500/10 hover:border-blue-500/40',
-  trial_reel: 'border-indigo-500/20 text-indigo-500/50 bg-indigo-500/5 hover:bg-indigo-500/10 hover:border-indigo-500/40',
-  head_talk: 'border-purple-500/20 text-purple-500/50 bg-purple-500/5 hover:bg-purple-500/10 hover:border-purple-500/40',
-  carousel: 'border-pink-500/20 text-pink-500/50 bg-pink-500/5 hover:bg-pink-500/10 hover:border-pink-500/40',
-  static_post: 'border-emerald-500/20 text-emerald-500/50 bg-emerald-500/5 hover:bg-emerald-500/10 hover:border-emerald-500/40',
-  story: 'border-orange-500/20 text-orange-500/50 bg-orange-500/5 hover:bg-orange-500/10 hover:border-orange-500/40',
-}
-
 // ─── Slot chip (empty PostSlot placeholder) — droppable ──────────────────────
 
 function SlotChip({
@@ -110,8 +101,6 @@ function SlotChip({
   const canDrop = dragState?.format === slot.format
   const [over, setOver] = useState(false)
 
-  const formatEmptyColor = FORMAT_EMPTY_COLOR[slot.format] ?? 'border-white/10 text-white/40 bg-white/5'
-
   return (
     <div
       onDragOver={(e) => { if (canDrop) { e.preventDefault(); setOver(true) } }}
@@ -123,7 +112,7 @@ function SlotChip({
           ? 'border-accent bg-accent/10 text-accent'
           : canDrop && dragState
             ? 'border-accent/40 text-accent/50'
-            : formatEmptyColor,
+            : 'border-white/10 text-white/25',
       )}
     >
       <div className="flex items-center gap-1">
@@ -675,7 +664,6 @@ function CompositionChip({
     >
       <div className="flex items-start justify-between w-full">
         <div className="flex items-center gap-1">
-          <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', DISPLAY_DOT[display])} />
           <FormatIcon size={10} className="shrink-0" />
           <span className="font-bold truncate leading-none pt-0.5">{FORMAT_LABEL[comp.format] ?? comp.format}</span>
         </div>
@@ -685,16 +673,9 @@ function CompositionChip({
           </span>
         )}
       </div>
-      
-      <div className="flex items-center justify-between pl-3 pr-1 w-full">
-        {comp.scheduledAt && (
-          <span className="text-[9px] opacity-70 font-medium">{fmtTime(comp.scheduledAt)}</span>
-        )}
-        <span className="text-[9px] opacity-70">{display}</span>
-      </div>
 
       {(thumb || isVideoThumb) && (
-        <div className="w-full h-14 rounded overflow-hidden mt-1 bg-black/20 flex-shrink-0 relative">
+        <div className="w-full h-14 rounded overflow-hidden bg-black/20 flex-shrink-0 relative">
           {thumb ? (
             <img src={thumb} alt="Thumbnail" className="w-full h-full object-cover opacity-90" />
           ) : isVideoThumb ? (
@@ -704,10 +685,20 @@ function CompositionChip({
       )}
 
       {comp.ideaText && (
-        <p className="text-[9.5px] opacity-80 leading-snug line-clamp-2 mt-0.5 whitespace-pre-wrap">
+        <p className="text-[9.5px] opacity-80 leading-snug line-clamp-2 whitespace-pre-wrap">
           {comp.ideaText}
         </p>
       )}
+
+      <div className="flex items-center justify-between w-full mt-auto pt-0.5">
+        <span className="text-[9px] opacity-70 font-medium">
+          {comp.scheduledAt ? fmtTime(comp.scheduledAt) : 'Unscheduled'}
+        </span>
+        <div className="flex items-center gap-1">
+          <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', DISPLAY_DOT[display])} />
+          <span className="text-[9px] opacity-70">{display}</span>
+        </div>
+      </div>
     </button>
   )
 }
@@ -991,14 +982,11 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
                     formatColor,
                   )}
                 >
-                  <div className="flex items-center gap-1.5 w-full">
-                    <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', DISPLAY_DOT[display])} />
-                    <FormatIcon size={12} className="shrink-0" />
-                    <span className="font-bold truncate leading-none">{FORMAT_LABEL[comp.format] ?? comp.format}</span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between w-full opacity-70">
-                    <span className="text-[10px]">{display}</span>
+                  <div className="flex items-start justify-between w-full">
+                    <div className="flex items-center gap-1.5">
+                      <FormatIcon size={12} className="shrink-0" />
+                      <span className="font-bold truncate leading-none pt-0.5">{FORMAT_LABEL[comp.format] ?? comp.format}</span>
+                    </div>
                     {tag && (
                       <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded border leading-none', TAG_COLOR[tag])}>
                         {tag}
@@ -1007,7 +995,7 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
                   </div>
 
                   {(thumb || isVideoThumb) && (
-                    <div className="w-full h-16 rounded overflow-hidden mt-0.5 bg-black/20 flex-shrink-0 relative">
+                    <div className="w-full h-16 rounded overflow-hidden bg-black/20 flex-shrink-0 relative">
                       {thumb ? (
                         <img src={thumb} alt="Thumbnail" className="w-full h-full object-cover opacity-90" />
                       ) : isVideoThumb ? (
@@ -1017,10 +1005,18 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
                   )}
 
                   {comp.ideaText && (
-                    <p className="text-[10px] opacity-80 leading-snug line-clamp-2 mt-0.5 whitespace-pre-wrap text-left">
+                    <p className="text-[10px] opacity-80 leading-snug line-clamp-2 whitespace-pre-wrap text-left">
                       {comp.ideaText}
                     </p>
                   )}
+
+                  <div className="flex items-center justify-between w-full mt-auto pt-1">
+                    <span className="text-[10px] opacity-70 font-medium">Unscheduled</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', DISPLAY_DOT[display])} />
+                      <span className="text-[10px] opacity-70">{display}</span>
+                    </div>
+                  </div>
                 </button>
               )
             })}
