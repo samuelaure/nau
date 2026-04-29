@@ -26,6 +26,8 @@ interface ComposeInput {
   principlesPrompt?: string | null
   templateContentSchema?: unknown | null
   templateSystemPrompt?: string | null
+  // Brand-specific custom instructions for this template — injected at highest priority
+  customPrompt?: string | null
 }
 
 interface ComposeResult {
@@ -55,6 +57,7 @@ export async function compose(input: ComposeInput): Promise<ComposeResult> {
     principlesPrompt,
     templateContentSchema,
     templateSystemPrompt,
+    customPrompt,
   } = input
 
   // 1. Fetch Brand Persona
@@ -130,7 +133,11 @@ export async function compose(input: ComposeInput): Promise<ComposeResult> {
     ? `\n\nTEMPLATE CONTENT SCHEMA (text-slot specs — follow exactly):\n${JSON.stringify(templateContentSchema, null, 2)}`
     : ''
 
-  const systemPrompt = `You are a Senior Creative Director for short-form social media content.
+  const creatorBlock = customPrompt?.trim()
+    ? `⚠️ CREATOR INSTRUCTIONS — these take absolute precedence over all guidelines below. Follow them exactly; let them shape the output above everything else:\n\n<creator_instructions>\n${customPrompt.trim()}\n</creator_instructions>\n\nAll sections below are subordinate to the above.\n\n---\n\n`
+    : ''
+
+  const systemPrompt = `${creatorBlock}You are a Senior Creative Director for short-form social media content.
 
 BRAND VOICE:
 ${effectivePersona.systemPrompt}${strategyBlock}${principlesBlock}${templatePromptBlock}${contentSchemaBlock}

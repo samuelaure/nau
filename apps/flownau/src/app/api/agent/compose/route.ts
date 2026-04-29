@@ -111,14 +111,16 @@ export async function POST(req: Request) {
       : ((await prisma.brandPersona.findFirst({ where: { brandId, isDefault: true } })) ??
         (await prisma.brandPersona.findFirst({ where: { brandId } })))
 
-    // Check template auto-approve
+    // Check template auto-approve and fetch custom prompt
     let autoApproveDraft = persona?.autoApproveCompositions ?? false
-    if (!autoApproveDraft && resolvedTemplateId) {
+    let templateCustomPrompt: string | null = null
+    if (resolvedTemplateId) {
       const config = await prisma.brandTemplateConfig.findUnique({
         where: { brandId_templateId: { brandId, templateId: resolvedTemplateId } },
-        select: { autoApproveDraft: true },
+        select: { autoApproveDraft: true, customPrompt: true },
       })
-      autoApproveDraft = config?.autoApproveDraft ?? false
+      if (!autoApproveDraft) autoApproveDraft = config?.autoApproveDraft ?? false
+      templateCustomPrompt = config?.customPrompt ?? null
     }
 
     const draftStatus = autoApproveDraft ? 'DRAFT_APPROVED' : 'DRAFT_PENDING'
@@ -165,7 +167,7 @@ export async function POST(req: Request) {
 
       logger.info(`[HeadTalkCompose] Updated post ${updatedPost.id}`)
     } else {
-      const { creative } = await compose({ ideaText: prompt, brandId, format, personaId })
+      const { creative } = await compose({ ideaText: prompt, brandId, format, personaId, customPrompt: templateCustomPrompt })
 
       const { sceneAssets, audioAsset } = await selectAssetsForCreative(creative, brandId, 30)
 

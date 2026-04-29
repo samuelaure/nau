@@ -21,6 +21,8 @@ import {
   Play,
   Square,
   CheckSquare,
+  SlidersHorizontal,
+  ChevronDown,
 } from 'lucide-react'
 import Modal from '@/modules/shared/components/Modal'
 import { cn } from '@/modules/shared/utils'
@@ -87,11 +89,45 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
   const [manualOpen, setManualOpen] = useState(false)
   const [manualText, setManualText] = useState('')
 
+  // Ideation prompt
+  const [ideationPrompt, setIdeationPrompt] = useState('')
+  const [promptModalOpen, setPromptModalOpen] = useState(false)
+  const [promptDraft, setPromptDraft] = useState('')
+  const [savingPrompt, setSavingPrompt] = useState(false)
+  const [brainstormShowPrompt, setBrainstormShowPrompt] = useState(false)
+  const [manualShowPrompt, setManualShowPrompt] = useState(false)
+
   // Idea detail modal
   const [openIdea, setOpenIdea] = useState<any | null>(null)
   const [editText, setEditText] = useState('')
   const [savingEdit, setSavingEdit] = useState(false)
   const [deletingIdea, setDeletingIdea] = useState(false)
+
+  const fetchIdeationPrompt = async () => {
+    try {
+      const res = await fetch(`/api/brands/${brandId}`)
+      const data = await res.json()
+      setIdeationPrompt(data.brand?.ideationPrompt ?? '')
+    } catch {}
+  }
+
+  const handleSavePrompt = async (text: string) => {
+    setSavingPrompt(true)
+    try {
+      const res = await fetch(`/api/brands/${brandId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ideationPrompt: text || null }),
+      })
+      if (!res.ok) throw new Error()
+      setIdeationPrompt(text)
+      toast.success('Ideation prompt saved')
+    } catch {
+      toast.error('Failed to save prompt')
+    } finally {
+      setSavingPrompt(false)
+    }
+  }
 
   const fetchIdeas = async () => {
     try {
@@ -111,6 +147,7 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
 
   useEffect(() => {
     fetchIdeas()
+    fetchIdeationPrompt()
     fetch(`/api/personas?brandId=${brandId}`).then(r => r.json()).then(d => {
       setPersonas(d.personas || [])
       const def = d.personas?.find((p: any) => p.isDefault) || d.personas?.[0]
@@ -310,6 +347,18 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
           <p className="text-xs text-text-secondary">Captured ideas first, then manual, then automatic.</p>
         </div>
         <div className="flex flex-wrap gap-2 items-center">
+          <button
+            onClick={() => { setPromptDraft(ideationPrompt); setPromptModalOpen(true) }}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
+              ideationPrompt
+                ? 'text-amber-300 border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20'
+                : 'text-text-secondary border-white/10 hover:text-white hover:bg-white/5',
+            )}
+          >
+            <SlidersHorizontal size={12} />
+            {ideationPrompt ? 'Prompt set' : 'Set prompt'}
+          </button>
           <Button onClick={() => setManualOpen(true)} size="sm" variant="outline">
             + Add Idea
           </Button>
@@ -575,6 +624,33 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
                 className="w-20 bg-gray-900 border border-gray-800 text-white rounded p-2 text-sm"
               />
             </div>
+            <div>
+              <button
+                onClick={() => setBrainstormShowPrompt(v => !v)}
+                className={cn(
+                  'flex items-center gap-1.5 text-xs transition-colors',
+                  ideationPrompt ? 'text-amber-300 hover:text-amber-200' : 'text-text-secondary hover:text-white',
+                )}
+              >
+                <SlidersHorizontal size={11} />
+                {ideationPrompt ? 'Ideation prompt set' : 'Add ideation prompt'}
+                <ChevronDown size={11} className={cn('transition-transform', brainstormShowPrompt && 'rotate-180')} />
+              </button>
+              {brainstormShowPrompt && (
+                <div className="mt-2 flex flex-col gap-2">
+                  <textarea
+                    rows={3}
+                    value={ideationPrompt}
+                    onChange={e => setIdeationPrompt(e.target.value)}
+                    placeholder="e.g. 'Always focus on founder-led content with a contrarian angle. Avoid corporate tone.'"
+                    className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-xs text-white resize-none"
+                  />
+                  <Button size="sm" variant="outline" disabled={savingPrompt} onClick={() => handleSavePrompt(ideationPrompt)} className="self-end text-xs">
+                    {savingPrompt ? <Loader2 size={11} className="animate-spin" /> : 'Save'}
+                  </Button>
+                </div>
+              )}
+            </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" disabled={generating} onClick={() => setBrainstormOpen(false)}>Cancel</Button>
               <Button disabled={generating} onClick={handleGenerate} className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
@@ -630,10 +706,70 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
               onChange={e => setManualText(e.target.value)}
               placeholder="Write the concept — hook, angle, educational value…"
             />
+            <div>
+              <button
+                onClick={() => setManualShowPrompt(v => !v)}
+                className={cn(
+                  'flex items-center gap-1.5 text-xs transition-colors',
+                  ideationPrompt ? 'text-amber-300 hover:text-amber-200' : 'text-text-secondary hover:text-white',
+                )}
+              >
+                <SlidersHorizontal size={11} />
+                {ideationPrompt ? 'Ideation prompt set' : 'Add ideation prompt'}
+                <ChevronDown size={11} className={cn('transition-transform', manualShowPrompt && 'rotate-180')} />
+              </button>
+              {manualShowPrompt && (
+                <div className="mt-2 flex flex-col gap-2">
+                  <textarea
+                    rows={3}
+                    value={ideationPrompt}
+                    onChange={e => setIdeationPrompt(e.target.value)}
+                    placeholder="e.g. 'Always focus on founder-led content with a contrarian angle.'"
+                    className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-xs text-white resize-none"
+                  />
+                  <Button size="sm" variant="outline" disabled={savingPrompt} onClick={() => handleSavePrompt(ideationPrompt)} className="self-end text-xs">
+                    {savingPrompt ? <Loader2 size={11} className="animate-spin" /> : 'Save'}
+                  </Button>
+                </div>
+              )}
+            </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setManualOpen(false)}>Cancel</Button>
               <Button onClick={handleCreateManualIdea} className="bg-accent text-white" disabled={!manualText.trim()}>
                 Save Idea
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Ideation prompt modal ────────────────────────────────────────────── */}
+      {promptModalOpen && (
+        <Modal isOpen={true} onClose={() => !savingPrompt && setPromptModalOpen(false)}>
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-xl font-heading font-semibold">Ideation Prompt</h2>
+              <p className="text-xs text-text-secondary mt-1">
+                Custom instructions injected into every idea generation — manual, brainstorm, and automatic. They take priority over all default guidelines.
+              </p>
+            </div>
+            <textarea
+              autoFocus
+              rows={8}
+              className="w-full bg-gray-900 border border-gray-800 rounded p-3 text-sm text-white resize-none focus:outline-none focus:border-accent/50"
+              value={promptDraft}
+              onChange={e => setPromptDraft(e.target.value)}
+              placeholder="e.g. 'Always write from a founder's POV. Prioritize contrarian angles over mainstream ones. Avoid motivational fluff — favour specific, practical insights.'"
+              disabled={savingPrompt}
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" disabled={savingPrompt} onClick={() => setPromptModalOpen(false)}>Cancel</Button>
+              <Button
+                disabled={savingPrompt}
+                onClick={async () => { await handleSavePrompt(promptDraft); setPromptModalOpen(false) }}
+                className="bg-accent text-white"
+              >
+                {savingPrompt ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Saving…</> : 'Save Prompt'}
               </Button>
             </div>
           </div>

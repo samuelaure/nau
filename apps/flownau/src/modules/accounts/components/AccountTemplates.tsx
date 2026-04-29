@@ -5,8 +5,9 @@ import { Card } from '@/modules/shared/components/ui/Card'
 import { Button } from '@/modules/shared/components/ui/Button'
 import { toast } from 'sonner'
 import Link from 'next/link'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, SlidersHorizontal, ChevronDown, Loader2 } from 'lucide-react'
 import { installDefaultTemplates } from '@/modules/accounts/actions'
+import { cn } from '@/modules/shared/utils'
 
 export default function AccountTemplates({
   brandId,
@@ -18,6 +19,9 @@ export default function AccountTemplates({
   const [templates, setTemplates] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [installing, setInstalling] = useState(false)
+  const [expandedPrompt, setExpandedPrompt] = useState<string | null>(null)
+  const [promptDrafts, setPromptDrafts] = useState<Record<string, string>>({})
+  const [savingPrompt, setSavingPrompt] = useState<string | null>(null)
 
   const fetchTemplates = async () => {
     try {
@@ -34,6 +38,33 @@ export default function AccountTemplates({
   useEffect(() => {
     fetchTemplates()
   }, [brandId])
+
+  const handlePromptToggle = (templateId: string, currentPrompt: string | null | undefined) => {
+    if (expandedPrompt === templateId) {
+      setExpandedPrompt(null)
+    } else {
+      setPromptDrafts(prev => ({ ...prev, [templateId]: currentPrompt ?? '' }))
+      setExpandedPrompt(templateId)
+    }
+  }
+
+  const handleSavePrompt = async (templateId: string) => {
+    setSavingPrompt(templateId)
+    try {
+      const res = await fetch('/api/account-templates', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brandId, templateId, customPrompt: promptDrafts[templateId] || null }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success('Prompt saved')
+      fetchTemplates()
+    } catch {
+      toast.error('Failed to save prompt')
+    } finally {
+      setSavingPrompt(null)
+    }
+  }
 
   const updateConfig = async (
     templateId: string,
@@ -120,6 +151,9 @@ export default function AccountTemplates({
             ? `/dashboard/workspace/${workspaceId}/template/${t.id}?brandId=${brandId}`
             : null
 
+          const customPrompt = config?.customPrompt ?? null
+          const isPromptExpanded = expandedPrompt === t.id
+
           return (
             <Card key={t.id} className="p-5 hover:border-gray-600 transition-colors">
               <div className="flex justify-between items-start gap-4">
@@ -173,7 +207,45 @@ export default function AccountTemplates({
                       />
                       Auto-post
                     </label>
+                    <button
+                      onClick={() => handlePromptToggle(t.id, customPrompt)}
+                      className={cn(
+                        'flex items-center gap-1.5 text-xs transition-colors',
+                        customPrompt ? 'text-amber-300 hover:text-amber-200' : 'text-text-secondary hover:text-white',
+                      )}
+                    >
+                      <SlidersHorizontal size={11} />
+                      {customPrompt ? 'Prompt set' : 'Set prompt'}
+                      <ChevronDown size={11} className={cn('transition-transform', isPromptExpanded && 'rotate-180')} />
+                    </button>
                   </div>
+
+                  {isPromptExpanded && (
+                    <div className="mt-3 flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
+                      <p className="text-xs text-text-secondary">
+                        Custom instructions injected when this template is used for drafting — takes priority over all defaults.
+                      </p>
+                      <textarea
+                        rows={4}
+                        value={promptDrafts[t.id] ?? ''}
+                        onChange={e => setPromptDrafts(prev => ({ ...prev, [t.id]: e.target.value }))}
+                        placeholder={`e.g. 'Always open with a provocative question. Keep each scene text under 8 words.'`}
+                        className="w-full bg-gray-950 border border-gray-800 rounded p-2.5 text-xs text-white resize-none focus:outline-none focus:border-accent/50"
+                      />
+                      <div className="flex justify-end gap-2">
+                        <Button size="sm" variant="outline" className="text-xs" onClick={() => setExpandedPrompt(null)}>Cancel</Button>
+                        <Button
+                          size="sm"
+                          className="text-xs bg-accent text-white"
+                          disabled={savingPrompt === t.id}
+                          onClick={() => handleSavePrompt(t.id)}
+                        >
+                          {savingPrompt === t.id ? <Loader2 size={11} className="animate-spin mr-1" /> : null}
+                          Save Prompt
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">

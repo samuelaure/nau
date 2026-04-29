@@ -21,8 +21,7 @@ model Brand {
   ideationCount        Int      @default(9)
   autoApproveIdeas     Boolean  @default(false)
   coverageHorizonDays  Int      @default(7)
-  directorPrompt       String?  @db.Text
-  creationPrompt       String?  @db.Text
+  ideationPrompt       String?  @db.Text
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
@@ -164,6 +163,7 @@ model BrandTemplateConfig {
   autoApproveDraft Boolean  @default(false)
   autoApprovePost  Boolean  @default(false)  // autoApproveRendered — kept as autoApprovePost
   enabled          Boolean  @default(true)
+  customPrompt     String?  @db.Text
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 

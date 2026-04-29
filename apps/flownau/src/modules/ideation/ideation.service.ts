@@ -21,6 +21,7 @@ export interface GenerationRequest {
   language?: string    // Brand content language (e.g. 'Spanish', 'English'). Default: 'Spanish'.
   count: number        // How many ideas to generate.
   recentContent?: string[]  // Recent published captions — avoid repeating these topics.
+  userInstructions?: string | null  // Brand-specific ideation prompt — injected with highest priority.
 }
 
 export async function generateContentIdeas(req: GenerationRequest): Promise<IdeationOutput> {
@@ -30,7 +31,11 @@ export async function generateContentIdeas(req: GenerationRequest): Promise<Idea
 
   const language = req.language ?? 'Spanish'
 
-  const systemPrompt = `Generate exactly ${req.count} concept ideas that exploit the three mechanisms that drive sharing on short-form platforms:
+  const creatorBlock = req.userInstructions?.trim()
+    ? `⚠️ CREATOR INSTRUCTIONS — these take absolute precedence over all guidelines below. Follow them exactly; let them shape the ideas above everything else:\n\n<creator_instructions>\n${req.userInstructions.trim()}\n</creator_instructions>\n\nAll default rules below are subordinate to the above.\n\n---\n\n`
+    : ''
+
+  const systemPrompt = `${creatorBlock}Generate exactly ${req.count} concept ideas that exploit the three mechanisms that drive sharing on short-form platforms:
 
 1. IDENTITY SIGNAL — content that lets the viewer signal something about who they are by sharing it ("this is so me", "this is what I believe", "this is my world"). The viewer is the hero, not the brand.
 

@@ -58,7 +58,7 @@ export async function GET(req: Request) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json()
-    const { brandId, templateId, autoApprovePost, enabled } = body
+    const { brandId, templateId, autoApprovePost, enabled, customPrompt } = body
 
     if (!brandId || !templateId) {
       return NextResponse.json({ error: 'Missing brandId or templateId' }, { status: 400 })
@@ -71,10 +71,12 @@ export async function PUT(req: Request) {
         templateId,
         autoApprovePost: autoApprovePost ?? false,
         enabled: enabled ?? true,
+        customPrompt: customPrompt ?? null,
       },
       update: {
         ...(autoApprovePost !== undefined && { autoApprovePost }),
         ...(enabled !== undefined && { enabled }),
+        ...(customPrompt !== undefined && { customPrompt }),
       },
     })
 

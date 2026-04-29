@@ -11,7 +11,24 @@ const BrandPatchSchema = z.object({
   ideationCount: z.number().int().min(1).max(30).optional(),
   autoApproveIdeas: z.boolean().optional(),
   coverageHorizonDays: z.number().int().min(1).max(30).optional(),
+  ideationPrompt: z.string().max(2000).nullable().optional(),
 })
+
+export async function GET(req: NextRequest, { params }: { params: Promise<{ brandId: string }> }) {
+  const { brandId } = await params
+  try {
+    await checkBrandAccess(brandId)
+    const brand = await prisma.brand.findUnique({
+      where: { id: brandId },
+      select: { id: true, ideationPrompt: true, language: true, ideationCount: true, autoApproveIdeas: true, coverageHorizonDays: true },
+    })
+    if (!brand) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    return NextResponse.json({ brand })
+  } catch (error) {
+    logError('BRAND_GET', error)
+    return NextResponse.json({ error: 'Failed to fetch brand' }, { status: 500 })
+  }
+}
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ brandId: string }> }) {
   const { brandId } = await params

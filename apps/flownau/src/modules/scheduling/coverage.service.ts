@@ -146,7 +146,7 @@ async function runCheck1(
       // Pick a random enabled template for this format
       const templateConfig = await prisma.brandTemplateConfig.findFirst({
         where: { brandId, enabled: true, template: { format: slot.format } },
-        include: { template: { select: { id: true, format: true } } },
+        select: { templateId: true, autoApproveDraft: true, customPrompt: true, template: { select: { id: true, format: true } } },
         // random-ish: order by updatedAt desc gives variety without a raw query
         orderBy: { updatedAt: 'desc' },
       })
@@ -164,13 +164,7 @@ async function runCheck1(
           schemaName: schemaNameForFormat(slot.format),
         })
 
-        // Resolve auto-approve
-        const autoApproveDraft = templateConfig
-          ? await prisma.brandTemplateConfig.findUnique({
-              where: { brandId_templateId: { brandId, templateId: templateConfig.templateId } },
-              select: { autoApproveDraft: true },
-            }).then((c) => c?.autoApproveDraft ?? false)
-          : false
+        const autoApproveDraft = templateConfig?.autoApproveDraft ?? false
 
         const draftStatus = autoApproveDraft ? 'DRAFT_APPROVED' : 'DRAFT_PENDING'
 
@@ -310,7 +304,7 @@ async function triggerIdeaGeneration(brandId: string, ideationCount: number): Pr
 
     const brand = await prisma.brand.findUnique({
       where: { id: brandId },
-      select: { language: true, autoApproveIdeas: true },
+      select: { language: true, autoApproveIdeas: true, ideationPrompt: true },
     })
 
     const digest = await fetchBrandDigest(brandId)
@@ -331,6 +325,7 @@ async function triggerIdeaGeneration(brandId: string, ideationCount: number): Pr
       language: brand?.language ?? 'Spanish',
       count: ideationCount,
       recentContent: recentPosts.map((p) => p.caption!.slice(0, 100)),
+      userInstructions: brand?.ideationPrompt ?? null,
     })
 
     const autoApprove = brand?.autoApproveIdeas ?? false
