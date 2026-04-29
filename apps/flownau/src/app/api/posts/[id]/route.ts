@@ -83,8 +83,19 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       },
     })
 
-    // If dropped onto a specific empty slot, mark it filled
+    // Handle slot assignment / rescheduling:
+    // Release the post's previous slot (if any), then claim the new one.
     if (slotId) {
+      const previousSlot = await prisma.postSlot.findFirst({
+        where: { postId: id },
+        select: { id: true },
+      })
+      if (previousSlot && previousSlot.id !== slotId) {
+        await prisma.postSlot.update({
+          where: { id: previousSlot.id },
+          data: { status: 'empty', postId: null },
+        })
+      }
       await prisma.postSlot.update({
         where: { id: slotId },
         data: { status: 'filled', postId: id },

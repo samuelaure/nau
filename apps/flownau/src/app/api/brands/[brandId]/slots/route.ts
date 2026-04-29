@@ -5,7 +5,6 @@ import { prisma } from '@/modules/shared/prisma'
 import { getAuthUser } from '@/lib/auth'
 import { checkBrandAccess } from '@/modules/shared/actions'
 import { logError } from '@/modules/shared/logger'
-import { materializeSlots } from '@/modules/scheduling/slot-materializer'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ brandId: string }> }) {
   const { brandId } = await params
@@ -13,12 +12,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ bran
     const user = await getAuthUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     await checkBrandAccess(brandId)
-
-    // Materialize slots on-demand so new brands see projections immediately
-    const schedule = await prisma.postSchedule.findUnique({ where: { brandId }, select: { isActive: true } })
-    if (schedule?.isActive) {
-      materializeSlots(brandId, 31).catch(() => {})
-    }
 
     const url = new URL(req.url)
     const from = url.searchParams.get('from')
