@@ -45,15 +45,8 @@ function getSecondaryTag(format: string, display: DisplayStatus): SecondaryTag {
   return null
 }
 
-const DISPLAY_COLOR: Record<DisplayStatus, string> = {
-  Draft: 'bg-gray-700/50 border-gray-600/50 text-gray-300',
-  Composed: 'bg-purple-500/15 border-purple-500/30 text-purple-300',
-  Published: 'bg-green-500/15 border-green-500/30 text-green-300',
-  Error: 'bg-red-500/15 border-red-500/30 text-red-400',
-}
-
 const DISPLAY_DOT: Record<DisplayStatus, string> = {
-  Draft: 'bg-gray-500',
+  Draft: 'bg-gray-400',
   Composed: 'bg-purple-400',
   Published: 'bg-green-400',
   Error: 'bg-red-400',
@@ -84,6 +77,24 @@ const FORMAT_LABEL: Record<string, string> = {
   story: 'Story',
 }
 
+const FORMAT_COLOR: Record<string, string> = {
+  reel: 'bg-blue-500/15 border-blue-500/30 text-blue-200',
+  trial_reel: 'bg-indigo-500/15 border-indigo-500/30 text-indigo-200',
+  head_talk: 'bg-purple-500/15 border-purple-500/30 text-purple-200',
+  carousel: 'bg-pink-500/15 border-pink-500/30 text-pink-200',
+  static_post: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-200',
+  story: 'bg-orange-500/15 border-orange-500/30 text-orange-200',
+}
+
+const FORMAT_EMPTY_COLOR: Record<string, string> = {
+  reel: 'border-blue-500/20 text-blue-500/50 bg-blue-500/5 hover:bg-blue-500/10 hover:border-blue-500/40',
+  trial_reel: 'border-indigo-500/20 text-indigo-500/50 bg-indigo-500/5 hover:bg-indigo-500/10 hover:border-indigo-500/40',
+  head_talk: 'border-purple-500/20 text-purple-500/50 bg-purple-500/5 hover:bg-purple-500/10 hover:border-purple-500/40',
+  carousel: 'border-pink-500/20 text-pink-500/50 bg-pink-500/5 hover:bg-pink-500/10 hover:border-pink-500/40',
+  static_post: 'border-emerald-500/20 text-emerald-500/50 bg-emerald-500/5 hover:bg-emerald-500/10 hover:border-emerald-500/40',
+  story: 'border-orange-500/20 text-orange-500/50 bg-orange-500/5 hover:bg-orange-500/10 hover:border-orange-500/40',
+}
+
 // ─── Slot chip (empty PostSlot placeholder) — droppable ──────────────────────
 
 function SlotChip({
@@ -99,6 +110,8 @@ function SlotChip({
   const canDrop = dragState?.format === slot.format
   const [over, setOver] = useState(false)
 
+  const formatEmptyColor = FORMAT_EMPTY_COLOR[slot.format] ?? 'border-white/10 text-white/40 bg-white/5'
+
   return (
     <div
       onDragOver={(e) => { if (canDrop) { e.preventDefault(); setOver(true) } }}
@@ -110,7 +123,7 @@ function SlotChip({
           ? 'border-accent bg-accent/10 text-accent'
           : canDrop && dragState
             ? 'border-accent/40 text-accent/50'
-            : 'border-white/10 text-white/25',
+            : formatEmptyColor,
       )}
     >
       <div className="flex items-center gap-1">
@@ -185,10 +198,13 @@ type Composition = {
   status: string
   scheduledAt: string | null
   caption: string | null
+  ideaText?: string | null
   createdAt: string
   userUploadedMediaUrl?: string | null
-  userPostedManually?: boolean
+  coverUrl?: string | null
+  videoUrl?: string | null
   renderedVideoUrl?: string | null
+  userPostedManually?: boolean
   payload?: Record<string, unknown> | null
 }
 
@@ -388,10 +404,7 @@ function CompositionModal({
               return (
                 <div className="flex items-center gap-1.5">
                   <span
-                    className={cn(
-                      'flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border',
-                      DISPLAY_COLOR[display],
-                    )}
+                    className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border bg-gray-800/50 border-gray-700/50 text-gray-300"
                   >
                     <span className={cn('w-1.5 h-1.5 rounded-full', DISPLAY_DOT[display])} />
                     {display}
@@ -640,6 +653,14 @@ function CompositionChip({
   const display = getDisplayStatus(comp.status)
   const tag = getSecondaryTag(comp.format, display)
   const isDragging = dragState?.postId === comp.id
+  const formatColor = FORMAT_COLOR[comp.format] ?? 'bg-gray-800/50 border-gray-700/50 text-gray-200'
+
+  // Prioritize cover image, fallback to rendered video if available (browser can try to grab first frame), or uploaded media.
+  // Actually, we shouldn't use video files as standard <img> src, but if coverUrl exists, we use it.
+  const thumb = comp.coverUrl || (comp.renderedVideoUrl?.endsWith('.mp4') ? null : comp.renderedVideoUrl) || (comp.userUploadedMediaUrl?.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? comp.userUploadedMediaUrl : null)
+
+  const isVideoThumb = !thumb && (comp.renderedVideoUrl || comp.userUploadedMediaUrl)
+
   return (
     <button
       draggable
@@ -647,27 +668,46 @@ function CompositionChip({
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       className={cn(
-        'w-full text-left rounded p-1.5 flex flex-col gap-0.5 text-[10px] border transition-all cursor-grab active:cursor-grabbing',
-        isDragging ? 'opacity-40 scale-95' : 'hover:opacity-80',
-        DISPLAY_COLOR[display],
+        'w-full text-left rounded p-1.5 flex flex-col gap-1 text-[10px] border transition-all cursor-grab active:cursor-grabbing overflow-hidden',
+        isDragging ? 'opacity-40 scale-95' : 'hover:brightness-110',
+        formatColor,
       )}
     >
-      <div className="flex items-center gap-1">
-        <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', DISPLAY_DOT[display])} />
-        <FormatIcon size={9} className="shrink-0" />
-        <span className="font-bold truncate">{FORMAT_LABEL[comp.format] ?? comp.format}</span>
-      </div>
-      {comp.scheduledAt && (
-        <span className="text-[9px] opacity-60 pl-3">{fmtTime(comp.scheduledAt)}</span>
-      )}
-      <div className="flex items-center gap-1 pl-3">
-        <span className="text-[9px] opacity-70">{display}</span>
+      <div className="flex items-start justify-between w-full">
+        <div className="flex items-center gap-1">
+          <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', DISPLAY_DOT[display])} />
+          <FormatIcon size={10} className="shrink-0" />
+          <span className="font-bold truncate leading-none pt-0.5">{FORMAT_LABEL[comp.format] ?? comp.format}</span>
+        </div>
         {tag && (
-          <span className={cn('text-[8px] font-bold px-1 rounded border', TAG_COLOR[tag])}>
+          <span className={cn('text-[8px] font-bold px-1 py-0.5 rounded border leading-none', TAG_COLOR[tag])}>
             {tag}
           </span>
         )}
       </div>
+      
+      <div className="flex items-center justify-between pl-3 pr-1 w-full">
+        {comp.scheduledAt && (
+          <span className="text-[9px] opacity-70 font-medium">{fmtTime(comp.scheduledAt)}</span>
+        )}
+        <span className="text-[9px] opacity-70">{display}</span>
+      </div>
+
+      {(thumb || isVideoThumb) && (
+        <div className="w-full h-14 rounded overflow-hidden mt-1 bg-black/20 flex-shrink-0 relative">
+          {thumb ? (
+            <img src={thumb} alt="Thumbnail" className="w-full h-full object-cover opacity-90" />
+          ) : isVideoThumb ? (
+            <video src={comp.renderedVideoUrl || comp.userUploadedMediaUrl || ''} className="w-full h-full object-cover opacity-90" muted playsInline />
+          ) : null}
+        </div>
+      )}
+
+      {comp.ideaText && (
+        <p className="text-[9.5px] opacity-80 leading-snug line-clamp-2 mt-0.5 whitespace-pre-wrap">
+          {comp.ideaText}
+        </p>
+      )}
     </button>
   )
 }
@@ -933,7 +973,11 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
               const FormatIcon = FORMAT_ICON[comp.format] ?? Film
               const display = getDisplayStatus(comp.status)
               const tag = getSecondaryTag(comp.format, display)
+              const formatColor = FORMAT_COLOR[comp.format] ?? 'bg-gray-800/50 border-gray-700/50 text-gray-200'
+              const thumb = comp.coverUrl || (comp.renderedVideoUrl?.endsWith('.mp4') ? null : comp.renderedVideoUrl) || (comp.userUploadedMediaUrl?.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? comp.userUploadedMediaUrl : null)
+              const isVideoThumb = !thumb && (comp.renderedVideoUrl || comp.userUploadedMediaUrl)
               const isDragging = dragState?.postId === comp.id
+
               return (
                 <button
                   key={comp.id}
@@ -942,24 +986,40 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
                   onDragEnd={() => setDragState(null)}
                   onClick={() => setSelected(comp)}
                   className={cn(
-                    'flex items-center gap-2 rounded-lg px-3 py-2 text-xs border transition-all cursor-grab active:cursor-grabbing',
-                    isDragging ? 'opacity-40 scale-95' : 'hover:opacity-80',
-                    DISPLAY_COLOR[display],
+                    'flex flex-col items-start gap-1.5 rounded-lg px-3 py-2 text-xs border transition-all cursor-grab active:cursor-grabbing w-40 overflow-hidden',
+                    isDragging ? 'opacity-40 scale-95' : 'hover:brightness-110',
+                    formatColor,
                   )}
                 >
-                  <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', DISPLAY_DOT[display])} />
-                  <FormatIcon size={12} />
-                  <span>{FORMAT_LABEL[comp.format] ?? comp.format}</span>
-                  <span className="opacity-60">{display}</span>
-                  {tag && (
-                    <span
-                      className={cn(
-                        'text-[10px] font-bold px-1.5 py-0.5 rounded border',
-                        TAG_COLOR[tag],
-                      )}
-                    >
-                      {tag}
-                    </span>
+                  <div className="flex items-center gap-1.5 w-full">
+                    <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', DISPLAY_DOT[display])} />
+                    <FormatIcon size={12} className="shrink-0" />
+                    <span className="font-bold truncate leading-none">{FORMAT_LABEL[comp.format] ?? comp.format}</span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between w-full opacity-70">
+                    <span className="text-[10px]">{display}</span>
+                    {tag && (
+                      <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded border leading-none', TAG_COLOR[tag])}>
+                        {tag}
+                      </span>
+                    )}
+                  </div>
+
+                  {(thumb || isVideoThumb) && (
+                    <div className="w-full h-16 rounded overflow-hidden mt-0.5 bg-black/20 flex-shrink-0 relative">
+                      {thumb ? (
+                        <img src={thumb} alt="Thumbnail" className="w-full h-full object-cover opacity-90" />
+                      ) : isVideoThumb ? (
+                        <video src={comp.renderedVideoUrl || comp.userUploadedMediaUrl || ''} className="w-full h-full object-cover opacity-90" muted playsInline />
+                      ) : null}
+                    </div>
+                  )}
+
+                  {comp.ideaText && (
+                    <p className="text-[10px] opacity-80 leading-snug line-clamp-2 mt-0.5 whitespace-pre-wrap text-left">
+                      {comp.ideaText}
+                    </p>
                   )}
                 </button>
               )
