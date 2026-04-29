@@ -33,6 +33,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     const {
       slotId,
+      releaseSlot,
       status,
       ideaText,
       format,
@@ -85,7 +86,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     // Handle slot assignment / rescheduling:
     // Release the post's previous slot (if any), then claim the new one.
-    if (slotId) {
+    if (slotId || releaseSlot) {
       const previousSlot = await prisma.postSlot.findFirst({
         where: { postId: id },
         select: { id: true },
@@ -96,10 +97,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           data: { status: 'empty', postId: null },
         })
       }
-      await prisma.postSlot.update({
-        where: { id: slotId },
-        data: { status: 'filled', postId: id },
-      })
+      if (slotId) {
+        await prisma.postSlot.update({
+          where: { id: slotId },
+          data: { status: 'filled', postId: id },
+        })
+      }
     }
 
     return NextResponse.json({ post: updated })

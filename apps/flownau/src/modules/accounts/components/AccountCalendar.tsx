@@ -144,16 +144,19 @@ function BetweenDropZone({
     : afterTime ?? beforeTime ?? new Date().toISOString()
 
   return (
+    // min-h keeps the zone stable when expanded — avoids layout reflow that causes onDragLeave to fire
     <div
-      onDragOver={(e) => { e.preventDefault(); setOver(true) }}
-      onDragLeave={() => setOver(false)}
+      onDragOver={(e) => { e.preventDefault(); if (!over) setOver(true) }}
+      onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver(false) }}
       onDrop={(e) => { e.preventDefault(); setOver(false); onDrop(midTime) }}
       className={cn(
-        'w-full h-1.5 rounded transition-all',
-        over ? 'h-6 bg-accent/20 border border-dashed border-accent flex items-center justify-center' : 'hover:h-3 bg-white/5',
+        'w-full rounded transition-colors flex items-center justify-center',
+        over
+          ? 'min-h-[24px] bg-accent/20 border border-dashed border-accent'
+          : 'min-h-[6px] bg-white/5 hover:bg-white/10',
       )}
     >
-      {over && <span className="text-[9px] text-accent">Drop here · {fmtTime(midTime)}</span>}
+      {over && <span className="text-[9px] text-accent pointer-events-none">Drop here · {fmtTime(midTime)}</span>}
     </div>
   )
 }
@@ -715,20 +718,34 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
 
   const handleDrop = async (postId: string, scheduledAt: string, slotId?: string) => {
     setDragState(null)
-    // Optimistic update
+
+    // Optimistic update: update the moved post's scheduledAt
     setCompositions((prev) =>
       prev.map((c) => c.id === postId ? { ...c, scheduledAt } : c),
     )
-    if (slotId) {
-      setSlots((prev) =>
-        prev.map((s) => s.id === slotId ? { ...s, status: 'filled', post: null } : s),
+
+    // Optimistic slot updates
+    setSlots((prev) => {
+      let next = prev
+      // Release the old slot this post was in (if any)
+      next = next.map((s) =>
+        s.post?.id === postId ? { ...s, status: 'empty', post: null } : s,
       )
-    }
+      // Fill the new target slot (if dropping onto a named slot)
+      if (slotId) {
+        next = next.map((s) =>
+          s.id === slotId ? { ...s, status: 'filled', post: null } : s,
+        )
+      }
+      return next
+    })
+
     try {
       await fetch(`/api/posts/${postId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scheduledAt, ...(slotId ? { slotId } : {}) }),
+        // Always send releaseSlot so the backend clears the old slot even when dropping to free space
+        body: JSON.stringify({ scheduledAt, releaseSlot: true, ...(slotId ? { slotId } : {}) }),
       })
       fetchCompositions()
     } catch {
