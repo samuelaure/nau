@@ -750,19 +750,60 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
 
   const handleRunCoverage = async () => {
     setRunningCoverage(true)
+    const loadingId = toast.loading('Filling calendar…')
     try {
       const res = await fetch(`/api/brands/${brandId}/fill-calendar`, { method: 'POST' })
       const data = await res.json()
+      toast.dismiss(loadingId)
       if (!res.ok) throw new Error(data.error ?? 'Failed')
-      const c1 = data.result?.check1
-      const filled = c1?.slotsFilledNow ?? 0
-      const ideas = c1?.ideasGenerated ?? false
-      toast.success(
-        `Calendar filled — ${filled} slot${filled === 1 ? '' : 's'} scheduled${ideas ? ', new ideas generated' : ''}`,
-      )
+
+      const r = data.result as {
+        alreadyFull: boolean
+        slotsNeeded: number
+        ideasGenerated: number
+        noDigest: boolean
+        approvedIdeas: number
+        slotsFilled: number
+        needsApproval: number
+      }
+
+      if (r.alreadyFull) {
+        toast.success('Calendar is already fully scheduled.')
+        return
+      }
+
+      // Step 1: report idea generation
+      if (r.ideasGenerated > 0) {
+        toast.info(`Generated ${r.ideasGenerated} new idea${r.ideasGenerated === 1 ? '' : 's'} to fill the queue.`)
+      } else if (r.noDigest && r.approvedIdeas < r.slotsNeeded) {
+        toast.warning('Could not auto-generate ideas — no InspoBase digest available. Add topics manually in the Ideas tab.')
+      }
+
+      // Step 2: approval gap
+      if (r.needsApproval > 0) {
+        toast.warning(
+          `To fill the calendar we need ${r.slotsNeeded} post${r.slotsNeeded === 1 ? '' : 's'}, but only ${r.approvedIdeas} idea${r.approvedIdeas === 1 ? '' : 's'} ${r.approvedIdeas === 1 ? 'is' : 'are'} approved. Approve ${r.needsApproval} more in the Ideas tab.`,
+          { duration: 8000 },
+        )
+      }
+
+      // Step 3: final scheduling result
+      const remaining = r.slotsNeeded - r.slotsFilled
+      if (r.slotsFilled === 0 && r.needsApproval > 0) {
+        // All blocked on approval — main message was already shown above
+      } else if (remaining > 0) {
+        toast.success(
+          `${r.slotsFilled} of ${r.slotsNeeded} post${r.slotsNeeded === 1 ? '' : 's'} scheduled. Approve ${remaining} more idea${remaining === 1 ? '' : 's'} and run Fill Calendar again to complete it.`,
+          { duration: 8000 },
+        )
+      } else {
+        toast.success(`Calendar filled — ${r.slotsFilled} post${r.slotsFilled === 1 ? '' : 's'} scheduled.`)
+      }
+
       fetchCompositions()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Coverage check failed')
+      toast.dismiss(loadingId)
+      toast.error(err instanceof Error ? err.message : 'Fill calendar failed')
     } finally {
       setRunningCoverage(false)
     }

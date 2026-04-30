@@ -295,6 +295,138 @@ async function runCheck2(brandId: string, halfHorizonDays: number): Promise<Chec
   }
 }
 
+// ─── Smart fill (manual trigger) ─────────────────────────────────────────────
+
+export interface SmartFillResult {
+  alreadyFull: boolean
+  slotsNeeded: number      // empty slots at the start of this run
+  ideasGenerated: number   // new ideas created during this run
+  noDigest: boolean        // generation skipped — no inspo digest available
+  approvedIdeas: number    // approved ideas available when slot-filling ran
+  slotsFilled: number      // slots actually filled
+  needsApproval: number    // more approvals still needed to fill remaining slots
+}
+
+/**
+ * Manual "Fill Calendar" trigger.
+ * 1. Materialise slots for the full coverage horizon.
+ * 2. Count the gap (empty slots).
+ * 3. If total ideas < gap, generate ideas in batches until covered (or digest runs out).
+ * 4. Fill slots using approved ideas (composing drafts as needed).
+ * 5. Return rich status for the UI notification.
+ */
+export async function smartFillCalendar(brandId: string): Promise<SmartFillResult> {
+  const brand = await prisma.brand.findUnique({
+    where: { id: brandId },
+    select: { coverageHorizonDays: true, ideationCount: true, autoApproveIdeas: true, language: true, ideationPrompt: true },
+  })
+  if (!brand) throw new Error(`Brand ${brandId} not found`)
+
+  const horizonDays = brand.coverageHorizonDays
+  await materializeSlots(brandId, horizonDays + 1)
+
+  const targetEnd = new Date(Date.now() + (horizonDays + 1) * 24 * 60 * 60 * 1000)
+  const now = new Date()
+
+  const [allSlots, filledSlots] = await Promise.all([
+    prisma.postSlot.count({ where: { brandId, scheduledAt: { lte: targetEnd, gt: now } } }),
+    prisma.postSlot.count({ where: { brandId, scheduledAt: { lte: targetEnd, gt: now }, status: { in: ['filled', 'published'] } } }),
+  ])
+  const slotsNeeded = allSlots - filledSlots
+
+  if (slotsNeeded === 0) {
+    return { alreadyFull: true, slotsNeeded: 0, ideasGenerated: 0, noDigest: false, approvedIdeas: 0, slotsFilled: 0, needsApproval: 0 }
+  }
+
+  // Count all available ideas (pending + approved — not yet turned into drafts)
+  const countAvailableIdeas = () =>
+    prisma.post.count({
+      where: { brandId, status: { in: ['IDEA_PENDING', 'IDEA_APPROVED'] } },
+    })
+
+  let totalIdeas = await countAvailableIdeas()
+  let ideasGenerated = 0
+  let noDigest = false
+
+  // Generate ideas in batches until we have enough to cover the gap
+  if (totalIdeas < slotsNeeded) {
+    const { fetchBrandDigest } = await import('@/modules/ideation/sources/inspo-source')
+    const { generateContentIdeas } = await import('@/modules/ideation/ideation.service')
+    const digest = await fetchBrandDigest(brandId)
+
+    if (!digest?.content?.trim()) {
+      noDigest = true
+      logger.warn({ brandId }, '[SMART_FILL] Idea generation skipped — no digest available')
+    } else {
+      const recentPosts = await prisma.post.findMany({
+        where: { brandId, createdAt: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) }, caption: { not: null } },
+        select: { caption: true },
+        take: 30,
+      })
+      const autoApprove = brand.autoApproveIdeas
+      const batchSize = brand.ideationCount
+
+      while (totalIdeas < slotsNeeded) {
+        const count = Math.min(batchSize, slotsNeeded - totalIdeas)
+        const output = await generateContentIdeas({
+          topic: digest.content,
+          language: brand.language,
+          count,
+          recentContent: recentPosts.map((p) => p.caption!.slice(0, 100)),
+          userInstructions: brand.ideationPrompt ?? null,
+        })
+        const batchId = crypto.randomUUID()
+        for (const idea of output.ideas) {
+          await prisma.post.create({
+            data: {
+              brandId,
+              ideaText: idea.concept,
+              status: autoApprove ? 'IDEA_APPROVED' : 'IDEA_PENDING',
+              source: 'automatic',
+              priority: 3,
+              generationBatchId: batchId,
+            },
+          })
+        }
+        ideasGenerated += output.ideas.length
+        totalIdeas = await countAvailableIdeas()
+
+        // Safety: if generation produced 0 ideas, break to avoid infinite loop
+        if (output.ideas.length === 0) break
+      }
+      logger.info({ brandId, ideasGenerated }, '[SMART_FILL] Ideas generated')
+    }
+  }
+
+  // Count approved ideas available for slot-filling
+  const approvedIdeas = await prisma.post.count({
+    where: { brandId, status: 'IDEA_APPROVED' },
+  })
+
+  // Run slot-filling (same logic as Check 1, minus the idea generation since we did it above)
+  const check1 = await runCheck1(brandId, horizonDays, brand)
+  const slotsFilled = check1.slotsFilledNow
+
+  const remainingEmpty = slotsNeeded - slotsFilled
+  // How many more approved ideas are needed to fill the rest
+  const approvedAfterFill = await prisma.post.count({
+    where: { brandId, status: 'IDEA_APPROVED' },
+  })
+  const needsApproval = Math.max(0, remainingEmpty - approvedAfterFill)
+
+  logger.info({ brandId, slotsNeeded, slotsFilled, ideasGenerated, approvedIdeas, needsApproval }, '[SMART_FILL] Complete')
+
+  return {
+    alreadyFull: false,
+    slotsNeeded,
+    ideasGenerated,
+    noDigest,
+    approvedIdeas,
+    slotsFilled,
+    needsApproval,
+  }
+}
+
 // ─── Idea generation trigger ──────────────────────────────────────────────────
 
 async function triggerIdeaGeneration(brandId: string, ideationCount: number): Promise<boolean> {
