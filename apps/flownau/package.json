@@ -18,6 +18,7 @@
   "private": true,
   "scripts": {
     "dev": "dotenv -e ../../.env.development -e .env.development -- next dev --port 3003",
+    "dev:worker": "dotenv -e ../../.env.development -e .env.development -- tsx src/modules/renderer/render-worker.ts",
     "predev": "dotenv -e ../../.env.development -e .env.development -- node scripts/db-bootstrap.js",
     "build": "next build",
     "start": "npm run db:bootstrap && next start",

@@ -139,10 +139,10 @@ export async function composeDraft<T = unknown>(
     template = config?.template ?? null
   }
 
-  // 3. Resolve brand language
+  // 3. Resolve brand language + context
   const brand = await prisma.brand.findUnique({
     where: { id: brandId },
-    select: { language: true },
+    select: { language: true, name: true, ideationPrompt: true },
   })
   const language = brand?.language ?? 'Spanish'
 
@@ -161,7 +161,16 @@ export async function composeDraft<T = unknown>(
     ? `⚠️ CREATOR INSTRUCTIONS — these take absolute precedence over all guidelines below. Follow them exactly; let them shape the output above everything else:\n\n<creator_instructions>\n${customPrompt.trim()}\n</creator_instructions>\n\nAll sections below are subordinate to the above.\n\n---\n\n`
     : ''
 
+  const brandContextParts: string[] = []
+  if (brand?.name) brandContextParts.push(`Brand name: ${brand.name}`)
+  if (brand?.ideationPrompt?.trim()) brandContextParts.push(`Brand niche & style: ${brand.ideationPrompt.trim()}`)
+  const brandContextBlock = brandContextParts.length > 0
+    ? `\n---\n\n**BRAND CONTEXT**\n\n${brandContextParts.join('\n')}\n\nCRITICAL: Never mention usernames, @handles, or social media account names in any output. Content is brand-level and platform-agnostic.`
+    : `\n---\n\nCRITICAL: Never mention usernames, @handles, or social media account names in any output.`
+
   const sections: string[] = [`${creatorBlock}${UNIVERSAL_DRAFTER_PROMPT}`]
+
+  sections.push(brandContextBlock)
 
   if (persona?.systemPrompt) {
     sections.push(`\n---\n\n**BRAND VOICE**\n\n${persona.systemPrompt}`)

@@ -60,20 +60,20 @@ export async function compose(input: ComposeInput): Promise<ComposeResult> {
     customPrompt,
   } = input
 
-  // 1. Fetch Brand Persona
-  const persona = personaId
-    ? await prisma.brandPersona.findUnique({ where: { id: personaId } })
-    : ((await prisma.brandPersona.findFirst({ where: { brandId, isDefault: true } })) ??
-      (await prisma.brandPersona.findFirst({ where: { brandId } })))
+  // 1. Fetch Brand Persona + brand context in parallel
+  const [persona, brandData, assets] = await Promise.all([
+    personaId
+      ? prisma.brandPersona.findUnique({ where: { id: personaId } })
+      : prisma.brandPersona.findFirst({ where: { brandId, isDefault: true } }).then(
+          p => p ?? prisma.brandPersona.findFirst({ where: { brandId } })
+        ),
+    prisma.brand.findUnique({ where: { id: brandId }, select: { name: true, ideationPrompt: true, language: true } }),
+    prisma.asset.findMany({ where: { brandId }, select: { tags: true, type: true } }),
+  ])
 
   const effectivePersona = persona ?? PLATFORM_DEFAULT_CREATIVE_PERSONA
 
-  // 2. Fetch asset tag summary for context (not URLs, just metadata)
-  const assets = await prisma.asset.findMany({
-    where: { brandId: brandId },
-    select: { tags: true, type: true },
-  })
-
+  // 2. Asset tag summary
   const uniqueTags = [...new Set(assets.flatMap((a) => a.tags))].filter(Boolean)
   const assetSummary =
     uniqueTags.length > 0
@@ -152,10 +152,20 @@ NEVER output scene objects as separate lines. NEVER output empty slots {} for te
     ? `⚠️ CREATOR INSTRUCTIONS — these take absolute precedence over all guidelines below. Follow them exactly; let them shape the output above everything else:\n\n<creator_instructions>\n${customPrompt.trim()}\n</creator_instructions>\n\nAll sections below are subordinate to the above.\n\n---\n\n`
     : ''
 
+  const brandContextParts: string[] = []
+  if (brandData?.name) brandContextParts.push(`Brand: ${brandData.name}`)
+  if (brandData?.ideationPrompt?.trim()) brandContextParts.push(`Niche & style: ${brandData.ideationPrompt.trim()}`)
+  const brandContextBlock = brandContextParts.length > 0
+    ? `\n\nBRAND CONTEXT:\n${brandContextParts.join('\n')}\n\nCRITICAL: Never write usernames, @handles, or social media account names in any scene slot, caption, or CTA. Content is brand-level — no account-specific identifiers.`
+    : `\n\nCRITICAL: Never write usernames, @handles, or social media account names anywhere in the output.`
+
+  const language = brandData?.language ?? 'Spanish'
+  const languageBlock = `\n\nLANGUAGE: Write ALL text content (scene slots, caption, hashtags context) in ${language}.`
+
   const systemPrompt = `${creatorBlock}You are a Senior Creative Director for short-form social media content.
 
 BRAND VOICE:
-${effectivePersona.systemPrompt}${strategyBlock}${principlesBlock}${templatePromptBlock}${contentSchemaBlock}
+${effectivePersona.systemPrompt}${brandContextBlock}${languageBlock}${strategyBlock}${principlesBlock}${templatePromptBlock}${contentSchemaBlock}
 
 AVAILABLE SCENE TYPES:
 ${formatSceneCatalogForAI(sceneFormat)}
@@ -227,7 +237,8 @@ async function callAI(
     messages,
     schema: CreativeDirectionSchema as any,
     schemaName: 'CreativeDirection',
-    timeoutMs: provider === 'openai' ? 60_000 : 30_000,
+    timeoutMs: provider === 'openai' ? 60_000 : 45_000,
+    maxTokens: 4096,
   })
   return result.data as CreativeDirection
 }

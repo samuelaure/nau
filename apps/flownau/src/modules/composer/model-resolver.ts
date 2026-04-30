@@ -1,5 +1,5 @@
 import type { AIModel } from '@prisma/client'
-import type { LLMProvider } from '@nau/llm-client'
+import { MODEL_REGISTRY, type LLMProvider } from '@nau/llm-client'
 
 /**
  * Resolved AI model information — maps a persona's AIModel enum to the
@@ -38,10 +38,6 @@ const DEFAULT_REGISTRY_ID = 'groq/llama-3.3-70b'
  * Uses the @nau/llm-client registry as the source of truth.
  */
 export function resolveModelId(modelSelection: AIModel | string): ResolvedModel {
-  // Dynamic import to keep model-resolver importable in server components
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { MODEL_REGISTRY } = require('@nau/llm-client')
-
   const registryId = MODEL_MAP[modelSelection as AIModel] ?? DEFAULT_REGISTRY_ID
   const def = MODEL_REGISTRY[registryId] ?? MODEL_REGISTRY[DEFAULT_REGISTRY_ID]
 
