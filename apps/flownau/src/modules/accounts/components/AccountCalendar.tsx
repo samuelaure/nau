@@ -22,19 +22,20 @@ import {
   Trash2,
   CalendarX,
   CalendarPlus,
+  RefreshCw,
 } from 'lucide-react'
 import { cn } from '@/modules/shared/utils'
 
 // ─── Status config ────────────────────────────────────────────────────────────
 
 // Four primary display statuses shown inside the calendar
-type DisplayStatus = 'Draft' | 'Composed' | 'Published' | 'Error'
+type DisplayStatus = 'Draft' | 'Ready' | 'Published' | 'Error'
 
 function getDisplayStatus(dbStatus: string): DisplayStatus {
   if (dbStatus === 'PUBLISHED') return 'Published'
   if (dbStatus === 'FAILED') return 'Error'
-  if (dbStatus === 'RENDERED' || dbStatus === 'PUBLISHING') return 'Composed'
-  // DRAFT, APPROVED, SCHEDULED, RENDERING → still "in progress" from user POV
+  if (dbStatus === 'RENDERED_PENDING' || dbStatus === 'RENDERED_APPROVED' || dbStatus === 'RENDERED' || dbStatus === 'PUBLISHING') return 'Ready'
+  // IDEA, DRAFT, SCHEDULED, RENDERING → still "in progress" from user POV
   return 'Draft'
 }
 
@@ -50,7 +51,7 @@ function getSecondaryTag(format: string, display: DisplayStatus): SecondaryTag {
 
 const DISPLAY_DOT: Record<DisplayStatus, string> = {
   Draft: 'bg-gray-400',
-  Composed: 'bg-purple-400',
+  Ready: 'bg-purple-400',
   Published: 'bg-green-400',
   Error: 'bg-red-400',
 }
@@ -439,6 +440,25 @@ function CompositionModal({
     }
   }
 
+  const handleRerender = async () => {
+    setActioning(true)
+    try {
+      const res = await fetch(`/api/posts/${comp.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'DRAFT_APPROVED' }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success('Re-rendering — this may take a minute.')
+      onRefresh()
+      onClose()
+    } catch {
+      toast.error('Failed to re-render')
+    } finally {
+      setActioning(false)
+    }
+  }
+
   const handleConfirmRetry = async () => {
     setActioning(true)
     try {
@@ -677,6 +697,12 @@ function CompositionModal({
                   Mark as published
                 </Button>
               </>
+            )}
+            {display === 'Ready' && !scheduling && (
+              <Button variant="outline" size="sm" onClick={handleRerender} disabled={actioning} className="gap-1.5">
+                {actioning ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+                Re-render
+              </Button>
             )}
             {display === 'Error' && (
               <Button size="sm" onClick={handleConfirmRetry} disabled={actioning} className="gap-1.5">
