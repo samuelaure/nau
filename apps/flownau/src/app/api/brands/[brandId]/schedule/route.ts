@@ -53,16 +53,16 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ bran
     })
 
     // Re-materialize slots so calendar reflects the new schedule immediately.
-    // Delete future empty slots first so stale ones from old settings don't linger.
+    // Delete ALL empty slots (past + future) and reset chain position so the
+    // new format order starts fresh without stale state from the old schedule.
     if (data.isActive) {
       const brand = await prisma.brand.findUnique({
         where: { id: brandId },
         select: { coverageHorizonDays: true },
       })
       const horizon = (brand?.coverageHorizonDays ?? 7) + 1
-      await prisma.postSlot.deleteMany({
-        where: { brandId, status: 'empty', scheduledAt: { gt: new Date() } },
-      })
+      await prisma.postSlot.deleteMany({ where: { brandId, status: 'empty' } })
+      await prisma.postSchedule.update({ where: { brandId }, data: { chainPosition: 0 } })
       materializeSlots(brandId, horizon).catch(() => {})
     }
 
