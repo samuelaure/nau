@@ -139,26 +139,28 @@ function IdeaModal({
         onClick={onClose}
       />
 
-      {/* Left nav arrow */}
-      <button
-        onClick={() => goTo(idx - 1)}
-        disabled={idx <= 0}
-        className="absolute left-4 sm:left-8 z-20 w-12 h-12 flex items-center justify-center rounded-full bg-white/10 border border-white/20 text-white hover:bg-white/20 disabled:opacity-20 disabled:cursor-not-allowed transition-all backdrop-blur-sm shadow-lg"
-      >
-        <ChevronLeft size={24} />
-      </button>
+      {/* Card + flanking arrows */}
+      <div className="relative z-10 w-full max-w-xl flex items-center">
+        {/* Left nav arrow */}
+        <button
+          onClick={() => goTo(idx - 1)}
+          disabled={idx <= 0}
+          className="absolute -left-16 w-12 h-12 flex items-center justify-center rounded-full bg-white/10 border border-white/20 text-white hover:bg-white/20 disabled:opacity-20 disabled:cursor-not-allowed transition-all backdrop-blur-sm shadow-lg"
+        >
+          <ChevronLeft size={24} />
+        </button>
 
-      {/* Right nav arrow */}
-      <button
-        onClick={() => goTo(idx + 1)}
-        disabled={idx >= total - 1}
-        className="absolute right-4 sm:right-8 z-20 w-12 h-12 flex items-center justify-center rounded-full bg-white/10 border border-white/20 text-white hover:bg-white/20 disabled:opacity-20 disabled:cursor-not-allowed transition-all backdrop-blur-sm shadow-lg"
-      >
-        <ChevronRight size={24} />
-      </button>
+        {/* Right nav arrow */}
+        <button
+          onClick={() => goTo(idx + 1)}
+          disabled={idx >= total - 1}
+          className="absolute -right-16 w-12 h-12 flex items-center justify-center rounded-full bg-white/10 border border-white/20 text-white hover:bg-white/20 disabled:opacity-20 disabled:cursor-not-allowed transition-all backdrop-blur-sm shadow-lg"
+        >
+          <ChevronRight size={24} />
+        </button>
 
       {/* Card */}
-      <div className="relative w-full max-w-md bg-panel border border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] rounded-[2.5rem] glass overflow-hidden z-10">
+      <div className="relative w-full bg-panel border border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] rounded-[2.5rem] glass overflow-hidden">
         {/* Close */}
         <button
           onClick={onClose}
@@ -240,6 +242,7 @@ function IdeaModal({
           )}
         </div>
       </div>
+      </div>{/* end card wrapper */}
 
       {/* Counter */}
       <span className="relative z-10 text-sm text-white/40 tabular-nums select-none">
