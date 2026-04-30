@@ -124,8 +124,13 @@ export async function materializeSlots(brandId: string, daysAhead?: number): Pro
         dayStart.setUTCDate(dayStart.getUTCDate() + 1)
         continue
       } else if (currentMins > windowStartMins) {
-        // Inside the window — shrink start to now so remaining slots fit
-        effStartMins = currentMins
+        // Inside the window — give 1 hour buffer from now
+        effStartMins = currentMins + 60
+        // If the buffer pushes past the window end, nothing fits today
+        if (effStartMins >= windowEndMins) {
+          dayStart.setUTCDate(dayStart.getUTCDate() + 1)
+          continue
+        }
       } else {
         // Before the window — use full window
         effStartMins = windowStartMins
