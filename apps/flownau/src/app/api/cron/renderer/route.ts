@@ -13,20 +13,17 @@ export async function GET(request: Request) {
   if (!validateCronSecret(request)) return unauthorizedCronResponse()
 
   try {
-    const now = new Date()
-    const advanceWindow = new Date(now.getTime() + 48 * 60 * 60 * 1000)
-
-    const scheduled = await prisma.post.findMany({
-      where: {
-        status: 'SCHEDULED',
-        scheduledAt: { lte: advanceWindow },
-      },
+    // Safety net: render is event-driven (triggerRenderForPost on every
+    // DRAFT_APPROVED transition). This cron catches any draft that slipped
+    // through — e.g. transitions that happened before the queue was reachable.
+    const drafts = await prisma.post.findMany({
+      where: { status: 'DRAFT_APPROVED' },
       include: { renderJob: true },
     })
 
     const results: Array<{ postId: string; status: string; jobId?: string }> = []
 
-    for (const post of scheduled) {
+    for (const post of drafts) {
       if (USER_MANAGED_FORMATS.has(post.format ?? '') && !post.userUploadedMediaUrl) {
         results.push({ postId: post.id, status: 'awaiting_user_media' })
         continue
@@ -48,7 +45,7 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.json({ message: 'Renderer cron complete', checked: scheduled.length, results })
+    return NextResponse.json({ message: 'Renderer cron complete', checked: drafts.length, results })
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error)
     logError('[Renderer Cron] Fatal error', error)

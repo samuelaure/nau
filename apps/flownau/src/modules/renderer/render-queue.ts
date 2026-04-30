@@ -1,5 +1,9 @@
 import { Queue, type ConnectionOptions } from 'bullmq'
 import { logger } from '@/modules/shared/logger'
+import { prisma } from '@/modules/shared/prisma'
+
+// Formats that require user-uploaded media instead of Remotion rendering.
+const USER_MANAGED_FORMATS = new Set(['head_talk', 'replicate'])
 
 function getRedisConnection(): ConnectionOptions {
   if (process.env.REDIS_URL) {
@@ -37,6 +41,29 @@ export async function addRenderJob(postId: string, priority?: number): Promise<s
   })
   logger.info(`[RenderQueue] Enqueued render job ${job.id} for post ${postId}`)
   return job.id ?? postId
+}
+
+/**
+ * Event-driven render trigger. Call whenever a post transitions into
+ * DRAFT_APPROVED. For user-managed formats (head_talk, replicate) it does
+ * nothing — the user uploads media manually. Otherwise it flips the post to
+ * RENDERING and enqueues a render job.
+ */
+export async function triggerRenderForPost(postId: string): Promise<{ enqueued: boolean; reason?: string }> {
+  const post = await prisma.post.findUnique({
+    where: { id: postId },
+    select: { id: true, status: true, format: true, userUploadedMediaUrl: true },
+  })
+  if (!post) return { enqueued: false, reason: 'not_found' }
+
+  if (USER_MANAGED_FORMATS.has(post.format ?? '')) {
+    return { enqueued: false, reason: 'user_managed_format' }
+  }
+
+  await prisma.post.update({ where: { id: postId }, data: { status: 'RENDERING' } })
+  await addRenderJob(postId)
+  logger.info({ postId, format: post.format }, '[RenderQueue] Render triggered for approved draft')
+  return { enqueued: true }
 }
 
 export async function getRenderJobStatus(postId: string): Promise<{

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 import { checkBrandAccess } from '@/modules/shared/actions'
 import { logError } from '@/modules/shared/logger'
+import { triggerRenderForPost } from '@/modules/renderer/render-queue'
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -83,6 +84,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         ...(userUploadedMediaUrl !== undefined && { userUploadedMediaUrl }),
       },
     })
+
+    // Auto-trigger render when a draft transitions into DRAFT_APPROVED
+    // (covers manual user approval and the re-render flow).
+    if (status === 'DRAFT_APPROVED' && post.status !== 'DRAFT_APPROVED') {
+      await triggerRenderForPost(id).catch((err) =>
+        logError('PATCH /api/posts/[id] triggerRenderForPost', err),
+      )
+    }
 
     // Handle slot assignment / rescheduling:
     // Release the post's previous slot (if any), then claim the new one.

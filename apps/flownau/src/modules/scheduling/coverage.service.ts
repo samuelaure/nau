@@ -5,6 +5,7 @@ import { materializeSlots } from './slot-materializer'
 import { composeDraft } from '@/modules/composer/draft-composer'
 import { HeadTalkCreativeSchema } from '@/modules/composer/head-talk-composer'
 import { CreativeDirectionSchema } from '@/types/scenes'
+import { triggerRenderForPost } from '@/modules/renderer/render-queue'
 
 function schemaForFormat(format: string) {
   if (format === 'head_talk') return HeadTalkCreativeSchema
@@ -20,7 +21,6 @@ function schemaNameForFormat(format: string): string {
 
 export interface CoverageResult {
   check1: Check1Result
-  check2: Check2Result
 }
 
 interface Check1Result {
@@ -32,18 +32,11 @@ interface Check1Result {
   notifyUserApproveIdeas: boolean
 }
 
-interface Check2Result {
-  renderedInHalfHorizon: number
-  needed: number
-  renderTriggered: number
-  notifyUploadVideo: string[]    // postIds needing user video upload
-  notifyApproveDrafts: boolean
-}
-
 /**
  * Runs after every successful PUBLISHED transition.
- * Check 1: Ensure scheduling coverage (DRAFT_PENDING/APPROVED in calendar) for coverageHorizonDays.
- * Check 2: Ensure render coverage (RENDERED_PENDING/APPROVED) for coverageHorizonDays / 2.
+ * Ensures scheduling coverage (DRAFT_PENDING/APPROVED in calendar) for coverageHorizonDays.
+ * Render is event-driven: every transition into DRAFT_APPROVED enqueues its own
+ * render via triggerRenderForPost, so no separate render-coverage check is needed.
  */
 export async function runCoverageChecks(brandId: string): Promise<CoverageResult> {
   const brand = await prisma.brand.findUnique({
@@ -53,19 +46,15 @@ export async function runCoverageChecks(brandId: string): Promise<CoverageResult
   if (!brand) throw new Error(`Brand ${brandId} not found`)
 
   const horizonDays = brand.coverageHorizonDays
-  const halfHorizonDays = Math.ceil(horizonDays / 2)
 
-  // Materialize slots first so they exist for the checks
+  // Materialize slots first so they exist for the check
   await materializeSlots(brandId, horizonDays + 1)
 
-  const [check1, check2] = await Promise.all([
-    runCheck1(brandId, horizonDays, brand),
-    runCheck2(brandId, halfHorizonDays),
-  ])
+  const check1 = await runCheck1(brandId, horizonDays, brand)
 
-  logger.info({ brandId, check1, check2 }, '[COVERAGE] Coverage checks complete')
+  logger.info({ brandId, check1 }, '[COVERAGE] Coverage check complete')
 
-  return { check1, check2 }
+  return { check1 }
 }
 
 // ─── Check 1: Scheduling coverage ────────────────────────────────────────────
@@ -194,6 +183,13 @@ async function runCheck1(
           { brandId, slotId: slot.id, postId: candidate.id, format: slot.format, draftStatus },
           '[COVERAGE] Slot filled via auto-compose',
         )
+
+        // Auto-approved drafts immediately enter the render pipeline
+        if (draftStatus === 'DRAFT_APPROVED') {
+          await triggerRenderForPost(candidate.id).catch((err) =>
+            logger.error({ postId: candidate.id, err }, '[COVERAGE] triggerRenderForPost failed'),
+          )
+        }
       } catch (err) {
         logger.error({ brandId, slotId: slot.id, err }, '[COVERAGE] Auto-compose failed for slot')
       }
@@ -221,78 +217,6 @@ async function runCheck1(
     slotsFilledNow,
     ideasGenerated,
     notifyUserApproveIdeas,
-  }
-}
-
-// ─── Check 2: Render coverage ─────────────────────────────────────────────────
-
-async function runCheck2(brandId: string, halfHorizonDays: number): Promise<Check2Result> {
-  const halfEnd = new Date(Date.now() + halfHorizonDays * 24 * 60 * 60 * 1000)
-
-  const renderedCount = await prisma.post.count({
-    where: {
-      brandId,
-      status: { in: ['RENDERED_PENDING', 'RENDERED_APPROVED'] },
-      scheduledAt: { lte: halfEnd },
-    },
-  })
-
-  // Count how many slots exist in that window to know the target
-  const slotsInWindow = await prisma.postSlot.count({
-    where: { brandId, scheduledAt: { lte: halfEnd }, status: { in: ['filled', 'published'] } },
-  })
-
-  const needed = Math.max(0, slotsInWindow - renderedCount)
-
-  if (needed === 0) {
-    return { renderedInHalfHorizon: renderedCount, needed: 0, renderTriggered: 0, notifyUploadVideo: [], notifyApproveDrafts: false }
-  }
-
-  // Find DRAFT_APPROVED posts in this window to trigger rendering
-  const draftsToRender = await prisma.post.findMany({
-    where: {
-      brandId,
-      status: 'DRAFT_APPROVED',
-      scheduledAt: { lte: halfEnd },
-    },
-    orderBy: { scheduledAt: 'asc' },
-    take: needed,
-    select: { id: true, format: true },
-  })
-
-  const notifyUploadVideo: string[] = []
-  let renderTriggered = 0
-
-  for (const draft of draftsToRender) {
-    if (draft.format === 'head_talk') {
-      // User must upload — can't auto-render
-      notifyUploadVideo.push(draft.id)
-    } else {
-      // Advance to RENDERING to queue for the render worker
-      await prisma.post.update({
-        where: { id: draft.id },
-        data: { status: 'RENDERING' },
-      })
-      renderTriggered++
-    }
-  }
-
-  // If no DRAFT_APPROVED at all in that window, notify user to approve
-  const notifyApproveDrafts = draftsToRender.length === 0 && needed > 0
-
-  if (renderTriggered > 0) {
-    logger.info({ brandId, renderTriggered }, '[COVERAGE] Triggered rendering for DRAFT_APPROVED posts')
-  }
-  if (notifyUploadVideo.length > 0) {
-    logger.info({ brandId, count: notifyUploadVideo.length }, '[COVERAGE] Head talk posts need video upload')
-  }
-
-  return {
-    renderedInHalfHorizon: renderedCount,
-    needed,
-    renderTriggered,
-    notifyUploadVideo,
-    notifyApproveDrafts,
   }
 }
 
