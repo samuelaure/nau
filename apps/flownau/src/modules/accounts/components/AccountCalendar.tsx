@@ -712,6 +712,7 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
   const [loading, setLoading] = useState(true)
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()))
   const [selected, setSelected] = useState<Composition | null>(null)
+  const [runningCoverage, setRunningCoverage] = useState(false)
 
   const fetchCompositions = useCallback(async () => {
     try {
@@ -746,6 +747,26 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
     slots.filter((s) => s.status === 'empty' && isSameDay(new Date(s.scheduledAt), day))
 
   const unscheduled = compositions.filter((c) => !c.scheduledAt)
+
+  const handleRunCoverage = async () => {
+    setRunningCoverage(true)
+    try {
+      const res = await fetch(`/api/brands/${brandId}/coverage`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Failed')
+      const c1 = data.result?.check1
+      const filled = c1?.slotsFilledNow ?? 0
+      const ideas = c1?.ideasGenerated ?? false
+      toast.success(
+        `Calendar filled — ${filled} slot${filled === 1 ? '' : 's'} scheduled${ideas ? ', new ideas generated' : ''}`,
+      )
+      fetchCompositions()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Coverage check failed')
+    } finally {
+      setRunningCoverage(false)
+    }
+  }
 
   const handleDrop = async (postId: string, scheduledAt: string, slotId?: string) => {
     setDragState(null)
@@ -805,6 +826,16 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
               Schedule Setup
             </Link>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRunCoverage}
+            disabled={runningCoverage}
+            className="text-xs gap-1.5"
+          >
+            {runningCoverage ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+            {runningCoverage ? 'Running…' : 'Fill Calendar'}
+          </Button>
           <Button
             variant="outline"
             size="sm"
