@@ -132,7 +132,7 @@ export default async function WorkspaceOverviewPage({
         <div className="min-h-[400px]">
           {activeTab === 'calendar' && <AccountCalendar brandId={brandId} workspaceId={workspaceId} />}
           {activeTab === 'ideas' && <BrandPosts brandId={brandId} />}
-          {activeTab === 'templates' && <AccountTemplates brandId={brandId} workspaceId={workspaceId} />}
+          {activeTab === 'templates' && <AccountTemplates brandId={brandId} />}
           {activeTab === 'profiles' && (
             <BrandProfiles
               brandId={brandId}
