@@ -139,6 +139,24 @@ function IdeaModal({
         onClick={onClose}
       />
 
+      {/* Left nav arrow */}
+      <button
+        onClick={() => goTo(idx - 1)}
+        disabled={idx <= 0}
+        className="absolute left-4 sm:left-8 z-20 w-12 h-12 flex items-center justify-center rounded-full bg-white/10 border border-white/20 text-white hover:bg-white/20 disabled:opacity-20 disabled:cursor-not-allowed transition-all backdrop-blur-sm shadow-lg"
+      >
+        <ChevronLeft size={24} />
+      </button>
+
+      {/* Right nav arrow */}
+      <button
+        onClick={() => goTo(idx + 1)}
+        disabled={idx >= total - 1}
+        className="absolute right-4 sm:right-8 z-20 w-12 h-12 flex items-center justify-center rounded-full bg-white/10 border border-white/20 text-white hover:bg-white/20 disabled:opacity-20 disabled:cursor-not-allowed transition-all backdrop-blur-sm shadow-lg"
+      >
+        <ChevronRight size={24} />
+      </button>
+
       {/* Card */}
       <div className="relative w-full max-w-md bg-panel border border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] rounded-[2.5rem] glass overflow-hidden z-10">
         {/* Close */}
@@ -150,31 +168,15 @@ function IdeaModal({
         </button>
 
         <div className="p-8 flex flex-col gap-5">
-          {/* Header: arrows + title */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => goTo(idx - 1)}
-              disabled={idx <= 0}
-              className="p-1.5 rounded-lg text-text-secondary hover:text-white hover:bg-white/10 disabled:opacity-20 disabled:cursor-not-allowed transition-all"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <div className="flex-1 min-w-0">
-              <h2 className="text-xl font-heading font-semibold">Idea</h2>
-              <div className="flex flex-wrap gap-1.5 mt-1.5">
-                {statusCfg && <Badge label={statusCfg.label} className={statusCfg.className} />}
-                <Badge label={sourceCfg.label} icon={sourceCfg.icon} className={sourceCfg.className} />
-                {formatCfg && <Badge label={formatCfg.label} icon={formatCfg.icon} className={formatCfg.className} />}
-                {idea.aiLinked && <Badge label="AI-Linked" icon={Brain} className="bg-rose-500/10 text-rose-400 border border-rose-500/20" />}
-              </div>
+          {/* Header */}
+          <div className="flex-1 min-w-0">
+            <h2 className="text-xl font-heading font-semibold">Idea</h2>
+            <div className="flex flex-wrap gap-1.5 mt-1.5">
+              {statusCfg && <Badge label={statusCfg.label} className={statusCfg.className} />}
+              <Badge label={sourceCfg.label} icon={sourceCfg.icon} className={sourceCfg.className} />
+              {formatCfg && <Badge label={formatCfg.label} icon={formatCfg.icon} className={formatCfg.className} />}
+              {idea.aiLinked && <Badge label="AI-Linked" icon={Brain} className="bg-rose-500/10 text-rose-400 border border-rose-500/20" />}
             </div>
-            <button
-              onClick={() => goTo(idx + 1)}
-              disabled={idx >= total - 1}
-              className="p-1.5 rounded-lg text-text-secondary hover:text-white hover:bg-white/10 disabled:opacity-20 disabled:cursor-not-allowed transition-all"
-            >
-              <ChevronRight size={18} />
-            </button>
           </div>
 
           {/* Editable text */}
@@ -239,24 +241,10 @@ function IdeaModal({
         </div>
       </div>
 
-      {/* Counter — outside the card */}
-      <div className="relative z-10 flex items-center gap-3 text-sm text-white/50 select-none">
-        <button
-          onClick={() => goTo(idx - 1)}
-          disabled={idx <= 0}
-          className="hover:text-white disabled:opacity-20 transition-colors"
-        >
-          <ChevronLeft size={16} />
-        </button>
-        <span className="tabular-nums">{idx + 1} of {total}</span>
-        <button
-          onClick={() => goTo(idx + 1)}
-          disabled={idx >= total - 1}
-          className="hover:text-white disabled:opacity-20 transition-colors"
-        >
-          <ChevronRight size={16} />
-        </button>
-      </div>
+      {/* Counter */}
+      <span className="relative z-10 text-sm text-white/40 tabular-nums select-none">
+        {idx + 1} of {total}
+      </span>
     </div>
   )
 
