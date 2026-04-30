@@ -125,6 +125,23 @@ function SlotChip({
   )
 }
 
+// ─── Generating slot placeholder ─────────────────────────────────────────────
+
+function GeneratingSlotChip({ slot }: { slot: PostSlot }) {
+  const FormatIcon = FORMAT_ICON[slot.format] ?? Film
+  return (
+    <div className="w-full rounded p-1.5 flex flex-col gap-0.5 text-[10px] border border-white/15 bg-white/4 animate-pulse">
+      <div className="flex items-center gap-1 text-white/40">
+        <FormatIcon size={9} className="shrink-0" />
+        <span className="font-medium truncate">{FORMAT_LABEL[slot.format] ?? slot.format}</span>
+        <Loader2 size={8} className="ml-auto animate-spin opacity-60 shrink-0" />
+      </div>
+      <span className="text-[9px] opacity-40 pl-3">{fmtTime(slot.scheduledAt)}</span>
+      <span className="text-[9px] pl-3 text-white/30">Generating…</span>
+    </div>
+  )
+}
+
 // ─── Between-slot drop zone ───────────────────────────────────────────────────
 
 function BetweenDropZone({
@@ -713,6 +730,7 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()))
   const [selected, setSelected] = useState<Composition | null>(null)
   const [runningCoverage, setRunningCoverage] = useState(false)
+  const [generatingSlotIds, setGeneratingSlotIds] = useState<Set<string>>(new Set())
 
   const fetchCompositions = useCallback(async () => {
     try {
@@ -749,6 +767,9 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
   const unscheduled = compositions.filter((c) => !c.scheduledAt)
 
   const handleRunCoverage = async () => {
+    // Immediately mark all current empty slots as generating for optimistic UI
+    const emptyIds = new Set(slots.filter((s) => s.status === 'empty').map((s) => s.id))
+    setGeneratingSlotIds(emptyIds)
     setRunningCoverage(true)
     const loadingId = toast.loading('Filling calendar…')
     try {
@@ -800,10 +821,12 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
         toast.success(`Calendar filled — ${r.slotsFilled} post${r.slotsFilled === 1 ? '' : 's'} scheduled.`)
       }
 
-      fetchCompositions()
+      await fetchCompositions()
+      setGeneratingSlotIds(new Set())
     } catch (err) {
       toast.dismiss(loadingId)
       toast.error(err instanceof Error ? err.message : 'Fill calendar failed')
+      setGeneratingSlotIds(new Set())
     } finally {
       setRunningCoverage(false)
     }
@@ -996,6 +1019,8 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
                               onDragStart={() => setDragState({ postId: item.data.id, format: item.data.format })}
                               onDragEnd={() => setDragState(null)}
                             />
+                          ) : generatingSlotIds.has(item.data.id) ? (
+                            <GeneratingSlotChip slot={item.data} />
                           ) : (
                             <SlotChip
                               slot={item.data}
