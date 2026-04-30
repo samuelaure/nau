@@ -29,6 +29,13 @@ export async function materializeSlots(brandId: string, daysAhead?: number): Pro
   if (!schedule || !schedule.isActive || schedule.formatChain.length === 0) return 0
 
   const horizon = daysAhead ?? (brand?.coverageHorizonDays ?? 7) + 1
+
+  // Prune empty slots that fall beyond the horizon — keeps the calendar tidy as
+  // the horizon rolls forward day by day without needing a schedule re-save.
+  const cutoffPrune = new Date(Date.now() + horizon * 24 * 60 * 60 * 1000)
+  await prisma.postSlot.deleteMany({
+    where: { brandId, status: 'empty', scheduledAt: { gt: cutoffPrune } },
+  })
   const chain = schedule.formatChain
   const freq = Math.max(1, schedule.dailyFrequency)
 

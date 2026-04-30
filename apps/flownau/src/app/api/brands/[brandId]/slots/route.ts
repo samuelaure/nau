@@ -17,9 +17,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ bran
     const from = url.searchParams.get('from')
     const to = url.searchParams.get('to')
 
-    // Default window: past 7 days → next 30 days
-    const defaultFrom = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-    const defaultTo = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    // Default window: today → coverageHorizonDays ahead
+    const brand = await prisma.brand.findUnique({
+      where: { id: brandId },
+      select: { coverageHorizonDays: true },
+    })
+    const horizonDays = brand?.coverageHorizonDays ?? 7
+    const defaultFrom = new Date()
+    const defaultTo = new Date(Date.now() + horizonDays * 24 * 60 * 60 * 1000)
 
     const slots = await prisma.postSlot.findMany({
       where: {
