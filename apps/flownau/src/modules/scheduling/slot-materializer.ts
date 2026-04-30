@@ -102,8 +102,12 @@ export async function materializeSlots(brandId: string, daysAhead?: number): Pro
   const todayStr = toLocalDateStr(now)
   const currentMins = nowLocalMins()
 
-  // Walk day by day and fill gaps
-  let chainPos = schedule.chainPosition
+  // Derive chain position from filled/published slots so the stored chainPosition
+  // never drifts out of sync with reality (e.g. after deleting empty slots).
+  const filledCount = await prisma.postSlot.count({
+    where: { brandId, status: { in: ['filled', 'published'] } },
+  })
+  let chainPos = filledCount % chain.length
   const slotsToCreate: Array<{ brandId: string; scheduledAt: Date; format: string; status: string }> = []
 
   const dayStart = new Date(todayLocal)
