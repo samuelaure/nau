@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { Card } from '@/modules/shared/components/ui/Card'
 import { Button } from '@/modules/shared/components/ui/Button'
 import { toast } from 'sonner'
@@ -23,6 +24,9 @@ import {
   CheckSquare,
   SlidersHorizontal,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  X,
 } from 'lucide-react'
 import Modal from '@/modules/shared/components/Modal'
 import { cn } from '@/modules/shared/utils'
@@ -57,6 +61,206 @@ function Badge({ label, icon: Icon, className }: { label: string; icon?: React.E
       {label}
     </span>
   )
+}
+
+// ── Idea detail modal ─────────────────────────────────────────────────────────
+
+function IdeaModal({
+  idea,
+  ideas,
+  editText,
+  setEditText,
+  savingEdit,
+  deletingIdea,
+  approving,
+  onClose,
+  onNavigate,
+  onDelete,
+  onSave,
+  onApprove,
+  onDraft,
+}: {
+  idea: any | null
+  ideas: any[]
+  editText: string
+  setEditText: (t: string) => void
+  savingEdit: boolean
+  deletingIdea: boolean
+  approving: string | null
+  onClose: () => void
+  onNavigate: (idea: any) => void
+  onDelete: () => void
+  onSave: () => void
+  onApprove: () => void
+  onDraft: (idea: any) => void
+}) {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+
+  const idx = idea ? ideas.findIndex((i) => i.id === idea.id) : -1
+  const total = ideas.length
+
+  const goTo = useCallback((nextIdx: number) => {
+    const target = ideas[nextIdx]
+    if (target) onNavigate(target)
+  }, [ideas, onNavigate])
+
+  // Keyboard navigation
+  useEffect(() => {
+    if (!idea) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft' && idx > 0) goTo(idx - 1)
+      if (e.key === 'ArrowRight' && idx < total - 1) goTo(idx + 1)
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [idea, idx, total, goTo, onClose])
+
+  // Lock scroll
+  useEffect(() => {
+    if (!idea) return
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [!!idea])
+
+  if (!idea || !mounted) return null
+
+  const statusCfg = STATUS_CONFIG[idea.status]
+  const sourceCfg = SOURCE_CONFIG[idea.source] ?? SOURCE_CONFIG.automatic
+  const formatCfg = idea.format ? FORMAT_CONFIG[idea.format] : null
+  const hasUnsaved = editText !== idea.ideaText
+
+  const modal = (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 p-4 sm:p-6">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-md"
+        onClick={onClose}
+      />
+
+      {/* Card */}
+      <div className="relative w-full max-w-md bg-panel border border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] rounded-[2.5rem] glass overflow-hidden z-10">
+        {/* Close */}
+        <button
+          onClick={onClose}
+          className="absolute right-6 top-6 z-20 rounded-full p-2 text-text-secondary hover:text-white hover:bg-white/10 transition-all"
+        >
+          <X size={18} />
+        </button>
+
+        <div className="p-8 flex flex-col gap-5">
+          {/* Header: arrows + title */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => goTo(idx - 1)}
+              disabled={idx <= 0}
+              className="p-1.5 rounded-lg text-text-secondary hover:text-white hover:bg-white/10 disabled:opacity-20 disabled:cursor-not-allowed transition-all"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-xl font-heading font-semibold">Idea</h2>
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                {statusCfg && <Badge label={statusCfg.label} className={statusCfg.className} />}
+                <Badge label={sourceCfg.label} icon={sourceCfg.icon} className={sourceCfg.className} />
+                {formatCfg && <Badge label={formatCfg.label} icon={formatCfg.icon} className={formatCfg.className} />}
+                {idea.aiLinked && <Badge label="AI-Linked" icon={Brain} className="bg-rose-500/10 text-rose-400 border border-rose-500/20" />}
+              </div>
+            </div>
+            <button
+              onClick={() => goTo(idx + 1)}
+              disabled={idx >= total - 1}
+              className="p-1.5 rounded-lg text-text-secondary hover:text-white hover:bg-white/10 disabled:opacity-20 disabled:cursor-not-allowed transition-all"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+
+          {/* Editable text */}
+          <textarea
+            className="w-full bg-gray-950 border border-border text-white rounded-lg p-3 text-sm min-h-[180px] resize-y focus:outline-none focus:border-accent/50"
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            disabled={savingEdit || deletingIdea}
+          />
+
+          {/* Actions row */}
+          <div className="flex items-center gap-2">
+            <button
+              disabled={deletingIdea || savingEdit}
+              onClick={onDelete}
+              className="flex items-center gap-1.5 text-sm text-red-400/70 hover:text-red-400 disabled:opacity-40 transition-colors"
+            >
+              {deletingIdea ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+              Delete
+            </button>
+            <div className="flex-1" />
+            <button
+              disabled={savingEdit || deletingIdea}
+              onClick={onClose}
+              className="text-sm text-text-secondary hover:text-white transition-colors px-1 disabled:opacity-40"
+            >
+              Cancel
+            </button>
+            <Button
+              disabled={savingEdit || deletingIdea || !editText.trim() || !hasUnsaved}
+              onClick={onSave}
+              className="bg-accent text-white hover:bg-accent/80"
+            >
+              {savingEdit ? <><Loader2 className="w-4 h-4 animate-spin mr-1" />Saving…</> : 'Save'}
+            </Button>
+          </div>
+
+          {/* Bottom action */}
+          {idea.status === 'IDEA_PENDING' && (
+            <div className="pt-2 border-t border-white/5">
+              <Button
+                disabled={approving === idea.id}
+                onClick={onApprove}
+                className="w-full bg-green-700/80 hover:bg-green-700 text-white"
+              >
+                {approving === idea.id ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+                Approve
+              </Button>
+            </div>
+          )}
+          {(idea.status === 'IDEA_APPROVED' || idea.status === 'USED') && (
+            <div className="pt-2 border-t border-white/5">
+              <Button
+                onClick={() => onDraft(idea)}
+                className={cn('w-full text-white', idea.status === 'USED' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-accent hover:bg-accent/80')}
+              >
+                <Wand2 className="w-4 h-4 mr-2" />
+                {idea.status === 'USED' ? 'Redo Draft' : 'Draft'}
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Counter — outside the card */}
+      <div className="relative z-10 flex items-center gap-3 text-sm text-white/50 select-none">
+        <button
+          onClick={() => goTo(idx - 1)}
+          disabled={idx <= 0}
+          className="hover:text-white disabled:opacity-20 transition-colors"
+        >
+          <ChevronLeft size={16} />
+        </button>
+        <span className="tabular-nums">{idx + 1} of {total}</span>
+        <button
+          onClick={() => goTo(idx + 1)}
+          disabled={idx >= total - 1}
+          className="hover:text-white disabled:opacity-20 transition-colors"
+        >
+          <ChevronRight size={16} />
+        </button>
+      </div>
+    </div>
+  )
+
+  return createPortal(modal, document.body)
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -490,92 +694,21 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
       </div>
 
       {/* ── Idea detail modal ─────────────────────────────────────────────────── */}
-      {openIdea && (
-        <Modal isOpen={true} onClose={() => !savingEdit && !deletingIdea && setOpenIdea(null)}>
-          <div className="flex flex-col gap-5">
-            {/* Title + tags */}
-            <div className="flex flex-col gap-2">
-              <h2 className="text-xl font-heading font-semibold">Idea</h2>
-              <div className="flex flex-wrap gap-1.5">
-                {(() => {
-                  const s = STATUS_CONFIG[openIdea.status]
-                  return s ? <Badge label={s.label} className={s.className} /> : null
-                })()}
-                {(() => {
-                  const sc = SOURCE_CONFIG[openIdea.source] ?? SOURCE_CONFIG.automatic
-                  return <Badge label={sc.label} icon={sc.icon} className={sc.className} />
-                })()}
-                {openIdea.format && (() => {
-                  const fc = FORMAT_CONFIG[openIdea.format]
-                  return fc ? <Badge label={fc.label} icon={fc.icon} className={fc.className} /> : null
-                })()}
-                {openIdea.aiLinked && <Badge label="AI-Linked" icon={Brain} className="bg-rose-500/10 text-rose-400 border border-rose-500/20" />}
-              </div>
-            </div>
-
-            {/* Editable text */}
-            <textarea
-              className="w-full bg-gray-950 border border-border text-white rounded-lg p-3 text-sm min-h-[180px] resize-y focus:outline-none focus:border-accent/50"
-              value={editText}
-              onChange={(e) => setEditText(e.target.value)}
-              disabled={savingEdit || deletingIdea}
-            />
-
-            {/* Delete / Cancel / Save */}
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                disabled={deletingIdea || savingEdit}
-                onClick={() => handleDelete(openIdea.id)}
-                className="text-red-400 border-red-900 hover:bg-red-950"
-              >
-                {deletingIdea ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                Delete
-              </Button>
-              <div className="flex-1" />
-              <Button
-                variant="outline"
-                disabled={savingEdit || deletingIdea}
-                onClick={() => setOpenIdea(null)}
-              >
-                Cancel
-              </Button>
-              <Button
-                disabled={savingEdit || deletingIdea || !editText.trim() || editText === openIdea.ideaText}
-                onClick={handleSaveEdit}
-                className="bg-accent text-white hover:bg-accent/80"
-              >
-                {savingEdit ? <><Loader2 className="w-4 h-4 animate-spin mr-1" /> Saving…</> : 'Save Changes'}
-              </Button>
-            </div>
-
-            {/* Action button */}
-            {openIdea.status === 'IDEA_PENDING' && (
-              <div className="pt-2 border-t border-white/5">
-                <Button
-                  disabled={approving === openIdea.id}
-                  onClick={() => handleApprove(openIdea)}
-                  className="w-full bg-green-700/80 hover:bg-green-700 text-white"
-                >
-                  {approving === openIdea.id ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
-                  Approve
-                </Button>
-              </div>
-            )}
-            {(openIdea.status === 'IDEA_APPROVED' || openIdea.status === 'USED') && (
-              <div className="pt-2 border-t border-white/5">
-                <Button
-                  onClick={() => { setComposingIdea(openIdea); setOpenIdea(null) }}
-                  className={cn('w-full text-white', openIdea.status === 'USED' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-accent hover:bg-accent/80')}
-                >
-                  <Wand2 className="w-4 h-4 mr-2" />
-                  {openIdea.status === 'USED' ? 'Redo Draft' : 'Draft'}
-                </Button>
-              </div>
-            )}
-          </div>
-        </Modal>
-      )}
+      <IdeaModal
+        idea={openIdea}
+        ideas={ideas}
+        editText={editText}
+        setEditText={setEditText}
+        savingEdit={savingEdit}
+        deletingIdea={deletingIdea}
+        approving={approving}
+        onClose={() => !savingEdit && !deletingIdea && setOpenIdea(null)}
+        onNavigate={(idea) => { setOpenIdea(idea); setEditText(idea.ideaText) }}
+        onDelete={() => handleDelete(openIdea?.id)}
+        onSave={handleSaveEdit}
+        onApprove={() => openIdea && handleApprove(openIdea)}
+        onDraft={(idea) => { setComposingIdea(idea); setOpenIdea(null) }}
+      />
 
       {/* ── Brainstorm modal ──────────────────────────────────────────────────── */}
       {brainstormOpen && (
