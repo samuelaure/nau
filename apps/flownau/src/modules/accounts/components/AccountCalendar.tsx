@@ -19,6 +19,9 @@ import {
   Send,
   AlertCircle,
   CalendarClock,
+  Trash2,
+  CalendarX,
+  CalendarPlus,
 } from 'lucide-react'
 import { cn } from '@/modules/shared/utils'
 
@@ -212,6 +215,7 @@ type Composition = {
   renderedVideoUrl?: string | null
   userPostedManually?: boolean
   payload?: Record<string, unknown> | null
+  creative?: Record<string, unknown> | null
 }
 
 type DragState = {
@@ -256,6 +260,84 @@ function fmtDateTime(iso: string) {
 }
 
 
+// ─── Format-specific creative content ────────────────────────────────────────
+
+function HeadTalkContent({
+  comp,
+  actioning,
+  onSaved,
+}: {
+  comp: Composition
+  actioning: boolean
+  onSaved: () => void
+}) {
+  const creative = comp.creative ?? comp.payload ?? null
+  const initialScript = (creative as { script?: string } | null)?.script ?? ''
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(initialScript)
+  const [saving, setSaving] = useState(false)
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/posts/${comp.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ creative: { ...(creative ?? {}), script: draft } }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success('Script updated.')
+      setEditing(false)
+      onSaved()
+    } catch {
+      toast.error('Failed to save script')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-text-secondary uppercase tracking-wider">Script</p>
+        {!editing && (
+          <button onClick={() => setEditing(true)} className="text-xs text-accent hover:underline">
+            Edit
+          </button>
+        )}
+      </div>
+      {editing ? (
+        <>
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            rows={6}
+            className="bg-gray-950 border border-gray-800 text-white rounded px-3 py-2 text-sm resize-none w-full focus:outline-none focus:border-accent/50"
+          />
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" size="sm" onClick={() => setEditing(false)}>Cancel</Button>
+            <Button size="sm" disabled={saving || actioning} onClick={save}>
+              {saving ? <Loader2 size={12} className="animate-spin" /> : 'Save'}
+            </Button>
+          </div>
+        </>
+      ) : draft ? (
+        <p className="text-sm text-white leading-relaxed whitespace-pre-wrap line-clamp-6">{draft}</p>
+      ) : (
+        <p className="text-sm text-text-secondary italic">No script yet.</p>
+      )}
+    </div>
+  )
+}
+
+function FormatContent({ comp, actioning, onSaved }: { comp: Composition; actioning: boolean; onSaved: () => void }) {
+  if (comp.format === 'head_talk') {
+    return <HeadTalkContent comp={comp} actioning={actioning} onSaved={onSaved} />
+  }
+  // Placeholder — additional formats will be implemented per template
+  return null
+}
+
 // ─── Composition detail modal ─────────────────────────────────────────────────
 
 function CompositionModal({
@@ -270,54 +352,69 @@ function CompositionModal({
   onRefresh: () => void
 }) {
   const [actioning, setActioning] = useState(false)
-  const [rescheduling, setRescheduling] = useState(false)
+  const [scheduling, setScheduling] = useState(false)
   const [newDatetime, setNewDatetime] = useState(
     comp.scheduledAt ? comp.scheduledAt.slice(0, 16) : '',
   )
   const [editingCaption, setEditingCaption] = useState(false)
   const [captionDraft, setCaptionDraft] = useState(comp.caption ?? '')
-  const [editingScript, setEditingScript] = useState(false)
-  const [scriptDraft, setScriptDraft] = useState(
-    (comp.payload as { script?: string } | null)?.script ?? '',
-  )
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   const FormatIcon = FORMAT_ICON[comp.format] ?? Film
+  const display = getDisplayStatus(comp.status)
+  const tag = getSecondaryTag(comp.format, display)
+  const isScheduled = !!comp.scheduledAt
 
-  const handleConfirm = async () => {
+  const handleSchedule = async () => {
+    if (!newDatetime) return
     setActioning(true)
     try {
-      const res = await fetch(`/api/compositions/${comp.id}`, {
-        method: 'PUT',
+      const res = await fetch(`/api/posts/${comp.id}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'SCHEDULED' }),
+        body: JSON.stringify({ scheduledAt: new Date(newDatetime).toISOString() }),
       })
       if (!res.ok) throw new Error()
-      toast.success('Composition scheduled for rendering.')
+      toast.success(isScheduled ? 'Rescheduled.' : 'Scheduled.')
+      setScheduling(false)
       onRefresh()
       onClose()
     } catch {
-      toast.error('Failed to confirm')
+      toast.error('Failed to schedule')
     } finally {
       setActioning(false)
     }
   }
 
-  const handleReschedule = async () => {
-    if (!newDatetime) return
+  const handleUnschedule = async () => {
     setActioning(true)
     try {
-      const res = await fetch(`/api/compositions/${comp.id}`, {
-        method: 'PUT',
+      const res = await fetch(`/api/posts/${comp.id}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scheduledAt: new Date(newDatetime).toISOString() }),
+        body: JSON.stringify({ scheduledAt: null, releaseSlot: true }),
       })
       if (!res.ok) throw new Error()
-      toast.success('Rescheduled.')
-      setRescheduling(false)
+      toast.success('Post unscheduled.')
       onRefresh()
       onClose()
     } catch {
-      toast.error('Failed to reschedule')
+      toast.error('Failed to unschedule')
+    } finally {
+      setActioning(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    setActioning(true)
+    try {
+      const res = await fetch(`/api/posts/${comp.id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error()
+      toast.success('Post deleted.')
+      onRefresh()
+      onClose()
+    } catch {
+      toast.error('Failed to delete')
     } finally {
       setActioning(false)
     }
@@ -342,11 +439,30 @@ function CompositionModal({
     }
   }
 
-  const handleSaveCaption = async () => {
+  const handleConfirmRetry = async () => {
     setActioning(true)
     try {
       const res = await fetch(`/api/compositions/${comp.id}`, {
         method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'SCHEDULED' }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success('Composition scheduled for rendering.')
+      onRefresh()
+      onClose()
+    } catch {
+      toast.error('Failed to retry')
+    } finally {
+      setActioning(false)
+    }
+  }
+
+  const handleSaveCaption = async () => {
+    setActioning(true)
+    try {
+      const res = await fetch(`/api/posts/${comp.id}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ caption: captionDraft }),
       })
@@ -356,26 +472,6 @@ function CompositionModal({
       onRefresh()
     } catch {
       toast.error('Failed to save caption')
-    } finally {
-      setActioning(false)
-    }
-  }
-
-  const handleSaveScript = async () => {
-    setActioning(true)
-    try {
-      const newPayload = { ...(comp.payload ?? {}), script: scriptDraft }
-      const res = await fetch(`/api/compositions/${comp.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ payload: newPayload }),
-      })
-      if (!res.ok) throw new Error()
-      toast.success('Script updated.')
-      setEditingScript(false)
-      onRefresh()
-    } catch {
-      toast.error('Failed to save script')
     } finally {
       setActioning(false)
     }
@@ -404,34 +500,18 @@ function CompositionModal({
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {(() => {
-              const display = getDisplayStatus(comp.status)
-              const tag = getSecondaryTag(comp.format, display)
-              return (
-                <div className="flex items-center gap-1.5">
-                  <span
-                    className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border bg-gray-800/50 border-gray-700/50 text-gray-300"
-                  >
-                    <span className={cn('w-1.5 h-1.5 rounded-full', DISPLAY_DOT[display])} />
-                    {display}
-                  </span>
-                  {tag && (
-                    <span
-                      className={cn(
-                        'text-xs font-semibold px-2 py-0.5 rounded-full border',
-                        TAG_COLOR[tag],
-                      )}
-                    >
-                      {tag}
-                    </span>
-                  )}
-                </div>
-              )
-            })()}
-            <button
-              onClick={onClose}
-              className="text-text-secondary hover:text-white transition-colors"
-            >
+            <div className="flex items-center gap-1.5">
+              <span className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border bg-gray-800/50 border-gray-700/50 text-gray-300">
+                <span className={cn('w-1.5 h-1.5 rounded-full', DISPLAY_DOT[display])} />
+                {display}
+              </span>
+              {tag && (
+                <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full border', TAG_COLOR[tag])}>
+                  {tag}
+                </span>
+              )}
+            </div>
+            <button onClick={onClose} className="text-text-secondary hover:text-white transition-colors">
               <X size={18} />
             </button>
           </div>
@@ -444,75 +524,30 @@ function CompositionModal({
             <Clock size={15} className="text-text-secondary mt-0.5 shrink-0" />
             <div>
               <p className="text-xs text-text-secondary uppercase tracking-wider mb-0.5">
-                Scheduled for
+                {isScheduled ? 'Scheduled for' : 'Not scheduled'}
               </p>
-              <p className="text-sm text-white">
-                {comp.scheduledAt ? fmtDateTime(comp.scheduledAt) : 'Not scheduled'}
-              </p>
+              {isScheduled && (
+                <p className="text-sm text-white">{fmtDateTime(comp.scheduledAt!)}</p>
+              )}
             </div>
           </div>
 
-          {/* Rendered video — show inline player when Composed */}
+          {/* Rendered video */}
           {comp.renderedVideoUrl && (
             <div className="rounded-lg overflow-hidden bg-black">
-              <video
-                src={comp.renderedVideoUrl}
-                controls
-                className="w-full max-h-72 object-contain"
-              />
+              <video src={comp.renderedVideoUrl} controls className="w-full max-h-72 object-contain" />
             </div>
           )}
 
-          {/* Draft script editor (head_talk) */}
-          {getDisplayStatus(comp.status) === 'Draft' && comp.format === 'head_talk' && (
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-text-secondary uppercase tracking-wider">Script</p>
-                {!editingScript && (
-                  <button
-                    onClick={() => setEditingScript(true)}
-                    className="text-xs text-accent hover:underline"
-                  >
-                    Edit
-                  </button>
-                )}
-              </div>
-              {editingScript ? (
-                <>
-                  <textarea
-                    value={scriptDraft}
-                    onChange={(e) => setScriptDraft(e.target.value)}
-                    rows={6}
-                    className="bg-gray-950 border border-gray-800 text-white rounded px-3 py-2 text-sm resize-none w-full"
-                  />
-                  <div className="flex gap-2 justify-end">
-                    <Button variant="outline" size="sm" onClick={() => setEditingScript(false)}>
-                      Cancel
-                    </Button>
-                    <Button size="sm" disabled={actioning} onClick={handleSaveScript}>
-                      {actioning ? <Loader2 size={12} className="animate-spin" /> : 'Save'}
-                    </Button>
-                  </div>
-                </>
-              ) : scriptDraft ? (
-                <p className="text-sm text-white leading-relaxed whitespace-pre-wrap line-clamp-6">
-                  {scriptDraft}
-                </p>
-              ) : (
-                <p className="text-sm text-text-secondary italic">No script yet.</p>
-              )}
-            </div>
-          )}
+          {/* Format-specific creative content */}
+          <FormatContent comp={comp} actioning={actioning} onSaved={onRefresh} />
 
           {/* Caption */}
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <p className="text-xs text-text-secondary uppercase tracking-wider">Caption</p>
               {!editingCaption && (
-                <button
-                  onClick={() => setEditingCaption(true)}
-                  className="text-xs text-accent hover:underline"
-                >
+                <button onClick={() => setEditingCaption(true)} className="text-xs text-accent hover:underline">
                   Edit
                 </button>
               )}
@@ -523,12 +558,10 @@ function CompositionModal({
                   value={captionDraft}
                   onChange={(e) => setCaptionDraft(e.target.value)}
                   rows={4}
-                  className="bg-gray-950 border border-gray-800 text-white rounded px-3 py-2 text-sm resize-none w-full"
+                  className="bg-gray-950 border border-gray-800 text-white rounded px-3 py-2 text-sm resize-none w-full focus:outline-none focus:border-accent/50"
                 />
                 <div className="flex gap-2 justify-end">
-                  <Button variant="outline" size="sm" onClick={() => setEditingCaption(false)}>
-                    Cancel
-                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setEditingCaption(false)}>Cancel</Button>
                   <Button size="sm" disabled={actioning} onClick={handleSaveCaption}>
                     {actioning ? <Loader2 size={12} className="animate-spin" /> : 'Save'}
                   </Button>
@@ -541,10 +574,12 @@ function CompositionModal({
             )}
           </div>
 
-          {/* Reschedule form */}
-          {rescheduling && (
+          {/* Schedule / Reschedule picker */}
+          {scheduling && (
             <div className="flex flex-col gap-2 p-3 bg-white/5 rounded-lg">
-              <p className="text-xs text-text-secondary font-medium">New date & time</p>
+              <p className="text-xs text-text-secondary font-medium">
+                {isScheduled ? 'New date & time' : 'Pick a date & time'}
+              </p>
               <input
                 type="datetime-local"
                 value={newDatetime}
@@ -552,11 +587,9 @@ function CompositionModal({
                 className="bg-gray-950 border border-gray-800 text-white rounded px-3 py-2 text-sm"
               />
               <div className="flex gap-2 justify-end">
-                <Button variant="outline" size="sm" onClick={() => setRescheduling(false)}>
-                  Cancel
-                </Button>
-                <Button size="sm" disabled={!newDatetime || actioning} onClick={handleReschedule}>
-                  {actioning ? <Loader2 size={13} className="animate-spin" /> : 'Save'}
+                <Button variant="outline" size="sm" onClick={() => setScheduling(false)}>Cancel</Button>
+                <Button size="sm" disabled={!newDatetime || actioning} onClick={handleSchedule}>
+                  {actioning ? <Loader2 size={13} className="animate-spin" /> : (isScheduled ? 'Reschedule' : 'Schedule')}
                 </Button>
               </div>
             </div>
@@ -564,77 +597,95 @@ function CompositionModal({
         </div>
 
         {/* Footer actions */}
-        {(() => {
-          const display = getDisplayStatus(comp.status)
-          const tag = getSecondaryTag(comp.format, display)
-          const needsUpload = tag !== null && !comp.userUploadedMediaUrl
-          return (
-            <div className="flex flex-wrap gap-2 px-6 py-4 border-t border-white/5">
-              {comp.scheduledAt && !rescheduling && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setRescheduling(true)}
-                  className="gap-1.5"
-                >
-                  <Clock size={13} /> Reschedule
-                </Button>
-              )}
-              {/* Replicate / Record: upload media → becomes Composed and will be auto-posted */}
-              {needsUpload && (
-                <label className="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border border-amber-400/30 text-amber-300 hover:bg-amber-400/10 transition-colors">
-                  <AlertCircle size={13} />
-                  {tag === 'Record' ? 'Upload recording' : 'Upload media'}
-                  <input
-                    type="file"
-                    accept="video/*,image/*"
-                    className="hidden"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0]
-                      if (!file) return
-                      const fd = new FormData()
-                      fd.append('file', file)
-                      fd.append('compositionId', comp.id)
-                      fd.append('brandId', brandId)
-                      const res = await fetch('/api/compositions/upload-recording', {
-                        method: 'POST',
-                        body: fd,
-                      })
-                      if (res.ok) {
-                        toast.success('Media uploaded — will be posted at scheduled time.')
-                        onRefresh()
-                        onClose()
-                      } else toast.error('Upload failed')
-                    }}
-                  />
-                </label>
-              )}
-              {/* Mark as published manually (user posted it themselves) */}
-              {tag !== null && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleMarkPosted}
-                  disabled={actioning}
-                  className="gap-1.5"
-                >
+        <div className="flex items-center gap-2 px-6 py-4 border-t border-white/5">
+          {/* Left: destructive */}
+          {confirmDelete ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-red-400">Delete this post?</span>
+              <button
+                onClick={handleDelete}
+                disabled={actioning}
+                className="text-xs text-red-400 hover:text-red-300 font-medium disabled:opacity-40"
+              >
+                {actioning ? <Loader2 size={12} className="animate-spin" /> : 'Yes, delete'}
+              </button>
+              <button onClick={() => setConfirmDelete(false)} className="text-xs text-text-secondary hover:text-white">
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="flex items-center gap-1.5 text-sm text-red-400/60 hover:text-red-400 transition-colors"
+            >
+              <Trash2 size={13} /> Delete
+            </button>
+          )}
+
+          <div className="flex-1" />
+
+          {/* Right: contextual actions */}
+          <div className="flex flex-wrap gap-2">
+            {isScheduled && !scheduling && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleUnschedule}
+                disabled={actioning}
+                className="gap-1.5"
+              >
+                <CalendarX size={13} /> Unschedule
+              </Button>
+            )}
+            {!scheduling && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setScheduling(true)}
+                className="gap-1.5"
+              >
+                {isScheduled ? <Clock size={13} /> : <CalendarPlus size={13} />}
+                {isScheduled ? 'Reschedule' : 'Schedule'}
+              </Button>
+            )}
+            {tag !== null && !scheduling && (
+              <>
+                {!comp.userUploadedMediaUrl && (
+                  <label className="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border border-amber-400/30 text-amber-300 hover:bg-amber-400/10 transition-colors">
+                    <AlertCircle size={13} />
+                    {tag === 'Record' ? 'Upload recording' : 'Upload media'}
+                    <input
+                      type="file"
+                      accept="video/*,image/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        const fd = new FormData()
+                        fd.append('file', file)
+                        fd.append('compositionId', comp.id)
+                        fd.append('brandId', brandId)
+                        const res = await fetch('/api/compositions/upload-recording', { method: 'POST', body: fd })
+                        if (res.ok) { toast.success('Media uploaded.'); onRefresh(); onClose() }
+                        else toast.error('Upload failed')
+                      }}
+                    />
+                  </label>
+                )}
+                <Button variant="outline" size="sm" onClick={handleMarkPosted} disabled={actioning} className="gap-1.5">
                   {actioning ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
                   Mark as published
                 </Button>
-              )}
-              {display === 'Error' && (
-                <Button size="sm" onClick={handleConfirm} disabled={actioning} className="gap-1.5">
-                  {actioning ? (
-                    <Loader2 size={13} className="animate-spin" />
-                  ) : (
-                    <CheckCircle2 size={13} />
-                  )}
-                  Retry
-                </Button>
-              )}
-            </div>
-          )
-        })()}
+              </>
+            )}
+            {display === 'Error' && (
+              <Button size="sm" onClick={handleConfirmRetry} disabled={actioning} className="gap-1.5">
+                {actioning ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
+                Retry
+              </Button>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )
