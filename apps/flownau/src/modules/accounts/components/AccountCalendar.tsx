@@ -803,7 +803,9 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
       // Step 2: approval gap
       if (r.needsApproval > 0) {
         toast.warning(
-          `To fill the calendar we need ${r.slotsNeeded} post${r.slotsNeeded === 1 ? '' : 's'}, but only ${r.approvedIdeas} idea${r.approvedIdeas === 1 ? '' : 's'} ${r.approvedIdeas === 1 ? 'is' : 'are'} approved. Approve ${r.needsApproval} more in the Ideas tab.`,
+          r.approvedIdeas === 0
+            ? `${r.slotsNeeded} slot${r.slotsNeeded === 1 ? '' : 's'} to fill but no ideas are approved yet. Approve some in the Ideas tab to get started.`
+            : `${r.slotsNeeded} slot${r.slotsNeeded === 1 ? '' : 's'} to fill but only ${r.approvedIdeas} idea${r.approvedIdeas === 1 ? '' : 's'} approved. Approve ${r.needsApproval} more in the Ideas tab.`,
           { duration: 8000 },
         )
       }
