@@ -39,13 +39,25 @@ function getDisplayStatus(dbStatus: string): DisplayStatus {
   return 'Draft'
 }
 
-// Secondary tag shown alongside Draft for formats that require user action
-type SecondaryTag = 'Replicate' | 'Record' | null
+// Reel and Trial Reel share a composer — they're interchangeable at the slot level.
+// The post's format is rewritten to match the destination slot when dropped, so a
+// Reel post dropped onto a Trial Reel slot publishes with trial_params, and vice versa.
+const REEL_FAMILY = new Set(['reel', 'trial_reel'])
+function formatsCompatible(a: string, b: string): boolean {
+  if (a === b) return true
+  if (REEL_FAMILY.has(a) && REEL_FAMILY.has(b)) return true
+  return false
+}
 
-function getSecondaryTag(format: string, display: DisplayStatus): SecondaryTag {
-  if (display !== 'Draft') return null
-  if (format === 'replicate') return 'Replicate'
-  if (format === 'head_talk') return 'Record'
+// Secondary tag shown alongside the primary status when the post needs user action
+type SecondaryTag = 'Replicate' | 'Record' | 'Approve' | null
+
+function getSecondaryTag(format: string, display: DisplayStatus, dbStatus?: string): SecondaryTag {
+  if (display === 'Draft') {
+    if (format === 'replicate') return 'Replicate'
+    if (format === 'head_talk') return 'Record'
+  }
+  if (display === 'Ready' && dbStatus === 'RENDERED_PENDING') return 'Approve'
   return null
 }
 
@@ -59,6 +71,7 @@ const DISPLAY_DOT: Record<DisplayStatus, string> = {
 const TAG_COLOR: Record<NonNullable<SecondaryTag>, string> = {
   Replicate: 'bg-amber-500/15 border-amber-500/30 text-amber-300',
   Record: 'bg-amber-500/15 border-amber-500/30 text-amber-300',
+  Approve: 'bg-purple-500/15 border-purple-500/30 text-purple-300',
 }
 
 // ─── Format config ────────────────────────────────────────────────────────────
@@ -102,7 +115,7 @@ function SlotChip({
   onDrop: (slotId: string, scheduledAt: string) => void
 }) {
   const FormatIcon = FORMAT_ICON[slot.format] ?? Film
-  const canDrop = dragState?.format === slot.format
+  const canDrop = !!dragState && formatsCompatible(dragState.format, slot.format)
   const [over, setOver] = useState(false)
 
   return (
@@ -363,7 +376,7 @@ function CompositionModal({
 
   const FormatIcon = FORMAT_ICON[comp.format] ?? Film
   const display = getDisplayStatus(comp.status)
-  const tag = getSecondaryTag(comp.format, display)
+  const tag = getSecondaryTag(comp.format, display, comp.status)
   const isScheduled = !!comp.scheduledAt
 
   const handleSchedule = async () => {
@@ -435,6 +448,25 @@ function CompositionModal({
       onClose()
     } catch {
       toast.error('Failed')
+    } finally {
+      setActioning(false)
+    }
+  }
+
+  const handleApproveRender = async () => {
+    setActioning(true)
+    try {
+      const res = await fetch(`/api/posts/${comp.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'RENDERED_APPROVED' }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success('Approved — ready to publish.')
+      onRefresh()
+      onClose()
+    } catch {
+      toast.error('Failed to approve')
     } finally {
       setActioning(false)
     }
@@ -668,7 +700,7 @@ function CompositionModal({
                 {isScheduled ? 'Reschedule' : 'Schedule'}
               </Button>
             )}
-            {tag !== null && !scheduling && (
+            {(tag === 'Record' || tag === 'Replicate') && !scheduling && (
               <>
                 {!comp.userUploadedMediaUrl && (
                   <label className="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border border-amber-400/30 text-amber-300 hover:bg-amber-400/10 transition-colors">
@@ -697,6 +729,12 @@ function CompositionModal({
                   Mark as published
                 </Button>
               </>
+            )}
+            {tag === 'Approve' && !scheduling && (
+              <Button size="sm" onClick={handleApproveRender} disabled={actioning} className="gap-1.5 bg-purple-600 hover:bg-purple-500">
+                {actioning ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
+                Approve
+              </Button>
             )}
             {display === 'Ready' && !scheduling && (
               <Button variant="outline" size="sm" onClick={handleRerender} disabled={actioning} className="gap-1.5">
@@ -734,7 +772,7 @@ function CompositionChip({
 }) {
   const FormatIcon = FORMAT_ICON[comp.format] ?? Film
   const display = getDisplayStatus(comp.status)
-  const tag = getSecondaryTag(comp.format, display)
+  const tag = getSecondaryTag(comp.format, display, comp.status)
   const isDragging = dragState?.postId === comp.id
   const formatColor = FORMAT_COLOR[comp.format] ?? 'bg-gray-800/50 border-gray-700/50 text-gray-200'
 
@@ -914,9 +952,18 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
   const handleDrop = async (postId: string, scheduledAt: string, slotId?: string) => {
     setDragState(null)
 
-    // Optimistic update: update the moved post's scheduledAt
+    // Resolve the destination slot format so we can rewrite the post's format
+    // when dropping across compatible formats (e.g. reel → trial_reel).
+    const targetSlot = slotId ? slots.find((s) => s.id === slotId) : null
+    const targetFormat = targetSlot?.format ?? null
+
+    // Optimistic update: update the moved post's scheduledAt + format if it changed
     setCompositions((prev) =>
-      prev.map((c) => c.id === postId ? { ...c, scheduledAt } : c),
+      prev.map((c) =>
+        c.id === postId
+          ? { ...c, scheduledAt, ...(targetFormat ? { format: targetFormat } : {}) }
+          : c,
+      ),
     )
 
     // Optimistic slot updates
@@ -939,8 +986,15 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
       await fetch(`/api/posts/${postId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        // Always send releaseSlot so the backend clears the old slot even when dropping to free space
-        body: JSON.stringify({ scheduledAt, releaseSlot: true, ...(slotId ? { slotId } : {}) }),
+        // Always send releaseSlot so the backend clears the old slot even when dropping to free space.
+        // When dropping onto a slot with a different (compatible) format, rewrite the post's format
+        // so it publishes correctly (Instagram trial flag follows trial_reel slots).
+        body: JSON.stringify({
+          scheduledAt,
+          releaseSlot: true,
+          ...(slotId ? { slotId } : {}),
+          ...(targetFormat ? { format: targetFormat } : {}),
+        }),
       })
       fetchCompositions()
     } catch {
@@ -1139,7 +1193,7 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
             {unscheduled.map((comp) => {
               const FormatIcon = FORMAT_ICON[comp.format] ?? Film
               const display = getDisplayStatus(comp.status)
-              const tag = getSecondaryTag(comp.format, display)
+              const tag = getSecondaryTag(comp.format, display, comp.status)
               const formatColor = FORMAT_COLOR[comp.format] ?? 'bg-gray-800/50 border-gray-700/50 text-gray-200'
               const thumb = comp.coverUrl || (comp.renderedVideoUrl?.endsWith('.mp4') ? null : comp.renderedVideoUrl) || (comp.userUploadedMediaUrl?.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? comp.userUploadedMediaUrl : null)
               const isVideoThumb = !thumb && (comp.renderedVideoUrl || comp.userUploadedMediaUrl)
