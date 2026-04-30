@@ -49,7 +49,6 @@ export async function materializeSlots(brandId: string, daysAhead?: number): Pro
   const [endH, endM] = schedule.windowEnd.split(':').map(Number)
   const windowStartMins = startH * 60 + startM
   const windowEndMins = endH * 60 + endM
-  const spacingMins = freq === 1 ? 0 : (windowEndMins - windowStartMins) / (freq - 1)
 
   // Helper: local YYYY-MM-DD for a UTC instant in the brand timezone
   const toLocalDateStr = (d: Date): string =>
@@ -59,6 +58,28 @@ export async function materializeSlots(brandId: string, daysAhead?: number): Pro
       month: '2-digit',
       day: '2-digit',
     }).format(d)
+
+  // Helper: current time-of-day in minutes in the brand timezone
+  const nowLocalMins = (): number => {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: schedule.timezone,
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false,
+    }).formatToParts(now)
+    const h = parseInt(parts.find((p) => p.type === 'hour')?.value ?? '0')
+    const m = parseInt(parts.find((p) => p.type === 'minute')?.value ?? '0')
+    return h * 60 + m
+  }
+
+  // Helper: compute evenly-spaced slot times for a day given an effective window
+  const computeSlotTimes = (day: Date, effStartMins: number, effEndMins: number, count: number): Date[] => {
+    const spacing = count <= 1 ? 0 : (effEndMins - effStartMins) / (count - 1)
+    return Array.from({ length: count }, (_, i) => {
+      const offsetMins = effStartMins + i * spacing
+      return localTimeToUTC(day, Math.floor(offsetMins / 60), Math.floor(offsetMins % 60), schedule.timezone)
+    })
+  }
 
   // Fetch all existing slots in the window (any status) so we can:
   //   a) count per day (to know how many slots already exist)
@@ -78,6 +99,9 @@ export async function materializeSlots(brandId: string, daysAhead?: number): Pro
   // Set of occupied UTC timestamps — used to avoid exact-time collisions
   const occupiedMs = new Set<number>(existingSlots.map((s) => s.scheduledAt.getTime()))
 
+  const todayStr = toLocalDateStr(now)
+  const currentMins = nowLocalMins()
+
   // Walk day by day and fill gaps
   let chainPos = schedule.chainPosition
   const slotsToCreate: Array<{ brandId: string; scheduledAt: Date; format: string; status: string }> = []
@@ -86,26 +110,37 @@ export async function materializeSlots(brandId: string, daysAhead?: number): Pro
   dayStart.setUTCHours(0, 0, 0, 0)
 
   while (dayStart < cutoff) {
-    // Compute ideal posting times for this calendar day
-    const idealTimes: Date[] = []
-    for (let i = 0; i < freq; i++) {
-      const offsetMins = windowStartMins + i * spacingMins
-      const localH = Math.floor(offsetMins / 60)
-      const localM = Math.floor(offsetMins % 60)
-      idealTimes.push(localTimeToUTC(dayStart, localH, localM, schedule.timezone))
-    }
-
-    // Local date string — derive from the first ideal time for timezone accuracy
-    const localDate = idealTimes.length > 0 ? toLocalDateStr(idealTimes[0]) : toLocalDateStr(dayStart)
+    const localDate = toLocalDateStr(dayStart)
+    const isToday = localDate === todayStr
     const existingCount = countByDate[localDate] ?? 0
 
+    // Determine effective posting window for this day
+    let effStartMins: number
+    let effEndMins: number = windowEndMins
+
+    if (isToday) {
+      if (currentMins > windowEndMins) {
+        // Past the posting window — skip today entirely
+        dayStart.setUTCDate(dayStart.getUTCDate() + 1)
+        continue
+      } else if (currentMins > windowStartMins) {
+        // Inside the window — shrink start to now so remaining slots fit
+        effStartMins = currentMins
+      } else {
+        // Before the window — use full window
+        effStartMins = windowStartMins
+      }
+    } else {
+      effStartMins = windowStartMins
+    }
+
     if (existingCount < freq) {
-      let needed = freq - existingCount
+      const needed = freq - existingCount
+      // Space `needed` new slots evenly within the effective window
+      const idealTimes = computeSlotTimes(dayStart, effStartMins, effEndMins, needed)
 
       for (const slotTime of idealTimes) {
-        if (needed <= 0) break
-        // Skip times already in the past or already occupied
-        if (slotTime < now || occupiedMs.has(slotTime.getTime())) continue
+        if (occupiedMs.has(slotTime.getTime())) continue
 
         slotsToCreate.push({
           brandId,
@@ -113,9 +148,8 @@ export async function materializeSlots(brandId: string, daysAhead?: number): Pro
           format: chain[chainPos],
           status: 'empty',
         })
-        occupiedMs.add(slotTime.getTime()) // prevent intra-run duplicates
+        occupiedMs.add(slotTime.getTime())
         chainPos = (chainPos + 1) % chain.length
-        needed--
       }
     }
 
