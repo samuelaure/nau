@@ -23,6 +23,7 @@ import {
   CalendarX,
   CalendarPlus,
   RefreshCw,
+  ChevronDown,
 } from 'lucide-react'
 import { cn } from '@/modules/shared/utils'
 
@@ -420,6 +421,7 @@ function CompositionModal({
   const [editingCaption, setEditingCaption] = useState(false)
   const [captionDraft, setCaptionDraft] = useState(comp.caption ?? '')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [contentOpen, setContentOpen] = useState(false)
 
   const FormatIcon = FORMAT_ICON[comp.format] ?? Film
   const display = getDisplayStatus(comp.status)
@@ -659,15 +661,16 @@ function CompositionModal({
             </div>
           </div>
 
-          {/* Rendered video */}
-          {comp.renderedVideoUrl && (
-            <div className="rounded-lg overflow-hidden bg-black">
-              <video src={comp.renderedVideoUrl} controls className="w-full max-h-72 object-contain" />
+          {/* Video player */}
+          {(comp.videoUrl || comp.renderedVideoUrl || comp.userUploadedMediaUrl) && (
+            <div className="rounded-xl overflow-hidden bg-black aspect-[9/16] max-h-72 flex items-center justify-center">
+              <video
+                src={comp.videoUrl || comp.renderedVideoUrl || comp.userUploadedMediaUrl || ''}
+                controls
+                className="w-full h-full object-contain"
+              />
             </div>
           )}
-
-          {/* Format-specific creative content */}
-          <FormatContent comp={comp} actioning={actioning} onSaved={onRefresh} />
 
           {/* Caption */}
           <div className="flex flex-col gap-2">
@@ -684,7 +687,7 @@ function CompositionModal({
                 <textarea
                   value={captionDraft}
                   onChange={(e) => setCaptionDraft(e.target.value)}
-                  rows={4}
+                  rows={5}
                   className="bg-gray-950 border border-gray-800 text-white rounded px-3 py-2 text-sm resize-none w-full focus:outline-none focus:border-accent/50"
                 />
                 <div className="flex gap-2 justify-end">
@@ -695,9 +698,25 @@ function CompositionModal({
                 </div>
               </>
             ) : captionDraft ? (
-              <p className="text-sm text-white leading-relaxed line-clamp-4">{captionDraft}</p>
+              <p className="text-sm text-white leading-relaxed whitespace-pre-wrap">{captionDraft}</p>
             ) : (
               <p className="text-sm text-text-secondary italic">No caption yet.</p>
+            )}
+          </div>
+
+          {/* Collapsible content / creative */}
+          <div className="border border-white/10 rounded-xl overflow-hidden">
+            <button
+              onClick={() => setContentOpen((v) => !v)}
+              className="w-full flex items-center justify-between px-4 py-3 text-xs text-text-secondary hover:text-white hover:bg-white/5 transition-colors"
+            >
+              <span className="uppercase tracking-wider font-medium">Content</span>
+              <ChevronDown size={14} className={cn('transition-transform duration-200', contentOpen && 'rotate-180')} />
+            </button>
+            {contentOpen && (
+              <div className="px-4 pb-4 border-t border-white/5">
+                <FormatContent comp={comp} actioning={actioning} onSaved={onRefresh} />
+              </div>
             )}
           </div>
 
