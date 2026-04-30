@@ -12,6 +12,11 @@ export const logger = pino({
 })
 
 export function logError(context: string, error: unknown, metadata?: any) {
+  // Next.js redirect/notFound errors must propagate — never swallow them
+  if (error instanceof Error && (error.message === 'NEXT_REDIRECT' || error.message === 'NEXT_NOT_FOUND')) {
+    throw error
+  }
+
   const message = error instanceof Error ? error.message : String(error)
   const stack = error instanceof Error ? error.stack : undefined
 
