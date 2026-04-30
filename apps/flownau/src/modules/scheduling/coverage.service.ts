@@ -78,10 +78,11 @@ async function runCheck1(
   const targetEnd = new Date(Date.now() + (horizonDays + 1) * 24 * 60 * 60 * 1000)
 
   // Count all slots in horizon
+  const now = new Date()
   const [allSlots, filledSlots] = await Promise.all([
-    prisma.postSlot.count({ where: { brandId, scheduledAt: { lte: targetEnd } } }),
+    prisma.postSlot.count({ where: { brandId, scheduledAt: { gt: now, lte: targetEnd } } }),
     prisma.postSlot.count({
-      where: { brandId, scheduledAt: { lte: targetEnd }, status: { in: ['filled', 'published'] } },
+      where: { brandId, scheduledAt: { gt: now, lte: targetEnd }, status: { in: ['filled', 'published'] } },
     }),
   ])
 
@@ -91,9 +92,9 @@ async function runCheck1(
     return { slotsInHorizon: allSlots, filledSlots, emptySlots: 0, slotsFilledNow: 0, ideasGenerated: false, notifyUserApproveIdeas: false }
   }
 
-  // Get empty slots ordered by scheduledAt
+  // Get empty slots ordered by scheduledAt — only future ones
   const emptySlotRecords = await prisma.postSlot.findMany({
-    where: { brandId, scheduledAt: { lte: targetEnd }, status: 'empty' },
+    where: { brandId, scheduledAt: { gt: now, lte: targetEnd }, status: 'empty' },
     orderBy: { scheduledAt: 'asc' },
   })
 

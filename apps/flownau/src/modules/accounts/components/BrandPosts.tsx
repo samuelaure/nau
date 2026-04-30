@@ -509,9 +509,18 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
     setComposing(true)
     const toastId = toast.loading('Converting idea into draft…')
     try {
-      const finalFormat = selectedTemplateId
-        ? templates.find(t => t.id === selectedTemplateId)?.format || composingIdea.format || 'head_talk'
-        : composingIdea.format || 'head_talk'
+      // Resolve format: template selection > idea format > next empty slot > chain fallback
+      let finalFormat: string = composingIdea.format ?? ''
+      if (selectedTemplateId) {
+        finalFormat = templates.find(t => t.id === selectedTemplateId)?.format ?? finalFormat
+      }
+      if (!finalFormat) {
+        // Ask the server for the next scheduled slot's format
+        const slotRes = await fetch(`/api/brands/${brandId}/slots?limit=1`)
+        const slotData = slotRes.ok ? await slotRes.json() : null
+        const nextEmptySlot = slotData?.slots?.find((s: any) => s.status === 'empty')
+        finalFormat = nextEmptySlot?.format ?? 'head_talk'
+      }
       const res = await fetch('/api/agent/compose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
