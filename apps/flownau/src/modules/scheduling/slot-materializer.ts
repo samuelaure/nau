@@ -17,7 +17,7 @@ import { logger } from '@/modules/shared/logger'
  *   Never deletes anything.
  *
  * @param brandId
- * @param daysAhead  days forward to materialize (defaults to brand.coverageHorizonDays + 1)
+ * @param daysAhead  days forward to materialize (defaults to brand.coverageHorizonDays)
  * @returns number of new slots created
  */
 export async function materializeSlots(brandId: string, daysAhead?: number): Promise<number> {
@@ -28,7 +28,7 @@ export async function materializeSlots(brandId: string, daysAhead?: number): Pro
 
   if (!schedule || !schedule.isActive || schedule.formatChain.length === 0) return 0
 
-  const horizon = daysAhead ?? (brand?.coverageHorizonDays ?? 7) + 1
+  const horizon = daysAhead ?? (brand?.coverageHorizonDays ?? 7)
 
   // Prune empty slots that fall beyond the horizon — keeps the calendar tidy as
   // the horizon rolls forward day by day without needing a schedule re-save.
@@ -145,12 +145,15 @@ export async function materializeSlots(brandId: string, daysAhead?: number): Pro
 
     if (existingCount < freq) {
       const needed = freq - existingCount
-      // Space `needed` new slots evenly within the effective window
-      const idealTimes = computeSlotTimes(dayStart, effStartMins, effEndMins, needed)
+      // Compute ideal positions for ALL freq slots, filter occupied times,
+      // then take only as many as needed. This handles the case where an
+      // existing slot sits at a non-ideal position (e.g. manually rescheduled)
+      // without double-creating slots.
+      const allIdealTimes = computeSlotTimes(dayStart, effStartMins, effEndMins, freq)
+      const availableTimes = allIdealTimes.filter((t) => !occupiedMs.has(t.getTime()))
+      const timesToCreate = availableTimes.slice(0, needed)
 
-      for (const slotTime of idealTimes) {
-        if (occupiedMs.has(slotTime.getTime())) continue
-
+      for (const slotTime of timesToCreate) {
         slotsToCreate.push({
           brandId,
           scheduledAt: slotTime,

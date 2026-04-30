@@ -127,6 +127,12 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     const post = await prisma.post.findUnique({ where: { id } })
     if (!post) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     await checkBrandAccess(post.brandId)
+    // Free the slot before deleting so it stays in the calendar as empty
+    // rather than becoming a phantom filled slot with no post.
+    await prisma.postSlot.updateMany({
+      where: { postId: id },
+      data: { status: 'empty', postId: null },
+    })
     await prisma.post.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (error) {

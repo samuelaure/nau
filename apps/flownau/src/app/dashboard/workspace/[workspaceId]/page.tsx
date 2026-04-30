@@ -97,7 +97,10 @@ export default async function WorkspaceOverviewPage({
         })
       : []
 
-    const basePath = localBrand.assetsRoot || localBrand.shortCode || brandId
+    // Uploaded assets land at flownau/accounts/{brandId}/assets/{type}/{id}.ext
+    // Use that prefix as the root so the viewer strips it and shows type folders.
+    // assetsRoot overrides this when an R2 folder is linked.
+    const basePath = localBrand.assetsRoot || `flownau/accounts/${brandId}/assets`
 
     return (
       <div className="animate-fade-in">

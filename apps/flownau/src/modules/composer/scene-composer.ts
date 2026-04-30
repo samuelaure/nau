@@ -110,7 +110,7 @@ export async function compose(input: ComposeInput): Promise<ComposeResult> {
     : `RULES:
 1. Start with a hook scene (hook-text or text-over-media with a hook). End with a cta-card.
 2. Use 'text-over-media' scenes heavily — they work best with B-roll content.
-3. CRITICAL: For every scene, copy the exact slot keys shown in the catalog and fill them with real content. Never output an empty slots object {}. Only media-only and transition may have empty slots.
+3. CRITICAL: For every scene, copy the EXACT slot keys shown in the catalog and fill them with REAL, SPECIFIC content. Never output an empty slots object {}. Only media-only and transition may have empty slots — all other scene types MUST have slots filled.
 4. Suggest a mood keyword per scene for asset matching (e.g. "nature", "urban", "food", "workspace").
 5. Write a compelling Instagram caption (max 2000 chars). Use line breaks for readability.
 6. Suggest 5-15 relevant hashtags (without the # symbol).
@@ -118,7 +118,22 @@ export async function compose(input: ComposeInput): Promise<ComposeResult> {
 8. Write ALL text content in the brand's natural language.
 9. Keep the total under 7 scenes for reels. Quality over quantity.
 10. Use 'media-only' scenes for breathing room between text-heavy scenes.
-11. Use 'transition' scenes sparingly (max 1 per reel).`
+11. Use 'transition' scenes sparingly (max 1 per reel).
+
+OUTPUT FORMAT — respond with a SINGLE JSON object exactly like this (all scenes inside the "scenes" array):
+{
+  "scenes": [
+    {"type":"hook-text","slots":{"hook":"You're doing it wrong — here's why"},"mood":"urban"},
+    {"type":"text-over-media","slots":{"text":"Most people skip this critical step every single day"},"mood":"workspace"},
+    {"type":"quote-card","slots":{"quote":"The best investment is in yourself","attribution":"Warren Buffett"},"mood":"inspiration"},
+    {"type":"cta-card","slots":{"cta":"Follow for daily tips","handle":"@yourbrand"},"mood":"brand"}
+  ],
+  "caption": "Your Instagram caption here...",
+  "hashtags": ["hashtag1","hashtag2","hashtag3"],
+  "coverSceneIndex": 0
+}
+
+NEVER output scene objects as separate lines. NEVER output empty slots {} for text scenes (hook-text, text-over-media, quote-card, list-reveal, cta-card MUST have their slot keys filled).`
 
   const strategyBlock = frameworkPrompt
     ? `\n\nIDEATION STRATEGY (carry forward from ideation):\n${frameworkPrompt}`

@@ -76,12 +76,25 @@ export class GroqClient implements LLMClient {
     const raw: string | undefined | null = completion.choices[0]?.message?.content?.trim()
     if (!raw) throw new Error('Groq returned empty response')
 
-    const jsonStr = raw.replace(/```json?\n?/g, '').replace(/```/g, '').trim()
+    let jsonStr = raw.replace(/```json?\n?/g, '').replace(/```/g, '').trim()
     let parsed: unknown
     try {
       parsed = JSON.parse(jsonStr)
     } catch {
-      throw new Error(`Groq returned invalid JSON: ${jsonStr.slice(0, 200)}`)
+      // Groq sometimes outputs JSONL (one object per line) instead of a single object.
+      // Try to find the largest/first complete {...} block that contains an array field.
+      const firstBrace = jsonStr.indexOf('{')
+      const lastBrace = jsonStr.lastIndexOf('}')
+      if (firstBrace !== -1 && lastBrace > firstBrace) {
+        try {
+          parsed = JSON.parse(jsonStr.slice(firstBrace, lastBrace + 1))
+        } catch {
+          // still invalid — throw original error
+          throw new Error(`Groq returned invalid JSON: ${jsonStr.slice(0, 300)}`)
+        }
+      } else {
+        throw new Error(`Groq returned invalid JSON: ${jsonStr.slice(0, 300)}`)
+      }
     }
 
     if (Array.isArray(parsed)) parsed = parsed[0]

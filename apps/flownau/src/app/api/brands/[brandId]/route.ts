@@ -6,6 +6,7 @@ import { getAuthUser } from '@/lib/auth'
 import { checkBrandAccess } from '@/modules/shared/actions'
 import { logError } from '@/modules/shared/logger'
 import { z } from 'zod'
+import { materializeSlots } from '@/modules/scheduling/slot-materializer'
 
 const BrandPatchSchema = z.object({
   ideationCount: z.number().int().min(1).max(30).optional(),
@@ -47,6 +48,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ br
       where: { id: brandId },
       data: parsed.data,
     })
+
+    // Re-materialize slots when the coverage horizon changes so new slots
+    // appear immediately without requiring a schedule re-save.
+    if (parsed.data.coverageHorizonDays !== undefined) {
+      materializeSlots(brandId, parsed.data.coverageHorizonDays).catch(() => {})
+    }
 
     return NextResponse.json({ brand })
   } catch (error) {

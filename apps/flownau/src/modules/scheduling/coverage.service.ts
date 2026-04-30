@@ -4,18 +4,11 @@ import { logger } from '@/modules/shared/logger'
 import { materializeSlots } from './slot-materializer'
 import { composeDraft } from '@/modules/composer/draft-composer'
 import { HeadTalkCreativeSchema } from '@/modules/composer/head-talk-composer'
-import { CreativeDirectionSchema } from '@/types/scenes'
+import { compose as sceneCompose } from '@/modules/composer/scene-composer'
+import type { ContentFormat } from '@/types/content'
 import { triggerRenderForPost } from '@/modules/renderer/render-queue'
 
-function schemaForFormat(format: string) {
-  if (format === 'head_talk') return HeadTalkCreativeSchema
-  return CreativeDirectionSchema
-}
-
-function schemaNameForFormat(format: string): string {
-  if (format === 'head_talk') return 'HeadTalkCreative'
-  return 'CreativeDirection'
-}
+const VIDEO_FORMATS = new Set(['reel', 'trial_reel', 'carousel', 'static_post'])
 
 // ─── Main entry point ─────────────────────────────────────────────────────────
 
@@ -48,7 +41,7 @@ export async function runCoverageChecks(brandId: string): Promise<CoverageResult
   const horizonDays = brand.coverageHorizonDays
 
   // Materialize slots first so they exist for the check
-  await materializeSlots(brandId, horizonDays + 1)
+  await materializeSlots(brandId, horizonDays)
 
   const check1 = await runCheck1(brandId, horizonDays, brand)
 
@@ -64,7 +57,7 @@ async function runCheck1(
   horizonDays: number,
   brand: { ideationCount: number; autoApproveIdeas: boolean; language: string },
 ): Promise<Check1Result> {
-  const targetEnd = new Date(Date.now() + (horizonDays + 1) * 24 * 60 * 60 * 1000)
+  const targetEnd = new Date(Date.now() + (horizonDays) * 24 * 60 * 60 * 1000)
 
   // Count all slots in horizon
   const now = new Date()
@@ -136,23 +129,52 @@ async function runCheck1(
       // Pick a random enabled template for this format
       const templateConfig = await prisma.brandTemplateConfig.findFirst({
         where: { brandId, enabled: true, template: { format: slot.format } },
-        select: { templateId: true, autoApproveDraft: true, customPrompt: true, template: { select: { id: true, format: true } } },
-        // random-ish: order by updatedAt desc gives variety without a raw query
+        select: {
+          templateId: true,
+          autoApproveDraft: true,
+          customPrompt: true,
+          template: { select: { id: true, format: true, systemPrompt: true, contentSchema: true } },
+        },
         orderBy: { updatedAt: 'desc' },
       })
 
       const templateId = templateConfig?.template.id ?? undefined
 
       // Auto-compose: idea → draft
+      // Video formats (reel, trial_reel) use scene-composer which produces CreativeDirection.
+      // Text formats (head_talk) use the generic draft-composer with HeadTalkCreativeSchema.
       try {
-        const result = await composeDraft({
-          ideaText: candidate.ideaText ?? '',
-          brandId,
-          templateId,
-          format: slot.format,
-          outputSchema: schemaForFormat(slot.format),
-          schemaName: schemaNameForFormat(slot.format),
-        })
+        let creative: unknown
+        let caption = ''
+        let hashtags: string[] = []
+        let resolvedTemplateId: string | null = templateId ?? null
+
+        if (VIDEO_FORMATS.has(slot.format)) {
+          const sceneResult = await sceneCompose({
+            ideaText: candidate.ideaText ?? '',
+            brandId,
+            format: slot.format as ContentFormat,
+            templateContentSchema: templateConfig?.template.contentSchema ?? null,
+            templateSystemPrompt: templateConfig?.template.systemPrompt ?? null,
+            customPrompt: templateConfig?.customPrompt ?? null,
+          })
+          creative = sceneResult.creative
+          caption = sceneResult.creative.caption
+          hashtags = sceneResult.creative.hashtags
+        } else {
+          const draftResult = await composeDraft({
+            ideaText: candidate.ideaText ?? '',
+            brandId,
+            templateId,
+            format: slot.format,
+            outputSchema: HeadTalkCreativeSchema,
+            schemaName: 'HeadTalkCreative',
+          })
+          creative = draftResult.creative
+          caption = draftResult.caption
+          hashtags = draftResult.hashtags
+          resolvedTemplateId = draftResult.templateId
+        }
 
         const autoApproveDraft = templateConfig?.autoApproveDraft ?? false
 
@@ -163,10 +185,10 @@ async function runCheck1(
           where: { id: candidate.id },
           data: {
             format: slot.format,
-            creative: result.creative as unknown as Prisma.InputJsonValue,
-            caption: result.caption,
-            hashtags: result.hashtags,
-            templateId: result.templateId ?? templateId ?? null,
+            creative: creative as Prisma.InputJsonValue,
+            caption,
+            hashtags,
+            templateId: resolvedTemplateId,
             status: draftStatus,
             scheduledAt: slot.scheduledAt,
           },
@@ -248,9 +270,9 @@ export async function smartFillCalendar(brandId: string): Promise<SmartFillResul
   if (!brand) throw new Error(`Brand ${brandId} not found`)
 
   const horizonDays = brand.coverageHorizonDays
-  await materializeSlots(brandId, horizonDays + 1)
+  await materializeSlots(brandId, horizonDays)
 
-  const targetEnd = new Date(Date.now() + (horizonDays + 1) * 24 * 60 * 60 * 1000)
+  const targetEnd = new Date(Date.now() + (horizonDays) * 24 * 60 * 60 * 1000)
   const now = new Date()
 
   const [allSlots, filledSlots] = await Promise.all([

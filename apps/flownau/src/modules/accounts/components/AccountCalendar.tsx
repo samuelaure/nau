@@ -344,11 +344,58 @@ function HeadTalkContent({
   )
 }
 
+type SceneSlots = Record<string, unknown>
+interface SceneDef { type: string; slots?: SceneSlots; mood?: string }
+
+function ReelContent({ comp }: { comp: Composition }) {
+  const creative = comp.creative as { scenes?: SceneDef[]; caption?: string } | null
+  const scenes = creative?.scenes ?? []
+
+  if (scenes.length === 0) {
+    return <p className="text-sm text-text-secondary italic">No scenes generated yet.</p>
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-xs text-text-secondary uppercase tracking-wider">Scenes ({scenes.length})</p>
+      {scenes.map((scene, i) => {
+        const slots = scene.slots ?? {}
+        const slotEntries = Object.entries(slots).filter(([, v]) => v !== null && v !== undefined && v !== '')
+        return (
+          <div key={i} className="rounded-lg bg-white/5 border border-white/10 px-3 py-2.5 flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-mono bg-accent/10 text-accent px-1.5 py-0.5 rounded">
+                {scene.type}
+              </span>
+              {scene.mood && (
+                <span className="text-[10px] text-text-secondary italic">{scene.mood}</span>
+              )}
+            </div>
+            {slotEntries.length > 0 ? (
+              slotEntries.map(([key, val]) => (
+                <p key={key} className="text-sm text-white leading-relaxed">
+                  {Array.isArray(val)
+                    ? (val as string[]).map((item, j) => <span key={j} className="block">• {item}</span>)
+                    : String(val)}
+                </p>
+              ))
+            ) : (
+              <p className="text-xs text-text-secondary italic">No text slots (visual scene)</p>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function FormatContent({ comp, actioning, onSaved }: { comp: Composition; actioning: boolean; onSaved: () => void }) {
   if (comp.format === 'head_talk') {
     return <HeadTalkContent comp={comp} actioning={actioning} onSaved={onSaved} />
   }
-  // Placeholder — additional formats will be implemented per template
+  if (comp.format === 'reel' || comp.format === 'trial_reel') {
+    return <ReelContent comp={comp} />
+  }
   return null
 }
 
@@ -448,6 +495,25 @@ function CompositionModal({
       onClose()
     } catch {
       toast.error('Failed')
+    } finally {
+      setActioning(false)
+    }
+  }
+
+  const handleApproveDraft = async () => {
+    setActioning(true)
+    try {
+      const res = await fetch(`/api/posts/${comp.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'DRAFT_APPROVED' }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success('Draft approved — rendering started.')
+      onRefresh()
+      onClose()
+    } catch {
+      toast.error('Failed to approve draft')
     } finally {
       setActioning(false)
     }
@@ -553,9 +619,18 @@ function CompositionModal({
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1.5">
-              <span className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border bg-gray-800/50 border-gray-700/50 text-gray-300">
-                <span className={cn('w-1.5 h-1.5 rounded-full', DISPLAY_DOT[display])} />
-                {display}
+              <span className={cn(
+                'flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border',
+                (comp.status === 'RENDERING' || comp.status === 'DRAFT_APPROVED')
+                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                  : 'bg-gray-800/50 border-gray-700/50 text-gray-300',
+              )}>
+                {(comp.status === 'RENDERING' || comp.status === 'DRAFT_APPROVED') ? (
+                  <Loader2 size={10} className="animate-spin" />
+                ) : (
+                  <span className={cn('w-1.5 h-1.5 rounded-full', DISPLAY_DOT[display])} />
+                )}
+                {comp.status === 'RENDERING' ? 'Rendering' : comp.status === 'DRAFT_APPROVED' ? 'Queued' : display}
               </span>
               {tag && (
                 <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full border', TAG_COLOR[tag])}>
@@ -730,6 +805,12 @@ function CompositionModal({
                 </Button>
               </>
             )}
+            {comp.status === 'DRAFT_PENDING' && !scheduling && (
+              <Button size="sm" onClick={handleApproveDraft} disabled={actioning} className="gap-1.5 bg-accent hover:bg-accent/80">
+                {actioning ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
+                Approve draft
+              </Button>
+            )}
             {tag === 'Approve' && !scheduling && (
               <Button size="sm" onClick={handleApproveRender} disabled={actioning} className="gap-1.5 bg-purple-600 hover:bg-purple-500">
                 {actioning ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
@@ -827,8 +908,14 @@ function CompositionChip({
           {comp.scheduledAt ? fmtTime(comp.scheduledAt) : 'Unscheduled'}
         </span>
         <div className="flex items-center gap-1">
-          <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', DISPLAY_DOT[display])} />
-          <span className="text-[9px] opacity-70">{display}</span>
+          {(comp.status === 'RENDERING' || comp.status === 'DRAFT_APPROVED') ? (
+            <Loader2 size={9} className="shrink-0 animate-spin text-amber-400" />
+          ) : (
+            <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', DISPLAY_DOT[display])} />
+          )}
+          <span className={cn('text-[9px] opacity-70', (comp.status === 'RENDERING' || comp.status === 'DRAFT_APPROVED') && 'text-amber-400 opacity-100')}>
+            {comp.status === 'RENDERING' ? 'Rendering' : comp.status === 'DRAFT_APPROVED' ? 'Queued' : display}
+          </span>
         </div>
       </div>
     </button>
@@ -1243,8 +1330,14 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
                   <div className="flex items-center justify-between w-full mt-auto pt-1">
                     <span className="text-[10px] opacity-70 font-medium">Unscheduled</span>
                     <div className="flex items-center gap-1.5">
-                      <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', DISPLAY_DOT[display])} />
-                      <span className="text-[10px] opacity-70">{display}</span>
+                      {(comp.status === 'RENDERING' || comp.status === 'DRAFT_APPROVED') ? (
+                        <Loader2 size={9} className="shrink-0 animate-spin text-amber-400" />
+                      ) : (
+                        <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', DISPLAY_DOT[display])} />
+                      )}
+                      <span className={cn('text-[10px] opacity-70', (comp.status === 'RENDERING' || comp.status === 'DRAFT_APPROVED') && 'text-amber-400 opacity-100')}>
+                        {comp.status === 'RENDERING' ? 'Rendering' : comp.status === 'DRAFT_APPROVED' ? 'Queued' : display}
+                      </span>
                     </div>
                   </div>
                 </button>

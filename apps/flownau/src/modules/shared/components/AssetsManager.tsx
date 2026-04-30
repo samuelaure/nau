@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import axios from 'axios'
 import NextImage from 'next/image'
 import { useDropzone } from 'react-dropzone'
@@ -25,6 +25,32 @@ import Modal from '@/modules/shared/components/Modal'
 import R2FolderBrowser from '@/modules/shared/components/R2FolderBrowser'
 import { Asset } from '@/types/video-schema'
 
+// ─── Upload singleton — survives tab navigation ───────────────────────────────
+// Component state is lost on unmount. This module-level object keeps the active
+// upload alive so that when the user returns to the Assets tab, progress resumes.
+
+const TOAST_ID = 'asset-upload-progress'
+
+interface UploadSnapshot {
+  uploading: boolean
+  progress: string
+  currentFileIndex: number
+  totalFiles: number
+  uploadPercentage: number
+}
+
+let _upload: UploadSnapshot = {
+  uploading: false, progress: '', currentFileIndex: 0, totalFiles: 0, uploadPercentage: 0,
+}
+const _listeners = new Set<() => void>()
+
+function setUpload(patch: Partial<UploadSnapshot>) {
+  _upload = { ..._upload, ...patch }
+  _listeners.forEach((fn) => fn())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 interface AssetsManagerProps {
   ownerId: string
   ownerType: 'brand' | 'template'
@@ -38,11 +64,19 @@ export default function AssetsManager({
   assets,
   basePath,
 }: AssetsManagerProps) {
-  const [uploading, setUploading] = useState<boolean>(false)
-  const [progress, setProgress] = useState<string>('')
-  const [currentFileIndex, setCurrentFileIndex] = useState(0)
-  const [totalFiles, setTotalFiles] = useState(0)
-  const [uploadPercentage, setUploadPercentage] = useState(0)
+  // Mirror the module-level singleton into component state so the UI re-renders
+  const [uploadSnap, setUploadSnap] = useState<UploadSnapshot>(() => ({ ..._upload }))
+  const { uploading, progress, currentFileIndex, totalFiles, uploadPercentage } = uploadSnap
+
+  // Re-sync whenever another instance (or this one) updates the singleton
+  useEffect(() => {
+    const sync = () => setUploadSnap({ ..._upload })
+    _listeners.add(sync)
+    // Restore state immediately if an upload is already running when we mount
+    sync()
+    return () => { _listeners.delete(sync) }
+  }, [])
+
   const [currentPath, setCurrentPath] = useState<string[]>([])
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false)
   const [linking, setLinking] = useState(false)
@@ -79,44 +113,43 @@ export default function AssetsManager({
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
       if (!acceptedFiles?.length) return
-      setUploading(true)
-      setTotalFiles(acceptedFiles.length)
+
+      setUpload({ uploading: true, totalFiles: acceptedFiles.length, currentFileIndex: 0, uploadPercentage: 0, progress: '' })
+      toast.loading(`Uploading 1 of ${acceptedFiles.length}…`, { id: TOAST_ID, duration: Infinity })
 
       try {
         for (let i = 0; i < acceptedFiles.length; i++) {
           const file = acceptedFiles[i]
-          setCurrentFileIndex(i)
-          setUploadPercentage(0)
-
-          setProgress(`Hashing ${file.name}...`)
+          setUpload({ currentFileIndex: i, uploadPercentage: 0, progress: `Hashing ${file.name}…` })
+          toast.loading(`Uploading ${i + 1} of ${acceptedFiles.length} — hashing…`, { id: TOAST_ID, duration: Infinity })
 
           const buffer = await file.arrayBuffer()
           const hashBuffer = await crypto.subtle.digest('SHA-256', buffer)
           const hashArray = Array.from(new Uint8Array(hashBuffer))
           const hash = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
 
-          setProgress(`Uploading ${file.name}...`)
+          setUpload({ progress: `Uploading ${file.name}…` })
+          toast.loading(`Uploading ${i + 1} of ${acceptedFiles.length} — ${file.name}`, { id: TOAST_ID, duration: Infinity })
 
           const formData = new FormData()
           formData.append('file', file)
           formData.append('hash', hash)
-
-          if (ownerType === 'brand') {
-            formData.append('brandId', ownerId)
-          } else {
-            formData.append('templateId', ownerId)
-          }
+          if (ownerType === 'brand') formData.append('brandId', ownerId)
+          else formData.append('templateId', ownerId)
 
           try {
             await axios.post('/api/protected/upload', formData, {
               onUploadProgress: (progressEvent) => {
                 const total = progressEvent.total || 0
                 if (total > 0) {
-                  const percent = Math.round((progressEvent.loaded * 100) / total)
-                  setUploadPercentage(percent)
-                  if (percent === 100) {
-                    setProgress(`Optimizing ${file.name}...`)
-                  }
+                  const pct = Math.round((progressEvent.loaded * 100) / total)
+                  setUpload({ uploadPercentage: pct, progress: pct === 100 ? `Optimizing ${file.name}…` : `Uploading ${file.name}…` })
+                  toast.loading(
+                    pct === 100
+                      ? `Optimizing ${i + 1} of ${acceptedFiles.length} — ${file.name}`
+                      : `Uploading ${i + 1} of ${acceptedFiles.length} — ${file.name} (${pct}%)`,
+                    { id: TOAST_ID, duration: Infinity },
+                  )
                 }
               },
             })
@@ -129,17 +162,13 @@ export default function AssetsManager({
             throw error
           }
         }
-        toast.success('All assets uploaded successfully')
+        toast.success('All assets uploaded successfully', { id: TOAST_ID })
         window.location.reload()
       } catch (error: unknown) {
         console.error('Upload failed', error)
-        toast.error(`Upload failed: ${(error as Error).message}`)
+        toast.error(`Upload failed: ${(error as Error).message}`, { id: TOAST_ID })
       } finally {
-        setUploading(false)
-        setProgress('')
-        setUploadPercentage(0)
-        setCurrentFileIndex(0)
-        setTotalFiles(0)
+        setUpload({ uploading: false, progress: '', uploadPercentage: 0, currentFileIndex: 0, totalFiles: 0 })
       }
     },
     [ownerId, ownerType],

@@ -60,8 +60,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ bran
         where: { id: brandId },
         select: { coverageHorizonDays: true },
       })
-      const horizon = (brand?.coverageHorizonDays ?? 7) + 1
+      const horizon = brand?.coverageHorizonDays ?? 7
       await prisma.postSlot.deleteMany({ where: { brandId, status: 'empty' } })
+      // Also reset any phantom filled slots (postId=null) left by deleted posts
+      await prisma.postSlot.deleteMany({ where: { brandId, status: 'filled', postId: null } })
       await prisma.postSchedule.update({ where: { brandId }, data: { chainPosition: 0 } })
       materializeSlots(brandId, horizon).catch(() => {})
     }
