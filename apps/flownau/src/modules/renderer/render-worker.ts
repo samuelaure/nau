@@ -11,6 +11,9 @@ import { compileTimeline } from '@/modules/composer/timeline-compiler'
 import { logger, logError } from '@/modules/shared/logger'
 import { redisConnection, type RenderJobData } from './render-queue'
 import type { CreativeDirection, BrandStyle } from '@/types/scenes'
+import type { BrandIdentity } from '@/modules/video/remotion/ReelTemplates'
+
+const SLOT_REEL_IDS = new Set(['ReelT1', 'ReelT2', 'ReelT3', 'ReelT4'])
 
 const DEFAULT_BRAND_STYLE: BrandStyle = {
   primaryColor: '#6C63FF',
@@ -42,7 +45,7 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
 
   const post = await prisma.post.findUnique({
     where: { id: postId },
-    include: { brand: true },
+    include: { brand: true, template: true },
   })
 
   if (!post) throw new Error(`Post ${postId} not found in DB`)
@@ -80,14 +83,59 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
 
   const format = post.format || 'reel'
   const isVideo = format === 'reel' || format === 'trial_reel'
-  const remotionCompId = isVideo ? 'SceneSequence' : 'DynamicTemplateMaster'
   const brandId = post.brandId
+
+  // Determine which Remotion composition to use
+  const templateRemotionId = post.template?.remotionId ?? ''
+  const isSlotReel = isVideo && SLOT_REEL_IDS.has(templateRemotionId)
+  const remotionCompId = isSlotReel
+    ? templateRemotionId
+    : isVideo
+      ? 'SceneSequence'
+      : 'DynamicTemplateMaster'
 
   // ── Build Remotion inputProps ─────────────────────────────────────────────────
   let inputProps: Record<string, unknown>
 
-  if (isVideo) {
-    // Reel: resolve assets + compile timeline from Post.creative (CreativeDirection)
+  if (isSlotReel) {
+    // Slot-based reel: creative = { slots, caption, hashtags, brollMood }
+    const creative = post.creative as Record<string, unknown> | null
+    if (!creative || !creative.slots) {
+      throw new Error(`Post ${postId} has no slot creative — cannot render ${templateRemotionId}`)
+    }
+
+    // Select B-roll assets by mood keywords
+    const brollMood = (creative.brollMood as string) ?? ''
+    const moodKeywords = brollMood.split(/[,\s]+/).map((s) => s.trim().toLowerCase()).filter(Boolean)
+
+    const brandAssets = await prisma.asset.findMany({
+      where: {
+        brandId,
+        type: 'video',
+        ...(moodKeywords.length > 0 ? { tags: { hasSome: moodKeywords } } : {}),
+      },
+      select: { url: true },
+      take: 10,
+    })
+
+    // Fallback: any brand video if mood query returns nothing
+    const fallbackAssets = brandAssets.length === 0
+      ? await prisma.asset.findMany({ where: { brandId, type: 'video' }, select: { url: true }, take: 5 })
+      : brandAssets
+
+    const brollUrls = fallbackAssets.map((a) => a.url)
+
+    const brandIdentity = (post.brand?.brandIdentity ?? {}) as BrandIdentity
+
+    inputProps = {
+      slots: creative.slots,
+      caption: creative.caption ?? '',
+      hashtags: creative.hashtags ?? [],
+      brollUrls,
+      brand: brandIdentity,
+    }
+  } else if (isVideo) {
+    // Legacy scene-based reel
     const creative = post.creative as CreativeDirection | null
     if (!creative || !creative.scenes || creative.scenes.length === 0) {
       throw new Error(`Post ${postId} has no creative direction — cannot render reel`)

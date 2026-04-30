@@ -29,6 +29,15 @@ const LANGUAGES = [
   { value: 'Italian', label: 'Italian' },
 ] as const
 
+interface BrandIdentity {
+  primaryColor?: string
+  secondaryColor?: string
+  titleFont?: string
+  bodyFont?: string
+  overlayOpacity?: number
+  logoUrl?: string
+}
+
 type Brand = {
   id: string
   language: string
@@ -36,6 +45,7 @@ type Brand = {
   autoApproveIdeas: boolean
   shortCode: string | null
   coverageHorizonDays: number
+  brandIdentity?: BrandIdentity | null
 }
 
 export default function BrandSettings({ brand, initialSchedule, initialTab }: { brand: Brand; initialSchedule: PostSchedule | null; initialTab?: BrandSettingsTab }) {
@@ -99,6 +109,84 @@ export default function BrandSettings({ brand, initialSchedule, initialTab }: { 
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div className="w-full border-t border-white/5 pt-6 flex flex-col gap-4">
+              <h4 className="form-label font-semibold text-white">Brand Identity</h4>
+              <p className="text-xs text-text-secondary -mt-2">Colors and fonts used in Remotion video templates.</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="form-label mb-1 block text-xs">Primary Color</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      defaultValue={brand.brandIdentity?.primaryColor ?? '#000000'}
+                      className="w-9 h-9 rounded cursor-pointer border-0 bg-transparent p-0"
+                    />
+                    <input
+                      type="text"
+                      name="bi_primaryColor"
+                      defaultValue={brand.brandIdentity?.primaryColor ?? '#000000'}
+                      placeholder="#000000"
+                      className="bg-gray-950 border border-border text-white rounded p-2 text-sm flex-1 font-mono"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="form-label mb-1 block text-xs">Secondary Color (text)</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      defaultValue={brand.brandIdentity?.secondaryColor ?? '#ffffff'}
+                      className="w-9 h-9 rounded cursor-pointer border-0 bg-transparent p-0"
+                    />
+                    <input
+                      type="text"
+                      name="bi_secondaryColor"
+                      defaultValue={brand.brandIdentity?.secondaryColor ?? '#ffffff'}
+                      placeholder="#ffffff"
+                      className="bg-gray-950 border border-border text-white rounded p-2 text-sm flex-1 font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="form-label mb-1 block text-xs">Title Font</label>
+                  <input
+                    type="text"
+                    name="bi_titleFont"
+                    defaultValue={brand.brandIdentity?.titleFont ?? ''}
+                    placeholder="sans-serif"
+                    className="bg-gray-950 border border-border text-white rounded p-2 text-sm w-full"
+                  />
+                </div>
+                <div>
+                  <label className="form-label mb-1 block text-xs">Body Font</label>
+                  <input
+                    type="text"
+                    name="bi_bodyFont"
+                    defaultValue={brand.brandIdentity?.bodyFont ?? ''}
+                    placeholder="sans-serif"
+                    className="bg-gray-950 border border-border text-white rounded p-2 text-sm w-full"
+                  />
+                </div>
+              </div>
+              <div className="w-48">
+                <label className="form-label mb-1 block text-xs">
+                  Overlay Opacity
+                  <span className="ml-1 opacity-60">(0 = transparent, 1 = solid)</span>
+                </label>
+                <input
+                  type="number"
+                  name="bi_overlayOpacity"
+                  defaultValue={brand.brandIdentity?.overlayOpacity ?? 0.55}
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  className="bg-gray-950 border border-border text-white rounded p-2 text-sm w-full"
+                />
+              </div>
             </div>
 
             <div className="w-full border-t border-white/5 pt-6 flex flex-col gap-3">

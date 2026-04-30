@@ -178,11 +178,31 @@ export async function updateBrand(brandId: string, formData: FormData) {
     language: formData.get('language'),
   })
 
+  // Brand identity fields (all optional)
+  const primaryColor = (formData.get('bi_primaryColor') as string | null)?.trim() || undefined
+  const secondaryColor = (formData.get('bi_secondaryColor') as string | null)?.trim() || undefined
+  const titleFont = (formData.get('bi_titleFont') as string | null)?.trim() || undefined
+  const bodyFont = (formData.get('bi_bodyFont') as string | null)?.trim() || undefined
+  const overlayOpacity = formData.get('bi_overlayOpacity') ? parseFloat(formData.get('bi_overlayOpacity') as string) : undefined
+
+  const existing = await prisma.brand.findUnique({ where: { id: parsedId }, select: { brandIdentity: true } })
+  const existingIdentity = (existing?.brandIdentity as Record<string, unknown>) ?? {}
+
+  const brandIdentity: Record<string, unknown> = {
+    ...existingIdentity,
+    ...(primaryColor !== undefined && { primaryColor }),
+    ...(secondaryColor !== undefined && { secondaryColor }),
+    ...(titleFont !== undefined && { titleFont }),
+    ...(bodyFont !== undefined && { bodyFont }),
+    ...(overlayOpacity !== undefined && !isNaN(overlayOpacity) && { overlayOpacity }),
+  }
+
   await prisma.brand.update({
     where: { id: parsedId },
     data: {
       shortCode: shortCode ?? undefined,
       language: language ?? undefined,
+      brandIdentity,
     },
   })
 

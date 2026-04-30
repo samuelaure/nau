@@ -163,6 +163,7 @@ export default async function WorkspaceOverviewPage({
                 autoApproveIdeas: localBrand.autoApproveIdeas,
                 shortCode: localBrand.shortCode,
                 coverageHorizonDays: localBrand.coverageHorizonDays,
+                brandIdentity: localBrand.brandIdentity as any,
               }}
               initialTab={settingsTab as 'general' | 'personas' | 'strategy' | 'principles' | 'planner' | 'schedule' | undefined}
               initialSchedule={postSchedule ? {

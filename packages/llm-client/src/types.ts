@@ -62,6 +62,7 @@ export interface ParsedCompletionOptions<T> {
   schemaName: string
   temperature?: number
   timeoutMs?: number
+  maxTokens?: number
 }
 
 export interface EmbeddingOptions {

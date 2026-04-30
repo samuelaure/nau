@@ -5,6 +5,7 @@ import { materializeSlots } from './slot-materializer'
 import { composeDraft } from '@/modules/composer/draft-composer'
 import { HeadTalkCreativeSchema } from '@/modules/composer/head-talk-composer'
 import { compose as sceneCompose } from '@/modules/composer/scene-composer'
+import { composeSlots } from '@/modules/composer/slot-composer'
 import type { ContentFormat } from '@/types/content'
 import { triggerRenderForPost } from '@/modules/renderer/render-queue'
 
@@ -133,7 +134,7 @@ async function runCheck1(
           templateId: true,
           autoApproveDraft: true,
           customPrompt: true,
-          template: { select: { id: true, format: true, systemPrompt: true, contentSchema: true } },
+          template: { select: { id: true, format: true, systemPrompt: true, contentSchema: true, slotSchema: true, remotionId: true } },
         },
         orderBy: { updatedAt: 'desc' },
       })
@@ -149,7 +150,21 @@ async function runCheck1(
         let hashtags: string[] = []
         let resolvedTemplateId: string | null = templateId ?? null
 
-        if (VIDEO_FORMATS.has(slot.format)) {
+        const isSlotTemplate = !!(templateConfig?.template.slotSchema && templateId)
+        const isReelFormat = slot.format === 'reel' || slot.format === 'trial_reel'
+
+        if (isReelFormat && isSlotTemplate) {
+          // Slot-based reel: AI fills typed text slots defined in template
+          const slotResult = await composeSlots({
+            ideaText: candidate.ideaText ?? '',
+            brandId,
+            templateId: templateId!,
+            customPrompt: templateConfig?.customPrompt ?? null,
+          })
+          creative = { slots: slotResult.slots, caption: slotResult.caption, hashtags: slotResult.hashtags, brollMood: slotResult.brollMood }
+          caption = slotResult.caption
+          hashtags = slotResult.hashtags
+        } else if (VIDEO_FORMATS.has(slot.format)) {
           const sceneResult = await sceneCompose({
             ideaText: candidate.ideaText ?? '',
             brandId,

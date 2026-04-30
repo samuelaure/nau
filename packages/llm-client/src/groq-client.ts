@@ -69,6 +69,7 @@ export class GroqClient implements LLMClient {
         model: options.model,
         messages,
         temperature: options.temperature,
+        max_tokens: options.maxTokens,
       },
       options.timeoutMs ? { timeout: options.timeoutMs } : undefined,
     )

@@ -95,6 +95,7 @@ export class OpenAIClient implements LLMClient {
         model: options.model,
         messages: options.messages,
         temperature: options.temperature,
+        max_tokens: options.maxTokens,
         response_format: {
           type: 'json_schema',
           json_schema: {
