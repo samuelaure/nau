@@ -253,7 +253,7 @@ function handleFailedJob(job: Job<RenderJobData> | undefined, error: Error): voi
   if (job.attemptsMade >= (job.opts.attempts ?? 3) - 1) {
     prisma.renderJob
       .update({ where: { postId }, data: { status: 'failed', error: error.message, completedAt: new Date() } })
-      .then(() => prisma.post.update({ where: { id: postId }, data: { status: 'RENDERING' } }))
+      .then(() => prisma.post.update({ where: { id: postId }, data: { status: 'DRAFT_APPROVED' } }))
       .catch((dbErr) => logError('[RenderWorker] Failed to update failed status in DB', dbErr))
   }
 }

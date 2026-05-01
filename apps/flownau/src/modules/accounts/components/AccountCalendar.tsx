@@ -614,6 +614,21 @@ function CompositionModal({
     }
   }
 
+  const handleCancelRender = async () => {
+    setActioning(true)
+    try {
+      const res = await fetch(`/api/posts/${comp.id}/cancel-render`, { method: 'POST' })
+      if (!res.ok) throw new Error()
+      toast.success('Render cancelled — post reset to draft.')
+      onRefresh()
+      onClose()
+    } catch {
+      toast.error('Failed to cancel render')
+    } finally {
+      setActioning(false)
+    }
+  }
+
   const handleSaveCaption = async () => {
     setActioning(true)
     try {
@@ -932,6 +947,12 @@ function CompositionModal({
               <Button variant="outline" size="sm" onClick={handleRerender} disabled={actioning} className="gap-1.5">
                 {actioning ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
                 Re-render
+              </Button>
+            )}
+            {comp.status === 'RENDERING' && (
+              <Button variant="outline" size="sm" onClick={handleCancelRender} disabled={actioning} className="gap-1.5 border-amber-500/30 text-amber-300 hover:bg-amber-500/10">
+                {actioning ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />}
+                Cancel render
               </Button>
             )}
             {display === 'Error' && (
