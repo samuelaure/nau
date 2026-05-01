@@ -232,6 +232,7 @@ type Composition = {
   userPostedManually?: boolean
   payload?: Record<string, unknown> | null
   creative?: Record<string, unknown> | null
+  templateId?: string | null
 }
 
 type DragState = {
@@ -614,6 +615,34 @@ function CompositionModal({
     }
   }
 
+  const handleRecompose = async () => {
+    const ideaText = comp.ideaText?.trim() ?? ''
+    if (ideaText.length < 3) {
+      toast.error('Idea text is too short to recompose. Edit the post idea first.')
+      return
+    }
+    setActioning(true)
+    try {
+      // Pass templateId to lock the format and avoid slot reassignment
+      const res = await fetch('/api/agent/compose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: ideaText, brandId, format: comp.format, postId: comp.id, templateId: comp.templateId }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        toast.error((body as { error?: string }).error ?? 'Failed to recompose post')
+        return
+      }
+      toast.success('Recomposed — review and approve the draft.')
+      onRefresh()
+    } catch {
+      toast.error('Failed to recompose post')
+    } finally {
+      setActioning(false)
+    }
+  }
+
   const handleCancelRender = async () => {
     setActioning(true)
     try {
@@ -932,6 +961,15 @@ function CompositionModal({
               </>
             )}
             {comp.status === 'DRAFT_PENDING' && !scheduling && (
+              <Button variant="outline" size="sm" onClick={handleRecompose} disabled={actioning} className="gap-1.5">
+                {actioning ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+                Recompose
+              </Button>
+            )}
+            {comp.status === 'DRAFT_PENDING' && !scheduling && (
+              !(comp.format === 'reel' || comp.format === 'trial_reel') ||
+              !!(comp.creative as Record<string, unknown> | null)?.slots
+            ) && (
               <Button size="sm" onClick={handleApproveDraft} disabled={actioning} className="gap-1.5 bg-accent hover:bg-accent/80">
                 {actioning ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
                 Approve draft
@@ -949,10 +987,10 @@ function CompositionModal({
                 Re-render
               </Button>
             )}
-            {comp.status === 'RENDERING' && (
+            {(comp.status === 'RENDERING' || comp.status === 'DRAFT_APPROVED') && (
               <Button variant="outline" size="sm" onClick={handleCancelRender} disabled={actioning} className="gap-1.5 border-amber-500/30 text-amber-300 hover:bg-amber-500/10">
                 {actioning ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />}
-                Cancel render
+                {comp.status === 'DRAFT_APPROVED' ? 'Remove from queue' : 'Cancel render'}
               </Button>
             )}
             {display === 'Error' && (

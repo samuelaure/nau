@@ -63,28 +63,32 @@ export async function POST(req: Request) {
     let targetSlotId: string | null = null
     let targetSlotScheduledAt: Date | null = null
 
-    // Get template's format if templateId is explicit
-    const templateFormat = templateId
-      ? (await prisma.template.findUnique({ where: { id: templateId }, select: { format: true } }))?.format ?? null
-      : null
+    // When recomposing an existing post (postId provided), never reassign slots —
+    // the post already owns its slot and we just want to regenerate creative.
+    if (!postId) {
+      // Get template's format if templateId is explicit
+      const templateFormat = templateId
+        ? (await prisma.template.findUnique({ where: { id: templateId }, select: { format: true } }))?.format ?? null
+        : null
 
-    if (templateId && templateFormat) {
-      // Find next empty slot of the template's format
-      const slot = await prisma.postSlot.findFirst({
-        where: { brandId, status: 'empty', format: templateFormat, scheduledAt: { gt: new Date() } },
-        orderBy: { scheduledAt: 'asc' },
-      })
-      if (slot) { targetSlotId = slot.id; targetSlotScheduledAt = slot.scheduledAt; format = templateFormat as typeof format }
-    } else if (!templateId) {
-      // Auto mode: find next empty slot of any format
-      const slot = await prisma.postSlot.findFirst({
-        where: { brandId, status: 'empty', scheduledAt: { gt: new Date() } },
-        orderBy: { scheduledAt: 'asc' },
-      })
-      if (slot) {
-        targetSlotId = slot.id
-        targetSlotScheduledAt = slot.scheduledAt
-        format = slot.format as typeof format
+      if (templateId && templateFormat) {
+        // Find next empty slot of the template's format
+        const slot = await prisma.postSlot.findFirst({
+          where: { brandId, status: 'empty', format: templateFormat, scheduledAt: { gt: new Date() } },
+          orderBy: { scheduledAt: 'asc' },
+        })
+        if (slot) { targetSlotId = slot.id; targetSlotScheduledAt = slot.scheduledAt; format = templateFormat as typeof format }
+      } else if (!templateId) {
+        // Auto mode: find next empty slot of any format
+        const slot = await prisma.postSlot.findFirst({
+          where: { brandId, status: 'empty', scheduledAt: { gt: new Date() } },
+          orderBy: { scheduledAt: 'asc' },
+        })
+        if (slot) {
+          targetSlotId = slot.id
+          targetSlotScheduledAt = slot.scheduledAt
+          format = slot.format as typeof format
+        }
       }
     }
 

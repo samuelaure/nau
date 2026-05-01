@@ -1,5 +1,5 @@
 import React from 'react'
-import { useCurrentFrame, interpolate, OffthreadVideo, Loop } from 'remotion'
+import { useCurrentFrame, interpolate, OffthreadVideo, Sequence } from 'remotion'
 
 export interface BrandIdentity {
   primaryColor?: string
@@ -46,13 +46,12 @@ function BrollBackground({ url, overlayOpacity }: { url?: string; overlayOpacity
   }
   return (
     <>
-      <Loop durationInFrames={180}>
-        <OffthreadVideo
-          src={url}
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-          muted
-        />
-      </Loop>
+      <OffthreadVideo
+        src={url}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+        muted
+        playbackRate={1}
+      />
       <div style={{ position: 'absolute', inset: 0, background: `rgba(0,0,0,${overlayOpacity})` }} />
     </>
   )
@@ -103,67 +102,27 @@ function FadeText({
   )
 }
 
-function Scene({
-  brollUrl,
-  text,
-  fontSize,
-  fontFamily,
-  textColor,
-  overlayOpacity,
-  frameOffset,
-  instant = false,
-}: {
-  brollUrl?: string
-  text: string
-  fontSize: number
-  fontFamily: string
-  textColor: string
-  overlayOpacity: number
-  frameOffset: number
-  instant?: boolean
-}) {
-  return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <BrollBackground url={brollUrl} overlayOpacity={overlayOpacity} />
-      <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <FadeText
-          text={text}
-          fontSize={fontSize}
-          fontFamily={fontFamily}
-          color={textColor}
-          frameOffset={frameOffset}
-          instant={instant}
-        />
-      </div>
-    </div>
-  )
-}
-
 // ─── ReelT1 — Single Moment ───────────────────────────────────────────────────
 // Layout: [text1 · 2.5s] [trail · 1.5s]  = 4s / 120f
 
 export function ReelT1({ slots, brollUrls = [], brand = {} }: ReelSlotProps) {
   const b = { ...DEFAULT_BRAND, ...brand }
-  const frame = useCurrentFrame()
-  const showText = frame < SCENE_SHORT
 
   return (
     <div style={{ width: 1080, height: 1920, background: '#000', position: 'relative', overflow: 'hidden' }}>
       <BrollBackground url={brollUrls[0]} overlayOpacity={b.overlayOpacity} />
-      {showText && (
+      <Sequence from={0} durationInFrames={SCENE_SHORT}>
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <FadeText
-              text={slots.text1 ?? ''}
-              fontSize={100}
-              fontFamily={b.titleFont}
-              color={b.secondaryColor}
-              frameOffset={0}
-              instant
-            />
-          </div>
+          <FadeText
+            text={slots.text1 ?? ''}
+            fontSize={100}
+            fontFamily={b.titleFont}
+            color={b.secondaryColor}
+            frameOffset={0}
+            instant
+          />
         </div>
-      )}
+      </Sequence>
     </div>
   )
 }
@@ -173,27 +132,23 @@ export function ReelT1({ slots, brollUrls = [], brand = {} }: ReelSlotProps) {
 
 export function ReelT2({ slots, brollUrls = [], brand = {} }: ReelSlotProps) {
   const b = { ...DEFAULT_BRAND, ...brand }
-  const frame = useCurrentFrame()
   const BODY = 150
-  const showText = frame < BODY
 
   return (
     <div style={{ width: 1080, height: 1920, background: '#000', position: 'relative', overflow: 'hidden' }}>
       <BrollBackground url={brollUrls[0]} overlayOpacity={b.overlayOpacity} />
-      {showText && (
+      <Sequence from={0} durationInFrames={BODY}>
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <FadeText
-              text={slots.text1 ?? ''}
-              fontSize={62}
-              fontFamily={b.bodyFont}
-              color={b.secondaryColor}
-              frameOffset={0}
-              instant
-            />
-          </div>
+          <FadeText
+            text={slots.text1 ?? ''}
+            fontSize={62}
+            fontFamily={b.bodyFont}
+            color={b.secondaryColor}
+            frameOffset={0}
+            instant
+          />
         </div>
-      )}
+      </Sequence>
     </div>
   )
 }
@@ -206,39 +161,27 @@ const T3_END = SCENE_HOOK + SCENE_BODY      // 195
 
 export function ReelT3({ slots, brollUrls = [], brand = {} }: ReelSlotProps) {
   const b = { ...DEFAULT_BRAND, ...brand }
-  const frame = useCurrentFrame()
-
-  const showScene1 = frame < T3_S2
-  const showScene2 = frame >= T3_S2 && frame < T3_END
+  const broll1 = brollUrls[0]
+  const broll2 = brollUrls[1] ?? brollUrls[0]
 
   return (
     <div style={{ width: 1080, height: 1920, background: '#000', position: 'relative', overflow: 'hidden' }}>
-      {showScene1 && (
-        <Scene
-          brollUrl={brollUrls[0]}
-          text={slots.text1 ?? ''}
-          fontSize={100}
-          fontFamily={b.titleFont}
-          textColor={b.secondaryColor}
-          overlayOpacity={b.overlayOpacity}
-          frameOffset={0}
-          instant
-        />
-      )}
-      {showScene2 && (
-        <Scene
-          brollUrl={brollUrls[1] ?? brollUrls[0]}
-          text={slots.text2 ?? ''}
-          fontSize={72}
-          fontFamily={b.bodyFont}
-          textColor={b.secondaryColor}
-          overlayOpacity={b.overlayOpacity}
-          frameOffset={T3_S2}
-        />
-      )}
-      {!showScene1 && !showScene2 && (
-        <BrollBackground url={brollUrls[1] ?? brollUrls[0]} overlayOpacity={b.overlayOpacity} />
-      )}
+      {/* Scene 1: hook — broll1 + text1 */}
+      <Sequence from={0} durationInFrames={T3_S2}>
+        <BrollBackground url={broll1} overlayOpacity={b.overlayOpacity} />
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <FadeText text={slots.text1 ?? ''} fontSize={100} fontFamily={b.titleFont} color={b.secondaryColor} frameOffset={0} instant />
+        </div>
+      </Sequence>
+      {/* Scene 2: reveal — broll2 spans body + trail, text2 only during body */}
+      <Sequence from={T3_S2} durationInFrames={SCENE_BODY + TRAIL}>
+        <BrollBackground url={broll2} overlayOpacity={b.overlayOpacity} />
+        <Sequence from={0} durationInFrames={SCENE_BODY}>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <FadeText text={slots.text2 ?? ''} fontSize={72} fontFamily={b.bodyFont} color={b.secondaryColor} frameOffset={0} />
+          </div>
+        </Sequence>
+      </Sequence>
     </div>
   )
 }
@@ -252,54 +195,35 @@ const T4_END = SCENE_HOOK + SCENE_BODY + SCENE_LAND   // 285
 
 export function ReelT4({ slots, brollUrls = [], brand = {} }: ReelSlotProps) {
   const b = { ...DEFAULT_BRAND, ...brand }
-  const frame = useCurrentFrame()
-
-  const showScene1 = frame < T4_S2
-  const showScene2 = frame >= T4_S2 && frame < T4_S3
-  const showScene3 = frame >= T4_S3 && frame < T4_END
-
-  const trailBroll = brollUrls[2] ?? brollUrls[1] ?? brollUrls[0]
+  const broll1 = brollUrls[0]
+  const broll2 = brollUrls[1] ?? brollUrls[0]
+  const broll3 = brollUrls[2] ?? brollUrls[1] ?? brollUrls[0]
 
   return (
     <div style={{ width: 1080, height: 1920, background: '#000', position: 'relative', overflow: 'hidden' }}>
-      {showScene1 && (
-        <Scene
-          brollUrl={brollUrls[0]}
-          text={slots.text1 ?? ''}
-          fontSize={100}
-          fontFamily={b.titleFont}
-          textColor={b.secondaryColor}
-          overlayOpacity={b.overlayOpacity}
-          frameOffset={0}
-          instant
-        />
-      )}
-      {showScene2 && (
-        <Scene
-          brollUrl={brollUrls[1] ?? brollUrls[0]}
-          text={slots.text2 ?? ''}
-          fontSize={72}
-          fontFamily={b.bodyFont}
-          textColor={b.secondaryColor}
-          overlayOpacity={b.overlayOpacity}
-          frameOffset={T4_S2}
-        />
-      )}
-      {showScene3 && (
-        <Scene
-          brollUrl={trailBroll}
-          text={slots.text3 ?? ''}
-          fontSize={100}
-          fontFamily={b.titleFont}
-          textColor={b.secondaryColor}
-          overlayOpacity={b.overlayOpacity}
-          frameOffset={T4_S3}
-        />
-      )}
-      {/* Trailing buffer — b-roll continues, no text */}
-      {!showScene1 && !showScene2 && !showScene3 && (
-        <BrollBackground url={trailBroll} overlayOpacity={b.overlayOpacity} />
-      )}
+      {/* Scene 1: opening — broll1 + text1 */}
+      <Sequence from={0} durationInFrames={T4_S2}>
+        <BrollBackground url={broll1} overlayOpacity={b.overlayOpacity} />
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <FadeText text={slots.text1 ?? ''} fontSize={100} fontFamily={b.titleFont} color={b.secondaryColor} frameOffset={0} instant />
+        </div>
+      </Sequence>
+      {/* Scene 2: development — broll2 + text2 */}
+      <Sequence from={T4_S2} durationInFrames={SCENE_BODY}>
+        <BrollBackground url={broll2} overlayOpacity={b.overlayOpacity} />
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <FadeText text={slots.text2 ?? ''} fontSize={72} fontFamily={b.bodyFont} color={b.secondaryColor} frameOffset={0} />
+        </div>
+      </Sequence>
+      {/* Scene 3: landing — broll3 spans land + trail, text3 only during land */}
+      <Sequence from={T4_S3} durationInFrames={SCENE_LAND + TRAIL}>
+        <BrollBackground url={broll3} overlayOpacity={b.overlayOpacity} />
+        <Sequence from={0} durationInFrames={SCENE_LAND}>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <FadeText text={slots.text3 ?? ''} fontSize={100} fontFamily={b.titleFont} color={b.secondaryColor} frameOffset={0} />
+          </div>
+        </Sequence>
+      </Sequence>
     </div>
   )
 }

@@ -86,7 +86,12 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
   // ── Build Remotion inputProps ─────────────────────────────────────────────────
   const creative = post.creative as Record<string, unknown> | null
   if (!creative?.slots) {
-    throw new Error(`Post ${postId} has no slot creative — cannot render ${templateRemotionId}`)
+    // Creative is missing or was composed with the legacy scene-composer.
+    // Reset so the user can recompose via the calendar modal.
+    await prisma.post.update({ where: { id: postId }, data: { status: 'DRAFT_PENDING' } })
+    await prisma.renderJob.update({ where: { id: renderJob.id }, data: { status: 'failed', error: 'No slot creative — please recompose this post', completedAt: new Date() } })
+    logger.warn({ postId, templateRemotionId }, '[RenderWorker] No slot creative — reset to DRAFT_PENDING')
+    return
   }
 
   // Select B-roll assets by mood keywords
@@ -253,7 +258,7 @@ function handleFailedJob(job: Job<RenderJobData> | undefined, error: Error): voi
   if (job.attemptsMade >= (job.opts.attempts ?? 3) - 1) {
     prisma.renderJob
       .update({ where: { postId }, data: { status: 'failed', error: error.message, completedAt: new Date() } })
-      .then(() => prisma.post.update({ where: { id: postId }, data: { status: 'DRAFT_APPROVED' } }))
+      .then(() => prisma.post.update({ where: { id: postId }, data: { status: 'DRAFT_PENDING' } }))
       .catch((dbErr) => logError('[RenderWorker] Failed to update failed status in DB', dbErr))
   }
 }
