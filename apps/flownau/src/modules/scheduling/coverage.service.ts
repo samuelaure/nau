@@ -127,7 +127,7 @@ async function runCheck1(
     if (candidate) {
       // Pick a random enabled template for this format
       const templateConfig = await prisma.brandTemplateConfig.findFirst({
-        where: { brandId, enabled: true, template: { format: slot.format } },
+        where: { brandId, enabled: true, template: { format: slot.format === 'trial_reel' ? 'reel' : slot.format } },
         select: {
           templateId: true,
           autoApproveDraft: true,

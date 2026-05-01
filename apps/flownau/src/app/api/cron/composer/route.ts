@@ -5,7 +5,6 @@ import { composeSlots } from '@/modules/composer/slot-composer'
 import { composeDraft } from '@/modules/composer/draft-composer'
 import { HeadTalkCreativeSchema } from '@/modules/composer/head-talk-composer'
 import { triggerRenderForPost } from '@/modules/renderer/render-queue'
-import { selectTemplateForIdea } from '@/modules/composer/template-selector'
 import type { ContentFormat } from '@/types/content'
 import { logError, logger } from '@/modules/shared/logger'
 import { validateCronSecret, unauthorizedCronResponse } from '@/modules/shared/nau-auth'
@@ -40,15 +39,18 @@ export async function GET(request: Request) {
       const persona = post.brandPersona
 
       try {
-        const selectedTemplate = await selectTemplateForIdea({ brandId: post.brandId, format })
+        // trial_reel uses the same templates as reel
+        const templateLookupFormat = format === 'trial_reel' ? 'reel' : format
+        const templateConfig = await prisma.brandTemplateConfig.findFirst({
+          where: { brandId: post.brandId, enabled: true, template: { format: templateLookupFormat } },
+          select: { autoApproveDraft: true, customPrompt: true, template: { select: { id: true } } },
+          orderBy: { updatedAt: 'desc' },
+        })
+        const selectedTemplateId = templateConfig?.template.id ?? null
 
         let autoApproveDraft = persona?.autoApproveCompositions ?? false
-        if (!autoApproveDraft && selectedTemplate) {
-          const config = await prisma.brandTemplateConfig.findUnique({
-            where: { brandId_templateId: { brandId: post.brandId, templateId: selectedTemplate.id } },
-            select: { autoApproveDraft: true },
-          })
-          autoApproveDraft = config?.autoApproveDraft ?? false
+        if (!autoApproveDraft && templateConfig) {
+          autoApproveDraft = templateConfig.autoApproveDraft ?? false
         }
 
         const draftStatus = autoApproveDraft ? 'DRAFT_APPROVED' : 'DRAFT_PENDING'
@@ -56,17 +58,13 @@ export async function GET(request: Request) {
         let creative: unknown
         let caption = ''
         let hashtags: string[] = []
-        let resolvedTemplateId: string | null = selectedTemplate?.id ?? null
+        let resolvedTemplateId: string | null = selectedTemplateId
 
-        if (REEL_FORMATS.has(format) && selectedTemplate) {
-          const templateConfig = await prisma.brandTemplateConfig.findFirst({
-            where: { brandId: post.brandId, enabled: true, templateId: selectedTemplate.id },
-            select: { customPrompt: true },
-          })
+        if (REEL_FORMATS.has(format) && selectedTemplateId) {
           const slotResult = await composeSlots({
             ideaText: post.ideaText ?? '',
             brandId: post.brandId,
-            templateId: selectedTemplate.id,
+            templateId: selectedTemplateId,
             personaId: persona?.id,
             customPrompt: templateConfig?.customPrompt ?? null,
           })
@@ -77,7 +75,7 @@ export async function GET(request: Request) {
           const draftResult = await composeDraft({
             ideaText: post.ideaText ?? '',
             brandId: post.brandId,
-            templateId: selectedTemplate?.id,
+            templateId: selectedTemplateId ?? undefined,
             format,
             outputSchema: HeadTalkCreativeSchema,
             schemaName: 'HeadTalkCreative',

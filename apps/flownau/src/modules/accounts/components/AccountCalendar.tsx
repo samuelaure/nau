@@ -704,41 +704,83 @@ function CompositionModal({
             </div>
           </div>
 
-          {/* HEAD TALK layout: script → video (if uploaded) → caption */}
-          {comp.format === 'head_talk' && !comp.userUploadedMediaUrl && (
-            <HeadTalkContent comp={comp} actioning={actioning} onSaved={onRefresh} />
-          )}
+          {/* ── REEL layout ─────────────────────────────────────────────────── */}
+          {(comp.format === 'reel' || comp.format === 'trial_reel') && (() => {
+            const hasVideo = !!(comp.videoUrl || comp.renderedVideoUrl)
+            return (
+              <>
+                {hasVideo ? (
+                  <>
+                    {/* Video player */}
+                    <div className="rounded-xl overflow-hidden bg-black aspect-[9/16] max-h-72 flex items-center justify-center">
+                      <video
+                        src={comp.videoUrl || comp.renderedVideoUrl || ''}
+                        controls
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    {/* Slot texts — collapsible once video exists */}
+                    <div className="border border-white/10 rounded-xl overflow-hidden">
+                      <button
+                        onClick={() => setContentOpen((v) => !v)}
+                        className="w-full flex items-center justify-between px-4 py-3 text-xs text-text-secondary hover:text-white hover:bg-white/5 transition-colors"
+                      >
+                        <span className="uppercase tracking-wider font-medium">Content</span>
+                        <ChevronDown size={14} className={cn('transition-transform duration-200', contentOpen && 'rotate-180')} />
+                      </button>
+                      {contentOpen && (
+                        <div className="px-4 pb-4 border-t border-white/5">
+                          <ReelContent comp={comp} />
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  /* No video yet — show slot texts open for review */
+                  <ReelContent comp={comp} />
+                )}
+              </>
+            )
+          })()}
 
-          {/* Video player (reels always, head_talk only if recording uploaded) */}
-          {(comp.videoUrl || comp.renderedVideoUrl || comp.userUploadedMediaUrl) && (
-            <div className="rounded-xl overflow-hidden bg-black aspect-[9/16] max-h-72 flex items-center justify-center">
-              <video
-                src={comp.videoUrl || comp.renderedVideoUrl || comp.userUploadedMediaUrl || ''}
-                controls
-                className="w-full h-full object-contain"
-              />
-            </div>
-          )}
+          {/* ── HEAD TALK layout ─────────────────────────────────────────────── */}
+          {comp.format === 'head_talk' && (() => {
+            const hasVideo = !!(comp.videoUrl || comp.renderedVideoUrl || comp.userUploadedMediaUrl)
+            return (
+              <>
+                {!hasVideo && (
+                  <HeadTalkContent comp={comp} actioning={actioning} onSaved={onRefresh} />
+                )}
+                {hasVideo && (
+                  <div className="rounded-xl overflow-hidden bg-black aspect-[9/16] max-h-72 flex items-center justify-center">
+                    <video
+                      src={comp.videoUrl || comp.renderedVideoUrl || comp.userUploadedMediaUrl || ''}
+                      controls
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                )}
+                {hasVideo && (
+                  <div className="border border-white/10 rounded-xl overflow-hidden">
+                    <button
+                      onClick={() => setContentOpen((v) => !v)}
+                      className="w-full flex items-center justify-between px-4 py-3 text-xs text-text-secondary hover:text-white hover:bg-white/5 transition-colors"
+                    >
+                      <span className="uppercase tracking-wider font-medium">Script</span>
+                      <ChevronDown size={14} className={cn('transition-transform duration-200', contentOpen && 'rotate-180')} />
+                    </button>
+                    {contentOpen && (
+                      <div className="px-4 pb-4 border-t border-white/5">
+                        <HeadTalkContent comp={comp} actioning={actioning} onSaved={onRefresh} hideLabel />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )
+          })()}
 
-          {/* Head talk with recording: script in a toggle below the video */}
-          {comp.format === 'head_talk' && comp.userUploadedMediaUrl && (
-            <div className="border border-white/10 rounded-xl overflow-hidden">
-              <button
-                onClick={() => setContentOpen((v) => !v)}
-                className="w-full flex items-center justify-between px-4 py-3 text-xs text-text-secondary hover:text-white hover:bg-white/5 transition-colors"
-              >
-                <span className="uppercase tracking-wider font-medium">Script</span>
-                <ChevronDown size={14} className={cn('transition-transform duration-200', contentOpen && 'rotate-180')} />
-              </button>
-              {contentOpen && (
-                <div className="px-4 pb-4 border-t border-white/5">
-                  <HeadTalkContent comp={comp} actioning={actioning} onSaved={onRefresh} hideLabel />
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Caption */}
+          {/* Caption — always last */}
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <p className="text-xs text-text-secondary uppercase tracking-wider">Caption</p>
@@ -769,24 +811,6 @@ function CompositionModal({
               <p className="text-sm text-text-secondary italic">No caption yet.</p>
             )}
           </div>
-
-          {/* Reel creative: collapsible (less likely to edit after render) */}
-          {(comp.format === 'reel' || comp.format === 'trial_reel') && (
-            <div className="border border-white/10 rounded-xl overflow-hidden">
-              <button
-                onClick={() => setContentOpen((v) => !v)}
-                className="w-full flex items-center justify-between px-4 py-3 text-xs text-text-secondary hover:text-white hover:bg-white/5 transition-colors"
-              >
-                <span className="uppercase tracking-wider font-medium">Content</span>
-                <ChevronDown size={14} className={cn('transition-transform duration-200', contentOpen && 'rotate-180')} />
-              </button>
-              {contentOpen && (
-                <div className="px-4 pb-4 border-t border-white/5">
-                  <ReelContent comp={comp} />
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Schedule / Reschedule picker */}
           {scheduling && (

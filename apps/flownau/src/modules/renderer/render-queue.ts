@@ -36,7 +36,7 @@ export interface RenderJobData {
 
 export async function addRenderJob(postId: string, priority?: number): Promise<string> {
   const job = await renderQueue.add('render', { postId } satisfies RenderJobData, {
-    jobId: `render-${postId}`,
+    jobId: `render-${postId}-${Date.now()}`,
     priority: priority ?? 10,
   })
   logger.info(`[RenderQueue] Enqueued render job ${job.id} for post ${postId}`)
@@ -71,7 +71,11 @@ export async function getRenderJobStatus(postId: string): Promise<{
   progress: number
   failedReason?: string
 }> {
-  const job = await renderQueue.getJob(`render-${postId}`)
+  // Job IDs now include a timestamp suffix — find the latest job for this post
+  const jobs = await renderQueue.getJobs(['active', 'waiting', 'delayed', 'failed', 'completed'], 0, 200)
+  const job = jobs
+    .filter((j) => j.id?.startsWith(`render-${postId}-`))
+    .sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0))[0]
   if (!job) return { state: 'unknown', progress: 0 }
   const state = await job.getState()
   const progress = typeof job.progress === 'number' ? job.progress : 0

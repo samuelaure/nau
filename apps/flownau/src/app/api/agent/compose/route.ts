@@ -93,7 +93,7 @@ export async function POST(req: Request) {
       templateId ??
       (targetSlotId && !templateId
         ? (await prisma.brandTemplateConfig.findFirst({
-            where: { brandId, enabled: true, template: { format } },
+            where: { brandId, enabled: true, template: { format: format === 'trial_reel' ? 'reel' : format } },
             include: { template: { select: { id: true } } },
             orderBy: { updatedAt: 'desc' },
           }))?.template.id ?? undefined
