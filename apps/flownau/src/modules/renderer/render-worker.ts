@@ -6,20 +6,11 @@ import fs from 'fs'
 import { prisma } from '@/modules/shared/prisma'
 import { storage } from '@/modules/shared/r2'
 import { flownau } from 'nau-storage'
-import { selectAssetsForCreative } from '@/modules/composer/asset-curator'
-import { compileTimeline } from '@/modules/composer/timeline-compiler'
 import { logger, logError } from '@/modules/shared/logger'
 import { redisConnection, type RenderJobData } from './render-queue'
-import type { CreativeDirection, BrandStyle } from '@/types/scenes'
 import type { BrandIdentity } from '@/modules/video/remotion/ReelTemplates'
 
 const SLOT_REEL_IDS = new Set(['ReelT1', 'ReelT2', 'ReelT3', 'ReelT4'])
-
-const DEFAULT_BRAND_STYLE: BrandStyle = {
-  primaryColor: '#6C63FF',
-  accentColor: '#FF6584',
-  fontFamily: 'sans-serif',
-}
 
 const CONCURRENCY = parseInt(process.env.RENDER_CONCURRENCY || '1', 10)
 const OUTPUT_DIR = path.join(process.cwd(), 'out')
@@ -87,81 +78,45 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
 
   // Determine which Remotion composition to use
   const templateRemotionId = post.template?.remotionId ?? ''
-  const isSlotReel = isVideo && SLOT_REEL_IDS.has(templateRemotionId)
-  const remotionCompId = isSlotReel
-    ? templateRemotionId
-    : isVideo
-      ? 'SceneSequence'
-      : 'DynamicTemplateMaster'
+  if (!isVideo || !SLOT_REEL_IDS.has(templateRemotionId)) {
+    throw new Error(`Post ${postId} has unsupported format/template: ${format}/${templateRemotionId}`)
+  }
+  const remotionCompId = templateRemotionId
 
   // ── Build Remotion inputProps ─────────────────────────────────────────────────
-  let inputProps: Record<string, unknown>
+  const creative = post.creative as Record<string, unknown> | null
+  if (!creative?.slots) {
+    throw new Error(`Post ${postId} has no slot creative — cannot render ${templateRemotionId}`)
+  }
 
-  if (isSlotReel) {
-    // Slot-based reel: creative = { slots, caption, hashtags, brollMood }
-    const creative = post.creative as Record<string, unknown> | null
-    if (!creative || !creative.slots) {
-      throw new Error(`Post ${postId} has no slot creative — cannot render ${templateRemotionId}`)
-    }
+  // Select B-roll assets by mood keywords
+  const brollMood = (creative.brollMood as string) ?? ''
+  const moodKeywords = brollMood.split(/[,\s]+/).map((s) => s.trim().toLowerCase()).filter(Boolean)
 
-    // Select B-roll assets by mood keywords
-    const brollMood = (creative.brollMood as string) ?? ''
-    const moodKeywords = brollMood.split(/[,\s]+/).map((s) => s.trim().toLowerCase()).filter(Boolean)
+  const brandAssets = await prisma.asset.findMany({
+    where: {
+      brandId,
+      type: { in: ['video', 'VID'] },
+      ...(moodKeywords.length > 0 ? { tags: { hasSome: moodKeywords } } : {}),
+    },
+    select: { url: true },
+    take: 10,
+  })
 
-    const brandAssets = await prisma.asset.findMany({
-      where: {
-        brandId,
-        type: { in: ['video', 'VID'] },
-        ...(moodKeywords.length > 0 ? { tags: { hasSome: moodKeywords } } : {}),
-      },
-      select: { url: true },
-      take: 10,
-    })
+  // Fallback: any brand video if mood query returns nothing
+  const allBrandVideos = brandAssets.length === 0
+    ? await prisma.asset.findMany({ where: { brandId, type: { in: ['video', 'VID'] } }, select: { url: true }, take: 5 })
+    : brandAssets
 
-    // Fallback: any brand video if mood query returns nothing
-    const fallbackAssets = brandAssets.length === 0
-      ? await prisma.asset.findMany({ where: { brandId, type: { in: ['video', 'VID'] } }, select: { url: true }, take: 5 })
-      : brandAssets
+  const brollUrls = allBrandVideos.map((a) => a.url)
+  const brandIdentity = (post.brand?.brandIdentity ?? {}) as BrandIdentity
 
-    const brollUrls = fallbackAssets.map((a) => a.url)
-
-    const brandIdentity = (post.brand?.brandIdentity ?? {}) as BrandIdentity
-
-    inputProps = {
-      slots: creative.slots,
-      caption: creative.caption ?? '',
-      hashtags: creative.hashtags ?? [],
-      brollUrls,
-      brand: brandIdentity,
-    }
-  } else if (isVideo) {
-    // Legacy scene-based reel
-    const creative = post.creative as CreativeDirection | null
-    if (!creative || !creative.scenes || creative.scenes.length === 0) {
-      throw new Error(`Post ${postId} has no creative direction — cannot render reel`)
-    }
-
-    logger.info(`[RenderWorker] Curating assets for ${creative.scenes.length} scenes...`)
-    const { sceneAssets, audioAsset } = await selectAssetsForCreative(creative, brandId, 30)
-    logger.info(`[RenderWorker] Assets: ${sceneAssets.size} scene assets, audio: ${!!audioAsset}`)
-
-    const { resolvedScenes, audio } = compileTimeline(
-      creative,
-      sceneAssets,
-      audioAsset,
-      DEFAULT_BRAND_STYLE,
-      format as 'reel' | 'trial_reel',
-    )
-
-    inputProps = {
-      scenes: resolvedScenes,
-      audio: audio ?? null,
-      brandStyle: DEFAULT_BRAND_STYLE,
-      handle: post.brand?.shortCode ? `@${post.brand.shortCode}` : undefined,
-    }
-  } else {
-    // Legacy: pass payload directly to DynamicTemplateMaster
-    inputProps = { schema: post.payload as Record<string, unknown> }
+  const inputProps: Record<string, unknown> = {
+    slots: creative.slots,
+    caption: creative.caption ?? '',
+    hashtags: creative.hashtags ?? [],
+    brollUrls,
+    brand: brandIdentity,
   }
 
   await job.updateProgress(20)

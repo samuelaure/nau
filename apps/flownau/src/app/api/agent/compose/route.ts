@@ -7,11 +7,8 @@ import { checkBrandAccess } from '@/modules/shared/actions'
 import { z } from 'zod'
 import { logError, logger } from '@/modules/shared/logger'
 import { checkRateLimit } from '@/modules/shared/rate-limit'
-import { compose } from '@/modules/composer/scene-composer'
 import { composeHeadTalk } from '@/modules/composer/head-talk-composer'
 import { composeSlots } from '@/modules/composer/slot-composer'
-import { selectAssetsForCreative, commitAssetUsage } from '@/modules/composer/asset-curator'
-import { compileTimeline } from '@/modules/composer/timeline-compiler'
 
 const ComposeRequestSchema = z.object({
   prompt: z.string().min(3),
@@ -168,117 +165,61 @@ export async function POST(req: Request) {
 
       logger.info(`[HeadTalkCompose] Updated post ${updatedPost.id}`)
     } else {
-      // Check if the resolved template is slot-based (new reel templates)
+      // Reel formats: slot-composer
       const templateMeta = resolvedTemplateId
-        ? await prisma.template.findUnique({
-            where: { id: resolvedTemplateId },
-            select: { slotSchema: true, remotionId: true },
-          })
+        ? await prisma.template.findUnique({ where: { id: resolvedTemplateId }, select: { remotionId: true } })
         : null
 
-      const isSlotTemplate = !!(templateMeta?.slotSchema && Array.isArray(templateMeta.slotSchema) && (templateMeta.slotSchema as unknown[]).length > 0)
-      const isReelFormat = format === 'reel' || format === 'trial_reel'
-
-      if (isSlotTemplate && isReelFormat && resolvedTemplateId) {
-        // Slot-based reel — new path
-        const result = await composeSlots({
-          ideaText: prompt,
-          brandId,
-          templateId: resolvedTemplateId,
-          personaId,
-          customPrompt: templateCustomPrompt,
-        })
-
-        const creativeData = {
-          slots: result.slots,
-          caption: result.caption,
-          hashtags: result.hashtags,
-          brollMood: result.brollMood,
-        }
-
-        if (postId) {
-          updatedPost = await prisma.post.update({
-            where: { id: postId },
-            data: {
-              format,
-              creative: creativeData as unknown as Prisma.InputJsonValue,
-              caption: result.caption,
-              hashtags: result.hashtags,
-              status: draftStatus,
-              templateId: resolvedTemplateId,
-              brandPersonaId: persona?.id ?? null,
-            },
-          })
-        } else {
-          updatedPost = await prisma.post.create({
-            data: {
-              brandId,
-              ideaText: prompt,
-              format,
-              creative: creativeData as unknown as Prisma.InputJsonValue,
-              caption: result.caption,
-              hashtags: result.hashtags,
-              status: draftStatus,
-              source: 'manual',
-              templateId: resolvedTemplateId,
-              brandPersonaId: persona?.id ?? null,
-            },
-          })
-        }
-
-        logger.info(`[SlotCompose] Created post ${updatedPost.id} (${templateMeta?.remotionId})`)
-      } else {
-        // Legacy scene-based composition
-        const { creative } = await compose({ ideaText: prompt, brandId, format, personaId, customPrompt: templateCustomPrompt })
-
-        const { sceneAssets, audioAsset } = await selectAssetsForCreative(creative, brandId, 30)
-
-        const brandStyle = {
-          primaryColor: '#6C63FF',
-          accentColor: '#FF6584',
-          fontFamily: 'sans-serif',
-        }
-
-        const { schema } = compileTimeline(creative, sceneAssets, audioAsset, brandStyle, format)
-
-        if (postId) {
-          updatedPost = await prisma.post.update({
-            where: { id: postId },
-            data: {
-              format,
-              creative: creative as unknown as Prisma.InputJsonValue,
-              payload: schema as unknown as Prisma.InputJsonValue,
-              caption: creative.caption,
-              hashtags: creative.hashtags,
-              status: draftStatus,
-              templateId: resolvedTemplateId ?? null,
-              brandPersonaId: persona?.id ?? null,
-            },
-          })
-        } else {
-          updatedPost = await prisma.post.create({
-            data: {
-              brandId,
-              ideaText: prompt,
-              format,
-              creative: creative as unknown as Prisma.InputJsonValue,
-              payload: schema as unknown as Prisma.InputJsonValue,
-              caption: creative.caption,
-              hashtags: creative.hashtags,
-              status: draftStatus,
-              source: 'manual',
-              templateId: resolvedTemplateId ?? null,
-              brandPersonaId: persona?.id ?? null,
-            },
-          })
-        }
-
-        const usedAssetIds = [...sceneAssets.values()].map((a) => a.id)
-        if (audioAsset) usedAssetIds.push(audioAsset.id)
-        await commitAssetUsage(usedAssetIds)
-
-        logger.info(`[DashboardCompose] Created post ${updatedPost.id} (${creative.scenes.length} scenes)`)
+      if (!resolvedTemplateId) {
+        return NextResponse.json({ error: 'No template found for this format' }, { status: 400 })
       }
+
+      const result = await composeSlots({
+        ideaText: prompt,
+        brandId,
+        templateId: resolvedTemplateId,
+        personaId,
+        customPrompt: templateCustomPrompt,
+      })
+
+      const creativeData = {
+        slots: result.slots,
+        caption: result.caption,
+        hashtags: result.hashtags,
+        brollMood: result.brollMood,
+      }
+
+      if (postId) {
+        updatedPost = await prisma.post.update({
+          where: { id: postId },
+          data: {
+            format,
+            creative: creativeData as unknown as Prisma.InputJsonValue,
+            caption: result.caption,
+            hashtags: result.hashtags,
+            status: draftStatus,
+            templateId: resolvedTemplateId,
+            brandPersonaId: persona?.id ?? null,
+          },
+        })
+      } else {
+        updatedPost = await prisma.post.create({
+          data: {
+            brandId,
+            ideaText: prompt,
+            format,
+            creative: creativeData as unknown as Prisma.InputJsonValue,
+            caption: result.caption,
+            hashtags: result.hashtags,
+            status: draftStatus,
+            source: 'manual',
+            templateId: resolvedTemplateId,
+            brandPersonaId: persona?.id ?? null,
+          },
+        })
+      }
+
+      logger.info(`[SlotCompose] Created post ${updatedPost.id} (${templateMeta?.remotionId})`)
     }
 
     // Assign to slot if one was resolved

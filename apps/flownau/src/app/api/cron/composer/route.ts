@@ -1,20 +1,19 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 import type { Prisma } from '@prisma/client'
-import { compose } from '@/modules/composer/scene-composer'
-import { selectAssetsForCreative, commitAssetUsage } from '@/modules/composer/asset-curator'
-import { compileTimeline } from '@/modules/composer/timeline-compiler'
-import { addRenderJob } from '@/modules/renderer/render-queue'
+import { composeSlots } from '@/modules/composer/slot-composer'
+import { composeDraft } from '@/modules/composer/draft-composer'
+import { HeadTalkCreativeSchema } from '@/modules/composer/head-talk-composer'
+import { triggerRenderForPost } from '@/modules/renderer/render-queue'
 import { selectTemplateForIdea } from '@/modules/composer/template-selector'
-import { generateTopicHash } from '@/modules/planning/daily-plan.service'
+import type { ContentFormat } from '@/types/content'
 import { logError, logger } from '@/modules/shared/logger'
 import { validateCronSecret, unauthorizedCronResponse } from '@/modules/shared/nau-auth'
-import type { ContentFormat } from '@/types/content'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
-const USER_MANAGED_FORMATS: ReadonlySet<string> = new Set(['head_talk', 'replicate'])
+const REEL_FORMATS = new Set(['reel', 'trial_reel'])
 
 export async function GET(request: Request) {
   if (!validateCronSecret(request)) {
@@ -22,12 +21,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const results: Array<{
-      postId: string
-      brandId: string
-      status: string
-      error?: string
-    }> = []
+    const results: Array<{ postId: string; brandId: string; status: string; error?: string }> = []
 
     const approvedPosts = await prisma.post.findMany({
       where: { status: 'IDEA_APPROVED' },
@@ -42,13 +36,12 @@ export async function GET(request: Request) {
     logger.info(`[Composer] Processing ${approvedPosts.length} approved posts`)
 
     for (const post of approvedPosts) {
-      const format: ContentFormat = (post.format as ContentFormat) || 'reel'
+      const format = (post.format ?? 'reel') as ContentFormat
       const persona = post.brandPersona
 
       try {
         const selectedTemplate = await selectTemplateForIdea({ brandId: post.brandId, format })
 
-        // Check auto-approve: persona flag or BrandTemplateConfig
         let autoApproveDraft = persona?.autoApproveCompositions ?? false
         if (!autoApproveDraft && selectedTemplate) {
           const config = await prisma.brandTemplateConfig.findUnique({
@@ -59,78 +52,63 @@ export async function GET(request: Request) {
         }
 
         const draftStatus = autoApproveDraft ? 'DRAFT_APPROVED' : 'DRAFT_PENDING'
-        const topicHash = generateTopicHash(post.ideaText)
 
-        if (USER_MANAGED_FORMATS.has(format)) {
-          await prisma.post.update({
-            where: { id: post.id },
-            data: {
-              format,
-              payload: {} as unknown as Prisma.InputJsonValue,
-              caption: post.ideaText.slice(0, 2000),
-              templateId: selectedTemplate?.id ?? null,
-              topicHash,
-              status: draftStatus,
-            },
+        let creative: unknown
+        let caption = ''
+        let hashtags: string[] = []
+        let resolvedTemplateId: string | null = selectedTemplate?.id ?? null
+
+        if (REEL_FORMATS.has(format) && selectedTemplate) {
+          const templateConfig = await prisma.brandTemplateConfig.findFirst({
+            where: { brandId: post.brandId, enabled: true, templateId: selectedTemplate.id },
+            select: { customPrompt: true },
           })
-          results.push({ postId: post.id, brandId: post.brandId, status: 'success' })
-          logger.info(`[Composer] Updated post ${post.id} as user-managed ${format}`)
-          continue
+          const slotResult = await composeSlots({
+            ideaText: post.ideaText ?? '',
+            brandId: post.brandId,
+            templateId: selectedTemplate.id,
+            personaId: persona?.id,
+            customPrompt: templateConfig?.customPrompt ?? null,
+          })
+          creative = { slots: slotResult.slots, caption: slotResult.caption, hashtags: slotResult.hashtags, brollMood: slotResult.brollMood }
+          caption = slotResult.caption
+          hashtags = slotResult.hashtags
+        } else {
+          const draftResult = await composeDraft({
+            ideaText: post.ideaText ?? '',
+            brandId: post.brandId,
+            templateId: selectedTemplate?.id,
+            format,
+            outputSchema: HeadTalkCreativeSchema,
+            schemaName: 'HeadTalkCreative',
+          })
+          creative = draftResult.creative
+          caption = draftResult.caption
+          hashtags = draftResult.hashtags
+          resolvedTemplateId = draftResult.templateId
         }
 
-        const { creative } = await compose({
-          ideaText: post.ideaText,
-          brandId: post.brandId,
-          format,
-          personaId: persona?.id,
-          templateContentSchema: selectedTemplate?.contentSchema ?? null,
-          templateSystemPrompt: selectedTemplate?.systemPrompt ?? null,
-        })
-
-        const { sceneAssets, audioAsset } = await selectAssetsForCreative(creative, post.brandId, 30)
-        const brandStyle = { primaryColor: '#6C63FF', accentColor: '#FF6584', fontFamily: 'sans-serif' }
-        const { schema } = compileTimeline(creative, sceneAssets, audioAsset, brandStyle, format)
-
-        const sceneTypes = creative.scenes.map((s: { type: string }) => s.type)
-
-        const updatedPost = await prisma.post.update({
+        await prisma.post.update({
           where: { id: post.id },
           data: {
             format,
-            creative: creative as unknown as Prisma.InputJsonValue,
-            payload: schema as unknown as Prisma.InputJsonValue,
-            caption: creative.caption,
-            hashtags: creative.hashtags,
-            templateId: selectedTemplate?.id ?? null,
-            sceneTypes,
-            topicHash,
+            creative: creative as Prisma.InputJsonValue,
+            caption,
+            hashtags,
+            templateId: resolvedTemplateId,
             status: draftStatus,
             brandPersonaId: persona?.id ?? null,
           },
         })
 
-        const usedAssetIds = [...sceneAssets.values()].map((a) => a.id)
-        if (audioAsset) usedAssetIds.push(audioAsset.id)
-        await commitAssetUsage(usedAssetIds)
-
-        // If auto-approved draft, also check autoApprovePost (rendered) and enqueue
-        const autoApprovePost = selectedTemplate
-          ? ((await prisma.brandTemplateConfig.findUnique({
-              where: { brandId_templateId: { brandId: post.brandId, templateId: selectedTemplate.id } },
-              select: { autoApprovePost: true },
-            }))?.autoApprovePost ?? false)
-          : false
-
-        if (autoApproveDraft && autoApprovePost) {
-          await prisma.post.update({ where: { id: updatedPost.id }, data: { status: 'RENDERING' } })
-          await prisma.renderJob.create({
-            data: { postId: updatedPost.id, status: 'queued', outputType: 'video' },
-          })
-          await addRenderJob(updatedPost.id)
+        if (autoApproveDraft) {
+          await triggerRenderForPost(post.id).catch((err) =>
+            logger.error({ postId: post.id, err }, '[Composer] triggerRenderForPost failed'),
+          )
         }
 
         results.push({ postId: post.id, brandId: post.brandId, status: 'success' })
-        logger.info(`[Composer] Updated post ${post.id} (${creative.scenes.length} scenes, ${draftStatus})`)
+        logger.info(`[Composer] Composed post ${post.id} (${format}, ${draftStatus})`)
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         logError(`[Composer] Failed to compose post ${post.id}`, err)

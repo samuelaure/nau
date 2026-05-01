@@ -4,12 +4,10 @@ import { logger } from '@/modules/shared/logger'
 import { materializeSlots } from './slot-materializer'
 import { composeDraft } from '@/modules/composer/draft-composer'
 import { HeadTalkCreativeSchema } from '@/modules/composer/head-talk-composer'
-import { compose as sceneCompose } from '@/modules/composer/scene-composer'
 import { composeSlots } from '@/modules/composer/slot-composer'
-import type { ContentFormat } from '@/types/content'
 import { triggerRenderForPost } from '@/modules/renderer/render-queue'
 
-const VIDEO_FORMATS = new Set(['reel', 'trial_reel', 'carousel', 'static_post'])
+const REEL_FORMATS = new Set(['reel', 'trial_reel'])
 
 // ─── Main entry point ─────────────────────────────────────────────────────────
 
@@ -142,40 +140,23 @@ async function runCheck1(
       const templateId = templateConfig?.template.id ?? undefined
 
       // Auto-compose: idea → draft
-      // Video formats (reel, trial_reel) use scene-composer which produces CreativeDirection.
-      // Text formats (head_talk) use the generic draft-composer with HeadTalkCreativeSchema.
+      // Reel formats use slot-composer; all other formats (head_talk) use draft-composer.
       try {
         let creative: unknown
         let caption = ''
         let hashtags: string[] = []
         let resolvedTemplateId: string | null = templateId ?? null
 
-        const isSlotTemplate = !!(templateConfig?.template.slotSchema && templateId)
-        const isReelFormat = slot.format === 'reel' || slot.format === 'trial_reel'
-
-        if (isReelFormat && isSlotTemplate) {
-          // Slot-based reel: AI fills typed text slots defined in template
+        if (REEL_FORMATS.has(slot.format) && templateId) {
           const slotResult = await composeSlots({
             ideaText: candidate.ideaText ?? '',
             brandId,
-            templateId: templateId!,
+            templateId,
             customPrompt: templateConfig?.customPrompt ?? null,
           })
           creative = { slots: slotResult.slots, caption: slotResult.caption, hashtags: slotResult.hashtags, brollMood: slotResult.brollMood }
           caption = slotResult.caption
           hashtags = slotResult.hashtags
-        } else if (VIDEO_FORMATS.has(slot.format)) {
-          const sceneResult = await sceneCompose({
-            ideaText: candidate.ideaText ?? '',
-            brandId,
-            format: slot.format as ContentFormat,
-            templateContentSchema: templateConfig?.template.contentSchema ?? null,
-            templateSystemPrompt: templateConfig?.template.systemPrompt ?? null,
-            customPrompt: templateConfig?.customPrompt ?? null,
-          })
-          creative = sceneResult.creative
-          caption = sceneResult.creative.caption
-          hashtags = sceneResult.creative.hashtags
         } else {
           const draftResult = await composeDraft({
             ideaText: candidate.ideaText ?? '',
