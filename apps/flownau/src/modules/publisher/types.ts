@@ -20,7 +20,7 @@ export interface IGPublishParams {
 /**
  * IG API constants.
  */
-export const IG_API_VERSION = 'v19.0'
+export const IG_API_VERSION = 'v21.0'
 export const IG_BASE_URL = `https://graph.facebook.com/${IG_API_VERSION}`
 
 /**

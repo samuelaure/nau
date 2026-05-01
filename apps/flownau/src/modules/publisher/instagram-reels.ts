@@ -28,14 +28,16 @@ export async function publishReel(params: ReelPublishParams): Promise<PublishRes
       caption,
       share_to_feed: 'true',
       access_token: accessToken,
+      audio_name: 'Background Audio',
     }
     if (coverUrl) {
       containerPayload.cover_url = coverUrl
     }
 
-    logger.info(`[PublishReel] Creating container for IG user ${igUserId}`)
+    logger.info({ igUserId, videoUrl }, `[PublishReel] Creating container for IG user ${igUserId}`)
     const containerRes = await axios.post(`${IG_BASE_URL}/${igUserId}/media`, containerPayload)
     const containerId: string = containerRes.data.id
+    logger.info(`[PublishReel] Container created: ${containerId} — polling…`)
 
     // Step 2: Poll until FINISHED
     await pollContainerStatus(containerId, accessToken)
@@ -65,13 +67,19 @@ export async function pollContainerStatus(containerId: string, accessToken: stri
   for (let i = 0; i < MAX_POLL_ATTEMPTS; i++) {
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
     const statusRes = await axios.get(`${IG_BASE_URL}/${containerId}`, {
-      params: { fields: 'status_code', access_token: accessToken },
+      params: { fields: 'status_code,status', access_token: accessToken },
     })
-    const status: string = statusRes.data.status_code
+    const statusCode: string = statusRes.data.status_code
+    // `status` is a richer field Instagram provides alongside status_code — may contain
+    // human-readable error descriptions like "video processing failed" or an error code.
+    const statusDetail: string | undefined = statusRes.data.status
 
-    if (status === 'FINISHED') return
-    if (status === 'ERROR') {
-      throw new Error(`Instagram container ${containerId} processing failed (ERROR)`)
+    logger.info(`[PublishReel] Container ${containerId} poll ${i + 1}: ${statusCode}${statusDetail ? ` (${statusDetail})` : ''}`)
+
+    if (statusCode === 'FINISHED') return
+    if (statusCode === 'ERROR') {
+      const reason = statusDetail ? ` — ${statusDetail}` : ''
+      throw new Error(`Instagram container ${containerId} processing failed (ERROR)${reason}`)
     }
     // IN_PROGRESS — continue polling
   }

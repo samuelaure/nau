@@ -596,6 +596,29 @@ function CompositionModal({
     }
   }
 
+  const handlePostNow = async () => {
+    setActioning(true)
+    try {
+      const res = await fetch(`/api/compositions/${comp.id}/post-now`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        toast.error((body as { error?: string }).error ?? 'Publish failed')
+        return
+      }
+      toast.success('Published! 🎉')
+      onRefresh()
+      onClose()
+    } catch {
+      toast.error('Failed to publish')
+    } finally {
+      setActioning(false)
+    }
+  }
+
   const handleConfirmRetry = async () => {
     setActioning(true)
     try {
@@ -985,6 +1008,17 @@ function CompositionModal({
               <Button variant="outline" size="sm" onClick={handleRerender} disabled={actioning} className="gap-1.5">
                 {actioning ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
                 Re-render
+              </Button>
+            )}
+            {display === 'Ready' && !scheduling && !!(comp.videoUrl || comp.renderedVideoUrl) && (
+              <Button
+                size="sm"
+                onClick={handlePostNow}
+                disabled={actioning}
+                className="gap-1.5 bg-green-600 hover:bg-green-500 text-white"
+              >
+                {actioning ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                Post now
               </Button>
             )}
             {(comp.status === 'RENDERING' || comp.status === 'DRAFT_APPROVED') && (

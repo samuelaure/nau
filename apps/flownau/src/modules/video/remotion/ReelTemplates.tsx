@@ -1,5 +1,5 @@
 import React from 'react'
-import { useCurrentFrame, interpolate, OffthreadVideo, Sequence } from 'remotion'
+import { useCurrentFrame, interpolate, OffthreadVideo, Sequence, Audio } from 'remotion'
 
 export interface BrandIdentity {
   primaryColor?: string
@@ -15,6 +15,7 @@ export interface ReelSlotProps {
   caption?: string
   hashtags?: string[]
   brollUrls?: string[]
+  audioUrl?: string
   brand?: BrandIdentity
 }
 
@@ -105,11 +106,12 @@ function FadeText({
 // ─── ReelT1 — Single Moment ───────────────────────────────────────────────────
 // Layout: [text1 · 2.5s] [trail · 1.5s]  = 4s / 120f
 
-export function ReelT1({ slots, brollUrls = [], brand = {} }: ReelSlotProps) {
+export function ReelT1({ slots, brollUrls = [], audioUrl, brand = {} }: ReelSlotProps) {
   const b = { ...DEFAULT_BRAND, ...brand }
 
   return (
     <div style={{ width: 1080, height: 1920, background: '#000', position: 'relative', overflow: 'hidden' }}>
+      {audioUrl && <Audio src={audioUrl} />}
       <BrollBackground url={brollUrls[0]} overlayOpacity={b.overlayOpacity} />
       <Sequence from={0} durationInFrames={SCENE_SHORT}>
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -130,12 +132,13 @@ export function ReelT1({ slots, brollUrls = [], brand = {} }: ReelSlotProps) {
 // ─── ReelT2 — Single Statement ────────────────────────────────────────────────
 // Layout: [text1 · 5s] [trail · 1.5s]  = 6.5s / 195f
 
-export function ReelT2({ slots, brollUrls = [], brand = {} }: ReelSlotProps) {
+export function ReelT2({ slots, brollUrls = [], audioUrl, brand = {} }: ReelSlotProps) {
   const b = { ...DEFAULT_BRAND, ...brand }
   const BODY = 150
 
   return (
     <div style={{ width: 1080, height: 1920, background: '#000', position: 'relative', overflow: 'hidden' }}>
+      {audioUrl && <Audio src={audioUrl} />}
       <BrollBackground url={brollUrls[0]} overlayOpacity={b.overlayOpacity} />
       <Sequence from={0} durationInFrames={BODY}>
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -159,13 +162,14 @@ export function ReelT2({ slots, brollUrls = [], brand = {} }: ReelSlotProps) {
 const T3_S2 = SCENE_HOOK                    // 75
 const T3_END = SCENE_HOOK + SCENE_BODY      // 195
 
-export function ReelT3({ slots, brollUrls = [], brand = {} }: ReelSlotProps) {
+export function ReelT3({ slots, brollUrls = [], audioUrl, brand = {} }: ReelSlotProps) {
   const b = { ...DEFAULT_BRAND, ...brand }
   const broll1 = brollUrls[0]
   const broll2 = brollUrls[1] ?? brollUrls[0]
 
   return (
     <div style={{ width: 1080, height: 1920, background: '#000', position: 'relative', overflow: 'hidden' }}>
+      {audioUrl && <Audio src={audioUrl} />}
       {/* Scene 1: hook — broll1 + text1 */}
       <Sequence from={0} durationInFrames={T3_S2}>
         <BrollBackground url={broll1} overlayOpacity={b.overlayOpacity} />
@@ -193,7 +197,7 @@ const T4_S2  = SCENE_HOOK                             // 75
 const T4_S3  = SCENE_HOOK + SCENE_BODY                // 195
 const T4_END = SCENE_HOOK + SCENE_BODY + SCENE_LAND   // 285
 
-export function ReelT4({ slots, brollUrls = [], brand = {} }: ReelSlotProps) {
+export function ReelT4({ slots, brollUrls = [], audioUrl, brand = {} }: ReelSlotProps) {
   const b = { ...DEFAULT_BRAND, ...brand }
   const broll1 = brollUrls[0]
   const broll2 = brollUrls[1] ?? brollUrls[0]
@@ -201,6 +205,7 @@ export function ReelT4({ slots, brollUrls = [], brand = {} }: ReelSlotProps) {
 
   return (
     <div style={{ width: 1080, height: 1920, background: '#000', position: 'relative', overflow: 'hidden' }}>
+      {audioUrl && <Audio src={audioUrl} />}
       {/* Scene 1: opening — broll1 + text1 */}
       <Sequence from={0} durationInFrames={T4_S2}>
         <BrollBackground url={broll1} overlayOpacity={b.overlayOpacity} />

@@ -114,7 +114,16 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
     : brandAssets
 
   const brollUrls = allBrandVideos.map((a) => a.url)
-  logger.info({ postId, brandId, moodKeywords, brandAssetsCount: brandAssets.length, fallbackCount: allBrandVideos.length, brollUrls }, '[RenderWorker] B-roll assets resolved')
+
+  // Fetch a random background audio track
+  const audioAssets = await prisma.asset.findMany({
+    where: { brandId, type: { in: ['audio', 'AUD'] } },
+    select: { url: true },
+  })
+  
+  const audioUrl = audioAssets.length > 0 ? audioAssets[Math.floor(Math.random() * audioAssets.length)].url : undefined
+
+  logger.info({ postId, brandId, moodKeywords, brandAssetsCount: brandAssets.length, fallbackCount: allBrandVideos.length, brollUrls, hasAudio: !!audioUrl }, '[RenderWorker] B-roll and audio assets resolved')
   const brandIdentity = (post.brand?.brandIdentity ?? {}) as BrandIdentity
 
   const inputProps: Record<string, unknown> = {
@@ -122,6 +131,7 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
     caption: creative.caption ?? '',
     hashtags: creative.hashtags ?? [],
     brollUrls,
+    audioUrl,
     brand: brandIdentity,
   }
 
