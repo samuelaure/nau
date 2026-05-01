@@ -6,7 +6,7 @@
   "packageManager": "pnpm@10.14.0",
   "scripts": {
     "build": "turbo run build",
-    "dev": "docker compose -f docker-compose.dev.yml up -d && turbo run dev --concurrency=20 --continue",
+    "dev": "docker compose -f docker-compose.dev.yml up -d && turbo run dev worker --concurrency=20 --continue",
     "infra:up": "docker compose -f docker-compose.dev.yml up -d",
     "infra:down": "docker compose -f docker-compose.dev.yml down",
     "typecheck": "turbo run typecheck",

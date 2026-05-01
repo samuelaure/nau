@@ -109,6 +109,7 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
     : brandAssets
 
   const brollUrls = allBrandVideos.map((a) => a.url)
+  logger.info({ postId, brandId, moodKeywords, brandAssetsCount: brandAssets.length, fallbackCount: allBrandVideos.length, brollUrls }, '[RenderWorker] B-roll assets resolved')
   const brandIdentity = (post.brand?.brandIdentity ?? {}) as BrandIdentity
 
   const inputProps: Record<string, unknown> = {
