@@ -96,8 +96,16 @@ Also write:
 • hashtags — 5–10 relevant hashtags (without # prefix)
 • brollMood — 1-2 mood/theme keywords for B-roll asset selection (e.g. "family, nature", "urban, focus")
 
+HOOK QUALITY RULES (applies to any opening/hook slot):
+- The hook MUST reference the specific topic of this idea — not a generic question
+- A viewer should be able to understand the subject from the hook alone, even with no other context
+- Bad: "¿Límites diferentes?" (generic, tells the viewer nothing)
+- Good: "Tu hijo no es difícil — tiene un tipo energético diferente" (specific, intriguing, self-contained)
+- Use tension, a surprising reframe, or a bold claim rooted in the content — never a vague teaser
+
 CRITICAL:
 - Respect word limits exactly (count carefully)
+- Each slot must be a COMPLETE, STANDALONE sentence or phrase — never split one sentence across two slots
 - Never mention usernames or @handles
 - Respond ONLY with valid JSON matching the schema`
 

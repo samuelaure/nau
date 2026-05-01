@@ -72,7 +72,7 @@ model PostSlot {
 
   createdAt   DateTime @default(now())
 
-  @@index([brandId, scheduledAt])
+  @@unique([brandId, scheduledAt])
   @@index([brandId, status])
 }
 

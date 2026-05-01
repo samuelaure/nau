@@ -52,7 +52,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ br
     // Re-materialize slots when the coverage horizon changes so new slots
     // appear immediately without requiring a schedule re-save.
     if (parsed.data.coverageHorizonDays !== undefined) {
-      materializeSlots(brandId, parsed.data.coverageHorizonDays).catch(() => {})
+      await materializeSlots(brandId, parsed.data.coverageHorizonDays)
     }
 
     return NextResponse.json({ brand })

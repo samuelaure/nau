@@ -111,7 +111,7 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
     const brandAssets = await prisma.asset.findMany({
       where: {
         brandId,
-        type: 'video',
+        type: { in: ['video', 'VID'] },
         ...(moodKeywords.length > 0 ? { tags: { hasSome: moodKeywords } } : {}),
       },
       select: { url: true },
@@ -120,7 +120,7 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
 
     // Fallback: any brand video if mood query returns nothing
     const fallbackAssets = brandAssets.length === 0
-      ? await prisma.asset.findMany({ where: { brandId, type: 'video' }, select: { url: true }, take: 5 })
+      ? await prisma.asset.findMany({ where: { brandId, type: { in: ['video', 'VID'] } }, select: { url: true }, take: 5 })
       : brandAssets
 
     const brollUrls = fallbackAssets.map((a) => a.url)
@@ -195,7 +195,7 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
       inputProps,
       codec: 'h264',
       concurrency: CONCURRENCY,
-      jpegQuality: 80,
+      jpegQuality: 95,
       onProgress: ({ progress }) => { job.updateProgress(35 + Math.round(progress * 45)).catch(() => {}) },
     })
 
@@ -231,7 +231,7 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
         inputProps,
         frame: coverFrame,
         imageFormat: 'jpeg',
-        jpegQuality: 85,
+        jpegQuality: 95,
       })
       const coverR2Key = flownau.renderCover(brandId, postId)
       coverUrl = await storage.upload(coverR2Key, fs.createReadStream(coverPath), { mimeType: 'image/jpeg' })

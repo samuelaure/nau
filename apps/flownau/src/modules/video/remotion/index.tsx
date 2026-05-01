@@ -20,7 +20,7 @@ export const RemotionVideo: React.FC = () => {
       <Composition
         id="ReelT1"
         component={ReelT1 as any}
-        durationInFrames={240}
+        durationInFrames={120}
         fps={30}
         width={1080}
         height={1920}
@@ -29,7 +29,7 @@ export const RemotionVideo: React.FC = () => {
       <Composition
         id="ReelT2"
         component={ReelT2 as any}
-        durationInFrames={540}
+        durationInFrames={195}
         fps={30}
         width={1080}
         height={1920}
@@ -38,7 +38,7 @@ export const RemotionVideo: React.FC = () => {
       <Composition
         id="ReelT3"
         component={ReelT3 as any}
-        durationInFrames={450}
+        durationInFrames={240}
         fps={30}
         width={1080}
         height={1920}
@@ -47,7 +47,7 @@ export const RemotionVideo: React.FC = () => {
       <Composition
         id="ReelT4"
         component={ReelT4 as any}
-        durationInFrames={540}
+        durationInFrames={330}
         fps={30}
         width={1080}
         height={1920}

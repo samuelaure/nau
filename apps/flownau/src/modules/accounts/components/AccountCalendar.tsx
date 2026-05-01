@@ -24,6 +24,7 @@ import {
   CalendarPlus,
   RefreshCw,
   ChevronDown,
+  Copy,
 } from 'lucide-react'
 import { cn } from '@/modules/shared/utils'
 
@@ -277,17 +278,31 @@ function fmtDateTime(iso: string) {
 
 // ─── Format-specific creative content ────────────────────────────────────────
 
+function deriveScript(creative: Record<string, unknown> | null): string {
+  if (!creative) return ''
+  // Prefer explicit script field (user-edited)
+  if (typeof creative.script === 'string' && creative.script.trim()) return creative.script
+  // Fall back to structured hook/body/cta fields from composeDraft
+  const parts: string[] = []
+  if (typeof creative.hook === 'string' && creative.hook.trim()) parts.push(creative.hook.trim())
+  if (typeof creative.body === 'string' && creative.body.trim()) parts.push(creative.body.trim())
+  if (typeof creative.cta === 'string' && creative.cta.trim()) parts.push(creative.cta.trim())
+  return parts.join('\n\n')
+}
+
 function HeadTalkContent({
   comp,
   actioning,
   onSaved,
+  hideLabel = false,
 }: {
   comp: Composition
   actioning: boolean
   onSaved: () => void
+  hideLabel?: boolean
 }) {
-  const creative = comp.creative ?? comp.payload ?? null
-  const initialScript = (creative as { script?: string } | null)?.script ?? ''
+  const creative = (comp.creative ?? comp.payload ?? null) as Record<string, unknown> | null
+  const initialScript = deriveScript(creative)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(initialScript)
   const [saving, setSaving] = useState(false)
@@ -314,9 +329,9 @@ function HeadTalkContent({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <p className="text-xs text-text-secondary uppercase tracking-wider">Script</p>
+        {!hideLabel && <p className="text-xs text-text-secondary uppercase tracking-wider">Script</p>}
         {!editing && (
-          <button onClick={() => setEditing(true)} className="text-xs text-accent hover:underline">
+          <button onClick={() => setEditing(true)} className="text-xs text-accent hover:underline ml-auto">
             Edit
           </button>
         )}
@@ -326,8 +341,9 @@ function HeadTalkContent({
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            rows={6}
-            className="bg-gray-950 border border-gray-800 text-white rounded px-3 py-2 text-sm resize-none w-full focus:outline-none focus:border-accent/50"
+            rows={10}
+            className="bg-gray-950 border border-gray-800 text-white rounded px-3 py-2 text-sm resize-none w-full focus:outline-none focus:border-accent/50 leading-relaxed"
+            placeholder="Write your teleprompter script here..."
           />
           <div className="flex gap-2 justify-end">
             <Button variant="outline" size="sm" onClick={() => setEditing(false)}>Cancel</Button>
@@ -337,7 +353,7 @@ function HeadTalkContent({
           </div>
         </>
       ) : draft ? (
-        <p className="text-sm text-white leading-relaxed whitespace-pre-wrap line-clamp-6">{draft}</p>
+        <p className="text-sm text-white leading-relaxed whitespace-pre-wrap">{draft}</p>
       ) : (
         <p className="text-sm text-text-secondary italic">No script yet.</p>
       )}
@@ -349,19 +365,39 @@ type SceneSlots = Record<string, unknown>
 interface SceneDef { type: string; slots?: SceneSlots; mood?: string }
 
 function ReelContent({ comp }: { comp: Composition }) {
-  const creative = comp.creative as { scenes?: SceneDef[]; caption?: string } | null
-  const scenes = creative?.scenes ?? []
+  const creative = comp.creative as { scenes?: SceneDef[]; slots?: Record<string, string>; brollMood?: string } | null
 
+  // Slot-based reel (new templates)
+  const slots = creative?.slots
+  if (slots && Object.keys(slots).length > 0) {
+    const slotEntries = Object.entries(slots)
+    return (
+      <div className="flex flex-col gap-2 pt-3">
+        {slotEntries.map(([key, val]) => (
+          <div key={key} className="rounded-lg bg-white/5 border border-white/10 px-3 py-2.5 flex flex-col gap-0.5">
+            <p className="text-[10px] font-mono text-accent uppercase tracking-wide">{key}</p>
+            <p className="text-sm text-white leading-relaxed">{val}</p>
+          </div>
+        ))}
+        {creative?.brollMood && (
+          <p className="text-[11px] text-text-secondary italic">B-roll mood: {creative.brollMood}</p>
+        )}
+      </div>
+    )
+  }
+
+  // Legacy scene-based reel
+  const scenes = creative?.scenes ?? []
   if (scenes.length === 0) {
-    return <p className="text-sm text-text-secondary italic">No scenes generated yet.</p>
+    return <p className="text-sm text-text-secondary italic pt-3">No content generated yet.</p>
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 pt-3">
       <p className="text-xs text-text-secondary uppercase tracking-wider">Scenes ({scenes.length})</p>
       {scenes.map((scene, i) => {
-        const slots = scene.slots ?? {}
-        const slotEntries = Object.entries(slots).filter(([, v]) => v !== null && v !== undefined && v !== '')
+        const sceneSlots = scene.slots ?? {}
+        const slotEntries = Object.entries(sceneSlots).filter(([, v]) => v !== null && v !== undefined && v !== '')
         return (
           <div key={i} className="rounded-lg bg-white/5 border border-white/10 px-3 py-2.5 flex flex-col gap-1">
             <div className="flex items-center gap-2">
@@ -640,6 +676,13 @@ function CompositionModal({
                 </span>
               )}
             </div>
+            <button
+              onClick={() => { navigator.clipboard.writeText(comp.id); toast.success('Post ID copied') }}
+              className="text-text-secondary hover:text-white transition-colors"
+              title={comp.id}
+            >
+              <Copy size={15} />
+            </button>
             <button onClick={onClose} className="text-text-secondary hover:text-white transition-colors">
               <X size={18} />
             </button>
@@ -661,7 +704,12 @@ function CompositionModal({
             </div>
           </div>
 
-          {/* Video player */}
+          {/* HEAD TALK layout: script → video (if uploaded) → caption */}
+          {comp.format === 'head_talk' && !comp.userUploadedMediaUrl && (
+            <HeadTalkContent comp={comp} actioning={actioning} onSaved={onRefresh} />
+          )}
+
+          {/* Video player (reels always, head_talk only if recording uploaded) */}
           {(comp.videoUrl || comp.renderedVideoUrl || comp.userUploadedMediaUrl) && (
             <div className="rounded-xl overflow-hidden bg-black aspect-[9/16] max-h-72 flex items-center justify-center">
               <video
@@ -669,6 +717,24 @@ function CompositionModal({
                 controls
                 className="w-full h-full object-contain"
               />
+            </div>
+          )}
+
+          {/* Head talk with recording: script in a toggle below the video */}
+          {comp.format === 'head_talk' && comp.userUploadedMediaUrl && (
+            <div className="border border-white/10 rounded-xl overflow-hidden">
+              <button
+                onClick={() => setContentOpen((v) => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 text-xs text-text-secondary hover:text-white hover:bg-white/5 transition-colors"
+              >
+                <span className="uppercase tracking-wider font-medium">Script</span>
+                <ChevronDown size={14} className={cn('transition-transform duration-200', contentOpen && 'rotate-180')} />
+              </button>
+              {contentOpen && (
+                <div className="px-4 pb-4 border-t border-white/5">
+                  <HeadTalkContent comp={comp} actioning={actioning} onSaved={onRefresh} hideLabel />
+                </div>
+              )}
             </div>
           )}
 
@@ -704,21 +770,23 @@ function CompositionModal({
             )}
           </div>
 
-          {/* Collapsible content / creative */}
-          <div className="border border-white/10 rounded-xl overflow-hidden">
-            <button
-              onClick={() => setContentOpen((v) => !v)}
-              className="w-full flex items-center justify-between px-4 py-3 text-xs text-text-secondary hover:text-white hover:bg-white/5 transition-colors"
-            >
-              <span className="uppercase tracking-wider font-medium">Content</span>
-              <ChevronDown size={14} className={cn('transition-transform duration-200', contentOpen && 'rotate-180')} />
-            </button>
-            {contentOpen && (
-              <div className="px-4 pb-4 border-t border-white/5">
-                <FormatContent comp={comp} actioning={actioning} onSaved={onRefresh} />
-              </div>
-            )}
-          </div>
+          {/* Reel creative: collapsible (less likely to edit after render) */}
+          {(comp.format === 'reel' || comp.format === 'trial_reel') && (
+            <div className="border border-white/10 rounded-xl overflow-hidden">
+              <button
+                onClick={() => setContentOpen((v) => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 text-xs text-text-secondary hover:text-white hover:bg-white/5 transition-colors"
+              >
+                <span className="uppercase tracking-wider font-medium">Content</span>
+                <ChevronDown size={14} className={cn('transition-transform duration-200', contentOpen && 'rotate-180')} />
+              </button>
+              {contentOpen && (
+                <div className="px-4 pb-4 border-t border-white/5">
+                  <ReelContent comp={comp} />
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Schedule / Reschedule picker */}
           {scheduling && (
