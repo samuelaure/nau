@@ -1,6 +1,6 @@
 'use client'
 
-import { useTransition } from 'react'
+import { useTransition, useEffect, useRef, useState } from 'react'
 import { updateBrand, updateOwnedSynthesis } from '@/modules/accounts/actions'
 import { Card } from '@/modules/shared/components/ui/Card'
 import { Button } from '@/modules/shared/components/ui/Button'
@@ -9,7 +9,6 @@ import AccountContentPrinciples from './AccountContentPrinciples'
 import AccountPlanners from './AccountPlanners'
 import AccountIdeasFrameworks from './AccountIdeasFrameworks'
 import AccountSchedule from './AccountSchedule'
-import { useState } from 'react'
 import { cn } from '@/modules/shared/utils'
 
 type BrandSettingsTab = 'general' | 'personas' | 'strategy' | 'principles' | 'planner' | 'schedule'
@@ -40,22 +39,97 @@ interface BrandIdentity {
 }
 
 const FONT_OPTIONS = [
-  { label: '— System default —', value: 'sans-serif' },
-  // Impact / display
-  { label: 'Anton (bold display)', value: 'Anton' },
-  { label: 'Bebas Neue (condensed impact)', value: 'Bebas Neue' },
-  { label: 'Oswald (condensed editorial)', value: 'Oswald' },
-  { label: 'Black Han Sans (heavy asian-friendly)', value: 'Black Han Sans' },
-  // Modern sans-serif
-  { label: 'Inter (clean neutral)', value: 'Inter' },
-  { label: 'Montserrat (geometric bold)', value: 'Montserrat' },
-  { label: 'Poppins (rounded modern)', value: 'Poppins' },
-  { label: 'DM Sans (low-contrast readable)', value: 'DM Sans' },
-  { label: 'Nunito (soft rounded)', value: 'Nunito' },
-  { label: 'Raleway (elegant thin)', value: 'Raleway' },
-  // Serif / editorial
-  { label: 'Playfair Display (editorial serif)', value: 'Playfair Display' },
-] as const
+  { description: 'System default',           value: 'sans-serif'       },
+  { description: 'bold display',             value: 'Anton'            },
+  { description: 'condensed impact',         value: 'Bebas Neue'       },
+  { description: 'condensed editorial',      value: 'Oswald'           },
+  { description: 'heavy, asian-friendly',    value: 'Black Han Sans'   },
+  { description: 'clean neutral',            value: 'Inter'            },
+  { description: 'geometric bold',           value: 'Montserrat'       },
+  { description: 'rounded modern',           value: 'Poppins'          },
+  { description: 'low-contrast readable',    value: 'DM Sans'          },
+  { description: 'soft rounded',             value: 'Nunito'           },
+  { description: 'elegant thin',             value: 'Raleway'          },
+  { description: 'editorial serif',          value: 'Playfair Display' },
+]
+
+// Google Fonts URL for all custom fonts in the list
+const GOOGLE_FONTS_URL =
+  'https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Oswald:wght@700&family=Black+Han+Sans&family=Inter:wght@700&family=Montserrat:wght@700&family=Poppins:wght@700&family=DM+Sans:wght@700&family=Nunito:wght@700&family=Raleway:wght@700&family=Playfair+Display:wght@700&display=swap'
+
+function FontPicker({ name, defaultValue }: { name: string; defaultValue: string }) {
+  const [value, setValue] = useState(defaultValue)
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  // Load Google Fonts once
+  useEffect(() => {
+    if (document.querySelector(`link[href="${GOOGLE_FONTS_URL}"]`)) return
+    const link = document.createElement('link')
+    link.rel = 'stylesheet'
+    link.href = GOOGLE_FONTS_URL
+    document.head.appendChild(link)
+  }, [])
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  const selected = FONT_OPTIONS.find((f) => f.value === value) ?? FONT_OPTIONS[0]!
+
+  return (
+    <div ref={ref} className="relative w-full">
+      {/* Hidden input so the form picks up the value */}
+      <input type="hidden" name={name} value={value} />
+
+      {/* Trigger button */}
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between gap-2 bg-gray-950 border border-border rounded p-2 text-sm text-white hover:border-white/30 transition-colors"
+      >
+        <span style={{ fontFamily: selected.value, fontSize: 15 }}>
+          {selected.value === 'sans-serif' ? '— System default —' : selected.value}
+        </span>
+        <span className="text-xs text-text-secondary shrink-0 ml-1">{selected.description}</span>
+        <svg className="w-3.5 h-3.5 text-text-secondary shrink-0 ml-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {/* Dropdown */}
+      {open && (
+        <div className="absolute z-50 mt-1 w-full bg-gray-900 border border-border rounded shadow-xl overflow-y-auto max-h-72">
+          {FONT_OPTIONS.map((f) => (
+            <button
+              key={f.value}
+              type="button"
+              onClick={() => { setValue(f.value); setOpen(false) }}
+              className={cn(
+                'w-full flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-white/5 transition-colors text-left',
+                value === f.value && 'bg-white/10',
+              )}
+            >
+              <span
+                style={{ fontFamily: f.value, fontSize: 16, lineHeight: 1 }}
+                className="text-white"
+              >
+                {f.value === 'sans-serif' ? '— System default —' : f.value}
+              </span>
+              <span className="text-xs text-text-secondary shrink-0">{f.description}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 type Brand = {
   id: string
@@ -172,27 +246,11 @@ export default function BrandSettings({ brand, initialSchedule, initialTab }: { 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="form-label mb-1 block text-xs">Title Font</label>
-                  <select
-                    name="bi_titleFont"
-                    defaultValue={brand.brandIdentity?.titleFont ?? 'sans-serif'}
-                    className="bg-gray-950 border border-border text-white rounded p-2 text-sm w-full"
-                  >
-                    {FONT_OPTIONS.map((f) => (
-                      <option key={f.value} value={f.value}>{f.label}</option>
-                    ))}
-                  </select>
+                  <FontPicker name="bi_titleFont" defaultValue={brand.brandIdentity?.titleFont ?? 'sans-serif'} />
                 </div>
                 <div>
                   <label className="form-label mb-1 block text-xs">Body Font</label>
-                  <select
-                    name="bi_bodyFont"
-                    defaultValue={brand.brandIdentity?.bodyFont ?? 'sans-serif'}
-                    className="bg-gray-950 border border-border text-white rounded p-2 text-sm w-full"
-                  >
-                    {FONT_OPTIONS.map((f) => (
-                      <option key={f.value} value={f.value}>{f.label}</option>
-                    ))}
-                  </select>
+                  <FontPicker name="bi_bodyFont" defaultValue={brand.brandIdentity?.bodyFont ?? 'sans-serif'} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
