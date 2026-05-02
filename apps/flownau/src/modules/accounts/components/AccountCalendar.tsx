@@ -1252,6 +1252,16 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
     fetchCompositions()
   }, [fetchCompositions])
 
+  // Poll every 5 s while any composition is actively rendering, stop when done.
+  useEffect(() => {
+    const isRendering = compositions.some(
+      (c) => c.status === 'RENDERING' || c.status === 'DRAFT_APPROVED' || c.status === 'PUBLISHING',
+    )
+    if (!isRendering) return
+    const id = setInterval(fetchCompositions, 5000)
+    return () => clearInterval(id)
+  }, [compositions, fetchCompositions])
+
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
   const today = new Date()
 

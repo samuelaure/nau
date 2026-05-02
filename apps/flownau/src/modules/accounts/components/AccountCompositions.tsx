@@ -101,6 +101,14 @@ export default function AccountCompositions({ brandId }: { brandId: string }) {
     fetchCompositions()
   }, [brandId])
 
+  // Poll every 5 s while any composition is actively rendering, stop when done.
+  useEffect(() => {
+    const isRendering = compositions.some((c) => c.status === 'RENDERING' || c.status === 'PUBLISHING')
+    if (!isRendering) return
+    const id = setInterval(fetchCompositions, 5000)
+    return () => clearInterval(id)
+  }, [compositions, brandId])
+
   const handleMarkPublished = async (id: string) => {
     if (!confirm('Mark as published?')) return
     setActioningId(id)
