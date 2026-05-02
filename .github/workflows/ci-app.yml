@@ -95,7 +95,7 @@ jobs:
             NEXT_PUBLIC_API_URL=https://api.9nau.com
             NEXT_PUBLIC_ACCOUNTS_URL=https://accounts.9nau.com
             NEXT_PUBLIC_APP_URL=https://app.9nau.com
-            NEXT_PUBLIC_FLOWNAU_URL=https://flow.9nau.com
+            NEXT_PUBLIC_FLOWNAU_URL=https://flownau.9nau.com
             NEXT_PUBLIC_NAUTHENTICITY_URL=https://nauthenticity.9nau.com
           cache-from: type=gha
           cache-to: type=gha,mode=max
