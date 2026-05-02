@@ -99,7 +99,7 @@ describe('generateContentIdeas()', () => {
     expect(userMessage?.content).toContain('unique-recent-caption-for-test')
   })
 
-  it('sends no user message when recentContent is empty', async () => {
+  it('sends topic as user message even when recentContent is empty', async () => {
     let capturedMessages: unknown[] = []
     mockParseCompletion.mockImplementation((params: { messages: unknown[] }) => {
       capturedMessages = params.messages
@@ -111,8 +111,8 @@ describe('generateContentIdeas()', () => {
     const userMessage = capturedMessages.find((m: unknown) => {
       const msg = m as { role: string; content: string }
       return msg.role === 'user'
-    })
+    }) as { role: string; content: string } | undefined
 
-    expect(userMessage).toBeUndefined()
+    expect(userMessage?.content).toContain(baseRequest.topic)
   })
 })

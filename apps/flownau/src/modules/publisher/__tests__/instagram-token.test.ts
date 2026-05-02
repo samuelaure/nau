@@ -8,7 +8,7 @@ vi.mock('axios', () => ({
 
 vi.mock('@/modules/shared/prisma', () => ({
   prisma: {
-    socialAccount: {
+    socialProfile: {
       findMany: vi.fn(),
       update: vi.fn(),
     },

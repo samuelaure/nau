@@ -7,7 +7,7 @@ import {
   Logger,
 } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
-import { Prisma } from '@prisma/client'
+import { PrismaClientKnownRequestError, PrismaClientValidationError } from '@prisma/client'
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -33,8 +33,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
           ? response
           : ((response as Record<string, unknown>).message as string) || exception.message
       error = exception.name
-    } else if (exception instanceof Prisma.PrismaClientKnownRequestError) {
-      const dbErr = exception as Prisma.PrismaClientKnownRequestError
+    } else if (exception instanceof PrismaClientKnownRequestError) {
+      const dbErr = exception as PrismaClientKnownRequestError
       switch (dbErr.code) {
         case 'P2002':
           httpStatus = HttpStatus.CONFLICT
@@ -49,7 +49,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         default:
           message = `Database error: ${dbErr.code}`
       }
-    } else if (exception instanceof Prisma.PrismaClientValidationError) {
+    } else if (exception instanceof PrismaClientValidationError) {
       httpStatus = HttpStatus.BAD_REQUEST
       message = 'Invalid data provided'
       error = 'ValidationError'
