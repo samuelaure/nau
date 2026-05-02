@@ -114,7 +114,7 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
   });
 
   // -------------------------------------------------------------------------
-  // 4. BrandIntelligence — upsert and fetch (structural Brand CRUD removed)
+  // 4. Brand — upsert and fetch
   // Brand identity (name, timezone, workspaceId, isActive) is managed by 9naŭ.
   // -------------------------------------------------------------------------
 

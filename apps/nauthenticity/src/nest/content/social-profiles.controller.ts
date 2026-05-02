@@ -26,7 +26,6 @@ export class SocialProfilesController {
       profileImageUrl?: string | null
       brandId?: string
       workspaceId?: string
-      targetType?: string
     },
   ) {
     if (!body.username) {

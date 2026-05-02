@@ -20,7 +20,7 @@ export class IntelligenceController {
   constructor(private readonly intelligenceService: IntelligenceService) {}
 
   // -------------------------------------------------------------------------
-  // BrandIntelligence
+  // Brand Intelligence
   // -------------------------------------------------------------------------
 
   @Get('brands/:brandId/intelligence')
