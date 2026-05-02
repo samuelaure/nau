@@ -46,7 +46,7 @@ export async function composeReel(input: ReelComposerInput): Promise<ReelCompose
     }),
     prisma.brand.findUnique({
       where: { id: brandId },
-      select: { name: true, ideationPrompt: true, language: true },
+      select: { name: true, ideationPrompt: true, composerPrompt: true, language: true },
     }),
   ])
 
@@ -83,11 +83,14 @@ export async function composeReel(input: ReelComposerInput): Promise<ReelCompose
 
   const isMultiSlot = slotDefs.length > 1
 
-  const creatorBlock = customPrompt?.trim()
-    ? `⚠️ CREATOR INSTRUCTIONS — absolute priority:\n<creator_instructions>\n${customPrompt.trim()}\n</creator_instructions>\n\n---\n\n`
+  const composerBlock = brandData?.composerPrompt?.trim()
+    ? `⚠️ COMPOSER INSTRUCTIONS — highest priority, override everything below:\n<composer_instructions>\n${brandData.composerPrompt.trim()}\n</composer_instructions>\n\n`
+    : ''
+  const templateBlock = customPrompt?.trim()
+    ? `⚠️ TEMPLATE INSTRUCTIONS — absolute priority:\n<template_instructions>\n${customPrompt.trim()}\n</template_instructions>\n\n---\n\n`
     : ''
 
-  const systemPrompt = `${creatorBlock}${template.systemPrompt ?? ''}
+  const systemPrompt = `${composerBlock}${templateBlock}${template.systemPrompt ?? ''}
 ${brandBlock}
 LANGUAGE: Write ALL text in ${language}.
 

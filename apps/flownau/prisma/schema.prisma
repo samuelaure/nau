@@ -22,6 +22,7 @@ model Brand {
   autoApproveIdeas     Boolean  @default(false)
   coverageHorizonDays  Int      @default(7)
   ideationPrompt       String?  @db.Text
+  composerPrompt       String?  @db.Text
   brandIdentity        Json?    // { primaryColor, secondaryColor, titleFont, bodyFont, overlayOpacity, logoUrl }
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
