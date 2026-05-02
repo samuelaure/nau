@@ -73,6 +73,37 @@ const TRAIL        = 45   // 1.5s  — silent buffer after last text
 // Worst-case scene duration — used by render-worker to ensure enough clip headroom.
 export const BROLL_REQUIRED_FRAMES = SCENE_BODY + TRAIL
 
+// ── Safe zone ─────────────────────────────────────────────────────────────────
+// Platform UI (navigation bar, caption/action tray) covers the edges of a reel.
+// All text must stay inside this zone.
+
+const SAFE_ZONE = { top: 220, bottom: 450, left: 80, right: 80 } as const
+const SAFE_W = 1080 - SAFE_ZONE.left - SAFE_ZONE.right   // 920
+const SAFE_H = 1920 - SAFE_ZONE.top  - SAFE_ZONE.bottom  // 1250
+
+// TextZone: positions a text block inside the safe zone.
+// align="center" (default) — vertically centered in safe area
+// align="top"              — anchored to safe zone top edge
+// align="bottom"           — anchored to safe zone bottom edge
+function TextZone({ children, align = 'center' }: { children: React.ReactNode; align?: 'top' | 'center' | 'bottom' }) {
+  const alignItems = align === 'top' ? 'flex-start' : align === 'bottom' ? 'flex-end' : 'center'
+  return (
+    <div style={{
+      position: 'absolute',
+      top: SAFE_ZONE.top,
+      left: SAFE_ZONE.left,
+      width: SAFE_W,
+      height: SAFE_H,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: alignItems,
+    }}>
+      {children}
+    </div>
+  )
+}
+
 // ── Shared primitives ──────────────────────────────────────────────────────────
 
 function BrollBackground({ clip, overlayOpacity }: { clip?: BrollClip; overlayOpacity: number }) {
@@ -200,19 +231,19 @@ export function ReelT1({ slots, brollClips = [], audioUrl, brand = {} }: ReelSlo
       {audioUrl && <Audio src={audioUrl} />}
       <BrollBackground clip={brollClips[0]} overlayOpacity={b.overlayOpacity} />
       <Sequence from={0} durationInFrames={SCENE_SHORT}>
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <TextZone>
           <FitText
             text={slots.text1 ?? ''}
             baseFontSize={100}
             maxTextSize={b.maxTextSize}
             fontFamily={b.titleFont}
             color={b.secondaryColor}
-            boxWidth={960}
-            boxHeight={700}
+            boxWidth={SAFE_W}
+            boxHeight={SAFE_H}
             frameOffset={0}
             instant
           />
-        </div>
+        </TextZone>
       </Sequence>
     </div>
   )
@@ -230,19 +261,19 @@ export function ReelT2({ slots, brollClips = [], audioUrl, brand = {} }: ReelSlo
       {audioUrl && <Audio src={audioUrl} />}
       <BrollBackground clip={brollClips[0]} overlayOpacity={b.overlayOpacity} />
       <Sequence from={0} durationInFrames={BODY}>
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <TextZone>
           <FitText
             text={slots.text1 ?? ''}
             baseFontSize={62}
             maxTextSize={b.maxTextSize}
             fontFamily={b.bodyFont}
             color={b.secondaryColor}
-            boxWidth={960}
-            boxHeight={900}
+            boxWidth={SAFE_W}
+            boxHeight={SAFE_H}
             frameOffset={0}
             instant
           />
-        </div>
+        </TextZone>
       </Sequence>
     </div>
   )
@@ -264,16 +295,16 @@ export function ReelT3({ slots, brollClips = [], audioUrl, brand = {} }: ReelSlo
       {audioUrl && <Audio src={audioUrl} />}
       <Sequence from={0} durationInFrames={T3_S2}>
         <BrollBackground clip={clip1} overlayOpacity={b.overlayOpacity} />
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <FitText text={slots.text1 ?? ''} baseFontSize={100} maxTextSize={b.maxTextSize} fontFamily={b.titleFont} color={b.secondaryColor} boxWidth={960} boxHeight={700} frameOffset={0} instant />
-        </div>
+        <TextZone>
+          <FitText text={slots.text1 ?? ''} baseFontSize={100} maxTextSize={b.maxTextSize} fontFamily={b.titleFont} color={b.secondaryColor} boxWidth={SAFE_W} boxHeight={SAFE_H} frameOffset={0} instant />
+        </TextZone>
       </Sequence>
       <Sequence from={T3_S2} durationInFrames={SCENE_BODY + TRAIL}>
         <BrollBackground clip={clip2} overlayOpacity={b.overlayOpacity} />
         <Sequence from={0} durationInFrames={SCENE_BODY}>
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <FitText text={slots.text2 ?? ''} baseFontSize={72} maxTextSize={b.maxTextSize} fontFamily={b.bodyFont} color={b.secondaryColor} boxWidth={960} boxHeight={900} frameOffset={0} />
-          </div>
+          <TextZone>
+            <FitText text={slots.text2 ?? ''} baseFontSize={72} maxTextSize={b.maxTextSize} fontFamily={b.bodyFont} color={b.secondaryColor} boxWidth={SAFE_W} boxHeight={SAFE_H} frameOffset={0} />
+          </TextZone>
         </Sequence>
       </Sequence>
     </div>
@@ -298,22 +329,22 @@ export function ReelT4({ slots, brollClips = [], audioUrl, brand = {} }: ReelSlo
       {audioUrl && <Audio src={audioUrl} />}
       <Sequence from={0} durationInFrames={T4_S2}>
         <BrollBackground clip={clip1} overlayOpacity={b.overlayOpacity} />
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <FitText text={slots.text1 ?? ''} baseFontSize={100} maxTextSize={b.maxTextSize} fontFamily={b.titleFont} color={b.secondaryColor} boxWidth={960} boxHeight={700} frameOffset={0} instant />
-        </div>
+        <TextZone>
+          <FitText text={slots.text1 ?? ''} baseFontSize={100} maxTextSize={b.maxTextSize} fontFamily={b.titleFont} color={b.secondaryColor} boxWidth={SAFE_W} boxHeight={SAFE_H} frameOffset={0} instant />
+        </TextZone>
       </Sequence>
       <Sequence from={T4_S2} durationInFrames={SCENE_BODY}>
         <BrollBackground clip={clip2} overlayOpacity={b.overlayOpacity} />
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <FitText text={slots.text2 ?? ''} baseFontSize={72} maxTextSize={b.maxTextSize} fontFamily={b.bodyFont} color={b.secondaryColor} boxWidth={960} boxHeight={900} frameOffset={0} />
-        </div>
+        <TextZone>
+          <FitText text={slots.text2 ?? ''} baseFontSize={72} maxTextSize={b.maxTextSize} fontFamily={b.bodyFont} color={b.secondaryColor} boxWidth={SAFE_W} boxHeight={SAFE_H} frameOffset={0} />
+        </TextZone>
       </Sequence>
       <Sequence from={T4_S3} durationInFrames={SCENE_LAND + TRAIL}>
         <BrollBackground clip={clip3} overlayOpacity={b.overlayOpacity} />
         <Sequence from={0} durationInFrames={SCENE_LAND}>
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <FitText text={slots.text3 ?? ''} baseFontSize={100} maxTextSize={b.maxTextSize} fontFamily={b.titleFont} color={b.secondaryColor} boxWidth={960} boxHeight={700} frameOffset={0} />
-          </div>
+          <TextZone>
+            <FitText text={slots.text3 ?? ''} baseFontSize={100} maxTextSize={b.maxTextSize} fontFamily={b.titleFont} color={b.secondaryColor} boxWidth={SAFE_W} boxHeight={SAFE_H} frameOffset={0} />
+          </TextZone>
         </Sequence>
       </Sequence>
     </div>
