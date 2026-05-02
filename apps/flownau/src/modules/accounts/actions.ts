@@ -184,6 +184,7 @@ export async function updateBrand(brandId: string, formData: FormData) {
   const titleFont = (formData.get('bi_titleFont') as string | null)?.trim() || undefined
   const bodyFont = (formData.get('bi_bodyFont') as string | null)?.trim() || undefined
   const overlayOpacity = formData.get('bi_overlayOpacity') ? parseFloat(formData.get('bi_overlayOpacity') as string) : undefined
+  const maxTextSize = formData.get('bi_maxTextSize') ? parseInt(formData.get('bi_maxTextSize') as string, 10) : undefined
 
   const existing = await prisma.brand.findUnique({ where: { id: parsedId }, select: { brandIdentity: true } })
   const existingIdentity = (existing?.brandIdentity as Record<string, unknown>) ?? {}
@@ -195,6 +196,7 @@ export async function updateBrand(brandId: string, formData: FormData) {
     ...(titleFont !== undefined && { titleFont }),
     ...(bodyFont !== undefined && { bodyFont }),
     ...(overlayOpacity !== undefined && !isNaN(overlayOpacity) && { overlayOpacity }),
+    ...(maxTextSize !== undefined && !isNaN(maxTextSize) && { maxTextSize }),
   }
 
   await prisma.brand.update({

@@ -36,7 +36,26 @@ interface BrandIdentity {
   bodyFont?: string
   overlayOpacity?: number
   logoUrl?: string
+  maxTextSize?: number
 }
+
+const FONT_OPTIONS = [
+  { label: '— System default —', value: 'sans-serif' },
+  // Impact / display
+  { label: 'Anton (bold display)', value: 'Anton' },
+  { label: 'Bebas Neue (condensed impact)', value: 'Bebas Neue' },
+  { label: 'Oswald (condensed editorial)', value: 'Oswald' },
+  { label: 'Black Han Sans (heavy asian-friendly)', value: 'Black Han Sans' },
+  // Modern sans-serif
+  { label: 'Inter (clean neutral)', value: 'Inter' },
+  { label: 'Montserrat (geometric bold)', value: 'Montserrat' },
+  { label: 'Poppins (rounded modern)', value: 'Poppins' },
+  { label: 'DM Sans (low-contrast readable)', value: 'DM Sans' },
+  { label: 'Nunito (soft rounded)', value: 'Nunito' },
+  { label: 'Raleway (elegant thin)', value: 'Raleway' },
+  // Serif / editorial
+  { label: 'Playfair Display (editorial serif)', value: 'Playfair Display' },
+] as const
 
 type Brand = {
   id: string
@@ -153,39 +172,60 @@ export default function BrandSettings({ brand, initialSchedule, initialTab }: { 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="form-label mb-1 block text-xs">Title Font</label>
-                  <input
-                    type="text"
+                  <select
                     name="bi_titleFont"
-                    defaultValue={brand.brandIdentity?.titleFont ?? ''}
-                    placeholder="sans-serif"
+                    defaultValue={brand.brandIdentity?.titleFont ?? 'sans-serif'}
+                    className="bg-gray-950 border border-border text-white rounded p-2 text-sm w-full"
+                  >
+                    {FONT_OPTIONS.map((f) => (
+                      <option key={f.value} value={f.value}>{f.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label mb-1 block text-xs">Body Font</label>
+                  <select
+                    name="bi_bodyFont"
+                    defaultValue={brand.brandIdentity?.bodyFont ?? 'sans-serif'}
+                    className="bg-gray-950 border border-border text-white rounded p-2 text-sm w-full"
+                  >
+                    {FONT_OPTIONS.map((f) => (
+                      <option key={f.value} value={f.value}>{f.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="form-label mb-1 block text-xs">
+                    Overlay Opacity
+                    <span className="ml-1 opacity-60">(0 = transparent, 1 = solid)</span>
+                  </label>
+                  <input
+                    type="number"
+                    name="bi_overlayOpacity"
+                    defaultValue={brand.brandIdentity?.overlayOpacity ?? 0.55}
+                    min="0"
+                    max="1"
+                    step="0.05"
                     className="bg-gray-950 border border-border text-white rounded p-2 text-sm w-full"
                   />
                 </div>
                 <div>
-                  <label className="form-label mb-1 block text-xs">Body Font</label>
+                  <label className="form-label mb-1 block text-xs">
+                    Max Text Size
+                    <span className="ml-1 opacity-60">(% of template default)</span>
+                  </label>
                   <input
-                    type="text"
-                    name="bi_bodyFont"
-                    defaultValue={brand.brandIdentity?.bodyFont ?? ''}
-                    placeholder="sans-serif"
+                    type="number"
+                    name="bi_maxTextSize"
+                    defaultValue={brand.brandIdentity?.maxTextSize ?? 100}
+                    min="50"
+                    max="150"
+                    step="5"
                     className="bg-gray-950 border border-border text-white rounded p-2 text-sm w-full"
                   />
                 </div>
-              </div>
-              <div className="w-48">
-                <label className="form-label mb-1 block text-xs">
-                  Overlay Opacity
-                  <span className="ml-1 opacity-60">(0 = transparent, 1 = solid)</span>
-                </label>
-                <input
-                  type="number"
-                  name="bi_overlayOpacity"
-                  defaultValue={brand.brandIdentity?.overlayOpacity ?? 0.55}
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  className="bg-gray-950 border border-border text-white rounded p-2 text-sm w-full"
-                />
               </div>
             </div>
 
