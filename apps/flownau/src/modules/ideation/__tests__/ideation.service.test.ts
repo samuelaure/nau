@@ -45,7 +45,7 @@ describe('generateContentIdeas()', () => {
     ).rejects.toThrow('Topic is required for idea generation.')
   })
 
-  it('includes topic in the system prompt', async () => {
+  it('includes topic in the user message', async () => {
     let capturedMessages: unknown[] = []
     mockParseCompletion.mockImplementation((params: { messages: unknown[] }) => {
       capturedMessages = params.messages
@@ -54,12 +54,12 @@ describe('generateContentIdeas()', () => {
 
     await generateContentIdeas({ ...baseRequest, topic: 'unique-topic-string-for-test' })
 
-    const systemMessage = capturedMessages.find((m: unknown) => {
+    const userMessage = capturedMessages.find((m: unknown) => {
       const msg = m as { role: string; content: string }
-      return msg.role === 'system'
+      return msg.role === 'user'
     }) as { role: string; content: string } | undefined
 
-    expect(systemMessage?.content).toContain('unique-topic-string-for-test')
+    expect(userMessage?.content).toContain('unique-topic-string-for-test')
   })
 
   it('includes language in the system prompt', async () => {
