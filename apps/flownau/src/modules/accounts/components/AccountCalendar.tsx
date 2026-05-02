@@ -25,8 +25,10 @@ import {
   RefreshCw,
   ChevronDown,
   Copy,
+  SlidersHorizontal,
 } from 'lucide-react'
 import { cn } from '@/modules/shared/utils'
+import Modal from '@/modules/shared/components/Modal'
 
 // ─── Status config ────────────────────────────────────────────────────────────
 
@@ -1230,6 +1232,10 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
   const [selected, setSelected] = useState<Composition | null>(null)
   const [runningCoverage, setRunningCoverage] = useState(false)
   const [generatingSlotIds, setGeneratingSlotIds] = useState<Set<string>>(new Set())
+  const [composerPrompt, setComposerPrompt] = useState<string>('')
+  const [composerPromptDraft, setComposerPromptDraft] = useState<string>('')
+  const [composerPromptModalOpen, setComposerPromptModalOpen] = useState(false)
+  const [savingComposerPrompt, setSavingComposerPrompt] = useState(false)
 
   const fetchCompositions = useCallback(async () => {
     try {
@@ -1251,6 +1257,32 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
   useEffect(() => {
     fetchCompositions()
   }, [fetchCompositions])
+
+  useEffect(() => {
+    fetch(`/api/brands/${brandId}`)
+      .then((r) => r.json())
+      .then((data) => setComposerPrompt(data.brand?.composerPrompt ?? ''))
+      .catch(() => {})
+  }, [brandId])
+
+  const handleSaveComposerPrompt = async () => {
+    setSavingComposerPrompt(true)
+    try {
+      const res = await fetch(`/api/brands/${brandId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ composerPrompt: composerPromptDraft || null }),
+      })
+      if (!res.ok) throw new Error('Failed')
+      setComposerPrompt(composerPromptDraft)
+      setComposerPromptModalOpen(false)
+      toast.success('Composer prompt saved')
+    } catch {
+      toast.error('Failed to save composer prompt')
+    } finally {
+      setSavingComposerPrompt(false)
+    }
+  }
 
   // Poll every 5 s while any composition is actively rendering, stop when done.
   useEffect(() => {
@@ -1417,6 +1449,18 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => { setComposerPromptDraft(composerPrompt); setComposerPromptModalOpen(true) }}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
+              composerPrompt
+                ? 'text-amber-300 border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20'
+                : 'text-text-secondary border-white/10 hover:text-white hover:bg-white/5',
+            )}
+          >
+            <SlidersHorizontal size={12} />
+            {composerPrompt ? 'Composer prompt set' : 'Composer prompt'}
+          </button>
           {workspaceId && (
             <Link
               href={`/dashboard/workspace/${workspaceId}?brandId=${brandId}&tab=settings&settingsTab=schedule`}
@@ -1662,6 +1706,34 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
           </div>
         </div>
       )}
+
+      {/* Composer prompt modal */}
+      <Modal isOpen={composerPromptModalOpen} onClose={() => setComposerPromptModalOpen(false)}>
+        <div className="text-center mb-6">
+          <div className="w-16 h-16 bg-amber-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4 text-amber-400">
+            <SlidersHorizontal size={28} />
+          </div>
+          <h2 className="text-2xl font-heading font-bold mb-2">Composer Prompt</h2>
+          <p className="text-text-secondary text-sm max-w-[320px] mx-auto">
+            Injected into every draft composition with the highest priority — overrides template and system prompts.
+          </p>
+        </div>
+        <textarea
+          value={composerPromptDraft}
+          onChange={(e) => setComposerPromptDraft(e.target.value)}
+          placeholder="e.g. Always write in a conversational tone. Never use bullet points."
+          rows={6}
+          className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-text-secondary resize-none focus:outline-none focus:border-amber-500/50 mb-6"
+        />
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={() => setComposerPromptModalOpen(false)} disabled={savingComposerPrompt} className="flex-1">
+            Cancel
+          </Button>
+          <Button onClick={handleSaveComposerPrompt} disabled={savingComposerPrompt} className="flex-1 bg-amber-600 hover:bg-amber-500 text-white">
+            {savingComposerPrompt ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
+          </Button>
+        </div>
+      </Modal>
 
       {/* Detail modal */}
       {selected && (

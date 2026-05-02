@@ -284,13 +284,19 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
   const [manualOpen, setManualOpen] = useState(false)
   const [manualText, setManualText] = useState('')
 
-  // Ideation prompt
+  // Ideation prompt — savedIdeationPrompt is the DB value; ideationPrompt is the per-generation editable copy
+  const [savedIdeationPrompt, setSavedIdeationPrompt] = useState('')
   const [ideationPrompt, setIdeationPrompt] = useState('')
   const [promptModalOpen, setPromptModalOpen] = useState(false)
   const [promptDraft, setPromptDraft] = useState('')
   const [savingPrompt, setSavingPrompt] = useState(false)
   const [brainstormShowPrompt, setBrainstormShowPrompt] = useState(false)
   const [manualShowPrompt, setManualShowPrompt] = useState(false)
+
+  // Composer prompt — savedComposerPrompt is the DB value; composerPrompt is the per-generation editable copy
+  const [savedComposerPrompt, setSavedComposerPrompt] = useState('')
+  const [composerPrompt, setComposerPrompt] = useState('')
+  const [composeShowPrompt, setComposeShowPrompt] = useState(false)
 
   // Idea detail modal
   const [openIdea, setOpenIdea] = useState<any | null>(null)
@@ -302,11 +308,16 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
     try {
       const res = await fetch(`/api/brands/${brandId}`)
       const data = await res.json()
-      setIdeationPrompt(data.brand?.ideationPrompt ?? '')
+      const ip = data.brand?.ideationPrompt ?? ''
+      const cp = data.brand?.composerPrompt ?? ''
+      setSavedIdeationPrompt(ip)
+      setIdeationPrompt(ip)
+      setSavedComposerPrompt(cp)
+      setComposerPrompt(cp)
     } catch {}
   }
 
-  const handleSavePrompt = async (text: string) => {
+const handleSavePrompt = async (text: string) => {
     setSavingPrompt(true)
     try {
       const res = await fetch(`/api/brands/${brandId}`, {
@@ -315,6 +326,7 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
         body: JSON.stringify({ ideationPrompt: text || null }),
       })
       if (!res.ok) throw new Error()
+      setSavedIdeationPrompt(text)
       setIdeationPrompt(text)
       toast.success('Ideation prompt saved')
     } catch {
@@ -778,9 +790,11 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
                     placeholder="e.g. 'Always focus on founder-led content with a contrarian angle. Avoid corporate tone.'"
                     className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-xs text-white resize-none"
                   />
-                  <Button size="sm" variant="outline" disabled={savingPrompt} onClick={() => handleSavePrompt(ideationPrompt)} className="self-end text-xs">
-                    {savingPrompt ? <Loader2 size={11} className="animate-spin" /> : 'Save'}
-                  </Button>
+                  {ideationPrompt !== savedIdeationPrompt && (
+                    <Button size="sm" variant="outline" onClick={() => setIdeationPrompt(savedIdeationPrompt)} className="self-end text-xs text-amber-400 border-amber-500/30">
+                      Reset to saved
+                    </Button>
+                  )}
                 </div>
               )}
             </div>
@@ -816,6 +830,34 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
                 <option value="">Auto Select (Director Mode)</option>
                 {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
+            </div>
+            <div>
+              <button
+                onClick={() => setComposeShowPrompt(v => !v)}
+                className={cn(
+                  'flex items-center gap-1.5 text-xs transition-colors',
+                  composerPrompt ? 'text-amber-300 hover:text-amber-200' : 'text-text-secondary hover:text-white',
+                )}
+              >
+                <SlidersHorizontal size={11} />
+                {composerPrompt ? 'Composer prompt set' : 'Composer prompt'}
+                <ChevronDown size={11} className={cn('transition-transform', composeShowPrompt && 'rotate-180')} />
+              </button>
+              {composeShowPrompt && (
+                <div className="mt-2 space-y-2">
+                  <textarea
+                    className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-xs min-h-[80px]"
+                    value={composerPrompt}
+                    onChange={e => setComposerPrompt(e.target.value)}
+                    placeholder="e.g. Always write in a conversational tone. Never use bullet points."
+                  />
+                  {composerPrompt !== savedComposerPrompt && (
+                    <Button size="sm" variant="outline" onClick={() => setComposerPrompt(savedComposerPrompt)} className="self-end text-xs text-amber-400 border-amber-500/30">
+                      Reset to saved
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" disabled={composing} onClick={() => setComposingIdea(null)}>Cancel</Button>
@@ -860,9 +902,11 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
                     placeholder="e.g. 'Always focus on founder-led content with a contrarian angle.'"
                     className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-xs text-white resize-none"
                   />
-                  <Button size="sm" variant="outline" disabled={savingPrompt} onClick={() => handleSavePrompt(ideationPrompt)} className="self-end text-xs">
-                    {savingPrompt ? <Loader2 size={11} className="animate-spin" /> : 'Save'}
-                  </Button>
+                  {ideationPrompt !== savedIdeationPrompt && (
+                    <Button size="sm" variant="outline" onClick={() => setIdeationPrompt(savedIdeationPrompt)} className="self-end text-xs text-amber-400 border-amber-500/30">
+                      Reset to saved
+                    </Button>
+                  )}
                 </div>
               )}
             </div>
