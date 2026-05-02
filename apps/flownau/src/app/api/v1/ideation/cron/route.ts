@@ -1,3 +1,4 @@
+import type { Prisma } from '@/generated/prisma'
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -98,7 +99,7 @@ export async function POST(request: NextRequest) {
             status: autoApprove ? 'IDEA_APPROVED' : 'IDEA_PENDING',
             priority: 3,
             generationBatchId: batchId,
-            llmTrace: { ideaTrace: result.trace },
+            llmTrace: { ideaTrace: result.trace } as unknown as Prisma.InputJsonValue,
           })),
           skipDuplicates: true,
         })

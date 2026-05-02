@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
-import type { Prisma } from '@prisma/client'
+import type { Prisma } from '@/generated/prisma'
 import { composeReel } from '@/modules/composer/reel-composer'
 import { composeHeadTalk } from '@/modules/composer/headtalk-composer'
 import { triggerRenderForPost } from '@/modules/renderer/render-queue'

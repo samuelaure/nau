@@ -6,7 +6,7 @@ import { validateServiceToken, unauthorizedResponse } from '@/modules/shared/nau
 import { prisma } from '@/modules/shared/prisma'
 import { logError, logger } from '@/modules/shared/logger'
 import { resolveProvenance } from '@/modules/ideation/provenance'
-import type { Prisma } from '@prisma/client'
+import type { Prisma } from '@/generated/prisma'
 
 const ReplicateRequestSchema = z.object({
   brandId: z.string().min(1),

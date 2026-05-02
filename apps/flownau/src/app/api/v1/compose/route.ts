@@ -8,7 +8,7 @@ import { composeReel } from '@/modules/composer/reel-composer'
 import { triggerRenderForPost } from '@/modules/renderer/render-queue'
 import { selectTemplateForIdea } from '@/modules/composer/template-selector'
 import { logError, logger } from '@/modules/shared/logger'
-import type { Prisma } from '@prisma/client'
+import type { Prisma } from '@/generated/prisma'
 
 const ComposeRequestSchema = z.object({
   brandId: z.string().min(1),
@@ -79,13 +79,13 @@ export async function POST(req: Request) {
       where: { id: post.id },
       data: {
         format: input.format,
-        creative: creative as Prisma.InputJsonValue,
+        creative: creative as unknown as Prisma.InputJsonValue,
         caption: reelResult.caption,
         hashtags: reelResult.hashtags,
         templateId: selectedTemplate.id,
         status: 'DRAFT_APPROVED',
         brandPersonaId: persona?.id ?? null,
-        llmTrace: { draftTrace: reelResult.trace },
+        llmTrace: { draftTrace: reelResult.trace } as unknown as Prisma.InputJsonValue,
       },
     })
 

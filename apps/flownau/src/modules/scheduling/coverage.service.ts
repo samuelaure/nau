@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client'
+import type { Prisma } from '@/generated/prisma'
 import { prisma } from '@/modules/shared/prisma'
 import { logger } from '@/modules/shared/logger'
 import { materializeSlots } from './slot-materializer'
@@ -269,13 +269,13 @@ async function runCheck1(
           where: { id: candidate.id },
           data: {
             format: slot.format,
-            creative: creative as Prisma.InputJsonValue,
+            creative: creative as unknown as Prisma.InputJsonValue,
             caption,
             hashtags,
             templateId: resolvedTemplateId,
             status: draftStatus,
             scheduledAt: slot.scheduledAt,
-            llmTrace: { ...(existingTrace?.llmTrace as object ?? {}), draftTrace },
+            llmTrace: { ...(existingTrace?.llmTrace as object ?? {}), draftTrace } as unknown as Prisma.InputJsonValue,
           },
         })
         await prisma.postSlot.update({
@@ -382,7 +382,7 @@ async function runCheck1(
         const draftStatus = autoApproveDraft ? 'DRAFT_APPROVED' : 'DRAFT_PENDING'
 
         const existingRetryTrace = await prisma.post.findUnique({ where: { id: retryCandidate.id }, select: { llmTrace: true } })
-        await prisma.post.update({ where: { id: retryCandidate.id }, data: { format: slot.format, creative: creative as Prisma.InputJsonValue, caption, hashtags, templateId: resolvedTemplateId, status: draftStatus, scheduledAt: slot.scheduledAt, llmTrace: { ...(existingRetryTrace?.llmTrace as object ?? {}), draftTrace } } })
+        await prisma.post.update({ where: { id: retryCandidate.id }, data: { format: slot.format, creative: creative as unknown as Prisma.InputJsonValue, caption, hashtags, templateId: resolvedTemplateId, status: draftStatus, scheduledAt: slot.scheduledAt, llmTrace: { ...(existingRetryTrace?.llmTrace as object ?? {}), draftTrace } as unknown as Prisma.InputJsonValue } })
         await prisma.postSlot.update({ where: { id: slot.id }, data: { status: 'filled', postId: retryCandidate.id } })
 
         advanceBatchWindow(retryCandidate.generationBatchId)
@@ -513,7 +513,7 @@ export async function smartFillCalendar(brandId: string): Promise<SmartFillResul
               source: 'automatic',
               priority: 3,
               generationBatchId: batchId,
-              llmTrace: { ideaTrace: output.trace },
+              llmTrace: { ideaTrace: output.trace } as unknown as Prisma.InputJsonValue,
             },
           })
         }
@@ -592,7 +592,7 @@ async function tryGenerateNewBatch(
           source: 'automatic',
           priority: 3,
           generationBatchId: batchId,
-          llmTrace: { ideaTrace: output.trace },
+          llmTrace: { ideaTrace: output.trace } as unknown as Prisma.InputJsonValue,
         },
       })
     }
@@ -648,7 +648,7 @@ async function triggerIdeaGeneration(brandId: string, ideationCount: number): Pr
           source: 'automatic',
           priority: 3,
           generationBatchId: batchId,
-          llmTrace: { ideaTrace: output.trace },
+          llmTrace: { ideaTrace: output.trace } as unknown as Prisma.InputJsonValue,
         },
       })
     }

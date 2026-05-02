@@ -1,4 +1,4 @@
-import type { AIModel } from '@prisma/client'
+import type { AIModel } from '@/generated/prisma'
 import { MODEL_REGISTRY, type LLMProvider } from '@nau/llm-client'
 
 /**

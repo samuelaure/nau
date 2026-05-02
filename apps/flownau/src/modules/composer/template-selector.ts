@@ -1,5 +1,5 @@
 import { prisma } from '@/modules/shared/prisma'
-import type { Template } from '@prisma/client'
+import type { Template } from '@/generated/prisma'
 import type { ContentFormat } from '@/types/content'
 
 /**

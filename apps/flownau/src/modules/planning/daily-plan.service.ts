@@ -1,5 +1,5 @@
 import { prisma } from '@/modules/shared/prisma'
-import type { Prisma } from '@prisma/client'
+import type { Prisma } from '@/generated/prisma'
 import crypto from 'crypto'
 
 // ─── Head Talk Detection ───────────────────────────────────────────

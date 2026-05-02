@@ -1,3 +1,4 @@
+import type { Prisma } from '@/generated/prisma'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 import { generateContentIdeas } from '@/modules/ideation/ideation.service'
@@ -85,7 +86,7 @@ export async function GET(request: Request) {
               priority: 3,
               sourceRef,
               generationBatchId: batchId,
-              llmTrace: { ideaTrace: output.trace },
+              llmTrace: { ideaTrace: output.trace } as unknown as Prisma.InputJsonValue,
             },
           })
         }

@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { getAuthUser } from '@/lib/auth'
 import { prisma } from '@/modules/shared/prisma'
-import { Prisma } from '@prisma/client'
+import { Prisma } from '@/generated/prisma'
 import { renderAndUpload } from '@/modules/video/renderer'
 import { publishReel } from '@/modules/publisher/instagram-reels'
 import { decrypt } from '@/modules/shared/encryption'
