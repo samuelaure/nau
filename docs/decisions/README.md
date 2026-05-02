@@ -19,7 +19,9 @@
 | [004](ADR-004-auth-model.md) | 🟢 | Access + refresh token model with per-service client JWTs | 2026-04-23 |
 | [005](ADR-005-monorepo-consolidation.md) | 🟢 | Consolidate into a single pnpm + turbo monorepo | 2026-04-23 |
 | [006](ADR-006-nestjs-on-nauthenticity.md) | 🟢 | Migrate nauthenticity from Fastify to NestJS | 2026-04-23 |
-| [007](ADR-007-naming-canon.md) | 🟢 | Enforce a single naming canon across the platform | 2026-04-23 |
+| [007](ADR-007-cicd-pipeline.md) | 🟢 | GitHub Actions → GHCR → SSH deploy pipeline | 2026-04-24 |
+| [008](ADR-008-monorepo-consolidation.md) | 🟢 | Final flat monorepo layout under `apps/` + `packages/` | 2026-04-24 |
+| [009](ADR-009-naming-canon.md) | 🟢 | Enforce a single naming canon across the platform | 2026-04-23 |
 
 ## Writing a new ADR
 

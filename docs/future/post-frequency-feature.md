@@ -1,8 +1,8 @@
 # Post Frequency Feature — Scheduling, Slot Assignment & Auto-Generation
 
-## Status: Planned (depends on Post model refactor)
+## Status: Partially implemented
 
-Supersedes: `calendar-posting-goals.md`
+`PostSchedule` and `PostSlot` models exist in flownau schema. Format chain, daily frequency, and time window fields are in place. Full auto-generation trigger loop and slot materialization service are pending.
 
 ---
 

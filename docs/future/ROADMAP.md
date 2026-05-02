@@ -1,6 +1,7 @@
 # naŭ Platform — Foundational Refactor Roadmap
 
-> The phased execution plan for the April 2026 foundational refactor.
+> The phased execution plan for the April–May 2026 foundational refactor.
+> Updated 2026-05-02 to reflect actual implementation state (platform is pre-production launch).
 > Each phase is independently reviewable and mergeable.
 
 ---
@@ -232,15 +233,15 @@ Once production traffic exists (post-launch), rollback becomes non-trivial and s
 
 ## Status tracking
 
-| Phase | Status | Branch | Merged? |
-|---|---|---|---|
-| 0 | 🟢 complete | `refactor/phase-0-docs` | pending |
-| 1 | 🔴 not started | — | — |
-| 2 | 🔴 not started | — | — |
-| 3 | 🔴 not started | — | — |
-| 4 | 🔴 not started | — | — |
-| 5 | 🔴 not started | — | — |
-| 6 | 🔴 not started | — | — |
-| 7 | 🔴 not started | — | — |
-| 8 | 🔴 not started | — | — |
-| 9 | 🔴 not started | — | — |
+| Phase | Status | Notes |
+|---|---|---|
+| 0 | 🟢 complete | Docs skeleton in place |
+| 1 | 🟡 partial | `@nau/auth`, `@nau/storage`, `@nau/logger` exist; `@nau/types`, `@nau/config`, `@nau/sdk` are stubs |
+| 2 | 🟡 partial | 9naŭ API exists with Brand/Workspace/SocialProfile; full entity refactor (Prompt table, JWKS) not done |
+| 3 | 🔴 not started | `@nau/sdk` is a stub — services call APIs directly |
+| 4 | 🟡 partial | SSO with HttpOnly cookies works; refresh rotation and nauthenticity `/auth/callback` done |
+| 5 | 🟢 complete | nauthenticity migrated to NestJS; BullMQ workers, all modules ported |
+| 6 | 🟡 in progress | flownau uses `Post` model (unified pipeline); `BrandPersona`/`IdeasFramework` still in schema (prompt centralization pending) |
+| 7 | 🔴 not started | zazu-dashboard still uses NextAuth |
+| 8 | 🟢 complete | Flat monorepo under `apps/` + `packages/` with turbo |
+| 9 | 🟡 in progress | This cleanup pass — docs updated; service stubs still partial |

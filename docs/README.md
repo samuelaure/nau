@@ -46,6 +46,10 @@ Every decision that has long-term consequence is captured as an ADR in `decision
 - **[AUTH.md](platform/AUTH.md)** — SSO flow, refresh tokens, service auth, CSRF
 - **[API-CONTRACT.md](platform/API-CONTRACT.md)** — every endpoint across every service
 - **[NAMING.md](platform/NAMING.md)** — canonical naming, URL patterns, header conventions
+- **[DEPLOYMENT.md](platform/DEPLOYMENT.md)** — Hetzner VPS topology, CI/CD pipeline, secrets management
+- **[TESTING.md](platform/TESTING.md)** — per-service test framework choices, CI, E2E with Playwright
+- **[PROMPTS.md](platform/PROMPTS.md)** — all AI system prompts used across the platform
+- **[BREACH-RUNBOOK.md](platform/BREACH-RUNBOOK.md)** — security incident response procedures
 
 ### Services
 
@@ -71,7 +75,8 @@ Every decision that has long-term consequence is captured as an ADR in `decision
 
 ### Features (end-to-end flows)
 
-- [features/content-creation-pipeline.md](features/content-creation-pipeline.md) — ideation → composition → render → publish
+- [features/content-creation-pipeline.md](features/content-creation-pipeline.md) — ideation → composition → render → publish (Post state machine)
+- [features/reel-templates.md](features/reel-templates.md) — Remotion template system, canvas spec, brand identity fields
 - [features/brand-intelligence.md](features/brand-intelligence.md) — DNA, InspoBase, benchmark chat
 - [features/comment-suggester.md](features/comment-suggester.md) — reactive + proactive suggestion flow
 - [features/sso.md](features/sso.md) — end-to-end login flow
@@ -107,4 +112,4 @@ See [platform/NAMING.md](platform/NAMING.md) for the full canon.
 
 ## Status of this doc set
 
-This doc set is being built as part of the April 2026 foundational refactor. Some documents may be stubs until their corresponding phase of the refactor is complete — see [future/ROADMAP.md](future/ROADMAP.md) for the execution plan.
+Updated 2026-05-02 ahead of production launch. The platform is largely built — Roadmap Phases 5 and 8 are complete; Phase 6 is in progress. Some docs still use old entity names (`ContentIdea`, `Composition`) where the code has already moved to the unified `Post` model. See [future/ROADMAP.md](future/ROADMAP.md) for the current phase-by-phase status.
