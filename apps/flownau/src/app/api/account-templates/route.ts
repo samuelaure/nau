@@ -2,17 +2,6 @@ export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
-import { seedSystemTemplates } from '../../../../prisma/seeds/templates'
-
-// Run the catalog seed once per process. Safe to skip on subsequent requests
-// because seedSystemTemplates upserts on every call — the flag is just an
-// optimization to avoid the extra DB roundtrips on every list call.
-let catalogSeeded = false
-async function ensureCatalogSeeded() {
-  if (catalogSeeded) return
-  await seedSystemTemplates(prisma)
-  catalogSeeded = true
-}
 
 /**
  * GET /api/account-templates?brandId=
@@ -32,8 +21,6 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const brandId = searchParams.get('brandId')
     if (!brandId) return NextResponse.json({ error: 'Missing brandId' }, { status: 400 })
-
-    await ensureCatalogSeeded()
 
     const brand = await prisma.brand.findUnique({
       where: { id: brandId },
@@ -63,7 +50,8 @@ export async function GET(req: Request) {
     })
 
     return NextResponse.json({ templates }, { status: 200 })
-  } catch {
+  } catch (err) {
+    console.error('[account-templates GET]', err)
     return NextResponse.json({ error: 'Failed to fetch account templates' }, { status: 500 })
   }
 }

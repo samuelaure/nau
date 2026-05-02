@@ -10,11 +10,16 @@ export interface BrandIdentity {
   logoUrl?: string
 }
 
+export interface BrollClip {
+  url: string
+  startFrom?: number
+}
+
 export interface ReelSlotProps {
   slots: Record<string, string>
   caption?: string
   hashtags?: string[]
-  brollUrls?: string[]
+  brollClips?: BrollClip[]
   audioUrl?: string
   brand?: BrandIdentity
 }
@@ -28,10 +33,7 @@ const DEFAULT_BRAND: Required<BrandIdentity> = {
   logoUrl: '',
 }
 
-// ── SM attention-span timing ───────────────────────────────────────────────────
-// Each scene occupies equal time so rhythm feels consistent.
-// A trailing buffer after the last text lets viewers finish reading before cut.
-// All durations at 30fps.
+export const REMOTION_FPS = 30
 
 const SCENE_SHORT  = 75   // 2.5s  — single-text templates
 const SCENE_HOOK   = 75   // 2.5s  — hook scene in multi-text
@@ -39,19 +41,22 @@ const SCENE_BODY   = 120  // 4s    — body / development scene
 const SCENE_LAND   = 90   // 3s    — landing / reveal scene
 const TRAIL        = 45   // 1.5s  — silent buffer after last text
 
+// Worst-case scene duration — used by render-worker to ensure enough clip headroom.
+export const BROLL_REQUIRED_FRAMES = SCENE_BODY + TRAIL
+
 // ── Shared primitives ──────────────────────────────────────────────────────────
 
-function BrollBackground({ url, overlayOpacity }: { url?: string; overlayOpacity: number }) {
-  if (!url) {
+function BrollBackground({ clip, overlayOpacity }: { clip?: BrollClip; overlayOpacity: number }) {
+  if (!clip?.url) {
     return <div style={{ position: 'absolute', inset: 0, background: '#111' }} />
   }
   return (
     <>
       <OffthreadVideo
-        src={url}
+        src={clip.url}
+        startFrom={clip.startFrom ?? 0}
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
         muted
-        playbackRate={1}
       />
       <div style={{ position: 'absolute', inset: 0, background: `rgba(0,0,0,${overlayOpacity})` }} />
     </>
@@ -106,13 +111,13 @@ function FadeText({
 // ─── ReelT1 — Single Moment ───────────────────────────────────────────────────
 // Layout: [text1 · 2.5s] [trail · 1.5s]  = 4s / 120f
 
-export function ReelT1({ slots, brollUrls = [], audioUrl, brand = {} }: ReelSlotProps) {
+export function ReelT1({ slots, brollClips = [], audioUrl, brand = {} }: ReelSlotProps) {
   const b = { ...DEFAULT_BRAND, ...brand }
 
   return (
     <div style={{ width: 1080, height: 1920, background: '#000', position: 'relative', overflow: 'hidden' }}>
       {audioUrl && <Audio src={audioUrl} />}
-      <BrollBackground url={brollUrls[0]} overlayOpacity={b.overlayOpacity} />
+      <BrollBackground clip={brollClips[0]} overlayOpacity={b.overlayOpacity} />
       <Sequence from={0} durationInFrames={SCENE_SHORT}>
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <FadeText
@@ -132,14 +137,14 @@ export function ReelT1({ slots, brollUrls = [], audioUrl, brand = {} }: ReelSlot
 // ─── ReelT2 — Single Statement ────────────────────────────────────────────────
 // Layout: [text1 · 5s] [trail · 1.5s]  = 6.5s / 195f
 
-export function ReelT2({ slots, brollUrls = [], audioUrl, brand = {} }: ReelSlotProps) {
+export function ReelT2({ slots, brollClips = [], audioUrl, brand = {} }: ReelSlotProps) {
   const b = { ...DEFAULT_BRAND, ...brand }
   const BODY = 150
 
   return (
     <div style={{ width: 1080, height: 1920, background: '#000', position: 'relative', overflow: 'hidden' }}>
       {audioUrl && <Audio src={audioUrl} />}
-      <BrollBackground url={brollUrls[0]} overlayOpacity={b.overlayOpacity} />
+      <BrollBackground clip={brollClips[0]} overlayOpacity={b.overlayOpacity} />
       <Sequence from={0} durationInFrames={BODY}>
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <FadeText
@@ -162,24 +167,22 @@ export function ReelT2({ slots, brollUrls = [], audioUrl, brand = {} }: ReelSlot
 const T3_S2 = SCENE_HOOK                    // 75
 const T3_END = SCENE_HOOK + SCENE_BODY      // 195
 
-export function ReelT3({ slots, brollUrls = [], audioUrl, brand = {} }: ReelSlotProps) {
+export function ReelT3({ slots, brollClips = [], audioUrl, brand = {} }: ReelSlotProps) {
   const b = { ...DEFAULT_BRAND, ...brand }
-  const broll1 = brollUrls[0]
-  const broll2 = brollUrls[1] ?? brollUrls[0]
+  const clip1 = brollClips[0]
+  const clip2 = brollClips[1] ?? brollClips[0]
 
   return (
     <div style={{ width: 1080, height: 1920, background: '#000', position: 'relative', overflow: 'hidden' }}>
       {audioUrl && <Audio src={audioUrl} />}
-      {/* Scene 1: hook — broll1 + text1 */}
       <Sequence from={0} durationInFrames={T3_S2}>
-        <BrollBackground url={broll1} overlayOpacity={b.overlayOpacity} />
+        <BrollBackground clip={clip1} overlayOpacity={b.overlayOpacity} />
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <FadeText text={slots.text1 ?? ''} fontSize={100} fontFamily={b.titleFont} color={b.secondaryColor} frameOffset={0} instant />
         </div>
       </Sequence>
-      {/* Scene 2: reveal — broll2 spans body + trail, text2 only during body */}
       <Sequence from={T3_S2} durationInFrames={SCENE_BODY + TRAIL}>
-        <BrollBackground url={broll2} overlayOpacity={b.overlayOpacity} />
+        <BrollBackground clip={clip2} overlayOpacity={b.overlayOpacity} />
         <Sequence from={0} durationInFrames={SCENE_BODY}>
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <FadeText text={slots.text2 ?? ''} fontSize={72} fontFamily={b.bodyFont} color={b.secondaryColor} frameOffset={0} />
@@ -197,32 +200,29 @@ const T4_S2  = SCENE_HOOK                             // 75
 const T4_S3  = SCENE_HOOK + SCENE_BODY                // 195
 const T4_END = SCENE_HOOK + SCENE_BODY + SCENE_LAND   // 285
 
-export function ReelT4({ slots, brollUrls = [], audioUrl, brand = {} }: ReelSlotProps) {
+export function ReelT4({ slots, brollClips = [], audioUrl, brand = {} }: ReelSlotProps) {
   const b = { ...DEFAULT_BRAND, ...brand }
-  const broll1 = brollUrls[0]
-  const broll2 = brollUrls[1] ?? brollUrls[0]
-  const broll3 = brollUrls[2] ?? brollUrls[1] ?? brollUrls[0]
+  const clip1 = brollClips[0]
+  const clip2 = brollClips[1] ?? brollClips[0]
+  const clip3 = brollClips[2] ?? brollClips[1] ?? brollClips[0]
 
   return (
     <div style={{ width: 1080, height: 1920, background: '#000', position: 'relative', overflow: 'hidden' }}>
       {audioUrl && <Audio src={audioUrl} />}
-      {/* Scene 1: opening — broll1 + text1 */}
       <Sequence from={0} durationInFrames={T4_S2}>
-        <BrollBackground url={broll1} overlayOpacity={b.overlayOpacity} />
+        <BrollBackground clip={clip1} overlayOpacity={b.overlayOpacity} />
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <FadeText text={slots.text1 ?? ''} fontSize={100} fontFamily={b.titleFont} color={b.secondaryColor} frameOffset={0} instant />
         </div>
       </Sequence>
-      {/* Scene 2: development — broll2 + text2 */}
       <Sequence from={T4_S2} durationInFrames={SCENE_BODY}>
-        <BrollBackground url={broll2} overlayOpacity={b.overlayOpacity} />
+        <BrollBackground clip={clip2} overlayOpacity={b.overlayOpacity} />
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <FadeText text={slots.text2 ?? ''} fontSize={72} fontFamily={b.bodyFont} color={b.secondaryColor} frameOffset={0} />
         </div>
       </Sequence>
-      {/* Scene 3: landing — broll3 spans land + trail, text3 only during land */}
       <Sequence from={T4_S3} durationInFrames={SCENE_LAND + TRAIL}>
-        <BrollBackground url={broll3} overlayOpacity={b.overlayOpacity} />
+        <BrollBackground clip={clip3} overlayOpacity={b.overlayOpacity} />
         <Sequence from={0} durationInFrames={SCENE_LAND}>
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <FadeText text={slots.text3 ?? ''} fontSize={100} fontFamily={b.titleFont} color={b.secondaryColor} frameOffset={0} />

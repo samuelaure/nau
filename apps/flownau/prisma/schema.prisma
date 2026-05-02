@@ -149,6 +149,8 @@ model Template {
   sceneType        String?
   slotSchema       Json?
   styleConfig      Json?
+  description      String?   @db.Text
+  previewUrl       String?
 
   renders      Render[]
   assets       Asset[]

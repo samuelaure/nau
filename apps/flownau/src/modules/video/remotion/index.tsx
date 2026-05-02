@@ -6,7 +6,7 @@ const defaultReelProps: ReelSlotProps = {
   slots: {},
   caption: '',
   hashtags: [],
-  brollUrls: [],
+  brollClips: [],
   brand: {},
 }
 

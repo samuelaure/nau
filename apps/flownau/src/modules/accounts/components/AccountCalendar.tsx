@@ -365,29 +365,95 @@ function HeadTalkContent({
 type SceneSlots = Record<string, unknown>
 interface SceneDef { type: string; slots?: SceneSlots; mood?: string }
 
-function ReelContent({ comp }: { comp: Composition }) {
+function ReelContent({
+  comp,
+  actioning,
+  onSaved,
+}: {
+  comp: Composition
+  actioning: boolean
+  onSaved: () => void
+}) {
   const creative = comp.creative as { scenes?: SceneDef[]; slots?: Record<string, string>; brollMood?: string } | null
-
-  // Slot-based reel (new templates)
   const slots = creative?.slots
+
+  // ── Slot-based reel (current templates) ──────────────────────────────────
+  const [editing, setEditing] = useState(false)
+  const [slotDrafts, setSlotDrafts] = useState<Record<string, string>>(slots ?? {})
+  const [saving, setSaving] = useState(false)
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/posts/${comp.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ creative: { ...(creative ?? {}), slots: slotDrafts } }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success('Slots updated.')
+      setEditing(false)
+      onSaved()
+    } catch {
+      toast.error('Failed to save slots')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (slots && Object.keys(slots).length > 0) {
-    const slotEntries = Object.entries(slots)
     return (
       <div className="flex flex-col gap-2 pt-3">
-        {slotEntries.map(([key, val]) => (
-          <div key={key} className="rounded-lg bg-white/5 border border-white/10 px-3 py-2.5 flex flex-col gap-0.5">
-            <p className="text-[10px] font-mono text-accent uppercase tracking-wide">{key}</p>
-            <p className="text-sm text-white leading-relaxed">{val}</p>
-          </div>
-        ))}
-        {creative?.brollMood && (
-          <p className="text-[11px] text-text-secondary italic">B-roll mood: {creative.brollMood}</p>
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-text-secondary uppercase tracking-wider">Content</p>
+          {!editing && (
+            <button onClick={() => setEditing(true)} className="text-xs text-accent hover:underline">
+              Edit
+            </button>
+          )}
+        </div>
+
+        {editing ? (
+          <>
+            {Object.keys(slotDrafts).map((key) => (
+              <div key={key} className="flex flex-col gap-1">
+                <p className="text-[10px] font-mono text-accent uppercase tracking-wide">{key}</p>
+                <textarea
+                  value={slotDrafts[key]}
+                  onChange={(e) => setSlotDrafts((prev) => ({ ...prev, [key]: e.target.value }))}
+                  rows={3}
+                  className="bg-gray-950 border border-gray-800 text-white rounded px-3 py-2 text-sm resize-none w-full focus:outline-none focus:border-accent/50 leading-relaxed"
+                />
+              </div>
+            ))}
+            {creative?.brollMood && (
+              <p className="text-[11px] text-text-secondary italic">B-roll mood: {creative.brollMood}</p>
+            )}
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="sm" onClick={() => { setSlotDrafts(slots); setEditing(false) }}>Cancel</Button>
+              <Button size="sm" disabled={saving || actioning} onClick={save}>
+                {saving ? <Loader2 size={12} className="animate-spin" /> : 'Save'}
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            {Object.entries(slotDrafts).map(([key, val]) => (
+              <div key={key} className="rounded-lg bg-white/5 border border-white/10 px-3 py-2.5 flex flex-col gap-0.5">
+                <p className="text-[10px] font-mono text-accent uppercase tracking-wide">{key}</p>
+                <p className="text-sm text-white leading-relaxed">{val}</p>
+              </div>
+            ))}
+            {creative?.brollMood && (
+              <p className="text-[11px] text-text-secondary italic">B-roll mood: {creative.brollMood}</p>
+            )}
+          </>
         )}
       </div>
     )
   }
 
-  // Legacy scene-based reel
+  // ── Legacy scene-based reel (read-only) ───────────────────────────────────
   const scenes = creative?.scenes ?? []
   if (scenes.length === 0) {
     return <p className="text-sm text-text-secondary italic pt-3">No content generated yet.</p>
@@ -432,7 +498,7 @@ function FormatContent({ comp, actioning, onSaved }: { comp: Composition; action
     return <HeadTalkContent comp={comp} actioning={actioning} onSaved={onSaved} />
   }
   if (comp.format === 'reel' || comp.format === 'trial_reel') {
-    return <ReelContent comp={comp} />
+    return <ReelContent comp={comp} actioning={actioning} onSaved={onSaved} />
   }
   return null
 }

@@ -22,13 +22,15 @@ export interface SlotDef {
 interface TemplateDefinition {
   name: string
   format: string
-  remotionId: string  // maps to <Composition id="..."> in remotion/index.tsx
+  remotionId: string
   sceneType: string
   scope: string
   systemPrompt: string
-  slotSchema?: SlotDef[]   // reel templates: defines text slots for AI + Remotion
-  contentSchema: object    // human-readable guidance (also used for head_talk output schema)
-  schemaJson?: object      // JSON Schema for LLM structured output
+  description?: string
+  previewUrl?: string
+  slotSchema?: SlotDef[]
+  contentSchema: object
+  schemaJson?: object
 }
 
 // ─── SYSTEM TEMPLATES ─────────────────────────────────────────────────────────
@@ -63,6 +65,7 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     remotionId: '',
     sceneType: 'head_talk',
     scope: 'system',
+    description: 'Opens with a scroll-stopping hook, delivers core insight, closes with a CTA. The go-to structure for educational and opinion content. Best for 15–30 s talking-head clips.',
     systemPrompt: HEAD_TALK_SYSTEM_PROMPT,
     contentSchema: {
       format: 'head_talk',
@@ -94,6 +97,7 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     remotionId: '',
     sceneType: 'head_talk',
     scope: 'system',
+    description: 'Names the specific frustration your audience feels daily, validates it, then offers a reframe. High-empathy format that builds trust fast. Best for 15–30 s clips targeting a tight niche.',
     systemPrompt: HEAD_TALK_SYSTEM_PROMPT,
     contentSchema: {
       format: 'head_talk',
@@ -125,6 +129,7 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     remotionId: '',
     sceneType: 'head_talk',
     scope: 'system',
+    description: 'Drops into a hyper-specific fictional moment the viewer recognises as their own, then extracts a lesson. Drives comments and saves. Best for 30–45 s emotional storytelling.',
     systemPrompt: HEAD_TALK_SYSTEM_PROMPT,
     contentSchema: {
       format: 'head_talk',
@@ -156,6 +161,7 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     remotionId: '',
     sceneType: 'head_talk',
     scope: 'system',
+    description: 'Tells a composite client/character story: problem → turning point → result with specific numbers → lesson. Social proof without testimonials. Best for 30–45 s authority-building clips.',
     systemPrompt: HEAD_TALK_SYSTEM_PROMPT,
     contentSchema: {
       format: 'head_talk',
@@ -187,6 +193,8 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     remotionId: 'ReelT1',
     sceneType: 'reel',
     scope: 'system',
+    previewUrl: 'https://media.9nau.com/flownau/accounts/cmogyjn5a0006gcv46nis4o0l/outputs/cmoo6vorl0007v4v4oy5qiq3e.mp4',
+    description: 'One punchy line — max 8 words — displayed over full-screen B-roll. Pure pattern interrupt. ~4 s total. Use for quotes, provocations, or single-idea statements that land without context.',
     systemPrompt: 'You are filling content slots for a short-form video reel. Follow each slot\'s intention and word limit exactly. Never mention usernames or @handles.',
     slotSchema: [
       {
@@ -221,6 +229,8 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     remotionId: 'ReelT2',
     sceneType: 'reel',
     scope: 'system',
+    previewUrl: 'https://media.9nau.com/flownau/accounts/cmogyjn5a0006gcv46nis4o0l/outputs/cmoo6vork0003v4v4v0f7jhx5.mp4',
+    description: 'One complete paragraph — up to 40 words — displayed over B-roll as the viewer reads along. Meditative pace. ~6.5 s. Best for a nuanced take, a belief, or a self-contained insight that benefits from dwell time.',
     systemPrompt: 'You are filling content slots for a short-form video reel. Follow each slot\'s intention and word limit exactly. Never mention usernames or @handles.',
     slotSchema: [
       {
@@ -255,6 +265,8 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     remotionId: 'ReelT3',
     sceneType: 'reel',
     scope: 'system',
+    previewUrl: 'https://media.9nau.com/flownau/accounts/cmogyjn5a0006gcv46nis4o0l/outputs/cmoo6vork0002v4v4is5hqueg.mp4',
+    description: 'Two scenes: a short hook (≤8 words) that creates tension, followed by the payoff reveal (≤25 words). The gap between them keeps the viewer watching. ~8 s total. Best for curiosity-driven content and contrarian takes.',
     systemPrompt: 'You are filling content slots for a short-form video reel. Follow each slot\'s intention and word limit exactly. The two slots must feel like a connected thought — the second completes what the first started. Never mention usernames or @handles.',
     slotSchema: [
       {
@@ -299,6 +311,8 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     remotionId: 'ReelT4',
     sceneType: 'reel',
     scope: 'system',
+    previewUrl: 'https://media.9nau.com/flownau/accounts/cmogyjn5a0006gcv46nis4o0l/outputs/cmoo6vorl0008v4v4fyywc8cv.mp4',
+    description: 'Three scenes forming a mini story arc: punchy opener (≤8 w) → development (≤20 w) → landing line (≤8 w). ~11 s total. The most complete reel structure — best for ideas that need setup and resolution.',
     systemPrompt: 'You are filling content slots for a short-form video reel. Follow each slot\'s intention and word limit exactly. The three slots must feel like a mini-story arc: opening → development → landing. Never mention usernames or @handles.',
     slotSchema: [
       {
@@ -378,6 +392,8 @@ export async function seedSystemTemplates(prisma: PrismaClient): Promise<void> {
         sceneType: t.sceneType,
         scope: 'system',
         systemPrompt: t.systemPrompt,
+        description: t.description ?? null,
+        previewUrl: t.previewUrl ?? null,
         contentSchema: t.contentSchema,
         slotSchema: (t.slotSchema as any) ?? undefined,
         schemaJson: t.schemaJson ?? undefined,
@@ -385,6 +401,8 @@ export async function seedSystemTemplates(prisma: PrismaClient): Promise<void> {
       },
       update: {
         systemPrompt: t.systemPrompt,
+        description: t.description ?? null,
+        previewUrl: t.previewUrl ?? null,
         contentSchema: t.contentSchema,
         slotSchema: (t.slotSchema as any) ?? undefined,
         schemaJson: t.schemaJson ?? undefined,

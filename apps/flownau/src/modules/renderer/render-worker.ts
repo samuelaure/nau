@@ -9,6 +9,8 @@ import { flownau } from 'nau-storage'
 import { logger, logError } from '@/modules/shared/logger'
 import { redisConnection, type RenderJobData } from './render-queue'
 import type { BrandIdentity } from '@/modules/video/remotion/ReelTemplates'
+import { BROLL_REQUIRED_FRAMES, REMOTION_FPS } from '@/modules/video/remotion/ReelTemplates'
+import { shuffle } from '@/modules/video/utils/assets'
 
 const SLOT_REEL_IDS = new Set(['ReelT1', 'ReelT2', 'ReelT3', 'ReelT4'])
 
@@ -94,43 +96,46 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
     return
   }
 
-  // Select B-roll assets by mood keywords
   const brollMood = (creative.brollMood as string) ?? ''
   const moodKeywords = brollMood.split(/[,\s]+/).map((s) => s.trim().toLowerCase()).filter(Boolean)
 
-  const brandAssets = await prisma.asset.findMany({
-    where: {
-      brandId,
-      type: { in: ['video', 'VID'] },
-      ...(moodKeywords.length > 0 ? { tags: { hasSome: moodKeywords } } : {}),
-    },
-    select: { url: true },
-    take: 10,
+  // Fetch video + audio assets in parallel. One video query covers both the mood case and the
+  // fallback: fetch all brand videos, then prefer mood-tagged ones in memory if any match.
+  const [allVideos, audioAssets] = await Promise.all([
+    prisma.asset.findMany({
+      where: { brandId, type: { in: ['video', 'VID'] } },
+      select: { url: true, duration: true, tags: true },
+      take: 50,
+    }),
+    prisma.asset.findMany({
+      where: { brandId, type: { in: ['audio', 'AUD'] } },
+      select: { url: true },
+      take: 50,
+    }),
+  ])
+
+  const moodMatched = moodKeywords.length > 0
+    ? allVideos.filter((a) => a.tags.some((t) => moodKeywords.includes(t.toLowerCase())))
+    : []
+  const videoPool = shuffle(moodMatched.length > 0 ? moodMatched : allVideos)
+
+  const brollClips = videoPool.map((a) => {
+    const assetFrames = a.duration ? Math.floor(a.duration * REMOTION_FPS) : 0
+    const maxStart = Math.max(0, assetFrames - BROLL_REQUIRED_FRAMES)
+    const startFrom = maxStart > 0 ? Math.floor(Math.random() * maxStart) : 0
+    return { url: a.url, startFrom }
   })
 
-  // Fallback: any brand video if mood query returns nothing
-  const allBrandVideos = brandAssets.length === 0
-    ? await prisma.asset.findMany({ where: { brandId, type: { in: ['video', 'VID'] } }, select: { url: true }, take: 5 })
-    : brandAssets
+  const audioUrl = shuffle(audioAssets)[0]?.url
 
-  const brollUrls = allBrandVideos.map((a) => a.url)
-
-  // Fetch a random background audio track
-  const audioAssets = await prisma.asset.findMany({
-    where: { brandId, type: { in: ['audio', 'AUD'] } },
-    select: { url: true },
-  })
-  
-  const audioUrl = audioAssets.length > 0 ? audioAssets[Math.floor(Math.random() * audioAssets.length)].url : undefined
-
-  logger.info({ postId, brandId, moodKeywords, brandAssetsCount: brandAssets.length, fallbackCount: allBrandVideos.length, brollUrls, hasAudio: !!audioUrl }, '[RenderWorker] B-roll and audio assets resolved')
+  logger.info({ postId, brandId, moodKeywords, videoPoolSize: videoPool.length, hasAudio: !!audioUrl }, '[RenderWorker] B-roll and audio assets resolved')
   const brandIdentity = (post.brand?.brandIdentity ?? {}) as BrandIdentity
 
   const inputProps: Record<string, unknown> = {
     slots: creative.slots,
     caption: creative.caption ?? '',
     hashtags: creative.hashtags ?? [],
-    brollUrls,
+    brollClips,
     audioUrl,
     brand: brandIdentity,
   }
@@ -165,8 +170,12 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
       outputLocation: outputPath,
       inputProps,
       codec: 'h264',
+      crf: 23,
+      x264Preset: 'slow',
       concurrency: CONCURRENCY,
-      jpegQuality: 95,
+      jpegQuality: 85,
+      // faststart moves the moov atom to the front — required for streaming playback
+      ffmpegOverride: ({ type, args }) => type === 'stitcher' ? [...args, '-movflags', '+faststart'] : args,
       onProgress: ({ progress }) => { job.updateProgress(35 + Math.round(progress * 45)).catch(() => {}) },
     })
 
