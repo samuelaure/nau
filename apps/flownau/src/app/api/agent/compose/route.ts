@@ -2,8 +2,8 @@ export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
-import type { Prisma } from '@prisma/client'
-import { checkBrandAccess } from '@/modules/shared/actions'
+import type { Prisma } from '@/generated/prisma'
+import { checkBrandAccessForRoute } from '@/lib/auth'
 import { z } from 'zod'
 import { logError, logger } from '@/modules/shared/logger'
 import { checkRateLimit } from '@/modules/shared/rate-limit'
@@ -51,7 +51,8 @@ export async function POST(req: Request) {
       )
     }
 
-    await checkBrandAccess(brandId)
+    const denied = await checkBrandAccessForRoute(brandId)
+    if (denied) return denied
 
     // ── Slot-aware format + template resolution ───────────────────────────────
     // If templateId is given: format = template's format, find next slot of that format.
@@ -93,24 +94,22 @@ export async function POST(req: Request) {
     }
 
     // Resolve templateId: explicit > auto-pick for slot format > from existing post > none
-    const resolvedTemplateId =
-      templateId ??
-      (targetSlotId && !templateId
-        ? (() => {
-            const key = format === 'trial_reel' ? 'reel' : format
-            return prisma.brandTemplateConfig.findMany({
-              where: { brandId, enabled: true, template: { format: key } },
-              select: { template: { select: { id: true } } },
-            }).then((configs) => {
-              if (configs.length === 0) return undefined
-              return configs[Math.floor(Math.random() * configs.length)]!.template.id
-            })
-          })()
-        : undefined) ??
-      (postId
-        ? (await prisma.post.findUnique({ where: { id: postId }, select: { templateId: true } }))
-            ?.templateId ?? undefined
-        : undefined)
+    let resolvedTemplateId: string | undefined = templateId
+    if (!resolvedTemplateId && targetSlotId) {
+      const key = format === 'trial_reel' ? 'reel' : format
+      const configs = await prisma.brandTemplateConfig.findMany({
+        where: { brandId, enabled: true, template: { format: key } },
+        select: { template: { select: { id: true } } },
+      })
+      if (configs.length > 0) {
+        resolvedTemplateId = configs[Math.floor(Math.random() * configs.length)]!.template.id
+      }
+    }
+    if (!resolvedTemplateId && postId) {
+      resolvedTemplateId =
+        (await prisma.post.findUnique({ where: { id: postId }, select: { templateId: true } }))
+          ?.templateId ?? undefined
+    }
 
     // Fetch persona for auto-approve flags
     const persona = personaId
@@ -148,13 +147,13 @@ export async function POST(req: Request) {
           where: { id: postId },
           data: {
             format,
-            creative: result.creative as unknown as Prisma.InputJsonValue,
+            creative: result.creative as unknown as unknown as Prisma.InputJsonValue,
             caption: result.caption,
             hashtags: result.hashtags,
             status: draftStatus,
             templateId: result.templateId ?? resolvedTemplateId ?? null,
             brandPersonaId: result.personaId ?? persona?.id ?? null,
-            llmTrace: { ...(existing?.llmTrace as object ?? {}), draftTrace: result.trace },
+            llmTrace: { ...(existing?.llmTrace as object ?? {}), draftTrace: result.trace } as unknown as Prisma.InputJsonValue,
           },
         })
       } else {
@@ -163,14 +162,14 @@ export async function POST(req: Request) {
             brandId,
             ideaText: prompt,
             format,
-            creative: result.creative as unknown as Prisma.InputJsonValue,
+            creative: result.creative as unknown as unknown as Prisma.InputJsonValue,
             caption: result.caption,
             hashtags: result.hashtags,
             status: draftStatus,
             source: 'manual',
             templateId: result.templateId ?? resolvedTemplateId ?? null,
             brandPersonaId: result.personaId ?? persona?.id ?? null,
-            llmTrace: { draftTrace: result.trace },
+            llmTrace: { draftTrace: result.trace } as unknown as Prisma.InputJsonValue,
           },
         })
       }
@@ -206,13 +205,13 @@ export async function POST(req: Request) {
           where: { id: postId },
           data: {
             format,
-            creative: creativeData as unknown as Prisma.InputJsonValue,
+            creative: creativeData as unknown as unknown as Prisma.InputJsonValue,
             caption: result.caption,
             hashtags: result.hashtags,
             status: draftStatus,
             templateId: resolvedTemplateId,
             brandPersonaId: persona?.id ?? null,
-            llmTrace: { ...(existing?.llmTrace as object ?? {}), draftTrace: result.trace },
+            llmTrace: { ...(existing?.llmTrace as object ?? {}), draftTrace: result.trace } as unknown as Prisma.InputJsonValue,
           },
         })
       } else {
@@ -221,14 +220,14 @@ export async function POST(req: Request) {
             brandId,
             ideaText: prompt,
             format,
-            creative: creativeData as unknown as Prisma.InputJsonValue,
+            creative: creativeData as unknown as unknown as Prisma.InputJsonValue,
             caption: result.caption,
             hashtags: result.hashtags,
             status: draftStatus,
             source: 'manual',
             templateId: resolvedTemplateId,
             brandPersonaId: persona?.id ?? null,
-            llmTrace: { draftTrace: result.trace },
+            llmTrace: { draftTrace: result.trace } as unknown as Prisma.InputJsonValue,
           },
         })
       }

@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
-import { checkBrandAccess } from '@/modules/shared/actions'
+import { checkBrandAccessForRoute } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 import { onPostPublished } from '@/modules/scheduling/post-published'
 
@@ -16,7 +16,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     if (!post) return NextResponse.json({ error: 'Post not found' }, { status: 404 })
 
-    await checkBrandAccess(post.brandId)
+    const denied = await checkBrandAccessForRoute(post.brandId); if (denied) return denied
 
     await prisma.post.update({
       where: { id },

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
-import { checkBrandAccess } from '@/modules/shared/actions'
+import { checkBrandAccessForRoute } from '@/lib/auth'
 import { renderQueue } from '@/modules/renderer/render-queue'
 import { logError, logger } from '@/modules/shared/logger'
 
@@ -9,7 +9,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     const { id } = await params
     const post = await prisma.post.findUnique({ where: { id }, select: { id: true, brandId: true, status: true } })
     if (!post) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-    await checkBrandAccess(post.brandId)
+    const denied = await checkBrandAccessForRoute(post.brandId); if (denied) return denied
 
     // Already out of the render pipeline — treat as success (idempotent)
     if (post.status !== 'RENDERING' && post.status !== 'DRAFT_APPROVED') {

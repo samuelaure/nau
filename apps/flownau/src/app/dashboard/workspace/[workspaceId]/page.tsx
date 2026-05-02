@@ -49,29 +49,40 @@ export default async function WorkspaceOverviewPage({
     secret: process.env.AUTH_SECRET ?? '',
   })
 
-  const workspaceResp = await fetch(`${nauApiUrl}/_service/workspaces/${workspaceId}`, {
-    headers: { Authorization: `Bearer ${serviceToken}` },
-    cache: 'no-store',
-  })
+  let workspace: { name: string; brands: NauBrand[] } | null = null
+  try {
+    const workspaceResp = await fetch(`${nauApiUrl}/_service/workspaces/${workspaceId}`, {
+      headers: { Authorization: `Bearer ${serviceToken}` },
+      cache: 'no-store',
+    })
+    if (workspaceResp.ok) {
+      workspace = (await workspaceResp.json()) as { name: string; brands: NauBrand[] }
+    } else {
+      console.error(`[WORKSPACES] Failed to fetch workspace ${workspaceId}: ${workspaceResp.status}`)
+    }
+  } catch (err) {
+    console.error(`[WORKSPACES] Network error fetching workspace ${workspaceId}:`, err)
+  }
 
-  if (!workspaceResp.ok) {
-    console.error(`[WORKSPACES] Failed to fetch workspace ${workspaceId}: ${workspaceResp.status}`)
+  if (!workspace) {
     return (
       <div className="flex flex-col items-center justify-center pt-20 animate-fade-in">
         <h2 className="text-2xl font-bold mb-4">Workspace Unavailable</h2>
-        <p className="text-text-secondary mb-8">Could not load this workspace. Please try again.</p>
+        <p className="text-text-secondary mb-8">Could not load this workspace. The API may be unreachable.</p>
         <a href="/dashboard" className="btn-primary px-6 py-2">Back to Dashboard</a>
       </div>
     )
   }
 
-  const workspace = (await workspaceResp.json()) as { name: string; brands: NauBrand[] }
   const brands: NauBrand[] = workspace.brands ?? []
 
   // ── Brand dashboard ────────────────────────────────────────────────────────
   if (brandId) {
     const nauBrand = brands.find((b) => b.id === brandId)
-    if (!nauBrand) notFound()
+    if (!nauBrand) {
+      console.error(`[WORKSPACES] Brand ${brandId} not found in workspace ${workspaceId}. brands=[${brands.map(b => b.id).join(', ')}]`)
+      notFound()
+    }
 
     // Upsert local Brand record so it always exists before rendering
     const localBrand = await prisma.brand.upsert({

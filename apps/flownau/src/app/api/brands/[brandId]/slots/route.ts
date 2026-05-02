@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 import { getAuthUser } from '@/lib/auth'
-import { checkBrandAccess } from '@/modules/shared/actions'
+import { checkBrandAccessForRoute } from '@/lib/auth'
 import { logError } from '@/modules/shared/logger'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ brandId: string }> }) {
@@ -11,7 +11,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ bran
   try {
     const user = await getAuthUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    await checkBrandAccess(brandId)
+    const denied = await checkBrandAccessForRoute(brandId); if (denied) return denied
 
     const url = new URL(req.url)
     const from = url.searchParams.get('from')

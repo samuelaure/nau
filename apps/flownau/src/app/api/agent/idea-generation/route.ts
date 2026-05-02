@@ -1,8 +1,9 @@
+import type { Prisma } from '@/generated/prisma'
 export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
-import { checkBrandAccess } from '@/modules/shared/actions'
+import { checkBrandAccessForRoute } from '@/lib/auth'
 import { generateContentIdeas } from '@/modules/ideation/ideation.service'
 import { logError } from '@/modules/shared/logger'
 
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing brandId' }, { status: 400 })
     }
 
-    await checkBrandAccess(brandId)
+    const denied = await checkBrandAccessForRoute(brandId); if (denied) return denied
 
     const brand = await prisma.brand.findUnique({
       where: { id: brandId },
@@ -76,7 +77,7 @@ export async function POST(req: Request) {
           priority,
           sourceRef,
           generationBatchId: batchId,
-          llmTrace: { ideaTrace: output.trace },
+          llmTrace: { ideaTrace: output.trace } as unknown as Prisma.InputJsonValue,
         },
       }),
     )

@@ -5,7 +5,7 @@ import { prisma } from '@/modules/shared/prisma'
 import { storage } from '@/modules/shared/r2'
 import { flownau, extFromMime } from 'nau-storage'
 import { getAuthUser } from '@/lib/auth'
-import { checkBrandAccess } from '@/modules/shared/actions'
+import { checkBrandAccessForRoute } from '@/lib/auth'
 import { logError, logger } from '@/modules/shared/logger'
 import { createId } from '@paralleldrive/cuid2'
 
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     if (!post) return NextResponse.json({ error: 'Post not found' }, { status: 404 })
 
-    await checkBrandAccess(post.brandId)
+    const denied = await checkBrandAccessForRoute(post.brandId); if (denied) return denied
 
     if (!UPLOADABLE_FORMATS.has(post.format ?? '')) {
       return NextResponse.json(

@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 import { getAuthUser } from '@/lib/auth'
-import { checkBrandAccess } from '@/modules/shared/actions'
+import { checkBrandAccessForRoute } from '@/lib/auth'
 import { logError } from '@/modules/shared/logger'
 import { z } from 'zod'
 import { materializeSlots } from '@/modules/scheduling/slot-materializer'
@@ -22,7 +22,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ bra
   try {
     const user = await getAuthUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    await checkBrandAccess(brandId)
+    const denied = await checkBrandAccessForRoute(brandId); if (denied) return denied
 
     const schedule = await prisma.postSchedule.findUnique({ where: { brandId } })
     return NextResponse.json({ schedule })
@@ -37,7 +37,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ bran
   try {
     const user = await getAuthUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    await checkBrandAccess(brandId)
+    const denied2 = await checkBrandAccessForRoute(brandId); if (denied2) return denied2
 
     const body = await req.json()
     const parsed = ScheduleUpsertSchema.safeParse(body)

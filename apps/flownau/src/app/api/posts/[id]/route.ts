@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
-import { checkBrandAccess } from '@/modules/shared/actions'
+import { checkBrandAccessForRoute } from '@/lib/auth'
 import { logError } from '@/modules/shared/logger'
 import { triggerRenderForPost } from '@/modules/renderer/render-queue'
 
@@ -15,7 +15,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       },
     })
     if (!post) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-    await checkBrandAccess(post.brandId)
+    const denied = await checkBrandAccessForRoute(post.brandId); if (denied) return denied
     return NextResponse.json({ post })
   } catch (error) {
     logError('GET /api/posts/[id]', error)
@@ -30,7 +30,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     const post = await prisma.post.findUnique({ where: { id } })
     if (!post) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-    await checkBrandAccess(post.brandId)
+    const denied2 = await checkBrandAccessForRoute(post.brandId); if (denied2) return denied2
 
     const {
       slotId,
@@ -126,7 +126,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     const { id } = await params
     const post = await prisma.post.findUnique({ where: { id } })
     if (!post) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-    await checkBrandAccess(post.brandId)
+    const denied3 = await checkBrandAccessForRoute(post.brandId); if (denied3) return denied3
     // Free the slot before deleting so it stays in the calendar as empty
     // rather than becoming a phantom filled slot with no post.
     await prisma.postSlot.updateMany({

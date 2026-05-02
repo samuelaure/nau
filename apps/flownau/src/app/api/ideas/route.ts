@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
-import { checkBrandAccess } from '@/modules/shared/actions'
+import { checkBrandAccessForRoute } from '@/lib/auth'
 import { resolveProvenance } from '@/modules/ideation/provenance'
 
 export async function GET(req: Request) {
@@ -15,7 +15,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Missing brandId' }, { status: 400 })
     }
 
-    await checkBrandAccess(brandId)
+    const denied = await checkBrandAccessForRoute(brandId); if (denied) return denied
 
     const ideas = await prisma.post.findMany({
       where: { brandId, status: { in: ['IDEA_PENDING', 'IDEA_APPROVED'] } },
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing brandId or ideaText' }, { status: 400 })
     }
 
-    await checkBrandAccess(brandId)
+    const denied2 = await checkBrandAccessForRoute(brandId); if (denied2) return denied2
 
     let priority = 3
     if (source === 'captured') priority = 1

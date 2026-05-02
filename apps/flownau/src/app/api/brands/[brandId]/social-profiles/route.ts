@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth'
 import { prisma } from '@/modules/shared/prisma'
-import { checkBrandAccess } from '@/modules/shared/actions'
+import { checkBrandAccessForRoute } from '@/lib/auth'
 
 /**
  * GET /api/brands/{brandId}/social-profiles
@@ -14,7 +14,7 @@ export async function GET(req: Request, { params }: { params: { brandId: string 
     const user = await getAuthUser()
     if (!user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    await checkBrandAccess(params.brandId)
+    const denied = await checkBrandAccessForRoute(params.brandId); if (denied) return denied
 
     const profiles = await prisma.socialProfile.findMany({
       where: { brandId: params.brandId },
@@ -37,7 +37,7 @@ export async function POST(req: Request, { params }: { params: { brandId: string
     const user = await getAuthUser()
     if (!user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    await checkBrandAccess(params.brandId)
+    const denied2 = await checkBrandAccessForRoute(params.brandId); if (denied2) return denied2
 
     const body = await req.json()
     const { username, platform = 'instagram', nauthenticityProfileId, syncedFromNauthenticity = false } = body

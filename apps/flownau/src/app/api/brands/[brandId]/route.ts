@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 import { getAuthUser } from '@/lib/auth'
-import { checkBrandAccess } from '@/modules/shared/actions'
+import { checkBrandAccessForRoute } from '@/lib/auth'
 import { logError } from '@/modules/shared/logger'
 import { z } from 'zod'
 import { materializeSlots } from '@/modules/scheduling/slot-materializer'
@@ -18,7 +18,7 @@ const BrandPatchSchema = z.object({
 export async function GET(req: NextRequest, { params }: { params: Promise<{ brandId: string }> }) {
   const { brandId } = await params
   try {
-    await checkBrandAccess(brandId)
+    const denied = await checkBrandAccessForRoute(brandId); if (denied) return denied
     const brand = await prisma.brand.findUnique({
       where: { id: brandId },
       select: { id: true, ideationPrompt: true, language: true, ideationCount: true, autoApproveIdeas: true, coverageHorizonDays: true },
@@ -36,7 +36,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ br
   try {
     const user = await getAuthUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    await checkBrandAccess(brandId)
+    const denied2 = await checkBrandAccessForRoute(brandId); if (denied2) return denied2
 
     const body = await req.json()
     const parsed = BrandPatchSchema.safeParse(body)

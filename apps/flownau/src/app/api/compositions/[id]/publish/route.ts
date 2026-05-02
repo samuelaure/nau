@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth'
 import { prisma } from '@/modules/shared/prisma'
-import { checkBrandAccess } from '@/modules/shared/actions'
+import { checkBrandAccessForRoute } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 
 /**
@@ -39,7 +39,7 @@ export async function POST(
       return NextResponse.json({ error: 'Post not found' }, { status: 404 })
     }
 
-    await checkBrandAccess(composition.brandId)
+    const denied = await checkBrandAccessForRoute(composition.brandId); if (denied) return denied
 
     // Verify all profiles belong to this brand
     const profiles = await prisma.socialProfile.findMany({
