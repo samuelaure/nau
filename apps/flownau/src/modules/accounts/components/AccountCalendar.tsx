@@ -503,6 +503,28 @@ function FormatContent({ comp, actioning, onSaved }: { comp: Composition; action
   return null
 }
 
+// ─── Idea toggle ─────────────────────────────────────────────────────────────
+
+function IdeaToggle({ ideaText }: { ideaText: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="border border-white/10 rounded-xl">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 text-xs text-text-secondary hover:text-white hover:bg-white/5 transition-colors rounded-xl"
+      >
+        <span className="uppercase tracking-wider font-medium">Original idea</span>
+        <ChevronDown size={14} className={cn('transition-transform duration-200', open && 'rotate-180')} />
+      </button>
+      {open && (
+        <div className="px-4 pb-4 border-t border-white/10">
+          <p className="text-sm text-white/70 leading-relaxed whitespace-pre-wrap pt-3">{ideaText}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Composition detail modal ─────────────────────────────────────────────────
 
 function CompositionModal({
@@ -823,7 +845,7 @@ function CompositionModal({
         </div>
 
         {/* Body */}
-        <div className="px-6 py-5 flex flex-col gap-4 overflow-y-auto">
+        <div className="px-6 py-5 flex flex-col gap-4 overflow-y-auto flex-1 min-h-0">
           {/* Scheduled time */}
           <div className="flex items-start gap-3">
             <Clock size={15} className="text-text-secondary mt-0.5 shrink-0" />
@@ -853,24 +875,24 @@ function CompositionModal({
                       />
                     </div>
                     {/* Slot texts — collapsible once video exists */}
-                    <div className="border border-white/10 rounded-xl overflow-hidden">
+                    <div className="border border-white/10 rounded-xl">
                       <button
                         onClick={() => setContentOpen((v) => !v)}
-                        className="w-full flex items-center justify-between px-4 py-3 text-xs text-text-secondary hover:text-white hover:bg-white/5 transition-colors"
+                        className="w-full flex items-center justify-between px-4 py-3 text-xs text-text-secondary hover:text-white hover:bg-white/5 transition-colors rounded-xl"
                       >
                         <span className="uppercase tracking-wider font-medium">Content</span>
                         <ChevronDown size={14} className={cn('transition-transform duration-200', contentOpen && 'rotate-180')} />
                       </button>
                       {contentOpen && (
-                        <div className="px-4 pb-4 border-t border-white/5">
-                          <ReelContent comp={comp} />
+                        <div className="px-4 pb-4 border-t border-white/10">
+                          <ReelContent comp={comp} actioning={actioning} onSaved={onRefresh} />
                         </div>
                       )}
                     </div>
                   </>
                 ) : (
                   /* No video yet — show slot texts open for review */
-                  <ReelContent comp={comp} />
+                  <ReelContent comp={comp} actioning={actioning} onSaved={onRefresh} />
                 )}
               </>
             )
@@ -944,6 +966,11 @@ function CompositionModal({
               <p className="text-sm text-text-secondary italic">No caption yet.</p>
             )}
           </div>
+
+          {/* Original idea — collapsible */}
+          {comp.ideaText && (
+            <IdeaToggle ideaText={comp.ideaText} />
+          )}
 
           {/* Schedule / Reschedule picker */}
           {scheduling && (
@@ -1257,6 +1284,7 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
         noDigest: boolean
         approvedIdeas: number
         slotsFilled: number
+        skippedByBatchRule: number
         needsApproval: number
       }
 
@@ -1272,7 +1300,15 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
         toast.warning('Could not auto-generate ideas — no InspoBase digest available. Add topics manually in the Ideas tab.')
       }
 
-      // Step 2: approval gap
+      // Step 2: batch-rule skips
+      if (r.skippedByBatchRule > 0) {
+        toast.warning(
+          `${r.skippedByBatchRule} slot${r.skippedByBatchRule === 1 ? '' : 's'} left empty — all available ideas come from the same batch. Generate or approve ideas from a different session in the Ideas tab.`,
+          { duration: 10000 },
+        )
+      }
+
+      // Step 3: approval gap
       if (r.needsApproval > 0) {
         toast.warning(
           r.approvedIdeas === 0
@@ -1282,7 +1318,7 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
         )
       }
 
-      // Step 3: final scheduling result
+      // Step 4: final scheduling result
       const remaining = r.slotsNeeded - r.slotsFilled
       if (r.slotsFilled === 0 && r.needsApproval > 0) {
         // All blocked on approval — main message was already shown above

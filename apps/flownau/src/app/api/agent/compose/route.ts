@@ -96,11 +96,16 @@ export async function POST(req: Request) {
     const resolvedTemplateId =
       templateId ??
       (targetSlotId && !templateId
-        ? (await prisma.brandTemplateConfig.findFirst({
-            where: { brandId, enabled: true, template: { format: format === 'trial_reel' ? 'reel' : format } },
-            include: { template: { select: { id: true } } },
-            orderBy: { updatedAt: 'desc' },
-          }))?.template.id ?? undefined
+        ? (() => {
+            const key = format === 'trial_reel' ? 'reel' : format
+            return prisma.brandTemplateConfig.findMany({
+              where: { brandId, enabled: true, template: { format: key } },
+              select: { template: { select: { id: true } } },
+            }).then((configs) => {
+              if (configs.length === 0) return undefined
+              return configs[Math.floor(Math.random() * configs.length)]!.template.id
+            })
+          })()
         : undefined) ??
       (postId
         ? (await prisma.post.findUnique({ where: { id: postId }, select: { templateId: true } }))
@@ -113,15 +118,15 @@ export async function POST(req: Request) {
       : ((await prisma.brandPersona.findFirst({ where: { brandId, isDefault: true } })) ??
         (await prisma.brandPersona.findFirst({ where: { brandId } })))
 
-    // Check template auto-approve and fetch custom prompt
-    let autoApproveDraft = persona?.autoApproveCompositions ?? false
+    // Check template config for auto-approve draft and custom prompt
+    let autoApproveDraft = false
     let templateCustomPrompt: string | null = null
     if (resolvedTemplateId) {
       const config = await prisma.brandTemplateConfig.findUnique({
         where: { brandId_templateId: { brandId, templateId: resolvedTemplateId } },
         select: { autoApproveDraft: true, customPrompt: true },
       })
-      if (!autoApproveDraft) autoApproveDraft = config?.autoApproveDraft ?? false
+      autoApproveDraft = config?.autoApproveDraft ?? false
       templateCustomPrompt = config?.customPrompt ?? null
     }
 
@@ -138,6 +143,7 @@ export async function POST(req: Request) {
       })
 
       if (postId) {
+        const existing = await prisma.post.findUnique({ where: { id: postId }, select: { llmTrace: true } })
         updatedPost = await prisma.post.update({
           where: { id: postId },
           data: {
@@ -148,6 +154,7 @@ export async function POST(req: Request) {
             status: draftStatus,
             templateId: result.templateId ?? resolvedTemplateId ?? null,
             brandPersonaId: result.personaId ?? persona?.id ?? null,
+            llmTrace: { ...(existing?.llmTrace as object ?? {}), draftTrace: result.trace },
           },
         })
       } else {
@@ -163,6 +170,7 @@ export async function POST(req: Request) {
             source: 'manual',
             templateId: result.templateId ?? resolvedTemplateId ?? null,
             brandPersonaId: result.personaId ?? persona?.id ?? null,
+            llmTrace: { draftTrace: result.trace },
           },
         })
       }
@@ -194,6 +202,7 @@ export async function POST(req: Request) {
       }
 
       if (postId) {
+        const existing = await prisma.post.findUnique({ where: { id: postId }, select: { llmTrace: true } })
         updatedPost = await prisma.post.update({
           where: { id: postId },
           data: {
@@ -204,6 +213,7 @@ export async function POST(req: Request) {
             status: draftStatus,
             templateId: resolvedTemplateId,
             brandPersonaId: persona?.id ?? null,
+            llmTrace: { ...(existing?.llmTrace as object ?? {}), draftTrace: result.trace },
           },
         })
       } else {
@@ -219,6 +229,7 @@ export async function POST(req: Request) {
             source: 'manual',
             templateId: resolvedTemplateId,
             brandPersonaId: persona?.id ?? null,
+            llmTrace: { draftTrace: result.trace },
           },
         })
       }

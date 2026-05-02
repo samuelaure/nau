@@ -34,6 +34,7 @@ type Template = {
   contentSchema?: Record<string, unknown> | null
   brandConfigs?: Array<{
     enabled: boolean
+    autoApproveDraft: boolean
     autoApprovePost: boolean
     customPrompt?: string | null
   }> | null
@@ -74,6 +75,7 @@ function TemplateModal({
 }) {
   const config = template.brandConfigs?.[0]
   const [isEnabled, setIsEnabled] = useState(config?.enabled ?? false)
+  const [autoApproveDraft, setAutoApproveDraft] = useState(config?.autoApproveDraft ?? false)
   const [autoApprovePost, setAutoApprovePost] = useState(config?.autoApprovePost ?? false)
   const [promptOpen, setPromptOpen] = useState(false)
   const [promptDraft, setPromptDraft] = useState(config?.customPrompt ?? '')
@@ -99,7 +101,7 @@ function TemplateModal({
   // Head-talk sections from contentSchema
   const htSections = (contentSchema?.sections as Array<{ key: string; label: string; intention: string; maxWords: number }> | undefined) ?? null
 
-  const update = async (patch: { enabled?: boolean; autoApprovePost?: boolean }) => {
+  const update = async (patch: { enabled?: boolean; autoApproveDraft?: boolean; autoApprovePost?: boolean }) => {
     setSaving(true)
     try {
       const res = await fetch('/api/account-templates', {
@@ -109,6 +111,7 @@ function TemplateModal({
       })
       if (!res.ok) throw new Error()
       if (patch.enabled !== undefined) setIsEnabled(patch.enabled)
+      if (patch.autoApproveDraft !== undefined) setAutoApproveDraft(patch.autoApproveDraft)
       if (patch.autoApprovePost !== undefined) setAutoApprovePost(patch.autoApprovePost)
       toast.success('Updated')
       onRefresh()
@@ -256,8 +259,21 @@ function TemplateModal({
                 </label>
                 <label className="flex items-center justify-between bg-white/3 border border-white/8 rounded-lg px-3 py-2.5 cursor-pointer">
                   <div>
-                    <p className="text-sm font-medium">Auto-post</p>
-                    <p className="text-xs text-white/40 mt-0.5">Automatically publish once render is approved</p>
+                    <p className="text-sm font-medium">Auto-approve draft</p>
+                    <p className="text-xs text-white/40 mt-0.5">Automatically approve the generated draft and queue it for rendering</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={autoApproveDraft}
+                    disabled={saving}
+                    onChange={(e) => update({ autoApproveDraft: e.target.checked })}
+                    className="w-4 h-4 accent-accent shrink-0"
+                  />
+                </label>
+                <label className="flex items-center justify-between bg-white/3 border border-white/8 rounded-lg px-3 py-2.5 cursor-pointer">
+                  <div>
+                    <p className="text-sm font-medium">Auto-approve post</p>
+                    <p className="text-xs text-white/40 mt-0.5">Automatically approve the rendered video for publishing when its scheduled time arrives</p>
                   </div>
                   <input
                     type="checkbox"

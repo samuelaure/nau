@@ -85,6 +85,7 @@ export async function POST(req: Request) {
         templateId: selectedTemplate.id,
         status: 'DRAFT_APPROVED',
         brandPersonaId: persona?.id ?? null,
+        llmTrace: { draftTrace: slotResult.trace },
       },
     })
 

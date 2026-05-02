@@ -22,6 +22,18 @@ function ensureOutputDir(): void {
   if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true })
 }
 
+async function applyAutoApprovePost(postId: string, brandId: string, templateId: string | null): Promise<void> {
+  if (!templateId) return
+  const config = await prisma.brandTemplateConfig.findUnique({
+    where: { brandId_templateId: { brandId, templateId } },
+    select: { autoApprovePost: true },
+  })
+  if (config?.autoApprovePost) {
+    await prisma.post.update({ where: { id: postId }, data: { status: 'RENDERED_APPROVED' } })
+    logger.info(`[RenderWorker] Auto-approved post ${postId} for publishing`)
+  }
+}
+
 function cleanupFile(filePath: string): void {
   try {
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
@@ -69,6 +81,7 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
       where: { id: postId },
       data: { videoUrl: post.userUploadedMediaUrl, status: 'RENDERED_PENDING' },
     })
+    await applyAutoApprovePost(postId, post.brandId, post.templateId)
     await job.updateProgress(100)
     logger.info(`[RenderWorker] Passthrough complete for ${postId} (${post.format})`)
     return
@@ -231,6 +244,7 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
       where: { id: postId },
       data: { videoUrl: videoPublicUrl, coverUrl, status: 'RENDERED_PENDING' },
     })
+    await applyAutoApprovePost(postId, post.brandId, post.templateId)
 
     logger.info(`[RenderWorker] Video render complete: ${postId} (${renderTimeMs}ms)`)
   } else {
@@ -261,6 +275,7 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
       where: { id: postId },
       data: { videoUrl: imagePublicUrl, status: 'RENDERED_PENDING' },
     })
+    await applyAutoApprovePost(postId, post.brandId, post.templateId)
 
     logger.info(`[RenderWorker] Still render complete: ${postId} (${renderTimeMs}ms)`)
   }
