@@ -1,6 +1,5 @@
 import { prisma } from '@/modules/shared/prisma'
-import { composeDraft } from '@/modules/composer/draft-composer'
-import { HeadTalkCreativeSchema } from '@/modules/composer/head-talk-composer'
+import { composeHeadTalk } from '@/modules/composer/headtalk-composer'
 
 const brandId = 'cmogyjn5a0006gcv46nis4o0l'
 
@@ -21,13 +20,10 @@ async function main() {
     console.log(`\nComposing ${template.name}...`)
     console.log(`Idea: ${idea.slice(0, 80)}`)
 
-    const result = await composeDraft({
+    const result = await composeHeadTalk({
       ideaText: idea,
       brandId,
       templateId: template.id,
-      format: 'head_talk',
-      outputSchema: HeadTalkCreativeSchema,
-      schemaName: 'HeadTalkCreative',
     })
 
     const creative = result.creative as any

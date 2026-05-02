@@ -3,9 +3,8 @@
  * Usage: npx dotenv ... npx tsx src/scripts/compose-and-render.ts
  */
 import { prisma } from '@/modules/shared/prisma'
-import { composeSlots } from '@/modules/composer/slot-composer'
-import { composeDraft } from '@/modules/composer/draft-composer'
-import { HeadTalkCreativeSchema } from '@/modules/composer/head-talk-composer'
+import { composeReel } from '@/modules/composer/reel-composer'
+import { composeHeadTalk } from '@/modules/composer/headtalk-composer'
 import { triggerRenderForPost } from '@/modules/renderer/render-queue'
 
 const brandId = 'cmogyjn5a0006gcv46nis4o0l'
@@ -44,7 +43,7 @@ async function main() {
     console.log(`    Idea: ${idea.ideaText.slice(0, 80)}`)
 
     try {
-      const result = await composeSlots({ ideaText: idea.ideaText, brandId, templateId: template.id })
+      const result = await composeReel({ ideaText: idea.ideaText, brandId, templateId: template.id })
       console.log(`    ✓ Slots: ${JSON.stringify(result.slots)}`)
       console.log(`    Caption: ${result.caption.slice(0, 80)}...`)
       console.log(`    brollMood: ${result.brollMood}`)
@@ -72,13 +71,10 @@ async function main() {
     const htIdea = `La conexión entre padres e hijos se fortalece cuando los niños aprenden en libertad y confianza.`
     console.log(`\n  Composing head talk: ${htTemplate.name}...`)
     try {
-      const result = await composeDraft({
+      const result = await composeHeadTalk({
         ideaText: htIdea,
         brandId,
         templateId: htTemplate.id,
-        format: 'head_talk',
-        outputSchema: HeadTalkCreativeSchema,
-        schemaName: 'HeadTalkCreative',
       })
       console.log(`    ✓ Hook: ${(result.creative as any).hook?.slice(0, 80)}`)
       console.log(`    ✓ Body: ${(result.creative as any).body?.slice(0, 80)}...`)

@@ -3,7 +3,7 @@
  * Usage: npx tsx src/scripts/compose-one.ts <ideaId> <templateName>
  */
 import { prisma } from '@/modules/shared/prisma'
-import { composeSlots } from '@/modules/composer/slot-composer'
+import { composeReel } from '@/modules/composer/reel-composer'
 import { triggerRenderForPost, renderQueue } from '@/modules/renderer/render-queue'
 
 const brandId = 'cmogyjn5a0006gcv46nis4o0l'
@@ -26,7 +26,7 @@ async function main() {
 
   console.log(`Composing ${template.name} (${template.remotionId}) for idea: ${idea.ideaText.slice(0, 80)}`)
 
-  const result = await composeSlots({ ideaText: idea.ideaText, brandId, templateId: template.id })
+  const result = await composeReel({ ideaText: idea.ideaText, brandId, templateId: template.id })
   console.log('Slots:', JSON.stringify(result.slots))
   console.log('Caption:', result.caption.slice(0, 100))
   console.log('brollMood:', result.brollMood)

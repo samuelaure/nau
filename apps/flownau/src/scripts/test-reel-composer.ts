@@ -1,5 +1,5 @@
 import { prisma } from '@/modules/shared/prisma'
-import { composeSlots } from '@/modules/composer/slot-composer'
+import { composeReel } from '@/modules/composer/reel-composer'
 
 const brandId = 'cmogyjn5a0006gcv46nis4o0l'
 
@@ -10,7 +10,7 @@ async function main() {
   })
   console.log('Template:', template)
 
-  const result = await composeSlots({
+  const result = await composeReel({
     ideaText: 'Homeschool en el bosque: aprender con la naturaleza como maestra',
     brandId,
     templateId: template!.id,

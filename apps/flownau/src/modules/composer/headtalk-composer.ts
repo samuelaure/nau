@@ -1,12 +1,10 @@
 import { getClientForFeature } from '@nau/llm-client'
 import { z } from 'zod'
 import { prisma } from '@/modules/shared/prisma'
-import { logError } from '@/modules/shared/logger'
+import { logError, logger } from '@/modules/shared/logger'
 import type { LlmTrace } from '@/modules/ideation/ideation.service'
 
 // ─── Universal Drafter System Prompt ─────────────────────────────────────────
-// Platform-level constant. Governs how any idea becomes a draft, regardless
-// of format. The template injects format-specific schema and guidelines on top.
 
 const UNIVERSAL_DRAFTER_PROMPT = `You are a content creator who understands one fundamental truth about human attention: people do not stop scrolling for information — they stop for feeling.
 
@@ -92,20 +90,29 @@ Engineer for this. Not for likes. Likes are a lagging indicator of resonance.
 * Disclaimers or caveats in the hook
 * A confident tone wrapped around a generic idea — the voice doesn't save weak content. The idea has to work first.`
 
+// ─── Output schema ────────────────────────────────────────────────────────────
+
+export const HeadTalkCreativeSchema = z.object({
+  hook: z.string().describe('Opening hook — max 2 sentences. Wins attention in the first 2 seconds.'),
+  body: z.string().describe('Main content body — max 150 words. Short paragraphs, one idea each.'),
+  cta: z.string().describe('Call to action — max 2 sentences. Closes the loop the hook opened.'),
+  caption: z.string().describe('Social media caption for when the video is published.'),
+  hashtags: z.array(z.string()).describe('8-12 relevant hashtags without # prefix.'),
+})
+
+export type HeadTalkCreative = z.infer<typeof HeadTalkCreativeSchema>
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export interface DraftComposerInput {
+export interface HeadTalkInput {
   ideaText: string
   brandId: string
-  templateId?: string   // if omitted, uses first enabled template for the format
-  format?: string       // used to find template when templateId not given
+  templateId?: string
   personaId?: string
-  outputSchema: z.ZodTypeAny
-  schemaName: string
 }
 
-export interface DraftComposerResult<T = unknown> {
-  creative: T
+export interface HeadTalkOutput {
+  creative: HeadTalkCreative
   caption: string
   hashtags: string[]
   templateId: string | null
@@ -113,12 +120,12 @@ export interface DraftComposerResult<T = unknown> {
   trace: LlmTrace
 }
 
-// ─── Universal Draft Composer ─────────────────────────────────────────────────
+// ─── Composer ─────────────────────────────────────────────────────────────────
 
-export async function composeDraft<T = unknown>(
-  input: DraftComposerInput,
-): Promise<DraftComposerResult<T>> {
-  const { ideaText, brandId, templateId, format, personaId, outputSchema, schemaName } = input
+export async function composeHeadTalk(input: HeadTalkInput): Promise<HeadTalkOutput> {
+  const { ideaText, brandId, templateId, personaId } = input
+
+  logger.info({ brandId, templateId }, '[HeadTalkComposer] Starting composition')
 
   // 1. Resolve persona
   const persona = personaId
@@ -133,13 +140,15 @@ export async function composeDraft<T = unknown>(
       where: { id: templateId },
       select: { id: true, systemPrompt: true, contentSchema: true },
     })
-  } else if (format) {
+  } else {
     const config = await prisma.brandTemplateConfig.findFirst({
-      where: { brandId, enabled: true, template: { format } },
+      where: { brandId, enabled: true, template: { format: 'head_talk' } },
       include: { template: { select: { id: true, systemPrompt: true, contentSchema: true } } },
     })
     template = config?.template ?? null
   }
+
+  logger.info({ brandId, templateId: template?.id ?? null, persona: persona?.name ?? 'none' }, '[HeadTalkComposer] Resolved persona and template')
 
   // 3. Resolve brand language + context
   const brand = await prisma.brand.findUnique({
@@ -158,7 +167,7 @@ export async function composeDraft<T = unknown>(
     customPrompt = config?.customPrompt ?? null
   }
 
-  // 5. Assemble system prompt — creator instructions block goes first at highest priority
+  // 5. Assemble system prompt
   const creatorBlock = customPrompt?.trim()
     ? `⚠️ CREATOR INSTRUCTIONS — these take absolute precedence over all guidelines below. Follow them exactly; let them shape the output above everything else:\n\n<creator_instructions>\n${customPrompt.trim()}\n</creator_instructions>\n\nAll sections below are subordinate to the above.\n\n---\n\n`
     : ''
@@ -171,38 +180,31 @@ export async function composeDraft<T = unknown>(
     : `\n---\n\nCRITICAL: Never mention usernames, @handles, or social media account names in any output.`
 
   const sections: string[] = [`${creatorBlock}${UNIVERSAL_DRAFTER_PROMPT}`]
-
   sections.push(brandContextBlock)
-
-  if (persona?.systemPrompt) {
-    sections.push(`\n---\n\n**BRAND VOICE**\n\n${persona.systemPrompt}`)
-  }
-
-  if (template?.systemPrompt) {
-    sections.push(`\n---\n\n**TEMPLATE GUIDELINES**\n\n${template.systemPrompt}`)
-  }
-
+  if (persona?.systemPrompt) sections.push(`\n---\n\n**BRAND VOICE**\n\n${persona.systemPrompt}`)
+  if (template?.systemPrompt) sections.push(`\n---\n\n**TEMPLATE GUIDELINES**\n\n${template.systemPrompt}`)
   if (template?.contentSchema) {
     sections.push(
       `\n**OUTPUT SCHEMA**\n\nProduce your output matching this structure exactly:\n\`\`\`json\n${JSON.stringify(template.contentSchema, null, 2)}\n\`\`\``,
     )
   }
-
   sections.push(`\n---\n\nLANGUAGE: Write the content in ${language}`)
   sections.push(`\nCREATE THE CONTENT ABOUT THIS TOPIC:`)
 
   const systemPrompt = sections.join('\n')
 
-  // 5. Call LLM
+  // 6. Call LLM
   const { client: llm, model, registryId, provider } = getClientForFeature('composition')
+
+  logger.info({ brandId, templateId: template?.id ?? null, provider, model }, '[HeadTalkComposer] Calling LLM')
 
   let rawResult: unknown
   try {
     const result = await llm.parseCompletion({
       model,
       temperature: 0.65,
-      schema: outputSchema as any,
-      schemaName,
+      schema: HeadTalkCreativeSchema as any,
+      schemaName: 'HeadTalkCreative',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: ideaText },
@@ -210,17 +212,17 @@ export async function composeDraft<T = unknown>(
       timeoutMs: 40_000,
     })
     rawResult = result.data
+    logger.info({ brandId, templateId: template?.id ?? null }, '[HeadTalkComposer] LLM response received successfully')
   } catch (err) {
-    logError('DRAFT_COMPOSER_LLM_ERROR', err)
+    logError('[HeadTalkComposer] LLM call failed', err)
     throw err
   }
 
-  const creative = rawResult as T
+  const creative = rawResult as HeadTalkCreative
+  const caption = typeof creative.caption === 'string' ? creative.caption : ''
+  const hashtags = Array.isArray(creative.hashtags) ? creative.hashtags : []
 
-  // Extract caption + hashtags from the creative (all schemas must include them)
-  const c = creative as Record<string, unknown>
-  const caption = typeof c.caption === 'string' ? c.caption : ''
-  const hashtags = Array.isArray(c.hashtags) ? (c.hashtags as string[]) : []
+  logger.info({ brandId, templateId: template?.id ?? null, captionLength: caption.length }, '[HeadTalkComposer] Composition complete')
 
   return {
     creative,

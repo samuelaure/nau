@@ -1,6 +1,6 @@
 import { prisma } from '@/modules/shared/prisma'
 import { renderQueue, addRenderJob } from '@/modules/renderer/render-queue'
-import { composeSlots } from '@/modules/composer/slot-composer'
+import { composeReel } from '@/modules/composer/reel-composer'
 
 const brandId = 'cmogyjn5a0006gcv46nis4o0l'
 const TEMPLATES = ['ReelT2', 'ReelT3', 'ReelT4']
@@ -16,7 +16,7 @@ async function main() {
     })
     console.log(`\nComposing ${template.name} (${remotionId})...`)
 
-    const result = await composeSlots({ ideaText, brandId, templateId: template.id })
+    const result = await composeReel({ ideaText, brandId, templateId: template.id })
     console.log('  slots:', JSON.stringify(result.slots))
     console.log('  caption:', result.caption?.slice(0, 60))
     console.log('  brollMood:', result.brollMood)

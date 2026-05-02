@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 import type { Prisma } from '@prisma/client'
-import { composeSlots } from '@/modules/composer/slot-composer'
-import { composeDraft } from '@/modules/composer/draft-composer'
-import { HeadTalkCreativeSchema } from '@/modules/composer/head-talk-composer'
+import { composeReel } from '@/modules/composer/reel-composer'
+import { composeHeadTalk } from '@/modules/composer/headtalk-composer'
 import { triggerRenderForPost } from '@/modules/renderer/render-queue'
 import type { ContentFormat } from '@/types/content'
 import { logError, logger } from '@/modules/shared/logger'
@@ -61,29 +60,27 @@ export async function GET(request: Request) {
         let resolvedTemplateId: string | null = selectedTemplateId
 
         if (REEL_FORMATS.has(format) && selectedTemplateId) {
-          const slotResult = await composeSlots({
+          const reelResult = await composeReel({
             ideaText: post.ideaText ?? '',
             brandId: post.brandId,
             templateId: selectedTemplateId,
             personaId: persona?.id,
             customPrompt: templateConfig?.customPrompt ?? null,
           })
-          creative = { slots: slotResult.slots, caption: slotResult.caption, hashtags: slotResult.hashtags, brollMood: slotResult.brollMood }
-          caption = slotResult.caption
-          hashtags = slotResult.hashtags
+          creative = { slots: reelResult.slots, caption: reelResult.caption, hashtags: reelResult.hashtags, brollMood: reelResult.brollMood }
+          caption = reelResult.caption
+          hashtags = reelResult.hashtags
         } else {
-          const draftResult = await composeDraft({
+          const headTalkResult = await composeHeadTalk({
             ideaText: post.ideaText ?? '',
             brandId: post.brandId,
             templateId: selectedTemplateId ?? undefined,
-            format,
-            outputSchema: HeadTalkCreativeSchema,
-            schemaName: 'HeadTalkCreative',
+            personaId: persona?.id,
           })
-          creative = draftResult.creative
-          caption = draftResult.caption
-          hashtags = draftResult.hashtags
-          resolvedTemplateId = draftResult.templateId
+          creative = headTalkResult.creative
+          caption = headTalkResult.caption
+          hashtags = headTalkResult.hashtags
+          resolvedTemplateId = headTalkResult.templateId
         }
 
         await prisma.post.update({

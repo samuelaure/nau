@@ -283,7 +283,7 @@ function deriveScript(creative: Record<string, unknown> | null): string {
   if (!creative) return ''
   // Prefer explicit script field (user-edited)
   if (typeof creative.script === 'string' && creative.script.trim()) return creative.script
-  // Fall back to structured hook/body/cta fields from composeDraft
+  // Fall back to structured hook/body/cta fields
   const parts: string[] = []
   if (typeof creative.hook === 'string' && creative.hook.trim()) parts.push(creative.hook.trim())
   if (typeof creative.body === 'string' && creative.body.trim()) parts.push(creative.body.trim())

@@ -2,9 +2,9 @@ import type { Prisma } from '@prisma/client'
 import { prisma } from '@/modules/shared/prisma'
 import { logger } from '@/modules/shared/logger'
 import { materializeSlots } from './slot-materializer'
-import { composeDraft } from '@/modules/composer/draft-composer'
-import { HeadTalkCreativeSchema } from '@/modules/composer/head-talk-composer'
-import { composeSlots } from '@/modules/composer/slot-composer'
+import { composeHeadTalk } from '@/modules/composer/headtalk-composer'
+import { HeadTalkCreativeSchema } from '@/modules/composer/headtalk-composer'
+import { composeReel } from '@/modules/composer/reel-composer'
 import { triggerRenderForPost } from '@/modules/renderer/render-queue'
 import { shuffle } from '@/modules/video/utils/assets'
 import { signServiceToken } from '@nau/auth'
@@ -238,30 +238,27 @@ async function runCheck1(
 
         let draftTrace
         if (REEL_FORMATS.has(slot.format) && templateId) {
-          const slotResult = await composeSlots({
+          const reelResult = await composeReel({
             ideaText: candidate.ideaText ?? '',
             brandId,
             templateId,
             customPrompt: templateConfig?.customPrompt ?? null,
           })
-          creative = { slots: slotResult.slots, caption: slotResult.caption, hashtags: slotResult.hashtags, brollMood: slotResult.brollMood }
-          caption = slotResult.caption
-          hashtags = slotResult.hashtags
-          draftTrace = slotResult.trace
+          creative = { slots: reelResult.slots, caption: reelResult.caption, hashtags: reelResult.hashtags, brollMood: reelResult.brollMood }
+          caption = reelResult.caption
+          hashtags = reelResult.hashtags
+          draftTrace = reelResult.trace
         } else {
-          const draftResult = await composeDraft({
+          const headTalkResult = await composeHeadTalk({
             ideaText: candidate.ideaText ?? '',
             brandId,
             templateId,
-            format: slot.format,
-            outputSchema: HeadTalkCreativeSchema,
-            schemaName: 'HeadTalkCreative',
           })
-          creative = draftResult.creative
-          caption = draftResult.caption
-          hashtags = draftResult.hashtags
-          resolvedTemplateId = draftResult.templateId
-          draftTrace = draftResult.trace
+          creative = headTalkResult.creative
+          caption = headTalkResult.caption
+          hashtags = headTalkResult.hashtags
+          resolvedTemplateId = headTalkResult.templateId
+          draftTrace = headTalkResult.trace
         }
 
         const autoApproveDraft = templateConfig?.autoApproveDraft ?? false
@@ -367,18 +364,18 @@ async function runCheck1(
 
         let draftTrace
         if (REEL_FORMATS.has(slot.format) && templateId) {
-          const slotResult = await composeSlots({ ideaText: retryCandidate.ideaText ?? '', brandId, templateId, customPrompt: templateConfig?.customPrompt ?? null })
-          creative = { slots: slotResult.slots, caption: slotResult.caption, hashtags: slotResult.hashtags, brollMood: slotResult.brollMood }
-          caption = slotResult.caption
-          hashtags = slotResult.hashtags
-          draftTrace = slotResult.trace
+          const reelResult = await composeReel({ ideaText: retryCandidate.ideaText ?? '', brandId, templateId, customPrompt: templateConfig?.customPrompt ?? null })
+          creative = { slots: reelResult.slots, caption: reelResult.caption, hashtags: reelResult.hashtags, brollMood: reelResult.brollMood }
+          caption = reelResult.caption
+          hashtags = reelResult.hashtags
+          draftTrace = reelResult.trace
         } else {
-          const draftResult = await composeDraft({ ideaText: retryCandidate.ideaText ?? '', brandId, templateId, format: slot.format, outputSchema: HeadTalkCreativeSchema, schemaName: 'HeadTalkCreative' })
-          creative = draftResult.creative
-          caption = draftResult.caption
-          hashtags = draftResult.hashtags
-          resolvedTemplateId = draftResult.templateId
-          draftTrace = draftResult.trace
+          const headTalkResult = await composeHeadTalk({ ideaText: retryCandidate.ideaText ?? '', brandId, templateId })
+          creative = headTalkResult.creative
+          caption = headTalkResult.caption
+          hashtags = headTalkResult.hashtags
+          resolvedTemplateId = headTalkResult.templateId
+          draftTrace = headTalkResult.trace
         }
 
         const autoApproveDraft = templateConfig?.autoApproveDraft ?? false

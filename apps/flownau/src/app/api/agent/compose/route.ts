@@ -7,8 +7,8 @@ import { checkBrandAccess } from '@/modules/shared/actions'
 import { z } from 'zod'
 import { logError, logger } from '@/modules/shared/logger'
 import { checkRateLimit } from '@/modules/shared/rate-limit'
-import { composeHeadTalk } from '@/modules/composer/head-talk-composer'
-import { composeSlots } from '@/modules/composer/slot-composer'
+import { composeHeadTalk } from '@/modules/composer/headtalk-composer'
+import { composeReel } from '@/modules/composer/reel-composer'
 
 const ComposeRequestSchema = z.object({
   prompt: z.string().min(3),
@@ -177,7 +177,6 @@ export async function POST(req: Request) {
 
       logger.info(`[HeadTalkCompose] Updated post ${updatedPost.id}`)
     } else {
-      // Reel formats: slot-composer
       const templateMeta = resolvedTemplateId
         ? await prisma.template.findUnique({ where: { id: resolvedTemplateId }, select: { remotionId: true } })
         : null
@@ -186,7 +185,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'No template found for this format' }, { status: 400 })
       }
 
-      const result = await composeSlots({
+      const result = await composeReel({
         ideaText: prompt,
         brandId,
         templateId: resolvedTemplateId,

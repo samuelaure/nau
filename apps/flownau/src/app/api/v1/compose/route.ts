@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { validateServiceToken, unauthorizedResponse } from '@/modules/shared/nau-auth'
 import { prisma } from '@/modules/shared/prisma'
-import { composeSlots } from '@/modules/composer/slot-composer'
+import { composeReel } from '@/modules/composer/reel-composer'
 import { triggerRenderForPost } from '@/modules/renderer/render-queue'
 import { selectTemplateForIdea } from '@/modules/composer/template-selector'
 import { logError, logger } from '@/modules/shared/logger'
@@ -65,7 +65,7 @@ export async function POST(req: Request) {
 
     const persona = await prisma.brandPersona.findFirst({ where: { brandId: input.brandId, isDefault: true } })
 
-    const slotResult = await composeSlots({
+    const reelResult = await composeReel({
       ideaText: input.prompt,
       brandId: input.brandId,
       templateId: selectedTemplate.id,
@@ -73,19 +73,19 @@ export async function POST(req: Request) {
       customPrompt: templateConfig?.customPrompt ?? null,
     })
 
-    const creative = { slots: slotResult.slots, caption: slotResult.caption, hashtags: slotResult.hashtags, brollMood: slotResult.brollMood }
+    const creative = { slots: reelResult.slots, caption: reelResult.caption, hashtags: reelResult.hashtags, brollMood: reelResult.brollMood }
 
     const updatedPost = await prisma.post.update({
       where: { id: post.id },
       data: {
         format: input.format,
         creative: creative as Prisma.InputJsonValue,
-        caption: slotResult.caption,
-        hashtags: slotResult.hashtags,
+        caption: reelResult.caption,
+        hashtags: reelResult.hashtags,
         templateId: selectedTemplate.id,
         status: 'DRAFT_APPROVED',
         brandPersonaId: persona?.id ?? null,
-        llmTrace: { draftTrace: slotResult.trace },
+        llmTrace: { draftTrace: reelResult.trace },
       },
     })
 

@@ -12,7 +12,7 @@ const PLATFORM_DEFAULT_PERSONA = {
   modelSelection: 'GROQ_LLAMA_3_3' as const,
 }
 
-export interface SlotComposerInput {
+export interface ReelComposerInput {
   ideaText: string
   brandId: string
   templateId: string
@@ -20,7 +20,7 @@ export interface SlotComposerInput {
   customPrompt?: string | null
 }
 
-export interface SlotComposerResult {
+export interface ReelComposerResult {
   slots: Record<string, string>
   caption: string
   hashtags: string[]
@@ -29,15 +29,10 @@ export interface SlotComposerResult {
   trace: LlmTrace
 }
 
-/**
- * SlotComposer — fills the fixed text slots defined in a template's slotSchema.
- *
- * Replaces scene-composer for reel templates. The AI's only job is to write
- * the right text for each slot — layout, timing, and visuals are fixed in the
- * Remotion component.
- */
-export async function composeSlots(input: SlotComposerInput): Promise<SlotComposerResult> {
+export async function composeReel(input: ReelComposerInput): Promise<ReelComposerResult> {
   const { ideaText, brandId, templateId, personaId, customPrompt } = input
+
+  logger.info({ brandId, templateId }, '[ReelComposer] Starting composition')
 
   const [persona, template, brandData] = await Promise.all([
     personaId
@@ -60,6 +55,8 @@ export async function composeSlots(input: SlotComposerInput): Promise<SlotCompos
 
   const slotDefs = template.slotSchema as unknown as SlotDef[]
   const effectivePersona = persona ?? PLATFORM_DEFAULT_PERSONA
+
+  logger.info({ brandId, templateId, persona: effectivePersona.name, slots: slotDefs.map((s) => s.key) }, '[ReelComposer] Resolved persona and template')
 
   // Resolve model
   const { provider, model, registryId } = resolveModelId(effectivePersona.modelSelection)
@@ -133,6 +130,8 @@ ${isMultiSlot ? `MULTI-SLOT NARRATIVE RULE (critical for this template):
 
   const llm = createLLMClient({ provider, apiKey })
 
+  logger.info({ brandId, templateId, provider, model }, '[ReelComposer] Calling LLM')
+
   const callAndParse = async (): Promise<Record<string, unknown>> => {
     const result = await llm.chatCompletion({
       model,
@@ -143,7 +142,6 @@ ${isMultiSlot ? `MULTI-SLOT NARRATIVE RULE (critical for this template):
     })
     const raw = result.content?.trim() ?? ''
     const jsonStr = raw.replace(/```json?\n?/g, '').replace(/```/g, '').trim()
-    // Extract first {...} block
     const start = jsonStr.indexOf('{')
     const end = jsonStr.lastIndexOf('}')
     if (start === -1 || end <= start) throw new Error(`No JSON object in response: ${raw.slice(0, 200)}`)
@@ -153,31 +151,34 @@ ${isMultiSlot ? `MULTI-SLOT NARRATIVE RULE (critical for this template):
   let parsed: Record<string, unknown>
   try {
     parsed = await callAndParse()
+    logger.info({ brandId, templateId }, '[ReelComposer] LLM response parsed successfully')
   } catch (firstError: unknown) {
     const errorMsg = firstError instanceof Error ? firstError.message : String(firstError)
-    logger.warn(`[SlotComposer] First attempt failed, retrying: ${errorMsg}`)
+    logger.warn({ brandId, templateId, error: errorMsg }, '[ReelComposer] First attempt failed, retrying')
     messages.push({
       role: 'user',
       content: `Your previous response had invalid JSON. Fix it and return only a valid JSON object. No markdown, no explanation.`,
     })
     try {
       parsed = await callAndParse()
+      logger.info({ brandId, templateId }, '[ReelComposer] Retry succeeded')
     } catch (secondError: unknown) {
-      logError(`[SlotComposer] Both attempts failed for idea: ${ideaText.slice(0, 100)}`, secondError)
-      throw new Error(`SlotComposer failed: ${secondError instanceof Error ? secondError.message : String(secondError)}`)
+      logError('[ReelComposer] Both attempts failed', secondError)
+      throw new Error(`ReelComposer failed: ${secondError instanceof Error ? secondError.message : String(secondError)}`)
     }
   }
 
   // Normalize: Groq often flattens slots to root level instead of nesting under "slots"
   let slots = (parsed.slots as Record<string, string> | undefined) ?? {}
   if (Object.keys(slots).length === 0) {
-    // Collect slot keys from slotDefs that appear at root level
     for (const slotDef of slotDefs) {
       if (typeof parsed[slotDef.key] === 'string') {
         slots[slotDef.key] = parsed[slotDef.key] as string
       }
     }
   }
+
+  logger.info({ brandId, templateId, slotKeys: Object.keys(slots), brollMood: parsed.brollMood }, '[ReelComposer] Composition complete')
 
   return {
     slots,
