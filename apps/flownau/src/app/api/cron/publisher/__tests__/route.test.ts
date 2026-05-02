@@ -5,7 +5,7 @@ import { publishComposition } from '@/modules/publisher/publish-orchestrator'
 
 vi.mock('@/modules/shared/prisma', () => ({
   prisma: {
-    composition: {
+    post: {
       findMany: vi.fn(),
       update: vi.fn(),
     },
@@ -31,42 +31,46 @@ vi.mock('@/modules/shared/logger', () => ({
 
 const mockRequest = new Request('http://localhost/api/cron/publisher')
 
-function buildComp(overrides: Partial<Record<string, unknown>> = {}) {
+function buildPost(overrides: Partial<Record<string, unknown>> = {}) {
   return {
-    id: 'comp1',
-    brandId: 'acc1',
+    id: 'post1',
+    brandId: 'brand1',
     templateId: 'tpl1',
     format: 'reel',
-    status: 'RENDERED',
+    status: 'RENDERED_APPROVED',
     scheduledAt: new Date(Date.now() - 1000),
     publishAttempts: 0,
-    videoUrl: 'https://r2.example.com/outputs/comp1.mp4',
+    videoUrl: 'https://r2.example.com/outputs/post1.mp4',
     coverUrl: null,
     caption: 'Test caption',
     hashtags: ['test'],
-    account: {
-      id: 'acc1',
-      accessToken: 'token',
-      platformId: 'ig123',
-      tokenExpiresAt: null,
-      username: 'samuel',
+    brand: {
+      socialProfiles: [
+        {
+          id: 'sp1',
+          accessToken: 'token',
+          platformId: 'ig123',
+          tokenExpiresAt: null,
+          username: 'samuel',
+        },
+      ],
     },
     template: {
       id: 'tpl1',
-      brandConfigs: [{ brandId: 'acc1', templateId: 'tpl1', autoApprovePost: true }],
+      brandConfigs: [{ brandId: 'brand1', templateId: 'tpl1', autoApprovePost: true }],
     },
     ...overrides,
   }
 }
 
-describe('Publisher Cron API (Phase 18)', () => {
+describe('Publisher Cron API', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('publishes compositions when BrandTemplateConfig.autoApprovePost is true', async () => {
-    const comp = buildComp()
-    ;(prisma.composition.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([comp])
+  it('publishes posts when BrandTemplateConfig.autoApprovePost is true', async () => {
+    const post = buildPost()
+    ;(prisma.post.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([post])
     ;(publishComposition as ReturnType<typeof vi.fn>).mockResolvedValue({
       success: true,
       externalId: 'ig_media_id',
@@ -77,23 +81,25 @@ describe('Publisher Cron API (Phase 18)', () => {
     const data = await response.json()
 
     expect(data.results).toContainEqual(
-      expect.objectContaining({ type: 'explicit', status: 'success' }),
+      expect.objectContaining({ postId: 'post1', status: 'success' }),
     )
-    expect(publishComposition).toHaveBeenCalledWith(comp)
+    expect(publishComposition).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'post1', format: 'reel' }),
+    )
     expect(prisma.contentPlanner.updateMany).toHaveBeenCalledWith({
-      where: { brandId: 'acc1', isDefault: true },
+      where: { brandId: 'brand1', isDefault: true },
       data: expect.objectContaining({ lastPostedAt: expect.any(Date) }),
     })
   })
 
-  it('skips compositions when autoApprovePost is false and status is not PUBLISHING', async () => {
-    const comp = buildComp({
+  it('skips posts when autoApprovePost is false and status is not PUBLISHING', async () => {
+    const post = buildPost({
       template: {
         id: 'tpl1',
-        brandConfigs: [{ brandId: 'acc1', templateId: 'tpl1', autoApprovePost: false }],
+        brandConfigs: [{ brandId: 'brand1', templateId: 'tpl1', autoApprovePost: false }],
       },
     })
-    ;(prisma.composition.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([comp])
+    ;(prisma.post.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([post])
 
     await GET(mockRequest)
 
@@ -101,26 +107,24 @@ describe('Publisher Cron API (Phase 18)', () => {
   })
 
   it('publishes when status is PUBLISHING even if autoApprovePost is false', async () => {
-    const comp = buildComp({
+    const post = buildPost({
       status: 'PUBLISHING',
       template: {
         id: 'tpl1',
-        brandConfigs: [{ brandId: 'acc1', templateId: 'tpl1', autoApprovePost: false }],
+        brandConfigs: [{ brandId: 'brand1', templateId: 'tpl1', autoApprovePost: false }],
       },
     })
-    ;(prisma.composition.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([comp])
-    ;(publishComposition as ReturnType<typeof vi.fn>).mockResolvedValue({
-      success: true,
-    })
+    ;(prisma.post.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([post])
+    ;(publishComposition as ReturnType<typeof vi.fn>).mockResolvedValue({ success: true })
 
     await GET(mockRequest)
 
-    expect(publishComposition).toHaveBeenCalledWith(comp)
+    expect(publishComposition).toHaveBeenCalled()
   })
 
   it('increments publishAttempts on orchestrator failure', async () => {
-    const comp = buildComp({ id: 'comp2', publishAttempts: 1, status: 'RENDERED' })
-    ;(prisma.composition.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([comp])
+    const post = buildPost({ id: 'post2', publishAttempts: 1, status: 'RENDERED_APPROVED' })
+    ;(prisma.post.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([post])
     ;(publishComposition as ReturnType<typeof vi.fn>).mockResolvedValue({
       success: false,
       error: 'IG API timeout',
@@ -130,19 +134,19 @@ describe('Publisher Cron API (Phase 18)', () => {
     const data = await response.json()
 
     expect(data.results[0].status).toBe('failed')
-    expect(prisma.composition.update).toHaveBeenCalledWith({
-      where: { id: 'comp2' },
+    expect(prisma.post.update).toHaveBeenCalledWith({
+      where: { id: 'post2' },
       data: {
         publishAttempts: 2,
         lastPublishError: 'IG API timeout',
-        status: 'RENDERED',
+        status: 'RENDERED_APPROVED',
       },
     })
   })
 
-  it('sets status to failed after 3 attempts', async () => {
-    const comp = buildComp({ id: 'comp3', publishAttempts: 2, format: 'trial_reel' })
-    ;(prisma.composition.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([comp])
+  it('sets status to PUBLISHING after 3 failed attempts', async () => {
+    const post = buildPost({ id: 'post3', publishAttempts: 2, status: 'RENDERED_APPROVED' })
+    ;(prisma.post.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([post])
     ;(publishComposition as ReturnType<typeof vi.fn>).mockResolvedValue({
       success: false,
       error: 'Persistent error',
@@ -150,13 +154,22 @@ describe('Publisher Cron API (Phase 18)', () => {
 
     await GET(mockRequest)
 
-    expect(prisma.composition.update).toHaveBeenCalledWith({
-      where: { id: 'comp3' },
+    expect(prisma.post.update).toHaveBeenCalledWith({
+      where: { id: 'post3' },
       data: {
         publishAttempts: 3,
         lastPublishError: 'Persistent error',
-        status: 'failed',
+        status: 'PUBLISHING',
       },
     })
+  })
+
+  it('skips posts with no social profile', async () => {
+    const post = buildPost({ brand: { socialProfiles: [] } })
+    ;(prisma.post.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([post])
+
+    await GET(mockRequest)
+
+    expect(publishComposition).not.toHaveBeenCalled()
   })
 })

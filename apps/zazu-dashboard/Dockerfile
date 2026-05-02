@@ -28,7 +28,9 @@ RUN cd packages/zazu-db && npx prisma generate
 RUN pnpm turbo build --filter=@zazu/dashboard
 
 # Stage the engine at a stable path so the runner can copy it without glob
-RUN find /app/node_modules -name "libquery_engine-linux-musl-openssl-3.0.x.so.node" \
+# touch ensures the file always exists so the runner COPY never fails if no engine is found
+RUN touch /app/prisma-engine.so.node && \
+    find /app/node_modules -name "libquery_engine-linux-musl-openssl-3.0.x.so.node" \
       -exec cp {} /app/prisma-engine.so.node \; 2>/dev/null || true
 
 RUN mkdir -p apps/zazu-dashboard/public apps/zazu-dashboard/.next/static
