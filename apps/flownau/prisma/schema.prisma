@@ -151,7 +151,8 @@ model Template {
   slotSchema       Json?
   styleConfig      Json?
   description      String?   @db.Text
-  previewUrl       String?
+  previewUrl           String?
+  previewThumbnailUrl  String?
 
   renders      Render[]
   assets       Asset[]

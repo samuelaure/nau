@@ -35,6 +35,9 @@ export default async function TemplateDetailPage({
           systemPrompt: template.systemPrompt,
           contentSchema: template.contentSchema,
           useBrandAssets: template.useBrandAssets,
+          description: template.description,
+          previewUrl: template.previewUrl,
+          previewThumbnailUrl: template.previewThumbnailUrl,
           _count: template._count,
         }}
         backUrl={backUrl}

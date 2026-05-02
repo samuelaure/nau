@@ -34,6 +34,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         creationPrompt: body.creationPrompt,
         captionPrompt: body.captionPrompt,
         sceneType: body.sceneType,
+        previewUrl: body.previewUrl,
+        previewThumbnailUrl: body.previewThumbnailUrl,
+        description: body.description,
       },
     })
     return NextResponse.json({ template }, { status: 200 })

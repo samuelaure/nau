@@ -16,6 +16,9 @@ interface Template {
   systemPrompt: string | null
   contentSchema: any
   useBrandAssets: boolean
+  description: string | null
+  previewUrl: string | null
+  previewThumbnailUrl: string | null
   _count?: { posts: number }
 }
 
@@ -34,6 +37,9 @@ export default function TemplateDetailClient({ template, backUrl }: Props) {
   const [sceneType, setSceneType] = useState(template.sceneType ?? '')
   const [scope, setScope] = useState(template.scope)
   const [systemPrompt, setSystemPrompt] = useState(template.systemPrompt ?? '')
+  const [description, setDescription] = useState(template.description ?? '')
+  const [previewUrl, setPreviewUrl] = useState(template.previewUrl ?? '')
+  const [previewThumbnailUrl, setPreviewThumbnailUrl] = useState(template.previewThumbnailUrl ?? '')
   const [contentSchemaRaw, setContentSchemaRaw] = useState(
     template.contentSchema ? JSON.stringify(template.contentSchema, null, 2) : '',
   )
@@ -63,6 +69,9 @@ export default function TemplateDetailClient({ template, backUrl }: Props) {
           scope,
           systemPrompt: systemPrompt || null,
           contentSchema: parsedSchema ?? null,
+          description: description || null,
+          previewUrl: previewUrl || null,
+          previewThumbnailUrl: previewThumbnailUrl || null,
         }),
       })
       if (!res.ok) throw new Error()
@@ -158,6 +167,23 @@ export default function TemplateDetailClient({ template, backUrl }: Props) {
         </h2>
 
         {field('Name', <input value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />)}
+
+        {field(
+          'Description',
+          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className={`${inputClass} resize-none`} placeholder="Short description shown in the template gallery" />,
+        )}
+
+        {field(
+          'Preview video URL',
+          <input value={previewUrl} onChange={(e) => setPreviewUrl(e.target.value)} className={inputClass} placeholder="https://cdn.example.com/templates/preview.mp4" />,
+          'MP4 video shown in the template gallery and detail modal.',
+        )}
+
+        {field(
+          'Preview thumbnail URL',
+          <input value={previewThumbnailUrl} onChange={(e) => setPreviewThumbnailUrl(e.target.value)} className={inputClass} placeholder="https://cdn.example.com/templates/preview.jpg" />,
+          'Static image shown before the video plays. Used as poster frame.',
+        )}
 
         {field(
           'Remotion ID',

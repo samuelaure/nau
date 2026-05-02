@@ -3,7 +3,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/modules/shared/components/ui/Button'
 import { toast } from 'sonner'
-import { SlidersHorizontal, ChevronDown, Loader2, X, Film, Mic, Play, LayoutGrid, ImageIcon, Clock, Layers, CheckCircle2, Circle, Volume2, VolumeX } from 'lucide-react'
+import {
+  SlidersHorizontal, ChevronDown, Loader2, X, Film, Mic, Play,
+  LayoutGrid, ImageIcon, Clock, Layers, CheckCircle2, Volume2, VolumeX,
+  ToggleLeft, ToggleRight,
+} from 'lucide-react'
 import { cn } from '@/modules/shared/utils'
 
 const FORMAT_ICON: Record<string, React.ElementType> = {
@@ -30,6 +34,7 @@ type Template = {
   format: string
   description?: string | null
   previewUrl?: string | null
+  previewThumbnailUrl?: string | null
   slotSchema?: SlotDef[] | null
   contentSchema?: Record<string, unknown> | null
   brandConfigs?: Array<{
@@ -40,23 +45,71 @@ type Template = {
   }> | null
 }
 
-// ─── Video preview — autoplays silently, pauses on mouse-leave ───────────────
+// ─── Card preview — thumbnail by default, video on hover ─────────────────────
 
-function VideoThumb({ src, className }: { src: string; className?: string }) {
-  const ref = useRef<HTMLVideoElement>(null)
+function PreviewMedia({
+  previewUrl,
+  previewThumbnailUrl,
+  format,
+  className,
+}: {
+  previewUrl?: string | null
+  previewThumbnailUrl?: string | null
+  format: string
+  className?: string
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [hovering, setHovering] = useState(false)
+  const FormatIcon = FORMAT_ICON[format] ?? Film
+
+  if (!previewUrl && !previewThumbnailUrl) {
+    return (
+      <div className={cn('flex items-center justify-center', className)}>
+        <FormatIcon size={28} className="text-gray-700" />
+      </div>
+    )
+  }
+
   return (
-    <video
-      ref={ref}
-      src={src}
-      muted
-      loop
-      playsInline
-      autoPlay
-      preload="auto"
-      onMouseEnter={() => ref.current?.play().catch(() => {})}
-      onMouseLeave={() => { if (ref.current) { ref.current.pause(); ref.current.currentTime = 0 } }}
-      className={className}
-    />
+    <div
+      className={cn('relative overflow-hidden', className)}
+      onMouseEnter={() => {
+        setHovering(true)
+        videoRef.current?.play().catch(() => {})
+      }}
+      onMouseLeave={() => {
+        setHovering(false)
+        if (videoRef.current) { videoRef.current.pause(); videoRef.current.currentTime = 0 }
+      }}
+    >
+      {/* Static thumbnail — shown when not hovering */}
+      {previewThumbnailUrl && (
+        <img
+          src={previewThumbnailUrl}
+          alt=""
+          className={cn('absolute inset-0 w-full h-full object-cover transition-opacity duration-200', hovering ? 'opacity-0' : 'opacity-100')}
+        />
+      )}
+      {/* Video — loaded lazily, shown on hover */}
+      {previewUrl && (
+        <video
+          ref={videoRef}
+          src={previewUrl}
+          poster={previewThumbnailUrl ?? undefined}
+          muted
+          loop
+          playsInline
+          preload="none"
+          className={cn('w-full h-full object-cover transition-opacity duration-200', hovering ? 'opacity-100' : 'opacity-0')}
+        />
+      )}
+      {/* Fallback icon when only previewUrl (no thumbnail) and not hovering */}
+      {!previewThumbnailUrl && previewUrl && !hovering && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <FormatIcon size={28} className="text-gray-700" />
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -98,8 +151,8 @@ function TemplateModal({
     return null
   })()
 
-  // Head-talk sections from contentSchema
   const htSections = (contentSchema?.sections as Array<{ key: string; label: string; intention: string; maxWords: number }> | undefined) ?? null
+  const sections = slotSchema ?? htSections
 
   const update = async (patch: { enabled?: boolean; autoApproveDraft?: boolean; autoApprovePost?: boolean }) => {
     setSaving(true)
@@ -141,29 +194,27 @@ function TemplateModal({
     }
   }
 
-  const sections = slotSchema ?? htSections
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
       <div
-        className="relative bg-gray-950 border border-white/10 rounded-xl w-full max-w-2xl max-h-[92vh] overflow-hidden shadow-2xl flex flex-col sm:flex-row"
+        className="relative bg-gray-950 border border-gray-800 rounded-xl w-full max-w-2xl max-h-[92vh] overflow-hidden shadow-2xl flex flex-col sm:flex-row"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Left: video preview */}
-        <div className="sm:w-52 shrink-0 bg-black flex items-stretch relative sm:rounded-l-xl overflow-hidden min-h-[200px]">
+        {/* Left: video/thumbnail preview */}
+        <div className="sm:w-52 shrink-0 bg-gray-950 flex items-stretch relative sm:rounded-l-xl overflow-hidden min-h-[200px]">
           {template.previewUrl ? (
             <>
               <video
                 ref={videoRef}
                 src={template.previewUrl}
+                poster={template.previewThumbnailUrl ?? undefined}
                 autoPlay
                 loop
                 muted={muted}
                 playsInline
                 className="w-full object-cover"
               />
-              {/* Mute toggle */}
               <button
                 onClick={() => setMuted((m) => !m)}
                 className="absolute bottom-2 right-2 rounded-full bg-black/60 p-1.5 text-white/70 hover:text-white transition-colors"
@@ -171,9 +222,11 @@ function TemplateModal({
                 {muted ? <VolumeX size={13} /> : <Volume2 size={13} />}
               </button>
             </>
+          ) : template.previewThumbnailUrl ? (
+            <img src={template.previewThumbnailUrl} alt="" className="w-full object-cover" />
           ) : (
             <div className="w-full flex items-center justify-center">
-              <FormatIcon size={32} className="text-white/15" />
+              <FormatIcon size={32} className="text-gray-700" />
             </div>
           )}
         </div>
@@ -181,19 +234,19 @@ function TemplateModal({
         {/* Right: info + settings */}
         <div className="flex-1 min-w-0 overflow-y-auto">
           {/* Header */}
-          <div className="flex items-start justify-between gap-3 p-5 border-b border-white/8 sticky top-0 bg-gray-950 z-10">
+          <div className="flex items-start justify-between gap-3 p-5 border-b border-gray-800 sticky top-0 bg-gray-950 z-10">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className={cn('p-1.5 rounded-md border', FORMAT_COLOR[template.format] ?? 'bg-white/5 text-white/50 border-white/10')}>
+              <div className={cn('p-1.5 rounded-md border', FORMAT_COLOR[template.format] ?? 'bg-white/5 text-white/50 border-gray-800')}>
                 <FormatIcon size={14} />
               </div>
               <div className="min-w-0">
                 <h2 className="font-semibold text-sm leading-tight">{template.name}</h2>
-                <span className={cn('text-[10px] px-1.5 py-0.5 rounded border mt-0.5 inline-block', FORMAT_COLOR[template.format] ?? 'bg-white/5 text-white/40 border-white/10')}>
+                <span className={cn('text-[10px] px-1.5 py-0.5 rounded border mt-0.5 inline-block', FORMAT_COLOR[template.format] ?? 'bg-white/5 text-white/40 border-gray-800')}>
                   {template.format.replace('_', ' ')}
                 </span>
               </div>
             </div>
-            <button onClick={onClose} className="text-white/40 hover:text-white transition-colors shrink-0 mt-0.5">
+            <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors shrink-0 mt-0.5">
               <X size={16} />
             </button>
           </div>
@@ -207,13 +260,13 @@ function TemplateModal({
             {/* Stats */}
             <div className="flex flex-wrap gap-2">
               {durationLabel && (
-                <div className="flex items-center gap-1.5 text-xs text-white/50 bg-white/5 rounded px-2.5 py-1.5 border border-white/8">
+                <div className="flex items-center gap-1.5 text-xs text-text-secondary bg-gray-900 rounded px-2.5 py-1.5 border border-gray-800">
                   <Clock size={11} />
                   {durationLabel}
                 </div>
               )}
               {sections && sections.length > 0 && (
-                <div className="flex items-center gap-1.5 text-xs text-white/50 bg-white/5 rounded px-2.5 py-1.5 border border-white/8">
+                <div className="flex items-center gap-1.5 text-xs text-text-secondary bg-gray-900 rounded px-2.5 py-1.5 border border-gray-800">
                   <Layers size={11} />
                   {sections.length} {slotSchema ? 'text slot' : 'section'}{sections.length !== 1 ? 's' : ''}
                 </div>
@@ -223,17 +276,17 @@ function TemplateModal({
             {/* Content breakdown */}
             {sections && sections.length > 0 && (
               <div className="space-y-2">
-                <p className="text-xs font-medium text-white/40 uppercase tracking-wide">
+                <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">
                   {slotSchema ? 'What the AI fills in' : 'Script structure'}
                 </p>
                 <div className="space-y-2">
                   {sections.map((s) => (
-                    <div key={s.key} className="bg-white/3 border border-white/8 rounded-lg p-3 space-y-1">
+                    <div key={s.key} className="bg-gray-900 border border-gray-800 rounded-lg p-3 space-y-1">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-semibold text-white/80">{s.label}</span>
-                        <span className="text-[10px] text-white/30 shrink-0">max {s.maxWords}w</span>
+                        <span className="text-xs font-semibold text-white">{s.label}</span>
+                        <span className="text-[10px] text-gray-600 shrink-0">max {s.maxWords}w</span>
                       </div>
-                      <p className="text-[11px] text-white/40 leading-relaxed">{s.intention}</p>
+                      <p className="text-[11px] text-text-secondary leading-relaxed">{s.intention}</p>
                     </div>
                   ))}
                 </div>
@@ -242,12 +295,12 @@ function TemplateModal({
 
             {/* Settings */}
             <div className="space-y-2">
-              <p className="text-xs font-medium text-white/40 uppercase tracking-wide">Settings</p>
+              <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">Settings</p>
               <div className="flex flex-col gap-2">
-                <label className="flex items-center justify-between bg-white/3 border border-white/8 rounded-lg px-3 py-2.5 cursor-pointer">
+                <label className="flex items-center justify-between bg-gray-900 border border-gray-800 rounded-lg px-3 py-2.5 cursor-pointer">
                   <div>
                     <p className="text-sm font-medium">Enabled</p>
-                    <p className="text-xs text-white/40 mt-0.5">Include when generating content for this brand</p>
+                    <p className="text-xs text-text-secondary mt-0.5">Include when generating content for this brand</p>
                   </div>
                   <input
                     type="checkbox"
@@ -257,10 +310,10 @@ function TemplateModal({
                     className="w-4 h-4 accent-accent shrink-0"
                   />
                 </label>
-                <label className="flex items-center justify-between bg-white/3 border border-white/8 rounded-lg px-3 py-2.5 cursor-pointer">
+                <label className="flex items-center justify-between bg-gray-900 border border-gray-800 rounded-lg px-3 py-2.5 cursor-pointer">
                   <div>
                     <p className="text-sm font-medium">Auto-approve draft</p>
-                    <p className="text-xs text-white/40 mt-0.5">Automatically approve the generated draft and queue it for rendering</p>
+                    <p className="text-xs text-text-secondary mt-0.5">Automatically approve the generated draft and queue it for rendering</p>
                   </div>
                   <input
                     type="checkbox"
@@ -270,17 +323,17 @@ function TemplateModal({
                     className="w-4 h-4 accent-accent shrink-0"
                   />
                 </label>
-                <label className="flex items-center justify-between bg-white/3 border border-white/8 rounded-lg px-3 py-2.5 cursor-pointer">
+                <label className="flex items-center justify-between bg-gray-900 border border-gray-800 rounded-lg px-3 py-2.5 cursor-pointer">
                   <div>
                     <p className="text-sm font-medium">Auto-approve post</p>
-                    <p className="text-xs text-white/40 mt-0.5">Automatically approve the rendered video for publishing when its scheduled time arrives</p>
+                    <p className="text-xs text-text-secondary mt-0.5">Automatically approve the rendered video for publishing when its scheduled time arrives</p>
                   </div>
                   <input
                     type="checkbox"
                     checked={autoApprovePost}
                     disabled={saving}
                     onChange={(e) => update({ autoApprovePost: e.target.checked })}
-                    className="w-4 h-4 accent-green-400 shrink-0"
+                    className="w-4 h-4 accent-accent shrink-0"
                   />
                 </label>
               </div>
@@ -292,7 +345,7 @@ function TemplateModal({
                 onClick={() => setPromptOpen((o) => !o)}
                 className={cn(
                   'flex items-center gap-1.5 text-xs transition-colors',
-                  config?.customPrompt ? 'text-amber-300 hover:text-amber-200' : 'text-white/40 hover:text-white',
+                  config?.customPrompt ? 'text-amber-300 hover:text-amber-200' : 'text-text-secondary hover:text-white',
                 )}
               >
                 <SlidersHorizontal size={11} />
@@ -309,7 +362,7 @@ function TemplateModal({
                     value={promptDraft}
                     onChange={(e) => setPromptDraft(e.target.value)}
                     placeholder="e.g. 'Always open with a provocative question. Keep each line under 8 words.'"
-                    className="w-full bg-gray-950 border border-gray-800 rounded p-2.5 text-xs text-white resize-none focus:outline-none focus:border-accent/50"
+                    className="w-full bg-gray-900 border border-gray-800 rounded p-2.5 text-xs text-white resize-none focus:outline-none focus:border-accent/50"
                   />
                   <div className="flex justify-end gap-2">
                     <Button size="sm" variant="outline" className="text-xs" onClick={() => setPromptOpen(false)}>Cancel</Button>
@@ -330,61 +383,91 @@ function TemplateModal({
 
 // ─── Template card ────────────────────────────────────────────────────────────
 
-function TemplateCard({ template, onClick }: { template: Template; onClick: () => void }) {
+function TemplateCard({
+  template,
+  brandId,
+  onClick,
+  onToggle,
+}: {
+  template: Template
+  brandId: string
+  onClick: () => void
+  onToggle: (enabled: boolean) => Promise<void>
+}) {
   const config = template.brandConfigs?.[0]
   const isEnabled = config?.enabled ?? false
-  const FormatIcon = FORMAT_ICON[template.format] ?? Film
   const isPortrait = template.format === 'reel' || template.format === 'trial_reel'
+  const [toggling, setToggling] = useState(false)
+
+  const handleToggle = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setToggling(true)
+    try {
+      await onToggle(!isEnabled)
+    } finally {
+      setToggling(false)
+    }
+  }
 
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className="group text-left w-full bg-gray-900/60 border border-white/8 rounded-xl overflow-hidden hover:border-accent/40 hover:bg-gray-900 transition-all flex flex-col"
+      onKeyDown={(e) => e.key === 'Enter' && onClick()}
+      className="group text-left w-full bg-gray-900 border border-gray-800 rounded-xl overflow-hidden hover:border-gray-700 transition-all flex flex-col cursor-pointer"
     >
       {/* Preview */}
-      <div className={cn(
-        'w-full relative bg-black overflow-hidden',
-        isPortrait ? 'aspect-[9/16]' : 'aspect-[4/3]',
-      )}>
-        {template.previewUrl ? (
-          <>
-            <VideoThumb src={template.previewUrl} className="w-full h-full object-cover" />
-            {/* Enabled badge overlay */}
-            <div className="absolute top-2 right-2">
-              {isEnabled
-                ? <CheckCircle2 size={16} className="text-green-400 drop-shadow" />
-                : <Circle size={16} className="text-white/30 drop-shadow" />}
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="w-full h-full flex items-center justify-center">
-              <FormatIcon size={28} className="text-white/15" />
-            </div>
-            <div className="absolute top-2 right-2">
-              {isEnabled
-                ? <CheckCircle2 size={16} className="text-green-400 drop-shadow" />
-                : <Circle size={16} className="text-white/30 drop-shadow" />}
-            </div>
-          </>
-        )}
+      <div className={cn('w-full relative bg-gray-950', isPortrait ? 'aspect-[9/16]' : 'aspect-[4/3]')}>
+        <PreviewMedia
+          previewUrl={template.previewUrl}
+          previewThumbnailUrl={template.previewThumbnailUrl}
+          format={template.format}
+          className="w-full h-full"
+        />
+        {/* Enable/disable toggle — bottom-left */}
+        <button
+          onClick={handleToggle}
+          disabled={toggling}
+          className={cn(
+            'absolute bottom-2 left-2 flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-full border transition-colors',
+            isEnabled
+              ? 'bg-green-900/80 border-green-700/50 text-green-300 hover:bg-green-800/80'
+              : 'bg-gray-900/80 border-gray-700 text-gray-400 hover:bg-gray-800/80',
+          )}
+        >
+          {toggling
+            ? <Loader2 size={9} className="animate-spin" />
+            : isEnabled ? <ToggleRight size={11} /> : <ToggleLeft size={11} />}
+          {isEnabled ? 'On' : 'Off'}
+        </button>
       </div>
 
       {/* Info */}
       <div className="p-3 flex flex-col gap-1.5 flex-1">
         <div className="flex items-start justify-between gap-1.5">
           <p className="text-xs font-semibold leading-snug line-clamp-2 group-hover:text-white transition-colors flex-1">{template.name}</p>
-          <span className={cn('text-[9px] px-1 py-0.5 rounded border shrink-0', FORMAT_COLOR[template.format] ?? 'bg-white/5 text-white/40 border-white/10')}>
+          <span className={cn('text-[9px] px-1 py-0.5 rounded border shrink-0', FORMAT_COLOR[template.format] ?? 'bg-gray-800 text-gray-400 border-gray-700')}>
             {template.format.replace('_', ' ')}
           </span>
         </div>
         {template.description && (
-          <p className="text-[11px] text-white/35 leading-snug line-clamp-3">{template.description}</p>
+          <p className="text-[11px] text-text-secondary leading-snug line-clamp-2">{template.description}</p>
         )}
       </div>
-    </button>
+    </div>
   )
 }
+
+// ─── Sub-section tabs ─────────────────────────────────────────────────────────
+
+type TabId = 'enabled' | 'disabled' | 'gallery'
+
+const TABS: { id: TabId; label: string }[] = [
+  { id: 'enabled', label: 'Enabled' },
+  { id: 'disabled', label: 'Disabled' },
+  { id: 'gallery', label: 'Gallery' },
+]
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
@@ -392,6 +475,7 @@ export default function AccountTemplates({ brandId }: { brandId: string }) {
   const [templates, setTemplates] = useState<Template[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<Template | null>(null)
+  const [activeTab, setActiveTab] = useState<TabId>('enabled')
 
   const fetchTemplates = async () => {
     try {
@@ -407,11 +491,27 @@ export default function AccountTemplates({ brandId }: { brandId: string }) {
 
   useEffect(() => { fetchTemplates() }, [brandId])
 
+  const toggleTemplate = async (templateId: string, enabled: boolean) => {
+    await fetch('/api/account-templates', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brandId, templateId, enabled }),
+    })
+    await fetchTemplates()
+    // Keep selected in sync
+    setSelected((prev) => prev?.id === templateId ? { ...prev } : prev)
+  }
+
   if (loading) return <p className="text-text-secondary text-sm">Loading…</p>
 
-  const reelTemplates = templates.filter((t) => t.format === 'reel' || t.format === 'trial_reel')
-  const headTalkTemplates = templates.filter((t) => t.format === 'head_talk')
-  const otherTemplates = templates.filter((t) => t.format !== 'reel' && t.format !== 'trial_reel' && t.format !== 'head_talk')
+  const enabled = templates.filter((t) => t.brandConfigs?.[0]?.enabled)
+  const disabled = templates.filter((t) => !t.brandConfigs?.[0]?.enabled)
+
+  const visibleTemplates = activeTab === 'enabled' ? enabled : activeTab === 'disabled' ? disabled : templates
+
+  const reelTemplates = visibleTemplates.filter((t) => t.format === 'reel' || t.format === 'trial_reel')
+  const headTalkTemplates = visibleTemplates.filter((t) => t.format === 'head_talk')
+  const otherTemplates = visibleTemplates.filter((t) => t.format !== 'reel' && t.format !== 'trial_reel' && t.format !== 'head_talk')
 
   const groups = [
     { label: 'Reels', items: reelTemplates, cols: 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4' },
@@ -420,7 +520,7 @@ export default function AccountTemplates({ brandId }: { brandId: string }) {
   ].filter((g) => g.items.length > 0)
 
   return (
-    <div className="animate-fade-in space-y-6">
+    <div className="animate-fade-in space-y-5">
       <div>
         <h2 className="text-xl font-heading font-semibold">Templates</h2>
         <p className="text-text-secondary text-sm mt-1">
@@ -428,16 +528,50 @@ export default function AccountTemplates({ brandId }: { brandId: string }) {
         </p>
       </div>
 
+      {/* Tabs */}
+      <div className="flex items-center gap-1 border-b border-gray-800">
+        {TABS.map((tab) => {
+          const count = tab.id === 'enabled' ? enabled.length : tab.id === 'disabled' ? disabled.length : templates.length
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors',
+                activeTab === tab.id
+                  ? 'border-accent text-white'
+                  : 'border-transparent text-text-secondary hover:text-white',
+              )}
+            >
+              {tab.label}
+              <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full', activeTab === tab.id ? 'bg-accent/20 text-accent' : 'bg-gray-800 text-gray-500')}>
+                {count}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
       {templates.length === 0 ? (
         <p className="text-text-secondary text-sm">No templates available yet.</p>
+      ) : visibleTemplates.length === 0 ? (
+        <p className="text-text-secondary text-sm py-4">
+          {activeTab === 'enabled' ? 'No templates enabled yet. Enable some from the Gallery tab.' : 'All templates are enabled.'}
+        </p>
       ) : (
         <div className="space-y-8">
           {groups.map((group) => (
             <div key={group.label} className="space-y-3">
-              <h3 className="text-xs font-medium text-white/40 uppercase tracking-wide">{group.label}</h3>
+              <h3 className="text-xs font-medium text-text-secondary uppercase tracking-wide">{group.label}</h3>
               <div className={cn('grid gap-3', group.cols)}>
                 {group.items.map((t) => (
-                  <TemplateCard key={t.id} template={t} onClick={() => setSelected(t)} />
+                  <TemplateCard
+                    key={t.id}
+                    template={t}
+                    brandId={brandId}
+                    onClick={() => setSelected(t)}
+                    onToggle={(enabled) => toggleTemplate(t.id, enabled)}
+                  />
                 ))}
               </div>
             </div>
