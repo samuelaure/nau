@@ -15,6 +15,7 @@ export interface SlotDef {
   key: string
   label: string
   intention: string  // what this text must achieve — passed verbatim to AI
+  minWords?: number  // soft lower bound — AI must meet or exceed this
   maxWords: number   // hard word limit — AI must not exceed
   style: 'short' | 'medium' | 'long'  // drives font size in component
 }
@@ -237,6 +238,7 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
         key: 'text1',
         label: 'The Statement',
         intention: 'A complete, self-contained idea — a mini-paragraph that says something real. It should make the viewer feel smart, seen, or slightly challenged. Flows naturally when read aloud. No bullet points, no line breaks. Just clean prose with a clear point.',
+        minWords: 25,
         maxWords: 40,
         style: 'long',
       },
@@ -267,19 +269,20 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     scope: 'system',
     previewUrl: 'https://media.9nau.com/flownau/accounts/cmogyjn5a0006gcv46nis4o0l/outputs/cmoo6vork0002v4v4is5hqueg.mp4',
     description: 'Two scenes: a short hook (≤8 words) that creates tension, followed by the payoff reveal (≤25 words). The gap between them keeps the viewer watching. ~8 s total. Best for curiosity-driven content and contrarian takes.',
-    systemPrompt: 'You are filling content slots for a short-form video reel. Follow each slot\'s intention and word limit exactly. The two slots must feel like a connected thought — the second completes what the first started. Never mention usernames or @handles.',
+    systemPrompt: 'You are filling content slots for a short-form video reel. CRITICAL: these two slots are NOT independent — they are one continuous thought split across two screens. Write the full thought first, then split it: text1 is the first fragment that creates unresolved tension, text2 is the resolution. A viewer watching back-to-back should feel they read one seamless sentence or idea. Never mention usernames or @handles.',
     slotSchema: [
       {
         key: 'text1',
         label: 'The Hook',
-        intention: 'A short, arresting opening that creates tension or curiosity. A question, a bold claim, or a surprising reframe. It must make the viewer want to know what comes next — not complete on its own.',
+        intention: 'The opening fragment — creates tension or curiosity. Must be incomplete on its own; the viewer must need text2 to understand it. A question without the answer, a bold claim without the proof, or the first half of a reframe.',
         maxWords: 8,
         style: 'short',
       },
       {
         key: 'text2',
         label: 'The Reveal',
-        intention: 'The payoff that completes the hook. Delivers the insight, answer, or reframe the viewer was waiting for. Should feel satisfying — the "aha" moment. Reads naturally aloud in one breath.',
+        intention: 'The direct continuation of text1 — delivers the payoff, answer, or second half of the reframe. Should feel like the natural end of a sentence that text1 started. Together they form one complete thought.',
+        minWords: 15,
         maxWords: 25,
         style: 'medium',
       },
@@ -313,26 +316,27 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     scope: 'system',
     previewUrl: 'https://media.9nau.com/flownau/accounts/cmogyjn5a0006gcv46nis4o0l/outputs/cmoo6vorl0008v4v4fyywc8cv.mp4',
     description: 'Three scenes forming a mini story arc: punchy opener (≤8 w) → development (≤20 w) → landing line (≤8 w). ~11 s total. The most complete reel structure — best for ideas that need setup and resolution.',
-    systemPrompt: 'You are filling content slots for a short-form video reel. Follow each slot\'s intention and word limit exactly. The three slots must feel like a mini-story arc: opening → development → landing. Never mention usernames or @handles.',
+    systemPrompt: 'You are filling content slots for a short-form video reel. CRITICAL: these three slots are one unified piece of writing split across three screens — not three separate ideas. Write the complete arc first (opening tension → development → landing resolution), then carve it into the three slots at the natural break points. A viewer watching all three back-to-back should feel they followed one coherent thought from start to finish. Never mention usernames or @handles.',
     slotSchema: [
       {
         key: 'text1',
         label: 'Opening',
-        intention: 'A short, punchy opener that sets up a tension or question. Hits immediately. Creates the "why should I keep watching" moment.',
+        intention: 'The inciting line — sets up a tension, question, or bold claim that demands resolution. Must be incomplete on its own. The viewer should think "wait, what?" and need the next screen.',
         maxWords: 8,
         style: 'short',
       },
       {
         key: 'text2',
         label: 'Development',
-        intention: 'The core of the idea — delivers the substance, context, or insight. This is where the most weight lives. Should expand on the opener and push the idea forward. Reads naturally aloud.',
+        intention: 'The body of the arc — directly continues from text1 and delivers the substance: the insight, the context, the why. This is where the idea earns its weight. Must be long enough to feel satisfying, not a fragment.',
+        minWords: 12,
         maxWords: 20,
         style: 'medium',
       },
       {
         key: 'text3',
         label: 'Landing',
-        intention: 'A crisp, memorable closer. The line they remember and share. Could be a reframe, a lesson, or a call to action. Short and punchy like the opener — it lands with weight.',
+        intention: 'The closing line — the punchline, reframe, or lesson that text1 + text2 were building toward. Short and final, like the last sentence of a paragraph. The viewer should feel the arc is complete.',
         maxWords: 8,
         style: 'short',
       },

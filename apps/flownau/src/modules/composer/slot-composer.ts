@@ -76,11 +76,15 @@ export async function composeSlots(input: SlotComposerInput): Promise<SlotCompos
 
   // Slot spec block
   const slotBlock = slotDefs
-    .map(
-      (s) =>
-        `• "${s.key}" (${s.label}) — max ${s.maxWords} words\n  Intention: ${s.intention}`,
-    )
+    .map((s) => {
+      const wordRange = s.minWords != null
+        ? `min ${s.minWords} words, max ${s.maxWords} words`
+        : `max ${s.maxWords} words`
+      return `• "${s.key}" (${s.label}) — ${wordRange}\n  Intention: ${s.intention}`
+    })
     .join('\n\n')
+
+  const isMultiSlot = slotDefs.length > 1
 
   const creatorBlock = customPrompt?.trim()
     ? `⚠️ CREATOR INSTRUCTIONS — absolute priority:\n<creator_instructions>\n${customPrompt.trim()}\n</creator_instructions>\n\n---\n\n`
@@ -105,9 +109,17 @@ HOOK QUALITY RULES (applies to any opening/hook slot):
 - Good: "Tu hijo no es difícil — tiene un tipo energético diferente" (specific, intriguing, self-contained)
 - Use tension, a surprising reframe, or a bold claim rooted in the content — never a vague teaser
 
-CRITICAL:
-- Respect word limits exactly (count carefully)
-- Each slot must be a COMPLETE, STANDALONE sentence or phrase — never split one sentence across two slots
+${isMultiSlot ? `MULTI-SLOT NARRATIVE RULE (critical for this template):
+- These slots are shown sequentially on screen — the viewer reads them one after another
+- They must read as ONE continuous thought, not separate independent sentences
+- Write the complete arc first, then carve it into slots at the natural break points
+- Test: if you read all slots back-to-back aloud, they must flow as a single coherent statement
+- WRONG: text1="No te esfuerces tanto" / text2="El descanso también es productivo" (two separate ideas)
+- RIGHT: text1="El problema no es que trabajas poco" / text2="es que no descansas lo suficiente para trabajar bien" (one split thought)
+
+` : ''}CRITICAL:
+- Respect word limits exactly — count every word, stay within min–max range for each slot
+- For slots with a minimum: write enough to fill the intent; a slot at half its minimum is a failure
 - Never mention usernames or @handles
 - Respond ONLY with valid JSON matching the schema`
 
