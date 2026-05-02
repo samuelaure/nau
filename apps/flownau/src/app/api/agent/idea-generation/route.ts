@@ -76,6 +76,7 @@ export async function POST(req: Request) {
           priority,
           sourceRef,
           generationBatchId: batchId,
+          llmTrace: { ideaTrace: output.trace },
         },
       }),
     )

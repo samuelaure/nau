@@ -307,6 +307,11 @@ model Post {
   userPostedManually Boolean   @default(false)
   publishedAt        DateTime?
 
+  // ── LLM observability ──────────────────────────────────────────────────────
+  // { ideaTrace: { provider, model, registryId, systemPrompt, userMessage, generatedAt },
+  //   draftTrace: { provider, model, registryId, systemPrompt, userMessage, generatedAt } }
+  llmTrace      Json?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

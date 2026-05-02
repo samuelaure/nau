@@ -1,4 +1,5 @@
 import { createLLMClient } from '@nau/llm-client'
+import type { LlmTrace } from '@/modules/ideation/ideation.service'
 import { prisma } from '@/modules/shared/prisma'
 import { resolveModelId } from '@/modules/composer/model-resolver'
 import { getSetting } from '@/modules/shared/settings'
@@ -25,6 +26,7 @@ export interface SlotComposerResult {
   hashtags: string[]
   brollMood: string
   personaName: string
+  trace: LlmTrace
 }
 
 /**
@@ -60,7 +62,7 @@ export async function composeSlots(input: SlotComposerInput): Promise<SlotCompos
   const effectivePersona = persona ?? PLATFORM_DEFAULT_PERSONA
 
   // Resolve model
-  const { provider, model } = resolveModelId(effectivePersona.modelSelection)
+  const { provider, model, registryId } = resolveModelId(effectivePersona.modelSelection)
   const groqKey = (await getSetting('groq_api_key')) ?? process.env.GROQ_API_KEY ?? null
   const openaiKey = (await getSetting('openai_api_key')) ?? process.env.OPENAI_API_KEY ?? null
 
@@ -171,5 +173,13 @@ CRITICAL:
     hashtags: Array.isArray(parsed.hashtags) ? (parsed.hashtags as string[]) : [],
     brollMood: (parsed.brollMood as string) ?? '',
     personaName: effectivePersona.name,
+    trace: {
+      provider,
+      model,
+      registryId,
+      systemPrompt,
+      userMessage: messages[1]?.content ?? '',
+      generatedAt: new Date().toISOString(),
+    },
   }
 }

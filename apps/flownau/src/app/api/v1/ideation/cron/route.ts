@@ -98,6 +98,7 @@ export async function POST(request: NextRequest) {
             status: autoApprove ? 'IDEA_APPROVED' : 'IDEA_PENDING',
             priority: 3,
             generationBatchId: batchId,
+            llmTrace: { ideaTrace: result.trace },
           })),
           skipDuplicates: true,
         })

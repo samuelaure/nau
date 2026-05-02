@@ -2,6 +2,7 @@ import { getClientForFeature } from '@nau/llm-client'
 import { z } from 'zod'
 import { prisma } from '@/modules/shared/prisma'
 import { logError } from '@/modules/shared/logger'
+import type { LlmTrace } from '@/modules/ideation/ideation.service'
 
 // ─── Universal Drafter System Prompt ─────────────────────────────────────────
 // Platform-level constant. Governs how any idea becomes a draft, regardless
@@ -109,6 +110,7 @@ export interface DraftComposerResult<T = unknown> {
   hashtags: string[]
   templateId: string | null
   personaId: string | null
+  trace: LlmTrace
 }
 
 // ─── Universal Draft Composer ─────────────────────────────────────────────────
@@ -192,7 +194,7 @@ export async function composeDraft<T = unknown>(
   const systemPrompt = sections.join('\n')
 
   // 5. Call LLM
-  const { client: llm, model } = getClientForFeature('composition')
+  const { client: llm, model, registryId, provider } = getClientForFeature('composition')
 
   let rawResult: unknown
   try {
@@ -226,5 +228,6 @@ export async function composeDraft<T = unknown>(
     hashtags,
     templateId: template?.id ?? null,
     personaId: persona?.id ?? null,
+    trace: { provider, model, registryId, systemPrompt, userMessage: ideaText, generatedAt: new Date().toISOString() },
   }
 }

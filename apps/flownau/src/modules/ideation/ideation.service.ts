@@ -16,6 +16,19 @@ const IdeationOutputSchema = z.object({
 
 export type IdeationOutput = z.infer<typeof IdeationOutputSchema>
 
+export interface LlmTrace {
+  provider: string
+  model: string
+  registryId: string
+  systemPrompt: string
+  userMessage: string
+  generatedAt: string
+}
+
+export interface IdeationOutputWithTrace extends IdeationOutput {
+  trace: LlmTrace
+}
+
 export interface GenerationRequest {
   topic: string        // Required. Manual input, capture text, or digest. NO TOPIC = blocked.
   language?: string    // Brand content language (e.g. 'Spanish', 'English'). Default: 'Spanish'.
@@ -24,7 +37,7 @@ export interface GenerationRequest {
   userInstructions?: string | null  // Brand-specific ideation prompt — injected with highest priority.
 }
 
-export async function generateContentIdeas(req: GenerationRequest): Promise<IdeationOutput> {
+export async function generateContentIdeas(req: GenerationRequest): Promise<IdeationOutputWithTrace> {
   if (!req.topic?.trim()) {
     throw new Error('Topic is required for idea generation.')
   }
@@ -76,7 +89,7 @@ WRITE THE IDEAS ABOUT THIS TOPIC:`
     })
   }
 
-  const { client: llm, model } = getClientForFeature('ideation')
+  const { client: llm, model, registryId, provider } = getClientForFeature('ideation')
 
   const result = await llm.parseCompletion({
     model,
@@ -90,5 +103,16 @@ WRITE THE IDEAS ABOUT THIS TOPIC:`
     timeoutMs: 60_000,
   })
 
-  return result.data as IdeationOutput
+  const data = result.data as IdeationOutput
+  return {
+    ...data,
+    trace: {
+      provider,
+      model,
+      registryId,
+      systemPrompt,
+      userMessage,
+      generatedAt: new Date().toISOString(),
+    },
+  }
 }

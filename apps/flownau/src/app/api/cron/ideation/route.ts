@@ -85,6 +85,7 @@ export async function GET(request: Request) {
               priority: 3,
               sourceRef,
               generationBatchId: batchId,
+              llmTrace: { ideaTrace: output.trace },
             },
           })
         }
