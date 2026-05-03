@@ -235,6 +235,7 @@ type Composition = {
   payload?: Record<string, unknown> | null
   creative?: Record<string, unknown> | null
   templateId?: string | null
+  publishedAt?: string | null
 }
 
 type DragState = {
@@ -554,6 +555,7 @@ function CompositionModal({
   const display = getDisplayStatus(comp.status)
   const tag = getSecondaryTag(comp.format, display, comp.status)
   const isScheduled = !!comp.scheduledAt
+  const displayDate = comp.status === 'PUBLISHED' ? (comp.publishedAt ?? comp.scheduledAt) : comp.scheduledAt
 
   const handleSchedule = async () => {
     if (!newDatetime) return
@@ -853,10 +855,10 @@ function CompositionModal({
             <Clock size={15} className="text-text-secondary mt-0.5 shrink-0" />
             <div>
               <p className="text-xs text-text-secondary uppercase tracking-wider mb-0.5">
-                {isScheduled ? 'Scheduled for' : 'Not scheduled'}
+                {comp.status === 'PUBLISHED' ? 'Published at' : isScheduled ? 'Scheduled for' : 'Not scheduled'}
               </p>
-              {isScheduled && (
-                <p className="text-sm text-white">{fmtDateTime(comp.scheduledAt!)}</p>
+              {displayDate && (
+                <p className="text-sm text-white">{fmtDateTime(displayDate)}</p>
               )}
             </div>
           </div>
@@ -1204,7 +1206,7 @@ function CompositionChip({
 
       <div className="flex items-center justify-between w-full mt-auto pt-0.5">
         <span className="text-[9px] opacity-70 font-medium">
-          {comp.scheduledAt ? fmtTime(comp.scheduledAt) : 'Unscheduled'}
+          {(() => { const d = comp.status === 'PUBLISHED' ? (comp.publishedAt ?? comp.scheduledAt) : comp.scheduledAt; return d ? fmtTime(d) : 'Unscheduled' })()}
         </span>
         <div className="flex items-center gap-1">
           {(comp.status === 'RENDERING' || comp.status === 'DRAFT_APPROVED') ? (
@@ -1297,15 +1299,19 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
   const today = new Date()
 
+  // For a published post use publishedAt as the calendar anchor; otherwise use scheduledAt.
+  const calendarDate = (c: Composition) =>
+    c.status === 'PUBLISHED' ? (c.publishedAt ?? c.scheduledAt) : c.scheduledAt
+
   const forDay = (day: Date) =>
     compositions
-      .filter((c) => c.scheduledAt && isSameDay(new Date(c.scheduledAt), day))
-      .sort((a, b) => (a.scheduledAt! < b.scheduledAt! ? -1 : 1))
+      .filter((c) => { const d = calendarDate(c); return d && isSameDay(new Date(d), day) })
+      .sort((a, b) => { const da = calendarDate(a)!; const db = calendarDate(b)!; return da < db ? -1 : 1 })
 
   const emptySlotsForDay = (day: Date) =>
     slots.filter((s) => s.status === 'empty' && isSameDay(new Date(s.scheduledAt), day))
 
-  const unscheduled = compositions.filter((c) => !c.scheduledAt)
+  const unscheduled = compositions.filter((c) => !calendarDate(c))
 
   const handleRunCoverage = async () => {
     // Immediately mark all current empty slots as generating for optimistic UI
@@ -1579,7 +1585,7 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
                         | { kind: 'comp'; data: Composition; time: string }
                         | { kind: 'slot'; data: PostSlot; time: string }
                       const items: ChipItem[] = [
-                        ...dayComps.map(c => ({ kind: 'comp' as const, data: c, time: c.scheduledAt! })),
+                        ...dayComps.map(c => ({ kind: 'comp' as const, data: c, time: (calendarDate(c) ?? c.scheduledAt)! })),
                         ...dayEmptySlots.map(s => ({ kind: 'slot' as const, data: s, time: s.scheduledAt })),
                       ].sort((a, b) => a.time < b.time ? -1 : 1)
 
