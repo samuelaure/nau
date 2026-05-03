@@ -44,7 +44,7 @@ const nextConfig: NextConfig = {
     return [{ source: '/(.*)', headers: securityHeaders }]
   },
   serverExternalPackages: ['@remotion/bundler', '@remotion/renderer', 'sharp'],
-  transpilePackages: ['nau-storage'],
+  transpilePackages: ['nau-storage', 'node-cron', 'bullmq', 'ioredis', 'pino', 'axios'],
 }
 
 export default nextConfig
