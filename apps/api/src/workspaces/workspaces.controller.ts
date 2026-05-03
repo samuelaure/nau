@@ -67,7 +67,7 @@ export class WorkspacesController {
     @Param('workspaceId') workspaceId: string,
     @Body() dto: AddMemberDto,
   ) {
-    return this.svc.addMemberByEmail(user.sub, workspaceId, dto);
+    return this.svc.addMember(user.sub, workspaceId, dto);
   }
 
   @Put(':workspaceId/members/:targetUserId')
@@ -89,5 +89,25 @@ export class WorkspacesController {
     @Param('targetUserId') targetUserId: string,
   ) {
     return this.svc.removeMember(user.sub, workspaceId, targetUserId);
+  }
+
+  @Post(':workspaceId/invites/:inviteId/regenerate')
+  @UseGuards(JwtAuthGuard)
+  regenerateInvite(
+    @CurrentUser() user: AccessTokenPayload,
+    @Param('workspaceId') workspaceId: string,
+    @Param('inviteId') inviteId: string,
+  ) {
+    return this.svc.regenerateInvite(user.sub, workspaceId, inviteId);
+  }
+
+  @Delete(':workspaceId/invites/:inviteId')
+  @UseGuards(JwtAuthGuard)
+  deleteInvite(
+    @CurrentUser() user: AccessTokenPayload,
+    @Param('workspaceId') workspaceId: string,
+    @Param('inviteId') inviteId: string,
+  ) {
+    return this.svc.deleteInvite(user.sub, workspaceId, inviteId);
   }
 }

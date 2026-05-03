@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { WorkspaceRole } from '@prisma/client';
+import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateWorkspaceDto, AddMemberDto } from './workspaces.dto';
 
@@ -57,10 +58,28 @@ export class WorkspacesService {
 
   async getWorkspaceMembers(userId: string, workspaceId: string) {
     await this.assertMembership(userId, workspaceId);
-    return this.prisma.workspaceMember.findMany({
-      where: { workspaceId },
-      include: { user: { select: { id: true, email: true, name: true } } },
-    });
+    const [members, rawInvites] = await Promise.all([
+      this.prisma.workspaceMember.findMany({
+        where: { workspaceId },
+        include: { user: { select: { id: true, email: true, name: true } } },
+      }),
+      this.prisma.inviteToken.findMany({
+        where: { workspaceId, usedAt: null },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    const pendingInvites = rawInvites.map((inv) => ({
+      id: inv.id,
+      email: inv.email,
+      role: inv.role,
+      token: inv.token,
+      expiresAt: inv.expiresAt,
+      expired: inv.expiresAt < new Date(),
+      createdAt: inv.createdAt,
+    }));
+
+    return { members, pendingInvites };
   }
 
   async updateMemberRole(actorId: string, workspaceId: string, targetUserId: string, role: WorkspaceRole) {
@@ -72,22 +91,80 @@ export class WorkspacesService {
     });
   }
 
-  async addMemberByEmail(actorId: string, workspaceId: string, dto: AddMemberDto) {
+  async addMember(actorId: string, workspaceId: string, dto: AddMemberDto) {
     const actor = await this.assertMembership(actorId, workspaceId);
-    if (actor.role !== WorkspaceRole.OWNER) throw new ForbiddenException('Only owners can add members');
+    if (actor.role !== WorkspaceRole.OWNER && actor.role !== WorkspaceRole.ADMIN) {
+      throw new ForbiddenException('Only owners and admins can add members');
+    }
 
-    const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
-    if (!user) throw new NotFoundException('User with that email not found');
+    const existingUser = await this.prisma.user.findUnique({ where: { email: dto.email } });
 
-    const existing = await this.prisma.workspaceMember.findUnique({
-      where: { userId_workspaceId: { userId: user.id, workspaceId } },
+    if (existingUser) {
+      const alreadyMember = await this.prisma.workspaceMember.findUnique({
+        where: { userId_workspaceId: { userId: existingUser.id, workspaceId } },
+      });
+      if (alreadyMember) throw new ConflictException('User is already a member');
+
+      const member = await this.prisma.workspaceMember.create({
+        data: { userId: existingUser.id, workspaceId, role: (dto.role as WorkspaceRole) ?? WorkspaceRole.MEMBER },
+        include: { user: { select: { id: true, email: true, name: true } } },
+      });
+      return { type: 'member' as const, member };
+    }
+
+    const pendingInvite = await this.prisma.inviteToken.findFirst({
+      where: { email: dto.email, workspaceId, usedAt: null },
     });
-    if (existing) throw new ConflictException('User is already a member');
+    if (pendingInvite) throw new ConflictException('An invite is already pending for this email');
 
-    return this.prisma.workspaceMember.create({
-      data: { userId: user.id, workspaceId, role: (dto.role as WorkspaceRole) ?? WorkspaceRole.MEMBER },
-      include: { user: { select: { id: true, email: true, name: true } } },
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    const invite = await this.prisma.inviteToken.create({
+      data: {
+        token,
+        email: dto.email,
+        workspaceId,
+        role: (dto.role as WorkspaceRole) ?? WorkspaceRole.MEMBER,
+        createdById: actorId,
+        expiresAt,
+      },
     });
+    return { type: 'invite' as const, invite };
+  }
+
+  async regenerateInvite(actorId: string, workspaceId: string, inviteId: string) {
+    const actor = await this.assertMembership(actorId, workspaceId);
+    if (actor.role !== WorkspaceRole.OWNER && actor.role !== WorkspaceRole.ADMIN) {
+      throw new ForbiddenException('Only owners and admins can manage invites');
+    }
+
+    const invite = await this.prisma.inviteToken.findFirst({
+      where: { id: inviteId, workspaceId, usedAt: null },
+    });
+    if (!invite) throw new NotFoundException('Invite not found');
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    return this.prisma.inviteToken.update({
+      where: { id: inviteId },
+      data: { token, expiresAt },
+    });
+  }
+
+  async deleteInvite(actorId: string, workspaceId: string, inviteId: string) {
+    const actor = await this.assertMembership(actorId, workspaceId);
+    if (actor.role !== WorkspaceRole.OWNER && actor.role !== WorkspaceRole.ADMIN) {
+      throw new ForbiddenException('Only owners and admins can manage invites');
+    }
+
+    const invite = await this.prisma.inviteToken.findFirst({
+      where: { id: inviteId, workspaceId, usedAt: null },
+    });
+    if (!invite) throw new NotFoundException('Invite not found');
+
+    await this.prisma.inviteToken.delete({ where: { id: inviteId } });
   }
 
   async removeMember(actorId: string, workspaceId: string, targetUserId: string) {

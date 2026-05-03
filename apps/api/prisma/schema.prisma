@@ -13,8 +13,9 @@ model User {
   email        String   @unique
   passwordHash String
   name         String?
-  telegramId   String?  @unique
-  createdAt    DateTime @default(now())
+  telegramId         String?  @unique
+  defaultWorkspaceId String?
+  createdAt          DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   workspaces   WorkspaceMember[]
@@ -69,8 +70,9 @@ model Workspace {
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
 
-  members   WorkspaceMember[]
-  brands    Brand[]
+  members      WorkspaceMember[]
+  brands       Brand[]
+  inviteTokens InviteToken[]
 }
 
 model WorkspaceMember {
@@ -85,6 +87,24 @@ model WorkspaceMember {
 
   @@unique([userId, workspaceId])
   @@index([workspaceId])
+}
+
+model InviteToken {
+  id           String        @id @default(cuid())
+  token        String        @unique
+  email        String
+  workspaceId  String
+  role         WorkspaceRole @default(MEMBER)
+  createdById  String
+  usedAt       DateTime?
+  usedByUserId String?
+  expiresAt    DateTime
+  createdAt    DateTime      @default(now())
+
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([email])
 }
 
 // ── Brand ─────────────────────────────────────────────────────────────────────

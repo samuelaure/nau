@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -17,7 +18,7 @@ import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { ServiceAuthGuard } from '../common/guards/service-auth.guard';
 import { CurrentUser } from './current-user.decorator';
-import { LinkTelegramDto, LoginDto, RegisterDto, VerifyLinkTokenDto } from './auth.dto';
+import { LinkTelegramDto, LoginDto, RegisterDto, SetDefaultWorkspaceDto, VerifyLinkTokenDto } from './auth.dto';
 import {
   buildAccessTokenCookie,
   buildRefreshTokenCookie,
@@ -109,5 +110,17 @@ export class AuthController {
     const user = await this.auth.findByEmail(email);
     if (!user) throw new NotFoundException('User not found');
     return user;
+  }
+
+  @Patch('default-workspace')
+  @UseGuards(JwtAuthGuard)
+  async setDefaultWorkspace(
+    @CurrentUser() user: AccessTokenPayload,
+    @Body() dto: SetDefaultWorkspaceDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const tokens = await this.auth.setDefaultWorkspace(user.sub, dto.workspaceId);
+    setCookies(res, tokens.accessToken, tokens.refreshToken);
+    return { expiresIn: tokens.expiresIn };
   }
 }

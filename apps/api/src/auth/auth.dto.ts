@@ -12,9 +12,8 @@ export class RegisterDto {
   @IsString()
   name?: string;
 
-  @IsOptional()
   @IsString()
-  workspaceName?: string;
+  inviteToken!: string;
 }
 
 export class LoginDto {
@@ -41,4 +40,9 @@ export class VerifyLinkTokenDto {
 
   @IsString()
   telegramId!: string;
+}
+
+export class SetDefaultWorkspaceDto {
+  @IsString()
+  workspaceId!: string;
 }

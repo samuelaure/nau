@@ -3,6 +3,7 @@ import {
   ConflictException,
   UnauthorizedException,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
@@ -30,27 +31,47 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
+    const invite = await this.prisma.inviteToken.findUnique({ where: { token: dto.inviteToken } });
+    if (!invite) throw new UnauthorizedException('Invalid invitation token');
+    if (invite.usedAt) throw new ConflictException('Invitation has already been used');
+    if (invite.expiresAt < new Date()) throw new UnauthorizedException('Invitation has expired');
+    if (invite.email && invite.email.toLowerCase() !== dto.email.toLowerCase()) {
+      throw new ForbiddenException('This invitation is for a different email address');
+    }
+
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (existing) throw new ConflictException('Email already registered');
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
-    const workspaceName = dto.workspaceName ?? `${dto.name ?? dto.email}'s Workspace`;
-    const workspaceSlug = workspaceName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const personalSlug = `personal-${crypto.randomBytes(4).toString('hex')}`;
 
-    const user = await this.prisma.user.create({
-      data: {
-        email: dto.email,
-        passwordHash,
-        name: dto.name,
-        workspaces: {
-          create: {
-            workspace: {
-              create: { name: workspaceName, slug: workspaceSlug },
+    const user = await this.prisma.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
+        data: {
+          email: dto.email,
+          passwordHash,
+          name: dto.name,
+          defaultWorkspaceId: invite.workspaceId,
+          workspaces: {
+            create: {
+              workspace: {
+                create: { name: 'Personal Workspace', slug: personalSlug },
+              },
             },
           },
         },
-      },
-      include: { workspaces: { include: { workspace: true } } },
+      });
+
+      await tx.workspaceMember.create({
+        data: { userId: newUser.id, workspaceId: invite.workspaceId, role: invite.role },
+      });
+
+      await tx.inviteToken.update({
+        where: { id: invite.id },
+        data: { usedAt: new Date(), usedByUserId: newUser.id },
+      });
+
+      return newUser;
     });
 
     return this.issueTokens(user.id);
@@ -173,11 +194,19 @@ export class AuthService {
   // ── Token issuance ──────────────────────────────────────────────────────────
 
   async issueTokens(userId: string, existingFamily?: string) {
-    const primaryMembership = await this.prisma.workspaceMember.findFirst({
-      where: { userId, role: 'OWNER' },
-      orderBy: { createdAt: 'asc' },
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { defaultWorkspaceId: true },
     });
-    const workspaceId = primaryMembership?.workspaceId ?? null;
+
+    let workspaceId = user?.defaultWorkspaceId ?? null;
+    if (!workspaceId) {
+      const primary = await this.prisma.workspaceMember.findFirst({
+        where: { userId, role: 'OWNER' },
+        orderBy: { createdAt: 'asc' },
+      });
+      workspaceId = primary?.workspaceId ?? null;
+    }
 
     const accessToken = this.jwt.sign(
       { sub: userId, workspaceId },
@@ -189,14 +218,18 @@ export class AuthService {
     const tokenFamily = existingFamily ?? generateFamily();
 
     await this.prisma.session.create({
-      data: {
-        userId,
-        tokenFamily,
-        tokenHash,
-        expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
-      },
+      data: { userId, tokenFamily, tokenHash, expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS) },
     });
 
     return { accessToken, refreshToken: rawRefresh, expiresIn: 900 };
+  }
+
+  async setDefaultWorkspace(userId: string, workspaceId: string) {
+    const member = await this.prisma.workspaceMember.findUnique({
+      where: { userId_workspaceId: { userId, workspaceId } },
+    });
+    if (!member) throw new ForbiddenException('Not a member of this workspace');
+    await this.prisma.user.update({ where: { id: userId }, data: { defaultWorkspaceId: workspaceId } });
+    return this.issueTokens(userId);
   }
 }
