@@ -27,6 +27,11 @@ const securityHeaders = [
 ]
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    resolveAlias: {
+      '@prisma/client': './node_modules/.prisma/client',
+    },
+  },
   output: 'standalone',
   outputFileTracingRoot: path.join(__dirname, '../../'),
   // pnpm virtual store doesn't expose @swc/helpers at a standard path — force-include it
@@ -40,13 +45,6 @@ const nextConfig: NextConfig = {
   },
   serverExternalPackages: ['@remotion/bundler', '@remotion/renderer', 'sharp'],
   transpilePackages: ['nau-storage'],
-  webpack(config) {
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      '@prisma/client': path.join(__dirname, 'node_modules/.prisma/client'),
-    }
-    return config
-  },
 }
 
 export default nextConfig
