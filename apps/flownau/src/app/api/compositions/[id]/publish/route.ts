@@ -12,9 +12,10 @@ import { logger } from '@/lib/logger'
  */
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const { id } = await params
     const user = await getAuthUser()
     if (!user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -31,7 +32,7 @@ export async function POST(
     }
 
     const composition = await prisma.post.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: { brand: true },
     })
 
@@ -87,7 +88,7 @@ export async function POST(
 
         logger.info(
           {
-            compositionId: params.id,
+            compositionId: id,
             profileId: profile.id,
             username: profile.username,
           },
@@ -102,7 +103,7 @@ export async function POST(
 
         logger.error(
           {
-            compositionId: params.id,
+            compositionId: id,
             profileId: profile.id,
             error,
           },
@@ -125,13 +126,13 @@ export async function POST(
     }
 
     await prisma.post.update({
-      where: { id: params.id },
+      where: { id: id },
       data: { status: 'PUBLISHED', publishedAt: new Date() },
     })
 
     logger.info(
       {
-        compositionId: params.id,
+        compositionId: id,
         profileCount: profiles.length,
       },
       '[PUBLISH] Composition published successfully',

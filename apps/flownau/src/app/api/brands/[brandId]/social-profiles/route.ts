@@ -9,15 +9,16 @@ import { checkBrandAccessForRoute } from '@/lib/auth'
  * GET /api/brands/{brandId}/social-profiles
  * List all social profiles for a brand
  */
-export async function GET(req: Request, { params }: { params: { brandId: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ brandId: string }> }) {
   try {
+    const { brandId } = await params
     const user = await getAuthUser()
     if (!user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const denied = await checkBrandAccessForRoute(params.brandId); if (denied) return denied
+    const denied = await checkBrandAccessForRoute(brandId); if (denied) return denied
 
     const profiles = await prisma.socialProfile.findMany({
-      where: { brandId: params.brandId },
+      where: { brandId },
       orderBy: { createdAt: 'desc' },
     })
 
@@ -32,12 +33,13 @@ export async function GET(req: Request, { params }: { params: { brandId: string 
  * POST /api/brands/{brandId}/social-profiles
  * Create a new social profile (soft add from flownau or nauthenticity sync)
  */
-export async function POST(req: Request, { params }: { params: { brandId: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ brandId: string }> }) {
   try {
+    const { brandId } = await params
     const user = await getAuthUser()
     if (!user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const denied2 = await checkBrandAccessForRoute(params.brandId); if (denied2) return denied2
+    const denied2 = await checkBrandAccessForRoute(brandId); if (denied2) return denied2
 
     const body = await req.json()
     const { username, platform = 'instagram', nauthenticityProfileId, syncedFromNauthenticity = false } = body
@@ -48,7 +50,7 @@ export async function POST(req: Request, { params }: { params: { brandId: string
 
     // Check if profile already exists
     const existing = await prisma.socialProfile.findFirst({
-      where: { brandId: params.brandId, username, platform },
+      where: { brandId, username, platform },
     })
 
     if (existing) {
@@ -59,7 +61,7 @@ export async function POST(req: Request, { params }: { params: { brandId: string
     }
 
     // Get workspace for this brand
-    const brand = await prisma.brand.findUnique({ where: { id: params.brandId } })
+    const brand = await prisma.brand.findUnique({ where: { id: brandId } })
     if (!brand?.workspaceId) {
       return NextResponse.json({ error: 'Brand not found or invalid workspace' }, { status: 404 })
     }
@@ -67,7 +69,7 @@ export async function POST(req: Request, { params }: { params: { brandId: string
     // Create soft profile (no tokens yet)
     const profile = await prisma.socialProfile.create({
       data: {
-        brandId: params.brandId,
+        brandId,
         workspaceId: brand.workspaceId,
         username,
         platform,
@@ -89,7 +91,7 @@ export async function POST(req: Request, { params }: { params: { brandId: string
         body: JSON.stringify({
           username,
           platform: 'instagram',
-          brandId: params.brandId,
+          brandId,
           workspaceId: brand.workspaceId,
         }),
       }).catch((err) => {
