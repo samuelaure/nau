@@ -183,12 +183,16 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
       outputLocation: outputPath,
       inputProps,
       codec: 'h264',
-      crf: 23,
+      crf: 26,
       x264Preset: 'slow',
+      audioBitrate: '128k',
       concurrency: CONCURRENCY,
       jpegQuality: 85,
-      // faststart moves the moov atom to the front — required for streaming playback
-      ffmpegOverride: ({ type, args }) => type === 'stitcher' ? [...args, '-movflags', '+faststart'] : args,
+      // faststart + yuv420p: required for streaming playback and Instagram compatibility
+      ffmpegOverride: ({ type, args }) =>
+        type === 'stitcher'
+          ? [...args, '-pix_fmt', 'yuv420p', '-movflags', '+faststart']
+          : args,
       onProgress: ({ progress }) => { job.updateProgress(35 + Math.round(progress * 45)).catch(() => {}) },
     })
 
@@ -224,7 +228,7 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
         inputProps,
         frame: coverFrame,
         imageFormat: 'jpeg',
-        jpegQuality: 95,
+        jpegQuality: 85,
       })
       const coverR2Key = flownau.renderCover(brandId, postId)
       coverUrl = await storage.upload(coverR2Key, fs.createReadStream(coverPath), { mimeType: 'image/jpeg' })
