@@ -7,6 +7,7 @@
   "author": "Samuel Aure",
   "scripts": {
     "build": "nest build",
+    "bootstrap": "dotenv -e ../../.env.development -e .env.development -- npx tsx scripts/bootstrap-admin.ts",
     "dev:db:migrate:deploy": "dotenv -e ../../.env.development -e .env.development -- npx prisma migrate deploy",
     "dev:db:reset": "dotenv -e ../../.env.development -e .env.development -- npx prisma migrate reset --force --skip-seed",
     "dev:db:seed": "dotenv -e ../../.env.development -e .env.development -- ts-node prisma/seed.ts",
