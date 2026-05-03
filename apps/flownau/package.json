@@ -20,7 +20,7 @@
     "dev": "dotenv -e ../../.env.development -e .env.development -- next dev --port 3003",
     "worker": "dotenv -e ../../.env.development -e .env.development -- tsx watch src/modules/renderer/render-worker.ts",
     "predev": "dotenv -e ../../.env.development -e .env.development -- node scripts/db-bootstrap.js",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "npm run db:bootstrap && next start",
     "lint": "eslint .",
     "test": "vitest",
