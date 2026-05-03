@@ -14,15 +14,11 @@ import {
   ChevronRight,
   Home,
   Sparkles,
-  Link as LinkIcon,
-  Unlink,
   Trash2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { deleteAsset } from '@/modules/shared/actions'
 import ActionMenu from '@/modules/shared/components/ActionMenu'
-import Modal from '@/modules/shared/components/Modal'
-import R2FolderBrowser from '@/modules/shared/components/R2FolderBrowser'
 import { Asset } from '@/types/video-schema'
 
 // ─── Upload singleton — survives tab navigation ───────────────────────────────
@@ -78,9 +74,6 @@ export default function AssetsManager({
   }, [])
 
   const [currentPath, setCurrentPath] = useState<string[]>([])
-  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false)
-  const [linking, setLinking] = useState(false)
-  const [unlinking, setUnlinking] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   const toggleSelect = useCallback((id: string) => {
@@ -173,68 +166,6 @@ export default function AssetsManager({
     },
     [ownerId, ownerType],
   )
-
-  const handleLinkFolder = async (prefix: string) => {
-    setLinking(true)
-    try {
-      const response = await fetch('/api/protected/r2/link', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prefix,
-          brandId: ownerType === 'brand' ? ownerId : null,
-          templateId: ownerType === 'template' ? ownerId : null,
-        }),
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Linking failed')
-      }
-
-      toast.success('R2 folder linked successfully')
-      window.location.reload()
-    } catch (error: unknown) {
-      console.error('Linking failed', error)
-      toast.error(`Linking failed: ${(error as Error).message}`)
-    } finally {
-      setLinking(false)
-      setIsLinkModalOpen(false)
-    }
-  }
-
-  const handleUnlinkFolder = async () => {
-    if (
-      !confirm(
-        'Are you sure you want to unlink the R2 folder? This will remove all associated assets from this scope.',
-      )
-    )
-      return
-    setUnlinking(true)
-    try {
-      const response = await fetch('/api/protected/r2/unlink', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          brandId: ownerType === 'brand' ? ownerId : null,
-          templateId: ownerType === 'template' ? ownerId : null,
-        }),
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Unlinking failed')
-      }
-
-      toast.success('R2 folder unlinked successfully')
-      window.location.reload()
-    } catch (error: unknown) {
-      console.error('Unlinking failed', error)
-      toast.error(`Unlinking failed: ${(error as Error).message}`)
-    } finally {
-      setUnlinking(false)
-    }
-  }
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -333,24 +264,7 @@ export default function AssetsManager({
             <Sparkles size={20} className="text-accent" />
             <h2 className="text-xl font-bold text-white tracking-tight">Asset Library</h2>
           </div>
-          <div className="flex items-center gap-2">
-            {basePath ? (
-              <button
-                onClick={handleUnlinkFolder}
-                disabled={unlinking}
-                className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-xl text-xs font-bold text-red-500 transition-all disabled:opacity-50"
-              >
-                {unlinking ? <Loader2 size={14} className="animate-spin" /> : <Unlink size={14} />}
-                {unlinking ? 'Unlinking...' : 'Unlink R2 Folder'}
-              </button>
-            ) : null}
-            <button
-              onClick={() => setIsLinkModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold transition-all"
-            >
-              <LinkIcon size={14} /> Link R2 Folder
-            </button>
-          </div>
+          <div />
         </div>
 
         <nav className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-widest text-text-secondary/50 overflow-x-auto pb-1 custom-scrollbar">
@@ -492,24 +406,6 @@ export default function AssetsManager({
         </div>
       )}
 
-      {/* Modals */}
-      <Modal isOpen={isLinkModalOpen} onClose={() => setIsLinkModalOpen(false)} maxWidth="lg">
-        {linking ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-6">
-            <Loader2 className="animate-spin text-accent" size={48} />
-            <div className="flex flex-col gap-1 text-center">
-              <h3 className="text-lg font-bold text-white uppercase tracking-widest">
-                Handshaking...
-              </h3>
-              <p className="text-sm opacity-50">
-                Indexing remote R2 objects and establishing secure links.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <R2FolderBrowser onSelect={handleLinkFolder} onCancel={() => setIsLinkModalOpen(false)} />
-        )}
-      </Modal>
     </div>
   )
 }
