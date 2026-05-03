@@ -3,7 +3,7 @@ import { prisma } from '@/modules/shared/prisma'
 import { checkBrandAccessForRoute } from '@/lib/auth'
 import { logError } from '@/modules/shared/logger'
 import { triggerRenderForPost } from '@/modules/renderer/render-queue'
-import { storage } from '@/modules/shared/r2'
+import { storage, keyFromCdnUrl } from '@/modules/shared/r2'
 import { flownau } from 'nau-storage'
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -158,7 +158,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     ])
     for (const url of [post.userUploadedMediaUrl, post.videoUrl, post.coverUrl]) {
       if (!url) continue
-      const key = storage.keyFromCdnUrl(url)
+      const key = keyFromCdnUrl(url)
       if (key) r2Keys.add(key)
     }
     storage.deleteMany([...r2Keys]).catch((err) =>

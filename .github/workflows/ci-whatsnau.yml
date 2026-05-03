@@ -73,7 +73,12 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Check Dockerfile exists
+        id: check_dockerfile
+        run: |
+          if [ -f apps/whatsnau/Dockerfile ]; then echo "exists=true" >> $GITHUB_OUTPUT; else echo "exists=false" >> $GITHUB_OUTPUT; fi
       - uses: docker/build-push-action@v6
+        if: steps.check_dockerfile.outputs.exists == 'true'
         with:
           context: .
           file: apps/whatsnau/Dockerfile

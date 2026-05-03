@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 import { getAuthUser } from '@/lib/auth'
-import { storage } from '@/modules/shared/r2'
+import { storage, keyFromCdnUrl } from '@/modules/shared/r2'
 import { flownau } from 'nau-storage'
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -63,7 +63,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     ])
     for (const url of [post.userUploadedMediaUrl, post.videoUrl, post.coverUrl]) {
       if (!url) continue
-      const key = storage.keyFromCdnUrl(url)
+      const key = keyFromCdnUrl(url)
       if (key) r2Keys.add(key)
     }
     storage.deleteMany([...r2Keys]).catch((err) => console.error('[DELETE_COMPOSITION_R2]', err))

@@ -1,7 +1,7 @@
 'use server'
 
 import { prisma } from '@/modules/shared/prisma'
-import { storage } from '@/modules/shared/r2'
+import { storage, keyFromCdnUrl } from '@/modules/shared/r2'
 import { revalidatePath } from 'next/cache'
 import { requireAuth } from '@/lib/auth'
 import { z } from 'zod'
@@ -70,7 +70,7 @@ export async function deleteAsset(assetId: string) {
     const keysToDelete = [asset.r2Key]
     // Also delete the thumbnail if one was generated alongside this asset
     if (asset.thumbnailUrl) {
-      const thumbKey = storage.keyFromCdnUrl(asset.thumbnailUrl)
+      const thumbKey = keyFromCdnUrl(asset.thumbnailUrl)
       if (thumbKey && thumbKey !== asset.r2Key) keysToDelete.push(thumbKey)
     }
     await storage.deleteMany(keysToDelete)

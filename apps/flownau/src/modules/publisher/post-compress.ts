@@ -2,7 +2,7 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import { prisma } from '@/modules/shared/prisma'
-import { storage } from '@/modules/shared/r2'
+import { storage, keyFromCdnUrl } from '@/modules/shared/r2'
 import { logger, logError } from '@/modules/shared/logger'
 import { compressVideoForArchive } from '@/modules/video/ffmpeg'
 import ffmpeg from 'fluent-ffmpeg'
@@ -52,7 +52,7 @@ export async function compressPublishedPost(postId: string): Promise<void> {
     const sizeAfter = fs.statSync(tmpOut).size
     const saving = Math.round((1 - sizeAfter / sizeBefore) * 100)
 
-    const r2Key = storage.keyFromCdnUrl(post.videoUrl)
+    const r2Key = keyFromCdnUrl(post.videoUrl)
     if (!r2Key) throw new Error(`Cannot derive R2 key from videoUrl: ${post.videoUrl}`)
 
     await storage.upload(r2Key, fs.createReadStream(tmpOut), { mimeType: 'video/mp4' })
@@ -70,7 +70,7 @@ export async function compressPublishedPost(postId: string): Promise<void> {
     try {
       await downloadToTemp(post.coverUrl, coverIn)
       await compressJpegForArchive(coverIn, coverOut)
-      const coverKey = storage.keyFromCdnUrl(post.coverUrl)
+      const coverKey = keyFromCdnUrl(post.coverUrl)
       if (coverKey) {
         await storage.upload(coverKey, fs.createReadStream(coverOut), { mimeType: 'image/jpeg' })
         logger.info({ postId }, '[PostCompress] Cover JPEG compressed and re-uploaded')
