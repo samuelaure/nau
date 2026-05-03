@@ -43,8 +43,7 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: '/(.*)', headers: securityHeaders }]
   },
-  serverExternalPackages: ['@remotion/bundler', '@remotion/renderer', 'sharp'],
-  transpilePackages: ['nau-storage'],
+  serverExternalPackages: ['@remotion/bundler', '@remotion/renderer', 'sharp', 'nau-storage', '@aws-sdk/client-s3'],
 }
 
 export default nextConfig
