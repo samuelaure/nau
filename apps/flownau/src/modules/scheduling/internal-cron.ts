@@ -1,4 +1,3 @@
-import cron from 'node-cron'
 import { prisma } from '@/modules/shared/prisma'
 import { addRenderJob, renderQueue } from '@/modules/renderer/render-queue'
 import { publishComposition } from '@/modules/publisher/publish-orchestrator'
@@ -147,7 +146,9 @@ function safe(name: string, fn: () => Promise<void>) {
   return () => fn().catch((err) => logError(`[Cron:${name}] Unhandled error`, err))
 }
 
-export function startInternalCron() {
+export async function startInternalCron() {
+  const { default: cron } = await import('node-cron')
+
   // Publisher — every 5 minutes
   cron.schedule('*/5 * * * *', safe('Publisher', runPublisher))
 
