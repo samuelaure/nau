@@ -31,7 +31,7 @@ COPY prisma.config.js ./
 RUN npm install prisma@^7.3.0 @prisma/client@^7.3.0 @swc/helpers@^0.5.5 @next/env --no-save && \
     node_modules/.bin/prisma generate --schema=prisma/schema.prisma && \
     cd apps/flownau/.next/node_modules && \
-    npm install pino@^10.3.1 pino-pretty@^13.1.3 pg pg-connection-string pg-types --no-save
+    npm install pino@^10.3.1 pino-pretty@^13.1.3 pg pg-connection-string pg-types "@prisma/adapter-pg@^7.3.0" --no-save
 
 EXPOSE 3000
 ENV PORT=3000
