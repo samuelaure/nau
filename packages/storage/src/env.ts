@@ -7,6 +7,7 @@ export const storageEnvSchema = z.object({
   R2_SECRET_ACCESS_KEY: z.string().min(1),
   R2_BUCKET_NAME: z.string().min(1),
   R2_PUBLIC_URL: z.string().url(),
+  R2_ENV_PREFIX: z.string().min(1).default('dev'),
 });
 
 export type StorageEnv = z.infer<typeof storageEnvSchema>;
@@ -34,5 +35,6 @@ export function loadStorageConfig(): StorageConfig {
     publicUrl: env.R2_PUBLIC_URL.endsWith('/')
       ? env.R2_PUBLIC_URL.slice(0, -1)
       : env.R2_PUBLIC_URL,
+    envPrefix: env.R2_ENV_PREFIX,
   };
 }

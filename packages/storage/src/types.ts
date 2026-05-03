@@ -8,6 +8,8 @@ export type StorageConfig = {
   secretAccessKey: string;
   bucket: string;
   publicUrl: string;
+  /** Environment prefix prepended to every key, e.g. "production", "staging", "dev". */
+  envPrefix?: string;
 };
 
 export type UploadSource = Buffer | Readable | Uint8Array;

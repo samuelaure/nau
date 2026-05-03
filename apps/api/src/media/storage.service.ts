@@ -13,9 +13,10 @@ export class StorageService implements OnModuleInit {
     const secretAccessKey = this.configService.get<string>('R2_SECRET_ACCESS_KEY', '');
     const bucket = this.configService.get<string>('R2_BUCKET_NAME', '');
     const publicUrl = this.configService.get<string>('R2_PUBLIC_URL', '');
+    const envPrefix = this.configService.get<string>('R2_ENV_PREFIX', 'dev');
 
     if (endpoint && accessKeyId && secretAccessKey && bucket && publicUrl) {
-      this.storage = createStorage({ endpoint, accessKeyId, secretAccessKey, bucket, publicUrl });
+      this.storage = createStorage({ endpoint, accessKeyId, secretAccessKey, bucket, publicUrl, envPrefix });
     }
   }
 

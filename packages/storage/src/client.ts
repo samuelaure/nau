@@ -20,10 +20,15 @@ export class NauStorage {
   private readonly s3: S3Client;
   private readonly bucket: string;
   private readonly publicUrl: string;
+  /** Normalised prefix with trailing slash, or empty string. */
+  private readonly envPrefix: string;
 
   constructor(config: StorageConfig) {
     this.bucket = config.bucket;
     this.publicUrl = config.publicUrl;
+    this.envPrefix = config.envPrefix
+      ? config.envPrefix.replace(/^\/|\/$/g, '') + '/'
+      : '';
 
     this.s3 = new S3Client({
       region: 'auto',
@@ -33,6 +38,15 @@ export class NauStorage {
         secretAccessKey: config.secretAccessKey,
       },
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Internal
+  // ---------------------------------------------------------------------------
+
+  /** Prepends the env prefix to a logical key. */
+  private pk(key: string): string {
+    return this.envPrefix + key;
   }
 
   // ---------------------------------------------------------------------------
@@ -48,7 +62,7 @@ export class NauStorage {
     await this.s3.send(
       new PutObjectCommand({
         Bucket: this.bucket,
-        Key: key,
+        Key: this.pk(key),
         Body: body,
         ContentType: options.mimeType,
         ...(options.size !== undefined && { ContentLength: options.size }),
@@ -70,13 +84,13 @@ export class NauStorage {
   ): Promise<PresignedUpload> {
     const command = new PutObjectCommand({
       Bucket: this.bucket,
-      Key: key,
+      Key: this.pk(key),
       ContentType: mimeType,
     });
 
     const uploadUrl = await getSignedUrl(this.s3, command, { expiresIn });
 
-    return { uploadUrl, storageKey: key, cdnUrl: this.cdnUrl(key) };
+    return { uploadUrl, storageKey: this.pk(key), cdnUrl: this.cdnUrl(key) };
   }
 
   // ---------------------------------------------------------------------------
@@ -85,7 +99,7 @@ export class NauStorage {
 
   async delete(key: string): Promise<void> {
     await this.s3.send(
-      new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
+      new DeleteObjectCommand({ Bucket: this.bucket, Key: this.pk(key) }),
     );
   }
 
@@ -99,7 +113,7 @@ export class NauStorage {
     await this.s3.send(
       new DeleteObjectsCommand({
         Bucket: this.bucket,
-        Delete: { Objects: keys.map((Key) => ({ Key })), Quiet: true },
+        Delete: { Objects: keys.map((key) => ({ Key: this.pk(key) })), Quiet: true },
       }),
     );
   }
@@ -116,7 +130,7 @@ export class NauStorage {
     const response = await this.s3.send(
       new ListObjectsV2Command({
         Bucket: this.bucket,
-        Prefix: prefix,
+        Prefix: this.pk(prefix),
         Delimiter: options.delimiter,
         MaxKeys: options.maxKeys,
         ContinuationToken: options.continuationToken,
@@ -124,14 +138,14 @@ export class NauStorage {
     );
 
     const objects: StorageObject[] = (response.Contents ?? []).map((obj) => ({
-      key: obj.Key!,
+      key: this.stripPrefix(obj.Key!),
       size: obj.Size ?? 0,
       lastModified: obj.LastModified ?? new Date(),
       etag: obj.ETag,
     }));
 
     const prefixes = (response.CommonPrefixes ?? [])
-      .map((p) => p.Prefix!)
+      .map((p) => this.stripPrefix(p.Prefix!))
       .filter(Boolean);
 
     return {
@@ -165,16 +179,25 @@ export class NauStorage {
 
   /** Returns the public CDN URL for a stored key. No credentials required. */
   cdnUrl(key: string): string {
-    return `${this.publicUrl}/${key}`;
+    return `${this.publicUrl}/${this.pk(key)}`;
   }
 
   /**
-   * Extracts the storage key from a CDN URL produced by this instance.
-   * Returns null if the URL doesn't belong to this bucket.
+   * Extracts the logical storage key (without env prefix) from a CDN URL
+   * produced by this instance. Returns null if the URL doesn't belong to
+   * this bucket or env prefix.
    */
   keyFromCdnUrl(url: string): string | null {
-    const prefix = `${this.publicUrl}/`;
-    return url.startsWith(prefix) ? url.slice(prefix.length) : null;
+    const base = `${this.publicUrl}/${this.envPrefix}`;
+    if (!url.startsWith(base)) return null;
+    return url.slice(base.length);
+  }
+
+  /** Strips the env prefix from a raw S3 key returned by list operations. */
+  private stripPrefix(rawKey: string): string {
+    return this.envPrefix && rawKey.startsWith(this.envPrefix)
+      ? rawKey.slice(this.envPrefix.length)
+      : rawKey;
   }
 }
 

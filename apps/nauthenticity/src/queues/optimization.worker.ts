@@ -17,6 +17,7 @@ const storage = config.env.R2_ENDPOINT && config.env.R2_ACCESS_KEY_ID && config.
       secretAccessKey: config.env.R2_SECRET_ACCESS_KEY,
       bucket: config.env.R2_BUCKET_NAME,
       publicUrl: config.env.R2_PUBLIC_URL,
+      envPrefix: config.env.R2_ENV_PREFIX,
     })
   : null;
 
