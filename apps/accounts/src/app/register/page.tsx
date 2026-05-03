@@ -11,21 +11,42 @@ import { registerAction } from '../actions'
 const DEFAULT_REDIRECT = process.env['NEXT_PUBLIC_APP_URL'] ?? 'https://app.9nau.com'
 
 function RegisterForm() {
+  const searchParams = useSearchParams()
+  const inviteToken = searchParams.get('invite') ?? ''
+  const redirectUri = searchParams.get('redirect_uri') ?? DEFAULT_REDIRECT
+
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const searchParams = useSearchParams()
-  const redirectUri = searchParams.get('redirect_uri') ?? DEFAULT_REDIRECT
+
+  if (!inviteToken) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[radial-gradient(circle_at_top_right,#1e1b4b,#000)] p-4">
+        <div className="glass w-full max-w-md animate-fade-in p-10 text-center">
+          <div className="w-16 h-16 bg-violet-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-[0_0_24px_rgba(124,58,237,0.5)]">
+            <span className="text-white text-2xl font-bold font-heading">9</span>
+          </div>
+          <h1 className="text-2xl font-heading font-bold mb-3">Invite required</h1>
+          <p className="text-white/60 text-sm mb-6">
+            9naŭ Platform is currently by invitation only. Ask your workspace owner for an invite link.
+          </p>
+          <Link href="/login" className="text-violet-400 hover:underline text-sm">
+            Already have an account? Sign in
+          </Link>
+        </div>
+        <div className="absolute top-[20%] left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-violet-600/10 blur-[150px] -z-10 rounded-full pointer-events-none" />
+      </div>
+    )
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setLoading(true)
-
     try {
-      const result = await registerAction(email, password, name)
+      const result = await registerAction(email, password, name, inviteToken)
       if (!result.ok) {
         setError(result.message)
         return
@@ -48,7 +69,7 @@ function RegisterForm() {
             <span className="text-white text-2xl font-bold font-heading">9</span>
           </div>
           <h1 className="text-3xl font-heading font-bold mb-2">Create your account</h1>
-          <p className="text-white/60 text-sm">Join the 9naŭ platform.</p>
+          <p className="text-white/60 text-sm">You&apos;ve been invited to join 9naŭ Platform.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">

@@ -106,9 +106,9 @@ export async function registerAction(
   email: string,
   password: string,
   name?: string,
-  workspaceName?: string,
+  inviteToken?: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  return callAuthEndpoint('register', { email, password, name, workspaceName })
+  return callAuthEndpoint('register', { email, password, name, inviteToken })
 }
 
 export async function logoutAction(): Promise<void> {
