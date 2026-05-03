@@ -144,6 +144,76 @@ _whatsnau is deferred — not included in v1 deployment._
 
 ---
 
+## Database backups
+
+All five PostgreSQL databases are backed up nightly at **02:00 UTC** by the `nau-backup` container. Dumps are compressed with gzip and uploaded to a private Cloudflare R2 bucket (`nau-backups`, Infrequent Access). Backups older than 30 days are pruned automatically.
+
+### Backup layout in R2
+
+```
+nau-backups/
+├── api/           api-YYYY-MM-DD.sql.gz
+├── flownau/       flownau-YYYY-MM-DD.sql.gz
+├── nauthenticity/ nauthenticity-YYYY-MM-DD.sql.gz
+├── zazu/          zazu-YYYY-MM-DD.sql.gz
+└── whatsnau/      whatsnau-YYYY-MM-DD.sql.gz
+```
+
+### Starting the backup service
+
+The `backup` service is defined in the root `docker-compose.yml`. It is **not started automatically by CI/CD** — start it once manually after first deployment and it will restart on its own from then on:
+
+```bash
+ssh nau
+cd ~/          # root docker-compose.yml lives here
+docker compose up -d backup
+```
+
+Verify it started:
+```bash
+docker logs nau-backup
+```
+
+### Environment variables required (root `.env`)
+
+| Variable | Description |
+|---|---|
+| `BACKUP_R2_BUCKET_NAME` | `nau-backups` |
+| `BACKUP_R2_ACCESS_KEY_ID` | R2 Account API Token access key (scoped to `nau-backups`) |
+| `BACKUP_R2_SECRET_ACCESS_KEY` | R2 Account API Token secret key |
+| `BACKUP_R2_ENDPOINT` | `https://<account-id>.r2.cloudflarestorage.com` |
+| `API_DB_PASSWORD` | PostgreSQL password for `nau_api` |
+| `FLOWNAU_DB_PASSWORD` | PostgreSQL password for `flownau` |
+| `NAUTHENTICITY_DB_PASSWORD` | PostgreSQL password for `nauthenticity` |
+| `ZAZU_DB_PASSWORD` | PostgreSQL password for `zazu` |
+| `WHATSNAU_DB_PASSWORD` | PostgreSQL password for `whatsnau` ⚠️ **fill in before starting backup service** |
+
+> ⚠️ `WHATSNAU_DB_PASSWORD` is currently empty in `.env.production` — set it once whatsnau has a production database before starting the backup container.
+
+### Manual backup run (on demand)
+
+```bash
+ssh nau
+docker exec nau-backup /usr/local/bin/backup.sh
+```
+
+### Restoring from backup
+
+```bash
+# 1. Download the dump from R2 (use rclone, aws CLI, or Cloudflare dashboard)
+# 2. Decompress and restore:
+gunzip api-2026-05-03.sql.gz
+docker exec -i api-postgres psql -U nau_api -d nau_api < api-2026-05-03.sql
+```
+
+### Viewing backup logs
+
+```bash
+ssh nau "docker logs nau-backup --tail=50"
+```
+
+---
+
 ## Uptime monitoring
 
 **Implementation:** `.github/workflows/uptime.yml` — a GitHub Actions scheduled workflow that runs every 5 minutes on GitHub's infrastructure (independent of the VPS).
