@@ -2,7 +2,7 @@
 set -e
 
 DATE=$(date +%Y-%m-%d)
-BUCKET="s3:${R2_BUCKET_NAME}"
+BUCKET=":s3:${R2_BUCKET_NAME}"
 
 echo "[backup] Starting nau platform backup — ${DATE}"
 
