@@ -20,7 +20,7 @@ const envSchema = z.object({
   R2_ENDPOINT: z.string().url().optional(),
   R2_BUCKET_NAME: z.string().optional(),
   R2_PUBLIC_URL: z.string().url().optional(),
-  R2_ENV_PREFIX: z.string().min(1).default('dev'),
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 });
 
 export type Env = z.infer<typeof envSchema>;
