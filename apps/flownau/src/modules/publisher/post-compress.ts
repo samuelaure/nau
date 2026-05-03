@@ -25,7 +25,7 @@ function compressJpegForArchive(inputPath: string, outputPath: string): Promise<
     ffmpeg(inputPath)
       .outputOptions(['-vframes 1', '-q:v 10'])
       .on('error', reject)
-      .on('end', resolve)
+      .on('end', () => resolve())
       .save(outputPath)
   })
 }
