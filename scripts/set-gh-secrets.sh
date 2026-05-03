@@ -48,6 +48,7 @@ set_secret_from_file "DEPLOY_SSH_KEY" "$HOME/.ssh/nau_hetzner"
 echo ""
 echo "Setting per-service env files..."
 
+set_secret_from_file "ROOT_ENV_FILE"           ".env.production"
 set_secret_from_file "API_ENV_FILE"            "apps/api/.env.production"
 set_secret_from_file "ACCOUNTS_ENV_FILE"       "apps/accounts/.env.production"
 set_secret_from_file "APP_ENV_FILE"            "apps/app/.env.production"
