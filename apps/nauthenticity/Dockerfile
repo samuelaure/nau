@@ -5,8 +5,6 @@ RUN apt-get update && apt-get install -y \
     openssl \
     && rm -rf /var/lib/apt/lists/*
 
-RUN corepack enable && corepack prepare pnpm@10.14.0 --activate
-
 WORKDIR /app
 
 COPY pnpm-lock.yaml ./
@@ -18,15 +16,20 @@ COPY tsconfig.base.json ./
 COPY packages ./packages
 COPY apps/nauthenticity ./apps/nauthenticity
 
+# Build the Vite dashboard SPA before enabling corepack.
+# corepack shims block npm when root package.json declares pnpm as packageManager.
+# --ignore-scripts skips husky postinstall from workspace packages.
+WORKDIR /app/apps/nauthenticity/dashboard
+RUN npm install --ignore-scripts
+RUN npm run build
+
+# Enable corepack + install pnpm workspace deps
+WORKDIR /app
+RUN corepack enable && corepack prepare pnpm@10.14.0 --activate
 RUN pnpm install --frozen-lockfile
 
 WORKDIR /app/apps/nauthenticity
 RUN npx prisma generate
-
-# Build the Vite dashboard SPA (uses npm, not pnpm — not a workspace package)
-WORKDIR /app/apps/nauthenticity/dashboard
-RUN npm install --frozen-lockfile
-RUN npm run build
 
 WORKDIR /app
 RUN pnpm build --filter=nauthenticity

@@ -26,7 +26,8 @@ vi.mock('@/modules/shared/prisma', () => ({
   },
 }))
 
-import { addRenderJob, getRenderJobStatus } from '../render-queue'
+import { addRenderJob, getRenderJobStatus, triggerRenderForPost } from '../render-queue'
+import { prisma } from '@/modules/shared/prisma'
 
 describe('addRenderJob()', () => {
   beforeEach(() => {
@@ -180,6 +181,51 @@ describe('getRenderJobStatus()', () => {
       ['active', 'waiting', 'delayed', 'failed', 'completed'],
       0,
       200,
+    )
+  })
+})
+
+describe('triggerRenderForPost()', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('returns { enqueued: false, reason: "not_found" } when post does not exist', async () => {
+    ;(prisma.post.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(null)
+
+    const result = await triggerRenderForPost('missing-post')
+
+    expect(result).toEqual({ enqueued: false, reason: 'not_found' })
+  })
+
+  it('returns { enqueued: false, reason: "user_managed_format" } for head_talk format', async () => {
+    ;(prisma.post.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: 'post-1',
+      status: 'DRAFT_APPROVED',
+      format: 'head_talk',
+      userUploadedMediaUrl: null,
+    })
+
+    const result = await triggerRenderForPost('post-1')
+
+    expect(result).toEqual({ enqueued: false, reason: 'user_managed_format' })
+  })
+
+  it('enqueues render job and returns { enqueued: true } for reel format', async () => {
+    ;(prisma.post.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: 'post-2',
+      status: 'DRAFT_APPROVED',
+      format: 'reel',
+      userUploadedMediaUrl: null,
+    })
+    ;(prisma.post.update as ReturnType<typeof vi.fn>).mockResolvedValue({})
+    mockAdd.mockResolvedValue({ id: 'render-post-2-999' })
+
+    const result = await triggerRenderForPost('post-2')
+
+    expect(result.enqueued).toBe(true)
+    expect(prisma.post.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'post-2' }, data: { status: 'RENDERING' } }),
     )
   })
 })
