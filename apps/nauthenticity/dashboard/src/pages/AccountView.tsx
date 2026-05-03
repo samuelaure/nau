@@ -51,7 +51,7 @@ export const AccountView = () => {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', marginBottom: '2rem' }}>
         <img
-          src={getMediaUrl(account.profileImageUrl) || 'https://via.placeholder.com/100'}
+          src={getMediaUrl(account.profileImageUrl ?? undefined) || 'https://via.placeholder.com/100'}
           alt={account.username}
           style={{
             width: '80px',

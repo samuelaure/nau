@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { ChevronDown, Globe } from 'lucide-react';
 
 type Brand = { id: string; name: string };
-type Workspace = { id: string; name: string };
 
 export function BrandSwitcher() {
   const navigate = useNavigate();

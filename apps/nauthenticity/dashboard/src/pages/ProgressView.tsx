@@ -1,14 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import {
-  getAccountProgress,
+  getProfileProgress,
   getAccounts,
   getQueueStatus,
   abortIngestion,
   pauseIngestion,
   resumeIngestion,
   deleteJob,
-  type AccountProgress,
+  type ProfileProgress,
   type PostProgress,
   type QueueMetrics,
 } from '../lib/api';
@@ -181,7 +181,7 @@ const ActiveJobs = ({
   jobs,
   username,
 }: {
-  jobs: AccountProgress['activeJobs'];
+  jobs: ProfileProgress['activeJobs'];
   username: string;
 }) => {
   const queryClient = useQueryClient();
@@ -392,7 +392,7 @@ const ProgressBar = ({
 
 // ─── Summary Header ──────────────────────────────────────────────────────────
 
-const SummaryCards = ({ summary }: { summary: AccountProgress['summary'] }) => {
+const SummaryCards = ({ summary }: { summary: ProfileProgress['summary'] }) => {
   const cards = [
     { label: 'Total Posts', value: summary.totalPosts, color: '#8b5cf6' },
     { label: 'Media Files', value: summary.totalMedia, color: '#3b82f6' },
@@ -528,7 +528,7 @@ export const ProgressView = () => {
     dataUpdatedAt,
   } = useQuery({
     queryKey: ['progress', selected],
-    queryFn: () => getAccountProgress(selected!),
+    queryFn: () => getProfileProgress(selected!),
     enabled: !!selected,
     refetchInterval: 5000, // Refresh every 5s for smoother progress
   });

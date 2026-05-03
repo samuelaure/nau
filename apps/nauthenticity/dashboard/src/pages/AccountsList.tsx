@@ -46,7 +46,7 @@ export const AccountsList = () => {
             >
               <div className="profile-header">
                 <img
-                  src={getMediaUrl(account.profileImageUrl) || 'https://via.placeholder.com/64'}
+                  src={getMediaUrl(account.profileImageUrl ?? undefined) || 'https://via.placeholder.com/64'}
                   alt={account.username}
                   className="avatar"
                 />

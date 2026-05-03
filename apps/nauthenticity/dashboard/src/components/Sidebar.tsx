@@ -17,7 +17,6 @@ import {
   Video,
   Building2,
   Settings,
-  ArrowLeft,
 } from 'lucide-react';
 
 type Workspace = { id: string; name: string };
@@ -162,7 +161,6 @@ function WorkspaceSelector() {
 
 export function Sidebar() {
   const location = useLocation();
-  const navigate = useNavigate();
 
   const brandMatch = location.pathname.match(/\/workspaces\/([^/]+)\/brands\/([^/]+)/);
   const workspaceMatch = location.pathname.match(/\/workspaces\/([^/]+)/);

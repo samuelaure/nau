@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { validateCronSecret } from '../nau-auth'
+import { validateCronSecret, unauthorizedResponse, unauthorizedCronResponse } from '../nau-auth'
 
 describe('nau-auth', () => {
   beforeEach(() => {
@@ -33,6 +33,24 @@ describe('nau-auth', () => {
         headers: { authorization: 'Basic secure' },
       })
       expect(validateCronSecret(req)).toBe(false)
+    })
+  })
+
+  describe('unauthorizedResponse()', () => {
+    it('returns 401 with JSON error body', async () => {
+      const res = unauthorizedResponse()
+      expect(res.status).toBe(401)
+      const body = await res.json()
+      expect(body.error).toMatch(/Unauthorized/)
+    })
+  })
+
+  describe('unauthorizedCronResponse()', () => {
+    it('returns 401 with JSON error body', async () => {
+      const res = unauthorizedCronResponse()
+      expect(res.status).toBe(401)
+      const body = await res.json()
+      expect(body.error).toMatch(/Unauthorized/)
     })
   })
 })
