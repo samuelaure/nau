@@ -9,12 +9,46 @@ CREATE TABLE "Brand" (
     "shortCode" TEXT,
     "assetsRoot" TEXT,
     "language" TEXT NOT NULL DEFAULT 'Spanish',
-    "directorPrompt" TEXT,
-    "creationPrompt" TEXT,
+    "ideationCount" INTEGER NOT NULL DEFAULT 9,
+    "autoApproveIdeas" BOOLEAN NOT NULL DEFAULT false,
+    "coverageHorizonDays" INTEGER NOT NULL DEFAULT 7,
+    "ideationPrompt" TEXT,
+    "composerPrompt" TEXT,
+    "brandIdentity" JSONB,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Brand_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "PostSchedule" (
+    "id" TEXT NOT NULL,
+    "brandId" TEXT NOT NULL,
+    "formatChain" TEXT[],
+    "chainPosition" INTEGER NOT NULL DEFAULT 0,
+    "dailyFrequency" INTEGER NOT NULL DEFAULT 1,
+    "windowStart" TEXT NOT NULL DEFAULT '09:00',
+    "windowEnd" TEXT NOT NULL DEFAULT '21:00',
+    "timezone" TEXT NOT NULL DEFAULT 'UTC',
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "PostSchedule_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "PostSlot" (
+    "id" TEXT NOT NULL,
+    "brandId" TEXT NOT NULL,
+    "scheduledAt" TIMESTAMP(3) NOT NULL,
+    "format" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'empty',
+    "postId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "PostSlot_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -68,10 +102,11 @@ CREATE TABLE "Asset" (
 CREATE TABLE "Template" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
-    "remotionId" TEXT NOT NULL,
+    "format" TEXT NOT NULL DEFAULT 'reel',
+    "remotionId" TEXT NOT NULL DEFAULT '',
     "config" JSONB,
-    "brandId" TEXT NOT NULL,
-    "scope" TEXT NOT NULL DEFAULT 'brand',
+    "brandId" TEXT,
+    "scope" TEXT NOT NULL DEFAULT 'system',
     "useBrandAssets" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -84,6 +119,9 @@ CREATE TABLE "Template" (
     "sceneType" TEXT,
     "slotSchema" JSONB,
     "styleConfig" JSONB,
+    "description" TEXT,
+    "previewUrl" TEXT,
+    "previewThumbnailUrl" TEXT,
 
     CONSTRAINT "Template_pkey" PRIMARY KEY ("id")
 );
@@ -93,8 +131,10 @@ CREATE TABLE "BrandTemplateConfig" (
     "id" TEXT NOT NULL,
     "brandId" TEXT NOT NULL,
     "templateId" TEXT NOT NULL,
+    "autoApproveDraft" BOOLEAN NOT NULL DEFAULT false,
     "autoApprovePost" BOOLEAN NOT NULL DEFAULT false,
     "enabled" BOOLEAN NOT NULL DEFAULT true,
+    "customPrompt" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -180,61 +220,46 @@ CREATE TABLE "ContentCreationPrinciples" (
 );
 
 -- CreateTable
-CREATE TABLE "ContentIdea" (
+CREATE TABLE "Post" (
     "id" TEXT NOT NULL,
     "brandId" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'IDEA_PENDING',
     "ideaText" TEXT NOT NULL,
-    "format" TEXT,
-    "status" TEXT NOT NULL DEFAULT 'PENDING',
-    "source" TEXT NOT NULL DEFAULT 'automatic',
+    "language" TEXT,
+    "source" TEXT NOT NULL DEFAULT 'manual',
     "sourceRef" TEXT,
     "priority" INTEGER NOT NULL DEFAULT 3,
-    "aiLinked" BOOLEAN NOT NULL DEFAULT false,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "brandPersonaId" TEXT,
-    "ideasFrameworkId" TEXT,
-    "contentPrinciplesId" TEXT,
-
-    CONSTRAINT "ContentIdea_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "Composition" (
-    "id" TEXT NOT NULL,
-    "brandId" TEXT NOT NULL,
+    "generationBatchId" TEXT,
     "templateId" TEXT,
-    "format" TEXT NOT NULL DEFAULT 'reel',
+    "format" TEXT,
     "creative" JSONB,
-    "payload" JSONB NOT NULL,
-    "videoUrl" TEXT,
-    "coverUrl" TEXT,
+    "payload" JSONB,
     "caption" TEXT,
     "hashtags" TEXT[] DEFAULT ARRAY[]::TEXT[],
-    "externalPostId" TEXT,
-    "externalPostUrl" TEXT,
-    "source" TEXT NOT NULL DEFAULT 'composed',
-    "status" TEXT NOT NULL DEFAULT 'DRAFT',
-    "scheduledAt" TIMESTAMP(3),
-    "publishAttempts" INTEGER NOT NULL DEFAULT 0,
-    "lastPublishError" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "ideaId" TEXT,
     "sceneTypes" TEXT[] DEFAULT ARRAY[]::TEXT[],
     "topicHash" TEXT,
-    "brandPersonaId" TEXT,
-    "ideasFrameworkId" TEXT,
-    "contentPrinciplesId" TEXT,
     "userUploadedMediaUrl" TEXT,
+    "brandPersonaId" TEXT,
+    "scheduledAt" TIMESTAMP(3),
+    "videoUrl" TEXT,
+    "coverUrl" TEXT,
+    "externalPostId" TEXT,
+    "externalPostUrl" TEXT,
+    "publishAttempts" INTEGER NOT NULL DEFAULT 0,
+    "lastPublishError" TEXT,
     "userPostedManually" BOOLEAN NOT NULL DEFAULT false,
+    "publishedAt" TIMESTAMP(3),
+    "llmTrace" JSONB,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "Composition_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "Post_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "RenderJob" (
     "id" TEXT NOT NULL,
-    "compositionId" TEXT NOT NULL,
+    "postId" TEXT NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'queued',
     "progress" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "outputUrl" TEXT,
@@ -288,19 +313,49 @@ CREATE TABLE "ContentPlanner" (
 );
 
 -- CreateIndex
+CREATE UNIQUE INDEX "PostSchedule_brandId_key" ON "PostSchedule"("brandId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "PostSlot_postId_key" ON "PostSlot"("postId");
+
+-- CreateIndex
+CREATE INDEX "PostSlot_brandId_status_idx" ON "PostSlot"("brandId", "status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "PostSlot_brandId_scheduledAt_key" ON "PostSlot"("brandId", "scheduledAt");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "SocialProfile_platform_platformId_key" ON "SocialProfile"("platform", "platformId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "BrandTemplateConfig_brandId_templateId_key" ON "BrandTemplateConfig"("brandId", "templateId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "RenderJob_compositionId_key" ON "RenderJob"("compositionId");
+CREATE INDEX "Post_brandId_status_idx" ON "Post"("brandId", "status");
+
+-- CreateIndex
+CREATE INDEX "Post_generationBatchId_idx" ON "Post"("generationBatchId");
+
+-- CreateIndex
+CREATE INDEX "Post_scheduledAt_idx" ON "Post"("scheduledAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "RenderJob_postId_key" ON "RenderJob"("postId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "ContentPlan_brandId_date_key" ON "ContentPlan"("brandId", "date");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "ContentPlanner_brandId_name_key" ON "ContentPlanner"("brandId", "name");
+
+-- AddForeignKey
+ALTER TABLE "PostSchedule" ADD CONSTRAINT "PostSchedule_brandId_fkey" FOREIGN KEY ("brandId") REFERENCES "Brand"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PostSlot" ADD CONSTRAINT "PostSlot_brandId_fkey" FOREIGN KEY ("brandId") REFERENCES "Brand"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PostSlot" ADD CONSTRAINT "PostSlot_postId_fkey" FOREIGN KEY ("postId") REFERENCES "Post"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "SocialProfile" ADD CONSTRAINT "SocialProfile_brandId_fkey" FOREIGN KEY ("brandId") REFERENCES "Brand"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -324,37 +379,16 @@ ALTER TABLE "BrandTemplateConfig" ADD CONSTRAINT "BrandTemplateConfig_templateId
 ALTER TABLE "Render" ADD CONSTRAINT "Render_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "Template"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ContentIdea" ADD CONSTRAINT "ContentIdea_brandId_fkey" FOREIGN KEY ("brandId") REFERENCES "Brand"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "Post" ADD CONSTRAINT "Post_brandId_fkey" FOREIGN KEY ("brandId") REFERENCES "Brand"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ContentIdea" ADD CONSTRAINT "ContentIdea_brandPersonaId_fkey" FOREIGN KEY ("brandPersonaId") REFERENCES "BrandPersona"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "Post" ADD CONSTRAINT "Post_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "Template"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ContentIdea" ADD CONSTRAINT "ContentIdea_ideasFrameworkId_fkey" FOREIGN KEY ("ideasFrameworkId") REFERENCES "IdeasFramework"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "Post" ADD CONSTRAINT "Post_brandPersonaId_fkey" FOREIGN KEY ("brandPersonaId") REFERENCES "BrandPersona"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ContentIdea" ADD CONSTRAINT "ContentIdea_contentPrinciplesId_fkey" FOREIGN KEY ("contentPrinciplesId") REFERENCES "ContentCreationPrinciples"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Composition" ADD CONSTRAINT "Composition_brandId_fkey" FOREIGN KEY ("brandId") REFERENCES "Brand"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Composition" ADD CONSTRAINT "Composition_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "Template"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Composition" ADD CONSTRAINT "Composition_ideaId_fkey" FOREIGN KEY ("ideaId") REFERENCES "ContentIdea"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Composition" ADD CONSTRAINT "Composition_brandPersonaId_fkey" FOREIGN KEY ("brandPersonaId") REFERENCES "BrandPersona"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Composition" ADD CONSTRAINT "Composition_ideasFrameworkId_fkey" FOREIGN KEY ("ideasFrameworkId") REFERENCES "IdeasFramework"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Composition" ADD CONSTRAINT "Composition_contentPrinciplesId_fkey" FOREIGN KEY ("contentPrinciplesId") REFERENCES "ContentCreationPrinciples"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "RenderJob" ADD CONSTRAINT "RenderJob_compositionId_fkey" FOREIGN KEY ("compositionId") REFERENCES "Composition"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "RenderJob" ADD CONSTRAINT "RenderJob_postId_fkey" FOREIGN KEY ("postId") REFERENCES "Post"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ContentPlan" ADD CONSTRAINT "ContentPlan_brandId_fkey" FOREIGN KEY ("brandId") REFERENCES "Brand"("id") ON DELETE CASCADE ON UPDATE CASCADE;

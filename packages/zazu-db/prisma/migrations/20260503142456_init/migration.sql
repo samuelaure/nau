@@ -97,4 +97,3 @@ ALTER TABLE "DeliveryWindow" ADD CONSTRAINT "DeliveryWindow_userId_fkey" FOREIGN
 
 -- AddForeignKey
 ALTER TABLE "NotificationQueue" ADD CONSTRAINT "NotificationQueue_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-

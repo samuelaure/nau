@@ -20,6 +20,7 @@ CREATE TABLE "User" (
     "passwordHash" TEXT NOT NULL,
     "name" TEXT,
     "telegramId" TEXT,
+    "defaultWorkspaceId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -81,6 +82,22 @@ CREATE TABLE "WorkspaceMember" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "WorkspaceMember_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "InviteToken" (
+    "id" TEXT NOT NULL,
+    "token" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "workspaceId" TEXT NOT NULL,
+    "role" "WorkspaceRole" NOT NULL DEFAULT 'MEMBER',
+    "createdById" TEXT NOT NULL,
+    "usedAt" TIMESTAMP(3),
+    "usedByUserId" TEXT,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "InviteToken_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -237,6 +254,15 @@ CREATE INDEX "WorkspaceMember_workspaceId_idx" ON "WorkspaceMember"("workspaceId
 CREATE UNIQUE INDEX "WorkspaceMember_userId_workspaceId_key" ON "WorkspaceMember"("userId", "workspaceId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "InviteToken_token_key" ON "InviteToken"("token");
+
+-- CreateIndex
+CREATE INDEX "InviteToken_workspaceId_idx" ON "InviteToken"("workspaceId");
+
+-- CreateIndex
+CREATE INDEX "InviteToken_email_idx" ON "InviteToken"("email");
+
+-- CreateIndex
 CREATE INDEX "Brand_workspaceId_idx" ON "Brand"("workspaceId");
 
 -- CreateIndex
@@ -289,6 +315,9 @@ ALTER TABLE "WorkspaceMember" ADD CONSTRAINT "WorkspaceMember_userId_fkey" FOREI
 
 -- AddForeignKey
 ALTER TABLE "WorkspaceMember" ADD CONSTRAINT "WorkspaceMember_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "InviteToken" ADD CONSTRAINT "InviteToken_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Brand" ADD CONSTRAINT "Brand_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace"("id") ON DELETE CASCADE ON UPDATE CASCADE;
