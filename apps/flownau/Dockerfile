@@ -31,6 +31,7 @@ COPY prisma.config.js ./
 #   symlinks named pkg-HASH -> pkg by extracting the hashes from the built SSR chunks.
 RUN npm install prisma@^7.3.0 @prisma/client@^7.3.0 @swc/helpers@^0.5.5 @next/env --no-save && \
     node_modules/.bin/prisma generate --schema=prisma/schema.prisma && \
+    mkdir -p apps/flownau/.next/node_modules && \
     cd apps/flownau/.next/node_modules && \
     npm install pino@^10.3.1 pino-pretty@^13.1.3 pg pg-connection-string pg-types "@prisma/adapter-pg@^7.3.0" --no-save && \
     for h in $(grep -rh 'pg-[0-9a-f]' ../server/chunks/ 2>/dev/null | grep -o '"pg-[0-9a-f]\{16\}"' | tr -d '"' | sort -u); do \
