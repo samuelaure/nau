@@ -65,6 +65,33 @@ export function compressVideo(inputPath: string, outputPath: string): Promise<vo
   })
 }
 
+export function compressVideoForArchive(inputPath: string, outputPath: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .outputOptions([
+        '-c:v libx264',
+        '-crf 35',
+        '-preset medium',
+        '-c:a aac',
+        '-b:a 96k',
+        '-pix_fmt yuv420p',
+        '-movflags +faststart',
+      ])
+      .on('start', (commandLine) => {
+        logger.debug({ commandLine }, 'Spawned FFmpeg (archive compress)')
+      })
+      .on('error', (err) => {
+        logger.error({ err }, 'Archive video compression error')
+        reject(err)
+      })
+      .on('end', () => {
+        logger.info('Archive video compression finished')
+        resolve()
+      })
+      .save(outputPath)
+  })
+}
+
 /**
  * Compresses an image file using ffmpeg.
  * Resizes to fit 1080x1920 and optimizes quality.

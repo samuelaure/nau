@@ -109,39 +109,58 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
     return
   }
 
-  const brollMood = (creative.brollMood as string) ?? ''
-  const moodKeywords = brollMood.split(/[,\s]+/).map((s) => s.trim().toLowerCase()).filter(Boolean)
+  type RenderSnapshot = { brollClips: Array<{ url: string; startFrom: number }>; audioUrl?: string }
+  const savedSnapshot = (creative as Record<string, unknown>).renderSnapshot as RenderSnapshot | undefined
 
-  // Fetch video + audio assets in parallel. One video query covers both the mood case and the
-  // fallback: fetch all brand videos, then prefer mood-tagged ones in memory if any match.
-  const [allVideos, audioAssets] = await Promise.all([
-    prisma.asset.findMany({
-      where: { brandId, type: { in: ['video', 'VID'] } },
-      select: { url: true, duration: true, tags: true },
-      take: 50,
-    }),
-    prisma.asset.findMany({
-      where: { brandId, type: { in: ['audio', 'AUD'] } },
-      select: { url: true },
-      take: 50,
-    }),
-  ])
+  let brollClips: Array<{ url: string; startFrom: number }>
+  let audioUrl: string | undefined
+  let freshlyResolved = false
 
-  const moodMatched = moodKeywords.length > 0
-    ? allVideos.filter((a) => a.tags.some((t) => moodKeywords.includes(t.toLowerCase())))
-    : []
-  const videoPool = shuffle(moodMatched.length > 0 ? moodMatched : allVideos)
+  if (savedSnapshot?.brollClips?.length) {
+    brollClips = savedSnapshot.brollClips
+    audioUrl = savedSnapshot.audioUrl
+    logger.info({ postId }, '[RenderWorker] Using render snapshot for b-roll and audio')
+  } else {
+    const brollMood = (creative.brollMood as string) ?? ''
+    const moodKeywords = brollMood.split(/[,\s]+/).map((s) => s.trim().toLowerCase()).filter(Boolean)
 
-  const brollClips = videoPool.map((a) => {
-    const assetFrames = a.duration ? Math.floor(a.duration * REMOTION_FPS) : 0
-    const maxStart = Math.max(0, assetFrames - BROLL_REQUIRED_FRAMES)
-    const startFrom = maxStart > 0 ? Math.floor(Math.random() * maxStart) : 0
-    return { url: a.url, startFrom }
-  })
+    const [allVideos, audioAssets] = await Promise.all([
+      prisma.asset.findMany({
+        where: { brandId, type: { in: ['video', 'VID'] } },
+        select: { url: true, duration: true, tags: true },
+        take: 50,
+      }),
+      prisma.asset.findMany({
+        where: { brandId, type: { in: ['audio', 'AUD'] } },
+        select: { url: true },
+        take: 50,
+      }),
+    ])
 
-  const audioUrl = shuffle(audioAssets)[0]?.url
+    const moodMatched = moodKeywords.length > 0
+      ? allVideos.filter((a) => a.tags.some((t) => moodKeywords.includes(t.toLowerCase())))
+      : []
+    const videoPool = shuffle(moodMatched.length > 0 ? moodMatched : allVideos)
 
-  logger.info({ postId, brandId, moodKeywords, videoPoolSize: videoPool.length, hasAudio: !!audioUrl }, '[RenderWorker] B-roll and audio assets resolved')
+    brollClips = videoPool.map((a) => {
+      const assetFrames = a.duration ? Math.floor(a.duration * REMOTION_FPS) : 0
+      const maxStart = Math.max(0, assetFrames - BROLL_REQUIRED_FRAMES)
+      const startFrom = maxStart > 0 ? Math.floor(Math.random() * maxStart) : 0
+      return { url: a.url, startFrom }
+    })
+
+    audioUrl = shuffle(audioAssets)[0]?.url
+    freshlyResolved = true
+
+    logger.info({ postId, brandId, moodKeywords, videoPoolSize: videoPool.length, hasAudio: !!audioUrl }, '[RenderWorker] B-roll and audio assets resolved')
+  }
+
+  if (freshlyResolved) {
+    await prisma.post.update({
+      where: { id: postId },
+      data: { creative: { ...(creative as object), renderSnapshot: { brollClips, audioUrl } } },
+    })
+  }
   const brandIdentity = (post.brand?.brandIdentity ?? {}) as BrandIdentity
 
   const inputProps: Record<string, unknown> = {
@@ -209,8 +228,8 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
     // Extract cover frame from the resolved scenes
     let coverUrl: string | null = null
     const scenes = inputProps.scenes as Array<{ startFrame: number; durationInFrames: number }> | undefined
-    const creative = post.creative as { coverSceneIndex?: number } | null
-    const coverIdx = creative?.coverSceneIndex ?? 0
+    const coverCreative = post.creative as { coverSceneIndex?: number } | null
+    const coverIdx = coverCreative?.coverSceneIndex ?? 0
 
     let coverFrame = 0
     if (scenes && coverIdx < scenes.length) {
