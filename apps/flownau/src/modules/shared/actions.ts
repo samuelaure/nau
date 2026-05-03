@@ -67,7 +67,13 @@ export async function deleteAsset(assetId: string) {
   if (!asset) return
 
   try {
-    await storage.delete(asset.r2Key)
+    const keysToDelete = [asset.r2Key]
+    // Also delete the thumbnail if one was generated alongside this asset
+    if (asset.thumbnailUrl) {
+      const thumbKey = storage.keyFromCdnUrl(asset.thumbnailUrl)
+      if (thumbKey && thumbKey !== asset.r2Key) keysToDelete.push(thumbKey)
+    }
+    await storage.deleteMany(keysToDelete)
   } catch (e) {
     console.error('Failed to delete from R2', e)
   }

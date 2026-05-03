@@ -3,6 +3,8 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 import { getAuthUser } from '@/lib/auth'
+import { storage } from '@/modules/shared/r2'
+import { flownau } from 'nau-storage'
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -45,13 +47,26 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getAuthUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { id } = await params
+    const post = await prisma.post.findUnique({ where: { id } })
+    if (!post) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
+    await prisma.postSlot.updateMany({ where: { postId: id }, data: { status: 'empty', postId: null } })
     await prisma.post.delete({ where: { id } })
+
+    const r2Keys = new Set([
+      flownau.renderOutput(post.brandId, id),
+      flownau.renderCover(post.brandId, id),
+      flownau.renderStill(post.brandId, id),
+    ])
+    for (const url of [post.userUploadedMediaUrl, post.videoUrl, post.coverUrl]) {
+      if (!url) continue
+      const key = storage.keyFromCdnUrl(url)
+      if (key) r2Keys.add(key)
+    }
+    storage.deleteMany([...r2Keys]).catch((err) => console.error('[DELETE_COMPOSITION_R2]', err))
 
     return NextResponse.json({ success: true }, { status: 200 })
   } catch (error) {

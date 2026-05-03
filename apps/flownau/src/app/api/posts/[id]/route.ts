@@ -3,6 +3,8 @@ import { prisma } from '@/modules/shared/prisma'
 import { checkBrandAccessForRoute } from '@/lib/auth'
 import { logError } from '@/modules/shared/logger'
 import { triggerRenderForPost } from '@/modules/renderer/render-queue'
+import { storage } from '@/modules/shared/r2'
+import { flownau } from 'nau-storage'
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -127,6 +129,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     const post = await prisma.post.findUnique({ where: { id } })
     if (!post) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     const denied3 = await checkBrandAccessForRoute(post.brandId); if (denied3) return denied3
+
     // Free the slot before deleting so it stays in the calendar as empty
     // rather than becoming a phantom filled slot with no post.
     await prisma.postSlot.updateMany({
@@ -134,6 +137,25 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       data: { status: 'empty', postId: null },
     })
     await prisma.post.delete({ where: { id } })
+
+    // Delete all R2 files associated with this post.
+    // The three render-output keys are deterministic and always attempted (delete
+    // of a non-existent key is a no-op on R2). The user-uploaded URL may point to
+    // a different key (generated at upload time) so we derive it from the stored URL.
+    const r2Keys = new Set([
+      flownau.renderOutput(post.brandId, id),
+      flownau.renderCover(post.brandId, id),
+      flownau.renderStill(post.brandId, id),
+    ])
+    for (const url of [post.userUploadedMediaUrl, post.videoUrl, post.coverUrl]) {
+      if (!url) continue
+      const key = storage.keyFromCdnUrl(url)
+      if (key) r2Keys.add(key)
+    }
+    storage.deleteMany([...r2Keys]).catch((err) =>
+      logError('DELETE /api/posts/[id] R2 cleanup', err),
+    )
+
     return NextResponse.json({ success: true })
   } catch (error) {
     logError('DELETE /api/posts/[id]', error)

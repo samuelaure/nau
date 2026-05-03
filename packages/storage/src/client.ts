@@ -167,6 +167,15 @@ export class NauStorage {
   cdnUrl(key: string): string {
     return `${this.publicUrl}/${key}`;
   }
+
+  /**
+   * Extracts the storage key from a CDN URL produced by this instance.
+   * Returns null if the URL doesn't belong to this bucket.
+   */
+  keyFromCdnUrl(url: string): string | null {
+    const prefix = `${this.publicUrl}/`;
+    return url.startsWith(prefix) ? url.slice(prefix.length) : null;
+  }
 }
 
 /** Convenience factory so callers don't need `new`. */
