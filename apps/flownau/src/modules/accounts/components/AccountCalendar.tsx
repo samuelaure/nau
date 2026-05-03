@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import Link from 'next/link'
 import { Button } from '@/modules/shared/components/ui/Button'
 import { toast } from 'sonner'
@@ -26,6 +26,8 @@ import {
   ChevronDown,
   Copy,
   SlidersHorizontal,
+  MoreHorizontal,
+  Shuffle,
 } from 'lucide-react'
 import { cn } from '@/modules/shared/utils'
 import Modal from '@/modules/shared/components/Modal'
@@ -54,7 +56,7 @@ function formatsCompatible(a: string, b: string): boolean {
 }
 
 // Secondary tag shown alongside the primary status when the post needs user action
-type SecondaryTag = 'Replicate' | 'Record' | 'Approve' | null
+type SecondaryTag = 'Replicate' | 'Record' | 'Approve' | 'Approved' | null
 
 function getSecondaryTag(format: string, display: DisplayStatus, dbStatus?: string): SecondaryTag {
   if (display === 'Draft') {
@@ -62,6 +64,7 @@ function getSecondaryTag(format: string, display: DisplayStatus, dbStatus?: stri
     if (format === 'head_talk') return 'Record'
   }
   if (display === 'Ready' && dbStatus === 'RENDERED_PENDING') return 'Approve'
+  if (display === 'Ready' && dbStatus === 'RENDERED_APPROVED') return 'Approved'
   return null
 }
 
@@ -75,7 +78,8 @@ const DISPLAY_DOT: Record<DisplayStatus, string> = {
 const TAG_COLOR: Record<NonNullable<SecondaryTag>, string> = {
   Replicate: 'bg-amber-500/15 border-amber-500/30 text-amber-300',
   Record: 'bg-amber-500/15 border-amber-500/30 text-amber-300',
-  Approve: 'bg-purple-500/15 border-purple-500/30 text-purple-300',
+  Approve: 'bg-orange-500/15 border-orange-500/30 text-orange-300',
+  Approved: 'bg-green-500/15 border-green-500/30 text-green-300',
 }
 
 // ─── Format config ────────────────────────────────────────────────────────────
@@ -550,6 +554,7 @@ function CompositionModal({
   const [captionDraft, setCaptionDraft] = useState(comp.caption ?? '')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [contentOpen, setContentOpen] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
 
   const FormatIcon = FORMAT_ICON[comp.format] ?? Film
   const display = getDisplayStatus(comp.status)
@@ -678,11 +683,30 @@ function CompositionModal({
         body: JSON.stringify({ status: 'DRAFT_APPROVED' }),
       })
       if (!res.ok) throw new Error()
-      toast.success('Re-rendering — this may take a minute.')
+      toast.success('Re-rendering with same assets — this may take a minute.')
       onRefresh()
       onClose()
     } catch {
       toast.error('Failed to re-render')
+    } finally {
+      setActioning(false)
+    }
+  }
+
+  const handleRecompose = async () => {
+    setActioning(true)
+    try {
+      const res = await fetch(`/api/posts/${comp.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'DRAFT_APPROVED', clearRenderSnapshot: true }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success('Re-rendering with different assets — this may take a minute.')
+      onRefresh()
+      onClose()
+    } catch {
+      toast.error('Failed to re-compose')
     } finally {
       setActioning(false)
     }
@@ -730,7 +754,7 @@ function CompositionModal({
     }
   }
 
-  const handleRecompose = async () => {
+  const handleAIRecompose = async () => {
     const ideaText = comp.ideaText?.trim() ?? ''
     if (ideaText.length < 3) {
       toast.error('Idea text is too short to recompose. Edit the post idea first.')
@@ -790,6 +814,38 @@ function CompositionModal({
     } finally {
       setActioning(false)
     }
+  }
+
+  const moreRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!moreOpen) return
+    const handle = (e: MouseEvent) => {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) setMoreOpen(false)
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [moreOpen])
+
+  type MenuItem = { key: string; label: string; icon: ReactNode; onClick: () => void; className?: string }
+  const moreItems: MenuItem[] = []
+  if (!scheduling && display !== 'Published' && display !== 'Error' && comp.status !== 'RENDERING' && comp.status !== 'DRAFT_APPROVED') {
+    moreItems.push({ key: 'schedule', label: isScheduled ? 'Reschedule' : 'Schedule', icon: isScheduled ? <Clock size={13} /> : <CalendarPlus size={13} />, onClick: () => setScheduling(true) })
+  }
+  if (isScheduled && !scheduling && display !== 'Published') {
+    moreItems.push({ key: 'unschedule', label: 'Unschedule', icon: <CalendarX size={13} />, onClick: handleUnschedule })
+  }
+  if (comp.status === 'DRAFT_PENDING') {
+    moreItems.push({ key: 'ai-recompose', label: 'Re-compose content', icon: <RefreshCw size={13} />, onClick: handleAIRecompose })
+  }
+  if (display === 'Ready') {
+    moreItems.push({ key: 'rerender', label: 'Re-render', icon: <RefreshCw size={13} />, onClick: handleRerender })
+    moreItems.push({ key: 'recompose', label: 'Use different assets', icon: <Shuffle size={13} />, onClick: handleRecompose })
+  }
+  if (tag === 'Record' || tag === 'Replicate') {
+    moreItems.push({ key: 'mark-posted', label: 'Mark as published', icon: <Send size={13} />, onClick: handleMarkPosted })
+  }
+  if (tag === 'Approve' && !!(comp.videoUrl || comp.renderedVideoUrl)) {
+    moreItems.push({ key: 'post-now', label: 'Post now', icon: <Send size={13} />, onClick: handlePostNow, className: 'text-green-300 hover:text-green-200' })
   }
 
   return (
@@ -1026,67 +1082,51 @@ function CompositionModal({
 
           <div className="flex-1" />
 
-          {/* Right: contextual actions */}
-          <div className="flex flex-wrap gap-2">
-            {isScheduled && !scheduling && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleUnschedule}
-                disabled={actioning}
-                className="gap-1.5"
-              >
-                <CalendarX size={13} /> Unschedule
+          {/* Right: primary action(s) + more dropdown */}
+          <div className="flex items-center gap-2">
+
+            {/* Queued / rendering → cancel is the only sensible action */}
+            {(comp.status === 'RENDERING' || comp.status === 'DRAFT_APPROVED') && (
+              <Button variant="outline" size="sm" onClick={handleCancelRender} disabled={actioning} className="gap-1.5 border-amber-500/30 text-amber-300 hover:bg-amber-500/10">
+                {actioning ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />}
+                {comp.status === 'DRAFT_APPROVED' ? 'Remove from queue' : 'Cancel render'}
               </Button>
             )}
-            {!scheduling && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setScheduling(true)}
-                className="gap-1.5"
-              >
-                {isScheduled ? <Clock size={13} /> : <CalendarPlus size={13} />}
-                {isScheduled ? 'Reschedule' : 'Schedule'}
-              </Button>
-            )}
-            {(tag === 'Record' || tag === 'Replicate') && !scheduling && (
-              <>
-                {!comp.userUploadedMediaUrl && (
-                  <label className="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border border-amber-400/30 text-amber-300 hover:bg-amber-400/10 transition-colors">
-                    <AlertCircle size={13} />
-                    {tag === 'Record' ? 'Upload recording' : 'Upload media'}
-                    <input
-                      type="file"
-                      accept="video/*,image/*"
-                      className="hidden"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0]
-                        if (!file) return
-                        const fd = new FormData()
-                        fd.append('file', file)
-                        fd.append('compositionId', comp.id)
-                        fd.append('brandId', brandId)
-                        const res = await fetch('/api/compositions/upload-recording', { method: 'POST', body: fd })
-                        if (res.ok) { toast.success('Media uploaded.'); onRefresh(); onClose() }
-                        else toast.error('Upload failed')
-                      }}
-                    />
-                  </label>
-                )}
-                <Button variant="outline" size="sm" onClick={handleMarkPosted} disabled={actioning} className="gap-1.5">
-                  {actioning ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
-                  Mark as published
-                </Button>
-              </>
-            )}
-            {comp.status === 'DRAFT_PENDING' && !scheduling && (
-              <Button variant="outline" size="sm" onClick={handleRecompose} disabled={actioning} className="gap-1.5">
+
+            {/* Error → retry */}
+            {display === 'Error' && (
+              <Button size="sm" onClick={handleConfirmRetry} disabled={actioning} className="gap-1.5">
                 {actioning ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
-                Recompose
+                Retry
               </Button>
             )}
-            {comp.status === 'DRAFT_PENDING' && !scheduling && (
+
+            {/* Record / Replicate: upload is the blocker action */}
+            {(tag === 'Record' || tag === 'Replicate') && !comp.userUploadedMediaUrl && (
+              <label className="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border border-amber-400/30 text-amber-300 hover:bg-amber-400/10 transition-colors">
+                <AlertCircle size={13} />
+                {tag === 'Record' ? 'Upload recording' : 'Upload media'}
+                <input
+                  type="file"
+                  accept="video/*,image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+                    const fd = new FormData()
+                    fd.append('file', file)
+                    fd.append('compositionId', comp.id)
+                    fd.append('brandId', brandId)
+                    const res = await fetch('/api/compositions/upload-recording', { method: 'POST', body: fd })
+                    if (res.ok) { toast.success('Media uploaded.'); onRefresh(); onClose() }
+                    else toast.error('Upload failed')
+                  }}
+                />
+              </label>
+            )}
+
+            {/* Draft → approve to start rendering */}
+            {comp.status === 'DRAFT_PENDING' && (
               !(comp.format === 'reel' || comp.format === 'trial_reel') ||
               !!(comp.creative as Record<string, unknown> | null)?.slots
             ) && (
@@ -1095,40 +1135,54 @@ function CompositionModal({
                 Approve draft
               </Button>
             )}
-            {tag === 'Approve' && !scheduling && (
-              <Button size="sm" onClick={handleApproveRender} disabled={actioning} className="gap-1.5 bg-purple-600 hover:bg-purple-500">
+
+            {/* Ready but not approved → needs posting approval */}
+            {tag === 'Approve' && (
+              <Button size="sm" onClick={handleApproveRender} disabled={actioning} className="gap-1.5 bg-orange-600 hover:bg-orange-500">
                 {actioning ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
                 Approve
               </Button>
             )}
-            {display === 'Ready' && !scheduling && (
-              <Button variant="outline" size="sm" onClick={handleRerender} disabled={actioning} className="gap-1.5">
-                {actioning ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
-                Re-render
-              </Button>
-            )}
-            {display === 'Ready' && !scheduling && !!(comp.videoUrl || comp.renderedVideoUrl) && (
-              <Button
-                size="sm"
-                onClick={handlePostNow}
-                disabled={actioning}
-                className="gap-1.5 bg-green-600 hover:bg-green-500 text-white"
-              >
+
+            {/* Approved and has video → publish immediately */}
+            {tag === 'Approved' && !!(comp.videoUrl || comp.renderedVideoUrl) && (
+              <Button size="sm" onClick={handlePostNow} disabled={actioning} className="gap-1.5 bg-green-600 hover:bg-green-500 text-white">
                 {actioning ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
                 Post now
               </Button>
             )}
-            {(comp.status === 'RENDERING' || comp.status === 'DRAFT_APPROVED') && (
-              <Button variant="outline" size="sm" onClick={handleCancelRender} disabled={actioning} className="gap-1.5 border-amber-500/30 text-amber-300 hover:bg-amber-500/10">
-                {actioning ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />}
-                {comp.status === 'DRAFT_APPROVED' ? 'Remove from queue' : 'Cancel render'}
-              </Button>
-            )}
-            {display === 'Error' && (
-              <Button size="sm" onClick={handleConfirmRetry} disabled={actioning} className="gap-1.5">
-                {actioning ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
-                Retry
-              </Button>
+
+            {/* More dropdown — secondary options */}
+            {moreItems.length > 0 && (
+              <div className="relative" ref={moreRef}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setMoreOpen((v) => !v)}
+                  className="px-2.5"
+                  aria-label="More options"
+                >
+                  <MoreHorizontal size={15} />
+                </Button>
+                {moreOpen && (
+                  <div className="absolute bottom-full right-0 mb-2 bg-panel border border-white/10 rounded-xl shadow-2xl py-1 min-w-44 z-50">
+                    {moreItems.map((item) => (
+                      <button
+                        key={item.key}
+                        onClick={() => { setMoreOpen(false); item.onClick() }}
+                        disabled={actioning}
+                        className={cn(
+                          'w-full flex items-center gap-2.5 px-4 py-2 text-sm text-text-primary hover:bg-white/5 transition-colors disabled:opacity-50',
+                          item.className,
+                        )}
+                      >
+                        {item.icon}
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>

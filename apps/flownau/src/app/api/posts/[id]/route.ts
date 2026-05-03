@@ -58,7 +58,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       publishedAt,
       brandPersonaId,
       userUploadedMediaUrl,
+      clearRenderSnapshot,
     } = body
+
+    // When clearRenderSnapshot is set, strip the saved asset snapshot so the
+    // next render queries fresh b-roll/audio instead of reusing the previous selection.
+    let creativeUpdate = creative
+    if (clearRenderSnapshot && post.creative && typeof post.creative === 'object') {
+      const { renderSnapshot: _dropped, ...rest } = post.creative as Record<string, unknown>
+      creativeUpdate = rest
+    }
 
     const updated = await prisma.post.update({
       where: { id },
@@ -67,7 +76,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         ...(ideaText !== undefined && { ideaText }),
         ...(format !== undefined && { format }),
         ...(templateId !== undefined && { templateId }),
-        ...(creative !== undefined && { creative }),
+        ...(creativeUpdate !== undefined && { creative: creativeUpdate }),
         ...(payload !== undefined && { payload }),
         ...(caption !== undefined && { caption }),
         ...(hashtags !== undefined && { hashtags }),
