@@ -463,7 +463,7 @@ export async function smartFillCalendar(brandId: string): Promise<SmartFillResul
   const slotsNeeded = allSlots - filledSlots
 
   if (slotsNeeded === 0) {
-    return { alreadyFull: true, slotsNeeded: 0, ideasGenerated: 0, noDigest: false, approvedIdeas: 0, slotsFilled: 0, needsApproval: 0 }
+    return { alreadyFull: true, slotsNeeded: 0, ideasGenerated: 0, noDigest: false, approvedIdeas: 0, slotsFilled: 0, skippedByBatchRule: 0, needsApproval: 0 }
   }
 
   // Count all available ideas (pending + approved — not yet turned into drafts)
