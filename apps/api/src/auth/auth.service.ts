@@ -71,6 +71,27 @@ export class AuthService {
         data: { usedAt: new Date(), usedByUserId: newUser.id },
       });
 
+      // Redeem any other pending invites for the same email (e.g. invited to
+      // multiple workspaces before account creation).
+      const otherInvites = await tx.inviteToken.findMany({
+        where: {
+          email: dto.email.toLowerCase(),
+          usedAt: null,
+          expiresAt: { gt: new Date() },
+          id: { not: invite.id },
+        },
+      });
+
+      for (const other of otherInvites) {
+        await tx.workspaceMember.create({
+          data: { userId: newUser.id, workspaceId: other.workspaceId, role: other.role },
+        });
+        await tx.inviteToken.update({
+          where: { id: other.id },
+          data: { usedAt: new Date(), usedByUserId: newUser.id },
+        });
+      }
+
       return newUser;
     });
 
