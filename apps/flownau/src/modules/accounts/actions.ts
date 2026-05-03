@@ -204,7 +204,7 @@ export async function updateBrand(brandId: string, formData: FormData) {
     data: {
       shortCode: shortCode ?? undefined,
       language: language ?? undefined,
-      brandIdentity,
+      brandIdentity: brandIdentity as never,
     },
   })
 
