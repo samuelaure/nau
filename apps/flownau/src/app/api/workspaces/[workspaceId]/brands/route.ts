@@ -1,33 +1,24 @@
-import { auth } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { getAuthUser } from '@/lib/auth';
+import { prisma } from '@/modules/shared/prisma';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { workspaceId: string } }
+  { params }: { params: Promise<{ workspaceId: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const user = await getAuthUser();
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { workspaceId } = params;
+    const { workspaceId } = await params;
 
-    // Verify workspace access
-    const workspace = await db.workspace.findFirst({
-      where: {
-        id: workspaceId,
-        members: { some: { userId: session.user.id } },
-      },
-    });
-
-    if (!workspace) {
+    if (user.workspaceId !== workspaceId) {
       return NextResponse.json({ error: 'Workspace not found' }, { status: 404 });
     }
 
-    // Get all brands in this workspace
-    const brands = await db.brand.findMany({
+    const brands = await prisma.brand.findMany({
       where: { workspaceId },
       select: { id: true, name: true },
       orderBy: { createdAt: 'asc' },
