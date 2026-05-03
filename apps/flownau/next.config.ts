@@ -43,7 +43,7 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: '/(.*)', headers: securityHeaders }]
   },
-  serverExternalPackages: ['@remotion/bundler', '@remotion/renderer', 'sharp'],
+  serverExternalPackages: ['@remotion/bundler', '@remotion/renderer', 'sharp', 'pg', '@prisma/adapter-pg'],
   transpilePackages: ['nau-storage'],
 }
 
