@@ -145,7 +145,7 @@ async function runCheck1(
   const emptySlots = allSlots - filledSlots
 
   if (emptySlots === 0) {
-    return { slotsInHorizon: allSlots, filledSlots, emptySlots: 0, slotsFilledNow: 0, ideasGenerated: false, notifyUserApproveIdeas: false }
+    return { slotsInHorizon: allSlots, filledSlots, emptySlots: 0, slotsFilledNow: 0, skippedByBatchRule: 0, ideasGenerated: false, notifyUserApproveIdeas: false, noDigest: false }
   }
 
   // Get empty slots ordered by scheduledAt — only future ones
