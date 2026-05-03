@@ -94,6 +94,34 @@ Set all secrets with: `bash scripts/set-gh-secrets.sh`
 3. SSH to server and ensure `~/apps/<service>/docker-compose.yml` is present
 4. Push to `main` — the pipeline will build, push, and deploy
 
+## First admin user (bootstrap)
+
+On a fresh database the registration flow is invite-only, so the first user must be bootstrapped directly. Run once after the databases are up — it creates the platform workspace and prints a 30-day registration link locked to your email.
+
+**Production (after first deployment):**
+```bash
+ssh nau
+cd ~/apps/api
+docker compose exec api npx tsx scripts/bootstrap-admin.ts
+```
+
+The script prints a registration link. Open it in a browser to create your admin account.
+
+- Safe to run only once — exits with an error if any user already exists.
+- The invite has OWNER role on the "naŭ Platform" workspace.
+- Valid for 30 days.
+
+**Dev:**
+```bash
+cd apps/api
+DATABASE_URL="postgresql://nau_api:dev_api_password@localhost:5432/nau_api" \
+ACCOUNTS_URL="http://localhost:3002" \
+ADMIN_EMAIL="samuelaure@gmail.com" \
+../flownau/node_modules/.bin/tsx scripts/bootstrap-admin.ts
+```
+
+---
+
 ## Manual deploy (emergency)
 
 ```bash
