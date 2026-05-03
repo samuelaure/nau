@@ -12,6 +12,19 @@ import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto, RegisterDto } from './auth.dto';
 
 const LINK_TOKEN_TTL_MS = 5 * 60 * 1000;
+
+async function notifyAdminNewUser(email: string, name?: string): Promise<void> {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.ADMIN_TELEGRAM_CHAT_ID;
+  if (!botToken || !chatId) return;
+  const displayName = name ? `${name} (${email})` : email;
+  const text = `🎉 New user registered: ${displayName}`;
+  await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, text }),
+  });
+}
 const ACCESS_TOKEN_TTL = '15m';
 const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
@@ -94,6 +107,8 @@ export class AuthService {
 
       return newUser;
     });
+
+    notifyAdminNewUser(user.email, user.name ?? undefined).catch(() => undefined);
 
     return this.issueTokens(user.id);
   }
