@@ -1,5 +1,176 @@
 # Deployment Guide
 
+## Contents
+
+1. [Architecture overview](#architecture-overview)
+2. [**Production Deployment Protocol**](#production-deployment-protocol) ← read this before every push
+3. [Domain mapping](#domain--service-mapping)
+4. [CI/CD pipeline](#cicd-pipeline)
+5. [Manual deploy & rollback](#manual-deploy-emergency)
+6. [Database backups](#database-backups)
+7. [Uptime monitoring](#uptime-monitoring)
+
+---
+
+## Production Deployment Protocol
+
+> **Read this before every push to `main`.** The platform runs background jobs 24/7 — a careless deployment can corrupt in-flight queue jobs, break active renders, or interrupt ongoing scraping runs.
+
+### The Golden Rule
+
+**Never push to `main` while long-running background jobs are active for services you are touching**, unless the change is purely additive (new endpoint, new field, read-only frontend change) and carries no risk of restarting workers mid-job.
+
+Services and their background processes:
+
+| Service | Background processes |
+|---|---|
+| **flownau** | Remotion renders, cron publisher (post scheduler), internal cron |
+| **nauthenticity** | BullMQ ingestion, download, optimization, compute workers |
+| **api** | Scheduled jobs (if any), inter-service webhooks |
+| **zazu-bot** | Long-polling / webhook handler |
+
+---
+
+### Before You Push
+
+#### 1. Check the queue status
+
+```bash
+# Nauthenticity — check active/waiting jobs
+ssh nau "docker exec nauthenticity curl -s http://localhost:3000/queue | jq '{download:.download.counts, compute:.compute.counts, optimization:.optimization.counts, ingestion:.ingestion.counts}'"
+```
+
+Wait for all queues to show `active: 0` before deploying nauthenticity.
+
+```bash
+# Flownau — check for active renders
+ssh nau "docker exec flownau-renderer ps aux | grep ffmpeg | grep -v grep | wc -l"
+```
+
+Wait for 0 active ffmpeg processes before deploying flownau or flownau-renderer.
+
+#### 2. Check for in-progress scraping runs
+
+```bash
+ssh nau "docker exec nauthenticity-postgres psql -U nauthenticity nauthenticity -c \"SELECT id, username, phase, status FROM \\\"ScrapingRun\\\" WHERE status = 'pending' OR phase NOT IN ('finished', 'idle');\""
+```
+
+If any run is in `downloading`, `optimizing`, or `visualizing` — wait until it finishes or [recover manually](#recovering-a-stuck-run) after deploy.
+
+#### 3. Check for scheduled posts about to fire
+
+The flownau cron publisher runs every 5 minutes. If a post is scheduled within the next 10 minutes, wait.
+
+```bash
+ssh nau "docker exec flownau-postgres psql -U flownau flownau -c \"SELECT id, status, \\\"scheduledAt\\\" FROM \\\"Post\\\" WHERE status = 'SCHEDULED' AND \\\"scheduledAt\\\" < NOW() + INTERVAL '10 minutes';\""
+```
+
+#### 4. Never push a schema migration without a deployment window
+
+Prisma migrations run at container startup. If the migration is destructive (DROP COLUMN, ALTER TYPE), the old container is still serving traffic while the migration runs — this is a race condition.
+
+**Protocol for schema changes:**
+1. Only additive migrations (ADD COLUMN, CREATE TABLE, CREATE INDEX) can deploy without a window.
+2. Destructive migrations require: first deploy application code that tolerates both old and new schema, then run the migration, then deploy the cleanup.
+3. Never ALTER a column type in a single deploy — always: add new column → migrate data → remove old column.
+
+---
+
+### When Is It Safe to Push?
+
+| Situation | Safe? |
+|---|---|
+| All queues idle, no scraping runs in progress | ✅ Yes |
+| Only changing frontend / dashboard code (no server restart) | ✅ Yes |
+| Additive-only backend change (new endpoint, new optional field) | ✅ Yes |
+| Optimization queue draining (e.g., 200 jobs waiting) | ❌ Wait |
+| Active ffmpeg render in progress | ❌ Wait |
+| Scraping run in `downloading` or `optimizing` phase | ❌ Wait |
+| Scheduled post firing within 10 minutes | ❌ Wait |
+| Schema migration with DROP / ALTER | ❌ Plan a maintenance window |
+
+---
+
+### Preferred Deployment Window
+
+**03:00–06:00 UTC** — low traffic, low likelihood of scheduled posts firing.
+
+For any push that touches workers, queues, or schema: confirm queues are empty first, regardless of time of day.
+
+---
+
+### After Deploying
+
+#### 1. Verify containers came up healthy
+
+```bash
+ssh nau "docker ps --format 'table {{.Names}}\t{{.Status}}' | grep -E 'nauthenticity|flownau|api'"
+```
+
+All should show `healthy` or `Up X seconds`.
+
+#### 2. Check worker startup logs
+
+```bash
+ssh nau "docker logs nauthenticity --tail=30"
+```
+
+Look for `All BullMQ workers ready`. If a scraping run was in-progress at deploy time, the startup recovery will log `[Recovery] Run ... stuck in ... — re-triggering ...` automatically.
+
+#### 3. Verify queues resumed
+
+```bash
+ssh nau "docker exec nauthenticity curl -s http://localhost:3000/queue | jq '{download:.download.counts, optimization:.optimization.counts}'"
+```
+
+If a queue was active before deploy, jobs should resume automatically via startup recovery.
+
+#### 4. Check for new failures
+
+```bash
+ssh nau "docker exec nauthenticity curl -s http://localhost:3000/queue | jq '{dlFailed:.download.counts.failed, optFailed:.optimization.counts.failed, computeFailed:.compute.counts.failed}'"
+```
+
+If any failed count jumped after deploy, check nauthenticity logs and recover manually if needed.
+
+---
+
+### Recovering a Stuck Run After Deploy
+
+If a deploy interrupted an in-flight scraping run and startup recovery didn't advance it (check logs first):
+
+```bash
+# 1. Find the stuck run
+ssh nau "docker exec nauthenticity-postgres psql -U nauthenticity nauthenticity -c \"SELECT id, username, phase FROM \\\"ScrapingRun\\\" WHERE status = 'pending';\""
+
+# 2. Restart nauthenticity — startup recovery runs automatically on every boot
+ssh nau "cd ~/apps/nauthenticity && docker compose restart nauthenticity"
+
+# 3. Watch logs to confirm recovery fired
+ssh nau "docker logs nauthenticity --tail=30 -f"
+```
+
+---
+
+### Push Frequency & Batching
+
+- **Batch related fixes** — don't push each individual commit as it's written. Group into coherent changesets.
+- **Mid-process changes** — only push while jobs are running if the change is purely additive and doesn't restart any worker process.
+- **Hotfixes** — if a bug is actively breaking users, it takes priority over job continuity. Drain the queues deliberately, deploy the fix, then re-trigger affected runs via the dashboard or recovery restart.
+
+---
+
+### Code Quality Gate (Before Every Push)
+
+- [ ] TypeScript compiles without errors: `pnpm --filter <service> build`
+- [ ] No `any` casts in queue/worker/schema code
+- [ ] No hardcoded environment values (URLs, secrets, ports)
+- [ ] If a new BullMQ queue is added: registered in `AnalyticsService.getQueueStatus()` and `WorkersService`
+- [ ] If a schema migration is included: additive-only, or a maintenance window is planned
+- [ ] If new transitional phases exist: startup recovery in `WorkersService.recoverStuckRuns()` covers them
+
+---
+
 ## Architecture overview
 
 ```
