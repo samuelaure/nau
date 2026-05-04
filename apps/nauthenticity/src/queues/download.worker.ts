@@ -108,8 +108,12 @@ export const downloadWorker = new Worker(
             const run = await prisma.scrapingRun.findUnique({ where: { id: runId } });
             if (run?.isPaused) return { paused: true };
 
+            const cdnBase = config.env.R2_PUBLIC_URL ?? ''
             const pendingCount = await prisma.media.count({
-              where: { post: { runId }, storageUrl: { equals: null } },
+              where: {
+                post: { runId },
+                NOT: { storageUrl: { startsWith: cdnBase || '/content/' } },
+              },
             });
 
             if (pendingCount === 0) {
