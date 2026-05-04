@@ -109,7 +109,7 @@ export const downloadWorker = new Worker(
             if (run?.isPaused) return { paused: true };
 
             const pendingCount = await prisma.media.count({
-              where: { post: { runId }, storageUrl: null },
+              where: { post: { runId }, storageUrl: { equals: null } },
             });
 
             if (pendingCount === 0) {
