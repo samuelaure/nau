@@ -109,10 +109,7 @@ export const downloadWorker = new Worker(
             if (run?.isPaused) return { paused: true };
 
             const pendingCount = await prisma.media.count({
-              where: {
-                post: { runId },
-                NOT: [{ storageUrl: { startsWith: storage ? storage.cdnUrl('') : '/content/' } }],
-              },
+              where: { post: { runId }, storageUrl: null },
             });
 
             if (pendingCount === 0) {
@@ -225,7 +222,7 @@ export const downloadWorker = new Worker(
       }
     });
   },
-  { connection: config.redis, concurrency: 25 },
+  { connection: config.redis, concurrency: 25, stalledInterval: 60_000, maxStalledCount: 3 },
 );
 
 downloadWorker.on('failed', (job, err) => {
