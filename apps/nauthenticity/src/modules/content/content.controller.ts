@@ -4,6 +4,7 @@ import { config } from '../../config';
 import { downloadQueue } from '../../queues/download.queue';
 import { computeQueue } from '../../queues/compute.queue';
 import { ingestionQueue } from '../../queues/ingestion.queue';
+import { optimizationQueue } from '../../queues/optimization.queue';
 
 export const contentController = async (fastify: FastifyInstance) => {
   fastify.get('/accounts', async (request: FastifyRequest, reply: FastifyReply) => {
@@ -216,12 +217,18 @@ export const contentController = async (fastify: FastifyInstance) => {
       const { username } = request.params as { username: string };
       try {
         // Aggregate totals in one query set
-        const [totalPosts, totalMedia, localMedia, totalTranscripts, activeRun] = await Promise.all(
+        const cdnBase = config.env.R2_PUBLIC_URL ?? '';
+        const [totalPosts, totalMedia, uploadedMedia, rawMedia, totalTranscripts, activeRun] = await Promise.all(
           [
             prisma.post.count({ where: { username } }),
             prisma.media.count({ where: { post: { username } } }),
+            // Uploaded = storageUrl starts with CDN base (R2) or local /content/
             prisma.media.count({
-              where: { post: { username }, storageUrl: { startsWith: '/content/' } },
+              where: { post: { username }, storageUrl: { startsWith: cdnBase || '/content/' } },
+            }),
+            // Raw = uploaded to R2 under /raw/ path, not yet optimized
+            prisma.media.count({
+              where: { post: { username }, storageUrl: { contains: '/raw/' } },
             }),
             prisma.transcript.count({ where: { post: { username } } }),
             prisma.scrapingRun.findFirst({
@@ -230,6 +237,7 @@ export const contentController = async (fastify: FastifyInstance) => {
             }),
           ],
         );
+        const optimizedMedia = uploadedMedia - rawMedia;
 
         const ongoingRun =
           activeRun ||
@@ -266,16 +274,18 @@ export const contentController = async (fastify: FastifyInstance) => {
         const videoPostsWithTranscript = videoPosts.filter((p: any) => p.transcripts.length > 0);
 
         // Fetch active jobs from queues to see what's currently happening
-        const [activeIngestion, activeDownloads, activeCompute] = await Promise.all([
+        const [activeIngestion, activeDownloads, activeCompute, activeOptimization] = await Promise.all([
           ingestionQueue.getJobs(['active']),
           downloadQueue.getJobs(['active']),
           computeQueue.getJobs(['active']),
+          optimizationQueue.getJobs(['active']),
         ]);
 
         const activeJobs = [
           ...activeIngestion.filter((j: any) => j.data.username === username),
           ...activeDownloads.filter((j: any) => j.data.username === username),
           ...activeCompute.filter((j: any) => j.data.username === username),
+          ...activeOptimization.filter((j: any) => j.data.username === username),
         ].map((j: any) => ({
           id: j.id,
           name: j.name,
@@ -288,9 +298,12 @@ export const contentController = async (fastify: FastifyInstance) => {
           summary: {
             totalPosts,
             totalMedia,
-            localMedia,
-            pendingDownloads: totalMedia - localMedia,
-            downloadPct: totalMedia > 0 ? Math.round((localMedia / totalMedia) * 100) : 0,
+            localMedia: uploadedMedia,
+            pendingDownloads: totalMedia - uploadedMedia,
+            downloadPct: totalMedia > 0 ? Math.round((uploadedMedia / totalMedia) * 100) : 0,
+            rawMedia,
+            optimizedMedia,
+            optimizePct: uploadedMedia > 0 ? Math.round((optimizedMedia / uploadedMedia) * 100) : 0,
             videoPostsTotal: videoPosts.length,
             transcribedPosts: videoPostsWithTranscript.length,
             transcriptPct:
@@ -311,7 +324,7 @@ export const contentController = async (fastify: FastifyInstance) => {
             postedAt: p.postedAt,
             caption: p.caption?.slice(0, 80),
             mediaCount: p.media.length,
-            downloaded: p.media.every((m: any) => m.storageUrl.startsWith('/content/')),
+            downloaded: p.media.every((m: any) => cdnBase ? m.storageUrl.startsWith(cdnBase) : m.storageUrl.startsWith('/content/')),
             hasVideo: p.media.some((m: any) => m.type === 'video'),
             transcribed: p.transcripts.length > 0,
             transcriptPreview: p.transcripts[0]?.text?.slice(0, 80) ?? null,

@@ -288,6 +288,7 @@ const ActiveJobs = ({
       {jobs.map((job) => {
         const isIngestion = job.name === 'start-ingestion';
         const isDownload = job.name === 'process-media';
+        const isOptimize = job.name === 'optimize-media';
         const isCompute =
           job.name === 'compute-video' ||
           job.name === 'compute-image' ||
@@ -300,6 +301,7 @@ const ActiveJobs = ({
         if (isIngestion)
           label = `Scraping & Ingesting: ${job.progressData?.step || 'Waiting for actor...'}`;
         if (isDownload) label = `Downloading Media: ${job.data?.mediaId?.slice(0, 8) || '...'}`;
+        if (isOptimize) label = `Optimizing: ${job.data?.mediaId?.slice(0, 8) || '...'}`;
         if (isCompute) label = `${job.progressData?.step || 'Computing...'}`;
 
         return (
@@ -533,7 +535,8 @@ export const ProgressView = () => {
     refetchInterval: 5000, // Refresh every 5s for smoother progress
   });
 
-  const isIdle = !isLoading && progress?.activeJobs.length === 0;
+  const activePhase = progress?.summary.phase;
+  const isIdle = !isLoading && progress?.activeJobs.length === 0 && (!activePhase || activePhase === 'idle' || activePhase === 'finished');
 
   return (
     <div className="fade-in" style={{ maxWidth: 900, margin: '0 auto' }}>
@@ -617,6 +620,12 @@ export const ProgressView = () => {
             icon={<Cpu size={18} />}
             queueName="compute"
           />
+          <QueueStatsSection
+            title="Optimization"
+            metrics={queueStatus.optimization}
+            icon={<Activity size={18} />}
+            queueName="optimization"
+          />
         </div>
       )}
 
@@ -650,7 +659,9 @@ export const ProgressView = () => {
                 />
                 <p style={{ margin: 0, fontWeight: 600, color: 'white' }}>No Active Processes</p>
                 <p style={{ margin: 0, fontSize: '0.9rem' }}>
-                  Everything is up to date for @{selected}.
+                  {activePhase && activePhase !== 'idle' && activePhase !== 'finished'
+                    ? `Phase: ${activePhase} — workers may be between jobs`
+                    : `Everything is up to date for @${selected}.`}
                 </p>
               </div>
               <div
@@ -699,6 +710,14 @@ export const ProgressView = () => {
               color="#10b981"
               height={12}
             />
+            {progress.summary.localMedia > 0 && (
+              <ProgressBar
+                pct={progress.summary.optimizePct}
+                label={`Optimization: ${progress.summary.optimizedMedia} / ${progress.summary.localMedia} files`}
+                color="#f59e0b"
+                height={12}
+              />
+            )}
             <ProgressBar
               pct={progress.summary.transcriptPct}
               label={`Transcriptions: ${progress.summary.transcribedPosts} / ${progress.summary.videoPostsTotal} video posts`}

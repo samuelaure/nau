@@ -136,6 +136,7 @@ export interface QueueStatus {
   download: QueueMetrics;
   compute: QueueMetrics;
   ingestion: QueueMetrics;
+  optimization: QueueMetrics;
 }
 
 export const getProfiles = async () => {
@@ -204,6 +205,9 @@ export interface ProfileProgress {
     localMedia: number;
     pendingDownloads: number;
     downloadPct: number;
+    rawMedia: number;
+    optimizedMedia: number;
+    optimizePct: number;
     videoPostsTotal: number;
     transcribedPosts: number;
     transcriptPct: number;
