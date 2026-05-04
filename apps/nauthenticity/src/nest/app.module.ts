@@ -32,7 +32,6 @@ import { AuthCallbackController } from './auth/auth-callback.controller'
     ServeStaticModule.forRoot({
       rootPath: path.join(__dirname, '../../dashboard/dist'),
       exclude: ['/api/(.*)', '/health', '/auth/(.*)'],
-      renderPath: '/*',
     }),
     PrismaModule,
     AuthModule,

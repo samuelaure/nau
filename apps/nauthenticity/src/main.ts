@@ -2,6 +2,7 @@ import { NestFactory, HttpAdapterHost } from '@nestjs/core'
 import { Logger } from '@nestjs/common'
 import helmet from 'helmet'
 import cookieParser from 'cookie-parser'
+import path from 'path'
 import { AppModule } from './nest/app.module'
 import { AllExceptionsFilter } from './nest/common/filters/all-exceptions.filter'
 
@@ -23,6 +24,12 @@ async function bootstrap() {
 
   if (origins.length === 0) throw new Error('ALLOWED_ORIGINS environment variable is required')
   app.enableCors({ origin: origins, credentials: true })
+
+  // SPA fallback: after all NestJS routes are registered, any unmatched GET
+  // request serves index.html so the React app handles client-side routing.
+  const spaIndex = path.join(__dirname, '../dashboard/dist/index.html')
+  const expressApp = app.getHttpAdapter().getInstance() as import('express').Application
+  expressApp.get('*', (_req, res) => res.sendFile(spaIndex))
 
   const port = process.env.PORT ?? 3000
   await app.listen(port)
