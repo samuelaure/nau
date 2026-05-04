@@ -27,7 +27,7 @@ model Session {
   id           String   @id @default(cuid())
   userId       String
   tokenFamily  String   // groups all rotated descendants of one login; reuse = revoke family
-  tokenHash    String   @unique // bcrypt hash of the opaque refresh token
+  tokenHash    String   @unique // SHA-256 hex hash of the opaque refresh token
   expiresAt    DateTime
   createdAt    DateTime @default(now())
 

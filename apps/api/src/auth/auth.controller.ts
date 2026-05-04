@@ -59,16 +59,22 @@ export class AuthController {
 
   @Post('refresh')
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const rawToken = req.cookies?.[COOKIE_REFRESH_TOKEN] as string | undefined;
+    const rawToken =
+      (req.cookies?.[COOKIE_REFRESH_TOKEN] as string | undefined) ??
+      (req.body as { refreshToken?: string })?.refreshToken;
     if (!rawToken) throw new UnauthorizedException('Missing refresh token');
     const tokens = await this.auth.refresh(rawToken);
     setCookies(res, tokens.accessToken, tokens.refreshToken);
-    return { expiresIn: tokens.expiresIn };
+    // Return tokens in body too — server-side callers (middleware) read from here
+    // since Headers.getSetCookie() is not universally available across runtimes.
+    return { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, expiresIn: tokens.expiresIn };
   }
 
   @Post('logout')
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const rawToken = req.cookies?.[COOKIE_REFRESH_TOKEN] as string | undefined;
+    const rawToken =
+      (req.cookies?.[COOKIE_REFRESH_TOKEN] as string | undefined) ??
+      (req.body as { refreshToken?: string })?.refreshToken;
     if (rawToken) await this.auth.logout(rawToken);
     res.setHeader('Set-Cookie', buildClearCookies({ domain: COOKIE_DOMAIN, secure: IS_SECURE }));
     return { ok: true };

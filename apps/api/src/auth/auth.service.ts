@@ -36,6 +36,12 @@ function generateFamily(): string {
   return crypto.randomBytes(16).toString('hex');
 }
 
+// Opaque tokens are 48 random bytes — their security comes from entropy, not hash slowness.
+// SHA-256 is sufficient and enables direct DB lookup via the @unique index.
+function hashToken(raw: string): string {
+  return crypto.createHash('sha256').update(raw).digest('hex');
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -124,33 +130,13 @@ export class AuthService {
   }
 
   async refresh(rawToken: string) {
-    // Find all sessions that might match (we only store hashes)
-    // We can't query by hash directly — look up candidate sessions by userId is not possible
-    // without the userId. Instead we use a separate index: we store the token hash directly.
-    const tokenHash = await bcrypt.hash(rawToken, 10);
-
-    // Find by scanning — for scale we'd use a faster token scheme, but bcrypt compare is the
-    // security-correct approach. With 30d TTL and < 10K sessions this is fine pre-launch.
-    const sessions = await this.prisma.session.findMany({
-      where: { expiresAt: { gt: new Date() } },
+    const hash = hashToken(rawToken);
+    const matched = await this.prisma.session.findUnique({
+      where: { tokenHash: hash },
       include: { user: true },
-      orderBy: { createdAt: 'desc' },
-      take: 1000,
     });
 
-    let matched: (typeof sessions)[0] | undefined;
-    for (const s of sessions) {
-      if (await bcrypt.compare(rawToken, s.tokenHash)) {
-        matched = s;
-        break;
-      }
-    }
-
-    if (!matched) {
-      // Token not found — could be a reuse attempt. We can't know the family without
-      // the session row, so just reject.
-      throw new UnauthorizedException('Invalid refresh token');
-    }
+    if (!matched) throw new UnauthorizedException('Invalid refresh token');
 
     if (matched.expiresAt < new Date()) {
       await this.prisma.session.delete({ where: { id: matched.id } });
@@ -163,16 +149,10 @@ export class AuthService {
   }
 
   async logout(rawToken: string) {
-    const sessions = await this.prisma.session.findMany({
-      where: { expiresAt: { gt: new Date() } },
-      take: 1000,
-    });
-    for (const s of sessions) {
-      if (await bcrypt.compare(rawToken, s.tokenHash)) {
-        // Revoke entire family (all devices for this login)
-        await this.prisma.session.deleteMany({ where: { tokenFamily: s.tokenFamily } });
-        return;
-      }
+    const hash = hashToken(rawToken);
+    const session = await this.prisma.session.findUnique({ where: { tokenHash: hash } });
+    if (session) {
+      await this.prisma.session.deleteMany({ where: { tokenFamily: session.tokenFamily } });
     }
   }
 
@@ -250,7 +230,7 @@ export class AuthService {
     );
 
     const rawRefresh = generateOpaqueToken();
-    const tokenHash = await bcrypt.hash(rawRefresh, 10);
+    const tokenHash = hashToken(rawRefresh);
     const tokenFamily = existingFamily ?? generateFamily();
 
     await this.prisma.session.create({
