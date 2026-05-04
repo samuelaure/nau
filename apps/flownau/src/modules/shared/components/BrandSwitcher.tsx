@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
   ChevronDown,
@@ -11,7 +11,11 @@ import {
   FileText,
   Users,
   Image,
+  Plus,
+  Loader2,
+  X,
 } from 'lucide-react'
+import { addBrand } from '@/modules/accounts/actions'
 
 type NauBrand = { id: string; name: string }
 type NauWorkspace = { id: string; name: string; brands: NauBrand[] }
@@ -30,6 +34,22 @@ export function BrandSwitcher() {
   const searchParams = useSearchParams()
   const [workspaces, setWorkspaces] = useState<NauWorkspace[]>([])
   const [open, setOpen] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [saving, setSaving] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpen(false)
+        setCreating(false)
+        setNewName('')
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
   const workspaceMatch = pathname.match(/^\/dashboard\/workspace\/([^/]+)/)
   const activeWorkspaceId = workspaceMatch?.[1] ?? null
@@ -51,6 +71,30 @@ export function BrandSwitcher() {
 
   const label = activeBrand ? activeBrand.name : activeWorkspace ? 'All Brands' : 'Select Brand'
 
+  const handleCreate = async () => {
+    if (!newName.trim() || !activeWorkspaceId) return
+    setSaving(true)
+    try {
+      const fd = new FormData()
+      fd.append('brandName', newName.trim())
+      fd.append('workspaceId', activeWorkspaceId)
+      const brand = await addBrand(fd)
+      setWorkspaces((ws) =>
+        ws.map((w) =>
+          w.id === activeWorkspaceId ? { ...w, brands: [...w.brands, { id: brand.id, name: newName.trim() }] } : w
+        )
+      )
+      setCreating(false)
+      setNewName('')
+      setOpen(false)
+      router.push(`/dashboard/workspace/${activeWorkspaceId}?brandId=${brand.id}`)
+    } catch {
+      // keep form open on error
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const handleSelect = (brandId: string | null) => {
     setOpen(false)
     if (brandId) {
@@ -67,7 +111,7 @@ export function BrandSwitcher() {
   return (
     <div className="mb-2">
       {/* Brand dropdown */}
-      <div className="relative mb-1">
+      <div ref={dropdownRef} className="relative mb-1">
         <button
           onClick={() => setOpen((o) => !o)}
           className="flex items-center gap-2 text-sm font-medium text-white hover:text-accent transition-colors w-full px-3 py-2 rounded-lg hover:bg-white/5"
@@ -99,6 +143,49 @@ export function BrandSwitcher() {
             {activeWorkspace.brands.length === 0 && (
               <p className="px-4 py-3 text-sm text-text-secondary">No brands in this workspace.</p>
             )}
+
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', padding: '4px 0' }}>
+              {creating ? (
+                <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <input
+                    autoFocus
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleCreate()
+                      if (e.key === 'Escape') { setCreating(false); setNewName('') }
+                    }}
+                    placeholder="Brand name"
+                    className="w-full text-sm text-white placeholder-gray-500 bg-white/5 border border-white/15 rounded-md px-2.5 py-1.5 outline-none"
+                  />
+                  <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                    <button
+                      onClick={() => { setCreating(false); setNewName('') }}
+                      className="p-1 rounded text-text-secondary hover:bg-white/5 border border-white/10"
+                    >
+                      <X size={12} />
+                    </button>
+                    <button
+                      onClick={handleCreate}
+                      disabled={saving || !newName.trim()}
+                      className="px-2.5 py-1 rounded text-xs text-white font-medium disabled:opacity-50"
+                      style={{ background: 'var(--accent-color)', border: 'none', cursor: saving ? 'not-allowed' : 'pointer' }}
+                    >
+                      {saving ? <Loader2 size={11} className="animate-spin" /> : 'Create'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setCreating(true)}
+                  className="flex items-center gap-2 w-full px-4 py-2.5 text-sm hover:bg-white/5 transition-colors"
+                  style={{ color: 'var(--accent-color)', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                >
+                  <Plus size={13} />
+                  Create a new Brand
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>

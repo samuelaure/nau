@@ -117,6 +117,30 @@ function WorkspaceSelector() {
             boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
           }}
         >
+          <button
+            onClick={() => {
+              setOpen(false)
+              router.push('/dashboard')
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              width: '100%',
+              padding: '10px 14px',
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--text-secondary)',
+              fontSize: '13px',
+              cursor: 'pointer',
+              textAlign: 'left',
+              fontWeight: 400,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+          >
+            All Workspaces
+          </button>
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />
           {workspaces.map((ws) => (
             <button
               key={ws.id}
