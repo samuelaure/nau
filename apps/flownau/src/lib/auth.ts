@@ -12,6 +12,23 @@ export interface AuthUser {
 const ACCOUNTS_URL = process.env.NEXT_PUBLIC_ACCOUNTS_URL ?? 'https://accounts.9nau.com'
 const FLOWNAU_URL = process.env.NEXT_PUBLIC_FLOWNAU_URL ?? 'https://flownau.9nau.com'
 
+const ADMIN_USER_IDS = (process.env.PLATFORM_ADMIN_USER_IDS ?? '')
+  .split(',').map(s => s.trim()).filter(Boolean)
+
+export function isAdminUser(userId: string): boolean {
+  return ADMIN_USER_IDS.includes(userId)
+}
+
+export async function requireAdmin(): Promise<AuthUser> {
+  const user = await requireAuth()
+  if (!isAdminUser(user.id)) redirect('/dashboard')
+  return user
+}
+
+export function adminUnauthorized(): NextResponse {
+  return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+}
+
 export async function getAuthUser(): Promise<AuthUser | null> {
   const cookieStore = await cookies()
   const session = await getSessionFromCookieStore(cookieStore)

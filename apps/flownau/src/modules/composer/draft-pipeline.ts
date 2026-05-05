@@ -1,15 +1,12 @@
-import { createLLMClient, getClientForFeature } from '@nau/llm-client'
+import { getAdminModelClient } from '@/modules/shared/admin-model'
 import { z } from 'zod'
 import { prisma } from '@/modules/shared/prisma'
 import { buildPrompt } from '@/modules/prompts/kernel'
 import { renderBrandContextBlock } from '@/modules/prompts/brand-context'
-import { resolveModelId } from '@/modules/composer/model-resolver'
-import { getSetting } from '@/modules/shared/settings'
 import { logError, logger } from '@/modules/shared/logger'
 import type { LlmTrace } from '@/modules/ideation/ideation.service'
 import type { SlotDef } from '../../../prisma/seeds/templates'
 
-const DEFAULT_MODEL_SELECTION = 'GROQ_LLAMA_3_3' as const
 
 const HEAD_TALK_FORMATS = new Set(['head_talk'])
 
@@ -45,7 +42,7 @@ export async function runDraftPipeline(input: DraftPipelineInput): Promise<Draft
 
   logger.info({ brandId, templateId }, '[DraftPipeline] Starting composition')
 
-  const [template, brand] = await Promise.all([
+  const [template, brand, brandTemplateConfig] = await Promise.all([
     prisma.template.findUnique({
       where: { id: templateId },
       select: { format: true, systemPrompt: true, slotSchema: true, schemaJson: true, contentSchema: true },
@@ -53,6 +50,10 @@ export async function runDraftPipeline(input: DraftPipelineInput): Promise<Draft
     prisma.brand.findUnique({
       where: { id: brandId },
       select: { name: true, context: true, draftCustomPrompt: true, language: true },
+    }),
+    prisma.brandTemplateConfig.findUnique({
+      where: { brandId_templateId: { brandId, templateId } },
+      select: { customPrompt: true, slotOverrides: true },
     }),
   ])
 
@@ -63,7 +64,10 @@ export async function runDraftPipeline(input: DraftPipelineInput): Promise<Draft
 
   const brandContextStr = renderBrandContextBlock({ name: brand?.name ?? null, context: brand?.context ?? null }) || null
 
-  const templateSchema = buildTemplateSchemaBlock(format, template)
+  const slotOverrides = (brandTemplateConfig?.slotOverrides ?? null) as Record<string, { intention?: string; minWords?: number; maxWords?: number }> | null
+  const mergedTemplate = slotOverrides ? { ...template, slotSchema: mergeSlotOverrides(template.slotSchema, slotOverrides) } : template
+
+  const templateSchema = buildTemplateSchemaBlock(format, mergedTemplate)
 
   const { systemPrompt, layers } = buildPrompt({
     base: 'draft',
@@ -71,6 +75,7 @@ export async function runDraftPipeline(input: DraftPipelineInput): Promise<Draft
     customPrompt: brand?.draftCustomPrompt ?? null,
     templateSchema,
     templateCustomPrompt: template.systemPrompt ?? null,
+    brandTemplatePrompt: brandTemplateConfig?.customPrompt ?? null,
     language,
   })
 
@@ -81,7 +86,7 @@ export async function runDraftPipeline(input: DraftPipelineInput): Promise<Draft
   if (HEAD_TALK_FORMATS.has(format)) {
     return runHeadTalkPath({ brandId, templateId, format, systemPrompt, userMessage, ideaText, layers })
   }
-  return runSlotPath({ brandId, templateId, format, systemPrompt, userMessage, template, ideaText, layers })
+  return runSlotPath({ brandId, templateId, format, systemPrompt, userMessage, template: mergedTemplate, ideaText, layers })
 }
 
 // ─── Head-talk path (structured output via parseCompletion) ───────────────────
@@ -97,7 +102,7 @@ async function runHeadTalkPath(args: {
 }): Promise<DraftPipelineResult> {
   const { brandId, templateId, format, systemPrompt, userMessage, layers } = args
 
-  const { client: llm, model, registryId, provider } = getClientForFeature('composition')
+  const { client: llm, model, registryId, provider } = await getAdminModelClient('drafting')
 
   logger.info({ brandId, templateId, provider, model }, '[DraftPipeline] HeadTalk LLM call')
 
@@ -154,14 +159,7 @@ async function runSlotPath(args: {
   if (!template.slotSchema) throw new Error(`Template ${templateId} has no slotSchema`)
   const slotDefs = template.slotSchema as unknown as SlotDef[]
 
-  const { provider, model, registryId } = resolveModelId(DEFAULT_MODEL_SELECTION)
-  const groqKey = (await getSetting('groq_api_key')) ?? process.env.GROQ_API_KEY ?? null
-  const openaiKey = (await getSetting('openai_api_key')) ?? process.env.OPENAI_API_KEY ?? null
-
-  const apiKey = provider === 'groq' ? groqKey : openaiKey
-  if (!apiKey) throw new Error(`${provider.toUpperCase()}_API_KEY is not configured`)
-
-  const llm = createLLMClient({ provider, apiKey })
+  const { client: llm, model, registryId, provider } = await getAdminModelClient('drafting')
 
   const messages: Array<{ role: 'system' | 'user'; content: string }> = [
     { role: 'system', content: systemPrompt },
@@ -251,6 +249,18 @@ function buildTemplateSchemaBlock(format: string, template: { slotSchema: unknow
   }
 
   return null
+}
+
+function mergeSlotOverrides(
+  slotSchema: unknown,
+  overrides: Record<string, { intention?: string; minWords?: number; maxWords?: number }>,
+): unknown {
+  if (!Array.isArray(slotSchema)) return slotSchema
+  return slotSchema.map((slot: SlotDef) => {
+    const ov = overrides[slot.key]
+    if (!ov) return slot
+    return { ...slot, ...(ov.intention !== undefined && { intention: ov.intention }), ...(ov.minWords !== undefined && { minWords: ov.minWords }), ...(ov.maxWords !== undefined && { maxWords: ov.maxWords }) }
+  })
 }
 
 function buildUserMessage(ideaText: string, recentContext?: string | null): string {

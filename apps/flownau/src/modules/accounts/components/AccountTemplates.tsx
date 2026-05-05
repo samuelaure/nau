@@ -1,11 +1,10 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Button } from '@/modules/shared/components/ui/Button'
 import { toast } from 'sonner'
 import {
   Loader2, X, Film, Mic, Play,
-  LayoutGrid, ImageIcon, Clock, Layers, CheckCircle2, Volume2, VolumeX,
+  LayoutGrid, ImageIcon, Clock, Layers, Volume2, VolumeX,
   ToggleLeft, ToggleRight,
 } from 'lucide-react'
 import { cn } from '@/modules/shared/utils'
@@ -26,7 +25,9 @@ const FORMAT_COLOR: Record<string, string> = {
   static_post: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/20',
 }
 
-type SlotDef = { key: string; label: string; intention: string; maxWords: number; style: string }
+type SlotDef = { key: string; label: string; intention: string; minWords?: number; maxWords: number; style: string }
+
+type SlotOverrides = Record<string, { intention?: string; minWords?: number; maxWords?: number }>
 
 type Template = {
   id: string
@@ -41,6 +42,8 @@ type Template = {
     enabled: boolean
     autoApproveDraft: boolean
     autoApprovePost: boolean
+    customPrompt?: string | null
+    slotOverrides?: SlotOverrides | null
   }> | null
 }
 
@@ -114,6 +117,112 @@ function PreviewMedia({
 
 // ─── Detail Modal ─────────────────────────────────────────────────────────────
 
+// ─── Inline slot override editor ─────────────────────────────────────────────
+
+function SlotOverrideRow({
+  slot,
+  override,
+  onChange,
+  onRestore,
+}: {
+  slot: SlotDef
+  override: { intention?: string; minWords?: number; maxWords?: number } | undefined
+  onChange: (key: string, patch: { intention?: string; minWords?: number; maxWords?: number } | null) => void
+  onRestore: (key: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [localIntention, setLocalIntention] = useState(override?.intention ?? slot.intention)
+  const [localMin, setLocalMin] = useState<number>(override?.minWords ?? slot.minWords ?? 0)
+  const [localMax, setLocalMax] = useState<number>(override?.maxWords ?? slot.maxWords)
+  const hasOverride = !!override && (override.intention !== undefined || override.minWords !== undefined || override.maxWords !== undefined)
+
+  const effectiveIntention = override?.intention ?? slot.intention
+  const effectiveMax = override?.maxWords ?? slot.maxWords
+
+  if (!editing) {
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => { setLocalIntention(override?.intention ?? slot.intention); setLocalMin(override?.minWords ?? slot.minWords ?? 0); setLocalMax(override?.maxWords ?? slot.maxWords); setEditing(true) }}
+        onKeyDown={(e) => e.key === 'Enter' && setEditing(true)}
+        className="bg-gray-900 border border-gray-800 rounded-lg p-3 space-y-1 cursor-text hover:border-gray-700 transition-colors group"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs font-semibold text-white">{slot.label}</span>
+          <div className="flex items-center gap-2">
+            {hasOverride && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onRestore(slot.key) }}
+                className="text-[10px] text-amber-400 hover:text-amber-300 transition-colors"
+              >
+                restore default
+              </button>
+            )}
+            <span className={cn('text-[10px] shrink-0', hasOverride ? 'text-accent' : 'text-gray-600')}>max {effectiveMax}w{hasOverride ? ' ·' : ''}{hasOverride ? ' custom' : ''}</span>
+          </div>
+        </div>
+        <p className="text-[11px] text-text-secondary leading-relaxed">{effectiveIntention}</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="bg-gray-900 border border-accent/40 rounded-lg p-3 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-semibold text-white">{slot.label}</span>
+        <div className="flex items-center gap-2">
+          <label className="text-[10px] text-gray-500">min</label>
+          <input
+            type="number"
+            value={localMin}
+            min={0}
+            onChange={(e) => setLocalMin(Number(e.target.value))}
+            className="w-14 text-xs bg-gray-800 border border-gray-700 text-white rounded px-1.5 py-0.5 focus:outline-none focus:border-gray-500"
+          />
+          <label className="text-[10px] text-gray-500">max</label>
+          <input
+            type="number"
+            value={localMax}
+            min={1}
+            onChange={(e) => setLocalMax(Number(e.target.value))}
+            className="w-14 text-xs bg-gray-800 border border-gray-700 text-white rounded px-1.5 py-0.5 focus:outline-none focus:border-gray-500"
+          />
+        </div>
+      </div>
+      <textarea
+        value={localIntention}
+        onChange={(e) => setLocalIntention(e.target.value)}
+        rows={3}
+        className="w-full text-[11px] bg-gray-800 border border-gray-700 text-white rounded px-2 py-1.5 resize-none focus:outline-none focus:border-gray-500 leading-relaxed"
+      />
+      <div className="flex items-center gap-2 justify-end">
+        <button
+          onClick={() => setEditing(false)}
+          className="text-xs text-gray-500 hover:text-white transition-colors px-2 py-1"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={() => {
+            const patch: { intention?: string; minWords?: number; maxWords?: number } = {}
+            if (localIntention !== slot.intention) patch.intention = localIntention
+            if (localMin !== (slot.minWords ?? 0)) patch.minWords = localMin
+            if (localMax !== slot.maxWords) patch.maxWords = localMax
+            onChange(slot.key, Object.keys(patch).length > 0 ? patch : null)
+            setEditing(false)
+          }}
+          className="text-xs bg-white text-black rounded px-3 py-1 hover:bg-zinc-200 transition-colors"
+        >
+          Apply
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Detail Modal ─────────────────────────────────────────────────────────────
+
 function TemplateModal({
   template,
   brandId,
@@ -129,7 +238,10 @@ function TemplateModal({
   const [isEnabled, setIsEnabled] = useState(config?.enabled ?? false)
   const [autoApproveDraft, setAutoApproveDraft] = useState(config?.autoApproveDraft ?? false)
   const [autoApprovePost, setAutoApprovePost] = useState(config?.autoApprovePost ?? false)
+  const [customPrompt, setCustomPrompt] = useState(config?.customPrompt ?? '')
+  const [slotOverrides, setSlotOverrides] = useState<SlotOverrides>(config?.slotOverrides ?? {})
   const [saving, setSaving] = useState(false)
+  const [savingPrompt, setSavingPrompt] = useState(false)
   const [muted, setMuted] = useState(true)
   const videoRef = useRef<HTMLVideoElement>(null)
 
@@ -169,6 +281,45 @@ function TemplateModal({
     } finally {
       setSaving(false)
     }
+  }
+
+  const saveCustomizations = async (newOverrides?: SlotOverrides, newPrompt?: string) => {
+    const overridesToSave = newOverrides ?? slotOverrides
+    const promptToSave = newPrompt ?? customPrompt
+    setSavingPrompt(true)
+    try {
+      const res = await fetch('/api/account-templates', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brandId,
+          templateId: template.id,
+          customPrompt: promptToSave || null,
+          slotOverrides: Object.keys(overridesToSave).length > 0 ? overridesToSave : null,
+        }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success('Saved')
+      onRefresh()
+    } catch {
+      toast.error('Failed to save')
+    } finally {
+      setSavingPrompt(false)
+    }
+  }
+
+  const handleSlotChange = (key: string, patch: { intention?: string; minWords?: number; maxWords?: number } | null) => {
+    const next = { ...slotOverrides }
+    if (patch === null) { delete next[key] } else { next[key] = { ...next[key], ...patch } }
+    setSlotOverrides(next)
+    saveCustomizations(next)
+  }
+
+  const handleSlotRestore = (key: string) => {
+    const next = { ...slotOverrides }
+    delete next[key]
+    setSlotOverrides(next)
+    saveCustomizations(next)
   }
 
   return (
@@ -250,14 +401,31 @@ function TemplateModal({
               )}
             </div>
 
-            {/* Content breakdown */}
-            {sections && sections.length > 0 && (
+            {/* Slot overrides — only for slot-based templates */}
+            {slotSchema && slotSchema.length > 0 && (
               <div className="space-y-2">
-                <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">
-                  {slotSchema ? 'What the AI fills in' : 'Script structure'}
-                </p>
+                <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">What the AI fills in</p>
+                <p className="text-[11px] text-gray-600">Click a slot to customize its instructions for this brand.</p>
                 <div className="space-y-2">
-                  {sections.map((s) => (
+                  {slotSchema.map((s) => (
+                    <SlotOverrideRow
+                      key={s.key}
+                      slot={s}
+                      override={slotOverrides[s.key]}
+                      onChange={handleSlotChange}
+                      onRestore={handleSlotRestore}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Read-only head-talk / content schema sections */}
+            {!slotSchema && htSections && htSections.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">Script structure</p>
+                <div className="space-y-2">
+                  {htSections.map((s) => (
                     <div key={s.key} className="bg-gray-900 border border-gray-800 rounded-lg p-3 space-y-1">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-xs font-semibold text-white">{s.label}</span>
@@ -269,6 +437,28 @@ function TemplateModal({
                 </div>
               </div>
             )}
+
+            {/* Custom prompt */}
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">Custom prompt</p>
+              <p className="text-[11px] text-gray-600">Extra instructions the AI must follow when drafting for this brand with this template. Highest priority — overrides everything else.</p>
+              <textarea
+                value={customPrompt}
+                onChange={(e) => setCustomPrompt(e.target.value)}
+                placeholder="e.g. Always start the hook with a number. Never use questions."
+                rows={4}
+                className="w-full text-sm bg-gray-900 border border-gray-800 text-white rounded-lg px-3 py-2 resize-none focus:outline-none focus:border-gray-600 placeholder:text-gray-600 leading-relaxed"
+              />
+              <div className="flex justify-end">
+                <button
+                  onClick={() => saveCustomizations(undefined, customPrompt)}
+                  disabled={savingPrompt}
+                  className="text-xs bg-white text-black rounded px-3 py-1.5 hover:bg-zinc-200 disabled:opacity-50 transition-colors"
+                >
+                  {savingPrompt ? 'Saving…' : 'Save prompt'}
+                </button>
+              </div>
+            </div>
 
             {/* Settings */}
             <div className="space-y-2">

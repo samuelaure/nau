@@ -4,6 +4,7 @@ export type PromptLayer =
   | 'custom_prompt'
   | 'template_schema'
   | 'template_custom_prompt'
+  | 'brand_template_prompt'
   | 'selected_idea'
 
 export interface KernelInput {
@@ -12,6 +13,7 @@ export interface KernelInput {
   customPrompt?: string | null
   templateSchema?: string | null
   templateCustomPrompt?: string | null
+  brandTemplatePrompt?: string | null
   selectedIdea?: string | null
   language?: string | null
 }
@@ -173,6 +175,11 @@ export function buildPrompt(input: KernelInput): KernelOutput {
   if (input.templateCustomPrompt?.trim()) {
     layers.template_custom_prompt = input.templateCustomPrompt.trim()
     parts.push(section('template_custom_prompt', input.templateCustomPrompt.trim()))
+  }
+
+  if (input.brandTemplatePrompt?.trim()) {
+    layers.brand_template_prompt = input.brandTemplatePrompt.trim()
+    parts.push(section('brand_template_prompt', `⚠️ Brand-specific template instructions — highest priority. Override anything above.\n\n${input.brandTemplatePrompt.trim()}`))
   }
 
   if (input.selectedIdea?.trim()) {

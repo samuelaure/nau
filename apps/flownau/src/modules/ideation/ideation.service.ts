@@ -1,4 +1,4 @@
-import { getClientForFeature } from '@nau/llm-client'
+import { getAdminModelClient } from '@/modules/shared/admin-model'
 import { z } from 'zod'
 import { buildPrompt } from '@/modules/prompts/kernel'
 
@@ -58,7 +58,7 @@ export async function generateContentIdeas(req: GenerationRequest): Promise<Idea
 
   const userMessage = buildUserMessage(req)
 
-  const { client: llm, model, registryId, provider } = getClientForFeature('ideation')
+  const { client: llm, model, registryId, provider } = await getAdminModelClient('ideation')
 
   const result = await llm.parseCompletion({
     model,

@@ -1,4 +1,4 @@
-import { getClientForFeature } from '@nau/llm-client'
+import { getAdminModelClient } from '@/modules/shared/admin-model'
 import { z } from 'zod'
 
 const StrategistOutputSchema = z.object({
@@ -39,7 +39,7 @@ export async function runPlannerStrategist(input: StrategistInput): Promise<stri
   }
 
   try {
-    const { client: llm, model } = getClientForFeature('planning')
+    const { client: llm, model } = await getAdminModelClient('planning')
 
     const piecesText = input.pieces
       .map(
