@@ -10,12 +10,16 @@ export async function optimizeVideo(inputPath: string, outputPath: string): Prom
     logger.info(`[MediaUtils] Optimizing video: ${inputPath}`);
     ffmpeg(inputPath)
       .videoCodec('libx264')
-      .size('?x720') // Max 720p height
-      .aspect('9:16') // Assume IG format primarily
-      .videoBitrate('2000k')
+      // Scale down to 720p max height, preserve aspect ratio, pad to even dimensions for libx264
+      .outputOptions([
+        '-vf', 'scale=-2:min(ih\\,720)',
+        '-preset', 'fast',
+        '-crf', '23',
+        '-movflags', '+faststart',
+        '-pix_fmt', 'yuv420p',
+      ])
       .audioCodec('aac')
       .audioBitrate('128k')
-      .outputOptions(['-preset fast', '-crf 23', '-movflags +faststart'])
       .on('end', () => {
         logger.info(`[MediaUtils] Video optimized successfully: ${outputPath}`);
         resolve();

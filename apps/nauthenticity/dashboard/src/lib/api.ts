@@ -186,6 +186,16 @@ export const deleteJob = async (queueName: string, jobId: string) => {
   return data;
 };
 
+export const retryFailedJobs = async (queueName?: string) => {
+  const { data } = await api.post('/queue/retry-failed', { queueName });
+  return data;
+};
+
+export const clearFailedJobs = async (queueName?: string) => {
+  const { data } = await api.post('/queue/clear-failed', { queueName });
+  return data;
+};
+
 export interface PostProgress {
   id: string;
   instagramId: string;

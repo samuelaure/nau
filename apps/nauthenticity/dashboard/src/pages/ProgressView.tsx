@@ -8,6 +8,8 @@ import {
   pauseIngestion,
   resumeIngestion,
   deleteJob,
+  retryFailedJobs,
+  clearFailedJobs,
   type ProfileProgress,
   type PostProgress,
   type QueueMetrics,
@@ -47,11 +49,18 @@ const QueueStatsSection = ({
   queueName: string;
 }) => {
   const queryClient = useQueryClient();
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['queue-status'] });
   const deleteMutation = useMutation({
     mutationFn: ({ id }: { id: string }) => deleteJob(queueName, id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['queue-status'] });
-    },
+    onSuccess: invalidate,
+  });
+  const retryMutation = useMutation({
+    mutationFn: () => retryFailedJobs(queueName),
+    onSuccess: invalidate,
+  });
+  const clearMutation = useMutation({
+    mutationFn: () => clearFailedJobs(queueName),
+    onSuccess: invalidate,
   });
 
   const stats = [
@@ -116,16 +125,35 @@ const QueueStatsSection = ({
 
       {metrics.failed && metrics.failed.length > 0 && (
         <div style={{ marginTop: '0.5rem' }}>
-          <p
-            style={{
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              color: '#ef4444',
-              marginBottom: '0.5rem',
-            }}
-          >
-            Recent Failures:
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+            <p style={{ fontSize: '0.75rem', fontWeight: 600, color: '#ef4444', margin: 0 }}>
+              Recent Failures:
+            </p>
+            <div style={{ display: 'flex', gap: '0.4rem' }}>
+              <button
+                onClick={() => retryMutation.mutate()}
+                disabled={retryMutation.isPending}
+                style={{
+                  fontSize: '0.7rem', padding: '2px 8px', borderRadius: 4, cursor: 'pointer',
+                  background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.4)',
+                  color: '#60a5fa',
+                }}
+              >
+                {retryMutation.isPending ? '…' : '↺ Retry all'}
+              </button>
+              <button
+                onClick={() => clearMutation.mutate()}
+                disabled={clearMutation.isPending}
+                style={{
+                  fontSize: '0.7rem', padding: '2px 8px', borderRadius: 4, cursor: 'pointer',
+                  background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
+                  color: '#f87171',
+                }}
+              >
+                {clearMutation.isPending ? '…' : '✕ Clear all'}
+              </button>
+            </div>
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
             {metrics.failed.slice(0, 3).map((job) => (
               <div
