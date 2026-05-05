@@ -14,7 +14,7 @@ interface TraceEntry {
   userMessage?: string
 }
 
-interface LlmTrace {
+export interface LlmTrace {
   ideaTrace?: TraceEntry
   draftTrace?: TraceEntry
   [key: string]: TraceEntry | undefined

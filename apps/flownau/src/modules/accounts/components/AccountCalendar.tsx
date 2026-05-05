@@ -32,7 +32,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/modules/shared/utils'
 import Modal from '@/modules/shared/components/Modal'
-import PromptsModal from './PromptsModal'
+import PromptsModal, { type LlmTrace } from './PromptsModal'
 
 // ─── Status config ────────────────────────────────────────────────────────────
 
@@ -1868,7 +1868,7 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
       )}
 
       {promptsComp?.llmTrace && (
-        <PromptsModal llmTrace={promptsComp.llmTrace as Record<string, unknown>} onClose={() => setPromptsComp(null)} />
+        <PromptsModal llmTrace={promptsComp.llmTrace as LlmTrace} onClose={() => setPromptsComp(null)} />
       )}
 
       {/* Re-format modal */}
