@@ -521,22 +521,32 @@ const handleSavePrompt = async (text: string) => {
     setComposing(true)
     const toastId = toast.loading('Converting idea into draft…')
     try {
-      // Resolve format: template selection > idea format > next empty slot > chain fallback
+      // Resolve format + template: explicit selection > idea format > next empty slot > random enabled template
       let finalFormat: string = composingIdea.format ?? ''
-      if (selectedTemplateId) {
-        finalFormat = templates.find(t => t.id === selectedTemplateId)?.format ?? finalFormat
+      let resolvedTemplateId: string = selectedTemplateId
+      if (resolvedTemplateId) {
+        finalFormat = templates.find(t => t.id === resolvedTemplateId)?.format ?? finalFormat
       }
       if (!finalFormat) {
         // Ask the server for the next scheduled slot's format
         const slotRes = await fetch(`/api/brands/${brandId}/slots?limit=1`)
         const slotData = slotRes.ok ? await slotRes.json() : null
         const nextEmptySlot = slotData?.slots?.find((s: any) => s.status === 'empty')
-        finalFormat = nextEmptySlot?.format ?? 'reel'
+        if (nextEmptySlot?.format) {
+          finalFormat = nextEmptySlot.format
+        } else if (templates.length > 0) {
+          // No slot — pick a random template from the enabled list
+          const picked = templates[Math.floor(Math.random() * templates.length)]
+          finalFormat = picked.format ?? 'reel'
+          if (!resolvedTemplateId) resolvedTemplateId = picked.id
+        } else {
+          finalFormat = 'reel'
+        }
       }
       const res = await fetch('/api/agent/compose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brandId, prompt: composingIdea.ideaText, format: finalFormat, postId: composingIdea.id, personaId: selectedPersonaId || undefined, templateId: selectedTemplateId || undefined }),
+        body: JSON.stringify({ brandId, prompt: composingIdea.ideaText, format: finalFormat, postId: composingIdea.id, personaId: selectedPersonaId || undefined, templateId: resolvedTemplateId || undefined }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Composition failed')
