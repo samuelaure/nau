@@ -12,8 +12,8 @@ const BrandPatchSchema = z.object({
   ideationCount: z.number().int().min(1).max(30).optional(),
   autoApproveIdeas: z.boolean().optional(),
   coverageHorizonDays: z.number().int().min(1).max(30).optional(),
-  ideationPrompt: z.string().max(2000).nullable().optional(),
-  composerPrompt: z.string().max(2000).nullable().optional(),
+  ideationPrompt: z.string().max(10000).nullable().optional(),
+  composerPrompt: z.string().max(10000).nullable().optional(),
 })
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ brandId: string }> }) {
