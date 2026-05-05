@@ -102,10 +102,13 @@ export const ingestProfile = async (
     // Immediately update the main account with the high-res profile found during the feed scrape
     if (scrapeResult.profile && scrapeResult.profile.username) {
       const hdUrl = scrapeResult.profile.profilePicUrlHD || scrapeResult.profile.profilePicUrl;
-      if (hdUrl) {
+      if (hdUrl || scrapeResult.profile.postsCount != null) {
         await prisma.socialProfile.updateMany({
           where: { username: scrapeResult.profile.username },
-          data: { profileImageUrl: hdUrl },
+          data: {
+            ...(hdUrl ? { profileImageUrl: hdUrl } : {}),
+            ...(scrapeResult.profile.postsCount != null ? { totalPostCount: scrapeResult.profile.postsCount } : {}),
+          },
         });
         // Queue Profile Image download
         await downloadQueue.add('process-profile-image', {

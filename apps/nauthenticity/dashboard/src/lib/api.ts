@@ -57,6 +57,7 @@ export interface SocialProfile {
   platform: string;
   username: string;
   profileImageUrl: string | null;
+  totalPostCount: number | null;
   lastScrapedAt: string;
   _count?: {
     posts: number;

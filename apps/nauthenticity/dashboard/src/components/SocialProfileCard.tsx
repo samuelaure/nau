@@ -9,6 +9,7 @@ interface SocialProfileCardProps {
     platform: string;
     username: string;
     profileImageUrl: string | null;
+    totalPostCount?: number | null;
     lastScrapedAt: string;
     _count?: {
       posts: number;
@@ -42,7 +43,9 @@ export const SocialProfileCard = ({
     }
   };
 
-  const postCount = profile._count?.posts || 0;
+  const downloaded = profile._count?.posts ?? 0;
+  const total = profile.totalPostCount ?? null;
+  const postLabel = total !== null && total !== downloaded ? `${downloaded} / ${total}` : String(downloaded);
   const lastScraped = new Date(profile.lastScrapedAt).toLocaleDateString();
 
   const handleSelect = () => {
@@ -151,7 +154,7 @@ export const SocialProfileCard = ({
             Posts
           </p>
           <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, color: '#58a6ff' }}>
-            {postCount}
+            {postLabel}
           </p>
         </div>
         <div

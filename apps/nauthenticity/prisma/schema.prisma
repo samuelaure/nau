@@ -19,6 +19,7 @@ model SocialProfile {
   platform        String   @default("instagram")
   username        String
   profileImageUrl String?
+  totalPostCount  Int?
   lastScrapedAt   DateTime @default(now())
 
   // Ownership — the ONE brand that publishes to this profile
