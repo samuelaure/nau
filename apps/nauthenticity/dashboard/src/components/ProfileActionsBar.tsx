@@ -2,16 +2,18 @@ import React from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { ingestAccount } from '../lib/api'
-import { RefreshCw, Database, Loader } from 'lucide-react'
+import { RefreshCw, Download, Loader } from 'lucide-react'
 
 interface ProfileActionsBarProps {
   username: string
+  postCount?: number
 }
 
-export const ProfileActionsBar = ({ username }: ProfileActionsBarProps) => {
+export const ProfileActionsBar = ({ username, postCount = 0 }: ProfileActionsBarProps) => {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [scrapeLimit, setScrapeLimit] = React.useState<number>(50)
+  const isFirstTime = postCount === 0
 
   const ingestMutation = useMutation({
     mutationFn: ingestAccount,
@@ -21,51 +23,18 @@ export const ProfileActionsBar = ({ username }: ProfileActionsBarProps) => {
     },
   })
 
-  const handleUpdateSync = () => {
-    ingestMutation.mutate({ username, limit: 50, updateSync: true })
-  }
-
-  const handleScrape = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    ingestMutation.mutate({ username, limit: scrapeLimit })
+    if (isFirstTime) {
+      ingestMutation.mutate({ username, limit: scrapeLimit })
+    } else {
+      ingestMutation.mutate({ username, limit: 50, updateSync: true })
+    }
   }
 
   return (
-    <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-      <button
-        className="btn-secondary"
-        onClick={handleUpdateSync}
-        disabled={ingestMutation.isPending}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          padding: '0.5rem 1rem',
-          fontSize: '0.875rem',
-          borderRadius: '4px',
-          background: 'var(--accent-primary)',
-          color: 'white',
-          border: 'none',
-          cursor: ingestMutation.isPending ? 'not-allowed' : 'pointer',
-          opacity: ingestMutation.isPending ? 0.6 : 1,
-        }}
-        title="Update Sync: Check for new posts"
-      >
-        {ingestMutation.isPending ? (
-          <>
-            <Loader size={16} style={{ animation: 'spin 1s linear infinite' }} /> Syncing...
-          </>
-        ) : (
-          <>
-            <RefreshCw size={16} /> Update Sync
-          </>
-        )}
-      </button>
-
-      <form
-        onSubmit={handleScrape}
-        style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}
-      >
+    <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+      {isFirstTime && (
         <input
           type="number"
           value={scrapeLimit}
@@ -80,39 +49,38 @@ export const ProfileActionsBar = ({ username }: ProfileActionsBarProps) => {
             padding: '0.5rem',
             borderRadius: '4px',
             width: '80px',
-            cursor: ingestMutation.isPending ? 'not-allowed' : 'auto',
           }}
         />
-        <button
-          type="submit"
-          className="btn-secondary"
-          disabled={ingestMutation.isPending}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.5rem 1rem',
-            fontSize: '0.875rem',
-            borderRadius: '4px',
-            background: '#444',
-            color: 'white',
-            border: 'none',
-            cursor: ingestMutation.isPending ? 'not-allowed' : 'pointer',
-            opacity: ingestMutation.isPending ? 0.6 : 1,
-          }}
-          title="Scrape historical posts"
-        >
-          {ingestMutation.isPending ? (
-            <>
-              <Loader size={16} style={{ animation: 'spin 1s linear infinite' }} /> Scraping...
-            </>
-          ) : (
-            <>
-              <Database size={16} /> Scrape
-            </>
-          )}
-        </button>
-      </form>
+      )}
+      <button
+        type="submit"
+        disabled={ingestMutation.isPending}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          padding: '0.5rem 1rem',
+          fontSize: '0.875rem',
+          borderRadius: '4px',
+          background: 'var(--accent-primary)',
+          color: 'white',
+          border: 'none',
+          cursor: ingestMutation.isPending ? 'not-allowed' : 'pointer',
+          opacity: ingestMutation.isPending ? 0.6 : 1,
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {ingestMutation.isPending ? (
+          <>
+            <Loader size={16} style={{ animation: 'spin 1s linear infinite' }} />
+            {isFirstTime ? 'Downloading...' : 'Syncing...'}
+          </>
+        ) : isFirstTime ? (
+          <><Download size={16} /> Download Profile</>
+        ) : (
+          <><RefreshCw size={16} /> Sync Profile</>
+        )}
+      </button>
 
       <style>{`
         @keyframes spin {
@@ -120,6 +88,6 @@ export const ProfileActionsBar = ({ username }: ProfileActionsBarProps) => {
           to { transform: rotate(360deg); }
         }
       `}</style>
-    </div>
+    </form>
   )
 }

@@ -108,7 +108,7 @@ export const BrandContentView = () => {
         </div>
 
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <ProfileActionsBar username={selectedUsername} />
+          <ProfileActionsBar username={selectedUsername} postCount={selectedAccount._count?.posts ?? 0} />
           <button
             onClick={() => navigate(`/progress?username=${selectedUsername}`)}
             style={{
