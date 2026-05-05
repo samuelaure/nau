@@ -27,6 +27,7 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  Shuffle,
 } from 'lucide-react'
 import Modal from '@/modules/shared/components/Modal'
 import { cn } from '@/modules/shared/utils'
@@ -79,6 +80,7 @@ function IdeaModal({
   onSave,
   onApprove,
   onDraft,
+  onReformat,
 }: {
   idea: any | null
   ideas: any[]
@@ -93,6 +95,7 @@ function IdeaModal({
   onSave: () => void
   onApprove: () => void
   onDraft: (idea: any) => void
+  onReformat: (idea: any) => void
 }) {
   const [mounted, setMounted] = useState(false)
   useEffect(() => { setMounted(true) }, [])
@@ -230,10 +233,20 @@ function IdeaModal({
             </div>
           )}
           {(idea.status === 'IDEA_APPROVED' || idea.status === 'USED') && (
-            <div className="pt-2 border-t border-white/5">
+            <div className="pt-2 border-t border-white/5 flex gap-2">
+              {idea.status === 'USED' && (
+                <Button
+                  onClick={() => onReformat(idea)}
+                  variant="outline"
+                  className="flex-1 text-white border-white/10 hover:bg-white/5"
+                >
+                  <Shuffle className="w-4 h-4 mr-2" />
+                  Re-format
+                </Button>
+              )}
               <Button
                 onClick={() => onDraft(idea)}
-                className={cn('w-full text-white', idea.status === 'USED' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-accent hover:bg-accent/80')}
+                className={cn('text-white', idea.status === 'USED' ? 'flex-1 bg-gray-700 hover:bg-gray-600' : 'w-full bg-accent hover:bg-accent/80')}
               >
                 <Wand2 className="w-4 h-4 mr-2" />
                 {idea.status === 'USED' ? 'Redo Draft' : 'Draft'}
@@ -297,6 +310,13 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
   const [savedComposerPrompt, setSavedComposerPrompt] = useState('')
   const [composerPrompt, setComposerPrompt] = useState('')
   const [composeShowPrompt, setComposeShowPrompt] = useState(false)
+
+  // Re-format modal
+  const [reformatIdea, setReformatIdea] = useState<any | null>(null)
+  const [reformatMode, setReformatMode] = useState<'format' | 'template'>('format')
+  const [reformatFormat, setReformatFormat] = useState('')
+  const [reformatTemplateId, setReformatTemplateId] = useState('')
+  const [reformatting, setReformatting] = useState(false)
 
   // Idea detail modal
   const [openIdea, setOpenIdea] = useState<any | null>(null)
@@ -562,6 +582,48 @@ const handleSavePrompt = async (text: string) => {
     }
   }
 
+  const handleReformat = async () => {
+    if (!reformatIdea) return
+    setReformatting(true)
+    const toastId = toast.loading('Re-formatting draft…')
+    try {
+      let finalTemplateId = reformatTemplateId
+      let finalFormat = reformatFormat
+
+      if (reformatMode === 'format' && finalFormat) {
+        // Pick a random enabled template for the chosen format
+        const candidates = templates.filter(t => t.format === finalFormat)
+        const picked = candidates[Math.floor(Math.random() * candidates.length)]
+        finalTemplateId = picked?.id ?? ''
+      }
+
+      if (!finalTemplateId && !finalFormat) throw new Error('Select a format or template')
+
+      const res = await fetch('/api/agent/compose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brandId,
+          prompt: reformatIdea.ideaText,
+          format: finalFormat || undefined,
+          postId: reformatIdea.id,
+          templateId: finalTemplateId || undefined,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Re-format failed')
+      toast.success('Draft re-formatted!', { id: toastId })
+      setReformatIdea(null)
+      setOpenIdea(null)
+      fetchIdeas()
+      if ((finalFormat || data.post?.format) === 'head_talk' && data.post) setHeadTalkDraftPost(data.post)
+    } catch (err: any) {
+      toast.error(err.message, { id: toastId })
+    } finally {
+      setReformatting(false)
+    }
+  }
+
   const pendingCount = ideas.filter(i => i.status === 'IDEA_PENDING').length
 
   return (
@@ -698,16 +760,27 @@ const handleSavePrompt = async (text: string) => {
                   </button>
                 )}
                 {(idea.status === 'IDEA_APPROVED' || isUsed) && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setComposingIdea(idea) }}
-                    className={cn(
-                      'flex items-center gap-1 text-[11px] font-semibold transition-colors',
-                      isUsed ? 'text-text-secondary hover:text-white' : 'text-accent hover:text-accent/80',
+                  <div className="flex items-center gap-2">
+                    {isUsed && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setReformatIdea(idea); setReformatMode('format'); setReformatFormat(''); setReformatTemplateId('') }}
+                        className="flex items-center gap-1 text-[11px] font-semibold text-text-secondary hover:text-white transition-colors"
+                      >
+                        <Shuffle size={11} />
+                        Re-format
+                      </button>
                     )}
-                  >
-                    <Wand2 size={11} />
-                    {isUsed ? 'Redo Draft' : 'Draft'}
-                  </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setComposingIdea(idea) }}
+                      className={cn(
+                        'flex items-center gap-1 text-[11px] font-semibold transition-colors',
+                        isUsed ? 'text-text-secondary hover:text-white' : 'text-accent hover:text-accent/80',
+                      )}
+                    >
+                      <Wand2 size={11} />
+                      {isUsed ? 'Redo Draft' : 'Draft'}
+                    </button>
+                  </div>
                 )}
               </div>
             </Card>
@@ -730,6 +803,7 @@ const handleSavePrompt = async (text: string) => {
         onSave={handleSaveEdit}
         onApprove={() => openIdea && handleApprove(openIdea)}
         onDraft={(idea) => { setComposingIdea(idea); setOpenIdea(null) }}
+        onReformat={(idea) => { setReformatIdea(idea); setReformatMode('format'); setReformatFormat(''); setReformatTemplateId(''); setOpenIdea(null) }}
       />
 
       {/* ── Brainstorm modal ──────────────────────────────────────────────────── */}
@@ -837,7 +911,7 @@ const handleSavePrompt = async (text: string) => {
                 onChange={e => setSelectedTemplateId(e.target.value)}
                 disabled={composing}
               >
-                <option value="">Auto Select (Director Mode)</option>
+                <option value="">Auto Select</option>
                 {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </div>
@@ -873,6 +947,87 @@ const handleSavePrompt = async (text: string) => {
               <Button variant="outline" disabled={composing} onClick={() => setComposingIdea(null)}>Cancel</Button>
               <Button disabled={composing} onClick={handleCompose} className="bg-accent text-white">
                 {composing ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Composing…</> : <><Wand2 className="w-4 h-4 mr-2" />Generate Draft</>}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Re-format modal ───────────────────────────────────────────────────── */}
+      {reformatIdea && (
+        <Modal isOpen={true} onClose={() => !reformatting && setReformatIdea(null)}>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Shuffle className="w-5 h-5 text-white/60" />
+              <h2 className="text-xl font-heading font-semibold">Re-format Draft</h2>
+            </div>
+            <div className="bg-gray-900 rounded-lg p-3 border border-gray-800 max-h-[100px] overflow-y-auto">
+              <p className="text-xs text-gray-400 whitespace-pre-wrap">{reformatIdea.ideaText}</p>
+            </div>
+            {/* Mode tabs */}
+            <div className="flex bg-gray-900 p-1 rounded-lg border border-gray-800">
+              {(['format', 'template'] as const).map(mode => (
+                <button
+                  key={mode}
+                  onClick={() => { setReformatMode(mode); setReformatFormat(''); setReformatTemplateId('') }}
+                  className={cn(
+                    'flex-1 py-1.5 text-xs font-bold rounded-md transition-all',
+                    reformatMode === mode ? 'bg-gray-800 text-white' : 'text-text-secondary hover:text-white',
+                  )}
+                >
+                  {mode === 'format' ? 'By Format' : 'Specific Template'}
+                </button>
+              ))}
+            </div>
+            {reformatMode === 'format' ? (
+              <div>
+                <label className="text-xs text-text-secondary block mb-2">Choose a format — a template will be picked at random</label>
+                <div className="flex flex-wrap gap-2">
+                  {[...new Set(templates.map(t => t.format).filter(Boolean))].map(fmt => {
+                    const fc = FORMAT_CONFIG[fmt]
+                    const Icon = fc?.icon
+                    return (
+                      <button
+                        key={fmt}
+                        onClick={() => setReformatFormat(fmt === reformatFormat ? '' : fmt)}
+                        className={cn(
+                          'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all',
+                          reformatFormat === fmt
+                            ? 'bg-accent border-accent text-white'
+                            : 'border-white/10 text-text-secondary hover:border-white/30 hover:text-white',
+                        )}
+                      >
+                        {Icon && <Icon size={12} />}
+                        {fc?.label ?? fmt}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label className="text-xs text-text-secondary block mb-1">Choose a template</label>
+                <select
+                  className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-sm"
+                  value={reformatTemplateId}
+                  onChange={e => setReformatTemplateId(e.target.value)}
+                  disabled={reformatting}
+                >
+                  <option value="">Select a template…</option>
+                  {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+            )}
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" disabled={reformatting} onClick={() => setReformatIdea(null)}>Cancel</Button>
+              <Button
+                disabled={reformatting || (reformatMode === 'format' ? !reformatFormat : !reformatTemplateId)}
+                onClick={handleReformat}
+                className="bg-accent text-white"
+              >
+                {reformatting
+                  ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Re-formatting…</>
+                  : <><Shuffle className="w-4 h-4 mr-2" />Re-format</>}
               </Button>
             </div>
           </div>
