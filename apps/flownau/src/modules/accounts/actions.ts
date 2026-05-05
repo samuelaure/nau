@@ -195,6 +195,20 @@ export async function updateBrand(brandId: string, formData: FormData) {
   revalidatePath('/dashboard')
 }
 
+/** Save manually edited brand context JSON. */
+export async function saveBrandContext(brandId: string, context: string) {
+  await checkAuth()
+  const parsedId = IdSchema.parse(brandId)
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(context)
+  } catch {
+    throw new Error('Invalid JSON — please check the format and try again.')
+  }
+  await prisma.brand.update({ where: { id: parsedId }, data: { context: parsed as any } })
+  revalidatePath('/dashboard')
+}
+
 /** Manually trigger owned content & voice synthesis in nauthenticity. */
 export async function updateOwnedSynthesis(brandId: string) {
   await checkAuth()

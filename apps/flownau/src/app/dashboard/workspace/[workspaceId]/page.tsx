@@ -174,8 +174,9 @@ export default async function WorkspaceOverviewPage({
                 shortCode: localBrand.shortCode,
                 coverageHorizonDays: localBrand.coverageHorizonDays,
                 brandIdentity: localBrand.brandIdentity as any,
+                context: localBrand.context,
               }}
-              initialTab={settingsTab as 'general' | 'personas' | 'strategy' | 'principles' | 'planner' | 'schedule' | undefined}
+              initialTab={settingsTab as 'general' | 'schedule' | undefined}
               initialSchedule={postSchedule ? {
                 formatChain: postSchedule.formatChain,
                 dailyFrequency: postSchedule.dailyFrequency,

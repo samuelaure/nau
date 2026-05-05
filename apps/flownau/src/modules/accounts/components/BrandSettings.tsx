@@ -1,17 +1,14 @@
 'use client'
 
 import { useTransition, useEffect, useRef, useState } from 'react'
-import { updateBrand, updateOwnedSynthesis } from '@/modules/accounts/actions'
+import { updateBrand, updateOwnedSynthesis, saveBrandContext } from '@/modules/accounts/actions'
 import { Card } from '@/modules/shared/components/ui/Card'
 import { Button } from '@/modules/shared/components/ui/Button'
-import AccountPersonas from './AccountPersonas'
-import AccountContentPrinciples from './AccountContentPrinciples'
-import AccountPlanners from './AccountPlanners'
-import AccountIdeasFrameworks from './AccountIdeasFrameworks'
 import AccountSchedule from './AccountSchedule'
 import { cn } from '@/modules/shared/utils'
+import { RefreshCw, Check, AlertCircle } from 'lucide-react'
 
-type BrandSettingsTab = 'general' | 'personas' | 'strategy' | 'principles' | 'planner' | 'schedule'
+type BrandSettingsTab = 'general' | 'schedule'
 
 interface PostSchedule {
   formatChain: string[]
@@ -139,20 +136,24 @@ type Brand = {
   shortCode: string | null
   coverageHorizonDays: number
   brandIdentity?: BrandIdentity | null
+  context?: unknown
 }
 
 export default function BrandSettings({ brand, initialSchedule, initialTab }: { brand: Brand; initialSchedule: PostSchedule | null; initialTab?: BrandSettingsTab }) {
   const [tab, setTab] = useState<BrandSettingsTab>(initialTab ?? 'general')
   const [isPending, startTransition] = useTransition()
-  const [isGenerating, setIsGenerating] = useState(false)
+  const [syncState, setSyncState] = useState<'idle' | 'syncing' | 'done' | 'error'>('idle')
+  const [syncError, setSyncError] = useState<string | null>(null)
+  const [contextJson, setContextJson] = useState(
+    brand.context ? JSON.stringify(brand.context, null, 2) : '',
+  )
+  const [contextSaving, setContextSaving] = useState(false)
+  const [contextSaved, setContextSaved] = useState(false)
+  const [contextError, setContextError] = useState<string | null>(null)
 
   const tabs: { id: BrandSettingsTab; label: string }[] = [
     { id: 'general', label: 'General' },
     { id: 'schedule', label: 'Schedule' },
-    { id: 'personas', label: 'Personas' },
-    { id: 'strategy', label: 'Strategy' },
-    { id: 'principles', label: 'Principles' },
-    { id: 'planner', label: 'Planner' },
   ]
 
   const handleUpdate = (formData: FormData) => {
@@ -287,32 +288,91 @@ export default function BrandSettings({ brand, initialSchedule, initialTab }: { 
               </div>
             </div>
 
-            <div className="w-full border-t border-white/5 pt-6 flex flex-col gap-3">
-              <label className="form-label block">
-                Owned Content Synthesis fallback
-                <span className="text-xs font-normal ml-2 opacity-70">
-                  Manually trigger (re)generation of content topics & brand voice from owned posts.
-                </span>
-              </label>
-              <div className="flex">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  disabled={isGenerating}
+            <div className="w-full border-t border-white/5 pt-6 flex flex-col gap-4">
+              <div>
+                <h4 className="form-label font-semibold text-white">Brand context</h4>
+                <p className="text-xs text-text-secondary mt-0.5">
+                  AI-generated brand profile from nauthenticity — used in every content generation step as context. Sync to pull the latest from nauthenticity, or edit directly.
+                </p>
+              </div>
+
+              {/* Sync button */}
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  disabled={syncState === 'syncing'}
                   onClick={async () => {
-                    setIsGenerating(true)
+                    setSyncState('syncing')
+                    setSyncError(null)
                     try {
                       await updateOwnedSynthesis(brand.id)
-                      alert('Synthesis updated successfully!')
-                    } catch (err: any) {
-                      alert(`Error: ${err.message}`)
-                    } finally {
-                      setIsGenerating(false)
+                      setSyncState('done')
+                      setTimeout(() => setSyncState('idle'), 3000)
+                    } catch (err: unknown) {
+                      setSyncError(err instanceof Error ? err.message : 'Sync failed')
+                      setSyncState('error')
                     }
                   }}
+                  className={cn(
+                    'inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-all',
+                    syncState === 'syncing' && 'border-zinc-700 text-zinc-400 cursor-not-allowed',
+                    syncState === 'done' && 'border-emerald-700 text-emerald-400 bg-emerald-900/20',
+                    syncState === 'error' && 'border-red-700 text-red-400 bg-red-900/20',
+                    (syncState === 'idle') && 'border-zinc-700 text-zinc-200 hover:border-zinc-500 hover:bg-zinc-800/50',
+                  )}
                 >
-                  {isGenerating ? 'Generating…' : 'Update Synthesis'}
-                </Button>
+                  {syncState === 'syncing' ? (
+                    <><RefreshCw size={14} className="animate-spin" /> Syncing…</>
+                  ) : syncState === 'done' ? (
+                    <><Check size={14} /> Synced</>
+                  ) : syncState === 'error' ? (
+                    <><AlertCircle size={14} /> Sync failed</>
+                  ) : (
+                    <><RefreshCw size={14} /> Sync from nauthenticity</>
+                  )}
+                </button>
+                {syncState === 'error' && syncError && (
+                  <p className="text-xs text-red-400">{syncError}</p>
+                )}
+              </div>
+
+              {/* Context editor */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs text-text-secondary">
+                  Context JSON — edit directly if needed. Syncing from nauthenticity overwrites this.
+                </label>
+                <textarea
+                  value={contextJson}
+                  onChange={(e) => { setContextJson(e.target.value); setContextSaved(false); setContextError(null) }}
+                  rows={14}
+                  spellCheck={false}
+                  placeholder={"{\n  \"identity\": { \"oneLiner\": \"…\" },\n  \"voice\": { \"descriptors\": [\"…\"] }\n}"}
+                  className="w-full font-mono text-xs bg-gray-950 border border-border text-white rounded-lg px-3 py-3 resize-y focus:outline-none focus:border-zinc-600 placeholder:text-zinc-700 leading-relaxed"
+                />
+                {contextError && <p className="text-xs text-red-400">{contextError}</p>}
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    disabled={contextSaving}
+                    onClick={async () => {
+                      setContextSaving(true)
+                      setContextError(null)
+                      setContextSaved(false)
+                      try {
+                        await saveBrandContext(brand.id, contextJson)
+                        setContextSaved(true)
+                        setTimeout(() => setContextSaved(false), 3000)
+                      } catch (err: unknown) {
+                        setContextError(err instanceof Error ? err.message : 'Save failed')
+                      } finally {
+                        setContextSaving(false)
+                      }
+                    }}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-zinc-700 text-zinc-200 hover:border-zinc-500 hover:bg-zinc-800/50 transition-all disabled:opacity-50"
+                  >
+                    {contextSaving ? 'Saving…' : contextSaved ? <><Check size={14} /> Saved</> : 'Save context'}
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -326,10 +386,6 @@ export default function BrandSettings({ brand, initialSchedule, initialTab }: { 
       )}
 
       {tab === 'schedule' && <AccountSchedule brandId={brand.id} initialSchedule={initialSchedule} initialIdeationCount={brand.ideationCount} initialAutoApproveIdeas={brand.autoApproveIdeas} initialCoverageHorizonDays={brand.coverageHorizonDays} />}
-      {tab === 'personas' && <AccountPersonas brandId={brand.id} />}
-      {tab === 'strategy' && <AccountIdeasFrameworks brandId={brand.id} />}
-      {tab === 'principles' && <AccountContentPrinciples brandId={brand.id} />}
-      {tab === 'planner' && <AccountPlanners brandId={brand.id} />}
     </div>
   )
 }
