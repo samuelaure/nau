@@ -2,11 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const { mockParseCompletion } = vi.hoisted(() => ({ mockParseCompletion: vi.fn() }))
 
-vi.mock('@nau/llm-client', () => ({
-  getClientForFeature: vi.fn(() => ({
-    client: { parseCompletion: mockParseCompletion },
-    model: 'gpt-4o',
-  })),
+vi.mock('@/modules/shared/admin-model', () => ({
+  getAdminModelClient: vi.fn(() =>
+    Promise.resolve({ client: { parseCompletion: mockParseCompletion }, model: 'gpt-4o', registryId: 'gpt-4o', provider: 'openai' }),
+  ),
 }))
 
 import { generateContentIdeas } from '../ideation.service'
