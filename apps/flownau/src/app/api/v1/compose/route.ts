@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { validateServiceToken, unauthorizedResponse } from '@/modules/shared/nau-auth'
 import { prisma } from '@/modules/shared/prisma'
-import { composeReel } from '@/modules/composer/reel-composer'
+import { runDraftPipeline } from '@/modules/composer/draft-pipeline'
 import { triggerRenderForPost } from '@/modules/renderer/render-queue'
 import { selectTemplateForIdea } from '@/modules/composer/template-selector'
 import { logError, logger } from '@/modules/shared/logger'
@@ -58,24 +58,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'No enabled template found for this format' }, { status: 400 })
     }
 
-    const reelResult = await composeReel({
+    const draftResult = await runDraftPipeline({
       ideaText: input.prompt,
       brandId: input.brandId,
       templateId: selectedTemplate.id,
     })
 
-    const creative = { slots: reelResult.slots, caption: reelResult.caption, hashtags: reelResult.hashtags, brollMood: reelResult.brollMood }
-
     const updatedPost = await prisma.post.update({
       where: { id: post.id },
       data: {
-        format: input.format,
-        creative: creative as unknown as Prisma.InputJsonValue,
-        caption: reelResult.caption,
-        hashtags: reelResult.hashtags,
+        format: draftResult.format,
+        creative: draftResult.creative as unknown as Prisma.InputJsonValue,
+        caption: draftResult.caption,
+        hashtags: draftResult.hashtags,
         templateId: selectedTemplate.id,
         status: 'DRAFT_APPROVED',
-        llmTrace: { draftTrace: reelResult.trace } as unknown as Prisma.InputJsonValue,
+        llmTrace: { draftTrace: draftResult.trace } as unknown as Prisma.InputJsonValue,
       },
     })
 

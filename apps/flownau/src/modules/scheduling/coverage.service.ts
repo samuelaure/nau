@@ -2,14 +2,12 @@ import type { Prisma } from '@/generated/prisma'
 import { prisma } from '@/modules/shared/prisma'
 import { logger } from '@/modules/shared/logger'
 import { materializeSlots } from './slot-materializer'
-import { composeHeadTalk } from '@/modules/composer/headtalk-composer'
-import { HeadTalkCreativeSchema } from '@/modules/composer/headtalk-composer'
-import { composeReel } from '@/modules/composer/reel-composer'
+import { runDraftPipeline } from '@/modules/composer/draft-pipeline'
+import { getRecentDraftContext } from '@/modules/composer/recent-context.service'
 import { triggerRenderForPost } from '@/modules/renderer/render-queue'
 import { shuffle } from '@/modules/video/utils/assets'
 import { signServiceToken } from '@nau/auth'
 
-const REEL_FORMATS = new Set(['reel', 'trial_reel'])
 
 // ─── Template deck: shuffle-drain per format ──────────────────────────────────
 // Ensures even distribution: each template is used once before any repeats.
@@ -235,29 +233,14 @@ async function runCheck1(
         let hashtags: string[] = []
         let resolvedTemplateId: string | null = templateId ?? null
 
-        let draftTrace
-        if (REEL_FORMATS.has(slot.format) && templateId) {
-          const reelResult = await composeReel({
-            ideaText: candidate.ideaText ?? '',
-            brandId,
-            templateId,
-          })
-          creative = { slots: reelResult.slots, caption: reelResult.caption, hashtags: reelResult.hashtags, brollMood: reelResult.brollMood }
-          caption = reelResult.caption
-          hashtags = reelResult.hashtags
-          draftTrace = reelResult.trace
-        } else {
-          const headTalkResult = await composeHeadTalk({
-            ideaText: candidate.ideaText ?? '',
-            brandId,
-            templateId,
-          })
-          creative = headTalkResult.creative
-          caption = headTalkResult.caption
-          hashtags = headTalkResult.hashtags
-          resolvedTemplateId = headTalkResult.templateId
-          draftTrace = headTalkResult.trace
-        }
+        if (!templateId) throw new Error('No template resolved for slot')
+        const recentContext = await getRecentDraftContext(brandId)
+        const draftResult = await runDraftPipeline({ ideaText: candidate.ideaText ?? '', brandId, templateId, recentContext })
+        creative = draftResult.creative
+        caption = draftResult.caption
+        hashtags = draftResult.hashtags
+        resolvedTemplateId = draftResult.templateId
+        const draftTrace = draftResult.trace
 
         const autoApproveDraft = templateConfig?.autoApproveDraft ?? false
         const draftStatus = autoApproveDraft ? 'DRAFT_APPROVED' : 'DRAFT_PENDING'
@@ -360,21 +343,14 @@ async function runCheck1(
         let hashtags: string[] = []
         let resolvedTemplateId: string | null = templateId ?? null
 
-        let draftTrace
-        if (REEL_FORMATS.has(slot.format) && templateId) {
-          const reelResult = await composeReel({ ideaText: retryCandidate.ideaText ?? '', brandId, templateId })
-          creative = { slots: reelResult.slots, caption: reelResult.caption, hashtags: reelResult.hashtags, brollMood: reelResult.brollMood }
-          caption = reelResult.caption
-          hashtags = reelResult.hashtags
-          draftTrace = reelResult.trace
-        } else {
-          const headTalkResult = await composeHeadTalk({ ideaText: retryCandidate.ideaText ?? '', brandId, templateId })
-          creative = headTalkResult.creative
-          caption = headTalkResult.caption
-          hashtags = headTalkResult.hashtags
-          resolvedTemplateId = headTalkResult.templateId
-          draftTrace = headTalkResult.trace
-        }
+        if (!templateId) throw new Error('No template resolved for slot')
+        const recentContext = await getRecentDraftContext(brandId)
+        const draftResult = await runDraftPipeline({ ideaText: retryCandidate.ideaText ?? '', brandId, templateId, recentContext })
+        creative = draftResult.creative
+        caption = draftResult.caption
+        hashtags = draftResult.hashtags
+        resolvedTemplateId = draftResult.templateId
+        const draftTrace = draftResult.trace
 
         const autoApproveDraft = templateConfig?.autoApproveDraft ?? false
         const draftStatus = autoApproveDraft ? 'DRAFT_APPROVED' : 'DRAFT_PENDING'

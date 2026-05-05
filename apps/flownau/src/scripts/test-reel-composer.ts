@@ -1,5 +1,5 @@
 import { prisma } from '@/modules/shared/prisma'
-import { composeReel } from '@/modules/composer/reel-composer'
+import { runDraftPipeline } from '@/modules/composer/draft-pipeline'
 
 const brandId = 'cmogyjn5a0006gcv46nis4o0l'
 
@@ -10,7 +10,7 @@ async function main() {
   })
   console.log('Template:', template)
 
-  const result = await composeReel({
+  const result = await runDraftPipeline({
     ideaText: 'Homeschool en el bosque: aprender con la naturaleza como maestra',
     brandId,
     templateId: template!.id,

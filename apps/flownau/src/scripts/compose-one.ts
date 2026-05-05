@@ -3,7 +3,7 @@
  * Usage: npx tsx src/scripts/compose-one.ts <ideaId> <templateName>
  */
 import { prisma } from '@/modules/shared/prisma'
-import { composeReel } from '@/modules/composer/reel-composer'
+import { runDraftPipeline } from '@/modules/composer/draft-pipeline'
 import { triggerRenderForPost, renderQueue } from '@/modules/renderer/render-queue'
 
 const brandId = 'cmogyjn5a0006gcv46nis4o0l'
@@ -26,17 +26,16 @@ async function main() {
 
   console.log(`Composing ${template.name} (${template.remotionId}) for idea: ${idea.ideaText.slice(0, 80)}`)
 
-  const result = await composeReel({ ideaText: idea.ideaText, brandId, templateId: template.id })
-  console.log('Slots:', JSON.stringify(result.slots))
+  const result = await runDraftPipeline({ ideaText: idea.ideaText ?? '', brandId, templateId: template.id })
+  console.log('Creative:', JSON.stringify(result.creative).slice(0, 200))
   console.log('Caption:', result.caption.slice(0, 100))
-  console.log('brollMood:', result.brollMood)
 
   await prisma.post.update({
     where: { id: idea.id },
     data: {
-      format: 'reel',
+      format: result.format,
       templateId: template.id,
-      creative: { slots: result.slots, caption: result.caption, hashtags: result.hashtags, brollMood: result.brollMood },
+      creative: result.creative as any,
       caption: result.caption,
       hashtags: result.hashtags,
       status: 'DRAFT_APPROVED',

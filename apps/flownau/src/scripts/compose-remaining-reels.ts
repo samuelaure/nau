@@ -1,6 +1,6 @@
 import { prisma } from '@/modules/shared/prisma'
 import { renderQueue, addRenderJob } from '@/modules/renderer/render-queue'
-import { composeReel } from '@/modules/composer/reel-composer'
+import { runDraftPipeline } from '@/modules/composer/draft-pipeline'
 
 const brandId = 'cmogyjn5a0006gcv46nis4o0l'
 const TEMPLATES = ['ReelT2', 'ReelT3', 'ReelT4']
@@ -16,26 +16,20 @@ async function main() {
     })
     console.log(`\nComposing ${template.name} (${remotionId})...`)
 
-    const result = await composeReel({ ideaText, brandId, templateId: template.id })
-    console.log('  slots:', JSON.stringify(result.slots))
+    const result = await runDraftPipeline({ ideaText, brandId, templateId: template.id })
+    console.log('  creative:', JSON.stringify(result.creative).slice(0, 100))
     console.log('  caption:', result.caption?.slice(0, 60))
-    console.log('  brollMood:', result.brollMood)
 
     const post = await prisma.post.create({
       data: {
         brandId,
         templateId: template.id,
-        format: 'reel',
+        format: result.format,
         status: 'RENDERING',
         ideaText,
         caption: result.caption,
         hashtags: result.hashtags,
-        creative: {
-          slots: result.slots,
-          caption: result.caption,
-          hashtags: result.hashtags,
-          brollMood: result.brollMood,
-        },
+        creative: result.creative as any,
       },
     })
     console.log(`  Created post ${post.id.slice(-8)}`)

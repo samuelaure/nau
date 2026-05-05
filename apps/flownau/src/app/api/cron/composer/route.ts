@@ -1,17 +1,14 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 import type { Prisma } from '@/generated/prisma'
-import { composeReel } from '@/modules/composer/reel-composer'
-import { composeHeadTalk } from '@/modules/composer/headtalk-composer'
+import { runDraftPipeline } from '@/modules/composer/draft-pipeline'
+import { getRecentDraftContext } from '@/modules/composer/recent-context.service'
 import { triggerRenderForPost } from '@/modules/renderer/render-queue'
-import type { ContentFormat } from '@/types/content'
 import { logError, logger } from '@/modules/shared/logger'
 import { validateCronSecret, unauthorizedCronResponse } from '@/modules/shared/nau-auth'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
-
-const REEL_FORMATS = new Set(['reel', 'trial_reel'])
 
 export async function GET(request: Request) {
   if (!validateCronSecret(request)) {
@@ -33,56 +30,45 @@ export async function GET(request: Request) {
     logger.info(`[Composer] Processing ${approvedPosts.length} approved posts`)
 
     for (const post of approvedPosts) {
-      const format = (post.format ?? 'reel') as ContentFormat
+      const format = post.format ?? 'reel'
 
       try {
-        // trial_reel uses the same templates as reel
         const templateLookupFormat = format === 'trial_reel' ? 'reel' : format
         const templateConfig = await prisma.brandTemplateConfig.findFirst({
           where: { brandId: post.brandId, enabled: true, template: { format: templateLookupFormat } },
           select: { autoApproveDraft: true, template: { select: { id: true } } },
           orderBy: { updatedAt: 'desc' },
         })
-        const selectedTemplateId = templateConfig?.template.id ?? null
 
-        const autoApproveDraft = templateConfig?.autoApproveDraft ?? false
+        if (!templateConfig?.template.id) {
+          logger.warn({ postId: post.id, format }, '[Composer] No template found — skipping')
+          results.push({ postId: post.id, brandId: post.brandId, status: 'skipped', error: 'No template found' })
+          continue
+        }
+
+        const selectedTemplateId = templateConfig.template.id
+        const autoApproveDraft = templateConfig.autoApproveDraft ?? false
         const draftStatus = autoApproveDraft ? 'DRAFT_APPROVED' : 'DRAFT_PENDING'
 
-        let creative: unknown
-        let caption = ''
-        let hashtags: string[] = []
-        let resolvedTemplateId: string | null = selectedTemplateId
+        const recentContext = await getRecentDraftContext(post.brandId)
 
-        if (REEL_FORMATS.has(format) && selectedTemplateId) {
-          const reelResult = await composeReel({
-            ideaText: post.ideaText ?? '',
-            brandId: post.brandId,
-            templateId: selectedTemplateId,
-          })
-          creative = { slots: reelResult.slots, caption: reelResult.caption, hashtags: reelResult.hashtags, brollMood: reelResult.brollMood }
-          caption = reelResult.caption
-          hashtags = reelResult.hashtags
-        } else {
-          const headTalkResult = await composeHeadTalk({
-            ideaText: post.ideaText ?? '',
-            brandId: post.brandId,
-            templateId: selectedTemplateId ?? undefined,
-          })
-          creative = headTalkResult.creative
-          caption = headTalkResult.caption
-          hashtags = headTalkResult.hashtags
-          resolvedTemplateId = headTalkResult.templateId
-        }
+        const result = await runDraftPipeline({
+          ideaText: post.ideaText ?? '',
+          brandId: post.brandId,
+          templateId: selectedTemplateId,
+          recentContext,
+        })
 
         await prisma.post.update({
           where: { id: post.id },
           data: {
-            format,
-            creative: creative as Prisma.InputJsonValue,
-            caption,
-            hashtags,
-            templateId: resolvedTemplateId,
+            format: result.format,
+            creative: result.creative as Prisma.InputJsonValue,
+            caption: result.caption,
+            hashtags: result.hashtags,
+            templateId: result.templateId,
             status: draftStatus,
+            llmTrace: { draftTrace: result.trace } as unknown as Prisma.InputJsonValue,
           },
         })
 
@@ -93,7 +79,7 @@ export async function GET(request: Request) {
         }
 
         results.push({ postId: post.id, brandId: post.brandId, status: 'success' })
-        logger.info(`[Composer] Composed post ${post.id} (${format}, ${draftStatus})`)
+        logger.info(`[Composer] Composed post ${post.id} (${result.format}, ${draftStatus})`)
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         logError(`[Composer] Failed to compose post ${post.id}`, err)

@@ -1,8 +1,7 @@
 import { prisma } from '@/modules/shared/prisma'
-import { composeHeadTalk } from '@/modules/composer/headtalk-composer'
+import { runDraftPipeline } from '@/modules/composer/draft-pipeline'
 
 const brandId = 'cmogyjn5a0006gcv46nis4o0l'
-
 const IDEAS = [
   { idea: 'La conexión entre padres e hijos se fortalece cuando los niños aprenden en libertad y confianza.', template: 'Head Talk — Hook First' },
   { idea: 'El mayor dolor de los padres de homeschool es sentir que van contra la corriente, solos.', template: 'Head Talk — Pain of Niche' },
@@ -18,35 +17,26 @@ async function main() {
     if (!template) { console.log(`Template not found: ${templateName}`); continue }
 
     console.log(`\nComposing ${template.name}...`)
-    console.log(`Idea: ${idea.slice(0, 80)}`)
-
-    const result = await composeHeadTalk({
-      ideaText: idea,
-      brandId,
-      templateId: template.id,
-    })
-
+    const result = await runDraftPipeline({ ideaText: idea, brandId, templateId: template.id })
     const creative = result.creative as any
-    console.log(`  Hook: ${creative.hook ?? creative.sections?.hook ?? 'N/A'}`)
-    console.log(`  Body: ${(creative.body ?? creative.sections?.body ?? '').toString().slice(0, 100)}...`)
-    console.log(`  CTA:  ${creative.cta ?? creative.sections?.cta ?? 'N/A'}`)
+    console.log(`  Hook: ${creative.hook ?? 'N/A'}`)
     console.log(`  Caption: ${result.caption.slice(0, 80)}...`)
 
     await prisma.post.create({
       data: {
         brandId,
         ideaText: idea,
-        format: 'head_talk',
+        format: result.format,
         templateId: template.id,
-        creative: creative,
+        creative,
         caption: result.caption,
         hashtags: result.hashtags,
         status: 'DRAFT_APPROVED',
         source: 'manual',
       },
     })
-    console.log(`  ✓ Head talk post created`)
+    console.log(`  Post created`)
   }
 }
 
-main().then(() => console.log('\n✅ All head talks composed')).catch(console.error).finally(() => prisma.$disconnect())
+main().then(() => console.log('\nDone')).catch(console.error).finally(() => prisma.$disconnect())
