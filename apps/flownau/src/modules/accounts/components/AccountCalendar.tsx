@@ -28,9 +28,11 @@ import {
   SlidersHorizontal,
   MoreHorizontal,
   Shuffle,
+  ScrollText,
 } from 'lucide-react'
 import { cn } from '@/modules/shared/utils'
 import Modal from '@/modules/shared/components/Modal'
+import PromptsModal from './PromptsModal'
 
 // ─── Status config ────────────────────────────────────────────────────────────
 
@@ -241,6 +243,7 @@ type Composition = {
   templateId?: string | null
   template?: { id: string; name: string; sceneType: string | null } | null
   publishedAt?: string | null
+  llmTrace?: Record<string, unknown> | null
 }
 
 type DragState = {
@@ -541,12 +544,14 @@ function CompositionModal({
   onClose,
   onRefresh,
   onReformat,
+  onShowPrompts,
 }: {
   comp: Composition
   brandId: string
   onClose: () => void
   onRefresh: () => void
   onReformat: (comp: Composition) => void
+  onShowPrompts: (comp: Composition) => void
 }) {
   const [actioning, setActioning] = useState(false)
   const [scheduling, setScheduling] = useState(false)
@@ -850,6 +855,9 @@ function CompositionModal({
   }
   if (tag === 'Approve' && !!(comp.videoUrl || comp.renderedVideoUrl)) {
     moreItems.push({ key: 'post-now', label: 'Post now', icon: <Send size={13} />, onClick: handlePostNow, className: 'text-green-300 hover:text-green-200' })
+  }
+  if (comp.llmTrace && Object.keys(comp.llmTrace).length > 0) {
+    moreItems.push({ key: 'prompts', label: 'See used prompts', icon: <ScrollText size={13} />, onClick: () => onShowPrompts(comp) })
   }
 
   return (
@@ -1300,6 +1308,7 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
 
   // Re-format
   const [reformatComp, setReformatComp] = useState<Composition | null>(null)
+  const [promptsComp, setPromptsComp] = useState<Composition | null>(null)
   const [reformatMode, setReformatMode] = useState<'format' | 'template'>('format')
   const [reformatFormat, setReformatFormat] = useState('')
   const [reformatTemplateId, setReformatTemplateId] = useState('')
@@ -1854,7 +1863,12 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
           onClose={() => setSelected(null)}
           onRefresh={fetchCompositions}
           onReformat={(comp) => { setReformatComp(comp); setReformatMode('format'); setReformatFormat(''); setReformatTemplateId('') }}
+          onShowPrompts={(comp) => setPromptsComp(comp)}
         />
+      )}
+
+      {promptsComp?.llmTrace && (
+        <PromptsModal llmTrace={promptsComp.llmTrace as Record<string, unknown>} onClose={() => setPromptsComp(null)} />
       )}
 
       {/* Re-format modal */}

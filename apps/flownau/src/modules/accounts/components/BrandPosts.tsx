@@ -28,8 +28,10 @@ import {
   ChevronRight,
   X,
   Shuffle,
+  ScrollText,
 } from 'lucide-react'
 import Modal from '@/modules/shared/components/Modal'
+import PromptsModal from './PromptsModal'
 import { cn } from '@/modules/shared/utils'
 
 // ── Badge configs ─────────────────────────────────────────────────────────────
@@ -81,6 +83,7 @@ function IdeaModal({
   onApprove,
   onDraft,
   onReformat,
+  onShowPrompts,
 }: {
   idea: any | null
   ideas: any[]
@@ -96,6 +99,7 @@ function IdeaModal({
   onApprove: () => void
   onDraft: (idea: any) => void
   onReformat: (idea: any) => void
+  onShowPrompts: (idea: any) => void
 }) {
   const [mounted, setMounted] = useState(false)
   useEffect(() => { setMounted(true) }, [])
@@ -203,6 +207,15 @@ function IdeaModal({
               Delete
             </button>
             <div className="flex-1" />
+            {idea.llmTrace && Object.keys(idea.llmTrace).length > 0 && (
+              <button
+                onClick={() => onShowPrompts(idea)}
+                className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-white transition-colors"
+              >
+                <ScrollText size={14} />
+                Prompts
+              </button>
+            )}
             <button
               disabled={savingEdit || deletingIdea}
               onClick={onClose}
@@ -313,6 +326,7 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
 
   // Re-format modal
   const [reformatIdea, setReformatIdea] = useState<any | null>(null)
+  const [promptsIdea, setPromptsIdea] = useState<any | null>(null)
   const [reformatMode, setReformatMode] = useState<'format' | 'template'>('format')
   const [reformatFormat, setReformatFormat] = useState('')
   const [reformatTemplateId, setReformatTemplateId] = useState('')
@@ -804,7 +818,12 @@ const handleSavePrompt = async (text: string) => {
         onApprove={() => openIdea && handleApprove(openIdea)}
         onDraft={(idea) => { setComposingIdea(idea); setOpenIdea(null) }}
         onReformat={(idea) => { setReformatIdea(idea); setReformatMode('format'); setReformatFormat(''); setReformatTemplateId(''); setOpenIdea(null) }}
+        onShowPrompts={(idea) => setPromptsIdea(idea)}
       />
+
+      {promptsIdea?.llmTrace && (
+        <PromptsModal llmTrace={promptsIdea.llmTrace} onClose={() => setPromptsIdea(null)} />
+      )}
 
       {/* ── Brainstorm modal ──────────────────────────────────────────────────── */}
       {brainstormOpen && (
