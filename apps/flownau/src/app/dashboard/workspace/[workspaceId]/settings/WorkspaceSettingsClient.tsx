@@ -49,6 +49,7 @@ export default function WorkspaceSettingsClient({
 
   // Delete workspace
   const [deletingWorkspace, setDeletingWorkspace] = useState(false)
+  const [deleteConfirmStep, setDeleteConfirmStep] = useState(0)
 
   const handleSaveName = async () => {
     if (!workspaceName.trim()) return toast.error('Name cannot be empty')
@@ -111,12 +112,10 @@ export default function WorkspaceSettingsClient({
   }
 
   const handleDeleteWorkspace = async () => {
-    if (
-      !confirm(
-        `Are you absolutely sure you want to delete "${workspace.name}"? This will remove all accounts, personas, and content linked to this workspace and cannot be undone.`,
-      )
-    )
+    if (deleteConfirmStep === 0) {
+      setDeleteConfirmStep(1)
       return
+    }
     setDeletingWorkspace(true)
     try {
       const res = await fetch(`/api/workspaces/${workspace.id}`, { method: 'DELETE' })
@@ -126,6 +125,7 @@ export default function WorkspaceSettingsClient({
     } catch {
       toast.error('Failed to delete workspace')
       setDeletingWorkspace(false)
+      setDeleteConfirmStep(0)
     }
   }
 
@@ -232,20 +232,20 @@ export default function WorkspaceSettingsClient({
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
                 placeholder="user@example.com"
-                className="bg-gray-950 border-gray-800 text-white flex-1"
+                className="bg-gray-950 border-gray-800 text-white min-w-0 flex-1"
                 disabled={inviting}
                 onKeyDown={(e) => e.key === 'Enter' && handleInvite()}
               />
               <select
                 value={inviteRole}
                 onChange={(e) => setInviteRole(e.target.value as 'admin' | 'member')}
-                className="bg-gray-950 border border-gray-800 text-white rounded p-2 text-sm"
+                className="bg-gray-950 border border-gray-800 text-white rounded p-2 text-sm w-28 shrink-0"
                 disabled={inviting}
               >
                 <option value="member">Member</option>
                 <option value="admin">Admin</option>
               </select>
-              <Button onClick={handleInvite} disabled={inviting || !inviteEmail.trim()}>
+              <Button onClick={handleInvite} disabled={inviting || !inviteEmail.trim()} className="shrink-0">
                 {inviting ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
@@ -268,20 +268,44 @@ export default function WorkspaceSettingsClient({
             Deleting this workspace is permanent and will remove all linked accounts, content, and
             assets. This action cannot be undone.
           </p>
-          <div>
-            <Button
-              onClick={handleDeleteWorkspace}
-              disabled={deletingWorkspace}
-              className="bg-red-900/60 text-red-300 hover:bg-red-900 border border-red-800"
-            >
-              {deletingWorkspace ? (
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              ) : (
+          <div className="flex items-center gap-3">
+            {deleteConfirmStep === 0 ? (
+              <Button
+                onClick={handleDeleteWorkspace}
+                disabled={deletingWorkspace}
+                className="bg-red-900/60 text-red-300 hover:bg-red-800 border border-red-800"
+              >
                 <Trash2 className="w-4 h-4 mr-2" />
-              )}
-              Delete Workspace
-            </Button>
+                Delete Workspace
+              </Button>
+            ) : (
+              <>
+                <Button
+                  onClick={handleDeleteWorkspace}
+                  disabled={deletingWorkspace}
+                  className="bg-red-600 text-white hover:bg-red-500 border border-red-500"
+                >
+                  {deletingWorkspace ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : (
+                    <Trash2 className="w-4 h-4 mr-2" />
+                  )}
+                  Yes, delete forever
+                </Button>
+                <button
+                  onClick={() => setDeleteConfirmStep(0)}
+                  className="text-sm text-gray-500 hover:text-gray-300 transition"
+                >
+                  Cancel
+                </button>
+              </>
+            )}
           </div>
+          {deleteConfirmStep === 1 && (
+            <p className="text-sm text-red-400 font-medium">
+              This cannot be undone. Click confirm to permanently delete "{workspace.name}".
+            </p>
+          )}
         </Card>
       )}
     </div>
