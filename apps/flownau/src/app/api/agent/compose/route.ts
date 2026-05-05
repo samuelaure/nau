@@ -17,7 +17,6 @@ const ComposeRequestSchema = z.object({
     .enum(['reel', 'trial_reel', 'head_talk', 'carousel', 'static_post', 'story'])
     .default('reel'),
   postId: z.string().optional(),
-  personaId: z.string().optional(),
   templateId: z.string().optional(),
 })
 
@@ -33,7 +32,7 @@ export async function POST(req: Request) {
       )
     }
 
-    const { prompt, brandId, format: requestedFormat, postId, personaId, templateId } = parsed.data
+    const { prompt, brandId, format: requestedFormat, postId, templateId } = parsed.data
 
     // Rate limit: 10 compose requests per minute per account
     const rateLimit = await checkRateLimit({
@@ -111,22 +110,14 @@ export async function POST(req: Request) {
           ?.templateId ?? undefined
     }
 
-    // Fetch persona for auto-approve flags
-    const persona = personaId
-      ? await prisma.brandPersona.findUnique({ where: { id: personaId } })
-      : ((await prisma.brandPersona.findFirst({ where: { brandId, isDefault: true } })) ??
-        (await prisma.brandPersona.findFirst({ where: { brandId } })))
-
-    // Check template config for auto-approve draft and custom prompt
+    // Check template config for auto-approve draft
     let autoApproveDraft = false
-    let templateCustomPrompt: string | null = null
     if (resolvedTemplateId) {
       const config = await prisma.brandTemplateConfig.findUnique({
         where: { brandId_templateId: { brandId, templateId: resolvedTemplateId } },
-        select: { autoApproveDraft: true, customPrompt: true },
+        select: { autoApproveDraft: true },
       })
       autoApproveDraft = config?.autoApproveDraft ?? false
-      templateCustomPrompt = config?.customPrompt ?? null
     }
 
     const draftStatus = autoApproveDraft ? 'DRAFT_APPROVED' : 'DRAFT_PENDING'
@@ -137,7 +128,6 @@ export async function POST(req: Request) {
       const result = await composeHeadTalk({
         ideaText: prompt,
         brandId,
-        personaId,
         templateId: resolvedTemplateId,
       })
 
@@ -152,7 +142,6 @@ export async function POST(req: Request) {
             hashtags: result.hashtags,
             status: draftStatus,
             templateId: result.templateId ?? resolvedTemplateId ?? null,
-            brandPersonaId: result.personaId ?? persona?.id ?? null,
             llmTrace: { ...(existing?.llmTrace as object ?? {}), draftTrace: result.trace } as unknown as Prisma.InputJsonValue,
           },
         })
@@ -168,7 +157,6 @@ export async function POST(req: Request) {
             status: draftStatus,
             source: 'manual',
             templateId: result.templateId ?? resolvedTemplateId ?? null,
-            brandPersonaId: result.personaId ?? persona?.id ?? null,
             llmTrace: { draftTrace: result.trace } as unknown as Prisma.InputJsonValue,
           },
         })
@@ -188,8 +176,6 @@ export async function POST(req: Request) {
         ideaText: prompt,
         brandId,
         templateId: resolvedTemplateId,
-        personaId,
-        customPrompt: templateCustomPrompt,
       })
 
       const creativeData = {
@@ -210,7 +196,6 @@ export async function POST(req: Request) {
             hashtags: result.hashtags,
             status: draftStatus,
             templateId: resolvedTemplateId,
-            brandPersonaId: persona?.id ?? null,
             llmTrace: { ...(existing?.llmTrace as object ?? {}), draftTrace: result.trace } as unknown as Prisma.InputJsonValue,
           },
         })
@@ -226,7 +211,6 @@ export async function POST(req: Request) {
             status: draftStatus,
             source: 'manual',
             templateId: resolvedTemplateId,
-            brandPersonaId: persona?.id ?? null,
             llmTrace: { draftTrace: result.trace } as unknown as Prisma.InputJsonValue,
           },
         })

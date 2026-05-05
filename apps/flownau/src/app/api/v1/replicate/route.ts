@@ -60,10 +60,7 @@ export async function POST(req: Request) {
     // Resolve provenance (captured for audit — there's no idea for replicate flow)
     const provenance = await resolveProvenance(brandId)
 
-    const persona = provenance.brandPersonaId
-      ? await prisma.brandPersona.findUnique({ where: { id: provenance.brandPersonaId } })
-      : null
-    const autoApprovePool = persona?.autoApprovePool ?? false
+    const autoApprovePool = false
 
     const payload: Record<string, unknown> = {
       type: 'replicate',
@@ -85,7 +82,6 @@ export async function POST(req: Request) {
         externalPostUrl: externalPostUrl ?? null,
         userUploadedMediaUrl: mediaUrl ?? null,
         status: autoApprovePool ? 'DRAFT_APPROVED' : 'DRAFT_PENDING',
-        brandPersonaId: provenance.brandPersonaId,
         priority: 1,
       },
     })

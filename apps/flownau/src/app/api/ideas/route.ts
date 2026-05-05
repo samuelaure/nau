@@ -4,7 +4,6 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 import { checkBrandAccessForRoute } from '@/lib/auth'
-import { resolveProvenance } from '@/modules/ideation/provenance'
 
 export async function GET(req: Request) {
   try {
@@ -44,8 +43,6 @@ export async function POST(req: Request) {
     if (source === 'captured') priority = 1
     if (source === 'manual') priority = 2
 
-    const provenance = await resolveProvenance(brandId)
-
     const idea = await prisma.post.create({
       data: {
         brandId,
@@ -53,7 +50,6 @@ export async function POST(req: Request) {
         source: source || 'manual',
         status: status || 'IDEA_PENDING',
         priority,
-        brandPersonaId: provenance.brandPersonaId,
       },
     })
 

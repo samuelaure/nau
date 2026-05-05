@@ -2,6 +2,7 @@ import { getClientForFeature } from '@nau/llm-client'
 import { z } from 'zod'
 import { prisma } from '@/modules/shared/prisma'
 import { logError, logger } from '@/modules/shared/logger'
+import { renderBrandContextBlock } from '@/modules/prompts/brand-context'
 import type { LlmTrace } from '@/modules/ideation/ideation.service'
 
 // ─── Universal Drafter System Prompt ─────────────────────────────────────────
@@ -108,7 +109,6 @@ export interface HeadTalkInput {
   ideaText: string
   brandId: string
   templateId?: string
-  personaId?: string
 }
 
 export interface HeadTalkOutput {
@@ -116,24 +116,17 @@ export interface HeadTalkOutput {
   caption: string
   hashtags: string[]
   templateId: string | null
-  personaId: string | null
   trace: LlmTrace
 }
 
 // ─── Composer ─────────────────────────────────────────────────────────────────
 
 export async function composeHeadTalk(input: HeadTalkInput): Promise<HeadTalkOutput> {
-  const { ideaText, brandId, templateId, personaId } = input
+  const { ideaText, brandId, templateId } = input
 
   logger.info({ brandId, templateId }, '[HeadTalkComposer] Starting composition')
 
-  // 1. Resolve persona
-  const persona = personaId
-    ? await prisma.brandPersona.findUnique({ where: { id: personaId } })
-    : ((await prisma.brandPersona.findFirst({ where: { brandId, isDefault: true } })) ??
-      (await prisma.brandPersona.findFirst({ where: { brandId } })))
-
-  // 2. Resolve template
+  // Resolve template
   let template: { id: string; systemPrompt: string | null; contentSchema: unknown } | null = null
   if (templateId) {
     template = await prisma.template.findUnique({
@@ -148,43 +141,30 @@ export async function composeHeadTalk(input: HeadTalkInput): Promise<HeadTalkOut
     template = config?.template ?? null
   }
 
-  logger.info({ brandId, templateId: template?.id ?? null, persona: persona?.name ?? 'none' }, '[HeadTalkComposer] Resolved persona and template')
+  logger.info({ brandId, templateId: template?.id ?? null }, '[HeadTalkComposer] Resolved template')
 
-  // 3. Resolve brand language + context
+  // Resolve brand language + context
   const brand = await prisma.brand.findUnique({
     where: { id: brandId },
-    select: { language: true, name: true, ideationPrompt: true, composerPrompt: true },
+    select: { language: true, name: true, context: true, draftCustomPrompt: true },
   })
   const language = brand?.language ?? 'Spanish'
 
-  // 4. Fetch per-brand custom prompt for this template
-  let customPrompt: string | null = null
-  if (template) {
-    const config = await prisma.brandTemplateConfig.findUnique({
-      where: { brandId_templateId: { brandId, templateId: template.id } },
-      select: { customPrompt: true },
-    })
-    customPrompt = config?.customPrompt ?? null
-  }
-
-  // 5. Assemble system prompt
-  const composerBlock = brand?.composerPrompt?.trim()
-    ? `⚠️ COMPOSER INSTRUCTIONS — highest priority, override everything below. Follow them exactly above all other guidelines:\n\n<composer_instructions>\n${brand.composerPrompt.trim()}\n</composer_instructions>\n\nAll sections below are subordinate to the above.\n\n`
-    : ''
-  const creatorBlock = customPrompt?.trim()
-    ? `⚠️ TEMPLATE INSTRUCTIONS — these take precedence over base guidelines below:\n\n<template_instructions>\n${customPrompt.trim()}\n</template_instructions>\n\nAll base guidelines below are subordinate to the above.\n\n---\n\n`
+  // Assemble system prompt
+  const draftCustomBlock = brand?.draftCustomPrompt?.trim()
+    ? `⚠️ DRAFT CUSTOM INSTRUCTIONS — campaign-level intent for drafting:\n\n<draft_custom>\n${brand.draftCustomPrompt.trim()}\n</draft_custom>\n\n---\n\n`
     : ''
 
-  const brandContextParts: string[] = []
-  if (brand?.name) brandContextParts.push(`Brand name: ${brand.name}`)
-  if (brand?.ideationPrompt?.trim()) brandContextParts.push(`Brand niche & style: ${brand.ideationPrompt.trim()}`)
-  const brandContextBlock = brandContextParts.length > 0
-    ? `\n---\n\n**BRAND CONTEXT**\n\n${brandContextParts.join('\n')}\n\nCRITICAL: Never mention usernames, @handles, or social media account names in any output. Content is brand-level and platform-agnostic.`
+  const renderedBrandContext = renderBrandContextBlock({
+    name: brand?.name ?? null,
+    context: brand?.context ?? null,
+  })
+  const brandContextBlock = renderedBrandContext
+    ? `\n---\n\n**BRAND CONTEXT**\n${renderedBrandContext}\nCRITICAL: Never mention usernames, @handles, or social media account names in any output. Content is brand-level and platform-agnostic.`
     : `\n---\n\nCRITICAL: Never mention usernames, @handles, or social media account names in any output.`
 
-  const sections: string[] = [`${composerBlock}${creatorBlock}${UNIVERSAL_DRAFTER_PROMPT}`]
+  const sections: string[] = [`${draftCustomBlock}${UNIVERSAL_DRAFTER_PROMPT}`]
   sections.push(brandContextBlock)
-  if (persona?.systemPrompt) sections.push(`\n---\n\n**BRAND VOICE**\n\n${persona.systemPrompt}`)
   if (template?.systemPrompt) sections.push(`\n---\n\n**TEMPLATE GUIDELINES**\n\n${template.systemPrompt}`)
   if (template?.contentSchema) {
     sections.push(
@@ -232,7 +212,6 @@ export async function composeHeadTalk(input: HeadTalkInput): Promise<HeadTalkOut
     caption,
     hashtags,
     templateId: template?.id ?? null,
-    personaId: persona?.id ?? null,
     trace: { provider, model, registryId, systemPrompt, userMessage: ideaText, generatedAt: new Date().toISOString() },
   }
 }

@@ -8,9 +8,6 @@ import { ApifyService } from '@/modules/accounts/apify'
 import { downloadAndUploadProfileImage } from '@/modules/accounts/profile-image-service'
 import { checkAuth, getUserPrimaryWorkspace } from '@/modules/shared/actions'
 import {
-  DEFAULT_MODEL,
-  DEFAULT_PERSONA_NAME,
-  DEFAULT_PERSONA_PROMPT,
   DEFAULT_FRAMEWORK_NAME,
   DEFAULT_FRAMEWORK_PROMPT,
   DEFAULT_PRINCIPLES_NAME,
@@ -132,19 +129,6 @@ export async function addBrand(formData: FormData): Promise<{ id: string; worksp
   // These are real, fully editable records — not system defaults.
   // The user can modify or delete them at any time.
   await Promise.all([
-    prisma.brandPersona.create({
-      data: {
-        brandId: nauBrand.id,
-        workspaceId,
-        name: DEFAULT_PERSONA_NAME,
-        systemPrompt: DEFAULT_PERSONA_PROMPT,
-        modelSelection: DEFAULT_MODEL,
-        isDefault: true,
-        manualCount: 5,
-        automaticCount: 5,
-        capturedCount: 3,
-      },
-    }),
     prisma.ideasFramework.create({
       data: {
         brandId: nauBrand.id,

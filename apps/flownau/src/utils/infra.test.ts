@@ -4,7 +4,6 @@ import { describe, it, expect, vi } from 'vitest'
 vi.mock('@/modules/shared/prisma', () => ({
   prisma: {
     contentIdea: { findMany: vi.fn(), update: vi.fn() },
-    brandPersona: { findFirst: vi.fn() },
   },
 }))
 

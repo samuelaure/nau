@@ -23,7 +23,6 @@ export async function GET(request: Request) {
 
     const approvedPosts = await prisma.post.findMany({
       where: { status: 'IDEA_APPROVED' },
-      include: { brandPersona: true },
       take: 20,
     })
 
@@ -35,23 +34,18 @@ export async function GET(request: Request) {
 
     for (const post of approvedPosts) {
       const format = (post.format ?? 'reel') as ContentFormat
-      const persona = post.brandPersona
 
       try {
         // trial_reel uses the same templates as reel
         const templateLookupFormat = format === 'trial_reel' ? 'reel' : format
         const templateConfig = await prisma.brandTemplateConfig.findFirst({
           where: { brandId: post.brandId, enabled: true, template: { format: templateLookupFormat } },
-          select: { autoApproveDraft: true, customPrompt: true, template: { select: { id: true } } },
+          select: { autoApproveDraft: true, template: { select: { id: true } } },
           orderBy: { updatedAt: 'desc' },
         })
         const selectedTemplateId = templateConfig?.template.id ?? null
 
-        let autoApproveDraft = persona?.autoApproveCompositions ?? false
-        if (!autoApproveDraft && templateConfig) {
-          autoApproveDraft = templateConfig.autoApproveDraft ?? false
-        }
-
+        const autoApproveDraft = templateConfig?.autoApproveDraft ?? false
         const draftStatus = autoApproveDraft ? 'DRAFT_APPROVED' : 'DRAFT_PENDING'
 
         let creative: unknown
@@ -64,8 +58,6 @@ export async function GET(request: Request) {
             ideaText: post.ideaText ?? '',
             brandId: post.brandId,
             templateId: selectedTemplateId,
-            personaId: persona?.id,
-            customPrompt: templateConfig?.customPrompt ?? null,
           })
           creative = { slots: reelResult.slots, caption: reelResult.caption, hashtags: reelResult.hashtags, brollMood: reelResult.brollMood }
           caption = reelResult.caption
@@ -75,7 +67,6 @@ export async function GET(request: Request) {
             ideaText: post.ideaText ?? '',
             brandId: post.brandId,
             templateId: selectedTemplateId ?? undefined,
-            personaId: persona?.id,
           })
           creative = headTalkResult.creative
           caption = headTalkResult.caption
@@ -92,7 +83,6 @@ export async function GET(request: Request) {
             hashtags,
             templateId: resolvedTemplateId,
             status: draftStatus,
-            brandPersonaId: persona?.id ?? null,
           },
         })
 

@@ -25,7 +25,7 @@ export async function POST(req: Request) {
 
     const brand = await prisma.brand.findUnique({
       where: { id: brandId },
-      select: { language: true, ideationCount: true, ideationPrompt: true },
+      select: { language: true, ideationCount: true, ideationCustomPrompt: true },
     })
 
     const language = brand?.language ?? 'Spanish'
@@ -62,7 +62,7 @@ export async function POST(req: Request) {
     }
 
     // Recent content for diversity (manual skip for speed; cron handles this for automatic)
-    const output = await generateContentIdeas({ topic, language, count, userInstructions: brand?.ideationPrompt ?? null })
+    const output = await generateContentIdeas({ topic, language, count, userInstructions: brand?.ideationCustomPrompt ?? null })
 
     const autoApprove = (await prisma.brand.findUnique({ where: { id: brandId }, select: { autoApproveIdeas: true } }))?.autoApproveIdeas ?? false
     const batchId = crypto.randomUUID()

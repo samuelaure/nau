@@ -4,20 +4,15 @@ import { prisma } from '@/modules/shared/prisma'
 import { resolveModelId } from '@/modules/composer/model-resolver'
 import { getSetting } from '@/modules/shared/settings'
 import { logError, logger } from '@/modules/shared/logger'
+import { renderBrandContextBlock } from '@/modules/prompts/brand-context'
 import type { SlotDef } from '../../../prisma/seeds/templates'
 
-const PLATFORM_DEFAULT_PERSONA = {
-  name: 'Platform Default',
-  systemPrompt: `You are a versatile, professional content creator. Communicate clearly and engagingly. Confident without arrogance. Direct without coldness.`,
-  modelSelection: 'GROQ_LLAMA_3_3' as const,
-}
+const DEFAULT_MODEL_SELECTION = 'GROQ_LLAMA_3_3' as const
 
 export interface ReelComposerInput {
   ideaText: string
   brandId: string
   templateId: string
-  personaId?: string
-  customPrompt?: string | null
 }
 
 export interface ReelComposerResult {
@@ -25,28 +20,22 @@ export interface ReelComposerResult {
   caption: string
   hashtags: string[]
   brollMood: string
-  personaName: string
   trace: LlmTrace
 }
 
 export async function composeReel(input: ReelComposerInput): Promise<ReelComposerResult> {
-  const { ideaText, brandId, templateId, personaId, customPrompt } = input
+  const { ideaText, brandId, templateId } = input
 
   logger.info({ brandId, templateId }, '[ReelComposer] Starting composition')
 
-  const [persona, template, brandData] = await Promise.all([
-    personaId
-      ? prisma.brandPersona.findUnique({ where: { id: personaId } })
-      : prisma.brandPersona
-          .findFirst({ where: { brandId, isDefault: true } })
-          .then((p) => p ?? prisma.brandPersona.findFirst({ where: { brandId } })),
+  const [template, brandData] = await Promise.all([
     prisma.template.findUnique({
       where: { id: templateId },
       select: { systemPrompt: true, slotSchema: true, schemaJson: true },
     }),
     prisma.brand.findUnique({
       where: { id: brandId },
-      select: { name: true, ideationPrompt: true, composerPrompt: true, language: true },
+      select: { name: true, context: true, draftCustomPrompt: true, language: true },
     }),
   ])
 
@@ -54,24 +43,20 @@ export async function composeReel(input: ReelComposerInput): Promise<ReelCompose
   if (!template.slotSchema) throw new Error(`Template ${templateId} has no slotSchema`)
 
   const slotDefs = template.slotSchema as unknown as SlotDef[]
-  const effectivePersona = persona ?? PLATFORM_DEFAULT_PERSONA
 
-  logger.info({ brandId, templateId, persona: effectivePersona.name, slots: slotDefs.map((s) => s.key) }, '[ReelComposer] Resolved persona and template')
+  logger.info({ brandId, templateId, slots: slotDefs.map((s) => s.key) }, '[ReelComposer] Resolved template')
 
-  // Resolve model
-  const { provider, model, registryId } = resolveModelId(effectivePersona.modelSelection)
+  const { provider, model, registryId } = resolveModelId(DEFAULT_MODEL_SELECTION)
   const groqKey = (await getSetting('groq_api_key')) ?? process.env.GROQ_API_KEY ?? null
   const openaiKey = (await getSetting('openai_api_key')) ?? process.env.OPENAI_API_KEY ?? null
 
   const language = brandData?.language ?? 'Spanish'
 
-  // Brand context
-  const brandLines: string[] = []
-  if (brandData?.name) brandLines.push(`Brand: ${brandData.name}`)
-  if (brandData?.ideationPrompt?.trim()) brandLines.push(`Niche & style: ${brandData.ideationPrompt.trim()}`)
-  const brandBlock = brandLines.length > 0 ? `\nBRAND CONTEXT:\n${brandLines.join('\n')}\n` : ''
+  const brandBlock = renderBrandContextBlock({
+    name: brandData?.name ?? null,
+    context: brandData?.context ?? null,
+  })
 
-  // Slot spec block
   const slotBlock = slotDefs
     .map((s) => {
       const wordRange = s.minWords != null
@@ -83,14 +68,11 @@ export async function composeReel(input: ReelComposerInput): Promise<ReelCompose
 
   const isMultiSlot = slotDefs.length > 1
 
-  const composerBlock = brandData?.composerPrompt?.trim()
-    ? `⚠️ COMPOSER INSTRUCTIONS — sets the overall voice and approach:\n<composer_instructions>\n${brandData.composerPrompt.trim()}\n</composer_instructions>\n\n`
-    : ''
-  const templateBlock = customPrompt?.trim()
-    ? `\n\n⚠️ TEMPLATE CUSTOM INSTRUCTIONS — these override everything above for this specific template:\n<template_instructions>\n${customPrompt.trim()}\n</template_instructions>`
+  const draftCustomBlock = brandData?.draftCustomPrompt?.trim()
+    ? `⚠️ DRAFT CUSTOM INSTRUCTIONS — campaign-level intent for drafting:\n<draft_custom>\n${brandData.draftCustomPrompt.trim()}\n</draft_custom>\n\n`
     : ''
 
-  const systemPrompt = `${composerBlock}${template.systemPrompt ?? ''}
+  const systemPrompt = `${draftCustomBlock}${template.systemPrompt ?? ''}
 ${brandBlock}
 LANGUAGE: Write ALL text in ${language}.
 
@@ -121,7 +103,7 @@ ${isMultiSlot ? `MULTI-SLOT NARRATIVE RULE (critical for this template):
 - Respect word limits exactly — count every word, stay within min–max range for each slot
 - For slots with a minimum: write enough to fill the intent; a slot at half its minimum is a failure
 - Never mention usernames or @handles
-- Respond ONLY with valid JSON matching the schema${templateBlock}`
+- Respond ONLY with valid JSON matching the schema`
 
   const messages: Array<{ role: 'system' | 'user'; content: string }> = [
     { role: 'system', content: systemPrompt },
@@ -171,7 +153,6 @@ ${isMultiSlot ? `MULTI-SLOT NARRATIVE RULE (critical for this template):
     }
   }
 
-  // Normalize: Groq often flattens slots to root level instead of nesting under "slots"
   let slots = (parsed.slots as Record<string, string> | undefined) ?? {}
   if (Object.keys(slots).length === 0) {
     for (const slotDef of slotDefs) {
@@ -188,7 +169,6 @@ ${isMultiSlot ? `MULTI-SLOT NARRATIVE RULE (critical for this template):
     caption: (parsed.caption as string) ?? '',
     hashtags: Array.isArray(parsed.hashtags) ? (parsed.hashtags as string[]) : [],
     brollMood: (parsed.brollMood as string) ?? '',
-    personaName: effectivePersona.name,
     trace: {
       provider,
       model,

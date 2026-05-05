@@ -1,28 +1,18 @@
 import { prisma } from '@/modules/shared/prisma'
-import { logger } from '@/modules/shared/logger'
+import { renderBrandContextBlock } from '@/modules/prompts/brand-context'
 
 /**
- * Fetches the Brand DNA (BrandPersona system prompt) for an account.
- * This is the fallback ideation source when InspoItems are unavailable.
+ * Fetches the brand DNA — a rendered BrandContext block — for ideation fallback.
+ * Used when InspoItems are unavailable.
  */
 export async function getBrandDNA(brandId: string): Promise<string> {
-  const persona = await prisma.brandPersona.findFirst({
-    where: { brandId, isDefault: true },
+  const brand = await prisma.brand.findUnique({
+    where: { id: brandId },
+    select: { name: true, context: true },
   })
 
-  if (!persona) {
-    // Fall back to any persona for the account
-    const anyPersona = await prisma.brandPersona.findFirst({
-      where: { brandId },
-    })
+  if (!brand) return 'No brand identity configured.'
 
-    if (!anyPersona) {
-      logger.warn(`[BrandDNA] No BrandPersona found for account ${brandId}`)
-      return 'No brand identity configured.'
-    }
-
-    return anyPersona.systemPrompt
-  }
-
-  return persona.systemPrompt
+  const block = renderBrandContextBlock({ name: brand.name ?? null, context: brand.context ?? null }).trim()
+  return block || 'No brand identity configured.'
 }

@@ -14,7 +14,7 @@ const REEL_FORMATS = new Set(['reel', 'trial_reel'])
 // ─── Template deck: shuffle-drain per format ──────────────────────────────────
 // Ensures even distribution: each template is used once before any repeats.
 
-type TemplateDeckEntry = { templateId: string; autoApproveDraft: boolean; customPrompt: string | null; template: { id: string; format: string; systemPrompt: string | null; contentSchema: unknown; slotSchema: unknown; remotionId: string } }
+type TemplateDeckEntry = { templateId: string; autoApproveDraft: boolean; template: { id: string; format: string; systemPrompt: string | null; contentSchema: unknown; slotSchema: unknown; remotionId: string } }
 
 class TemplateDeck {
   private decks = new Map<string, TemplateDeckEntry[]>()
@@ -29,7 +29,6 @@ class TemplateDeck {
         select: {
           templateId: true,
           autoApproveDraft: true,
-          customPrompt: true,
           template: { select: { id: true, format: true, systemPrompt: true, contentSchema: true, slotSchema: true, remotionId: true } },
         },
       })
@@ -128,7 +127,7 @@ export async function runCoverageChecks(brandId: string): Promise<CoverageResult
 async function runCheck1(
   brandId: string,
   horizonDays: number,
-  brand: { ideationCount: number; autoApproveIdeas: boolean; language: string; ideationPrompt?: string | null },
+  brand: { ideationCount: number; autoApproveIdeas: boolean; language: string; ideationCustomPrompt?: string | null },
   source: 'manual' | 'automatic' = 'manual',
 ): Promise<Check1Result> {
   const targetEnd = new Date(Date.now() + (horizonDays) * 24 * 60 * 60 * 1000)
@@ -242,7 +241,6 @@ async function runCheck1(
             ideaText: candidate.ideaText ?? '',
             brandId,
             templateId,
-            customPrompt: templateConfig?.customPrompt ?? null,
           })
           creative = { slots: reelResult.slots, caption: reelResult.caption, hashtags: reelResult.hashtags, brollMood: reelResult.brollMood }
           caption = reelResult.caption
@@ -364,7 +362,7 @@ async function runCheck1(
 
         let draftTrace
         if (REEL_FORMATS.has(slot.format) && templateId) {
-          const reelResult = await composeReel({ ideaText: retryCandidate.ideaText ?? '', brandId, templateId, customPrompt: templateConfig?.customPrompt ?? null })
+          const reelResult = await composeReel({ ideaText: retryCandidate.ideaText ?? '', brandId, templateId })
           creative = { slots: reelResult.slots, caption: reelResult.caption, hashtags: reelResult.hashtags, brollMood: reelResult.brollMood }
           caption = reelResult.caption
           hashtags = reelResult.hashtags
@@ -446,7 +444,7 @@ export interface SmartFillResult {
 export async function smartFillCalendar(brandId: string): Promise<SmartFillResult> {
   const brand = await prisma.brand.findUnique({
     where: { id: brandId },
-    select: { coverageHorizonDays: true, ideationCount: true, autoApproveIdeas: true, language: true, ideationPrompt: true },
+    select: { coverageHorizonDays: true, ideationCount: true, autoApproveIdeas: true, language: true, ideationCustomPrompt: true },
   })
   if (!brand) throw new Error(`Brand ${brandId} not found`)
 
@@ -501,7 +499,7 @@ export async function smartFillCalendar(brandId: string): Promise<SmartFillResul
           language: brand.language,
           count,
           recentContent: recentPosts.map((p) => p.caption!.slice(0, 100)),
-          userInstructions: brand.ideationPrompt ?? null,
+          userInstructions: brand.ideationCustomPrompt ?? null,
         })
         const batchId = crypto.randomUUID()
         for (const idea of output.ideas) {
@@ -561,7 +559,7 @@ export async function smartFillCalendar(brandId: string): Promise<SmartFillResul
 
 async function tryGenerateNewBatch(
   brandId: string,
-  brand: { ideationCount: number; autoApproveIdeas: boolean; language: string; ideationPrompt?: string | null },
+  brand: { ideationCount: number; autoApproveIdeas: boolean; language: string; ideationCustomPrompt?: string | null },
 ): Promise<{ hasDigest: boolean }> {
   try {
     const { fetchBrandDigest } = await import('@/modules/ideation/sources/inspo-source')
@@ -580,7 +578,7 @@ async function tryGenerateNewBatch(
       language: brand.language,
       count: brand.ideationCount,
       recentContent: recentPosts.map((p) => p.caption!.slice(0, 100)),
-      userInstructions: brand.ideationPrompt ?? null,
+      userInstructions: brand.ideationCustomPrompt ?? null,
     })
     const batchId = crypto.randomUUID()
     for (const idea of output.ideas) {
@@ -613,7 +611,7 @@ async function triggerIdeaGeneration(brandId: string, ideationCount: number): Pr
 
     const brand = await prisma.brand.findUnique({
       where: { id: brandId },
-      select: { language: true, autoApproveIdeas: true, ideationPrompt: true },
+      select: { language: true, autoApproveIdeas: true, ideationCustomPrompt: true },
     })
 
     const digest = await fetchBrandDigest(brandId)
@@ -634,7 +632,7 @@ async function triggerIdeaGeneration(brandId: string, ideationCount: number): Pr
       language: brand?.language ?? 'Spanish',
       count: ideationCount,
       recentContent: recentPosts.map((p) => p.caption!.slice(0, 100)),
-      userInstructions: brand?.ideationPrompt ?? null,
+      userInstructions: brand?.ideationCustomPrompt ?? null,
     })
 
     const autoApprove = brand?.autoApproveIdeas ?? false

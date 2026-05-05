@@ -6,8 +6,8 @@ const brandId = 'cmogyjn5a0006gcv46nis4o0l'
 const TEMPLATES = ['ReelT2', 'ReelT3', 'ReelT4']
 
 async function main() {
-  const brand = await prisma.brand.findUniqueOrThrow({ where: { id: brandId }, select: { id: true, ideationPrompt: true } })
-  const ideaText = brand.ideationPrompt ?? 'Share valuable insights about our brand and services'
+  const brand = await prisma.brand.findUniqueOrThrow({ where: { id: brandId }, select: { id: true, ideationCustomPrompt: true } })
+  const ideaText = brand.ideationCustomPrompt ?? 'Share valuable insights about our brand and services'
 
   for (const remotionId of TEMPLATES) {
     const template = await prisma.template.findFirstOrThrow({

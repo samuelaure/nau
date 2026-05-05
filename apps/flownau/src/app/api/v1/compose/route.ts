@@ -58,19 +58,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'No enabled template found for this format' }, { status: 400 })
     }
 
-    const templateConfig = await prisma.brandTemplateConfig.findFirst({
-      where: { brandId: input.brandId, templateId: selectedTemplate.id },
-      select: { customPrompt: true },
-    })
-
-    const persona = await prisma.brandPersona.findFirst({ where: { brandId: input.brandId, isDefault: true } })
-
     const reelResult = await composeReel({
       ideaText: input.prompt,
       brandId: input.brandId,
       templateId: selectedTemplate.id,
-      personaId: persona?.id,
-      customPrompt: templateConfig?.customPrompt ?? null,
     })
 
     const creative = { slots: reelResult.slots, caption: reelResult.caption, hashtags: reelResult.hashtags, brollMood: reelResult.brollMood }
@@ -84,7 +75,6 @@ export async function POST(req: Request) {
         hashtags: reelResult.hashtags,
         templateId: selectedTemplate.id,
         status: 'DRAFT_APPROVED',
-        brandPersonaId: persona?.id ?? null,
         llmTrace: { draftTrace: reelResult.trace } as unknown as Prisma.InputJsonValue,
       },
     })

@@ -6,23 +6,6 @@
  * concrete examples the user can build on or replace entirely.
  */
 
-export const DEFAULT_MODEL = 'GROQ_LLAMA_3_3' as const
-
-export const DEFAULT_PERSONA_NAME = 'Starter Persona'
-export const DEFAULT_PERSONA_PROMPT = `You are a versatile, professional content creator for short-form social media video.
-
-Communicate clearly, engagingly, and authentically. Lead with value in every piece of content.
-Use compelling storytelling, vivid imagery, and concrete examples that stop the scroll.
-Keep content accessible yet sophisticated — never dumbed down, never inaccessible.
-
-Adapt tone to the subject matter:
-- Educational content: clear, structured, authoritative
-- Inspirational content: warm, motivating, story-driven
-- Entertaining content: playful, surprising, high-energy
-
-Always prioritise originality. Avoid generic advice and clichés.
-Every hook must earn attention. Every CTA must feel natural, not forced.`
-
 export const DEFAULT_FRAMEWORK_NAME = 'Starter Framework'
 export const DEFAULT_FRAMEWORK_PROMPT = `Generate content ideas optimised for maximum engagement on short-form video platforms (Instagram Reels, TikTok).
 

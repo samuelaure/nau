@@ -77,7 +77,6 @@ export async function ingestExternalIdea(params: ExternalIdeaInput) {
       priority: SOURCE_PRIORITY[source],
       sourceRef: sourceRef ?? null,
       status,
-      brandPersonaId: provenance.brandPersonaId,
     },
   })
 
@@ -137,7 +136,6 @@ export async function ingestExternalIdeas(
         priority: SOURCE_PRIORITY[source],
         sourceRef: idea.sourceRef ?? null,
         status,
-        brandPersonaId: provenance.brandPersonaId,
       },
     })
 

@@ -56,7 +56,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       lastPublishError,
       userPostedManually,
       publishedAt,
-      brandPersonaId,
       userUploadedMediaUrl,
       clearRenderSnapshot,
     } = body
@@ -91,7 +90,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         ...(lastPublishError !== undefined && { lastPublishError }),
         ...(userPostedManually !== undefined && { userPostedManually }),
         ...(publishedAt !== undefined && { publishedAt: publishedAt ? new Date(publishedAt) : null }),
-        ...(brandPersonaId !== undefined && { brandPersonaId }),
         ...(userUploadedMediaUrl !== undefined && { userUploadedMediaUrl }),
       },
     })
