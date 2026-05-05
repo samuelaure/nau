@@ -84,13 +84,13 @@ export async function composeReel(input: ReelComposerInput): Promise<ReelCompose
   const isMultiSlot = slotDefs.length > 1
 
   const composerBlock = brandData?.composerPrompt?.trim()
-    ? `⚠️ COMPOSER INSTRUCTIONS — highest priority, override everything below:\n<composer_instructions>\n${brandData.composerPrompt.trim()}\n</composer_instructions>\n\n`
+    ? `⚠️ COMPOSER INSTRUCTIONS — sets the overall voice and approach:\n<composer_instructions>\n${brandData.composerPrompt.trim()}\n</composer_instructions>\n\n`
     : ''
   const templateBlock = customPrompt?.trim()
-    ? `⚠️ TEMPLATE INSTRUCTIONS — absolute priority:\n<template_instructions>\n${customPrompt.trim()}\n</template_instructions>\n\n---\n\n`
+    ? `\n\n⚠️ TEMPLATE CUSTOM INSTRUCTIONS — these override everything above for this specific template:\n<template_instructions>\n${customPrompt.trim()}\n</template_instructions>`
     : ''
 
-  const systemPrompt = `${composerBlock}${templateBlock}${template.systemPrompt ?? ''}
+  const systemPrompt = `${composerBlock}${template.systemPrompt ?? ''}
 ${brandBlock}
 LANGUAGE: Write ALL text in ${language}.
 
@@ -121,7 +121,7 @@ ${isMultiSlot ? `MULTI-SLOT NARRATIVE RULE (critical for this template):
 - Respect word limits exactly — count every word, stay within min–max range for each slot
 - For slots with a minimum: write enough to fill the intent; a slot at half its minimum is a failure
 - Never mention usernames or @handles
-- Respond ONLY with valid JSON matching the schema`
+- Respond ONLY with valid JSON matching the schema${templateBlock}`
 
   const messages: Array<{ role: 'system' | 'user'; content: string }> = [
     { role: 'system', content: systemPrompt },
