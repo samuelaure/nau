@@ -5,7 +5,11 @@ import { logger } from './logger';
  * Optimizes a video file for storage.
  * Standardizes to H.264, 720p max height, and reasonable bitrate.
  */
-export async function optimizeVideo(inputPath: string, outputPath: string): Promise<void> {
+export async function optimizeVideo(
+  inputPath: string,
+  outputPath: string,
+  onProgress?: () => void,
+): Promise<void> {
   return new Promise((resolve, reject) => {
     logger.info(`[MediaUtils] Optimizing video: ${inputPath}`);
     ffmpeg(inputPath)
@@ -20,6 +24,7 @@ export async function optimizeVideo(inputPath: string, outputPath: string): Prom
       ])
       .audioCodec('aac')
       .audioBitrate('128k')
+      .on('progress', () => onProgress?.())
       .on('end', () => {
         logger.info(`[MediaUtils] Video optimized successfully: ${outputPath}`);
         resolve();

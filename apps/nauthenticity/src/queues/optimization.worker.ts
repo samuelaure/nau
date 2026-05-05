@@ -5,6 +5,7 @@ import { logger } from '../utils/logger';
 import { wlog } from '../utils/worker-logger';
 import fs from 'fs';
 import path from 'path';
+import { pipeline } from 'stream/promises';
 import { createStorage, nauthenticity } from 'nau-storage';
 import { optimizeImage, optimizeVideo } from '../utils/media';
 import { computeQueue } from './compute.queue';
@@ -55,11 +56,10 @@ export const optimizationWorker = new Worker(
           if (storage) {
             const response = await fetch(rawUrl);
             if (!response.ok) throw new Error(`Failed to fetch raw from R2: ${response.status}`);
-            const buffer = Buffer.from(await response.arrayBuffer());
-            fs.writeFileSync(tempRawPath, buffer);
+            await pipeline(response.body as unknown as NodeJS.ReadableStream, fs.createWriteStream(tempRawPath));
 
             if (type === 'video') {
-              await optimizeVideo(tempRawPath, tempOptimizedPath);
+              await optimizeVideo(tempRawPath, tempOptimizedPath, () => job.extendLock(mediaId, 600_000));
             } else {
               await optimizeImage(tempRawPath, tempOptimizedPath);
             }
@@ -89,7 +89,7 @@ export const optimizationWorker = new Worker(
 
             if (fs.existsSync(localRawPath)) {
               if (type === 'video') {
-                await optimizeVideo(localRawPath, tempOptimizedPath);
+                await optimizeVideo(localRawPath, tempOptimizedPath, () => job.extendLock(mediaId, 600_000));
               } else {
                 await optimizeImage(localRawPath, tempOptimizedPath);
               }
@@ -130,7 +130,7 @@ export const optimizationWorker = new Worker(
       }
     });
   },
-  { connection: config.redis, concurrency: 1 },
+  { connection: config.redis, concurrency: 1, lockDuration: 600_000, stalledInterval: 120_000 },
 );
 
 optimizationWorker.on('failed', (job, err) => {

@@ -76,10 +76,9 @@ export const downloadWorker = new Worker(
           if (storage) {
             const response = await fetch(url);
             if (!response.ok) throw new Error(`Failed to fetch: ${response.status}`);
-            const buffer = Buffer.from(await response.arrayBuffer());
-            fs.writeFileSync(tempFilePath, buffer);
+            await pipeline(response.body as any, createWriteStream(tempFilePath));
 
-            publicUrl = await storage.upload(storageKey, buffer, {
+            publicUrl = await storage.upload(storageKey, fs.createReadStream(tempFilePath), {
               mimeType: type === 'video' ? 'video/mp4' : 'image/jpeg',
             });
           } else {
@@ -92,7 +91,6 @@ export const downloadWorker = new Worker(
             if (!fs.existsSync(finalPath)) {
               const response = await fetch(url);
               if (!response.ok) throw new Error(`Failed to fetch: ${response.status}`);
-              await pipeline(response.body as any, createWriteStream(tempFilePath));
               await pipeline(response.body as any, createWriteStream(finalPath));
             }
           }
@@ -170,11 +168,10 @@ export const downloadWorker = new Worker(
           if (storage) {
             const response = await fetch(url);
             if (!response.ok) throw new Error(`Failed to fetch profile: ${response.status}`);
-            const buffer = Buffer.from(await response.arrayBuffer());
 
             const tempProfilePath = path.join(config.paths.temp, `profile_${username}_${Date.now()}.jpg`);
             const optimizedProfilePath = path.join(config.paths.temp, `profile_${username}_opt_${Date.now()}.jpg`);
-            fs.writeFileSync(tempProfilePath, buffer);
+            await pipeline(response.body as any, createWriteStream(tempProfilePath));
             await optimizeImage(tempProfilePath, optimizedProfilePath);
 
             const storageKey = nauthenticity.profilePic(username, 'jpg');
@@ -212,9 +209,8 @@ export const downloadWorker = new Worker(
             if (!fs.existsSync(finalPath)) {
               const response = await fetch(url);
               if (!response.ok) throw new Error(`Failed to fetch profile: ${response.status}`);
-              const buffer = Buffer.from(await response.arrayBuffer());
               const tempProfilePath = path.join(config.paths.temp, `profile_${username}_${Date.now()}.jpg`);
-              fs.writeFileSync(tempProfilePath, buffer);
+              await pipeline(response.body as any, createWriteStream(tempProfilePath));
               await optimizeImage(tempProfilePath, finalPath);
               if (fs.existsSync(tempProfilePath)) fs.unlinkSync(tempProfilePath);
             }
@@ -226,7 +222,7 @@ export const downloadWorker = new Worker(
       }
     });
   },
-  { connection: config.redis, concurrency: 25, stalledInterval: 60_000, maxStalledCount: 3 },
+  { connection: config.redis, concurrency: 5, stalledInterval: 120_000, maxStalledCount: 2 },
 );
 
 downloadWorker.on('failed', (job, err) => {
