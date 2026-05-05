@@ -222,7 +222,7 @@ export const downloadWorker = new Worker(
       }
     });
   },
-  { connection: config.redis, concurrency: 5, stalledInterval: 120_000, maxStalledCount: 2 },
+  { connection: config.redis, concurrency: 5, lockDuration: 300_000, stalledInterval: 120_000, maxStalledCount: 2 },
 );
 
 downloadWorker.on('failed', (job, err) => {
