@@ -1301,9 +1301,9 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
   const [selected, setSelected] = useState<Composition | null>(null)
   const [runningCoverage, setRunningCoverage] = useState(false)
   const [generatingSlotIds, setGeneratingSlotIds] = useState<Set<string>>(new Set())
-  const [composerPrompt, setComposerPrompt] = useState<string>('')
-  const [composerPromptDraft, setComposerPromptDraft] = useState<string>('')
-  const [composerPromptModalOpen, setComposerPromptModalOpen] = useState(false)
+  const [draftCustomPrompt, setDraftCustomPrompt] = useState<string>('')
+  const [draftCustomPromptDraft, setDraftCustomPromptDraft] = useState<string>('')
+  const [draftCustomPromptModalOpen, setDraftCustomPromptModalOpen] = useState(false)
   const [savingComposerPrompt, setSavingComposerPrompt] = useState(false)
 
   // Re-format
@@ -1373,7 +1373,7 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
   useEffect(() => {
     fetch(`/api/brands/${brandId}`)
       .then((r) => r.json())
-      .then((data) => setComposerPrompt(data.brand?.composerPrompt ?? ''))
+      .then((data) => setDraftCustomPrompt(data.brand?.draftCustomPrompt ?? ''))
       .catch(() => {})
     fetch(`/api/account-templates?brandId=${brandId}`)
       .then((r) => r.json())
@@ -1387,11 +1387,11 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
       const res = await fetch(`/api/brands/${brandId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ composerPrompt: composerPromptDraft || null }),
+        body: JSON.stringify({ draftCustomPrompt: draftCustomPromptDraft || null }),
       })
       if (!res.ok) throw new Error('Failed')
-      setComposerPrompt(composerPromptDraft)
-      setComposerPromptModalOpen(false)
+      setDraftCustomPrompt(draftCustomPromptDraft)
+      setDraftCustomPromptModalOpen(false)
       toast.success('Composer prompt saved')
     } catch {
       toast.error('Failed to save composer prompt')
@@ -1570,16 +1570,16 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => { setComposerPromptDraft(composerPrompt); setComposerPromptModalOpen(true) }}
+            onClick={() => { setDraftCustomPromptDraft(draftCustomPrompt); setDraftCustomPromptModalOpen(true) }}
             className={cn(
               'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
-              composerPrompt
+              draftCustomPrompt
                 ? 'text-amber-300 border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20'
                 : 'text-text-secondary border-white/10 hover:text-white hover:bg-white/5',
             )}
           >
             <SlidersHorizontal size={12} />
-            {composerPrompt ? 'Composer prompt set' : 'Composer prompt'}
+            {draftCustomPrompt ? 'Composer prompt set' : 'Composer prompt'}
           </button>
           {workspaceId && (
             <Link
@@ -1828,7 +1828,7 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
       )}
 
       {/* Composer prompt modal */}
-      <Modal isOpen={composerPromptModalOpen} onClose={() => setComposerPromptModalOpen(false)}>
+      <Modal isOpen={draftCustomPromptModalOpen} onClose={() => setDraftCustomPromptModalOpen(false)}>
         <div className="text-center mb-6">
           <div className="w-16 h-16 bg-amber-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4 text-amber-400">
             <SlidersHorizontal size={28} />
@@ -1839,14 +1839,14 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
           </p>
         </div>
         <textarea
-          value={composerPromptDraft}
-          onChange={(e) => setComposerPromptDraft(e.target.value)}
+          value={draftCustomPromptDraft}
+          onChange={(e) => setDraftCustomPromptDraft(e.target.value)}
           placeholder="e.g. Always write in a conversational tone. Never use bullet points."
           rows={6}
           className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-text-secondary resize-none focus:outline-none focus:border-amber-500/50 mb-6"
         />
         <div className="flex gap-3">
-          <Button variant="outline" onClick={() => setComposerPromptModalOpen(false)} disabled={savingComposerPrompt} className="flex-1">
+          <Button variant="outline" onClick={() => setDraftCustomPromptModalOpen(false)} disabled={savingComposerPrompt} className="flex-1">
             Cancel
           </Button>
           <Button onClick={handleSaveComposerPrompt} disabled={savingComposerPrompt} className="flex-1 bg-amber-600 hover:bg-amber-500 text-white">

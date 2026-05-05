@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/modules/shared/components/ui/Button'
 import { toast } from 'sonner'
 import {
-  SlidersHorizontal, ChevronDown, Loader2, X, Film, Mic, Play,
+  Loader2, X, Film, Mic, Play,
   LayoutGrid, ImageIcon, Clock, Layers, CheckCircle2, Volume2, VolumeX,
   ToggleLeft, ToggleRight,
 } from 'lucide-react'
@@ -41,7 +41,6 @@ type Template = {
     enabled: boolean
     autoApproveDraft: boolean
     autoApprovePost: boolean
-    customPrompt?: string | null
   }> | null
 }
 
@@ -130,10 +129,7 @@ function TemplateModal({
   const [isEnabled, setIsEnabled] = useState(config?.enabled ?? false)
   const [autoApproveDraft, setAutoApproveDraft] = useState(config?.autoApproveDraft ?? false)
   const [autoApprovePost, setAutoApprovePost] = useState(config?.autoApprovePost ?? false)
-  const [promptOpen, setPromptOpen] = useState(false)
-  const [promptDraft, setPromptDraft] = useState(config?.customPrompt ?? '')
   const [saving, setSaving] = useState(false)
-  const [savingPrompt, setSavingPrompt] = useState(false)
   const [muted, setMuted] = useState(true)
   const videoRef = useRef<HTMLVideoElement>(null)
 
@@ -172,25 +168,6 @@ function TemplateModal({
       toast.error('Failed to update')
     } finally {
       setSaving(false)
-    }
-  }
-
-  const savePrompt = async () => {
-    setSavingPrompt(true)
-    try {
-      const res = await fetch('/api/account-templates', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brandId, templateId: template.id, customPrompt: promptDraft || null }),
-      })
-      if (!res.ok) throw new Error()
-      toast.success('Prompt saved')
-      setPromptOpen(false)
-      onRefresh()
-    } catch {
-      toast.error('Failed to save prompt')
-    } finally {
-      setSavingPrompt(false)
     }
   }
 
@@ -339,41 +316,6 @@ function TemplateModal({
               </div>
             </div>
 
-            {/* Custom prompt */}
-            <div className="space-y-2">
-              <button
-                onClick={() => setPromptOpen((o) => !o)}
-                className={cn(
-                  'flex items-center gap-1.5 text-xs transition-colors',
-                  config?.customPrompt ? 'text-amber-300 hover:text-amber-200' : 'text-text-secondary hover:text-white',
-                )}
-              >
-                <SlidersHorizontal size={11} />
-                {config?.customPrompt ? 'Custom prompt set' : 'Add custom prompt'}
-                <ChevronDown size={11} className={cn('transition-transform', promptOpen && 'rotate-180')} />
-              </button>
-              {promptOpen && (
-                <div className="space-y-2">
-                  <p className="text-xs text-text-secondary">
-                    Instructions injected when this template is used — overrides defaults.
-                  </p>
-                  <textarea
-                    rows={4}
-                    value={promptDraft}
-                    onChange={(e) => setPromptDraft(e.target.value)}
-                    placeholder="e.g. 'Always open with a provocative question. Keep each line under 8 words.'"
-                    className="w-full bg-gray-900 border border-gray-800 rounded p-2.5 text-xs text-white resize-none focus:outline-none focus:border-accent/50"
-                  />
-                  <div className="flex justify-end gap-2">
-                    <Button size="sm" variant="outline" className="text-xs" onClick={() => setPromptOpen(false)}>Cancel</Button>
-                    <Button size="sm" className="text-xs bg-accent text-white" disabled={savingPrompt} onClick={savePrompt}>
-                      {savingPrompt ? <Loader2 size={11} className="animate-spin mr-1" /> : null}
-                      Save
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </div>

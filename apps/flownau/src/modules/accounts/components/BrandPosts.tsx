@@ -292,8 +292,6 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
   const [templates, setTemplates] = useState<any[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [headTalkDraftPost, setHeadTalkDraftPost] = useState<any | null>(null)
-  const [personas, setPersonas] = useState<any[]>([])
-  const [selectedPersonaId, setSelectedPersonaId] = useState('')
 
   // Selection
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -310,18 +308,18 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
   const [manualOpen, setManualOpen] = useState(false)
   const [manualText, setManualText] = useState('')
 
-  // Ideation prompt — savedIdeationPrompt is the DB value; ideationPrompt is the per-generation editable copy
+  // Ideation prompt — savedIdeationPrompt is the DB value; ideationCustomPrompt is the per-generation editable copy
   const [savedIdeationPrompt, setSavedIdeationPrompt] = useState('')
-  const [ideationPrompt, setIdeationPrompt] = useState('')
+  const [ideationCustomPrompt, setIdeationCustomPrompt] = useState('')
   const [promptModalOpen, setPromptModalOpen] = useState(false)
   const [promptDraft, setPromptDraft] = useState('')
   const [savingPrompt, setSavingPrompt] = useState(false)
   const [brainstormShowPrompt, setBrainstormShowPrompt] = useState(false)
   const [manualShowPrompt, setManualShowPrompt] = useState(false)
 
-  // Composer prompt — savedComposerPrompt is the DB value; composerPrompt is the per-generation editable copy
+  // Composer prompt — savedComposerPrompt is the DB value; draftCustomPrompt is the per-generation editable copy
   const [savedComposerPrompt, setSavedComposerPrompt] = useState('')
-  const [composerPrompt, setComposerPrompt] = useState('')
+  const [draftCustomPrompt, setDraftCustomPrompt] = useState('')
   const [composeShowPrompt, setComposeShowPrompt] = useState(false)
 
   // Re-format modal
@@ -342,12 +340,12 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
     try {
       const res = await fetch(`/api/brands/${brandId}`)
       const data = await res.json()
-      const ip = data.brand?.ideationPrompt ?? ''
-      const cp = data.brand?.composerPrompt ?? ''
+      const ip = data.brand?.ideationCustomPrompt ?? ''
+      const cp = data.brand?.draftCustomPrompt ?? ''
       setSavedIdeationPrompt(ip)
-      setIdeationPrompt(ip)
+      setIdeationCustomPrompt(ip)
       setSavedComposerPrompt(cp)
-      setComposerPrompt(cp)
+      setDraftCustomPrompt(cp)
     } catch {}
   }
 
@@ -357,11 +355,11 @@ const handleSavePrompt = async (text: string) => {
       const res = await fetch(`/api/brands/${brandId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ideationPrompt: text || null }),
+        body: JSON.stringify({ ideationCustomPrompt: text || null }),
       })
       if (!res.ok) throw new Error()
       setSavedIdeationPrompt(text)
-      setIdeationPrompt(text)
+      setIdeationCustomPrompt(text)
       toast.success('Ideation prompt saved')
     } catch {
       toast.error('Failed to save prompt')
@@ -389,11 +387,6 @@ const handleSavePrompt = async (text: string) => {
   useEffect(() => {
     fetchIdeas()
     fetchIdeationPrompt()
-    fetch(`/api/personas?brandId=${brandId}`).then(r => r.json()).then(d => {
-      setPersonas(d.personas || [])
-      const def = d.personas?.find((p: any) => p.isDefault) || d.personas?.[0]
-      if (def) setSelectedPersonaId(def.id)
-    }).catch(() => {})
     fetch('/api/templates').then(r => r.json()).then(d => {
       setTemplates((d.templates || []).filter((t: any) => t.brandId === brandId || !t.brandId))
     }).catch(() => {})
@@ -580,7 +573,7 @@ const handleSavePrompt = async (text: string) => {
       const res = await fetch('/api/agent/compose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brandId, prompt: composingIdea.ideaText, format: finalFormat, postId: composingIdea.id, personaId: selectedPersonaId || undefined, templateId: resolvedTemplateId || undefined }),
+        body: JSON.stringify({ brandId, prompt: composingIdea.ideaText, format: finalFormat, postId: composingIdea.id, templateId: resolvedTemplateId || undefined }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Composition failed')
@@ -650,16 +643,16 @@ const handleSavePrompt = async (text: string) => {
         </div>
         <div className="flex flex-wrap gap-2 items-center">
           <button
-            onClick={() => { setPromptDraft(ideationPrompt); setPromptModalOpen(true) }}
+            onClick={() => { setPromptDraft(ideationCustomPrompt); setPromptModalOpen(true) }}
             className={cn(
               'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
-              ideationPrompt
+              ideationCustomPrompt
                 ? 'text-amber-300 border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20'
                 : 'text-text-secondary border-white/10 hover:text-white hover:bg-white/5',
             )}
           >
             <SlidersHorizontal size={12} />
-            {ideationPrompt ? 'Prompt set' : 'Set prompt'}
+            {ideationCustomPrompt ? 'Prompt set' : 'Set prompt'}
           </button>
           <Button onClick={() => setManualOpen(true)} size="sm" variant="outline">
             + Add Idea
@@ -877,24 +870,24 @@ const handleSavePrompt = async (text: string) => {
                 onClick={() => setBrainstormShowPrompt(v => !v)}
                 className={cn(
                   'flex items-center gap-1.5 text-xs transition-colors',
-                  ideationPrompt ? 'text-amber-300 hover:text-amber-200' : 'text-text-secondary hover:text-white',
+                  ideationCustomPrompt ? 'text-amber-300 hover:text-amber-200' : 'text-text-secondary hover:text-white',
                 )}
               >
                 <SlidersHorizontal size={11} />
-                {ideationPrompt ? 'Ideation prompt set' : 'Add ideation prompt'}
+                {ideationCustomPrompt ? 'Ideation prompt set' : 'Add ideation prompt'}
                 <ChevronDown size={11} className={cn('transition-transform', brainstormShowPrompt && 'rotate-180')} />
               </button>
               {brainstormShowPrompt && (
                 <div className="mt-2 flex flex-col gap-2">
                   <textarea
                     rows={3}
-                    value={ideationPrompt}
-                    onChange={e => setIdeationPrompt(e.target.value)}
+                    value={ideationCustomPrompt}
+                    onChange={e => setIdeationCustomPrompt(e.target.value)}
                     placeholder="e.g. 'Always focus on founder-led content with a contrarian angle. Avoid corporate tone.'"
                     className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-xs text-white resize-none"
                   />
-                  {ideationPrompt !== savedIdeationPrompt && (
-                    <Button size="sm" variant="outline" onClick={() => setIdeationPrompt(savedIdeationPrompt)} className="self-end text-xs text-amber-400 border-amber-500/30">
+                  {ideationCustomPrompt !== savedIdeationPrompt && (
+                    <Button size="sm" variant="outline" onClick={() => setIdeationCustomPrompt(savedIdeationPrompt)} className="self-end text-xs text-amber-400 border-amber-500/30">
                       Reset to saved
                     </Button>
                   )}
@@ -939,23 +932,23 @@ const handleSavePrompt = async (text: string) => {
                 onClick={() => setComposeShowPrompt(v => !v)}
                 className={cn(
                   'flex items-center gap-1.5 text-xs transition-colors',
-                  composerPrompt ? 'text-amber-300 hover:text-amber-200' : 'text-text-secondary hover:text-white',
+                  draftCustomPrompt ? 'text-amber-300 hover:text-amber-200' : 'text-text-secondary hover:text-white',
                 )}
               >
                 <SlidersHorizontal size={11} />
-                {composerPrompt ? 'Composer prompt set' : 'Composer prompt'}
+                {draftCustomPrompt ? 'Composer prompt set' : 'Composer prompt'}
                 <ChevronDown size={11} className={cn('transition-transform', composeShowPrompt && 'rotate-180')} />
               </button>
               {composeShowPrompt && (
                 <div className="mt-2 space-y-2">
                   <textarea
                     className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-xs min-h-[80px]"
-                    value={composerPrompt}
-                    onChange={e => setComposerPrompt(e.target.value)}
+                    value={draftCustomPrompt}
+                    onChange={e => setDraftCustomPrompt(e.target.value)}
                     placeholder="e.g. Always write in a conversational tone. Never use bullet points."
                   />
-                  {composerPrompt !== savedComposerPrompt && (
-                    <Button size="sm" variant="outline" onClick={() => setComposerPrompt(savedComposerPrompt)} className="self-end text-xs text-amber-400 border-amber-500/30">
+                  {draftCustomPrompt !== savedComposerPrompt && (
+                    <Button size="sm" variant="outline" onClick={() => setDraftCustomPrompt(savedComposerPrompt)} className="self-end text-xs text-amber-400 border-amber-500/30">
                       Reset to saved
                     </Button>
                   )}
@@ -1070,24 +1063,24 @@ const handleSavePrompt = async (text: string) => {
                 onClick={() => setManualShowPrompt(v => !v)}
                 className={cn(
                   'flex items-center gap-1.5 text-xs transition-colors',
-                  ideationPrompt ? 'text-amber-300 hover:text-amber-200' : 'text-text-secondary hover:text-white',
+                  ideationCustomPrompt ? 'text-amber-300 hover:text-amber-200' : 'text-text-secondary hover:text-white',
                 )}
               >
                 <SlidersHorizontal size={11} />
-                {ideationPrompt ? 'Ideation prompt set' : 'Add ideation prompt'}
+                {ideationCustomPrompt ? 'Ideation prompt set' : 'Add ideation prompt'}
                 <ChevronDown size={11} className={cn('transition-transform', manualShowPrompt && 'rotate-180')} />
               </button>
               {manualShowPrompt && (
                 <div className="mt-2 flex flex-col gap-2">
                   <textarea
                     rows={3}
-                    value={ideationPrompt}
-                    onChange={e => setIdeationPrompt(e.target.value)}
+                    value={ideationCustomPrompt}
+                    onChange={e => setIdeationCustomPrompt(e.target.value)}
                     placeholder="e.g. 'Always focus on founder-led content with a contrarian angle.'"
                     className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-xs text-white resize-none"
                   />
-                  {ideationPrompt !== savedIdeationPrompt && (
-                    <Button size="sm" variant="outline" onClick={() => setIdeationPrompt(savedIdeationPrompt)} className="self-end text-xs text-amber-400 border-amber-500/30">
+                  {ideationCustomPrompt !== savedIdeationPrompt && (
+                    <Button size="sm" variant="outline" onClick={() => setIdeationCustomPrompt(savedIdeationPrompt)} className="self-end text-xs text-amber-400 border-amber-500/30">
                       Reset to saved
                     </Button>
                   )}
