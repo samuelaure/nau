@@ -25,14 +25,16 @@ async function bootstrap() {
   if (origins.length === 0) throw new Error('ALLOWED_ORIGINS environment variable is required')
   app.enableCors({ origin: origins, credentials: true })
 
-  // SPA fallback: after all NestJS routes are registered, any unmatched GET
-  // request serves index.html so the React app handles client-side routing.
+  const port = process.env.PORT ?? 3000
+  await app.listen(port)
+
+  // SPA fallback registered after app.listen() so ServeStaticModule's express.static()
+  // middleware (registered in onModuleInit) runs first and serves real assets.
+  // Only unmatched GET requests reach this handler and get index.html.
   const spaIndex = path.join(__dirname, '../dashboard/dist/index.html')
   const expressApp = app.getHttpAdapter().getInstance() as import('express').Application
   expressApp.get('*', (_req, res) => res.sendFile(spaIndex))
 
-  const port = process.env.PORT ?? 3000
-  await app.listen(port)
   logger.log(`nauthenticity listening on port ${port}`)
 }
 
