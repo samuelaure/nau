@@ -838,8 +838,8 @@ function CompositionModal({
     moreItems.push({ key: 'unschedule', label: 'Unschedule', icon: <CalendarX size={13} />, onClick: handleUnschedule })
   }
   if (comp.status === 'DRAFT_PENDING') {
-    moreItems.push({ key: 'ai-recompose', label: 'Re-compose content', icon: <RefreshCw size={13} />, onClick: handleAIRecompose })
-    moreItems.push({ key: 'reformat', label: 'Re-format (change template)', icon: <Shuffle size={13} />, onClick: () => { onClose(); onReformat(comp) } })
+    moreItems.push({ key: 'ai-recompose', label: 'Re-compose', icon: <RefreshCw size={13} />, onClick: handleAIRecompose })
+    moreItems.push({ key: 'reformat', label: 'Re-format', icon: <Shuffle size={13} />, onClick: () => { onClose(); onReformat(comp) } })
   }
   if (display === 'Ready') {
     moreItems.push({ key: 'rerender', label: 'Re-render', icon: <RefreshCw size={13} />, onClick: handleRerender })
@@ -1314,8 +1314,10 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
       ])
       const compData = await compRes.json()
       const slotData = await slotRes.json()
-      setCompositions(compData.compositions || [])
+      const comps = compData.compositions || []
+      setCompositions(comps)
       setSlots(slotData.slots || [])
+      setSelected(prev => prev ? (comps.find((c: Composition) => c.id === prev.id) ?? prev) : null)
     } catch {
       toast.error('Failed to load calendar')
     } finally {
