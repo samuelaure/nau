@@ -12,18 +12,19 @@ datasource db {
 // Stores flownau-specific pipeline config (prompts, short code, assets root).
 // Content pipeline (ideas, compositions, plans, templates, assets) is anchored here.
 model Brand {
-  id             String   @id            // = 9naŭ Brand.id
-  workspaceId    String                  // = 9naŭ Workspace.id
-  name           String?                 // cached from 9naŭ API
-  shortCode      String?
-  assetsRoot     String?
+  id                   String   @id // = 9naŭ Brand.id
+  workspaceId          String // = 9naŭ Workspace.id
+  name                 String? // cached from 9naŭ API
+  shortCode            String?
+  assetsRoot           String?
   language             String   @default("Spanish")
   ideationCount        Int      @default(9)
   autoApproveIdeas     Boolean  @default(false)
   coverageHorizonDays  Int      @default(7)
-  ideationPrompt       String?  @db.Text
-  composerPrompt       String?  @db.Text
-  brandIdentity        Json?    // { primaryColor, secondaryColor, titleFont, bodyFont, overlayOpacity, logoUrl }
+  ideationCustomPrompt String?  @db.Text // user-edited from Ideas tab; campaign-level intent for ideation
+  draftCustomPrompt    String?  @db.Text // user-edited from Calendar tab; campaign-level intent for drafting
+  context              Json? // BrandContext: nauthenticity-generated, user-editable
+  brandIdentity        Json? // { primaryColor, secondaryColor, titleFont, bodyFont, overlayOpacity, logoUrl }
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
@@ -40,11 +41,11 @@ model Brand {
 // ── PostSchedule ───────────────────────────────────────────────────────────────
 // One per brand. Defines the repeating format chain + daily posting rhythm.
 model PostSchedule {
-  id             String   @id @default(cuid())
-  brandId        String   @unique
-  brand          Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  id      String @id @default(cuid())
+  brandId String @unique
+  brand   Brand  @relation(fields: [brandId], references: [id], onDelete: Cascade)
 
-  formatChain    String[]             // ordered format list, repeats cyclically
+  formatChain    String[] // ordered format list, repeats cyclically
   chainPosition  Int      @default(0) // current position in formatChain
   dailyFrequency Int      @default(1) // posts per day
   windowStart    String   @default("09:00") // "HH:MM" in brand timezone
@@ -52,26 +53,26 @@ model PostSchedule {
   timezone       String   @default("UTC")
   isActive       Boolean  @default(true)
 
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ── PostSlot ───────────────────────────────────────────────────────────────────
 // A materialized calendar entry. Created by the slot materialization service.
 // Filled when an IDEA_APPROVED post is auto-composed into it.
 model PostSlot {
-  id          String    @id @default(cuid())
-  brandId     String
-  brand       Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  id      String @id @default(cuid())
+  brandId String
+  brand   Brand  @relation(fields: [brandId], references: [id], onDelete: Cascade)
 
-  scheduledAt DateTime               // exact UTC datetime for this slot
-  format      String                 // format assigned by chain position
-  status      String  @default("empty") // empty | filled | published
+  scheduledAt DateTime // exact UTC datetime for this slot
+  format      String // format assigned by chain position
+  status      String   @default("empty") // empty | filled | published
 
-  postId      String?  @unique       // null until filled
-  post        Post?    @relation(fields: [postId], references: [id])
+  postId String? @unique // null until filled
+  post   Post?   @relation(fields: [postId], references: [id])
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([brandId, scheduledAt])
   @@index([brandId, status])
@@ -89,7 +90,7 @@ model SocialProfile {
   platformId       String?
   username         String?
   profileImage     String?
-  accessToken      String?   // Optional for soft-added profiles awaiting OAuth
+  accessToken      String? // Optional for soft-added profiles awaiting OAuth
   refreshToken     String?
   expiresAt        DateTime?
   tokenExpiresAt   DateTime?
@@ -99,8 +100,8 @@ model SocialProfile {
   syncedFromNauthenticity Boolean @default(false)
   nauthenticityProfileId  String? // Reference to nauthenticity SocialProfile.id if synced
 
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([platform, platformId])
 }
@@ -131,34 +132,34 @@ model Asset {
 }
 
 model Template {
-  id               String    @id @default(cuid())
-  name             String
-  format           String    @default("reel")   // reel | head_talk | carousel | static_post
-  remotionId       String    @default("")
-  config           Json?
-  brandId          String?               // null for system-scoped templates
-  scope            String    @default("system")  // system | brand
-  useBrandAssets   Boolean   @default(true)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  assetsRoot       String?
-  systemPrompt     String?   @db.Text
-  creationPrompt   String?   @db.Text
-  captionPrompt    String?   @db.Text
-  schemaJson       Json?
-  contentSchema    Json?
-  sceneType        String?
-  slotSchema       Json?
-  styleConfig      Json?
-  description      String?   @db.Text
-  previewUrl           String?
-  previewThumbnailUrl  String?
+  id                  String   @id @default(cuid())
+  name                String
+  format              String   @default("reel") // reel | head_talk | carousel | static_post
+  remotionId          String   @default("")
+  config              Json?
+  brandId             String? // null for system-scoped templates
+  scope               String   @default("system") // system | brand
+  useBrandAssets      Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  assetsRoot          String?
+  systemPrompt        String?  @db.Text
+  creationPrompt      String?  @db.Text
+  captionPrompt       String?  @db.Text
+  schemaJson          Json?
+  contentSchema       Json?
+  sceneType           String?
+  slotSchema          Json?
+  styleConfig         Json?
+  description         String?  @db.Text
+  previewUrl          String?
+  previewThumbnailUrl String?
 
   renders      Render[]
   assets       Asset[]
   posts        Post[]
   brandConfigs BrandTemplateConfig[]
-  brand        Brand?  @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  brand        Brand?                @relation(fields: [brandId], references: [id], onDelete: Cascade)
 }
 
 model BrandTemplateConfig {
@@ -166,9 +167,8 @@ model BrandTemplateConfig {
   brandId          String
   templateId       String
   autoApproveDraft Boolean  @default(false)
-  autoApprovePost  Boolean  @default(false)  // autoApproveRendered — kept as autoApprovePost
+  autoApprovePost  Boolean  @default(false) // autoApproveRendered — kept as autoApprovePost
   enabled          Boolean  @default(true)
-  customPrompt     String?  @db.Text
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -216,31 +216,10 @@ enum AIModel {
   OPENAI_O1_MINI
 }
 
-model BrandPersona {
-  id                      String   @id @default(cuid())
-  brandId                 String   // 9naŭ Brand.id
-  workspaceId             String   // 9naŭ Workspace.id
-  name                    String
-  systemPrompt            String   @db.Text
-  modelSelection          AIModel  @default(GROQ_LLAMA_3_3)
-  isDefault               Boolean  @default(false)
-  autoApproveIdeas        Boolean  @default(false)
-  autoApproveCompositions Boolean  @default(false)
-  autoApprovePool         Boolean  @default(false)
-  capturedAutoApprove     Boolean  @default(false)
-  capturedCount           Int      @default(3)
-  manualAutoApprove       Boolean  @default(false)
-  manualCount             Int      @default(5)
-  automaticAutoApprove    Boolean  @default(false)
-  automaticCount          Int      @default(5)
-
-  posts        Post[]
-}
-
 model IdeasFramework {
   id           String   @id @default(cuid())
-  brandId      String   // 9naŭ Brand.id
-  workspaceId  String   // 9naŭ Workspace.id
+  brandId      String // 9naŭ Brand.id
+  workspaceId  String // 9naŭ Workspace.id
   name         String
   systemPrompt String   @db.Text
   isDefault    Boolean  @default(false)
@@ -250,8 +229,8 @@ model IdeasFramework {
 
 model ContentCreationPrinciples {
   id           String   @id @default(cuid())
-  brandId      String   // 9naŭ Brand.id
-  workspaceId  String   // 9naŭ Workspace.id
+  brandId      String // 9naŭ Brand.id
+  workspaceId  String // 9naŭ Workspace.id
   name         String
   systemPrompt String   @db.Text
   isDefault    Boolean  @default(false)
@@ -268,36 +247,36 @@ model ContentCreationPrinciples {
 //   IDEA_PENDING → IDEA_APPROVED → DRAFT_PENDING → DRAFT_APPROVED
 //   → SCHEDULED → RENDERING → RENDERED_PENDING → RENDERED_APPROVED → PUBLISHED
 model Post {
-  id        String @id @default(cuid())
-  brandId   String
+  id      String @id @default(cuid())
+  brandId String
 
   // Combined stage + review status
-  status    String @default("IDEA_PENDING")
+  status String @default("IDEA_PENDING")
   // IDEA_PENDING | IDEA_APPROVED | DRAFT_PENDING | DRAFT_APPROVED
   // | SCHEDULED | RENDERING | RENDERED_PENDING | RENDERED_APPROVED | PUBLISHED
 
   // ── Stage 1: Idea ──────────────────────────────────────────────────────────
-  ideaText          String    @db.Text
+  ideaText          String  @db.Text
   language          String?
-  source            String    @default("manual")   // manual | capture | automatic
-  sourceRef         String?                         // digest URLs, inspo lineage
-  priority          Int       @default(3)           // 1=capture, 2=manual, 3=automatic
-  generationBatchId String?                         // groups ideas from the same ideation request
+  source            String  @default("manual") // manual | capture | automatic
+  sourceRef         String? // digest URLs, inspo lineage
+  priority          Int     @default(3) // 1=capture, 2=manual, 3=automatic
+  generationBatchId String? // groups ideas from the same ideation request
 
   // ── Stage 2: Draft (set when IDEA_APPROVED → DRAFT_PENDING) ───────────────
   templateId           String?
-  format               String?                      // set at draft creation from template
-  creative             Json?                        // format-agnostic scene/script/slide data
-  payload              Json?                        // compiled rendering timeline
-  caption              String?   @db.Text
-  hashtags             String[]  @default([])
-  sceneTypes           String[]  @default([])
+  format               String? // set at draft creation from template
+  creative             Json? // format-agnostic scene/script/slide data
+  payload              Json? // compiled rendering timeline
+  caption              String?  @db.Text
+  hashtags             String[] @default([])
+  sceneTypes           String[] @default([])
   topicHash            String?
   userUploadedMediaUrl String?
-  brandPersonaId       String?                      // persona used by the composer
+  angle                String? // direct | complementary | indirect (ideation prism)
 
   // ── Stage 3: Scheduling ────────────────────────────────────────────────────
-  scheduledAt          DateTime?
+  scheduledAt DateTime?
 
   // ── Stage 4: Publishing ────────────────────────────────────────────────────
   videoUrl           String?
@@ -312,16 +291,15 @@ model Post {
   // ── LLM observability ──────────────────────────────────────────────────────
   // { ideaTrace: { provider, model, registryId, systemPrompt, userMessage, generatedAt },
   //   draftTrace: { provider, model, registryId, systemPrompt, userMessage, generatedAt } }
-  llmTrace      Json?
+  llmTrace Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  brand         Brand         @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  template      Template?     @relation(fields: [templateId], references: [id])
-  brandPersona  BrandPersona? @relation(fields: [brandPersonaId], references: [id])
-  renderJob     RenderJob?
-  postSlot      PostSlot?
+  brand     Brand      @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  template  Template?  @relation(fields: [templateId], references: [id])
+  renderJob RenderJob?
+  postSlot  PostSlot?
 
   @@index([brandId, status])
   @@index([generationBatchId])
@@ -329,34 +307,34 @@ model Post {
 }
 
 model RenderJob {
-  id        String @id @default(cuid())
-  postId    String @unique
-  status    String @default("queued")
-  progress  Float  @default(0)
-  outputUrl String?
-  outputType String @default("video")
-  error     String? @db.Text
-  attempts  Int     @default(0)
-  maxAttempts Int   @default(3)
-  startedAt   DateTime?
-  completedAt DateTime?
+  id           String    @id @default(cuid())
+  postId       String    @unique
+  status       String    @default("queued")
+  progress     Float     @default(0)
+  outputUrl    String?
+  outputType   String    @default("video")
+  error        String?   @db.Text
+  attempts     Int       @default(0)
+  maxAttempts  Int       @default(3)
+  startedAt    DateTime?
+  completedAt  DateTime?
   renderTimeMs Int?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 }
 
 model ContentPlan {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   brandId     String
-  date        DateTime @db.Date
+  date        DateTime  @db.Date
   pieces      Json
   scripts     Json?
-  delivered   Boolean  @default(false)
+  delivered   Boolean   @default(false)
   deliveredAt DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
 
@@ -364,20 +342,20 @@ model ContentPlan {
 }
 
 model ContentPlanner {
-  id                  String   @id @default(cuid())
-  brandId             String   // 9naŭ Brand.id
-  workspaceId         String   // 9naŭ Workspace.id
+  id                  String    @id @default(cuid())
+  brandId             String // 9naŭ Brand.id
+  workspaceId         String // 9naŭ Workspace.id
   name                String
-  isDefault           Boolean  @default(false)
-  autoApproveSchedule Boolean  @default(false)
-  strategistPrompt    String?  @db.Text
-  daysToPlan          Int      @default(7)
-  frequencyDays       Int      @default(1)
-  reelsPerDay         Int      @default(5)
-  trialReelsPerDay    Int      @default(5)
-  postingTimes        Json     @default("[]")
-  trialPostingTimes   Json     @default("[]")
-  timezone            String   @default("Europe/Madrid")
+  isDefault           Boolean   @default(false)
+  autoApproveSchedule Boolean   @default(false)
+  strategistPrompt    String?   @db.Text
+  daysToPlan          Int       @default(7)
+  frequencyDays       Int       @default(1)
+  reelsPerDay         Int       @default(5)
+  trialReelsPerDay    Int       @default(5)
+  postingTimes        Json      @default("[]")
+  trialPostingTimes   Json      @default("[]")
+  timezone            String    @default("Europe/Madrid")
   lastPostedAt        DateTime?
 
   @@unique([brandId, name])
