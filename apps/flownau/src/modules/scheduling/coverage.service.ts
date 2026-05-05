@@ -507,6 +507,7 @@ export async function smartFillCalendar(brandId: string): Promise<SmartFillResul
             data: {
               brandId,
               ideaText: idea.concept,
+              angle: idea.angle,
               status: autoApprove ? 'IDEA_APPROVED' : 'IDEA_PENDING',
               source: 'automatic',
               priority: 3,
@@ -586,6 +587,7 @@ async function tryGenerateNewBatch(
         data: {
           brandId,
           ideaText: idea.concept,
+          angle: idea.angle,
           status: brand.autoApproveIdeas ? 'IDEA_APPROVED' : 'IDEA_PENDING',
           source: 'automatic',
           priority: 3,
@@ -642,6 +644,7 @@ async function triggerIdeaGeneration(brandId: string, ideationCount: number): Pr
         data: {
           brandId,
           ideaText: idea.concept,
+          angle: idea.angle,
           status: autoApprove ? 'IDEA_APPROVED' : 'IDEA_PENDING',
           source: 'automatic',
           priority: 3,

@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 import { checkBrandAccessForRoute } from '@/lib/auth'
 import { generateContentIdeas } from '@/modules/ideation/ideation.service'
+import { renderBrandContextBlock } from '@/modules/prompts/brand-context'
 import { logError } from '@/modules/shared/logger'
 
 export async function POST(req: Request) {
@@ -25,7 +26,7 @@ export async function POST(req: Request) {
 
     const brand = await prisma.brand.findUnique({
       where: { id: brandId },
-      select: { language: true, ideationCount: true, ideationCustomPrompt: true },
+      select: { language: true, ideationCount: true, ideationCustomPrompt: true, name: true, context: true },
     })
 
     const language = brand?.language ?? 'Spanish'
@@ -62,7 +63,15 @@ export async function POST(req: Request) {
     }
 
     // Recent content for diversity (manual skip for speed; cron handles this for automatic)
-    const output = await generateContentIdeas({ topic, language, count, userInstructions: brand?.ideationCustomPrompt ?? null })
+    const brandContext = renderBrandContextBlock({ name: brand?.name ?? null, context: brand?.context ?? null }) || null
+
+    const output = await generateContentIdeas({
+      topic,
+      language,
+      count,
+      userInstructions: brand?.ideationCustomPrompt ?? null,
+      brandContext,
+    })
 
     const autoApprove = (await prisma.brand.findUnique({ where: { id: brandId }, select: { autoApproveIdeas: true } }))?.autoApproveIdeas ?? false
     const batchId = crypto.randomUUID()
@@ -72,6 +81,7 @@ export async function POST(req: Request) {
         data: {
           brandId,
           ideaText: idea.concept,
+          angle: idea.angle,
           status: autoApprove ? 'IDEA_APPROVED' : 'IDEA_PENDING',
           source,
           priority,

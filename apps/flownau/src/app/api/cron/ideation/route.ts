@@ -2,6 +2,7 @@ import type { Prisma } from '@/generated/prisma'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 import { generateContentIdeas } from '@/modules/ideation/ideation.service'
+import { renderBrandContextBlock } from '@/modules/prompts/brand-context'
 import { fetchBrandDigest } from '@/modules/ideation/sources/inspo-source'
 import { logError, logger } from '@/modules/shared/logger'
 
@@ -45,7 +46,7 @@ export async function GET(request: Request) {
 
         const brand = await prisma.brand.findUnique({
           where: { id: account.brandId },
-          select: { language: true, ideationCount: true, autoApproveIdeas: true },
+          select: { language: true, ideationCount: true, autoApproveIdeas: true, ideationCustomPrompt: true, name: true, context: true },
         })
 
         const language = brand?.language ?? 'Spanish'
@@ -67,11 +68,15 @@ export async function GET(request: Request) {
               : JSON.stringify(digest.attachedUrls)
             : null
 
+        const brandContext = renderBrandContextBlock({ name: brand?.name ?? null, context: brand?.context ?? null }) || null
+
         const output = await generateContentIdeas({
           topic: digest.content,
           language,
           count,
           recentContent,
+          userInstructions: brand?.ideationCustomPrompt ?? null,
+          brandContext,
         })
 
         const autoApprove = brand?.autoApproveIdeas ?? false
@@ -81,6 +86,7 @@ export async function GET(request: Request) {
             data: {
               brandId: account.id,
               ideaText: idea.concept,
+              angle: idea.angle,
               status: autoApprove ? 'IDEA_APPROVED' : 'IDEA_PENDING',
               source: 'automatic',
               priority: 3,
