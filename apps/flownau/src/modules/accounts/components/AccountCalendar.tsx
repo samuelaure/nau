@@ -239,6 +239,7 @@ type Composition = {
   payload?: Record<string, unknown> | null
   creative?: Record<string, unknown> | null
   templateId?: string | null
+  template?: { id: string; name: string; sceneType: string | null } | null
   publishedAt?: string | null
 }
 
@@ -539,11 +540,13 @@ function CompositionModal({
   brandId,
   onClose,
   onRefresh,
+  onReformat,
 }: {
   comp: Composition
   brandId: string
   onClose: () => void
   onRefresh: () => void
+  onReformat: (comp: Composition) => void
 }) {
   const [actioning, setActioning] = useState(false)
   const [scheduling, setScheduling] = useState(false)
@@ -836,6 +839,7 @@ function CompositionModal({
   }
   if (comp.status === 'DRAFT_PENDING') {
     moreItems.push({ key: 'ai-recompose', label: 'Re-compose content', icon: <RefreshCw size={13} />, onClick: handleAIRecompose })
+    moreItems.push({ key: 'reformat', label: 'Re-format (change template)', icon: <Shuffle size={13} />, onClick: () => { onClose(); onReformat(comp) } })
   }
   if (display === 'Ready') {
     moreItems.push({ key: 'rerender', label: 'Re-render', icon: <RefreshCw size={13} />, onClick: handleRerender })
@@ -866,6 +870,7 @@ function CompositionModal({
             <div>
               <p className="font-semibold">{FORMAT_LABEL[comp.format] ?? comp.format}</p>
               <p className="text-xs text-text-secondary">
+                {comp.template?.name && <span className="text-white/60">{comp.template.name} · </span>}
                 Created {new Date(comp.createdAt).toLocaleDateString('en-GB')}
               </p>
             </div>
@@ -1293,6 +1298,14 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
   const [composerPromptModalOpen, setComposerPromptModalOpen] = useState(false)
   const [savingComposerPrompt, setSavingComposerPrompt] = useState(false)
 
+  // Re-format
+  const [reformatComp, setReformatComp] = useState<Composition | null>(null)
+  const [reformatMode, setReformatMode] = useState<'format' | 'template'>('format')
+  const [reformatFormat, setReformatFormat] = useState('')
+  const [reformatTemplateId, setReformatTemplateId] = useState('')
+  const [reformatting, setReformatting] = useState(false)
+  const [availableTemplates, setAvailableTemplates] = useState<any[]>([])
+
   const fetchCompositions = useCallback(async () => {
     try {
       const [compRes, slotRes] = await Promise.all([
@@ -1310,6 +1323,38 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
     }
   }, [brandId])
 
+  const handleReformat = async () => {
+    if (!reformatComp) return
+    setReformatting(true)
+    const toastId = toast.loading('Re-formatting draft…')
+    try {
+      let finalTemplateId = reformatTemplateId
+      let finalFormat = reformatFormat
+      if (reformatMode === 'format' && finalFormat) {
+        const candidates = availableTemplates.filter(t => t.format === finalFormat)
+        const picked = candidates[Math.floor(Math.random() * candidates.length)]
+        finalTemplateId = picked?.id ?? ''
+      }
+      if (!finalTemplateId && !finalFormat) throw new Error('Select a format or template')
+      const res = await fetch('/api/agent/compose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brandId, prompt: reformatComp.ideaText ?? '', postId: reformatComp.id, format: finalFormat || undefined, templateId: finalTemplateId || undefined }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error((body as any).error ?? 'Re-format failed')
+      }
+      toast.success('Draft re-formatted!', { id: toastId })
+      setReformatComp(null)
+      fetchCompositions()
+    } catch (err: any) {
+      toast.error(err.message, { id: toastId })
+    } finally {
+      setReformatting(false)
+    }
+  }
+
   useEffect(() => {
     fetchCompositions()
   }, [fetchCompositions])
@@ -1318,6 +1363,10 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
     fetch(`/api/brands/${brandId}`)
       .then((r) => r.json())
       .then((data) => setComposerPrompt(data.brand?.composerPrompt ?? ''))
+      .catch(() => {})
+    fetch(`/api/account-templates?brandId=${brandId}`)
+      .then((r) => r.json())
+      .then((data) => setAvailableTemplates((data.templates || []).filter((t: any) => t.brandConfigs?.[0]?.enabled !== false)))
       .catch(() => {})
   }, [brandId])
 
@@ -1802,7 +1851,79 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
           brandId={brandId}
           onClose={() => setSelected(null)}
           onRefresh={fetchCompositions}
+          onReformat={(comp) => { setReformatComp(comp); setReformatMode('format'); setReformatFormat(''); setReformatTemplateId('') }}
         />
+      )}
+
+      {/* Re-format modal */}
+      {reformatComp && (
+        <Modal isOpen={true} onClose={() => !reformatting && setReformatComp(null)}>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Shuffle className="w-5 h-5 text-white/60" />
+              <h2 className="text-xl font-heading font-semibold">Re-format Draft</h2>
+            </div>
+            {reformatComp.ideaText && (
+              <div className="bg-gray-900 rounded-lg p-3 border border-gray-800 max-h-[80px] overflow-y-auto">
+                <p className="text-xs text-gray-400 whitespace-pre-wrap">{reformatComp.ideaText}</p>
+              </div>
+            )}
+            <div className="flex bg-gray-900 p-1 rounded-lg border border-gray-800">
+              {(['format', 'template'] as const).map(mode => (
+                <button
+                  key={mode}
+                  onClick={() => { setReformatMode(mode); setReformatFormat(''); setReformatTemplateId('') }}
+                  className={cn('flex-1 py-1.5 text-xs font-bold rounded-md transition-all', reformatMode === mode ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white')}
+                >
+                  {mode === 'format' ? 'By Format' : 'Specific Template'}
+                </button>
+              ))}
+            </div>
+            {reformatMode === 'format' ? (
+              <div>
+                <label className="text-xs text-gray-400 block mb-2">Choose a format — a template will be picked at random</label>
+                <div className="flex flex-wrap gap-2">
+                  {[...new Set(availableTemplates.map(t => t.format).filter(Boolean))].map(fmt => {
+                    const Icon = FORMAT_ICON[fmt]
+                    return (
+                      <button
+                        key={fmt}
+                        onClick={() => setReformatFormat(fmt === reformatFormat ? '' : fmt)}
+                        className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all', reformatFormat === fmt ? 'bg-accent border-accent text-white' : 'border-white/10 text-gray-400 hover:border-white/30 hover:text-white')}
+                      >
+                        {Icon && <Icon size={12} />}
+                        {FORMAT_LABEL[fmt] ?? fmt}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Choose a template</label>
+                <select
+                  className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-sm"
+                  value={reformatTemplateId}
+                  onChange={e => setReformatTemplateId(e.target.value)}
+                  disabled={reformatting}
+                >
+                  <option value="">Select a template…</option>
+                  {availableTemplates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+            )}
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" disabled={reformatting} onClick={() => setReformatComp(null)}>Cancel</Button>
+              <Button
+                disabled={reformatting || (reformatMode === 'format' ? !reformatFormat : !reformatTemplateId)}
+                onClick={handleReformat}
+                className="bg-accent text-white"
+              >
+                {reformatting ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Re-formatting…</> : <><Shuffle className="w-4 h-4 mr-2" />Re-format</>}
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   )

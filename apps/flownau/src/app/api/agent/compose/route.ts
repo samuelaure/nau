@@ -93,9 +93,9 @@ export async function POST(req: Request) {
       }
     }
 
-    // Resolve templateId: explicit > auto-pick for slot format > from existing post > none
+    // Resolve templateId: explicit > auto-pick for format (with or without slot) > from existing post > none
     let resolvedTemplateId: string | undefined = templateId
-    if (!resolvedTemplateId && targetSlotId) {
+    if (!resolvedTemplateId && format) {
       const key = format === 'trial_reel' ? 'reel' : format
       const configs = await prisma.brandTemplateConfig.findMany({
         where: { brandId, enabled: true, template: { format: key } },
