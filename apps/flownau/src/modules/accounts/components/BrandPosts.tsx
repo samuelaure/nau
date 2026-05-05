@@ -531,7 +531,7 @@ const handleSavePrompt = async (text: string) => {
         const slotRes = await fetch(`/api/brands/${brandId}/slots?limit=1`)
         const slotData = slotRes.ok ? await slotRes.json() : null
         const nextEmptySlot = slotData?.slots?.find((s: any) => s.status === 'empty')
-        finalFormat = nextEmptySlot?.format ?? 'head_talk'
+        finalFormat = nextEmptySlot?.format ?? 'reel'
       }
       const res = await fetch('/api/agent/compose', {
         method: 'POST',
