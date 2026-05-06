@@ -77,7 +77,6 @@ export async function runDraftPipeline(input: DraftPipelineInput): Promise<Draft
     brandContext: brandContextStr,
     customPrompt: brand?.draftCustomPrompt ?? null,
     templateSchema,
-    templateCustomPrompt: template.systemPrompt ?? null,
     brandTemplatePrompt: brandTemplateConfig?.customPrompt ?? null,
     language,
   })

@@ -4,7 +4,6 @@ export type PromptLayer =
   | 'custom_prompt'
   | 'template_schema'
   | 'template_custom_prompt'
-  | 'brand_template_prompt'
   | 'selected_idea'
 
 export interface KernelInput {
@@ -12,7 +11,6 @@ export interface KernelInput {
   brandContext?: string | null
   customPrompt?: string | null
   templateSchema?: string | null
-  templateCustomPrompt?: string | null
   brandTemplatePrompt?: string | null
   selectedIdea?: string | null
   language?: string | null
@@ -155,31 +153,26 @@ export function buildPrompt(input: KernelInput): KernelOutput {
 
   const base = BASES[input.base]
   layers.base = base
-  parts.push(section('base', base))
+  parts.push(section('base', `This is the foundation of a composed prompt. Each section that follows adds a specific layer of context — brand, format, and customization — that narrows and shapes the output. This base defines the role, craft principles, and non-negotiable rules that apply regardless of what any later section instructs.\n\n${base}`))
 
   if (input.brandContext?.trim()) {
     layers.brand_context = input.brandContext.trim()
-    parts.push(section('brand_context', input.brandContext.trim()))
+    parts.push(section('brand_context', `This is the brand you are creating content as. Everything you write should feel like it came from this specific voice, for this specific audience, from this specific point of view. Internalize it — do not just reference it.\n\n${input.brandContext.trim()}`))
   }
 
   if (input.customPrompt?.trim()) {
     layers.custom_prompt = input.customPrompt.trim()
-    parts.push(section('custom_prompt', `⚠️ These instructions override everything above. Follow them exactly.\n\n${input.customPrompt.trim()}`))
+    parts.push(section('custom_prompt', `These are brand-level content instructions that shape the overall direction of every piece created for this brand. They operate at a high level — influencing angle, tone, and priorities across all formats. Apply them as standing guidance throughout the composition.\n\n${input.customPrompt.trim()}`))
   }
 
   if (input.templateSchema?.trim()) {
     layers.template_schema = input.templateSchema.trim()
-    parts.push(section('template_schema', input.templateSchema.trim()))
-  }
-
-  if (input.templateCustomPrompt?.trim()) {
-    layers.template_custom_prompt = input.templateCustomPrompt.trim()
-    parts.push(section('template_custom_prompt', input.templateCustomPrompt.trim()))
+    parts.push(section('template_schema', `This defines the output structure you must fill. You are writing content for a short-form video format where each slot is a sequential segment of a single, continuous piece. The slots are not independent — they form one connected arc. Transitions between slots must feel natural and unbroken, as if the viewer is watching one uninterrupted delivery. Fill each slot according to its constraints; do not let the structure fragment the content.\n\n${input.templateSchema.trim()}`))
   }
 
   if (input.brandTemplatePrompt?.trim()) {
-    layers.brand_template_prompt = input.brandTemplatePrompt.trim()
-    parts.push(section('brand_template_prompt', `⚠️ Brand-specific template instructions — highest priority. Override anything above.\n\n${input.brandTemplatePrompt.trim()}`))
+    layers.template_custom_prompt = input.brandTemplatePrompt.trim()
+    parts.push(section('template_custom_prompt', `These are user-defined instructions specific to this template for this brand. They work alongside the brand-level instructions above — both layers are active and complementary, not mutually exclusive. Where they overlap, apply both; where they differ, these template-specific instructions take precedence for decisions within this format.\n\n${input.brandTemplatePrompt.trim()}`))
   }
 
   if (input.selectedIdea?.trim()) {
