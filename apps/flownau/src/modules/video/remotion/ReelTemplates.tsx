@@ -208,6 +208,7 @@ function FitText({
           lineHeight: 1.2,
           wordBreak: 'break-word',
           overflowWrap: 'break-word',
+          whiteSpace: 'pre-wrap',
           textShadow: '0 2px 20px rgba(0,0,0,0.8)',
           letterSpacing: '-0.5px',
           width: '100%',
