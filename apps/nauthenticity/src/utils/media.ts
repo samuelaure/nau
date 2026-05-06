@@ -45,7 +45,7 @@ export async function optimizeImage(inputPath: string, outputPath: string): Prom
   return new Promise((resolve, reject) => {
     logger.info(`[MediaUtils] Optimizing image: ${inputPath}`);
     ffmpeg(inputPath)
-      .outputOptions(['-q:v 2']) // High quality JPEG
+      .outputOptions(['-frames:v', '1', '-q:v', '2'])
       .on('end', () => {
         logger.info(`[MediaUtils] Image optimized successfully: ${outputPath}`);
         resolve();
