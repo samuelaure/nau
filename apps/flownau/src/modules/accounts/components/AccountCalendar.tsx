@@ -563,6 +563,8 @@ function CompositionModal({
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [contentOpen, setContentOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
+  const [recomposeOpen, setRecomposeOpen] = useState(false)
+  const [recomposeInstructions, setRecomposeInstructions] = useState('')
 
   const FormatIcon = FORMAT_ICON[comp.format] ?? Film
   const display = getDisplayStatus(comp.status)
@@ -762,7 +764,7 @@ function CompositionModal({
     }
   }
 
-  const handleAIRecompose = async () => {
+  const handleAIRecompose = async (instructions?: string) => {
     const ideaText = comp.ideaText?.trim() ?? ''
     if (ideaText.length < 3) {
       toast.error('Idea text is too short to recompose. Edit the post idea first.')
@@ -770,18 +772,21 @@ function CompositionModal({
     }
     setActioning(true)
     try {
-      // Pass templateId to lock the format and avoid slot reassignment
+      const body: Record<string, unknown> = { prompt: ideaText, brandId, format: comp.format, postId: comp.id, templateId: comp.templateId }
+      if (instructions?.trim()) body.recomposeInstructions = instructions.trim()
       const res = await fetch('/api/agent/compose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: ideaText, brandId, format: comp.format, postId: comp.id, templateId: comp.templateId }),
+        body: JSON.stringify(body),
       })
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        toast.error((body as { error?: string }).error ?? 'Failed to recompose post')
+        const err = await res.json().catch(() => ({}))
+        toast.error((err as { error?: string }).error ?? 'Failed to recompose post')
         return
       }
       toast.success('Recomposed — review and approve the draft.')
+      setRecomposeOpen(false)
+      setRecomposeInstructions('')
       onRefresh()
     } catch {
       toast.error('Failed to recompose post')
@@ -843,7 +848,7 @@ function CompositionModal({
     moreItems.push({ key: 'unschedule', label: 'Unschedule', icon: <CalendarX size={13} />, onClick: handleUnschedule })
   }
   if (comp.status === 'DRAFT_PENDING') {
-    moreItems.push({ key: 'ai-recompose', label: 'Re-compose', icon: <RefreshCw size={13} />, onClick: handleAIRecompose })
+    moreItems.push({ key: 'ai-recompose', label: 'Re-compose', icon: <RefreshCw size={13} />, onClick: () => { setRecomposeOpen(true); setMoreOpen(false) } })
     moreItems.push({ key: 'reformat', label: 'Re-format', icon: <Shuffle size={13} />, onClick: () => { onClose(); onReformat(comp) } })
   }
   if (display === 'Ready') {
@@ -1066,6 +1071,27 @@ function CompositionModal({
             </div>
           )}
         </div>
+
+        {/* Re-compose panel */}
+        {recomposeOpen && (
+          <div className="px-6 py-4 border-t border-white/5 flex flex-col gap-3">
+            <p className="text-xs text-text-secondary">What should change? <span className="text-white/40">(optional — leave blank for a completely fresh take)</span></p>
+            <textarea
+              value={recomposeInstructions}
+              onChange={(e) => setRecomposeInstructions(e.target.value)}
+              placeholder="e.g. Make the hook more punchy, focus on the result not the process…"
+              rows={3}
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/30 resize-none focus:outline-none focus:border-white/25"
+            />
+            <div className="flex items-center gap-2 justify-end">
+              <button onClick={() => { setRecomposeOpen(false); setRecomposeInstructions('') }} className="text-xs text-text-secondary hover:text-white transition-colors">Cancel</button>
+              <Button size="sm" onClick={() => handleAIRecompose(recomposeInstructions)} disabled={actioning} className="gap-1.5">
+                {actioning ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+                Compose
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Footer actions */}
         <div className="flex items-center gap-2 px-6 py-4 border-t border-white/5">

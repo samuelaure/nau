@@ -18,6 +18,7 @@ const ComposeRequestSchema = z.object({
     .default('reel'),
   postId: z.string().optional(),
   templateId: z.string().optional(),
+  recomposeInstructions: z.string().optional(),
 })
 
 export async function POST(req: Request) {
@@ -32,7 +33,7 @@ export async function POST(req: Request) {
       )
     }
 
-    const { prompt, brandId, format: requestedFormat, postId, templateId } = parsed.data
+    const { prompt, brandId, format: requestedFormat, postId, templateId, recomposeInstructions } = parsed.data
 
     const rateLimit = await checkRateLimit({
       key: `rate:compose:${brandId}`,
@@ -107,18 +108,28 @@ export async function POST(req: Request) {
     // ── Compose ───────────────────────────────────────────────────────────────
     const recentContext = await getRecentDraftContext(brandId)
 
+    let currentDraft: { creative: Record<string, unknown>; caption: string } | null = null
+    if (postId) {
+      const existing = await prisma.post.findUnique({ where: { id: postId }, select: { creative: true, caption: true } })
+      if (existing?.creative) {
+        currentDraft = { creative: existing.creative as Record<string, unknown>, caption: existing.caption ?? '' }
+      }
+    }
+
     const result = await runDraftPipeline({
       ideaText: prompt,
       brandId,
       templateId: resolvedTemplateId,
       recentContext,
+      currentDraft,
+      recomposeInstructions: recomposeInstructions ?? null,
     })
 
     const creativeData = result.creative as unknown as Prisma.InputJsonValue
 
     let updatedPost
     if (postId) {
-      const existing = await prisma.post.findUnique({ where: { id: postId }, select: { llmTrace: true } })
+      const existingTrace = await prisma.post.findUnique({ where: { id: postId }, select: { llmTrace: true } })
       updatedPost = await prisma.post.update({
         where: { id: postId },
         data: {
@@ -128,7 +139,7 @@ export async function POST(req: Request) {
           hashtags: result.hashtags,
           status: draftStatus,
           templateId: resolvedTemplateId,
-          llmTrace: { ...(existing?.llmTrace as object ?? {}), draftTrace: result.trace } as unknown as Prisma.InputJsonValue,
+          llmTrace: { ...(existingTrace?.llmTrace as object ?? {}), draftTrace: result.trace } as unknown as Prisma.InputJsonValue,
         },
       })
     } else {

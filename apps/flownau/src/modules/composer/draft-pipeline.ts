@@ -25,6 +25,8 @@ export interface DraftPipelineInput {
   brandId: string
   templateId: string
   recentContext?: string | null
+  currentDraft?: { creative: Record<string, unknown>; caption: string } | null
+  recomposeInstructions?: string | null
 }
 
 export interface DraftPipelineResult {
@@ -38,7 +40,7 @@ export interface DraftPipelineResult {
 }
 
 export async function runDraftPipeline(input: DraftPipelineInput): Promise<DraftPipelineResult> {
-  const { ideaText, brandId, templateId, recentContext } = input
+  const { ideaText, brandId, templateId, recentContext, currentDraft, recomposeInstructions } = input
 
   logger.info({ brandId, templateId }, '[DraftPipeline] Starting composition')
 
@@ -80,7 +82,7 @@ export async function runDraftPipeline(input: DraftPipelineInput): Promise<Draft
     language,
   })
 
-  const userMessage = buildUserMessage(ideaText, recentContext)
+  const userMessage = buildUserMessage(ideaText, recentContext, currentDraft, recomposeInstructions)
 
   logger.info({ brandId, templateId, format }, '[DraftPipeline] Prompt assembled')
 
@@ -284,8 +286,25 @@ function mergeSlotOverrides(
   })
 }
 
-function buildUserMessage(ideaText: string, recentContext?: string | null): string {
+function buildUserMessage(
+  ideaText: string,
+  recentContext?: string | null,
+  currentDraft?: { creative: Record<string, unknown>; caption: string } | null,
+  recomposeInstructions?: string | null,
+): string {
   let msg = `Create the content for this idea:\n\n${ideaText}`
   if (recentContext) msg += `\n\n${recentContext}`
+  if (currentDraft) {
+    const slots = (currentDraft.creative as { slots?: Record<string, string> }).slots
+    const draftSummary = slots && Object.keys(slots).length > 0
+      ? Object.entries(slots).map(([k, v]) => `[${k}]: ${v}`).join('\n')
+      : currentDraft.caption
+    msg += `\n\n--- RECOMPOSE REQUEST ---\nThe user wants a fresh recompose. Below is what was already generated — do NOT repeat the same structure, phrasing, or angle:\n\n${draftSummary}`
+    if (currentDraft.caption) msg += `\n\nCaption: ${currentDraft.caption}`
+    const instruction = recomposeInstructions?.trim()
+    msg += instruction
+      ? `\n\nThe user specifically wants: ${instruction}`
+      : '\n\nGenerate a meaningfully different take — different hook angle, different flow, different phrasing.'
+  }
   return msg
 }
