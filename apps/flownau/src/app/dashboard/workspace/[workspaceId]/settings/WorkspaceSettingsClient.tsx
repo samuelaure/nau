@@ -227,19 +227,21 @@ export default function WorkspaceSettingsClient({
           <div className="mt-4 flex flex-col gap-3 pt-4 border-t border-gray-800">
             <h3 className="text-sm font-semibold text-gray-300">Add Collaborator</h3>
             <div className="flex gap-2">
-              <Input
-                type="email"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                placeholder="user@example.com"
-                className="bg-gray-950 border-gray-800 text-white min-w-0 flex-1"
-                disabled={inviting}
-                onKeyDown={(e) => e.key === 'Enter' && handleInvite()}
-              />
+              <div className="flex-1 min-w-0">
+                <Input
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  placeholder="user@example.com"
+                  className="bg-gray-950 border-gray-800 text-white"
+                  disabled={inviting}
+                  onKeyDown={(e) => e.key === 'Enter' && handleInvite()}
+                />
+              </div>
               <select
                 value={inviteRole}
                 onChange={(e) => setInviteRole(e.target.value as 'admin' | 'member')}
-                className="bg-gray-950 border border-gray-800 text-white rounded p-2 text-sm w-28 shrink-0"
+                className="bg-gray-950 border border-gray-800 text-white rounded p-2 text-sm w-20 shrink-0"
                 disabled={inviting}
               >
                 <option value="member">Member</option>
