@@ -60,9 +60,10 @@ export class IngestionService {
 
     const { phase, id: runId } = run
     if (phase === 'downloading') {
-      const pendingMedia = await this.prisma.media.findMany({
-        where: { post: { runId }, storageUrl: { not: { startsWith: '/content/' } } },
-      })
+      // Only re-queue media where storageUrl still equals the original CDN/source url
+      // (i.e. not yet moved to our own storage). storageUrl !== url means already downloaded.
+      const allMedia = await this.prisma.media.findMany({ where: { post: { runId } } })
+      const pendingMedia = allMedia.filter((m) => m.storageUrl === m.url)
       for (const m of pendingMedia) {
         await downloadQueue.add('process-media', {
           postId: m.postId,
@@ -72,6 +73,20 @@ export class IngestionService {
           type: m.type,
           username,
         })
+      }
+    } else if (phase === 'transcribing') {
+      // Guard: skip re-queuing if all video media already have transcripts — prevents duplicate Whisper calls
+      const videoMedia = await this.prisma.media.findMany({
+        where: { post: { runId }, type: 'video' },
+        include: { transcript: true },
+      })
+      const needsTranscription = videoMedia.filter((m) => !m.transcript)
+      if (needsTranscription.length === 0) {
+        // All done — advance to next step
+        await this.prisma.scrapingRun.update({ where: { id: run.id }, data: { phase: 'embedding' } })
+        await computeQueue.add('embed-batch', { runId, username })
+      } else {
+        await computeQueue.add('transcribe-batch', { runId, username })
       }
     } else {
       const stepName = (Object.keys(PHASE_LABELS) as PipelineStepName[]).find(

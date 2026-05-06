@@ -90,6 +90,30 @@ export class WorkersService implements OnApplicationBootstrap, OnApplicationShut
         await prisma.scrapingRun.update({ where: { id: run.id }, data: { phase: 'visualizing' } })
         await computeQueue.add('visualize-batch', { runId: run.id, username })
       }
+
+      // Runs stuck in 'transcribing': worker crashed mid-transcription.
+      // Re-queue only if there are still videos without transcripts — prevents duplicate Whisper calls on restart.
+      const stuckInTranscribing = await prisma.scrapingRun.findMany({
+        where: { phase: 'transcribing', status: 'pending', isPaused: false },
+        include: { posts: { include: { media: { include: { transcript: true } } } } },
+      })
+
+      for (const run of stuckInTranscribing) {
+        const username = run.posts[0]?.username
+        if (!username) continue
+
+        const videoMedia = run.posts.flatMap((p) => p.media).filter((m) => m.type === 'video')
+        const needsTranscription = videoMedia.filter((m) => !m.transcript)
+
+        if (needsTranscription.length === 0) {
+          this.logger.warn(`[Recovery] Run ${run.id} stuck in transcribing but all done — advancing to embedding`)
+          await prisma.scrapingRun.update({ where: { id: run.id }, data: { phase: 'embedding' } })
+          await computeQueue.add('embed-batch', { runId: run.id, username })
+        } else {
+          this.logger.warn(`[Recovery] Run ${run.id} stuck in transcribing — re-queuing (${needsTranscription.length} videos remaining)`)
+          await computeQueue.add('transcribe-batch', { runId: run.id, username })
+        }
+      }
     } catch (err) {
       this.logger.error(`[Recovery] Startup recovery failed: ${err}`)
     }
