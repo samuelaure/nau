@@ -110,7 +110,8 @@ export const ingestProfile = async (
             ...(scrapeResult.profile.postsCount != null ? { totalPostCount: scrapeResult.profile.postsCount } : {}),
           },
         });
-        // Queue Profile Image download
+      }
+      if (hdUrl) {
         await downloadQueue.add('process-profile-image', {
           username: scrapeResult.profile.username,
           url: hdUrl,
@@ -209,12 +210,8 @@ export const ingestProfile = async (
             })
           : null;
 
-        // Queue collab profile image download if we have a URL and it's not local
-        if (
-          collab.profilePicUrl &&
-          (!collabAccount?.profileImageUrl ||
-            !collabAccount.profileImageUrl.startsWith('/content/'))
-        ) {
+        // Queue collab profile image download only if we don't have one stored yet
+        if (collab.profilePicUrl && !collabAccount?.profileImageUrl) {
           await downloadQueue.add('process-profile-image', {
             username: collab.username,
             url: collab.profilePicUrl,
@@ -297,8 +294,10 @@ export const ingestProfile = async (
         let mediaInDb = post.media.find((m) => m.index === i);
 
         if (mediaInDb) {
-          // IMPORTANT: If we already have a local path, DO NOT overwrite with CDN link
-          if (!mediaInDb.storageUrl.startsWith('/content/')) {
+          // Only overwrite storageUrl if we haven't yet moved the file to our own storage.
+          // After download/optimization, storageUrl differs from the original url.
+          const notYetDownloaded = mediaInDb.storageUrl === mediaInDb.url;
+          if (notYetDownloaded) {
             mediaInDb = await prisma.media.update({
               where: { id: mediaInDb.id },
               data: { storageUrl: media.url, url: media.url },
@@ -318,8 +317,8 @@ export const ingestProfile = async (
         }
 
         // 6. Queue for Local Storage (Both Images and Videos)
-        // If it's already local, we skip
-        if (!mediaInDb.storageUrl.startsWith('/content/')) {
+        // Skip if already moved to our own storage (storageUrl has been updated from the original url)
+        if (mediaInDb.storageUrl === mediaInDb.url) {
           await downloadQueue.add(
             'process-media',
             {

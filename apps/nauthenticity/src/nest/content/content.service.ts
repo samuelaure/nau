@@ -138,7 +138,12 @@ export class ContentService {
     const [totalPosts, totalMedia, localMedia, totalTranscripts, activeRun] = await Promise.all([
       this.prisma.post.count({ where: { username } }),
       this.prisma.media.count({ where: { post: { username } } }),
-      this.prisma.media.count({ where: { post: { username }, storageUrl: { startsWith: '/content/' } } }),
+      this.prisma.$queryRaw<[{ count: bigint }]>`
+        SELECT COUNT(*) as count FROM "Media" m
+        JOIN "Post" p ON m."postId" = p.id
+        WHERE p.username = ${username}
+          AND m."storageUrl" IS DISTINCT FROM m.url
+      `.then(r => Number(r[0]?.count ?? 0)),
       this.prisma.transcript.count({ where: { post: { username } } }),
       this.prisma.scrapingRun.findFirst({ where: { username, status: 'pending' }, orderBy: { createdAt: 'desc' } }),
     ])
@@ -157,7 +162,7 @@ export class ContentService {
         platformId: true,
         postedAt: true,
         caption: true,
-        media: { select: { id: true, type: true, storageUrl: true } },
+        media: { select: { id: true, type: true, url: true, storageUrl: true } },
         transcripts: { select: { id: true, text: true }, take: 1 },
       },
     })
@@ -200,7 +205,7 @@ export class ContentService {
         postedAt: p.postedAt,
         caption: p.caption?.slice(0, 80),
         mediaCount: p.media.length,
-        downloaded: p.media.every((m) => m.storageUrl.startsWith('/content/')),
+        downloaded: p.media.every((m) => m.storageUrl !== m.url),
         hasVideo: p.media.some((m) => m.type === 'video'),
         transcribed: p.transcripts.length > 0,
         transcriptPreview: p.transcripts[0]?.text?.slice(0, 80) ?? null,
