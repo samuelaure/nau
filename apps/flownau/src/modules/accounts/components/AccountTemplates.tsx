@@ -25,7 +25,14 @@ const FORMAT_COLOR: Record<string, string> = {
   static_post: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/20',
 }
 
-type SlotDef = { key: string; label: string; intention: string; minWords?: number; maxWords: number; style: string }
+type SlotDef = { key: string; label: string; intention: string; minWords?: number; maxWords: number; style?: string }
+
+const CAPTION_SLOT: SlotDef = {
+  key: 'caption',
+  label: 'Caption',
+  intention: 'Instagram caption for when this video is published. 2-3 sentences, engaging, no hashtags.',
+  maxWords: 60,
+}
 
 type SlotOverrides = Record<string, { intention?: string; minWords?: number; maxWords?: number }>
 
@@ -401,7 +408,7 @@ function TemplateModal({
               )}
             </div>
 
-            {/* Slot overrides — only for slot-based templates */}
+            {/* Slot overrides — text slots for slot-based templates */}
             {slotSchema && slotSchema.length > 0 && (
               <div className="space-y-2">
                 <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">What the AI fills in</p>
@@ -419,6 +426,18 @@ function TemplateModal({
                 </div>
               </div>
             )}
+
+            {/* Caption customization — available for all templates */}
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">Caption</p>
+              <p className="text-[11px] text-gray-600">Customize how the AI writes the Instagram caption for this brand.</p>
+              <SlotOverrideRow
+                slot={CAPTION_SLOT}
+                override={slotOverrides['caption']}
+                onChange={handleSlotChange}
+                onRestore={handleSlotRestore}
+              />
+            </div>
 
             {/* Read-only head-talk / content schema sections */}
             {!slotSchema && htSections && htSections.length > 0 && (

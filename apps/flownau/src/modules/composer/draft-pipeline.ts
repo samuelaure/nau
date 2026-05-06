@@ -65,9 +65,10 @@ export async function runDraftPipeline(input: DraftPipelineInput): Promise<Draft
   const brandContextStr = renderBrandContextBlock({ name: brand?.name ?? null, context: brand?.context ?? null }) || null
 
   const slotOverrides = (brandTemplateConfig?.slotOverrides ?? null) as Record<string, { intention?: string; minWords?: number; maxWords?: number }> | null
+  const captionOverride = slotOverrides?.['caption'] ?? null
   const mergedTemplate = slotOverrides ? { ...template, slotSchema: mergeSlotOverrides(template.slotSchema, slotOverrides) } : template
 
-  const templateSchema = buildTemplateSchemaBlock(format, mergedTemplate)
+  const templateSchema = buildTemplateSchemaBlock(format, mergedTemplate, captionOverride)
 
   const { systemPrompt, layers } = buildPrompt({
     base: 'draft',
@@ -225,7 +226,20 @@ async function runSlotPath(args: {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function buildTemplateSchemaBlock(format: string, template: { slotSchema: unknown; contentSchema: unknown; schemaJson: unknown }): string | null {
+function buildCaptionInstruction(override: { intention?: string; minWords?: number; maxWords?: number } | null): string {
+  if (!override) return '• caption — Instagram caption (max 300 chars, 2-3 sentences, no hashtags)'
+  const intention = override.intention ?? 'Instagram caption (2-3 sentences, no hashtags)'
+  const wordRange = override.minWords != null
+    ? `min ${override.minWords}, max ${override.maxWords ?? 60} words`
+    : `max ${override.maxWords ?? 60} words`
+  return `• caption — ${intention} (${wordRange})`
+}
+
+function buildTemplateSchemaBlock(
+  format: string,
+  template: { slotSchema: unknown; contentSchema: unknown; schemaJson: unknown },
+  captionOverride: { intention?: string; minWords?: number; maxWords?: number } | null = null,
+): string | null {
   if (template.slotSchema) {
     const slotDefs = template.slotSchema as unknown as SlotDef[]
     const isMultiSlot = slotDefs.length > 1
@@ -241,11 +255,18 @@ function buildTemplateSchemaBlock(format: string, template: { slotSchema: unknow
       ? `\nMULTI-SLOT NARRATIVE RULE: These slots are shown sequentially. They must read as ONE continuous thought — write the complete arc first, then carve it into slots at natural break points.\n`
       : ''
 
-    return `SLOTS TO FILL:\n${slotBlock}\n${multiSlotRule}\nAlso write:\n• caption — Instagram caption (max 300 chars, 2-3 sentences, no hashtags)\n• hashtags — 5–10 relevant hashtags (without # prefix)\n• brollMood — 1-2 mood/theme keywords for B-roll asset selection\n\nRespond ONLY with valid JSON matching the schema. Never mention @handles.`
+    const captionLine = buildCaptionInstruction(captionOverride)
+
+    return `SLOTS TO FILL:\n${slotBlock}\n${multiSlotRule}\nAlso write:\n${captionLine}\n• hashtags — 5–10 relevant hashtags (without # prefix)\n• brollMood — 1-2 mood/theme keywords for B-roll asset selection\n\nRespond ONLY with valid JSON matching the schema. Never mention @handles.`
   }
 
   if (template.contentSchema) {
-    return `OUTPUT SCHEMA:\n\`\`\`json\n${JSON.stringify(template.contentSchema, null, 2)}\n\`\`\``
+    let block = `OUTPUT SCHEMA:\n\`\`\`json\n${JSON.stringify(template.contentSchema, null, 2)}\n\`\`\``
+    if (captionOverride) {
+      const captionNote = buildCaptionInstruction(captionOverride).replace('• caption — ', '')
+      block += `\n\nCaption requirement: ${captionNote}`
+    }
+    return block
   }
 
   return null
