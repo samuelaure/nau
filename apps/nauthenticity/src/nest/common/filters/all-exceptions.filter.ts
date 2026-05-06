@@ -5,9 +5,14 @@ import {
   HttpException,
   HttpStatus,
   Logger,
+  NotFoundException,
 } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
 import { Prisma } from '../../../../node_modules/.prisma/client'
+import nodePath from 'path'
+import fs from 'fs'
+
+const SPA_INDEX = nodePath.join(__dirname, '../../../../dashboard/dist/index.html')
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -20,6 +25,20 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const ctx = host.switchToHttp()
     const request = ctx.getRequest<{ method: string }>()
     const path = httpAdapter.getRequestUrl(ctx.getRequest())
+
+    // SPA fallback: GET requests that are not API routes and got a 404 should
+    // receive index.html so React Router can handle client-side navigation.
+    if (
+      exception instanceof NotFoundException &&
+      request.method === 'GET' &&
+      !path.startsWith('/api/') &&
+      !path.startsWith('/auth/') &&
+      !path.startsWith('/health') &&
+      fs.existsSync(SPA_INDEX)
+    ) {
+      const res = ctx.getResponse<import('express').Response>()
+      return void res.sendFile(SPA_INDEX)
+    }
 
     let httpStatus = HttpStatus.INTERNAL_SERVER_ERROR
     let message = 'Internal server error'
