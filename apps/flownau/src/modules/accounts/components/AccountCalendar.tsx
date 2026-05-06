@@ -862,7 +862,7 @@ function CompositionModal({
     moreItems.push({ key: 'post-now', label: 'Post now', icon: <Send size={13} />, onClick: handlePostNow, className: 'text-green-300 hover:text-green-200' })
   }
   if (comp.llmTrace && Object.keys(comp.llmTrace).length > 0) {
-    moreItems.push({ key: 'prompts', label: 'See used prompts', icon: <ScrollText size={13} />, onClick: () => onShowPrompts(comp) })
+    moreItems.push({ key: 'prompts', label: 'Used prompts', icon: <ScrollText size={13} />, onClick: () => onShowPrompts(comp) })
   }
 
   return (
