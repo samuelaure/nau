@@ -118,32 +118,19 @@ export default function AssetsManager({
 
           const buffer = await file.arrayBuffer()
           const hashBuffer = await crypto.subtle.digest('SHA-256', buffer)
-          const hashArray = Array.from(new Uint8Array(hashBuffer))
-          const hash = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
+          const hash = Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, '0')).join('')
 
-          setUpload({ progress: `Uploading ${file.name}…` })
-          toast.loading(`Uploading ${i + 1} of ${acceptedFiles.length} — ${file.name}`, { id: TOAST_ID, duration: Infinity })
-
-          const formData = new FormData()
-          formData.append('file', file)
-          formData.append('hash', hash)
-          if (ownerType === 'brand') formData.append('brandId', ownerId)
-          else formData.append('templateId', ownerId)
-
+          // Step 1: get a presigned URL (lightweight JSON request — no file bytes through server)
+          let presignData: { assetId: string; uploadUrl: string; cdnUrl: string; r2Key: string; ext: string; type: string; contextAccountId: string | null }
           try {
-            await axios.post('/api/protected/upload', formData, {
-              onUploadProgress: (progressEvent) => {
-                const total = progressEvent.total || 0
-                if (total > 0) {
-                  const pct = Math.round((progressEvent.loaded * 100) / total)
-                  setUpload({ uploadPercentage: pct, progress: `Uploading ${file.name}…` })
-                  toast.loading(
-                    `Uploading ${i + 1} of ${acceptedFiles.length} — ${file.name} (${pct}%)`,
-                    { id: TOAST_ID, duration: Infinity },
-                  )
-                }
-              },
+            const presignRes = await axios.post('/api/protected/upload/presign', {
+              filename: file.name,
+              mimeType: file.type,
+              size: file.size,
+              hash,
+              ...(ownerType === 'brand' ? { brandId: ownerId } : { templateId: ownerId }),
             })
+            presignData = presignRes.data
           } catch (error: any) {
             if (error.response?.status === 409) {
               const msg = error.response.data?.message || 'duplicate detected'
@@ -152,6 +139,38 @@ export default function AssetsManager({
             }
             throw error
           }
+
+          // Step 2: upload directly to R2 (bypasses server — no memory pressure)
+          setUpload({ progress: `Uploading ${file.name}…` })
+          await axios.put(presignData.uploadUrl, file, {
+            headers: { 'Content-Type': file.type },
+            onUploadProgress: (progressEvent) => {
+              const total = progressEvent.total || 0
+              if (total > 0) {
+                const pct = Math.round((progressEvent.loaded * 100) / total)
+                setUpload({ uploadPercentage: pct, progress: `Uploading ${file.name}…` })
+                toast.loading(
+                  `Uploading ${i + 1} of ${acceptedFiles.length} — ${file.name} (${pct}%)`,
+                  { id: TOAST_ID, duration: Infinity },
+                )
+              }
+            },
+          })
+
+          // Step 3: confirm — server creates DB record and queues background optimization
+          await axios.post('/api/protected/upload/confirm', {
+            assetId: presignData.assetId,
+            r2Key: presignData.r2Key,
+            cdnUrl: presignData.cdnUrl,
+            ext: presignData.ext,
+            type: presignData.type,
+            contextAccountId: presignData.contextAccountId,
+            templateId: ownerType === 'template' ? ownerId : null,
+            originalFilename: file.name,
+            mimeType: file.type,
+            hash,
+            size: file.size,
+          })
         }
         toast.success('All assets uploaded successfully', { id: TOAST_ID })
         window.location.reload()
