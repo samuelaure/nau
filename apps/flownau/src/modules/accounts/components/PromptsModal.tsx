@@ -76,7 +76,7 @@ function TraceSection({ label, trace }: { label: string; trace: TraceEntry }) {
                 <div className="flex justify-end mb-1.5">
                   <CopyButton text={trace.systemPrompt} />
                 </div>
-                <pre className="text-[11px] text-gray-300 whitespace-pre-wrap font-mono leading-relaxed bg-black/30 rounded-lg p-3 max-h-64 overflow-y-auto border border-white/5">
+                <pre className="text-[11px] text-gray-300 whitespace-pre-wrap font-mono leading-relaxed bg-black/30 rounded-lg p-3 min-h-32 max-h-96 overflow-y-auto resize-y border border-white/5">
                   {trace.systemPrompt}
                 </pre>
               </div>
@@ -100,7 +100,7 @@ function TraceSection({ label, trace }: { label: string; trace: TraceEntry }) {
                 <div className="flex justify-end mb-1.5">
                   <CopyButton text={trace.userMessage} />
                 </div>
-                <pre className="text-[11px] text-gray-300 whitespace-pre-wrap font-mono leading-relaxed bg-black/30 rounded-lg p-3 max-h-40 overflow-y-auto border border-white/5">
+                <pre className="text-[11px] text-gray-300 whitespace-pre-wrap font-mono leading-relaxed bg-black/30 rounded-lg p-3 min-h-24 max-h-64 overflow-y-auto resize-y border border-white/5">
                   {trace.userMessage}
                 </pre>
               </div>
@@ -129,7 +129,7 @@ export default function PromptsModal({ llmTrace, onClose }: { llmTrace: LlmTrace
   const modal = (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-2xl bg-panel border border-white/10 rounded-2xl shadow-2xl flex flex-col max-h-[85vh]">
+      <div className="relative z-10 w-full max-w-4xl bg-panel border border-white/10 rounded-2xl shadow-2xl flex flex-col max-h-[85vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 shrink-0">
           <div>
