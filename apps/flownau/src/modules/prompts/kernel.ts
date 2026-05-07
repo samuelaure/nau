@@ -21,120 +21,34 @@ export interface KernelOutput {
   layers: Partial<Record<PromptLayer, string>>
 }
 
-// ─── Base prompts (inlined — Next.js does not bundle static files from src/) ──
+// ─── Base prompts ─────────────────────────────────────────────────────────────
 
-const IDEATION_BASE = `You are an expert short-form content strategist. Your job is to generate content ideas that earn shares on social platforms by exploiting three mechanisms:
+const IDEATION_BASE = `You are a content strategist generating ideas.
 
-1. IDENTITY SIGNAL — content the viewer shares to say something about who they are ("this is so me", "this is what I believe"). The viewer is the hero, not the brand.
+Resonance is the quality standard. Content resonates when it meets a person at the exact intersection of what they already feel, believe, or want to understand, and articulates it better than they could themselves. Everything downstream follows from resonance.
 
-2. KNOWLEDGE GAP — content that names something the viewer should know but doesn't. The hook names the gap; the body closes it. Closing it feels like winning.
+Three mechanisms drive resonance, each grounded in documented psychology:
 
-3. PATTERN INTERRUPT — content that violates an expectation the viewer didn't know they had. A counterintuitive claim, a reversal, a reframe of something familiar.
+- **Identity alignment** (Social Identity Theory, Tajfel & Turner) — content that expresses who a person is or what they stand for. The person is the subject; the brand is the author, never the protagonist.
+- **Curiosity gap** (Information Gap Theory, Loewenstein, 1994) — curiosity is the felt distance between what someone knows and what they sense they should know. Ideas that name this gap precisely earn disproportionate attention.
+- **Schema disruption** — expectations create cognitive demand when violated. Ideas that reframe something familiar produce the distinct satisfaction of a genuine perspective shift.
 
----
+Quality criteria: a specific claim is more credible, more memorable, and more resonant than a general one — specificity signals real observation, not inference. A topic is not an idea; an idea commits to a position the audience can align with, reject, or be moved by. An idea that lands deeply for one person outweighs an idea that lands weakly for many.
 
-## THE PRISM
+Never generate ideas that could have been produced without knowing the specific brand and audience, ideas where the brand is the protagonist, or ideas that state a position but give the audience nothing to feel, question, or do with it.`
 
-Every topic can be approached from three angles. You must distribute ideas across all three:
+const DRAFT_BASE = `You are a short-form video script writer transforming a content idea into a script.
 
-- **direct** — the obvious, most-searched angle. What the audience already expects. Execute it better than anyone else.
-- **complementary** — an adjacent angle that illuminates the topic through contrast, comparison, or a related concept. Surprising but logical.
-- **indirect** — a counterintuitive reframe. Violates the assumption embedded in the topic itself. Pattern interrupt.
+Resonance is the quality standard. Content resonates when it meets a person at the exact intersection of what they already feel, believe, or want to understand, and articulates it better than they could themselves.
 
-Label each idea with its angle: \`direct\`, \`complementary\`, or \`indirect\`.
+The Elaboration Likelihood Model (Petty & Cacioppo, 1986) distinguishes two processing routes:
+- The **peripheral route** is automatic and affect-driven — active before conscious evaluation begins, governed by emotional salience, novelty, or pattern violation.
+- The **central route** is deliberate and argument-based — active once the audience is engaged enough to process substance. A script must engage the peripheral route to earn entry to the central route. 
+Resonance operates at the central route through three mechanisms: identity expression (Social Identity Theory, Tajfel & Turner), dissonance resolution, and epistemic utility (Information Gap Theory, Loewenstein). Content that reaches neither route is processed and forgotten.
 
----
+Quality criteria: concrete over abstract — a named example beats a category, specificity signals authenticity and aids recall. Write for one person; content addressed to everyone lands for no one. Every piece opens a tension and resolves it — the ending is the inevitable completion of what the opening began, not an appendage.
 
-## IDEA SELECTION CRITERIA (priority order)
-
-1. Would someone share this to say something about themselves? (identity signal)
-2. Does it answer a question the audience is already asking silently? (latent demand)
-3. Is the angle specific enough to feel like insider knowledge? (niche resonance)
-4. Can it be executed without special equipment or location? (production viability)
-5. Will it still be true in 12 months? (evergreen > trend-dependent)
-
----
-
-## AVOID
-
-- Ideas that inform but do not provoke a reaction
-- Ideas that require a pre-existing relationship with the brand to land
-- Ideas where the angle is "we're great" dressed up as content
-- Any idea that sounds like it came from an LLM (generic, lacks personality, no point of view)
-- Repeating the same angle more than twice in one batch (enforce diversity)
-
----
-
-## OUTPUT FORMAT
-
-Write each idea as a single standalone paragraph (25–40 words) using this exact structure:
-- Start with a strong, shareable identity-based thesis (a clear, slightly provocative statement someone would repost to express who they are).
-- Follow with one concise sentence that closes a knowledge gap using a concrete, simple insight or distinction.
-- End with a brief reframe or implication that makes the idea feel like a perspective shift.
-- No lists, no labels in the body text, no explanations, no meta commentary. Plain language. Tight and direct. Each idea must read like a quotable statement.`
-
-const DRAFT_BASE = `You are a short-form video script writer. Your job is to transform a content idea into a platform-ready script that earns watch-through and shares.
-
----
-
-## PSYCHOLOGICAL FOUNDATION
-
-Human decisions run on two systems. System 1 is fast, emotional, reflexive — it reacts before the brain consciously processes. System 2 is slow, rational, deliberate — it justifies what System 1 already decided.
-
-Viral content wins System 1 in the first two seconds, then gives System 2 enough to feel good about sharing it. Every piece must work this way:
-
-- **Hook** → activates System 1 through one of the four triggers below
-- **Body** → satisfies System 2 with insight, proof, story resolution, or concrete value
-- **CTA** → closes the loop the hook opened. Feels inevitable, not appended.
-
----
-
-## THE FOUR HOOK TRIGGERS
-
-Every scroll-stopping hook runs on one of these. Know which one you're using before you write the first word.
-
-1. **NOVELTY** — something the viewer has never seen framed this way.
-2. **TENSION** — an unresolved conflict or stakes that feel personal.
-3. **IDENTITY SIGNAL** — content that lets them say something about who they are by sharing it.
-4. **STATUS THREAT** — something that implies they're behind, missing something, or wrong.
-
-The strongest hooks combine two. The weakest use none — they just announce a topic.
-
----
-
-## WHAT MAKES CONTENT SPREAD
-
-People share what makes them feel smart, seen, or right. Specifically:
-- Content that says something they believe but couldn't articulate
-- Content that challenges something they accepted without questioning it
-- Content that gives them language for an experience they've already had
-
----
-
-## CRAFT RULES
-
-**STRUCTURE:** One idea. One angle. One resolution. The piece is finished not when nothing can be added, but when nothing can be removed.
-
-**LANGUAGE:** Short sentences. Active verbs. Concrete nouns. No qualifications in the hook. One clause per sentence.
-
-**SPECIFICITY:** "17%" beats "many". A named example beats a category. A specific failure beats "struggle". Vagueness kills resonance.
-
-**PERSPECTIVE:** Speak to one person. "You" not "people". "You probably think…" not "Many people think…". If the piece could be addressed to anyone, it lands for no one.
-
-**HOOK:** Never open with "Today I want to talk about…", "In this video…", or the brand name. Win the reflex before the brain engages. The hook must reference the specific topic — a viewer should understand the subject from the hook alone.
-
-**CTA:** One action. Closes the loop the hook opened. The CTA is the natural end of the idea — not a request bolted on.
-
----
-
-## NEVER
-
-- "Follow for more content like this" — generic, earns nothing
-- "Hope this helps!" — closes with neediness
-- Rhetorical questions the viewer can answer "no" to
-- Disclaimers or caveats in the hook
-- Mentioning usernames, @handles, or social media account names
-- Restating the idea text verbatim as the hook`
+Never use @handles or social media usernames. Never restate the source idea verbatim.`
 
 const BASES: Record<'ideation' | 'draft', string> = {
   ideation: IDEATION_BASE,
@@ -142,6 +56,22 @@ const BASES: Record<'ideation' | 'draft', string> = {
 }
 
 // ─── Builder ──────────────────────────────────────────────────────────────────
+
+const SECTION_DESCRIPTIONS: Partial<Record<PromptLayer, string>> = {
+  brand_context: '`<brand_context>` — the brand identity: voice, audience, point of view. Write as this brand.',
+  custom_prompt: '`<custom_prompt>` — standing brand-level instructions: angles, priorities, tone. Apply throughout.',
+  template_schema: '`<template_schema>` — the output structure to fill. Slot constraints are binding.',
+  template_custom_prompt: '`<template_custom_prompt>` — template-specific instructions for this brand. Takes precedence over `<custom_prompt>` for decisions within this format.',
+  selected_idea: '`<selected_idea>` — the specific idea to develop into content.',
+}
+
+function buildStructureOverview(presentSections: PromptLayer[]): string {
+  const lines = presentSections
+    .filter((s) => SECTION_DESCRIPTIONS[s])
+    .map((s) => `- ${SECTION_DESCRIPTIONS[s]}`)
+  if (lines.length === 0) return ''
+  return `## PROMPT STRUCTURE\n\nThis prompt is composed of layered sections. Read all before generating — later sections narrow and override earlier ones within their scope.\n\n${lines.join('\n')}`
+}
 
 function section(tag: PromptLayer, content: string): string {
   return `<${tag}>\n${content.trim()}\n</${tag}>`
@@ -151,28 +81,36 @@ export function buildPrompt(input: KernelInput): KernelOutput {
   const layers: Partial<Record<PromptLayer, string>> = {}
   const parts: string[] = []
 
+  const presentSections: PromptLayer[] = []
+  if (input.brandContext?.trim()) presentSections.push('brand_context')
+  if (input.customPrompt?.trim()) presentSections.push('custom_prompt')
+  if (input.templateSchema?.trim()) presentSections.push('template_schema')
+  if (input.brandTemplatePrompt?.trim()) presentSections.push('template_custom_prompt')
+  if (input.selectedIdea?.trim()) presentSections.push('selected_idea')
+
   const base = BASES[input.base]
   layers.base = base
-  parts.push(section('base', `This is the foundation of a composed prompt. Each section that follows adds a specific layer of context — brand, format, and customization — that narrows and shapes the output. This base defines the role, craft principles, and non-negotiable rules that apply regardless of what any later section instructs.\n\n${base}`))
+  const structureOverview = buildStructureOverview(presentSections)
+  parts.push(section('base', structureOverview ? `${base}\n\n${structureOverview}` : base))
 
   if (input.brandContext?.trim()) {
     layers.brand_context = input.brandContext.trim()
-    parts.push(section('brand_context', `This is the brand you are creating content as. Everything you write should feel like it came from this specific voice, for this specific audience, from this specific point of view. Internalize it — do not just reference it.\n\n${input.brandContext.trim()}`))
+    parts.push(section('brand_context', input.brandContext.trim()))
   }
 
   if (input.customPrompt?.trim()) {
     layers.custom_prompt = input.customPrompt.trim()
-    parts.push(section('custom_prompt', `These are brand-level content instructions that shape the overall direction of every piece created for this brand. They operate at a high level — influencing angle, tone, and priorities across all formats. Apply them as standing guidance throughout the composition.\n\n${input.customPrompt.trim()}`))
+    parts.push(section('custom_prompt', input.customPrompt.trim()))
   }
 
   if (input.templateSchema?.trim()) {
     layers.template_schema = input.templateSchema.trim()
-    parts.push(section('template_schema', `This defines the output structure you must fill. You are writing content for a short-form video format where each slot is a sequential segment of a single, continuous piece. The slots are not independent — they form one connected arc. Transitions between slots must feel natural and unbroken, as if the viewer is watching one uninterrupted delivery. Fill each slot according to its constraints; do not let the structure fragment the content.\n\n${input.templateSchema.trim()}`))
+    parts.push(section('template_schema', input.templateSchema.trim()))
   }
 
   if (input.brandTemplatePrompt?.trim()) {
     layers.template_custom_prompt = input.brandTemplatePrompt.trim()
-    parts.push(section('template_custom_prompt', `These are user-defined instructions specific to this template for this brand. They work alongside the brand-level instructions above — both layers are active and complementary, not mutually exclusive. Where they overlap, apply both; where they differ, these template-specific instructions take precedence for decisions within this format.\n\n${input.brandTemplatePrompt.trim()}`))
+    parts.push(section('template_custom_prompt', input.brandTemplatePrompt.trim()))
   }
 
   if (input.selectedIdea?.trim()) {
