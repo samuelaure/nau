@@ -136,11 +136,9 @@ export default function AssetsManager({
                 const total = progressEvent.total || 0
                 if (total > 0) {
                   const pct = Math.round((progressEvent.loaded * 100) / total)
-                  setUpload({ uploadPercentage: pct, progress: pct === 100 ? `Optimizing ${file.name}…` : `Uploading ${file.name}…` })
+                  setUpload({ uploadPercentage: pct, progress: `Uploading ${file.name}…` })
                   toast.loading(
-                    pct === 100
-                      ? `Optimizing ${i + 1} of ${acceptedFiles.length} — ${file.name}`
-                      : `Uploading ${i + 1} of ${acceptedFiles.length} — ${file.name} (${pct}%)`,
+                    `Uploading ${i + 1} of ${acceptedFiles.length} — ${file.name} (${pct}%)`,
                     { id: TOAST_ID, duration: Infinity },
                   )
                 }

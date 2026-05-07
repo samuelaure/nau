@@ -88,119 +88,24 @@ export async function POST(req: NextRequest) {
   await fs.writeFile(inputPath, buffer)
   logger.debug({ inputPath }, 'Saved temp file')
 
+  const assetFolder =
+    type === 'VID' ? ('videos' as const) : type === 'AUD' ? ('audios' as const) : ('images' as const)
+  const rawExt = file.name.split('.').pop() || ''
+  const rawR2Key = contextAccountId
+    ? flownau.accountAsset(contextAccountId, assetFolder, assetId, rawExt)
+    : flownau.templateAsset(templateId || 'global', assetId, rawExt)
+
   try {
-    // 6. Optimize
-    let outputPath = inputPath
-    let finalExt = file.name.split('.').pop() || ''
-    let finalMime = file.type
-    let thumbPath: string | null = null
-
-    const inputStats = await fs.stat(inputPath)
-
-    if (type === 'VID') {
-      finalExt = 'mp4'
-      finalMime = 'video/mp4'
-      outputPath = getTempPath(`optimized_${Date.now()}.mp4`)
-      await compressVideo(inputPath, outputPath)
-
-      const outputStats = await fs.stat(outputPath)
-      if (outputStats.size > inputStats.size) {
-        logger.info(
-          { outputSize: outputStats.size, inputSize: inputStats.size },
-          'Skipping video re-encode: output larger than input',
-        )
-        await fs.unlink(outputPath).catch(() => {})
-        outputPath = inputPath
-        finalExt = file.name.split('.').pop() || 'mp4'
-        finalMime = file.type || 'video/mp4'
-      }
-
-      thumbPath = getTempPath(`thumb_${Date.now()}.jpg`)
-      try {
-        await generateThumbnail(outputPath, thumbPath)
-      } catch (e) {
-        logger.warn({ err: e }, 'Thumbnail generation failed, continuing without it')
-        thumbPath = null
-      }
-    } else if (type === 'AUD') {
-      finalExt = 'm4a'
-      finalMime = 'audio/mp4'
-      outputPath = getTempPath(`optimized_${Date.now()}.m4a`)
-      await compressAudio(inputPath, outputPath)
-
-      const outputStats = await fs.stat(outputPath)
-      if (outputStats.size > inputStats.size) {
-        logger.info('Skipping audio re-encode: output larger than input')
-        await fs.unlink(outputPath).catch(() => {})
-        outputPath = inputPath
-        finalExt = file.name.split('.').pop() || 'm4a'
-        finalMime = file.type || 'audio/mp4'
-      }
-    } else if (type === 'IMG') {
-      finalExt = 'jpg'
-      finalMime = 'image/jpeg'
-      outputPath = getTempPath(`optimized_${Date.now()}.jpg`)
-      await compressImage(inputPath, outputPath)
-
-      const outputStats = await fs.stat(outputPath)
-      if (outputStats.size > inputStats.size) {
-        logger.info('Skipping image re-encode: output larger than input')
-        await fs.unlink(outputPath).catch(() => {})
-        outputPath = inputPath
-        finalExt = file.name.split('.').pop() || 'jpg'
-        finalMime = file.type || 'image/jpeg'
-      }
-    }
-
-    // 7. Build R2 key using canonical path builders
-    const assetFolder =
-      type === 'VID'
-        ? ('videos' as const)
-        : type === 'AUD'
-          ? ('audios' as const)
-          : ('images' as const)
-    const r2Key = contextAccountId
-      ? flownau.accountAsset(contextAccountId, assetFolder, assetId, finalExt)
-      : flownau.templateAsset(templateId || 'global', assetId, finalExt)
-
-    // 8. Upload to R2
-    const fileStream = createReadStream(outputPath)
-    const stats = await fs.stat(outputPath)
-
-    logger.info({ r2Key, size: stats.size }, 'Uploading asset to R2')
-
-    const publicUrl = await storage.upload(r2Key, fileStream, {
-      mimeType: finalMime,
-      size: stats.size,
+    // 6. Upload raw file to R2 immediately so the client isn't blocked on ffmpeg
+    const rawStats = await fs.stat(inputPath)
+    logger.info({ r2Key: rawR2Key, size: rawStats.size }, 'Uploading raw asset to R2')
+    const rawUrl = await storage.upload(rawR2Key, createReadStream(inputPath), {
+      mimeType: file.type,
+      size: rawStats.size,
     })
 
-    // Upload thumbnail if generated
-    let thumbnailUrl: string | null = null
-    if (thumbPath) {
-      const thumbKey = contextAccountId
-        ? flownau.accountThumbnail(contextAccountId, assetId)
-        : flownau.templateThumbnail(templateId || 'global', assetId)
-      const thumbStream = createReadStream(thumbPath)
-      const thumbStats = await fs.stat(thumbPath)
-
-      thumbnailUrl = await storage.upload(thumbKey, thumbStream, {
-        mimeType: 'image/jpeg',
-        size: thumbStats.size,
-      })
-    }
-
-    // 9. Get Duration if applicable
-    let duration: number | undefined = undefined
-    if (type === 'VID' || type === 'AUD') {
-      try {
-        duration = await getDuration(outputPath)
-      } catch (e) {
-        logger.warn({ err: e }, 'Failed to get media duration')
-      }
-    }
-
-    // 10. DB Record
-    const systemFilename = `${assetId}.${finalExt}`
+    // 7. Create DB record with raw values so the client gets a usable asset immediately
+    const systemFilename = `${assetId}.${rawExt}`
     const asset = await prisma.asset.create({
       data: {
         id: assetId,
@@ -208,30 +113,146 @@ export async function POST(req: NextRequest) {
         templateId: templateId || null,
         originalFilename: file.name,
         systemFilename,
-        r2Key,
-        size: stats.size,
-        mimeType: finalMime,
+        r2Key: rawR2Key,
+        size: rawStats.size,
+        mimeType: file.type,
         hash: clientHash,
         type,
-        url: publicUrl,
-        thumbnailUrl,
-        duration,
+        url: rawUrl,
+        thumbnailUrl: null,
+        duration: null,
       },
     })
 
-    // 11. Cleanup
-    await fs.unlink(inputPath).catch((e) => logger.warn({ err: e }, 'Cleanup failed'))
-    if (outputPath !== inputPath) {
-      await fs.unlink(outputPath).catch((e) => logger.warn({ err: e }, 'Cleanup failed'))
-    }
-    if (thumbPath) {
-      await fs.unlink(thumbPath).catch((e) => logger.warn({ err: e }, 'Cleanup failed'))
-    }
+    // 8. Optimize in the background — compress, re-upload, update DB record
+    void optimizeAssetBackground({
+      assetId,
+      inputPath,
+      type,
+      originalMime: file.type,
+      originalExt: rawExt,
+      contextAccountId,
+      templateId: templateId ?? null,
+      assetFolder,
+    })
 
     return NextResponse.json({ success: true, asset })
   } catch (error: unknown) {
     logger.error({ err: (error as Error).message }, 'Upload processing failed')
     await fs.unlink(inputPath).catch(() => {})
     return NextResponse.json({ error: (error as Error).message }, { status: 500 })
+  }
+}
+
+async function optimizeAssetBackground(args: {
+  assetId: string
+  inputPath: string
+  type: 'VID' | 'AUD' | 'IMG'
+  originalMime: string
+  originalExt: string
+  contextAccountId: string | null
+  templateId: string | null
+  assetFolder: 'videos' | 'audios' | 'images'
+}) {
+  const { assetId, inputPath, type, originalMime, originalExt, contextAccountId, templateId, assetFolder } = args
+
+  try {
+    const inputStats = await fs.stat(inputPath)
+    let outputPath = inputPath
+    let finalExt = originalExt
+    let finalMime = originalMime
+    let thumbPath: string | null = null
+
+    if (type === 'VID') {
+      finalExt = 'mp4'
+      finalMime = 'video/mp4'
+      outputPath = getTempPath(`optimized_${Date.now()}.mp4`)
+      await compressVideo(inputPath, outputPath)
+      const outputStats = await fs.stat(outputPath)
+      if (outputStats.size > inputStats.size) {
+        await fs.unlink(outputPath).catch(() => {})
+        outputPath = inputPath
+        finalExt = originalExt
+        finalMime = originalMime
+      }
+      thumbPath = getTempPath(`thumb_${Date.now()}.jpg`)
+      try {
+        await generateThumbnail(outputPath, thumbPath)
+      } catch {
+        thumbPath = null
+      }
+    } else if (type === 'AUD') {
+      finalExt = 'm4a'
+      finalMime = 'audio/mp4'
+      outputPath = getTempPath(`optimized_${Date.now()}.m4a`)
+      await compressAudio(inputPath, outputPath)
+      const outputStats = await fs.stat(outputPath)
+      if (outputStats.size > inputStats.size) {
+        await fs.unlink(outputPath).catch(() => {})
+        outputPath = inputPath
+        finalExt = originalExt
+        finalMime = originalMime
+      }
+    } else if (type === 'IMG') {
+      finalExt = 'jpg'
+      finalMime = 'image/jpeg'
+      outputPath = getTempPath(`optimized_${Date.now()}.jpg`)
+      await compressImage(inputPath, outputPath)
+      const outputStats = await fs.stat(outputPath)
+      if (outputStats.size > inputStats.size) {
+        await fs.unlink(outputPath).catch(() => {})
+        outputPath = inputPath
+        finalExt = originalExt
+        finalMime = originalMime
+      }
+    }
+
+    const optimizedR2Key = contextAccountId
+      ? flownau.accountAsset(contextAccountId, assetFolder, assetId, finalExt)
+      : flownau.templateAsset(templateId || 'global', assetId, finalExt)
+
+    const optimizedStats = await fs.stat(outputPath)
+    logger.info({ assetId, r2Key: optimizedR2Key, size: optimizedStats.size }, 'Uploading optimized asset to R2')
+
+    const optimizedUrl = await storage.upload(optimizedR2Key, createReadStream(outputPath), {
+      mimeType: finalMime,
+      size: optimizedStats.size,
+    })
+
+    let thumbnailUrl: string | null = null
+    if (thumbPath) {
+      const thumbKey = contextAccountId
+        ? flownau.accountThumbnail(contextAccountId, assetId)
+        : flownau.templateThumbnail(templateId || 'global', assetId)
+      const thumbStats = await fs.stat(thumbPath)
+      thumbnailUrl = await storage.upload(thumbKey, createReadStream(thumbPath), {
+        mimeType: 'image/jpeg',
+        size: thumbStats.size,
+      })
+    }
+
+    let duration: number | undefined
+    if (type === 'VID' || type === 'AUD') {
+      try { duration = await getDuration(outputPath) } catch { /* non-critical */ }
+    }
+
+    await prisma.asset.update({
+      where: { id: assetId },
+      data: {
+        r2Key: optimizedR2Key,
+        systemFilename: `${assetId}.${finalExt}`,
+        size: optimizedStats.size,
+        mimeType: finalMime,
+        url: optimizedUrl,
+        thumbnailUrl,
+        ...(duration !== undefined && { duration }),
+      },
+    })
+
+    logger.info({ assetId }, 'Background optimization complete')
+  } catch (err) {
+    logger.error({ assetId, err }, 'Background optimization failed')
+  } finally {
+    await fs.unlink(inputPath).catch(() => {})
   }
 }
