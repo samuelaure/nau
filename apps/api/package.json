@@ -24,7 +24,7 @@
     "test:cov": "jest --coverage",
     "test:db:migrate:deploy": "dotenv -e ../../.env.test -e .env.test -- npx prisma migrate deploy",
     "test:db:reset": "dotenv -e ../../.env.test -e .env.test -- npx prisma migrate reset --force --skip-seed",
-    "test:db:seed": "dotenv -e ../../.env.test -e .env.test -- ts-node prisma/seed.ts",
+    "test:db:seed": "dotenv -e ../../.env.test -e .env.test -- ts-node --transpile-only prisma/seed.ts",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "test:on": "pnpm run test:db:reset && pnpm run test:db:migrate:deploy && dotenv -e ../../.env.test -e .env.test -- nest start --watch",
