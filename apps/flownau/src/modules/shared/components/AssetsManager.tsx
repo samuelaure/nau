@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import axios from 'axios'
 import NextImage from 'next/image'
 import { useDropzone } from 'react-dropzone'
@@ -15,6 +15,10 @@ import {
   Home,
   Sparkles,
   Trash2,
+  RotateCcw,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { deleteAsset } from '@/modules/shared/actions'
@@ -57,7 +61,7 @@ interface AssetsManagerProps {
 export default function AssetsManager({
   ownerId,
   ownerType,
-  assets,
+  assets: initialAssets,
   basePath,
 }: AssetsManagerProps) {
   // Mirror the module-level singleton into component state so the UI re-renders
@@ -68,10 +72,33 @@ export default function AssetsManager({
   useEffect(() => {
     const sync = () => setUploadSnap({ ..._upload })
     _listeners.add(sync)
-    // Restore state immediately if an upload is already running when we mount
     sync()
     return () => { _listeners.delete(sync) }
   }, [])
+
+  // Live asset state — poll while any asset is pending/processing
+  const [assets, setAssets] = useState<Asset[]>(initialAssets)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const needsPoll = assets.some(
+    (a) => a.optimizationStatus === 'pending' || a.optimizationStatus === 'processing',
+  )
+
+  useEffect(() => {
+    if (ownerType !== 'brand') return
+    if (!needsPoll) {
+      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+      return
+    }
+    if (pollRef.current) return
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await axios.get(`/api/protected/assets?brandId=${ownerId}`)
+        setAssets(res.data.assets)
+      } catch {}
+    }, 3000)
+    return () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null } }
+  }, [needsPoll, ownerId, ownerType])
 
   const [currentPath, setCurrentPath] = useState<string[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -173,7 +200,12 @@ export default function AssetsManager({
           })
         }
         toast.success('All assets uploaded successfully', { id: TOAST_ID })
-        window.location.reload()
+        if (ownerType === 'brand') {
+          const res = await axios.get(`/api/protected/assets?brandId=${ownerId}`)
+          setAssets(res.data.assets)
+        } else {
+          window.location.reload()
+        }
       } catch (error: unknown) {
         console.error('Upload failed', error)
         toast.error(`Upload failed: ${(error as Error).message}`, { id: TOAST_ID })
@@ -405,6 +437,15 @@ export default function AssetsManager({
             asset={asset}
             selected={selectedIds.has(asset.id)}
             onToggleSelect={() => toggleSelect(asset.id)}
+            onRetry={async () => {
+              try {
+                await axios.post(`/api/protected/upload/retry/${asset.id}`)
+                toast.success('Re-queued for optimization')
+                setAssets(prev => prev.map(a => a.id === asset.id ? { ...a, optimizationStatus: 'pending' } : a))
+              } catch {
+                toast.error('Failed to retry')
+              }
+            }}
           />
         ))}
       </div>
@@ -427,14 +468,60 @@ export default function AssetsManager({
   )
 }
 
+function OptimizationBadge({ status, onRetry }: { status: string; onRetry: () => Promise<void> }) {
+  const [retrying, setRetrying] = useState(false)
+
+  if (status === 'done') {
+    return (
+      <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-green-600/60">
+        <CheckCircle2 size={10} /> Optimized
+      </span>
+    )
+  }
+  if (status === 'processing') {
+    return (
+      <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-blue-400">
+        <Loader2 size={10} className="animate-spin" /> Optimizing…
+      </span>
+    )
+  }
+  if (status === 'pending') {
+    return (
+      <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-zinc-500">
+        <Clock size={10} /> Queued
+      </span>
+    )
+  }
+  if (status === 'failed') {
+    return (
+      <div className="flex items-center gap-2">
+        <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-red-500/80">
+          <AlertTriangle size={10} /> Failed
+        </span>
+        <button
+          onClick={async (e) => { e.stopPropagation(); setRetrying(true); await onRetry(); setRetrying(false) }}
+          disabled={retrying}
+          className="flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-widest text-zinc-400 hover:text-white transition-colors disabled:opacity-40"
+        >
+          {retrying ? <Loader2 size={9} className="animate-spin" /> : <RotateCcw size={9} />}
+          Retry
+        </button>
+      </div>
+    )
+  }
+  return null
+}
+
 function AssetCard({
   asset,
   selected,
   onToggleSelect,
+  onRetry,
 }: {
   asset: Asset
   selected: boolean
   onToggleSelect: () => void
+  onRetry: () => Promise<void>
 }) {
   const isImage = asset.type === 'IMG' || asset.mimeType.startsWith('image/')
   const isVideo = asset.type === 'VID' || asset.mimeType.startsWith('video/')
@@ -558,7 +645,7 @@ function AssetCard({
       </div>
 
       {/* Info */}
-      <div className="p-4 flex flex-col gap-1 min-w-0">
+      <div className="p-4 flex flex-col gap-1.5 min-w-0">
         <h4
           className={`text-[11px] font-bold truncate tracking-tight transition-colors ${selected ? 'text-accent' : 'text-zinc-300 group-hover:text-white'}`}
           title={`Original: ${asset.originalFilename}`}
@@ -576,8 +663,8 @@ function AssetCard({
                   .padStart(2, '0')}`
               : ''}
           </span>
-          <span className="opacity-0 group-hover:opacity-100 transition-opacity">Asset Entity</span>
         </div>
+        <OptimizationBadge status={asset.optimizationStatus ?? 'done'} onRetry={onRetry} />
       </div>
     </div>
   )

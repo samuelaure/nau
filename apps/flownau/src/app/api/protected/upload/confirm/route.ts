@@ -20,7 +20,7 @@ export const dynamic = 'force-dynamic'
 
 // Serialize ffmpeg jobs — running them concurrently OOMs the 640MB container.
 let optimizationQueue = Promise.resolve()
-function enqueueOptimization(fn: () => Promise<void>): void {
+export function enqueueOptimization(fn: () => Promise<void>): void {
   optimizationQueue = optimizationQueue.then(() => fn().catch(() => {}))
 }
 
@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
       url: cdnUrl,
       thumbnailUrl: null,
       duration: null,
+      optimizationStatus: 'pending',
     },
   })
 
@@ -87,7 +88,7 @@ async function downloadToTemp(url: string, destPath: string): Promise<void> {
   })
 }
 
-async function optimizeAssetBackground(args: {
+export async function optimizeAssetBackground(args: {
   assetId: string
   cdnUrl: string
   type: 'VID' | 'AUD' | 'IMG'
@@ -99,6 +100,8 @@ async function optimizeAssetBackground(args: {
 }) {
   const { assetId, cdnUrl, type, mimeType, ext, contextAccountId, templateId, assetFolder } = args
   const inputPath = getTempPath(`raw_${assetId}.${ext}`)
+
+  await prisma.asset.update({ where: { id: assetId }, data: { optimizationStatus: 'processing' } })
 
   try {
     await downloadToTemp(cdnUrl, inputPath)
@@ -187,6 +190,7 @@ async function optimizeAssetBackground(args: {
         mimeType: finalMime,
         url: optimizedUrl,
         thumbnailUrl,
+        optimizationStatus: 'done',
         ...(duration !== undefined && { duration }),
       },
     })
@@ -194,6 +198,7 @@ async function optimizeAssetBackground(args: {
     logger.info({ assetId }, 'Background optimization complete')
   } catch (err) {
     logger.error({ assetId, err }, 'Background optimization failed')
+    await prisma.asset.update({ where: { id: assetId }, data: { optimizationStatus: 'failed' } }).catch(() => {})
   } finally {
     await fs.unlink(inputPath).catch(() => {})
   }

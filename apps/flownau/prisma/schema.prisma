@@ -120,8 +120,9 @@ model Asset {
   hash             String?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
-  thumbnailUrl     String?
-  duration         Float?
+  thumbnailUrl        String?
+  duration            Float?
+  optimizationStatus  String  @default("pending") // pending | processing | done | failed
   description      String?   @db.Text
   tags             String[]  @default([])
   lastUsedAt       DateTime?
