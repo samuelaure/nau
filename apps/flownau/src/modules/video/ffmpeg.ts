@@ -29,6 +29,16 @@ if (envFfprobe && fs.existsSync(envFfprobe)) {
   ffmpeg.setFfprobePath(envFfprobe)
 }
 
+export function getVideoCodec(inputPath: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    ffmpeg.ffprobe(inputPath, (err, metadata) => {
+      if (err) return resolve(null)
+      const videoStream = metadata.streams.find((s) => s.codec_type === 'video')
+      resolve(videoStream?.codec_name ?? null)
+    })
+  })
+}
+
 /**
  * Compresses a video file.
  * Ensures dimensions fit within 1080x1920 (portrait) or 1920x1080 (landscape)

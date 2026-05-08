@@ -1426,6 +1426,13 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
     }
   }
 
+  // Refresh data whenever the modal opens (selected changes to a new post).
+  // Ensures videoUrl / status are current even if the last poll was before the render completed.
+  useEffect(() => {
+    if (selected) fetchCompositions()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.id])
+
   // Poll every 5 s while any composition is actively rendering, stop when done.
   useEffect(() => {
     const isRendering = compositions.some(

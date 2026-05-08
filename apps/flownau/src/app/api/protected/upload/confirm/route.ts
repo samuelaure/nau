@@ -9,6 +9,7 @@ import {
   getTempPath,
   generateThumbnail,
   getDuration,
+  getVideoCodec,
 } from '@/modules/video/ffmpeg'
 import fs from 'fs/promises'
 import { createReadStream, createWriteStream } from 'fs'
@@ -118,7 +119,11 @@ export async function optimizeAssetBackground(args: {
       outputPath = getTempPath(`opt_${assetId}.mp4`)
       await compressVideo(inputPath, outputPath)
       const outStats = await fs.stat(outputPath)
-      if (outStats.size > inputStats.size) {
+      const sourceCodec = await getVideoCodec(inputPath)
+      // Always use transcoded H.264 output when source is not h264 (e.g. vp9).
+      // Non-h264 videos crash Remotion's proxy when rendering.
+      const mustTranscode = sourceCodec !== null && sourceCodec !== 'h264'
+      if (!mustTranscode && outStats.size > inputStats.size) {
         await fs.unlink(outputPath).catch(() => {})
         outputPath = inputPath
         finalExt = ext
