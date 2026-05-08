@@ -102,13 +102,20 @@ export const ingestProfile = async (
     // Immediately update the main account with the high-res profile found during the feed scrape
     if (scrapeResult.profile && scrapeResult.profile.username) {
       const hdUrl = scrapeResult.profile.profilePicUrlHD || scrapeResult.profile.profilePicUrl;
-      if (hdUrl || scrapeResult.profile.postsCount != null) {
+      if (scrapeResult.profile.postsCount != null) {
         await prisma.socialProfile.updateMany({
           where: { username: scrapeResult.profile.username },
-          data: {
-            ...(hdUrl ? { profileImageUrl: hdUrl } : {}),
-            ...(scrapeResult.profile.postsCount != null ? { totalPostCount: scrapeResult.profile.postsCount } : {}),
+          data: { totalPostCount: scrapeResult.profile.postsCount },
+        });
+      }
+      if (hdUrl) {
+        // Only set the Instagram URL as a placeholder if no R2-hosted URL is stored yet
+        await prisma.socialProfile.updateMany({
+          where: {
+            username: scrapeResult.profile.username,
+            NOT: { profileImageUrl: { startsWith: 'https://media.9nau.com' } },
           },
+          data: { profileImageUrl: hdUrl },
         });
       }
       if (hdUrl) {

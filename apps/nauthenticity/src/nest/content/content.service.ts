@@ -12,6 +12,11 @@ export class ContentService {
     private readonly config: ConfigService,
   ) {}
 
+  private sanitizeProfileImageUrl(url: string | null | undefined): string | null {
+    if (!url) return null
+    return url.includes('cdninstagram.com') ? null : url
+  }
+
   private sanitizeCollaborators(collaborators: any[] | null | undefined): any[] {
     if (!Array.isArray(collaborators)) return [];
     return collaborators
@@ -43,7 +48,10 @@ export class ContentService {
       }),
       this.prisma.socialProfile.count(),
     ])
-    return { accounts, pagination: { total, page, limit, totalPages: Math.ceil(total / limit) } }
+    return {
+      accounts: accounts.map((a) => ({ ...a, profileImageUrl: this.sanitizeProfileImageUrl(a.profileImageUrl) })),
+      pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    }
   }
 
   async getAccount(username: string) {
@@ -57,9 +65,9 @@ export class ContentService {
       },
     })
     if (!account) throw new NotFoundException('SocialProfile not found')
-    // Sanitize collaborators to remove Instagram CDN URLs
     return {
       ...account,
+      profileImageUrl: this.sanitizeProfileImageUrl(account.profileImageUrl),
       posts: account.posts.map((post) => this.sanitizePostCollaborators(post)),
     }
   }
@@ -162,7 +170,7 @@ export class ContentService {
         platformId: true,
         postedAt: true,
         caption: true,
-        media: { select: { id: true, type: true, url: true, storageUrl: true } },
+        media: { select: { id: true, type: true, url: true, storageUrl: true, thumbnailUrl: true } },
         transcripts: { select: { id: true, text: true }, take: 1 },
       },
     })

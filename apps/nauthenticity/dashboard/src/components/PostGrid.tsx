@@ -10,7 +10,8 @@ interface PostGridItemProps {
 export const PostGridItem = ({ post }: PostGridItemProps) => {
   const [isHovered, setIsHovered] = React.useState(false);
   const media = post.media && post.media.length > 0 ? post.media[0] : null;
-  const thumbUrl = media ? getMediaUrl(media.thumbnailUrl || media.storageUrl) : null;
+  const rawThumb = media?.thumbnailUrl || (media?.type === 'image' ? media?.storageUrl : null);
+  const thumbUrl = rawThumb ? getMediaUrl(rawThumb) : null;
   const videoUrl = media && media.type === 'video' ? getMediaUrl(media.storageUrl) : null;
 
   return (
@@ -70,13 +71,17 @@ export const PostGridItem = ({ post }: PostGridItemProps) => {
                   autoPlay
                   style={{ objectFit: 'cover', width: '100%', height: '100%' }}
                 />
-              ) : (
+              ) : thumbUrl ? (
                 <img
-                  src={thumbUrl!}
+                  src={thumbUrl}
                   alt="Post Preview"
                   className="post-media"
                   style={{ objectFit: 'cover' }}
                 />
+              ) : (
+                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#111', color: '#555', fontSize: '2rem' }}>
+                  🎥
+                </div>
               )}
               <div
                 style={{
