@@ -24,6 +24,9 @@ COPY apps/flownau/prisma.config.js ./apps/flownau/
 # Install dependencies (workspace-aware)
 RUN pnpm install --frozen-lockfile --filter=flownau...
 
+# Build workspace packages so dist/ exists for tsx resolution
+RUN pnpm --filter='./packages/**' build
+
 # Copy full flownau source
 COPY apps/flownau/src/ ./apps/flownau/src/
 COPY apps/flownau/tsconfig*.json ./apps/flownau/
