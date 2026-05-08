@@ -608,7 +608,7 @@ function TemplateCard({
         <div className="flex items-start justify-between gap-1.5">
           <p className="text-xs font-semibold leading-snug line-clamp-2 group-hover:text-white transition-colors flex-1">{template.name}</p>
           <div className="flex items-center gap-1 shrink-0">
-            {config?.customPrompt && (
+            {(config?.customPrompt || (config?.slotOverrides && Object.keys(config.slotOverrides).length > 0)) && (
               <span className="text-[9px] px-1 py-0.5 rounded border bg-amber-500/10 text-amber-400 border-amber-500/20" title="Custom prompt set">
                 custom
               </span>
