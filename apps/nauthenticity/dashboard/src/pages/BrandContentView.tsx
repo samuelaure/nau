@@ -102,13 +102,13 @@ export const BrandContentView = () => {
           <div>
             <h1 style={{ margin: 0, fontSize: '2rem' }}>@{selectedAccount.username}</h1>
             <span style={{ color: 'var(--text-secondary)' }}>
-              {selectedAccount._count?.posts || 0} posts
+              {selectedAccount.posts?.length ?? 0} posts
             </span>
           </div>
         </div>
 
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <ProfileActionsBar username={selectedUsername} postCount={selectedAccount._count?.posts ?? 0} />
+          <ProfileActionsBar username={selectedUsername} postCount={selectedAccount.posts?.length ?? 0} />
           <button
             onClick={() => navigate(`/progress?username=${selectedUsername}`)}
             style={{

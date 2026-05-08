@@ -347,11 +347,13 @@ export const BrandOwnedView = () => {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1rem' }}>
           {ownedProfiles.map((profile: any) => (
             <div key={profile.id} style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: '10px', padding: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <div style={{ fontSize: '1rem', fontWeight: 600 }}>@{profile.socialProfile?.username}</div>
-              <div style={{ fontSize: '0.85rem', color: '#8b949e' }}>{profile.socialProfile?.platform || 'instagram'}</div>
-              <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.5rem' }}>
-                Status: <span style={{ color: profile.isActive ? '#86efac' : '#ef4444' }}>{profile.isActive ? 'Active' : 'Inactive'}</span>
-              </div>
+              <div style={{ fontSize: '1rem', fontWeight: 600 }}>@{profile.username}</div>
+              <div style={{ fontSize: '0.85rem', color: '#8b949e' }}>{profile.platform || 'instagram'}</div>
+              {profile.lastScrapedAt && (
+                <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.5rem' }}>
+                  Last scraped: {new Date(profile.lastScrapedAt).toLocaleDateString()}
+                </div>
+              )}
             </div>
           ))}
         </div>
