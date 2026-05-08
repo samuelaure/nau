@@ -121,7 +121,9 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
     audioUrl = savedSnapshot.audioUrl
     logger.info({ postId }, '[RenderWorker] Using render snapshot for b-roll and audio')
   } else {
-    const brollMood = (creative.brollMood as string) ?? ''
+    const brollMood = Array.isArray(creative.brollMood)
+      ? (creative.brollMood as string[]).join(', ')
+      : String(creative.brollMood ?? '')
     const moodKeywords = brollMood.split(/[,\s]+/).map((s) => s.trim().toLowerCase()).filter(Boolean)
 
     const [allVideos, audioAssets] = await Promise.all([
