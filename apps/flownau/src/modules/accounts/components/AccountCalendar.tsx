@@ -1428,10 +1428,19 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
     }
   }
 
-  // Refresh data whenever the modal opens (selected changes to a new post).
-  // Ensures videoUrl / status are current even if the last poll was before the render completed.
+  // Fetch fresh post data whenever the modal opens so videoUrl/status are always current,
+  // regardless of whether the compositions list was polled after the render completed.
   useEffect(() => {
-    if (selected) fetchCompositions()
+    if (!selected) return
+    fetch(`/api/posts/${selected.id}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.post) return
+        const fresh = { ...data.post, renderedVideoUrl: data.post.renderJob?.outputUrl ?? null }
+        setSelected((prev) => (prev?.id === fresh.id ? fresh : prev))
+        setCompositions((prev) => prev.map((c) => (c.id === fresh.id ? fresh : c)))
+      })
+      .catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.id])
 
