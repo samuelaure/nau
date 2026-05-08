@@ -959,14 +959,13 @@ function CompositionModal({
                 {hasVideo ? (
                   <>
                     {/* Video player */}
-                    <div className="rounded-xl overflow-hidden bg-black w-full h-64 flex items-center justify-center">
-                      <video
-                        src={comp.videoUrl || comp.renderedVideoUrl || ''}
-                        poster={comp.coverUrl ?? undefined}
-                        controls
-                        className="w-full h-full object-contain"
-                      />
-                    </div>
+                    <video
+                      src={comp.videoUrl || comp.renderedVideoUrl || ''}
+                      poster={comp.coverUrl ?? undefined}
+                      controls
+                      className="w-full rounded-xl bg-black"
+                      style={{ maxHeight: '20rem' }}
+                    />
                     {/* Slot texts — collapsible once video exists */}
                     <div className="border border-white/10 rounded-xl">
                       <button
@@ -1000,14 +999,13 @@ function CompositionModal({
                   <HeadTalkContent comp={comp} actioning={actioning} onSaved={onRefresh} />
                 )}
                 {hasVideo && (
-                  <div className="rounded-xl overflow-hidden bg-black w-full h-64 flex items-center justify-center">
-                    <video
-                      src={comp.videoUrl || comp.renderedVideoUrl || comp.userUploadedMediaUrl || ''}
-                      poster={comp.coverUrl ?? undefined}
-                      controls
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
+                  <video
+                    src={comp.videoUrl || comp.renderedVideoUrl || comp.userUploadedMediaUrl || ''}
+                    poster={comp.coverUrl ?? undefined}
+                    controls
+                    className="w-full rounded-xl bg-black"
+                    style={{ maxHeight: '20rem' }}
+                  />
                 )}
                 {hasVideo && (
                   <div className="border border-white/10 rounded-xl overflow-hidden">
