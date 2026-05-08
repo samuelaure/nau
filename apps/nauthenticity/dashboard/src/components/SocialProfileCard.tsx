@@ -50,7 +50,7 @@ export const SocialProfileCard = ({
 
   const handleSelect = () => {
     if (brandId && workspaceId) {
-      navigate(`/workspaces/${workspaceId}/brands/${brandId}/profiles/${profile.username}`);
+      navigate(`/workspaces/${workspaceId}/brands/${brandId}/content/profiles/${profile.username}`);
     } else {
       onSelect(profile.username);
     }

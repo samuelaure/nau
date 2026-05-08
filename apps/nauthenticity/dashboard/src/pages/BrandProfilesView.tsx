@@ -1,13 +1,18 @@
 import { useState } from 'react';
 import { BrandMonitoredView } from './BrandMonitoredView';
 import { BrandBenchmarkView } from './BrandBenchmarkView';
-import { BrandOwnedView } from './BrandOwnedView';
-import { Users } from 'lucide-react';
+import { Users, Sparkles, Activity, BarChart2 } from 'lucide-react';
 
-type Tab = 'monitored' | 'benchmark' | 'owned';
+type Tab = 'inspiration' | 'monitored' | 'benchmark';
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'inspiration', label: 'Inspiration' },
+  { id: 'monitored', label: 'Monitored' },
+  { id: 'benchmark', label: 'Benchmark' },
+];
 
 export const BrandProfilesView = () => {
-  const [activeTab, setActiveTab] = useState<Tab>('owned');
+  const [activeTab, setActiveTab] = useState<Tab>('inspiration');
 
   return (
     <div className="fade-in">
@@ -21,30 +26,36 @@ export const BrandProfilesView = () => {
       </div>
 
       <div style={{ display: 'flex', gap: '0', marginBottom: '2rem', borderBottom: '1px solid var(--border)' }}>
-        {(['owned', 'monitored', 'benchmark'] as Tab[]).map((tab) => (
+        {TABS.map(({ id, label }) => (
           <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
+            key={id}
+            onClick={() => setActiveTab(id)}
             style={{
               padding: '0.6rem 1.4rem',
               background: 'none',
               border: 'none',
-              borderBottom: activeTab === tab ? '2px solid var(--accent)' : '2px solid transparent',
-              color: activeTab === tab ? 'var(--accent)' : 'var(--text-secondary)',
-              fontWeight: activeTab === tab ? 600 : 400,
+              borderBottom: activeTab === id ? '2px solid var(--accent)' : '2px solid transparent',
+              color: activeTab === id ? 'var(--accent)' : 'var(--text-secondary)',
+              fontWeight: activeTab === id ? 600 : 400,
               fontSize: '0.9rem',
               cursor: 'pointer',
               marginBottom: '-1px',
               transition: 'color 0.15s',
-              textTransform: 'capitalize',
             }}
           >
-            {tab === 'monitored' ? 'Monitored' : tab === 'benchmark' ? 'Benchmark' : 'Owned'}
+            {label}
           </button>
         ))}
       </div>
 
-      {activeTab === 'owned' && <BrandOwnedView />}
+      {activeTab === 'inspiration' && (
+        <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)', border: '1px dashed var(--border)', borderRadius: '10px' }}>
+          <Sparkles size={32} style={{ marginBottom: '1rem', opacity: 0.4 }} />
+          <p style={{ margin: 0, fontSize: '0.95rem' }}>
+            Inspiration profiles — add full social profiles to your brand's InspoBase. Coming soon.
+          </p>
+        </div>
+      )}
       {activeTab === 'monitored' && <BrandMonitoredView />}
       {activeTab === 'benchmark' && <BrandBenchmarkView />}
     </div>
