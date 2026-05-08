@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { BrandMonitoredView } from './BrandMonitoredView';
 import { BrandBenchmarkView } from './BrandBenchmarkView';
-import { Users, Sparkles, Activity, BarChart2 } from 'lucide-react';
+import { Users, Sparkles } from 'lucide-react';
 
 type Tab = 'inspiration' | 'monitored' | 'benchmark';
 
