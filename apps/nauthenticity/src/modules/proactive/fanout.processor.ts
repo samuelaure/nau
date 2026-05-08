@@ -128,8 +128,8 @@ export const runProactiveFanout = async (now: Date = new Date()): Promise<void> 
             username: item.ownerUsername,
             caption: item.caption ?? '',
             postedAt: new Date(item.timestamp),
-            likes: item.likesCount ?? 0,
-            comments: item.commentsCount ?? 0,
+            likes: Math.max(0, item.likesCount ?? 0),
+            comments: Math.max(0, item.commentsCount ?? 0),
           },
         });
       }

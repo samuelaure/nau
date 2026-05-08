@@ -40,8 +40,8 @@ export const generateReactiveComments = async (
         username: scraped.author.username,
         caption: scraped.caption,
         postedAt: new Date(scraped.takenAt),
-        likes: scraped.likesCount,
-        comments: scraped.commentsCount,
+        likes: Math.max(0, scraped.likesCount ?? 0),
+        comments: Math.max(0, scraped.commentsCount ?? 0),
       },
       include: { transcripts: { take: 1 } },
     });

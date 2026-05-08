@@ -235,8 +235,8 @@ export const ingestProfile = async (
         : item.timestamp
           ? new Date(item.timestamp)
           : new Date();
-      const likes = item.likes ?? item.likesCount ?? 0;
-      const comments = item.comments ?? item.commentsCount ?? 0;
+      const likes = Math.max(0, item.likes ?? item.likesCount ?? 0);
+      const comments = Math.max(0, item.comments ?? item.commentsCount ?? 0);
       const videoUrl =
         item.video_links && item.video_links.length > 0 ? item.video_links[0] : item.videoUrl;
 
