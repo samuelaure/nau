@@ -296,7 +296,8 @@ export default function Sidebar() {
 
   const handleSignOut = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
-    router.push('/login')
+    const accountsUrl = process.env.NEXT_PUBLIC_ACCOUNTS_URL ?? 'https://accounts.9nau.com'
+    window.location.href = `${accountsUrl}/login`
   }
 
   const bottomLinkStyle = (active: boolean) => ({

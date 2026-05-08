@@ -123,6 +123,7 @@ export async function logoutAction(): Promise<void> {
     }).catch(() => undefined)
   }
 
-  cookieStore.delete(COOKIE_ACCESS_TOKEN)
-  cookieStore.delete(COOKIE_REFRESH_TOKEN)
+  const clearOpts = { domain: COOKIE_DOMAIN, httpOnly: true, path: '/', maxAge: 0, secure: IS_SECURE } as const
+  cookieStore.set(COOKIE_ACCESS_TOKEN, '', { ...clearOpts, sameSite: 'lax' })
+  cookieStore.set(COOKIE_REFRESH_TOKEN, '', { ...clearOpts, sameSite: 'strict' })
 }
