@@ -43,7 +43,7 @@ RUN npm install prisma@^7.3.0 @prisma/client@^7.3.0 @swc/helpers@^0.5.5 @next/en
         mkdir -p @prisma && ln -sfn adapter-pg "@prisma/$h" 2>/dev/null || true; \
     done && \
     for pkg in client-s3 s3-request-presigner lib-storage; do \
-        for h in $(grep -rh "\"${pkg}-[0-9a-f]" ../server/chunks/ 2>/dev/null | grep -o "\"${pkg}-[0-9a-f]\{16\}\"" | tr -d '"' | sort -u); do \
+        for h in $(grep -rh "@aws-sdk/${pkg}-[0-9a-f]" ../server/chunks/ 2>/dev/null | grep -o "\"@aws-sdk/${pkg}-[0-9a-f]\{16\}\"" | tr -d '"' | sed "s|@aws-sdk/||" | sort -u); do \
             mkdir -p @aws-sdk && ln -sfn "${pkg}" "@aws-sdk/${h}" 2>/dev/null || true; \
         done; \
     done
