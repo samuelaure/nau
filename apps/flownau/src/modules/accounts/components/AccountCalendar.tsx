@@ -945,9 +945,10 @@ function CompositionModal({
                 {hasVideo ? (
                   <>
                     {/* Video player */}
-                    <div className="rounded-xl overflow-hidden bg-black aspect-[9/16] max-h-72 flex items-center justify-center">
+                    <div className="rounded-xl overflow-hidden bg-black w-full h-64 flex items-center justify-center">
                       <video
                         src={comp.videoUrl || comp.renderedVideoUrl || ''}
+                        poster={comp.coverUrl ?? undefined}
                         controls
                         className="w-full h-full object-contain"
                       />
@@ -985,9 +986,10 @@ function CompositionModal({
                   <HeadTalkContent comp={comp} actioning={actioning} onSaved={onRefresh} />
                 )}
                 {hasVideo && (
-                  <div className="rounded-xl overflow-hidden bg-black aspect-[9/16] max-h-72 flex items-center justify-center">
+                  <div className="rounded-xl overflow-hidden bg-black w-full h-64 flex items-center justify-center">
                     <video
                       src={comp.videoUrl || comp.renderedVideoUrl || comp.userUploadedMediaUrl || ''}
+                      poster={comp.coverUrl ?? undefined}
                       controls
                       className="w-full h-full object-contain"
                     />
