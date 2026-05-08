@@ -7,6 +7,7 @@ import { Card } from '@/modules/shared/components/ui/Card'
 import { Button } from '@/modules/shared/components/ui/Button'
 import { toast } from 'sonner'
 import HeadTalkDraftModal from './HeadTalkDraftModal'
+import { PromptHistoryPanel } from './PromptHistoryPanel'
 import {
   Loader2,
   Wand2,
@@ -966,6 +967,12 @@ const handleSavePrompt = async (text: string) => {
                       Reset to saved
                     </Button>
                   )}
+                  <PromptHistoryPanel
+                    entityType="brand"
+                    entityId={brandId}
+                    field="draftCustomPrompt"
+                    onRestore={(content) => setDraftCustomPrompt(content)}
+                  />
                 </div>
               )}
             </div>
@@ -1135,6 +1142,12 @@ const handleSavePrompt = async (text: string) => {
                 {savingPrompt ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Saving…</> : 'Save Prompt'}
               </Button>
             </div>
+            <PromptHistoryPanel
+              entityType="brand"
+              entityId={brandId}
+              field="ideationCustomPrompt"
+              onRestore={(content) => setPromptDraft(content)}
+            />
           </div>
         </Modal>
       )}

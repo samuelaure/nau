@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
+import { recordPromptChange } from '@/modules/shared/prompt-history'
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -39,6 +40,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         description: body.description,
       },
     })
+    const promptFields = ['systemPrompt', 'creationPrompt', 'captionPrompt'] as const
+    for (const f of promptFields) {
+      if (body[f] !== undefined) {
+        await recordPromptChange('template', resolvedParams.id, f, body[f])
+      }
+    }
+
     return NextResponse.json({ template }, { status: 200 })
   } catch {
     return NextResponse.json({ error: 'Failed to update template' }, { status: 500 })

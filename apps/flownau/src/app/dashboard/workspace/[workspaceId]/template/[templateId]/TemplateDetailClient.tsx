@@ -6,6 +6,7 @@ import { Card } from '@/modules/shared/components/ui/Card'
 import { Button } from '@/modules/shared/components/ui/Button'
 import { toast } from 'sonner'
 import { Save, Loader2, Trash2, ChevronLeft, Globe, Lock } from 'lucide-react'
+import { PromptHistoryPanel } from '@/modules/accounts/components/PromptHistoryPanel'
 
 interface Template {
   id: string
@@ -242,8 +243,14 @@ export default function TemplateDetailClient({ template, backUrl }: Props) {
           value={systemPrompt}
           onChange={(e) => setSystemPrompt(e.target.value)}
           rows={6}
-          className={`${inputClass} resize-none`}
+          className={`${inputClass} resize-y`}
           placeholder="Describe the narrative structure and tone this template should follow…"
+        />
+        <PromptHistoryPanel
+          entityType="template"
+          entityId={template.id}
+          field="systemPrompt"
+          onRestore={(content) => setSystemPrompt(content)}
         />
       </Card>
 

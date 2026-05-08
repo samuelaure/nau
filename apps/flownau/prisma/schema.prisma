@@ -362,3 +362,15 @@ model ContentPlanner {
 
   @@unique([brandId, name])
 }
+
+model PromptHistory {
+  id          String    @id @default(cuid())
+  entityType  String    // "brand" | "brand_account_template" | "template" | "content_planner"
+  entityId    String
+  field       String    // e.g. "ideationCustomPrompt", "customPrompt", "systemPrompt"
+  content     String    @db.Text
+  activeSince DateTime
+  replacedAt  DateTime?
+
+  @@index([entityType, entityId, field])
+}

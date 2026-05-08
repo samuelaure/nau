@@ -8,6 +8,7 @@ import {
   ToggleLeft, ToggleRight,
 } from 'lucide-react'
 import { cn } from '@/modules/shared/utils'
+import { PromptHistoryPanel } from './PromptHistoryPanel'
 
 const FORMAT_ICON: Record<string, React.ElementType> = {
   reel: Film,
@@ -46,6 +47,7 @@ type Template = {
   slotSchema?: SlotDef[] | null
   contentSchema?: Record<string, unknown> | null
   brandConfigs?: Array<{
+    id: string
     enabled: boolean
     autoApproveDraft: boolean
     autoApprovePost: boolean
@@ -476,6 +478,14 @@ function TemplateModal({
                   {savingPrompt ? 'Saving…' : 'Save prompt'}
                 </button>
               </div>
+              {config?.id && (
+                <PromptHistoryPanel
+                  entityType="brand_account_template"
+                  entityId={config.id}
+                  field="customPrompt"
+                  onRestore={(content) => setCustomPrompt(content)}
+                />
+              )}
             </div>
 
             {/* Settings */}

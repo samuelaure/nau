@@ -6,6 +6,7 @@ import { Button } from '@/modules/shared/components/ui/Button'
 import { Input } from '@/modules/shared/components/ui/Input'
 import { Textarea } from '@/modules/shared/components/ui/Textarea'
 import { toast } from 'sonner'
+import { PromptHistoryPanel } from './PromptHistoryPanel'
 
 const DEFAULT_FORM = {
   name: '',
@@ -235,9 +236,17 @@ export default function AccountPlanners({ brandId }: { brandId: string }) {
               value={formData.strategistPrompt}
               onChange={(e) => f('strategistPrompt', e.target.value)}
               rows={5}
-              className="bg-gray-950 border border-border text-white w-full rounded p-3 text-sm"
+              className="bg-gray-950 border border-border text-white w-full rounded p-3 text-sm resize-y"
               placeholder="Prioritise educational content on weekdays, promotional on weekends. Avoid posting similar formats back-to-back..."
             />
+            {editingId && (
+              <PromptHistoryPanel
+                entityType="content_planner"
+                entityId={editingId}
+                field="strategistPrompt"
+                onRestore={(content) => f('strategistPrompt', content)}
+              />
+            )}
           </div>
 
           <div className="flex flex-wrap gap-4">

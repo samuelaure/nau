@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
+import { recordPromptChange } from '@/modules/shared/prompt-history'
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -42,6 +43,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         timezone: body.timezone,
       },
     })
+
+    if (body.strategistPrompt !== undefined) {
+      await recordPromptChange('content_planner', id, 'strategistPrompt', body.strategistPrompt)
+    }
 
     return NextResponse.json({ planner }, { status: 200 })
   } catch {

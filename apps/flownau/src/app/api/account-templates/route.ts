@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
+import { recordPromptChange } from '@/modules/shared/prompt-history'
 
 /**
  * GET /api/account-templates?brandId=
@@ -84,6 +85,10 @@ export async function PUT(req: Request) {
         ...(slotOverrides !== undefined && { slotOverrides: slotOverrides || null }),
       },
     })
+
+    if (customPrompt !== undefined) {
+      await recordPromptChange('brand_account_template', config.id, 'customPrompt', customPrompt)
+    }
 
     return NextResponse.json({ config }, { status: 200 })
   } catch {
