@@ -80,7 +80,14 @@ jobs:
       - name: Load E2E env vars
         run: |
           echo "${{ secrets.ROOT_ENV_FILE }}" > .env.e2e
-          grep -v '^#' .env.e2e | grep -v '^$' >> $GITHUB_ENV
+          # Exclude vars already set by the job env (DATABASE_URL, NODE_ENV, AUTH_SECRET, COOKIE_DOMAIN, *_URL)
+          grep -v '^#' .env.e2e | grep -v '^$' \
+            | grep -v '^DATABASE_URL=' \
+            | grep -v '^NODE_ENV=' \
+            | grep -v '^AUTH_SECRET=' \
+            | grep -v '^COOKIE_DOMAIN=' \
+            | grep -v '_URL=' \
+            >> $GITHUB_ENV
           rm .env.e2e
 
       - uses: pnpm/action-setup@v4
