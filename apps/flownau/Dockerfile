@@ -33,7 +33,7 @@ RUN npm install prisma@^7.3.0 @prisma/client@^7.3.0 @swc/helpers@^0.5.5 @next/en
     node_modules/.bin/prisma generate --schema=prisma/schema.prisma && \
     mkdir -p apps/flownau/.next/node_modules && \
     cd apps/flownau/.next/node_modules && \
-    npm install pino@^10.3.1 pino-pretty@^13.1.3 pg pg-connection-string pg-types "@prisma/adapter-pg@^7.3.0" bullmq ioredis axios nau-storage node-cron --no-save && \
+    npm install pino@^10.3.1 pino-pretty@^13.1.3 pg pg-connection-string pg-types "@prisma/adapter-pg@^7.3.0" bullmq ioredis axios nau-storage node-cron "@aws-sdk/client-s3" "@aws-sdk/s3-request-presigner" "@aws-sdk/lib-storage" --no-save && \
     for pkg in pg pino bullmq ioredis axios nau-storage node-cron; do \
         for h in $(grep -rh "\"${pkg}-[0-9a-f]" ../server/chunks/ 2>/dev/null | grep -o "\"${pkg}-[0-9a-f]\{16\}\"" | tr -d '"' | sort -u); do \
             ln -sfn "$pkg" "$h" 2>/dev/null || true; \
@@ -41,6 +41,11 @@ RUN npm install prisma@^7.3.0 @prisma/client@^7.3.0 @swc/helpers@^0.5.5 @next/en
     done && \
     for h in $(grep -rh 'adapter-pg-[0-9a-f]' ../server/chunks/ 2>/dev/null | grep -o '"@prisma/adapter-pg-[0-9a-f]\{16\}"' | tr -d '"' | sed 's|@prisma/||' | sort -u); do \
         mkdir -p @prisma && ln -sfn adapter-pg "@prisma/$h" 2>/dev/null || true; \
+    done && \
+    for pkg in client-s3 s3-request-presigner lib-storage; do \
+        for h in $(grep -rh "\"${pkg}-[0-9a-f]" ../server/chunks/ 2>/dev/null | grep -o "\"${pkg}-[0-9a-f]\{16\}\"" | tr -d '"' | sort -u); do \
+            mkdir -p @aws-sdk && ln -sfn "${pkg}" "@aws-sdk/${h}" 2>/dev/null || true; \
+        done; \
     done
 
 EXPOSE 3000
