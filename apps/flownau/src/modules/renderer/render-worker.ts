@@ -169,7 +169,7 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
     slots: creative.slots,
     caption: creative.caption ?? '',
     hashtags: creative.hashtags ?? [],
-    brollClips,
+    brollClips: brollClips.slice(0, 5),
     audioUrl,
     brand: brandIdentity,
   }
