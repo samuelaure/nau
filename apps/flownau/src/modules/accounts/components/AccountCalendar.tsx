@@ -539,7 +539,7 @@ function IdeaToggle({ ideaText }: { ideaText: string }) {
 // ─── Composition detail modal ─────────────────────────────────────────────────
 
 function CompositionModal({
-  comp,
+  comp: initialComp,
   brandId,
   onClose,
   onRefresh,
@@ -553,10 +553,24 @@ function CompositionModal({
   onReformat: (comp: Composition) => void
   onShowPrompts: (comp: Composition) => void
 }) {
+  const [comp, setComp] = useState(initialComp)
+
+  // Always fetch fresh data when the modal opens so videoUrl/status are current.
+  useEffect(() => {
+    fetch(`/api/posts/${initialComp.id}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.post) return
+        setComp({ ...data.post, renderedVideoUrl: data.post.renderJob?.outputUrl ?? null })
+      })
+      .catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialComp.id])
+
   const [actioning, setActioning] = useState(false)
   const [scheduling, setScheduling] = useState(false)
   const [newDatetime, setNewDatetime] = useState(
-    comp.scheduledAt ? comp.scheduledAt.slice(0, 16) : '',
+    initialComp.scheduledAt ? initialComp.scheduledAt.slice(0, 16) : '',
   )
   const [editingCaption, setEditingCaption] = useState(false)
   const [captionDraft, setCaptionDraft] = useState(comp.caption ?? '')
@@ -1428,21 +1442,6 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
     }
   }
 
-  // Fetch fresh post data whenever the modal opens so videoUrl/status are always current,
-  // regardless of whether the compositions list was polled after the render completed.
-  useEffect(() => {
-    if (!selected) return
-    fetch(`/api/posts/${selected.id}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (!data.post) return
-        const fresh = { ...data.post, renderedVideoUrl: data.post.renderJob?.outputUrl ?? null }
-        setSelected((prev) => (prev?.id === fresh.id ? fresh : prev))
-        setCompositions((prev) => prev.map((c) => (c.id === fresh.id ? fresh : c)))
-      })
-      .catch(() => {})
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected?.id])
 
   // Poll every 5 s while any composition is actively rendering, stop when done.
   useEffect(() => {
