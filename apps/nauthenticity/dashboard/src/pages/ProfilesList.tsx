@@ -45,11 +45,13 @@ export const ProfilesList = () => {
               onClick={() => navigate(`/profiles/${profile.username}`)}
             >
               <div className="profile-header">
-                <img
-                  src={getMediaUrl(profile.profileImageUrl ?? undefined) || 'https://via.placeholder.com/64'}
-                  alt={profile.username}
-                  className="avatar"
-                />
+                {getMediaUrl(profile.profileImageUrl ?? undefined) ? (
+                  <img src={getMediaUrl(profile.profileImageUrl ?? undefined)} alt={profile.username} className="avatar" />
+                ) : (
+                  <div className="avatar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--card-bg)', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                    {profile.username[0]?.toUpperCase()}
+                  </div>
+                )}
                 <div className="profile-info">
                   <h3>@{profile.username}</h3>
                   <span>Updated {formatDistanceToNow(new Date(profile.lastScrapedAt))} ago</span>

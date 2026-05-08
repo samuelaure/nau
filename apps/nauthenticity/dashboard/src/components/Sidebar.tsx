@@ -23,6 +23,7 @@ type Workspace = { id: string; name: string };
 
 function WorkspaceSelector() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -30,9 +31,19 @@ function WorkspaceSelector() {
   const [saving, setSaving] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  const [activeId, setActiveId] = useState<string | null>(() =>
-    localStorage.getItem('nau_workspace_id'),
+  const urlWorkspaceId = location.pathname.match(/\/workspaces\/([^/]+)/)?.[1] ?? null;
+
+  const [activeId, setActiveId] = useState<string | null>(
+    () => urlWorkspaceId ?? localStorage.getItem('nau_workspace_id'),
   );
+
+  // URL is source of truth — sync state when navigating to a different workspace
+  useEffect(() => {
+    if (urlWorkspaceId && urlWorkspaceId !== activeId) {
+      setActiveId(urlWorkspaceId);
+      localStorage.setItem('nau_workspace_id', urlWorkspaceId);
+    }
+  }, [urlWorkspaceId]);
 
   const active = workspaces.find((w) => w.id === activeId);
 

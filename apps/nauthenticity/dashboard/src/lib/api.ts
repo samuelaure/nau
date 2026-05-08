@@ -22,6 +22,8 @@ api.interceptors.response.use(
 
 export const getMediaUrl = (url?: string) => {
   if (!url) return '';
+  // Expired Instagram CDN URLs — treat as missing
+  if (url.includes('cdninstagram.com') || url.includes('fbcdn.net')) return '';
   if (url.startsWith('http')) return url;
   if (url.startsWith('/content')) {
     if (API_URL.startsWith('http')) {

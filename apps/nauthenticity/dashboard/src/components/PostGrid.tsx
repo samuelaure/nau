@@ -45,13 +45,17 @@ export const PostGridItem = ({ post }: PostGridItemProps) => {
             border: '1px solid rgba(255,255,255,0.1)',
           }}
         >
-          <img
-            src={
-              getMediaUrl(post.collaborators[0].profilePicUrl) || 'https://via.placeholder.com/24'
-            }
-            alt={post.collaborators[0].username}
-            style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover' }}
-          />
+          {getMediaUrl(post.collaborators[0].profilePicUrl) ? (
+            <img
+              src={getMediaUrl(post.collaborators[0].profilePicUrl)}
+              alt={post.collaborators[0].username}
+              style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover' }}
+            />
+          ) : (
+            <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: '#aaa', flexShrink: 0 }}>
+              {post.collaborators[0].username[0]?.toUpperCase()}
+            </div>
+          )}
           <span style={{ color: 'white', fontSize: '0.75rem', fontWeight: 500 }}>
             {post.collaborators[0].username}
           </span>
@@ -62,9 +66,9 @@ export const PostGridItem = ({ post }: PostGridItemProps) => {
         <div style={{ width: '100%', height: '100%', position: 'relative' }}>
           {media.type === 'video' ? (
             <>
-              {isHovered ? (
+              {isHovered && videoUrl ? (
                 <video
-                  src={videoUrl!}
+                  src={videoUrl}
                   className="post-media"
                   muted
                   loop

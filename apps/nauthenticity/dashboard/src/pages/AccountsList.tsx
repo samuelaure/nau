@@ -45,11 +45,13 @@ export const AccountsList = () => {
               onClick={() => navigate(`/accounts/${account.username}`)}
             >
               <div className="profile-header">
-                <img
-                  src={getMediaUrl(account.profileImageUrl ?? undefined) || 'https://via.placeholder.com/64'}
-                  alt={account.username}
-                  className="avatar"
-                />
+                {getMediaUrl(account.profileImageUrl ?? undefined) ? (
+                  <img src={getMediaUrl(account.profileImageUrl ?? undefined)} alt={account.username} className="avatar" />
+                ) : (
+                  <div className="avatar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--card-bg)', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                    {account.username[0]?.toUpperCase()}
+                  </div>
+                )}
                 <div className="profile-info">
                   <h3>@{account.username}</h3>
                   <span>Updated {formatDistanceToNow(new Date(account.lastScrapedAt))} ago</span>
