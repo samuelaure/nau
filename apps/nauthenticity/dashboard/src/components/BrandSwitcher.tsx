@@ -91,7 +91,7 @@ export function BrandSwitcher() {
             right: 0,
             marginTop: '4px',
             zIndex: 50,
-            background: 'var(--card-bg)',
+            background: '#161b22',
             border: '1px solid rgba(255, 255, 255, 0.1)',
             borderRadius: '8px',
             overflow: 'hidden',
