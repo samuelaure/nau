@@ -171,6 +171,7 @@ model Brand {
   ownedProfiles SocialProfile[]
   monitors      SocialProfileMonitor[]
   syntheses     BrandSynthesis[]
+  context       BrandContext?
   feedbacks     CommentFeedback[]
   inspoItems    InspoItem[]
 
@@ -191,6 +192,21 @@ model BrandSynthesis {
   createdAt DateTime @default(now())
 
   @@index([brandId, type])
+}
+
+// ── Brand Context ──────────────────────────────────────────────────────────────
+// Structured brand identity context generated from owned posts, InspoBase,
+// previous context, and/or manual input. Pushed to flownau on every write.
+
+model BrandContext {
+  id          String    @id @default(uuid())
+  brandId     String    @unique
+  brand       Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  status      String    @default("idle") // idle | generating | ready | failed
+  content     Json?     // BrandContext JSON matching flownau BrandContext shape
+  sources     Json?     // { ownedProfile: bool, inspoBase: bool, previousContext: bool, manual: string|null }
+  generatedAt DateTime?
+  updatedAt   DateTime  @updatedAt
 }
 
 // A SocialProfileMonitor links a Brand to a SocialProfile it monitors.

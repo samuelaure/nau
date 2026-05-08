@@ -39,4 +39,9 @@ export declare const baseNextSchema: z.ZodObject<{
     NODE_ENV?: "development" | "production" | "test" | undefined;
 }>;
 export { z };
+export declare const UNIT_COSTS: Record<string, {
+    inputPer1M: number;
+    outputPer1M: number;
+}>;
+export declare function estimateCostUsd(model: string, promptTokens: number, completionTokens: number): number | undefined;
 //# sourceMappingURL=index.d.ts.map

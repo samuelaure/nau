@@ -391,6 +391,26 @@ export const triggerOwnedSynthesis = async (brandId: string): Promise<any> => {
   return data;
 };
 
+export const getBrandContext = async (brandId: string) => {
+  const { data } = await api.get(`/brands/${brandId}/context`);
+  return data;
+};
+
+export const generateBrandContext = async (brandId: string, sources: {
+  ownedProfile?: boolean;
+  inspoBase?: boolean;
+  previousContext?: boolean;
+  manual?: string | null;
+}) => {
+  const { data } = await api.post(`/brands/${brandId}/context/generate`, { sources });
+  return data;
+};
+
+export const saveBrandContext = async (brandId: string, content: Record<string, unknown>) => {
+  const { data } = await api.patch(`/brands/${brandId}/context`, { content });
+  return data;
+};
+
 export const syncSocialProfile = async (payload: { username: string; brandId?: string; workspaceId?: string }) => {
   const { data } = await api.post(`/social-profiles/sync`, payload);
   return data;
