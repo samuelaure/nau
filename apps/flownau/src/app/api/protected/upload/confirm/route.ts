@@ -18,6 +18,12 @@ import { logger } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
+// Serialize ffmpeg jobs — running them concurrently OOMs the 640MB container.
+let optimizationQueue = Promise.resolve()
+function enqueueOptimization(fn: () => Promise<void>): void {
+  optimizationQueue = optimizationQueue.then(() => fn().catch(() => {}))
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.json()
   const { assetId, r2Key, cdnUrl, ext, type, contextAccountId, templateId, originalFilename, mimeType, hash, size } = body as {
@@ -60,7 +66,7 @@ export async function POST(req: NextRequest) {
   const assetFolder =
     type === 'VID' ? ('videos' as const) : type === 'AUD' ? ('audios' as const) : ('images' as const)
 
-  void optimizeAssetBackground({ assetId, cdnUrl, type, mimeType, ext, contextAccountId, templateId, assetFolder })
+  enqueueOptimization(() => optimizeAssetBackground({ assetId, cdnUrl, type, mimeType, ext, contextAccountId, templateId, assetFolder }))
 
   logger.info({ assetId, type }, 'Asset confirmed — optimization queued in background')
 
