@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { Card } from '@/modules/shared/components/ui/Card'
 import { Button } from '@/modules/shared/components/ui/Button'
@@ -282,13 +283,12 @@ function IdeaModal({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function BrandPosts({ brandId }: { brandId: string }) {
+export default function BrandPosts({ brandId, workspaceId }: { brandId: string; workspaceId: string }) {
+  const router = useRouter()
   const [ideas, setIdeas] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [generating, setGenerating] = useState(false)
   const [approving, setApproving] = useState<string | null>(null)
   const [composingIdea, setComposingIdea] = useState<any | null>(null)
-  const [composing, setComposing] = useState(false)
   const [templates, setTemplates] = useState<any[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [headTalkDraftPost, setHeadTalkDraftPost] = useState<any | null>(null)
@@ -328,7 +328,6 @@ export default function BrandPosts({ brandId }: { brandId: string }) {
   const [reformatMode, setReformatMode] = useState<'format' | 'template'>('format')
   const [reformatFormat, setReformatFormat] = useState('')
   const [reformatTemplateId, setReformatTemplateId] = useState('')
-  const [reformatting, setReformatting] = useState(false)
 
   // Idea detail modal
   const [openIdea, setOpenIdea] = useState<any | null>(null)
@@ -521,48 +520,51 @@ const handleSavePrompt = async (text: string) => {
       toast.error('Please enter a topic.')
       return
     }
-    setGenerating(true)
-    const toastId = toast.loading(brainstormSource === 'automatic' ? 'Fetching InspoBase digest…' : `Generating ideas about: "${brainstormConcept.slice(0, 40)}…"`)
+    // Close modal immediately — generation runs in background
+    const concept = brainstormConcept
+    const count = brainstormCount
+    const source = brainstormSource
+    setBrainstormOpen(false)
+    setBrainstormConcept('')
+    setBrainstormCount('')
+    const toastId = toast.loading(source === 'automatic' ? 'Generating ideas from InspoBase…' : `Generating ideas: "${concept.slice(0, 40)}…"`)
     try {
       const res = await fetch('/api/agent/idea-generation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brandId, topic: brainstormSource === 'manual' ? brainstormConcept : undefined, count: brainstormCount || undefined, source: brainstormSource }),
+        body: JSON.stringify({ brandId, topic: source === 'manual' ? concept : undefined, count: count || undefined, source }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed')
-      toast.success(`Generated ${data.ideas?.length ?? 0} new ideas!`, { id: toastId })
+      toast.success(`${data.ideas?.length ?? 0} new ideas ready!`, { id: toastId, duration: 6000 })
       fetchIdeas()
     } catch (err: any) {
       toast.error(err.message, { id: toastId })
-    } finally {
-      setGenerating(false)
-      setBrainstormOpen(false)
-      setBrainstormConcept('')
-      setBrainstormCount('')
     }
   }
 
   const handleCompose = async () => {
     if (!composingIdea) return
-    setComposing(true)
-    const toastId = toast.loading('Converting idea into draft…')
+    // Close modal immediately — generation runs in background
+    const idea = composingIdea
+    const templateId = selectedTemplateId
+    setComposingIdea(null)
+    setOpenIdea(null)
+    const toastId = toast.loading('Composing draft…')
     try {
       // Resolve format + template: explicit selection > idea format > next empty slot > random enabled template
-      let finalFormat: string = composingIdea.format ?? ''
-      let resolvedTemplateId: string = selectedTemplateId
+      let finalFormat: string = idea.format ?? ''
+      let resolvedTemplateId: string = templateId
       if (resolvedTemplateId) {
         finalFormat = templates.find(t => t.id === resolvedTemplateId)?.format ?? finalFormat
       }
       if (!finalFormat) {
-        // Ask the server for the next scheduled slot's format
         const slotRes = await fetch(`/api/brands/${brandId}/slots?limit=1`)
         const slotData = slotRes.ok ? await slotRes.json() : null
         const nextEmptySlot = slotData?.slots?.find((s: any) => s.status === 'empty')
         if (nextEmptySlot?.format) {
           finalFormat = nextEmptySlot.format
         } else if (templates.length > 0) {
-          // No slot — pick a random template from the enabled list
           const picked = templates[Math.floor(Math.random() * templates.length)]
           finalFormat = picked.format ?? 'reel'
           if (!resolvedTemplateId) resolvedTemplateId = picked.id
@@ -573,61 +575,78 @@ const handleSavePrompt = async (text: string) => {
       const res = await fetch('/api/agent/compose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brandId, prompt: composingIdea.ideaText, format: finalFormat, postId: composingIdea.id, templateId: resolvedTemplateId || undefined }),
+        body: JSON.stringify({ brandId, prompt: idea.ideaText, format: finalFormat, postId: idea.id, templateId: resolvedTemplateId || undefined }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Composition failed')
-      toast.success('Draft generated!', { id: toastId })
-      setComposingIdea(null)
-      setOpenIdea(null)
       fetchIdeas()
-      if (finalFormat === 'head_talk' && data.post) setHeadTalkDraftPost(data.post)
+      if (finalFormat === 'head_talk' && data.post) {
+        setHeadTalkDraftPost(data.post)
+        toast.success('Draft ready!', { id: toastId, duration: 8000 })
+      } else if (data.post?.id) {
+        toast.success('Draft ready!', {
+          id: toastId,
+          duration: 10000,
+          action: { label: 'View draft', onClick: () => router.push(`/dashboard/workspace/${workspaceId}/draft/${data.post.id}`) },
+        })
+      } else {
+        toast.success('Draft generated!', { id: toastId, duration: 6000 })
+      }
     } catch (err: any) {
       toast.error(err.message, { id: toastId })
-    } finally {
-      setComposing(false)
     }
   }
 
   const handleReformat = async () => {
     if (!reformatIdea) return
-    setReformatting(true)
-    const toastId = toast.loading('Re-formatting draft…')
+    let finalTemplateId = reformatTemplateId
+    let finalFormat = reformatFormat
+
+    if (reformatMode === 'format' && finalFormat) {
+      const candidates = templates.filter(t => t.format === finalFormat)
+      const picked = candidates[Math.floor(Math.random() * candidates.length)]
+      finalTemplateId = picked?.id ?? ''
+    }
+
+    if (!finalTemplateId && !finalFormat) {
+      toast.error('Select a format or template')
+      return
+    }
+
+    // Close modal immediately — generation runs in background
+    const idea = reformatIdea
+    setReformatIdea(null)
+    setOpenIdea(null)
+    const toastId = toast.loading('Re-composing draft…')
     try {
-      let finalTemplateId = reformatTemplateId
-      let finalFormat = reformatFormat
-
-      if (reformatMode === 'format' && finalFormat) {
-        // Pick a random enabled template for the chosen format
-        const candidates = templates.filter(t => t.format === finalFormat)
-        const picked = candidates[Math.floor(Math.random() * candidates.length)]
-        finalTemplateId = picked?.id ?? ''
-      }
-
-      if (!finalTemplateId && !finalFormat) throw new Error('Select a format or template')
-
       const res = await fetch('/api/agent/compose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           brandId,
-          prompt: reformatIdea.ideaText,
+          prompt: idea.ideaText,
           format: finalFormat || undefined,
-          postId: reformatIdea.id,
+          postId: idea.id,
           templateId: finalTemplateId || undefined,
         }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Re-format failed')
-      toast.success('Draft re-formatted!', { id: toastId })
-      setReformatIdea(null)
-      setOpenIdea(null)
+      if (!res.ok) throw new Error(data.error || 'Re-compose failed')
       fetchIdeas()
-      if ((finalFormat || data.post?.format) === 'head_talk' && data.post) setHeadTalkDraftPost(data.post)
+      if ((finalFormat || data.post?.format) === 'head_talk' && data.post) {
+        setHeadTalkDraftPost(data.post)
+        toast.success('Draft ready!', { id: toastId, duration: 8000 })
+      } else if (data.post?.id) {
+        toast.success('Draft re-composed!', {
+          id: toastId,
+          duration: 10000,
+          action: { label: 'View draft', onClick: () => router.push(`/dashboard/workspace/${workspaceId}/draft/${data.post.id}`) },
+        })
+      } else {
+        toast.success('Draft re-composed!', { id: toastId, duration: 6000 })
+      }
     } catch (err: any) {
       toast.error(err.message, { id: toastId })
-    } finally {
-      setReformatting(false)
     }
   }
 
@@ -659,11 +678,10 @@ const handleSavePrompt = async (text: string) => {
           </Button>
           <Button
             onClick={() => setBrainstormOpen(true)}
-            disabled={generating}
             size="sm"
             className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
           >
-            {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+            <Wand2 className="w-4 h-4" />
             Brainstorm
           </Button>
         </div>
@@ -820,7 +838,7 @@ const handleSavePrompt = async (text: string) => {
 
       {/* ── Brainstorm modal ──────────────────────────────────────────────────── */}
       {brainstormOpen && (
-        <Modal isOpen={true} onClose={() => !generating && setBrainstormOpen(false)}>
+        <Modal isOpen={true} onClose={() => setBrainstormOpen(false)}>
           <div className="space-y-4">
             <h2 className="text-xl font-heading font-semibold">Brainstorm Ideas</h2>
             <div className="flex bg-gray-900 p-1 rounded-lg border border-gray-800">
@@ -841,11 +859,10 @@ const handleSavePrompt = async (text: string) => {
             {brainstormSource === 'manual' ? (
               <textarea
                 autoFocus
-                className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-sm min-h-[100px]"
+                className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-sm min-h-[100px] resize-y"
                 value={brainstormConcept}
                 onChange={e => setBrainstormConcept(e.target.value)}
-                placeholder="e.g. 'How AI is changing content creation'…"
-                disabled={generating}
+                placeholder="What's the concept or topic to explore?&#10;e.g. 'How AI is changing content creation for small brands'"
               />
             ) : (
               <div className="bg-purple-500/5 border border-purple-500/10 rounded-lg p-4">
@@ -861,7 +878,6 @@ const handleSavePrompt = async (text: string) => {
                 value={brainstormCount}
                 onChange={e => setBrainstormCount(e.target.value === '' ? '' : Number(e.target.value))}
                 placeholder="e.g. 5"
-                disabled={generating}
                 className="w-20 bg-gray-900 border border-gray-800 text-white rounded p-2 text-sm"
               />
             </div>
@@ -880,11 +896,10 @@ const handleSavePrompt = async (text: string) => {
               {brainstormShowPrompt && (
                 <div className="mt-2 flex flex-col gap-2">
                   <textarea
-                    rows={3}
                     value={ideationCustomPrompt}
                     onChange={e => setIdeationCustomPrompt(e.target.value)}
-                    placeholder="e.g. 'Always focus on founder-led content with a contrarian angle. Avoid corporate tone.'"
-                    className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-xs text-white resize-none"
+                    placeholder={"What angles, constraints or filters should shape the ideas?\n\ne.g. 'Focus on founder-led, behind-the-scenes content. Avoid motivational clichés. Ideas should resonate with early-stage founders, not investors. Never suggest list-based formats.'"}
+                    className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-xs text-white resize-y min-h-[80px]"
                   />
                   {ideationCustomPrompt !== savedIdeationPrompt && (
                     <Button size="sm" variant="outline" onClick={() => setIdeationCustomPrompt(savedIdeationPrompt)} className="self-end text-xs text-amber-400 border-amber-500/30">
@@ -895,9 +910,9 @@ const handleSavePrompt = async (text: string) => {
               )}
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" disabled={generating} onClick={() => setBrainstormOpen(false)}>Cancel</Button>
-              <Button disabled={generating} onClick={handleGenerate} className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
-                {generating ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Generating…</> : <><Wand2 className="w-4 h-4 mr-2" />Generate Ideas</>}
+              <Button variant="outline" onClick={() => setBrainstormOpen(false)}>Cancel</Button>
+              <Button onClick={handleGenerate} className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+                <Wand2 className="w-4 h-4 mr-2" />Generate Ideas
               </Button>
             </div>
           </div>
@@ -906,7 +921,7 @@ const handleSavePrompt = async (text: string) => {
 
       {/* ── Compose modal ─────────────────────────────────────────────────────── */}
       {composingIdea && (
-        <Modal isOpen={true} onClose={() => !composing && setComposingIdea(null)}>
+        <Modal isOpen={true} onClose={() => setComposingIdea(null)}>
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-heading font-semibold">Draft</h2>
@@ -921,7 +936,6 @@ const handleSavePrompt = async (text: string) => {
                 className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-sm"
                 value={selectedTemplateId}
                 onChange={e => setSelectedTemplateId(e.target.value)}
-                disabled={composing}
               >
                 <option value="">Auto Select</option>
                 {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -942,10 +956,10 @@ const handleSavePrompt = async (text: string) => {
               {composeShowPrompt && (
                 <div className="mt-2 space-y-2">
                   <textarea
-                    className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-xs min-h-[80px]"
+                    className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-xs min-h-[80px] resize-y"
                     value={draftCustomPrompt}
                     onChange={e => setDraftCustomPrompt(e.target.value)}
-                    placeholder="e.g. Always write in a conversational tone. Never use bullet points."
+                    placeholder={"How should scripts be written for this brand?\n\ne.g. 'Open with a provocative statement, never a question. Max 3 short paragraphs. Conversational but direct. Never end with a call to action — let the point land on its own.'"}
                   />
                   {draftCustomPrompt !== savedComposerPrompt && (
                     <Button size="sm" variant="outline" onClick={() => setDraftCustomPrompt(savedComposerPrompt)} className="self-end text-xs text-amber-400 border-amber-500/30">
@@ -956,9 +970,9 @@ const handleSavePrompt = async (text: string) => {
               )}
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" disabled={composing} onClick={() => setComposingIdea(null)}>Cancel</Button>
-              <Button disabled={composing} onClick={handleCompose} className="bg-accent text-white">
-                {composing ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Composing…</> : <><Wand2 className="w-4 h-4 mr-2" />Generate Draft</>}
+              <Button variant="outline" onClick={() => setComposingIdea(null)}>Cancel</Button>
+              <Button onClick={handleCompose} className="bg-accent text-white">
+                <Wand2 className="w-4 h-4 mr-2" />Generate Draft
               </Button>
             </div>
           </div>
@@ -967,11 +981,11 @@ const handleSavePrompt = async (text: string) => {
 
       {/* ── Re-format modal ───────────────────────────────────────────────────── */}
       {reformatIdea && (
-        <Modal isOpen={true} onClose={() => !reformatting && setReformatIdea(null)}>
+        <Modal isOpen={true} onClose={() => setReformatIdea(null)}>
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <Shuffle className="w-5 h-5 text-white/60" />
-              <h2 className="text-xl font-heading font-semibold">Re-format Draft</h2>
+              <h2 className="text-xl font-heading font-semibold">Re-compose Draft</h2>
             </div>
             <div className="bg-gray-900 rounded-lg p-3 border border-gray-800 max-h-[100px] overflow-y-auto">
               <p className="text-xs text-gray-400 whitespace-pre-wrap">{reformatIdea.ideaText}</p>
@@ -1023,7 +1037,6 @@ const handleSavePrompt = async (text: string) => {
                   className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-sm"
                   value={reformatTemplateId}
                   onChange={e => setReformatTemplateId(e.target.value)}
-                  disabled={reformatting}
                 >
                   <option value="">Select a template…</option>
                   {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -1031,15 +1044,13 @@ const handleSavePrompt = async (text: string) => {
               </div>
             )}
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" disabled={reformatting} onClick={() => setReformatIdea(null)}>Cancel</Button>
+              <Button variant="outline" onClick={() => setReformatIdea(null)}>Cancel</Button>
               <Button
-                disabled={reformatting || (reformatMode === 'format' ? !reformatFormat : !reformatTemplateId)}
+                disabled={reformatMode === 'format' ? !reformatFormat : !reformatTemplateId}
                 onClick={handleReformat}
                 className="bg-accent text-white"
               >
-                {reformatting
-                  ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Re-formatting…</>
-                  : <><Shuffle className="w-4 h-4 mr-2" />Re-format</>}
+                <Shuffle className="w-4 h-4 mr-2" />Re-compose
               </Button>
             </div>
           </div>
@@ -1073,11 +1084,10 @@ const handleSavePrompt = async (text: string) => {
               {manualShowPrompt && (
                 <div className="mt-2 flex flex-col gap-2">
                   <textarea
-                    rows={3}
                     value={ideationCustomPrompt}
                     onChange={e => setIdeationCustomPrompt(e.target.value)}
-                    placeholder="e.g. 'Always focus on founder-led content with a contrarian angle.'"
-                    className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-xs text-white resize-none"
+                    placeholder={"What angles, constraints or filters should shape the ideas?\n\ne.g. 'Focus on founder-led, behind-the-scenes content. Avoid motivational clichés. Ideas should resonate with early-stage founders, not investors. Never suggest list-based formats.'"}
+                    className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-xs text-white resize-y min-h-[80px]"
                   />
                   {ideationCustomPrompt !== savedIdeationPrompt && (
                     <Button size="sm" variant="outline" onClick={() => setIdeationCustomPrompt(savedIdeationPrompt)} className="self-end text-xs text-amber-400 border-amber-500/30">
@@ -1109,11 +1119,10 @@ const handleSavePrompt = async (text: string) => {
             </div>
             <textarea
               autoFocus
-              rows={8}
-              className="w-full bg-gray-900 border border-gray-800 rounded p-3 text-sm text-white resize-none focus:outline-none focus:border-accent/50"
+              className="w-full bg-gray-900 border border-gray-800 rounded p-3 text-sm text-white resize-y min-h-[140px] focus:outline-none focus:border-accent/50"
               value={promptDraft}
               onChange={e => setPromptDraft(e.target.value)}
-              placeholder="e.g. 'Always write from a founder's POV. Prioritize contrarian angles over mainstream ones. Avoid motivational fluff — favour specific, practical insights.'"
+              placeholder={"What angles, constraints or filters should shape every idea generation for this brand?\n\n• Angle focus: e.g. 'Always lean into behind-the-scenes honesty'\n• Tone restriction: e.g. 'Avoid motivational clichés and self-help language'\n• Audience lens: e.g. 'Ideas must resonate with early-stage founders, not investors'\n• Format rules: e.g. 'Never suggest list-based or how-to content'\n• Priority topics: e.g. 'Prioritise product-led, specific and contrarian takes'"}
               disabled={savingPrompt}
             />
             <div className="flex justify-end gap-2">

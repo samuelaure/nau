@@ -464,9 +464,8 @@ function TemplateModal({
               <textarea
                 value={customPrompt}
                 onChange={(e) => setCustomPrompt(e.target.value)}
-                placeholder="e.g. Always start the hook with a number. Never use questions."
-                rows={4}
-                className="w-full text-sm bg-gray-900 border border-gray-800 text-white rounded-lg px-3 py-2 resize-none focus:outline-none focus:border-gray-600 placeholder:text-gray-600 leading-relaxed"
+                placeholder={"How should the AI write when using this template for this brand?\n\n• Hook rule: e.g. 'Always open with a bold, specific claim — no questions'\n• Format constraint: e.g. 'Keep sentences under 12 words; no bullet lists'\n• Tone note: e.g. 'Dry and direct — no hype, no exclamation marks'\n• Brand-specific detail: e.g. 'Reference our founding year 2019 when relevant'\n• Hard restriction: e.g. 'Never mention competitors by name'"}
+                className="w-full text-sm bg-gray-900 border border-gray-800 text-white rounded-lg px-3 py-2 resize-y min-h-[140px] focus:outline-none focus:border-gray-600 placeholder:text-gray-600 leading-relaxed"
               />
               <div className="flex justify-end">
                 <button
