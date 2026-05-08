@@ -3,6 +3,7 @@ set -e
 
 DATE=$(date +%Y-%m-%d)
 BUCKET=":s3:${R2_BUCKET_NAME}"
+RCLONE_FLAGS="--s3-provider=Cloudflare --s3-access-key-id=${R2_ACCESS_KEY_ID} --s3-secret-access-key=${R2_SECRET_ACCESS_KEY} --s3-endpoint=${R2_ENDPOINT} --s3-no-check-bucket --log-level ERROR"
 
 echo "[backup] Starting nau platform backup — ${DATE}"
 
@@ -14,17 +15,17 @@ dump_db() {
   local pass="$5"
   local file="/tmp/${name}-${DATE}.sql.gz"
 
+  if ! ping -c1 -W2 "$host" > /dev/null 2>&1; then
+    echo "[backup] Skipping ${name} — host ${host} unreachable"
+    return 0
+  fi
+
   echo "[backup] Dumping ${name}..."
   PGPASSWORD="$pass" pg_dump -h "$host" -U "$user" -d "$db" --no-owner --no-privileges \
     | gzip > "$file"
 
   echo "[backup] Uploading ${name}..."
-  rclone copy "$file" "${BUCKET}/${name}/" \
-    --s3-provider=Cloudflare \
-    --s3-access-key-id="${R2_ACCESS_KEY_ID}" \
-    --s3-secret-access-key="${R2_SECRET_ACCESS_KEY}" \
-    --s3-endpoint="${R2_ENDPOINT}" \
-    --s3-no-check-bucket
+  rclone copy "$file" "${BUCKET}/${name}/" $RCLONE_FLAGS
 
   rm -f "$file"
   echo "[backup] ${name} done."
@@ -41,11 +42,7 @@ echo "[backup] Pruning old backups..."
 for db in api flownau nauthenticity zazu whatsnau; do
   rclone delete "${BUCKET}/${db}/" \
     --min-age 30d \
-    --s3-provider=Cloudflare \
-    --s3-access-key-id="${R2_ACCESS_KEY_ID}" \
-    --s3-secret-access-key="${R2_SECRET_ACCESS_KEY}" \
-    --s3-endpoint="${R2_ENDPOINT}" \
-    --s3-no-check-bucket
+    $RCLONE_FLAGS
 done
 
 echo "[backup] All done."
