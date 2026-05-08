@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Heart, MessageCircle } from 'lucide-react';
 import { getMediaUrl, type Post } from '../lib/api';
 
@@ -9,6 +9,7 @@ interface PostGridItemProps {
 
 export const PostGridItem = ({ post }: PostGridItemProps) => {
   const [isHovered, setIsHovered] = React.useState(false);
+  const location = useLocation();
   const media = post.media && post.media.length > 0 ? post.media[0] : null;
   const rawThumb = media?.thumbnailUrl || (media?.type === 'image' ? media?.storageUrl : null);
   const thumbUrl = rawThumb ? getMediaUrl(rawThumb) : null;
@@ -17,6 +18,7 @@ export const PostGridItem = ({ post }: PostGridItemProps) => {
   return (
     <Link
       to={`/posts/${post.id}`}
+      state={{ backTo: location.pathname }}
       className="post-card"
       style={{
         textDecoration: 'none',

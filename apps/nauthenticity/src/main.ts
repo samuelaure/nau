@@ -10,7 +10,22 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap')
   const app = await NestFactory.create(AppModule)
   app.enableShutdownHooks()
-  app.use(helmet())
+  const mediaDomain = (process.env.R2_PUBLIC_URL ?? 'https://media.9nau.com').replace(/\/$/, '')
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', mediaDomain],
+        mediaSrc: ["'self'", mediaDomain],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'", 'data:'],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+      },
+    },
+  }))
   app.use(cookieParser())
   app.setGlobalPrefix('api/v1', { exclude: ['health', 'auth/(.*)'] })
 
