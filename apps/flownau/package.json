@@ -74,7 +74,7 @@
     "ioredis": "^5.0.0",
     "jose": "^6.2.2",
     "lucide-react": "^0.563.0",
-    "nau-storage": "^0.1.1",
+    "nau-storage": "workspace:*",
     "next": "^16.1.6",
     "node-cron": "^4.2.1",
     "openai": "^6.25.0",

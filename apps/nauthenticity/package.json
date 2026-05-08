@@ -51,7 +51,7 @@
     "helmet": "^8.1.0",
     "ioredis": "^5.9.2",
     "jsonwebtoken": "^9.0.2",
-    "nau-storage": "^0.1.1",
+    "nau-storage": "workspace:*",
     "openai": "^6.16.0",
     "pg": "^8.20.0",
     "pino": "^9.6.0",

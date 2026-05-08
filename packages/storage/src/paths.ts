@@ -71,6 +71,17 @@ export const nauthenticity = {
    */
   profilePic: (username: string, ext: string) =>
     `nauthenticity/content/${username}/profile.${ext}`,
+
+  /**
+   * Profile picture of a collaborator, stored under the context account's folder.
+   * e.g. manualfamiliar/collaborators/profile_somecollab.jpg
+   */
+  collaboratorPic: (contextUsername: string, collaboratorUsername: string, ext: string) =>
+    `nauthenticity/content/${contextUsername}/collaborators/profile_${collaboratorUsername}.${ext}`,
+
+  /** Thumbnail for a post media item. Co-located with the optimized post. */
+  postThumbnail: (username: string, mediaId: string) =>
+    `nauthenticity/content/${username}/posts/${mediaId}_thumb.jpg`,
 };
 
 // ---------------------------------------------------------------------------

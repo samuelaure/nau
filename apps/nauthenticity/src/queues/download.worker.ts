@@ -20,6 +20,7 @@ const storage = config.env.R2_ENDPOINT && config.env.R2_ACCESS_KEY_ID && config.
       secretAccessKey: config.env.R2_SECRET_ACCESS_KEY,
       bucket: config.env.R2_BUCKET_NAME,
       publicUrl: config.env.R2_PUBLIC_URL,
+      envPrefix: config.env.NODE_ENV,
     })
   : null;
 
@@ -174,7 +175,12 @@ export const downloadWorker = new Worker(
             await pipeline(response.body as any, createWriteStream(tempProfilePath));
             await optimizeImage(tempProfilePath, optimizedProfilePath);
 
-            const storageKey = nauthenticity.profilePic(username, 'jpg');
+            // Own profile pic goes under the profile's own folder; collaborator pics
+            // go under the context account's collaborators/ subfolder.
+            const isCollaborator = username !== contextUsername;
+            const storageKey = isCollaborator
+              ? nauthenticity.collaboratorPic(contextUsername, username, 'jpg')
+              : nauthenticity.profilePic(username, 'jpg');
             const publicUrl = await storage.upload(storageKey, fs.createReadStream(optimizedProfilePath), {
               mimeType: 'image/jpeg',
             });

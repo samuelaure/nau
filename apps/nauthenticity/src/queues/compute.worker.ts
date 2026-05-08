@@ -12,8 +12,9 @@ import { logContextStorage } from '../utils/context';
 import { computeQueue } from './compute.queue';
 import { downloadQueue } from './download.queue';
 import { getProfilesInfo } from '../services/apify.service';
-import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { Readable } from 'stream';
+import { createStorage, nauthenticity } from 'nau-storage';
 
 // ---------------------------------------------------------------------------
 // R2 Client Initialization
@@ -29,6 +30,17 @@ const r2Client =
         },
       })
     : null;
+
+const storage = config.env.R2_ENDPOINT && config.env.R2_ACCESS_KEY_ID && config.env.R2_SECRET_ACCESS_KEY && config.env.R2_BUCKET_NAME && config.env.R2_PUBLIC_URL
+  ? createStorage({
+      endpoint: config.env.R2_ENDPOINT,
+      accessKeyId: config.env.R2_ACCESS_KEY_ID,
+      secretAccessKey: config.env.R2_SECRET_ACCESS_KEY,
+      bucket: config.env.R2_BUCKET_NAME,
+      publicUrl: config.env.R2_PUBLIC_URL,
+      envPrefix: config.env.NODE_ENV,
+    })
+  : null;
 
 // ---------------------------------------------------------------------------
 // Pipeline Step Registry
@@ -214,20 +226,11 @@ const generateThumbnail = async (
   });
 
   // 2. Upload to R2 if enabled
-  if (r2Client && config.env.R2_BUCKET_NAME) {
-    const storageKey = `nauthenticity/content/${username}/posts/${thumbFilename}`;
-    await r2Client.send(
-      new PutObjectCommand({
-        Bucket: config.env.R2_BUCKET_NAME,
-        Key: storageKey,
-        Body: fs.createReadStream(thumbPath),
-        ContentType: 'image/jpeg',
-      }),
-    );
-    finalThumbUrl = config.env.R2_PUBLIC_URL
-      ? `${config.env.R2_PUBLIC_URL}/${storageKey}`
-      : thumbPublicUrl;
-
+  if (storage) {
+    const storageKey = nauthenticity.postThumbnail(username, mediaId);
+    finalThumbUrl = await storage.upload(storageKey, fs.createReadStream(thumbPath), {
+      mimeType: 'image/jpeg',
+    });
     if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
   }
 
@@ -479,23 +482,18 @@ const handleOptimizeBatch = async (
         wlog.optimize.start(currentItem.username, m.id, m.type, m.storageUrl ?? '', (m.storageUrl ?? '').replace('/raw/', '/content/'));
         const optimizedPath = await optimizeMedia(m.id, filePath);
 
-        if (m.storageUrl?.startsWith('http') && r2Client && config.env.R2_BUCKET_NAME) {
-          // If remote, upload optimized to content location
-          const url = new URL(m.storageUrl);
-          const pathname = url.pathname.startsWith('/') ? url.pathname.slice(1) : url.pathname;
-          const optimizedKey = pathname.replace('/raw/', '/content/');
+        if (m.storageUrl?.startsWith('http') && storage) {
+          const ext = path.extname(m.storageUrl).slice(1) || (m.type === 'video' ? 'mp4' : 'jpg');
+          const username = m.post.username ?? '';
+          const finalKey = nauthenticity.post(username, m.id, ext);
+          const rawKey = nauthenticity.rawPost(username, m.id, ext);
 
-          await r2Client.send(
-            new PutObjectCommand({
-              Bucket: config.env.R2_BUCKET_NAME,
-              Key: optimizedKey,
-              Body: fs.createReadStream(optimizedPath),
-              ContentType: m.type === 'video' ? 'video/mp4' : 'image/jpeg',
-            }),
-          );
+          const optimizedUrl = await storage.upload(finalKey, fs.createReadStream(optimizedPath), {
+            mimeType: m.type === 'video' ? 'video/mp4' : 'image/jpeg',
+          });
 
-          // Update media to point to optimized location
-          const optimizedUrl = `${config.env.R2_PUBLIC_URL}/${optimizedKey}`;
+          await storage.delete(rawKey).catch(() => {});
+
           await prisma.media.update({
             where: { id: m.id },
             data: { storageUrl: optimizedUrl },
