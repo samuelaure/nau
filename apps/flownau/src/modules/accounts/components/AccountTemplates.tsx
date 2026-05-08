@@ -607,9 +607,16 @@ function TemplateCard({
       <div className="p-3 flex flex-col gap-1.5 flex-1">
         <div className="flex items-start justify-between gap-1.5">
           <p className="text-xs font-semibold leading-snug line-clamp-2 group-hover:text-white transition-colors flex-1">{template.name}</p>
-          <span className={cn('text-[9px] px-1 py-0.5 rounded border shrink-0', FORMAT_COLOR[template.format] ?? 'bg-gray-800 text-gray-400 border-gray-700')}>
-            {template.format.replace('_', ' ')}
-          </span>
+          <div className="flex items-center gap-1 shrink-0">
+            {config?.customPrompt && (
+              <span className="text-[9px] px-1 py-0.5 rounded border bg-amber-500/10 text-amber-400 border-amber-500/20" title="Custom prompt set">
+                custom
+              </span>
+            )}
+            <span className={cn('text-[9px] px-1 py-0.5 rounded border', FORMAT_COLOR[template.format] ?? 'bg-gray-800 text-gray-400 border-gray-700')}>
+              {template.format.replace('_', ' ')}
+            </span>
+          </div>
         </div>
         {template.description && (
           <p className="text-[11px] text-text-secondary leading-snug line-clamp-2">{template.description}</p>
