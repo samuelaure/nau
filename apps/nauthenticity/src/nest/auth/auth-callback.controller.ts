@@ -98,7 +98,7 @@ export class AuthCallbackController {
 
     try {
       const payload = this.verifyToken(refreshed.at)
-      refreshed.setCookies.forEach((c) => res.setHeader('Set-Cookie', c))
+      res.setHeader('Set-Cookie', refreshed.setCookies)
       return res.json({ id: payload['sub'], workspaceId: payload['workspaceId'] })
     } catch {
       return res.status(HttpStatus.UNAUTHORIZED).json({ error: 'Invalid refreshed token' })
