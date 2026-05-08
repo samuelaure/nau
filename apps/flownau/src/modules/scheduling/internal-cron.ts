@@ -32,7 +32,9 @@ async function runPublisher() {
 
     const templateConfig = post.template?.brandConfigs?.find((c) => c.brandId === post.brandId)
     const autoApprovePost = templateConfig?.autoApprovePost ?? false
-    if (!autoApprovePost && post.status !== 'PUBLISHING') continue
+    // RENDERED_APPROVED reached via auto-approve cron — skip if manual review required.
+    // PUBLISHING (manually approved) and SCHEDULED always proceed.
+    if (!autoApprovePost && post.status === 'RENDERED_APPROVED') continue
 
     try {
       const result = await publishComposition({

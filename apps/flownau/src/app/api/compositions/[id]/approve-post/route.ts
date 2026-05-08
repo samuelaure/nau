@@ -33,7 +33,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const updated = await prisma.post.update({
       where: { id },
-      data: { status: 'RENDERED_APPROVED' },
+      data: {
+        status: 'PUBLISHING',
+        scheduledAt: post.scheduledAt ?? new Date(),
+      },
     })
 
     return NextResponse.json({ post: updated }, { status: 200 })
