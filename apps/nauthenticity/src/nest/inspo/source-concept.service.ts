@@ -22,29 +22,39 @@ export class SourceConceptService {
     })
     if (!brand) throw new NotFoundException('Brand not found')
 
+    // Fetch INSPO post memberships — use postSynthesis (rich interpretation) when available,
+    // fall back to caption slice. Profile-only memberships contribute a username line.
+    // Select recent posts first; this is the "recent" selection strategy.
+    // Future variants: random, topic-based.
     const memberships = await this.prisma.categoryMembership.findMany({
-      where: { brandId, category: 'INSPO', isActive: true },
+      where: { brandId, category: 'INSPO', isActive: true, postId: { not: null } },
       include: {
-        post: { select: { url: true, caption: true } },
-        socialProfile: { select: { username: true } },
+        post: { select: { postSynthesis: true, caption: true } },
       },
+      orderBy: { createdAt: 'desc' },
+      take: 60,
     })
 
-    if (memberships.length === 0) {
+    const profileMemberships = await this.prisma.categoryMembership.findMany({
+      where: { brandId, category: 'INSPO', isActive: true, socialProfileId: { not: null } },
+      include: { socialProfile: { select: { username: true } } },
+      take: 20,
+    })
+
+    const totalItems = memberships.length + profileMemberships.length
+    if (totalItems === 0) {
       throw new UnprocessableEntityException('InspoBase is empty — add posts or profiles first.')
     }
 
     const inspoLines: string[] = []
     for (const m of memberships) {
-      if (m.post?.caption) inspoLines.push(`Caption: ${m.post.caption.slice(0, 600)}`)
-      else if (m.socialProfile) inspoLines.push(`Profile: @${m.socialProfile.username}`)
+      if (!m.post) continue
+      const text = m.post.postSynthesis ?? m.post.caption?.slice(0, 400)
+      if (text) inspoLines.push(text)
     }
-
-    const ownedSynthesis = await this.prisma.brandSynthesis.findFirst({
-      where: { brandId, type: 'owned_content' },
-      orderBy: { createdAt: 'desc' },
-      select: { content: true },
-    })
+    for (const m of profileMemberships) {
+      if (m.socialProfile) inspoLines.push(`Profile: @${m.socialProfile.username}`)
+    }
 
     const systemPrompt = `You are a creative content strategist. You receive a brand's InspoBase — a curated collection of inspiring posts and profiles — and you extract distinct, actionable source concepts from it as a whole.
 
@@ -55,11 +65,8 @@ Generate as many source concepts as genuinely capture distinct angles from this 
 Return JSON: { "concepts": [ { "content": "..." }, ... ] }
 Each "content" is a paragraph (30–60 words) describing the concept clearly enough for an ideation LLM to work from it independently.`
 
-    const inspoBlock = inspoLines.join('\n')
     const voiceBlock = brand.voicePrompt ? `\n\n## BRAND VOICE\n${brand.voicePrompt.slice(0, 500)}` : ''
-    const ownedBlock = ownedSynthesis ? `\n\n## OWNED CONTENT SYNTHESIS\n${ownedSynthesis.content.slice(0, 400)}` : ''
-
-    const userMessage = `## INSPOBASE\n${inspoBlock}${voiceBlock}${ownedBlock}\n\nExtract source concepts.`
+    const userMessage = `## INSPOBASE\n${inspoLines.join('\n\n')}${voiceBlock}\n\nExtract source concepts.`
 
     const { client, model } = getClientForFeature('synthesis')
     const result = await client.chatCompletion({

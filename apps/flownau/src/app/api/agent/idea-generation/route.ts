@@ -38,24 +38,21 @@ export async function POST(req: Request) {
     let priority = 2
 
     if (source === 'automatic') {
-      const { fetchBrandDigest } = await import('@/modules/ideation/sources/inspo-source')
-      const digest = await fetchBrandDigest(brandId)
+      const { fetchPendingSourceConcepts, generateSourceConcepts } = await import('@/modules/ideation/sources/inspo-source')
+      let concepts = await fetchPendingSourceConcepts(brandId)
+      if (concepts.length === 0) concepts = await generateSourceConcepts(brandId)
 
-      if (!digest?.content?.trim()) {
+      if (concepts.length === 0) {
         return NextResponse.json(
-          { error: 'No InspoBase digest available. Run a nauthenticity scrape first.' },
+          { error: 'No source concepts available. Add posts or profiles to InspoBase first.' },
           { status: 422 },
         )
       }
 
-      topic = digest.content
+      // Use the first pending concept as the topic for this brainstorm session
+      topic = concepts[0].content
       priority = 3
-      sourceRef =
-        digest.attachedUrls.length > 0
-          ? digest.attachedUrls.length === 1
-            ? digest.attachedUrls[0]
-            : JSON.stringify(digest.attachedUrls)
-          : null
+      sourceRef = concepts[0].id
     }
 
     if (!topic) {

@@ -52,6 +52,7 @@ model Post {
   engagementScore Float?
   collaborators   Json?
   intelligence    Json?
+  postSynthesis   String?  @db.Text
 
   runId String?
   run   ScrapingRun? @relation(fields: [runId], references: [id])

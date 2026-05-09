@@ -53,6 +53,7 @@ export type PipelineStepName =
   | 'profile-sync-batch'
   | 'optimize-batch'
   | 'transcribe-batch'
+  | 'synthesize-batch'
   | 'embed-batch';
 
 /** Ordered execution sequence. Modify this array to re-sort the pipeline. */
@@ -61,6 +62,7 @@ const PIPELINE: PipelineStepName[] = [
   'profile-sync-batch',
   'optimize-batch',
   'transcribe-batch',
+  'synthesize-batch',
   'embed-batch',
 ];
 
@@ -70,6 +72,7 @@ export const PHASE_LABELS: Record<PipelineStepName, string> = {
   'profile-sync-batch': 'profiling',
   'optimize-batch': 'optimizing',
   'transcribe-batch': 'transcribing',
+  'synthesize-batch': 'synthesizing',
   'embed-batch': 'embedding',
 };
 
@@ -571,6 +574,70 @@ const handleTranscribeBatch = async (
   }
 };
 
+const handleSynthesizeBatch = async (
+  job: Job,
+  runId: string,
+  _username: string,
+  checkPaused: PauseChecker,
+): Promise<{ paused: true } | void> => {
+  wlog.phase('synthesizing', runId);
+
+  const posts = await prisma.post.findMany({
+    where: { runId, postSynthesis: null },
+    select: { id: true, caption: true, transcripts: { select: { text: true }, take: 1 } },
+  });
+
+  if (posts.length === 0) return;
+
+  const { getClientForFeature } = await import('@nau/llm-client');
+  const { client, model } = getClientForFeature('synthesis');
+
+  for (let i = 0; i < posts.length; i++) {
+    if (i % 20 === 0 && await checkPaused(runId)) {
+      wlog.phase('paused', runId, 'synthesis stopped');
+      return { paused: true };
+    }
+
+    await job.updateProgress({
+      progress: Math.round((i / posts.length) * 100),
+      step: `Synthesizing ${i + 1}/${posts.length}`,
+      currentItem: { type: 'synthesis' },
+    });
+
+    const post = posts[i];
+    const caption = post.caption?.slice(0, 800) ?? '';
+    const transcript = post.transcripts[0]?.text?.slice(0, 800) ?? '';
+
+    if (!caption && !transcript) continue;
+
+    const contentBlock = [
+      caption && `Caption: ${caption}`,
+      transcript && `Transcript: ${transcript}`,
+    ].filter(Boolean).join('\n');
+
+    try {
+      const result = await client.chatCompletion({
+        model,
+        temperature: 0.3,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a content analyst. Given social media post content, write a compact synthesis (2-4 sentences) that captures the core idea, angle, and tone. Focus on what makes this post distinctive and useful as inspiration. Be direct and specific.',
+          },
+          { role: 'user', content: contentBlock },
+        ],
+      });
+
+      await prisma.post.update({
+        where: { id: post.id },
+        data: { postSynthesis: result.content.trim() },
+      });
+    } catch (err) {
+      logger.error({ postId: post.id, err }, '[SYNTHESIZE] Failed to synthesize post');
+    }
+  }
+};
+
 const handleEmbedBatch = async (
   job: Job,
   runId: string,
@@ -626,6 +693,7 @@ const STEP_HANDLERS: Record<
   'profile-sync-batch': handleProfileSyncBatch,
   'optimize-batch': handleOptimizeBatch,
   'transcribe-batch': handleTranscribeBatch,
+  'synthesize-batch': handleSynthesizeBatch,
   'embed-batch': handleEmbedBatch,
 };
 
