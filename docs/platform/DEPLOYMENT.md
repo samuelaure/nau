@@ -331,13 +331,15 @@ ssh nau "docker logs nauthenticity --tail=100 -f"
 | accounts | 384M | 0.50 |
 | app | 384M | 0.50 |
 | flownau | 640M | 0.75 |
-| flownau-renderer | 1792M | 1.50 |
+| flownau-renderer | 3G | 1.50 |
 | nauthenticity | 640M | 1.00 |
 | zazu-bot | 384M | 0.50 |
 | zazu-dashboard | 384M | 0.50 |
 | Databases (×4) | 256–384M each | — |
 | Redis (×4) | 128M each | — |
-| **Total headroom** | **~1.5GB free** | — |
+| **Total headroom** | **~200MB hard limit + 4GB swap** | — |
+
+_Renderer was raised from 1792M to 3G after Remotion compositor SIGKILL on complex renders (OOM at peak ~2.6GB). Server has a 4GB swap that absorbs transient spikes above hard limits._
 
 _whatsnau is deferred — not included in v1 deployment._
 
