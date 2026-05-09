@@ -5,11 +5,13 @@ import { type PublishResult, type IGPublishParams, IG_BASE_URL } from './types'
 
 interface TrialReelPublishParams extends IGPublishParams {
   videoUrl: string
-  graduationStrategy?: 'AUTO' | 'MANUAL'
+  // MANUAL: stays as trial until manually graduated in the Instagram app (safe default for pipeline)
+  // SS_PERFORMANCE: auto-graduates to followers if performance meets Instagram's thresholds
+  graduationStrategy?: 'MANUAL' | 'SS_PERFORMANCE'
 }
 
 export async function publishTrialReel(params: TrialReelPublishParams): Promise<PublishResult> {
-  const { accessToken, igUserId, videoUrl, caption, graduationStrategy = 'AUTO' } = params
+  const { accessToken, igUserId, videoUrl, caption, graduationStrategy = 'MANUAL' } = params
 
   try {
     // Step 1: Create container with trial_params
@@ -18,7 +20,6 @@ export async function publishTrialReel(params: TrialReelPublishParams): Promise<
       media_type: 'REELS',
       caption,
       access_token: accessToken,
-      audio_name: 'Background Audio',
       trial_params: JSON.stringify({ graduation_strategy: graduationStrategy }),
     }
 
