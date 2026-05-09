@@ -106,35 +106,6 @@ async function runRenderer() {
   }
 }
 
-async function runApproveRenders() {
-  // Only auto-approve posts where the brand+template config has autoApprovePost enabled.
-  const candidates = await prisma.post.findMany({
-    where: {
-      status: 'RENDERED_PENDING',
-      scheduledAt: { lte: new Date(Date.now() + 48 * 60 * 60 * 1000) },
-    },
-    select: { id: true, brandId: true, templateId: true },
-  })
-
-  if (candidates.length === 0) return
-
-  const eligible = await Promise.all(
-    candidates.map(async (post) => {
-      if (!post.templateId) return null
-      const config = await prisma.brandTemplateConfig.findUnique({
-        where: { brandId_templateId: { brandId: post.brandId, templateId: post.templateId } },
-        select: { autoApprovePost: true },
-      })
-      return config?.autoApprovePost ? post.id : null
-    }),
-  )
-
-  const ids = eligible.filter((id): id is string => id !== null)
-  if (ids.length === 0) return
-
-  await prisma.post.updateMany({ where: { id: { in: ids } }, data: { status: 'RENDERED_APPROVED' } })
-  logger.info(`[Cron:ApproveRenders] Auto-approved ${ids.length} post(s)`)
-}
 
 async function runScheduler() {
   try {
@@ -172,9 +143,6 @@ export async function startInternalCron() {
 
   // Renderer safety-net — every 10 minutes
   cron.schedule('*/10 * * * *', safe('Renderer', runRenderer))
-
-  // Auto-approve renders due within 48h — every 30 minutes
-  cron.schedule('*/30 * * * *', safe('ApproveRenders', runApproveRenders))
 
   // AI slot scheduler — once daily at 00:05
   cron.schedule('5 0 * * *', safe('Scheduler', runScheduler))
