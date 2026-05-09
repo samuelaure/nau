@@ -151,7 +151,7 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
       const assetFrames = a.duration ? Math.floor(a.duration * REMOTION_FPS) : 0
       const maxStart = Math.max(0, assetFrames - BROLL_REQUIRED_FRAMES)
       const startFrom = maxStart > 0 ? Math.floor(Math.random() * maxStart) : 0
-      return { url: a.url, startFrom }
+      return { url: a.url, startFrom, durationInFrames: assetFrames > 0 ? assetFrames : undefined }
     })
 
     audioUrl = shuffle(audioAssets)[0]?.url

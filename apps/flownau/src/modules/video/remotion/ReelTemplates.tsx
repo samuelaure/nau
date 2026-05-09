@@ -41,6 +41,7 @@ export interface BrandIdentity {
 export interface BrollClip {
   url: string
   startFrom?: number
+  durationInFrames?: number
 }
 
 export interface ReelSlotProps {
@@ -107,15 +108,21 @@ function TextZone({ children, align = 'center' }: { children: React.ReactNode; a
 // ── Shared primitives ──────────────────────────────────────────────────────────
 
 function BrollBackground({ clip, overlayOpacity }: { clip?: BrollClip; overlayOpacity: number }) {
+  const frame = useCurrentFrame()
   if (!clip?.url) {
     return <div style={{ position: 'absolute', inset: 0, background: '#111' }} />
   }
+  // OffthreadVideo has no loop prop — simulate by wrapping the frame counter.
+  // Falls back to startFrom (no looping) when clip duration is unknown.
+  const clipFrames = clip.durationInFrames
+  const startFrom = clipFrames
+    ? (clip.startFrom ?? 0) + (frame % clipFrames)
+    : (clip.startFrom ?? 0)
   return (
     <>
       <OffthreadVideo
         src={clip.url}
-        startFrom={clip.startFrom ?? 0}
-        loop
+        startFrom={startFrom}
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
         muted
       />
