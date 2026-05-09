@@ -139,10 +139,13 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
       }),
     ])
 
+    const longEnough = allVideos.filter((a) => !a.duration || Math.floor(a.duration * REMOTION_FPS) >= BROLL_REQUIRED_FRAMES)
+    const candidatePool = longEnough.length > 0 ? longEnough : allVideos
+
     const moodMatched = moodKeywords.length > 0
-      ? allVideos.filter((a) => a.tags.some((t) => moodKeywords.includes(t.toLowerCase())))
+      ? candidatePool.filter((a) => a.tags.some((t) => moodKeywords.includes(t.toLowerCase())))
       : []
-    const videoPool = shuffle(moodMatched.length > 0 ? moodMatched : allVideos)
+    const videoPool = shuffle(moodMatched.length > 0 ? moodMatched : candidatePool)
 
     brollClips = videoPool.map((a) => {
       const assetFrames = a.duration ? Math.floor(a.duration * REMOTION_FPS) : 0
