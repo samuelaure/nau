@@ -36,23 +36,68 @@ interface BrandIdentity {
 }
 
 const FONT_OPTIONS = [
-  { description: 'System default',           value: 'sans-serif'       },
-  { description: 'bold display',             value: 'Anton'            },
-  { description: 'condensed impact',         value: 'Bebas Neue'       },
-  { description: 'condensed editorial',      value: 'Oswald'           },
-  { description: 'heavy, asian-friendly',    value: 'Black Han Sans'   },
-  { description: 'clean neutral',            value: 'Inter'            },
-  { description: 'geometric bold',           value: 'Montserrat'       },
-  { description: 'rounded modern',           value: 'Poppins'          },
-  { description: 'low-contrast readable',    value: 'DM Sans'          },
-  { description: 'soft rounded',             value: 'Nunito'           },
-  { description: 'elegant thin',             value: 'Raleway'          },
-  { description: 'editorial serif',          value: 'Playfair Display' },
+  { description: 'system default',           value: 'sans-serif'            },
+  // Bold display
+  { description: 'bold display',             value: 'Anton'                 },
+  { description: 'condensed impact',         value: 'Bebas Neue'            },
+  { description: 'condensed editorial',      value: 'Oswald'                },
+  { description: 'heavy, asian-friendly',    value: 'Black Han Sans'        },
+  { description: 'condensed sport',          value: 'Barlow Condensed'      },
+  { description: 'tall bold display',        value: 'Teko'                  },
+  { description: 'chunky display',           value: 'Big Shoulders Display' },
+  { description: 'retro bold',               value: 'Righteous'             },
+  { description: 'heavy grotesque',          value: 'Archivo Black'         },
+  // Modern sans-serif
+  { description: 'clean neutral',            value: 'Inter'                 },
+  { description: 'geometric bold',           value: 'Montserrat'            },
+  { description: 'rounded modern',           value: 'Poppins'               },
+  { description: 'low-contrast readable',    value: 'DM Sans'               },
+  { description: 'soft rounded',             value: 'Nunito'                },
+  { description: 'elegant thin',             value: 'Raleway'               },
+  { description: 'humanist balanced',        value: 'Lato'                  },
+  { description: 'universal readable',       value: 'Roboto'                },
+  { description: 'open grotesque',           value: 'Work Sans'             },
+  { description: 'wide modern',              value: 'Manrope'               },
+  { description: 'minimalist clean',         value: 'Urbanist'              },
+  { description: 'contemporary geometric',   value: 'Outfit'                },
+  { description: 'friendly modern',          value: 'Figtree'               },
+  { description: 'tech editorial',           value: 'Space Grotesk'         },
+  { description: 'clean circular',           value: 'Sora'                  },
+  { description: 'condensed versatile',      value: 'Barlow'                },
+  { description: 'sharp modern',             value: 'Kanit'                 },
+  // Serif
+  { description: 'editorial serif',          value: 'Playfair Display'      },
+  { description: 'warm readable serif',      value: 'Lora'                  },
+  { description: 'sturdy news serif',        value: 'Merriweather'          },
+  { description: 'elegant high contrast',    value: 'Cormorant'             },
+  { description: 'classic book serif',       value: 'Libre Baskerville'     },
+  { description: 'vintage editorial',        value: 'Crimson Text'          },
+  { description: 'roman decorative',         value: 'Cinzel'                },
+  // Handwriting / script
+  { description: 'flowing script',           value: 'Dancing Script'        },
+  { description: 'thin signature',           value: 'Sacramento'            },
+  { description: 'casual script',            value: 'Satisfy'               },
+  { description: 'playful retro',            value: 'Pacifico'              },
+  { description: 'natural handwritten',      value: 'Caveat'                },
 ]
 
 // Google Fonts URL for all custom fonts in the list
 const GOOGLE_FONTS_URL =
-  'https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Oswald:wght@700&family=Black+Han+Sans&family=Inter:wght@700&family=Montserrat:wght@700&family=Poppins:wght@700&family=DM+Sans:wght@700&family=Nunito:wght@700&family=Raleway:wght@700&family=Playfair+Display:wght@700&display=swap'
+  'https://fonts.googleapis.com/css2?' +
+  'family=Anton&family=Bebas+Neue&family=Oswald:wght@700&family=Black+Han+Sans&' +
+  'family=Barlow+Condensed:wght@700&family=Teko:wght@600&family=Big+Shoulders+Display:wght@700&' +
+  'family=Righteous&family=Archivo+Black&' +
+  'family=Inter:wght@700&family=Montserrat:wght@700&family=Poppins:wght@700&' +
+  'family=DM+Sans:wght@700&family=Nunito:wght@700&family=Raleway:wght@700&' +
+  'family=Lato:wght@700&family=Roboto:wght@700&family=Work+Sans:wght@700&' +
+  'family=Manrope:wght@700&family=Urbanist:wght@700&family=Outfit:wght@700&' +
+  'family=Figtree:wght@700&family=Space+Grotesk:wght@700&family=Sora:wght@700&' +
+  'family=Barlow:wght@700&family=Kanit:wght@700&' +
+  'family=Playfair+Display:wght@700&family=Lora:wght@700&family=Merriweather:wght@700&' +
+  'family=Cormorant:wght@700&family=Libre+Baskerville:wght@700&family=Crimson+Text:wght@700&' +
+  'family=Cinzel:wght@700&' +
+  'family=Dancing+Script:wght@700&family=Sacramento&family=Satisfy&family=Pacifico&family=Caveat:wght@700&' +
+  'display=swap'
 
 function FontPicker({ name, defaultValue }: { name: string; defaultValue: string }) {
   const [value, setValue] = useState(defaultValue)
