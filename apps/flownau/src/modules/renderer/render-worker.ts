@@ -160,10 +160,12 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
     logger.info({ postId, brandId, moodKeywords, videoPoolSize: videoPool.length, hasAudio: !!audioUrl }, '[RenderWorker] B-roll and audio assets resolved')
   }
 
+  const selectedClips = brollClips.slice(0, 5)
+
   if (freshlyResolved) {
     await prisma.post.update({
       where: { id: postId },
-      data: { creative: { ...(creative as object), renderSnapshot: { brollClips, audioUrl } } },
+      data: { creative: { ...(creative as object), renderSnapshot: { brollClips: selectedClips, audioUrl } } },
     })
   }
   const brandIdentity = (post.brand?.brandIdentity ?? {}) as BrandIdentity
@@ -172,7 +174,7 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
     slots: creative.slots,
     caption: creative.caption ?? '',
     hashtags: creative.hashtags ?? [],
-    brollClips: brollClips.slice(0, 5),
+    brollClips: selectedClips,
     audioUrl,
     brand: brandIdentity,
   }

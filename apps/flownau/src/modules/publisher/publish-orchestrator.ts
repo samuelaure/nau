@@ -67,9 +67,18 @@ export async function publishComposition(post: PostForPublish): Promise<PublishR
     case 'reel':
       result = await publishReel({ accessToken: validToken, igUserId, videoUrl: post.videoUrl, caption, coverUrl: post.coverUrl ?? undefined })
       break
-    case 'trial_reel':
-      result = await publishTrialReel({ accessToken: validToken, igUserId, videoUrl: post.videoUrl, caption })
+    case 'trial_reel': {
+      const trialResult = await publishTrialReel({ accessToken: validToken, igUserId, videoUrl: post.videoUrl, caption })
+      // 2207081 = account doesn't meet trial reel follower requirement — non-transient, fall back to regular reel
+      if (!trialResult.success && trialResult.igErrorSubcode === 2207081) {
+        logger.warn({ postId: post.id }, '[PublishOrchestrator] Trial reel not eligible (follower count) — falling back to regular reel')
+        await prisma.post.update({ where: { id: post.id }, data: { format: 'reel' } })
+        result = await publishReel({ accessToken: validToken, igUserId, videoUrl: post.videoUrl, caption, coverUrl: post.coverUrl ?? undefined })
+      } else {
+        result = trialResult
+      }
       break
+    }
     case 'carousel': {
       const imageUrls = post.videoUrl.split(',').map((u) => u.trim())
       result = await publishCarousel({ accessToken: validToken, igUserId, imageUrls, caption })

@@ -48,9 +48,10 @@ export async function publishTrialReel(params: TrialReelPublishParams): Promise<
     const apiError = axios.isAxiosError(err) ? err.response?.data : undefined
     logError('[PublishTrialReel] Failed', err)
     if (apiError) logger.error({ apiError }, '[PublishTrialReel] Instagram API error body')
+    const igSubcode: number | undefined = apiError?.error?.error_subcode
     const msg = axios.isAxiosError(err) && apiError?.error?.message
       ? apiError.error.message
       : err instanceof Error ? err.message : String(err)
-    return { success: false, error: msg }
+    return { success: false, error: msg, igErrorSubcode: igSubcode }
   }
 }
