@@ -140,8 +140,8 @@ export const BROLL_REQUIRED_FRAMES = SCENE_BODY + TRAIL
 // Platform UI (navigation bar, caption/action tray) covers the edges of a reel.
 // All text must stay inside this zone.
 
-const SAFE_ZONE = { top: 220, bottom: 450, left: 80, right: 80 } as const
-const SAFE_W = 1080 - SAFE_ZONE.left - SAFE_ZONE.right   // 920
+const SAFE_ZONE = { top: 220, bottom: 450, left: 100, right: 100 } as const
+const SAFE_W = 1080 - SAFE_ZONE.left - SAFE_ZONE.right   // 880
 const SAFE_H = 1920 - SAFE_ZONE.top  - SAFE_ZONE.bottom  // 1250
 
 // TextZone: positions a text block inside the safe zone.
@@ -292,7 +292,7 @@ function FitText({
 }
 
 // ─── ReelT1 — Single Moment ───────────────────────────────────────────────────
-// Layout: [text1 · 2.5s] [trail · 1.5s]  = 4s / 120f
+// Layout: [text1 · 4s — full duration, never disappears]  = 4s / 120f
 
 export function ReelT1({ slots, brollClips = [], audioUrl, brand = {} }: ReelSlotProps) {
   const b = { ...DEFAULT_BRAND, ...brand }
@@ -301,60 +301,55 @@ export function ReelT1({ slots, brollClips = [], audioUrl, brand = {} }: ReelSlo
     <div style={{ width: 1080, height: 1920, background: '#000', position: 'relative', overflow: 'hidden' }}>
       {audioUrl && <Audio src={audioUrl} />}
       <BrollBackground clip={brollClips[0]} overlayOpacity={b.overlayOpacity} />
-      <Sequence from={0} durationInFrames={SCENE_SHORT}>
-        <TextZone>
-          <FitText
-            text={slots.text1 ?? ''}
-            baseFontSize={100}
-            maxTextSize={b.maxTextSize}
-            fontFamily={b.titleFont}
-            color={b.secondaryColor}
-            boxWidth={SAFE_W}
-            boxHeight={SAFE_H}
-            frameOffset={0}
-            instant
-          />
-        </TextZone>
-      </Sequence>
+      <TextZone>
+        <FitText
+          text={slots.text1 ?? ''}
+          baseFontSize={100}
+          maxTextSize={b.maxTextSize}
+          fontFamily={b.titleFont}
+          color={b.secondaryColor}
+          boxWidth={SAFE_W}
+          boxHeight={SAFE_H}
+          frameOffset={0}
+          instant
+        />
+      </TextZone>
     </div>
   )
 }
 
 // ─── ReelT2 — Single Statement ────────────────────────────────────────────────
-// Layout: [text1 · 5s] [trail · 1.5s]  = 6.5s / 195f
+// Layout: [text1 · 9s — full duration, never disappears]  = 9s / 270f
 
 export function ReelT2({ slots, brollClips = [], audioUrl, brand = {} }: ReelSlotProps) {
   const b = { ...DEFAULT_BRAND, ...brand }
-  const BODY = 150
 
   return (
     <div style={{ width: 1080, height: 1920, background: '#000', position: 'relative', overflow: 'hidden' }}>
       {audioUrl && <Audio src={audioUrl} />}
       <BrollBackground clip={brollClips[0]} overlayOpacity={b.overlayOpacity} />
-      <Sequence from={0} durationInFrames={BODY}>
-        <TextZone>
-          <FitText
-            text={slots.text1 ?? ''}
-            baseFontSize={62}
-            maxTextSize={b.maxTextSize}
-            fontFamily={b.bodyFont}
-            color={b.secondaryColor}
-            boxWidth={SAFE_W}
-            boxHeight={SAFE_H}
-            frameOffset={0}
-            instant
-          />
-        </TextZone>
-      </Sequence>
+      <TextZone>
+        <FitText
+          text={slots.text1 ?? ''}
+          baseFontSize={62}
+          maxTextSize={b.maxTextSize}
+          fontFamily={b.bodyFont}
+          color={b.secondaryColor}
+          boxWidth={SAFE_W}
+          boxHeight={SAFE_H}
+          frameOffset={0}
+          instant
+        />
+      </TextZone>
     </div>
   )
 }
 
 // ─── ReelT3 — Hook & Reveal ───────────────────────────────────────────────────
-// Layout: [hook · 2.5s] [reveal · 4s] [trail · 1.5s]  = 8s / 240f
+// Layout: [hook · 2.5s] [reveal · 3.5s, text until end]  = 6s / 180f
 
-const T3_S2 = SCENE_HOOK                    // 75
-const T3_END = SCENE_HOOK + SCENE_BODY      // 195
+const T3_S2 = SCENE_HOOK   // 75 — reveal starts here
+const T3_REVEAL = 105      // 3.5s — reveal scene duration
 
 export function ReelT3({ slots, brollClips = [], audioUrl, brand = {} }: ReelSlotProps) {
   const b = { ...DEFAULT_BRAND, ...brand }
@@ -370,24 +365,22 @@ export function ReelT3({ slots, brollClips = [], audioUrl, brand = {} }: ReelSlo
           <FitText text={slots.text1 ?? ''} baseFontSize={100} maxTextSize={b.maxTextSize} fontFamily={b.titleFont} color={b.secondaryColor} boxWidth={SAFE_W} boxHeight={SAFE_H} frameOffset={0} instant />
         </TextZone>
       </Sequence>
-      <Sequence from={T3_S2} durationInFrames={SCENE_BODY + TRAIL}>
+      <Sequence from={T3_S2} durationInFrames={T3_REVEAL}>
         <BrollBackground clip={clip2} overlayOpacity={b.overlayOpacity} />
-        <Sequence from={0} durationInFrames={SCENE_BODY}>
-          <TextZone>
-            <FitText text={slots.text2 ?? ''} baseFontSize={72} maxTextSize={b.maxTextSize} fontFamily={b.bodyFont} color={b.secondaryColor} boxWidth={SAFE_W} boxHeight={SAFE_H} frameOffset={0} />
-          </TextZone>
-        </Sequence>
+        <TextZone>
+          <FitText text={slots.text2 ?? ''} baseFontSize={72} maxTextSize={b.maxTextSize} fontFamily={b.bodyFont} color={b.secondaryColor} boxWidth={SAFE_W} boxHeight={SAFE_H} frameOffset={0} />
+        </TextZone>
       </Sequence>
     </div>
   )
 }
 
 // ─── ReelT4 — Arc ─────────────────────────────────────────────────────────────
-// Layout: [opening · 2.5s] [development · 4s] [landing · 3s] [trail · 1.5s] = 11s / 330f
+// Layout: [opening · 2.5s] [development · 4s] [landing · 5.5s, text until end]  = 12s / 360f
 
-const T4_S2  = SCENE_HOOK                             // 75
-const T4_S3  = SCENE_HOOK + SCENE_BODY                // 195
-const T4_END = SCENE_HOOK + SCENE_BODY + SCENE_LAND   // 285
+const T4_S2     = SCENE_HOOK                  // 75  — development starts
+const T4_S3     = SCENE_HOOK + SCENE_BODY     // 195 — landing starts
+const T4_LAND   = 165                         // 5.5s — landing scene duration
 
 export function ReelT4({ slots, brollClips = [], audioUrl, brand = {} }: ReelSlotProps) {
   const b = { ...DEFAULT_BRAND, ...brand }
@@ -410,13 +403,11 @@ export function ReelT4({ slots, brollClips = [], audioUrl, brand = {} }: ReelSlo
           <FitText text={slots.text2 ?? ''} baseFontSize={72} maxTextSize={b.maxTextSize} fontFamily={b.bodyFont} color={b.secondaryColor} boxWidth={SAFE_W} boxHeight={SAFE_H} frameOffset={0} />
         </TextZone>
       </Sequence>
-      <Sequence from={T4_S3} durationInFrames={SCENE_LAND + TRAIL}>
+      <Sequence from={T4_S3} durationInFrames={T4_LAND}>
         <BrollBackground clip={clip3} overlayOpacity={b.overlayOpacity} />
-        <Sequence from={0} durationInFrames={SCENE_LAND}>
-          <TextZone>
-            <FitText text={slots.text3 ?? ''} baseFontSize={100} maxTextSize={b.maxTextSize} fontFamily={b.titleFont} color={b.secondaryColor} boxWidth={SAFE_W} boxHeight={SAFE_H} frameOffset={0} />
-          </TextZone>
-        </Sequence>
+        <TextZone>
+          <FitText text={slots.text3 ?? ''} baseFontSize={100} maxTextSize={b.maxTextSize} fontFamily={b.titleFont} color={b.secondaryColor} boxWidth={SAFE_W} boxHeight={SAFE_H} frameOffset={0} />
+        </TextZone>
       </Sequence>
     </div>
   )
