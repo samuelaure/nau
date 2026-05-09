@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BrandMonitoredView } from './BrandMonitoredView';
+import { BrandCommentView } from './BrandCommentView';
 import { BrandBenchmarkView } from './BrandBenchmarkView';
 import { Users, Sparkles } from 'lucide-react';
 
@@ -56,7 +56,7 @@ export const BrandProfilesView = () => {
           </p>
         </div>
       )}
-      {activeTab === 'monitored' && <BrandMonitoredView />}
+      {activeTab === 'monitored' && <BrandCommentView />}
       {activeTab === 'benchmark' && <BrandBenchmarkView />}
     </div>
   );

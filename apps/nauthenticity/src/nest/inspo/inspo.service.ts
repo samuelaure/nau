@@ -92,8 +92,19 @@ export class InspoService {
   }
 
   async delete(id: string, brandId: string) {
-    await this.assertOwnership(id, brandId)
+    const membership = await this.assertOwnership(id, brandId)
     await this.prisma.categoryMembership.delete({ where: { id } })
+
+    // Default-absorption: if post/profile has no remaining non-OWN membership for this brand, add BENCHMARK
+    const { socialProfileId, postId } = membership
+    const remaining = await this.prisma.categoryMembership.count({
+      where: { brandId, socialProfileId: socialProfileId ?? undefined, postId: postId ?? undefined },
+    })
+    if (remaining === 0) {
+      await this.prisma.categoryMembership.create({
+        data: { brandId, socialProfileId, postId, category: 'BENCHMARK', isActive: true },
+      })
+    }
   }
 
   /**
@@ -333,5 +344,6 @@ Devuelve un JSON con los campos:
     if (!membership || membership.brandId !== brandId || membership.category !== 'INSPO') {
       throw new NotFoundException('Inspo membership not found')
     }
+    return membership
   }
 }

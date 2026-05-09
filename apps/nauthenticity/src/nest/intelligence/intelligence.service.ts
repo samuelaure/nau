@@ -153,7 +153,22 @@ export class IntelligenceService {
   }
 
   async deleteMembership(id: string) {
+    const membership = await this.prisma.categoryMembership.findUnique({ where: { id } })
+    if (!membership) return { success: true }
+
     await this.prisma.categoryMembership.delete({ where: { id } })
+
+    // Default-absorption: if profile/post has no remaining non-OWN membership for this brand, add BENCHMARK
+    const { brandId, socialProfileId, postId } = membership
+    const remaining = await this.prisma.categoryMembership.count({
+      where: { brandId, socialProfileId: socialProfileId ?? undefined, postId: postId ?? undefined },
+    })
+    if (remaining === 0) {
+      await this.prisma.categoryMembership.create({
+        data: { brandId, socialProfileId, postId, category: 'BENCHMARK', isActive: true },
+      })
+    }
+
     return { success: true }
   }
 
