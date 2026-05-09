@@ -18,6 +18,7 @@
     "type-check": "tsc --noEmit",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "dotenv -e ../../.env.development -e .env.development -- ts-node --transpile-only prisma/seed.ts",
     "test": "jest",
     "test:cov": "jest --coverage",
     "test:ci": "jest --coverage --ci --forceExit"
