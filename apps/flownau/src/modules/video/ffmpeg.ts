@@ -50,7 +50,7 @@ export function compressVideo(inputPath: string, outputPath: string): Promise<vo
       .outputOptions([
         '-c:v libx264',
         '-crf 22',
-        '-preset medium',
+        '-preset veryfast',
         '-c:a aac',
         '-b:a 128k',
         '-pix_fmt yuv420p',
