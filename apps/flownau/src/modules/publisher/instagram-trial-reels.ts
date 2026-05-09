@@ -18,6 +18,7 @@ export async function publishTrialReel(params: TrialReelPublishParams): Promise<
       media_type: 'REELS',
       caption,
       access_token: accessToken,
+      audio_name: 'Background Audio',
       trial_params: JSON.stringify({ graduation_strategy: graduationStrategy }),
     }
 
