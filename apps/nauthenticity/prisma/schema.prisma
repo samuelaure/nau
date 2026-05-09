@@ -171,6 +171,7 @@ model Brand {
   ownedProfiles       SocialProfile[]
   categoryMemberships CategoryMembership[]
   syntheses           BrandSynthesis[]
+  sourceConcepts      SourceConcept[]
   context             BrandContext?
   feedbacks           CommentFeedback[]
 
@@ -178,6 +179,24 @@ model Brand {
   updatedAt DateTime @updatedAt
 
   @@index([workspaceId])
+}
+
+// ── SourceConcept ─────────────────────────────────────────────────────────────
+// A distilled idea angle extracted from an InspoBase (or future: voicenote, specific capture).
+// Each pending concept drives one idea-generation batch in flownau.
+// sourceType values: 'inspo_base' | 'voicenote' | 'specific_post' | 'specific_profile'
+// status values: 'pending' | 'consumed'
+model SourceConcept {
+  id         String    @id @default(uuid())
+  brandId    String
+  brand      Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  content    String    @db.Text
+  sourceType String    @default("inspo_base")
+  status     String    @default("pending")
+  createdAt  DateTime  @default(now())
+  consumedAt DateTime?
+
+  @@index([brandId, status])
 }
 
 model BrandSynthesis {
