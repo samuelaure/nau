@@ -102,6 +102,24 @@ export default function AssetsManager({
 
   const [currentPath, setCurrentPath] = useState<string[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [optimizingAll, setOptimizingAll] = useState(false)
+
+  const pendingCount = assets.filter((a) => a.optimizationStatus !== 'done').length
+
+  const handleOptimizeAll = async () => {
+    if (pendingCount === 0) return
+    setOptimizingAll(true)
+    try {
+      const res = await axios.post(`/api/protected/upload/retry-all?brandId=${ownerId}`)
+      const { queued } = res.data
+      setAssets((prev) => prev.map((a) => a.optimizationStatus !== 'done' ? { ...a, optimizationStatus: 'pending' } : a))
+      toast.success(`${queued} asset${queued !== 1 ? 's' : ''} queued for optimization`)
+    } catch {
+      toast.error('Failed to queue optimization')
+    } finally {
+      setOptimizingAll(false)
+    }
+  }
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -313,7 +331,16 @@ export default function AssetsManager({
             <Sparkles size={20} className="text-accent" />
             <h2 className="text-xl font-bold text-white tracking-tight">Asset Library</h2>
           </div>
-          <div />
+          {ownerType === 'brand' && pendingCount > 0 && (
+            <button
+              onClick={handleOptimizeAll}
+              disabled={optimizingAll}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold bg-accent/10 hover:bg-accent/20 text-accent border border-accent/20 transition-all disabled:opacity-50"
+            >
+              {optimizingAll ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
+              Optimize all ({pendingCount})
+            </button>
+          )}
         </div>
 
         <nav className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-widest text-text-secondary/50 overflow-x-auto pb-1 custom-scrollbar">
