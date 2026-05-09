@@ -142,23 +142,59 @@ const SAFE_ZONE = { top: 220, bottom: 450, left: 100, right: 100 } as const
 const SAFE_W = 1080 - SAFE_ZONE.left - SAFE_ZONE.right   // 880
 const SAFE_H = 1920 - SAFE_ZONE.top  - SAFE_ZONE.bottom  // 1250
 
-// TextZone: positions a text block inside the safe zone.
-// align="center" (default) — vertically centered in safe area
-// align="top"              — anchored to safe zone top edge
-// align="bottom"           — anchored to safe zone bottom edge
+// TextZone: centers text on the full 1920px canvas height so text appears
+// visually centered on screen. Horizontal safe margins are still respected.
+// The text block itself is bounded to SAFE_H so it can't overflow into UI areas.
+// align="top"    — anchored to safe zone top edge (padding applied)
+// align="bottom" — anchored to safe zone bottom edge (padding applied)
 function TextZone({ children, align = 'center' }: { children: React.ReactNode; align?: 'top' | 'center' | 'bottom' }) {
-  const alignItems = align === 'top' ? 'flex-start' : align === 'bottom' ? 'flex-end' : 'center'
+  if (align === 'top') {
+    return (
+      <div style={{
+        position: 'absolute',
+        top: SAFE_ZONE.top,
+        left: SAFE_ZONE.left,
+        width: SAFE_W,
+        height: SAFE_H,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+      }}>
+        {children}
+      </div>
+    )
+  }
+  if (align === 'bottom') {
+    return (
+      <div style={{
+        position: 'absolute',
+        bottom: SAFE_ZONE.bottom,
+        left: SAFE_ZONE.left,
+        width: SAFE_W,
+        height: SAFE_H,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+      }}>
+        {children}
+      </div>
+    )
+  }
+  // center: span full canvas height so text is centered on the whole frame,
+  // not on the asymmetric safe zone (bottom padding is 2× the top).
   return (
     <div style={{
       position: 'absolute',
-      top: SAFE_ZONE.top,
+      top: 0,
       left: SAFE_ZONE.left,
       width: SAFE_W,
-      height: SAFE_H,
+      height: 1920,
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      justifyContent: alignItems,
+      justifyContent: 'center',
     }}>
       {children}
     </div>
