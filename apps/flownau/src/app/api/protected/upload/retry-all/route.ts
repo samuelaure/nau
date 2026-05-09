@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
 import { logger } from '@/lib/logger'
-import { enqueueOptimization, optimizeAssetBackground } from '../confirm/route'
+import { enqueueOptimization } from '@/modules/asset/optimization-queue'
 
 export async function POST(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -27,18 +27,16 @@ export async function POST(req: NextRequest) {
     const assetFolder =
       type === 'VID' ? ('videos' as const) : type === 'AUD' ? ('audios' as const) : ('images' as const)
 
-    enqueueOptimization(() =>
-      optimizeAssetBackground({
-        assetId: asset.id,
-        cdnUrl: asset.url,
-        type,
-        mimeType: asset.mimeType,
-        ext,
-        contextAccountId: asset.brandId,
-        templateId: asset.templateId,
-        assetFolder,
-      }),
-    )
+    await enqueueOptimization({
+      assetId: asset.id,
+      cdnUrl: asset.url,
+      type,
+      mimeType: asset.mimeType,
+      ext,
+      contextAccountId: asset.brandId,
+      templateId: asset.templateId,
+      assetFolder,
+    })
   }
 
   logger.info({ brandId, count: assets.length }, 'Bulk asset optimization queued')

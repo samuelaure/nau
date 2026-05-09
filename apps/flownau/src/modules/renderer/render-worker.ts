@@ -345,8 +345,10 @@ export function startRenderWorker(): Worker<RenderJobData> {
 }
 
 import { fileURLToPath } from 'node:url'
+import { startOptimizationWorker } from '@/modules/asset/optimization-worker'
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])
 if (isMain) {
   logger.info('[RenderWorker] Starting standalone render worker...')
   startRenderWorker()
+  startOptimizationWorker()
 }
