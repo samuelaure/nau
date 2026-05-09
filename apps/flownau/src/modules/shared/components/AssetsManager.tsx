@@ -487,9 +487,19 @@ function OptimizationBadge({ status, onRetry }: { status: string; onRetry: () =>
   }
   if (status === 'pending') {
     return (
-      <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-zinc-500">
-        <Clock size={10} /> Queued
-      </span>
+      <div className="flex items-center gap-2">
+        <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-zinc-500">
+          <Clock size={10} /> Queued
+        </span>
+        <button
+          onClick={async (e) => { e.stopPropagation(); setRetrying(true); await onRetry(); setRetrying(false) }}
+          disabled={retrying}
+          className="flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-widest text-zinc-400 hover:text-white transition-colors disabled:opacity-40"
+        >
+          {retrying ? <Loader2 size={9} className="animate-spin" /> : <RotateCcw size={9} />}
+          Retry
+        </button>
+      </div>
     )
   }
   if (status === 'failed') {
