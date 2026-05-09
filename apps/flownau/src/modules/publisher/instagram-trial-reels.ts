@@ -5,16 +5,11 @@ import { type PublishResult, type IGPublishParams, IG_BASE_URL } from './types'
 
 interface TrialReelPublishParams extends IGPublishParams {
   videoUrl: string
-  graduationStrategy?: 'auto' | 'manual'
+  graduationStrategy?: 'AUTO' | 'MANUAL'
 }
 
-/**
- * Publish a Trial Reel to Instagram.
- * Trial Reels are only shown to non-followers as a test.
- * Same 3-step flow as standard reels but includes trial_params.
- */
 export async function publishTrialReel(params: TrialReelPublishParams): Promise<PublishResult> {
-  const { accessToken, igUserId, videoUrl, caption, graduationStrategy = 'auto' } = params
+  const { accessToken, igUserId, videoUrl, caption, graduationStrategy = 'AUTO' } = params
 
   try {
     // Step 1: Create container with trial_params
@@ -23,15 +18,10 @@ export async function publishTrialReel(params: TrialReelPublishParams): Promise<
       media_type: 'REELS',
       caption,
       access_token: accessToken,
-      audio_name: 'Background Audio',
-      trial_params: JSON.stringify({
-        graduation_strategy: graduationStrategy,
-      }),
+      trial_params: JSON.stringify({ graduation_strategy: graduationStrategy }),
     }
 
-    logger.info(
-      `[PublishTrialReel] Creating trial reel container (strategy: ${graduationStrategy})`,
-    )
+    logger.info(`[PublishTrialReel] Creating trial reel container (strategy: ${graduationStrategy})`)
     const containerRes = await axios.post(`${IG_BASE_URL}/${igUserId}/media`, containerPayload)
     const containerId: string = containerRes.data.id
 
@@ -51,8 +41,13 @@ export async function publishTrialReel(params: TrialReelPublishParams): Promise<
     logger.info(`[PublishTrialReel] Published trial reel ${mediaId}`)
     return { success: true, externalId: mediaId, permalink: permalink ?? undefined }
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
+    // Log the full Instagram API error body, not just the axios message
+    const apiError = axios.isAxiosError(err) ? err.response?.data : undefined
     logError('[PublishTrialReel] Failed', err)
+    if (apiError) logger.error({ apiError }, '[PublishTrialReel] Instagram API error body')
+    const msg = axios.isAxiosError(err) && apiError?.error?.message
+      ? apiError.error.message
+      : err instanceof Error ? err.message : String(err)
     return { success: false, error: msg }
   }
 }
