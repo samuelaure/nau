@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     })
 
     const language = brand?.language ?? 'Spanish'
-    const count = typeof countOverride === 'number' ? countOverride : (brand?.ideationCount ?? 9)
+    const count = typeof countOverride === 'number' ? countOverride : (brand?.ideationCount ?? undefined)
 
     // Resolve topic: for automatic source fetch digest from nauthenticity; for manual require it from body
     let topic: string = topicFromBody?.trim() ?? ''

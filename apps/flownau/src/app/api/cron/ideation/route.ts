@@ -50,7 +50,7 @@ export async function GET(request: Request) {
         })
 
         const language = brand?.language ?? 'Spanish'
-        const count = brand?.ideationCount ?? 9
+        const count = brand?.ideationCount ?? undefined
 
         // Recent content for diversity tracking
         const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)
