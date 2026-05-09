@@ -11,6 +11,37 @@ import { loadFont as loadNunito } from '@remotion/google-fonts/Nunito'
 import { loadFont as loadRaleway } from '@remotion/google-fonts/Raleway'
 import { loadFont as loadPlayfairDisplay } from '@remotion/google-fonts/PlayfairDisplay'
 import { loadFont as loadBlackHanSans } from '@remotion/google-fonts/BlackHanSans'
+// Modern sans-serif
+import { loadFont as loadManrope } from '@remotion/google-fonts/Manrope'
+import { loadFont as loadUrbanist } from '@remotion/google-fonts/Urbanist'
+import { loadFont as loadOutfit } from '@remotion/google-fonts/Outfit'
+import { loadFont as loadFigtree } from '@remotion/google-fonts/Figtree'
+import { loadFont as loadSpaceGrotesk } from '@remotion/google-fonts/SpaceGrotesk'
+import { loadFont as loadSora } from '@remotion/google-fonts/Sora'
+import { loadFont as loadLato } from '@remotion/google-fonts/Lato'
+import { loadFont as loadRoboto } from '@remotion/google-fonts/Roboto'
+import { loadFont as loadWorkSans } from '@remotion/google-fonts/WorkSans'
+import { loadFont as loadBarlow } from '@remotion/google-fonts/Barlow'
+import { loadFont as loadKanit } from '@remotion/google-fonts/Kanit'
+// Serif
+import { loadFont as loadMerriweather } from '@remotion/google-fonts/Merriweather'
+import { loadFont as loadLora } from '@remotion/google-fonts/Lora'
+import { loadFont as loadCormorant } from '@remotion/google-fonts/Cormorant'
+import { loadFont as loadLibreBaskerville } from '@remotion/google-fonts/LibreBaskerville'
+import { loadFont as loadCrimsonText } from '@remotion/google-fonts/CrimsonText'
+import { loadFont as loadCinzel } from '@remotion/google-fonts/Cinzel'
+// Bold display
+import { loadFont as loadTeko } from '@remotion/google-fonts/Teko'
+import { loadFont as loadRighteous } from '@remotion/google-fonts/Righteous'
+import { loadFont as loadArchivoBlack } from '@remotion/google-fonts/ArchivoBlack'
+import { loadFont as loadBarlowCondensed } from '@remotion/google-fonts/BarlowCondensed'
+import { loadFont as loadBigShouldersDisplay } from '@remotion/google-fonts/BigShouldersDisplay'
+// Handwriting / script
+import { loadFont as loadDancingScript } from '@remotion/google-fonts/DancingScript'
+import { loadFont as loadSacramento } from '@remotion/google-fonts/Sacramento'
+import { loadFont as loadSatisfy } from '@remotion/google-fonts/Satisfy'
+import { loadFont as loadPacifico } from '@remotion/google-fonts/Pacifico'
+import { loadFont as loadCaveat } from '@remotion/google-fonts/Caveat'
 
 // Pre-load all supported fonts so Remotion can wait for them before rendering.
 // Each loadFont() returns a handle; we delay rendering until all resolve.
@@ -26,6 +57,37 @@ const fontLoaders = [
   loadRaleway(),
   loadPlayfairDisplay(),
   loadBlackHanSans(),
+  // Modern sans-serif
+  loadManrope(),
+  loadUrbanist(),
+  loadOutfit(),
+  loadFigtree(),
+  loadSpaceGrotesk(),
+  loadSora(),
+  loadLato(),
+  loadRoboto(),
+  loadWorkSans(),
+  loadBarlow(),
+  loadKanit(),
+  // Serif
+  loadMerriweather(),
+  loadLora(),
+  loadCormorant(),
+  loadLibreBaskerville(),
+  loadCrimsonText(),
+  loadCinzel(),
+  // Bold display
+  loadTeko(),
+  loadRighteous(),
+  loadArchivoBlack(),
+  loadBarlowCondensed(),
+  loadBigShouldersDisplay(),
+  // Handwriting / script
+  loadDancingScript(),
+  loadSacramento(),
+  loadSatisfy(),
+  loadPacifico(),
+  loadCaveat(),
 ]
 
 export interface BrandIdentity {
