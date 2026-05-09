@@ -30,11 +30,8 @@ async function runPublisher() {
     const profile = post.brand?.socialProfiles?.[0]
     if (!profile?.accessToken || !profile?.platformId) continue
 
-    const templateConfig = post.template?.brandConfigs?.find((c) => c.brandId === post.brandId)
-    const autoApprovePost = templateConfig?.autoApprovePost ?? false
-    // RENDERED_APPROVED reached via auto-approve cron — skip if manual review required.
-    // PUBLISHING (manually approved) and SCHEDULED always proceed.
-    if (!autoApprovePost && post.status === 'RENDERED_APPROVED') continue
+    // RENDERED_PENDING requires manual approval — never publish directly.
+    if (post.status === 'RENDERED_PENDING') continue
 
     try {
       const result = await publishComposition({
@@ -110,14 +107,33 @@ async function runRenderer() {
 }
 
 async function runApproveRenders() {
-  const { count } = await prisma.post.updateMany({
+  // Only auto-approve posts where the brand+template config has autoApprovePost enabled.
+  const candidates = await prisma.post.findMany({
     where: {
       status: 'RENDERED_PENDING',
       scheduledAt: { lte: new Date(Date.now() + 48 * 60 * 60 * 1000) },
     },
-    data: { status: 'RENDERED_APPROVED' },
+    select: { id: true, brandId: true, templateId: true },
   })
-  if (count > 0) logger.info(`[Cron:ApproveRenders] Auto-approved ${count} post(s)`)
+
+  if (candidates.length === 0) return
+
+  const eligible = await Promise.all(
+    candidates.map(async (post) => {
+      if (!post.templateId) return null
+      const config = await prisma.brandTemplateConfig.findUnique({
+        where: { brandId_templateId: { brandId: post.brandId, templateId: post.templateId } },
+        select: { autoApprovePost: true },
+      })
+      return config?.autoApprovePost ? post.id : null
+    }),
+  )
+
+  const ids = eligible.filter((id): id is string => id !== null)
+  if (ids.length === 0) return
+
+  await prisma.post.updateMany({ where: { id: { in: ids } }, data: { status: 'RENDERED_APPROVED' } })
+  logger.info(`[Cron:ApproveRenders] Auto-approved ${ids.length} post(s)`)
 }
 
 async function runScheduler() {
