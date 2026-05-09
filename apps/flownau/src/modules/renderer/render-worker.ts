@@ -209,6 +209,8 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
       audioBitrate: '128k',
       concurrency: CONCURRENCY,
       jpegQuality: 85,
+      // swangle = ANGLE on SwiftShader: CPU-based GL, avoids GPU compositor memory in Docker
+      chromiumOptions: { gl: 'swangle' },
       // faststart + yuv420p: required for streaming playback and Instagram compatibility
       ffmpegOverride: ({ type, args }) =>
         type === 'stitcher'
@@ -250,6 +252,7 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
         frame: coverFrame,
         imageFormat: 'jpeg',
         jpegQuality: 85,
+        chromiumOptions: { gl: 'swangle' },
       })
       const coverR2Key = flownau.renderCover(brandId, postId)
       coverUrl = await storage.upload(coverR2Key, fs.createReadStream(coverPath), { mimeType: 'image/jpeg' })
@@ -283,6 +286,7 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
       inputProps,
       frame: 0,
       imageFormat: 'png',
+      chromiumOptions: { gl: 'swangle' },
     })
 
     await job.updateProgress(80)
