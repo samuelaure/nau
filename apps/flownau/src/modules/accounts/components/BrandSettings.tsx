@@ -44,7 +44,6 @@ const FONT_OPTIONS = [
   { description: 'heavy, asian-friendly',    value: 'Black Han Sans'        },
   { description: 'condensed sport',          value: 'Barlow Condensed'      },
   { description: 'tall bold display',        value: 'Teko'                  },
-  { description: 'chunky display',           value: 'Big Shoulders Display' },
   { description: 'retro bold',               value: 'Righteous'             },
   { description: 'heavy grotesque',          value: 'Archivo Black'         },
   // Modern sans-serif

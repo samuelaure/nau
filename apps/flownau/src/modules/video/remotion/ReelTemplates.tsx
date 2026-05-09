@@ -35,7 +35,6 @@ import { loadFont as loadTeko } from '@remotion/google-fonts/Teko'
 import { loadFont as loadRighteous } from '@remotion/google-fonts/Righteous'
 import { loadFont as loadArchivoBlack } from '@remotion/google-fonts/ArchivoBlack'
 import { loadFont as loadBarlowCondensed } from '@remotion/google-fonts/BarlowCondensed'
-import { loadFont as loadBigShouldersDisplay } from '@remotion/google-fonts/BigShouldersDisplay'
 // Handwriting / script
 import { loadFont as loadDancingScript } from '@remotion/google-fonts/DancingScript'
 import { loadFont as loadSacramento } from '@remotion/google-fonts/Sacramento'
@@ -81,7 +80,6 @@ const fontLoaders = [
   loadRighteous(),
   loadArchivoBlack(),
   loadBarlowCondensed(),
-  loadBigShouldersDisplay(),
   // Handwriting / script
   loadDancingScript(),
   loadSacramento(),
