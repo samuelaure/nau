@@ -3,6 +3,13 @@ import { PrismaService } from '../prisma/prisma.service'
 import { runProactiveFanout } from '../../modules/proactive/fanout.processor'
 import { generateReactiveComments } from '../../modules/proactive/reactive.service'
 
+export type Category = 'COMMENT' | 'INSPO' | 'BENCHMARK'
+export const CATEGORIES: readonly Category[] = ['COMMENT', 'INSPO', 'BENCHMARK'] as const
+
+export function isCategory(value: unknown): value is Category {
+  return typeof value === 'string' && (CATEGORIES as readonly string[]).includes(value)
+}
+
 @Injectable()
 export class IntelligenceService {
   constructor(private readonly prisma: PrismaService) {}
@@ -11,13 +18,13 @@ export class IntelligenceService {
     const intelligence = await this.prisma.brand.findUnique({
       where: { id: brandId },
       include: {
-        monitors: {
+        categoryMemberships: {
           select: {
             id: true,
             socialProfile: { select: { username: true } },
-            monitoringType: true,
+            postId: true,
+            category: true,
             isActive: true,
-            settings: true,
             createdAt: true,
           },
         },
@@ -48,7 +55,10 @@ export class IntelligenceService {
     const intelligence = await this.prisma.brand.findUnique({
       where: { id: brandId },
       include: {
-        monitors: { select: { socialProfile: { select: { username: true } }, settings: true } },
+        categoryMemberships: {
+          where: { socialProfileId: { not: null } },
+          select: { socialProfile: { select: { username: true } }, category: true },
+        },
         syntheses: { orderBy: { createdAt: 'desc' }, take: 1 },
       },
     })
@@ -58,7 +68,7 @@ export class IntelligenceService {
       voicePrompt: intelligence.voicePrompt,
       commentStrategy: intelligence.commentStrategy,
       suggestionsCount: intelligence.suggestionsCount,
-      targets: intelligence.monitors,
+      memberships: intelligence.categoryMemberships,
       latestSynthesis: (intelligence as unknown as { syntheses: unknown[] }).syntheses[0] ?? null,
     }
   }
@@ -76,7 +86,10 @@ export class IntelligenceService {
     return this.prisma.brand.findMany({
       where: { workspaceId },
       include: {
-        monitors: { select: { socialProfile: { select: { username: true } }, settings: true, monitoringType: true } },
+        categoryMemberships: {
+          where: { socialProfileId: { not: null } },
+          select: { socialProfile: { select: { username: true } }, category: true },
+        },
       },
     })
   }
@@ -85,14 +98,14 @@ export class IntelligenceService {
     return this.prisma.brand.update({ where: { id: brandId }, data })
   }
 
-  async createTargets(
+  /**
+   * Add (or upsert) profile-level memberships under a given category.
+   * Called when a user adds usernames to one of: COMMENT, INSPO, BENCHMARK.
+   */
+  async createProfileMemberships(
     brandId: string,
     usernames: string[],
-    opts: {
-      monitoringType?: string
-      settings?: Record<string, unknown>
-      isActive?: boolean
-    },
+    opts: { category: Category; isActive?: boolean },
   ) {
     for (const username of usernames) {
       const profile = await this.prisma.socialProfile.upsert({
@@ -100,36 +113,47 @@ export class IntelligenceService {
         create: { platform: 'instagram', username },
         update: {},
       })
-      const createData: any = {
-        brandId,
-        socialProfileId: profile.id,
-        monitoringType: opts.monitoringType ?? 'content',
-        isActive: opts.isActive ?? true,
-      }
-      if (opts.settings) {
-        createData.settings = opts.settings
-      }
 
-      const updateData: any = {}
-      if (opts.monitoringType) updateData.monitoringType = opts.monitoringType
-      if (opts.settings) updateData.settings = opts.settings
-      if (opts.isActive !== undefined) updateData.isActive = opts.isActive
-
-      await this.prisma.socialProfileMonitor.upsert({
-        where: { brandId_socialProfileId: { brandId, socialProfileId: profile.id } },
-        create: createData,
-        update: updateData,
+      // Profile-level membership: enforced by partial unique index
+      // (brandId, category, socialProfileId) WHERE postId IS NULL.
+      // Prisma 7 disallows null in compound unique-key lookups, so we use findFirst + create/update.
+      const existing = await this.prisma.categoryMembership.findFirst({
+        where: {
+          brandId,
+          category: opts.category,
+          socialProfileId: profile.id,
+          postId: null,
+        },
+        select: { id: true },
       })
+      if (existing) {
+        await this.prisma.categoryMembership.update({
+          where: { id: existing.id },
+          data: { isActive: opts.isActive ?? true },
+        })
+      } else {
+        await this.prisma.categoryMembership.create({
+          data: {
+            brandId,
+            socialProfileId: profile.id,
+            category: opts.category,
+            isActive: opts.isActive ?? true,
+          },
+        })
+      }
     }
     return { success: true }
   }
 
-  async updateTarget(id: string, data: Record<string, unknown>) {
-    return this.prisma.socialProfileMonitor.update({ where: { id }, data })
+  async updateMembership(id: string, data: { isActive?: boolean; category?: Category }) {
+    const patch: Record<string, unknown> = {}
+    if (data.isActive !== undefined) patch.isActive = data.isActive
+    if (data.category !== undefined) patch.category = data.category
+    return this.prisma.categoryMembership.update({ where: { id }, data: patch })
   }
 
-  async deleteTarget(id: string) {
-    await this.prisma.socialProfileMonitor.delete({ where: { id } })
+  async deleteMembership(id: string) {
+    await this.prisma.categoryMembership.delete({ where: { id } })
     return { success: true }
   }
 
@@ -152,20 +176,21 @@ export class IntelligenceService {
     return { success: true, message: 'Fanout initiated in background.' }
   }
 
-  async getTargets(brandId: string, monitoringType?: string) {
-    return this.prisma.socialProfileMonitor.findMany({
-      where: { brandId, monitoringType: monitoringType ?? undefined },
+  /**
+   * List profile-level memberships for a brand, optionally filtered by category.
+   * (Post-level memberships are managed via the InspoBase / Benchmark/Study endpoints.)
+   */
+  async getProfileMemberships(brandId: string, category?: Category) {
+    return this.prisma.categoryMembership.findMany({
+      where: {
+        brandId,
+        category: category ?? undefined,
+        socialProfileId: { not: null },
+      },
       include: {
         socialProfile: { include: { _count: { select: { posts: true } } } },
       },
       orderBy: { createdAt: 'desc' },
     })
-  }
-
-  async patchTarget(id: string, data: { isActive?: boolean; settings?: Record<string, unknown> }) {
-    const patch: Record<string, unknown> = {}
-    if (data.isActive !== undefined) patch.isActive = data.isActive
-    if (data.settings !== undefined) patch.settings = data.settings
-    return this.prisma.socialProfileMonitor.update({ where: { id }, data: patch })
   }
 }

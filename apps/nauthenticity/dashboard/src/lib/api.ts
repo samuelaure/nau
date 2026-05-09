@@ -335,9 +335,28 @@ export const updateInspoItem = async (id: string, brandId: string, updates: any)
   return data;
 };
 
+// Maps the dashboard's legacy targetType values to the new CategoryMembership.category enum.
+// 'single_post' has no profile-level analogue — it now routes through the InspoBase / Benchmark
+// post-level endpoints; that page will be refactored separately.
+function targetTypeToCategory(targetType?: string): string | undefined {
+  if (!targetType) return undefined;
+  switch (targetType) {
+    case 'monitored':
+      return 'COMMENT';
+    case 'benchmark':
+      return 'BENCHMARK';
+    case 'inspiration':
+    case 'inspo':
+      return 'INSPO';
+    default:
+      return targetType.toUpperCase();
+  }
+}
+
 export const getBrandTargets = async (brandId: string, targetType?: string) => {
-  const url = targetType
-    ? `/targets?brandId=${brandId}&targetType=${targetType}`
+  const category = targetTypeToCategory(targetType);
+  const url = category
+    ? `/targets?brandId=${brandId}&category=${category}`
     : `/targets?brandId=${brandId}`;
   const { data } = await api.get(url);
   return data;
@@ -351,7 +370,14 @@ export const addBrandTarget = async (payload: {
   initialDownloadCount?: number;
   autoUpdate?: boolean;
 }) => {
-  const { data } = await api.post(`/targets`, payload);
+  const { brandId, username, targetType, isActive } = payload;
+  const category = targetTypeToCategory(targetType);
+  const { data } = await api.post(`/targets`, {
+    brandId,
+    usernames: [username],
+    category,
+    isActive,
+  });
   return data;
 };
 
@@ -359,7 +385,8 @@ export const updateBrandTarget = async (
   id: string,
   updates: { isActive?: boolean; autoUpdate?: boolean; initialDownloadCount?: number },
 ) => {
-  const { data } = await api.patch(`/targets/${id}`, updates);
+  const { isActive } = updates;
+  const { data } = await api.patch(`/targets/${id}`, { isActive });
   return data;
 };
 

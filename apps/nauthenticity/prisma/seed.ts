@@ -41,11 +41,11 @@ async function main() {
     },
   })
 
-  // ── Social Profiles ────────────────────────────────────────────────────────
-  // Own profiles (ownerId set — brand publishes to these)
+  // ── Social Profiles ───────────────────────────────────────────────────────
+  // Own profiles (ownerId set — OWN category lives here, 1:1)
   const ownAlpha = await prisma.socialProfile.upsert({
     where: { platform_username: { platform: 'instagram', username: 'alpha_brand' } },
-    update: {},
+    update: { ownerId: brandAlpha.id },
     create: {
       platform: 'instagram',
       username: 'alpha_brand',
@@ -57,7 +57,7 @@ async function main() {
 
   const ownBeta = await prisma.socialProfile.upsert({
     where: { platform_username: { platform: 'instagram', username: 'beta_brand' } },
-    update: {},
+    update: { ownerId: brandBeta.id },
     create: {
       platform: 'instagram',
       username: 'beta_brand',
@@ -66,8 +66,10 @@ async function main() {
       ownerId: brandBeta.id,
     },
   })
+  void ownAlpha
+  void ownBeta
 
-  // Monitored profiles — comment generation targets
+  // Profiles used in COMMENT / INSPO / BENCHMARK memberships
   const commentProfile1 = await prisma.socialProfile.upsert({
     where: { platform_username: { platform: 'instagram', username: 'competitor_x' } },
     update: {},
@@ -90,7 +92,6 @@ async function main() {
     },
   })
 
-  // Inspiration profiles
   const inspoProfile1 = await prisma.socialProfile.upsert({
     where: { platform_username: { platform: 'instagram', username: 'inspo_creator_a' } },
     update: {},
@@ -102,7 +103,6 @@ async function main() {
     },
   })
 
-  // Benchmark profiles
   const benchProfile1 = await prisma.socialProfile.upsert({
     where: { platform_username: { platform: 'instagram', username: 'industry_giant' } },
     update: {},
@@ -114,46 +114,34 @@ async function main() {
     },
   })
 
-  // ── SocialProfileMonitors ──────────────────────────────────────────────────
-  // Alpha brand: monitors competitor_x and niche_leader for comments
-  await prisma.socialProfileMonitor.upsert({
-    where: { brandId_socialProfileId: { brandId: brandAlpha.id, socialProfileId: commentProfile1.id } },
-    update: {},
-    create: { brandId: brandAlpha.id, socialProfileId: commentProfile1.id, monitoringType: 'content', isActive: true },
-  })
-  await prisma.socialProfileMonitor.upsert({
-    where: { brandId_socialProfileId: { brandId: brandAlpha.id, socialProfileId: commentProfile2.id } },
-    update: {},
-    create: { brandId: brandAlpha.id, socialProfileId: commentProfile2.id, monitoringType: 'content', isActive: true },
-  })
+  // ── CategoryMemberships ───────────────────────────────────────────────────
+  // Profile-level memberships
+  const profileMemberships: Array<{
+    brandId: string
+    socialProfileId: string
+    category: 'COMMENT' | 'INSPO' | 'BENCHMARK'
+  }> = [
+    { brandId: brandAlpha.id, socialProfileId: commentProfile1.id, category: 'COMMENT' },
+    { brandId: brandAlpha.id, socialProfileId: commentProfile2.id, category: 'COMMENT' },
+    { brandId: brandAlpha.id, socialProfileId: inspoProfile1.id, category: 'INSPO' },
+    { brandId: brandAlpha.id, socialProfileId: benchProfile1.id, category: 'BENCHMARK' },
+    // Beta also monitors niche_leader (cross-brand shared profile)
+    { brandId: brandBeta.id, socialProfileId: commentProfile2.id, category: 'COMMENT' },
+    // Beta also tracks industry_giant (cross-brand shared)
+    { brandId: brandBeta.id, socialProfileId: benchProfile1.id, category: 'BENCHMARK' },
+  ]
 
-  // Alpha brand: inspo_creator_a for inspiration
-  await prisma.socialProfileMonitor.upsert({
-    where: { brandId_socialProfileId: { brandId: brandAlpha.id, socialProfileId: inspoProfile1.id } },
-    update: {},
-    create: { brandId: brandAlpha.id, socialProfileId: inspoProfile1.id, monitoringType: 'inspiration', isActive: true },
-  })
-
-  // Alpha brand: industry_giant for benchmark
-  await prisma.socialProfileMonitor.upsert({
-    where: { brandId_socialProfileId: { brandId: brandAlpha.id, socialProfileId: benchProfile1.id } },
-    update: {},
-    create: { brandId: brandAlpha.id, socialProfileId: benchProfile1.id, monitoringType: 'benchmark', isActive: true },
-  })
-
-  // Beta brand: also monitors niche_leader for comments (cross-brand shared profile)
-  await prisma.socialProfileMonitor.upsert({
-    where: { brandId_socialProfileId: { brandId: brandBeta.id, socialProfileId: commentProfile2.id } },
-    update: {},
-    create: { brandId: brandBeta.id, socialProfileId: commentProfile2.id, monitoringType: 'content', isActive: true },
-  })
-
-  // Beta brand: industry_giant for benchmark too (cross-brand shared profile)
-  await prisma.socialProfileMonitor.upsert({
-    where: { brandId_socialProfileId: { brandId: brandBeta.id, socialProfileId: benchProfile1.id } },
-    update: {},
-    create: { brandId: brandBeta.id, socialProfileId: benchProfile1.id, monitoringType: 'benchmark', isActive: true },
-  })
+  for (const m of profileMemberships) {
+    const existing = await prisma.categoryMembership.findFirst({
+      where: { brandId: m.brandId, category: m.category, socialProfileId: m.socialProfileId, postId: null },
+      select: { id: true },
+    })
+    if (existing) {
+      await prisma.categoryMembership.update({ where: { id: existing.id }, data: { isActive: true } })
+    } else {
+      await prisma.categoryMembership.create({ data: { ...m, isActive: true } })
+    }
+  }
 
   // ── Posts ──────────────────────────────────────────────────────────────────
   const post1 = await prisma.post.upsert({
@@ -206,66 +194,34 @@ async function main() {
       engagementScore: 6.0,
     },
   })
+  void post3
 
-  // ── InspoItems (InspoBase) ─────────────────────────────────────────────────
-  // Alpha brand has saved post1 and post2 as inspiration
-  await prisma.inspoItem.upsert({
-    where: { id: 'seed-inspo-alpha-001' },
-    update: {},
-    create: {
-      id: 'seed-inspo-alpha-001',
-      brandId: brandAlpha.id,
-      postId: post1.id,
-      sourceUrl: post1.url,
-      type: 'post',
-      note: 'Great hook format — the "0 to X in Y months" angle works well for us too.',
-      status: 'processed',
-      extractedHook: 'From 0 to 50k in 6 months using only organic content',
-      extractedTheme: 'organic growth strategy',
-    },
-  })
+  // Post-level memberships (InspoBase post-level)
+  const postMemberships: Array<{ brandId: string; postId: string; category: 'INSPO' }> = [
+    { brandId: brandAlpha.id, postId: post1.id, category: 'INSPO' },
+    { brandId: brandAlpha.id, postId: post2.id, category: 'INSPO' },
+    // post2 is shared between Alpha and Beta — no duplication, two CategoryMembership rows.
+    { brandId: brandBeta.id, postId: post2.id, category: 'INSPO' },
+  ]
 
-  await prisma.inspoItem.upsert({
-    where: { id: 'seed-inspo-alpha-002' },
-    update: {},
-    create: {
-      id: 'seed-inspo-alpha-002',
-      brandId: brandAlpha.id,
-      postId: post2.id,
-      sourceUrl: post2.url,
-      type: 'post',
-      note: 'Save-bait format with a numbered framework. High retention on this style.',
-      status: 'processed',
-      extractedHook: 'The 3-post framework that doubled engagement',
-      extractedTheme: 'content frameworks and engagement tactics',
-    },
-  })
-
-  // Beta brand has saved post2 as inspo too (same post linked to two brands — no duplication)
-  await prisma.inspoItem.upsert({
-    where: { id: 'seed-inspo-beta-001' },
-    update: {},
-    create: {
-      id: 'seed-inspo-beta-001',
-      brandId: brandBeta.id,
-      postId: post2.id,
-      sourceUrl: post2.url,
-      type: 'post',
-      note: 'The numbered framework approach fits our educational voice perfectly.',
-      status: 'processed',
-      extractedHook: 'The 3-post framework that doubled engagement',
-      extractedTheme: 'educational content frameworks',
-    },
-  })
+  for (const m of postMemberships) {
+    const existing = await prisma.categoryMembership.findFirst({
+      where: { brandId: m.brandId, category: m.category, postId: m.postId, socialProfileId: null },
+      select: { id: true },
+    })
+    if (existing) {
+      await prisma.categoryMembership.update({ where: { id: existing.id }, data: { isActive: true } })
+    } else {
+      await prisma.categoryMembership.create({ data: { ...m, isActive: true } })
+    }
+  }
 
   console.log('Seed complete.')
-  console.log(`  Brands:   ${brandAlpha.id}, ${brandBeta.id}`)
-  console.log(`  Own profiles:     alpha_brand (Alpha), beta_brand (Beta)`)
-  console.log(`  Comment monitors: competitor_x, niche_leader (Alpha); niche_leader (Beta)`)
-  console.log(`  Inspo monitors:   inspo_creator_a (Alpha)`)
-  console.log(`  Benchmark monitors: industry_giant (Alpha + Beta — shared)`)
-  console.log(`  Posts:     3 seeded`)
-  console.log(`  InspoItems: 3 seeded (post2 shared across Alpha + Beta)`)
+  console.log(`  Brands: ${brandAlpha.id}, ${brandBeta.id}`)
+  console.log(`  OWN profiles:        alpha_brand → Alpha; beta_brand → Beta`)
+  console.log(`  COMMENT memberships: competitor_x, niche_leader (Alpha); niche_leader (Beta)`)
+  console.log(`  INSPO memberships:   inspo_creator_a profile (Alpha); post1, post2 (Alpha); post2 (Beta — shared)`)
+  console.log(`  BENCHMARK memberships: industry_giant (Alpha + Beta — shared)`)
 }
 
 main().catch((e) => { console.error(e); process.exit(1) }).finally(() => prisma.$disconnect())

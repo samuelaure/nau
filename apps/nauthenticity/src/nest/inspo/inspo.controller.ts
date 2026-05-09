@@ -6,14 +6,13 @@ import {
   Delete,
   Param,
   Body,
-  Query,
   UseGuards,
   HttpCode,
   HttpStatus,
   BadRequestException,
 } from '@nestjs/common'
 import { InspoService } from './inspo.service'
-import { CreateInspoItemDto, UpdateInspoItemDto } from './inspo.dto'
+import { CreateInspoMembershipDto, UpdateInspoMembershipDto } from './inspo.dto'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { ServiceAuthGuard } from '../auth/service-auth.guard'
 
@@ -24,18 +23,14 @@ export class InspoController {
   // User-facing routes
   @Post('brands/:brandId/inspo')
   @UseGuards(JwtAuthGuard)
-  create(@Param('brandId') brandId: string, @Body() dto: CreateInspoItemDto) {
+  create(@Param('brandId') brandId: string, @Body() dto: CreateInspoMembershipDto) {
     return this.inspoService.create(brandId, dto)
   }
 
   @Get('brands/:brandId/inspo')
   @UseGuards(JwtAuthGuard)
-  list(
-    @Param('brandId') brandId: string,
-    @Query('type') type?: string,
-    @Query('status') status?: string,
-  ) {
-    return this.inspoService.list(brandId, { type, status })
+  list(@Param('brandId') brandId: string) {
+    return this.inspoService.list(brandId)
   }
 
   @Get('inspo/:id')
@@ -49,7 +44,7 @@ export class InspoController {
   update(
     @Param('brandId') brandId: string,
     @Param('id') id: string,
-    @Body() dto: UpdateInspoItemDto,
+    @Body() dto: UpdateInspoMembershipDto,
   ) {
     return this.inspoService.update(id, brandId, dto)
   }
@@ -97,18 +92,14 @@ export class InspoController {
   // Service route (called by 9naŭ API / flownau)
   @Post('_service/brands/:brandId/inspo')
   @UseGuards(ServiceAuthGuard)
-  createByService(@Param('brandId') brandId: string, @Body() dto: CreateInspoItemDto) {
+  createByService(@Param('brandId') brandId: string, @Body() dto: CreateInspoMembershipDto) {
     return this.inspoService.create(brandId, dto)
   }
 
   @Get('_service/brands/:brandId/inspo')
   @UseGuards(ServiceAuthGuard)
-  listByService(
-    @Param('brandId') brandId: string,
-    @Query('type') type?: string,
-    @Query('status') status?: string,
-  ) {
-    return this.inspoService.list(brandId, { type, status })
+  listByService(@Param('brandId') brandId: string) {
+    return this.inspoService.list(brandId)
   }
 
   @Get('_service/brands/:brandId/inspo/digest')
@@ -140,7 +131,7 @@ export class InspoController {
   updateByService(
     @Param('brandId') brandId: string,
     @Param('id') id: string,
-    @Body() dto: UpdateInspoItemDto,
+    @Body() dto: UpdateInspoMembershipDto,
   ) {
     return this.inspoService.update(id, brandId, dto)
   }

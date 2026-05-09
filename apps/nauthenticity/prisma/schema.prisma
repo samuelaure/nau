@@ -26,8 +26,8 @@ model SocialProfile {
   ownerId String?
   owner   Brand?  @relation(fields: [ownerId], references: [id], onDelete: SetNull)
 
-  posts    Post[]
-  monitors SocialProfileMonitor[]
+  posts               Post[]
+  categoryMemberships CategoryMembership[]
 
   @@unique([platform, username])
   @@index([platform, username])
@@ -56,10 +56,10 @@ model Post {
   runId String?
   run   ScrapingRun? @relation(fields: [runId], references: [id])
 
-  media       Media[]
-  transcripts Transcript[]
-  feedbacks   CommentFeedback[]
-  inspoItems  InspoItem[]
+  media               Media[]
+  transcripts         Transcript[]
+  feedbacks           CommentFeedback[]
+  categoryMemberships CategoryMembership[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -168,12 +168,11 @@ model Brand {
   timezone                String  @default("UTC")
   inspoRequestCount       Int     @default(0)
 
-  ownedProfiles SocialProfile[]
-  monitors      SocialProfileMonitor[]
-  syntheses     BrandSynthesis[]
-  context       BrandContext?
-  feedbacks     CommentFeedback[]
-  inspoItems    InspoItem[]
+  ownedProfiles       SocialProfile[]
+  categoryMemberships CategoryMembership[]
+  syntheses           BrandSynthesis[]
+  context             BrandContext?
+  feedbacks           CommentFeedback[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -209,22 +208,37 @@ model BrandContext {
   updatedAt   DateTime  @updatedAt
 }
 
-// A SocialProfileMonitor links a Brand to a SocialProfile it monitors.
-// monitoringType: "content" (comment generation) | "benchmark" (analytics) | "inspiration"
-model SocialProfileMonitor {
-  id              String        @id @default(uuid())
+// CategoryMembership links a Brand to either a SocialProfile or a Post under one of the
+// non-OWN categories. OWN ownership lives separately on SocialProfile.ownerId (1:1).
+//
+// category values:
+//   "COMMENT"   — proactive comment-suggestion monitoring (profile-level only)
+//   "INSPO"     — InspoBase membership (profile-level OR post-level)
+//   "BENCHMARK" — benchmark/study membership (profile-level OR post-level); also the default-
+//                 absorption sink: when a profile/post is removed from INSPO and COMMENT and
+//                 has no other membership, it is moved to BENCHMARK rather than deleted.
+//
+// Exactly one of (socialProfileId, postId) must be set per row.
+model CategoryMembership {
+  id              String         @id @default(uuid())
   brandId         String
-  brand           Brand         @relation(fields: [brandId], references: [id])
-  socialProfileId String
-  socialProfile   SocialProfile @relation(fields: [socialProfileId], references: [id])
-  monitoringType  String        @default("content")
-  isActive        Boolean       @default(true)
-  settings        Json?
+  brand           Brand          @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  socialProfileId String?
+  socialProfile   SocialProfile? @relation(fields: [socialProfileId], references: [id], onDelete: Cascade)
+  postId          String?
+  post            Post?          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  category        String
+  isActive        Boolean        @default(true)
 
   createdAt DateTime @default(now())
 
-  @@unique([brandId, socialProfileId])
-  @@index([brandId])
+  // Note: actual uniqueness is enforced by two partial unique indexes (raw SQL in migration):
+  //   - (brandId, category, socialProfileId) WHERE postId IS NULL
+  //   - (brandId, category, postId)          WHERE socialProfileId IS NULL
+  // Postgres treats NULL as distinct in standard unique constraints, so we use partial indexes instead.
+  @@index([brandId, category])
+  @@index([socialProfileId])
+  @@index([postId])
 }
 
 model CommentFeedback {
@@ -241,26 +255,3 @@ model CommentFeedback {
   @@index([brandId])
 }
 
-// ── Inspo ─────────────────────────────────────────────────────────────────────
-
-model InspoItem {
-  id              String  @id @default(uuid())
-  brandId         String
-  brand           Brand   @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  postId          String?
-  post            Post?   @relation(fields: [postId], references: [id])
-  sourceUrl       String?
-  type            String
-  note            String? @db.Text
-  status          String  @default("pending")
-  extractedHook   String? @db.Text
-  extractedTheme  String?
-  adaptedScript   String? @db.Text
-  injectedContext String? @db.Text
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([brandId])
-  @@index([brandId, status])
-}

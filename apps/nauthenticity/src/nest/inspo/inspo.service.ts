@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException, BadGatewayException, UnprocessableEntityException } from '@nestjs/common'
+import { Injectable, NotFoundException, BadGatewayException, BadRequestException, UnprocessableEntityException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
-import { CreateInspoItemDto, UpdateInspoItemDto } from './inspo.dto'
+import { CreateInspoMembershipDto, UpdateInspoMembershipDto } from './inspo.dto'
 import { getClientForFeature, reportUsage } from '@nau/llm-client'
 import { z } from 'zod'
 
@@ -13,6 +13,7 @@ const SynthesisOutputSchema = z.object({
 })
 
 const DEFAULT_OWNED_POST_LIMIT = 20
+const DEFAULT_DIGEST_LIMIT = 50
 
 @Injectable()
 export class InspoService {
@@ -21,49 +22,109 @@ export class InspoService {
     private readonly config: ConfigService,
   ) {}
 
-  async create(brandId: string, dto: CreateInspoItemDto) {
-    return this.prisma.inspoItem.create({
-      data: { brandId, ...dto },
+  /**
+   * Add a profile or post to a brand's InspoBase.
+   * Exactly one of socialProfileId or postId must be provided.
+   */
+  async create(brandId: string, dto: CreateInspoMembershipDto) {
+    const profileSet = !!dto.socialProfileId
+    const postSet = !!dto.postId
+    if (profileSet === postSet) {
+      throw new BadRequestException('Provide exactly one of socialProfileId or postId')
+    }
+    const existing = await this.prisma.categoryMembership.findFirst({
+      where: {
+        brandId,
+        category: 'INSPO',
+        socialProfileId: dto.socialProfileId ?? null,
+        postId: dto.postId ?? null,
+      },
+      select: { id: true },
+    })
+    if (existing) {
+      return this.prisma.categoryMembership.update({
+        where: { id: existing.id },
+        data: { isActive: true },
+      })
+    }
+    return this.prisma.categoryMembership.create({
+      data: {
+        brandId,
+        category: 'INSPO',
+        socialProfileId: dto.socialProfileId ?? null,
+        postId: dto.postId ?? null,
+        isActive: true,
+      },
     })
   }
 
-  async list(brandId: string, filters: { type?: string; status?: string } = {}) {
-    return this.prisma.inspoItem.findMany({
-      where: { brandId, ...filters },
+  async list(brandId: string) {
+    return this.prisma.categoryMembership.findMany({
+      where: { brandId, category: 'INSPO' },
+      include: {
+        socialProfile: { select: { id: true, username: true, profileImageUrl: true } },
+        post: { select: { id: true, url: true, caption: true, postedAt: true } },
+      },
       orderBy: { createdAt: 'desc' },
     })
   }
 
   async findOne(id: string) {
-    const item = await this.prisma.inspoItem.findUnique({ where: { id } })
-    if (!item) throw new NotFoundException('Inspo item not found')
-    return item
+    const membership = await this.prisma.categoryMembership.findUnique({
+      where: { id },
+      include: {
+        socialProfile: true,
+        post: true,
+      },
+    })
+    if (!membership || membership.category !== 'INSPO') {
+      throw new NotFoundException('Inspo membership not found')
+    }
+    return membership
   }
 
-  async update(id: string, brandId: string, dto: UpdateInspoItemDto) {
+  async update(id: string, brandId: string, dto: UpdateInspoMembershipDto) {
     await this.assertOwnership(id, brandId)
-    return this.prisma.inspoItem.update({ where: { id }, data: dto })
+    return this.prisma.categoryMembership.update({
+      where: { id },
+      data: { isActive: dto.isActive },
+    })
   }
 
   async delete(id: string, brandId: string) {
     await this.assertOwnership(id, brandId)
-    await this.prisma.inspoItem.delete({ where: { id } })
+    await this.prisma.categoryMembership.delete({ where: { id } })
   }
 
+  /**
+   * Build a brand's InspoBase digest for ideation source-concept extraction.
+   * NOTE: This is a placeholder implementation — Priority 3 of the
+   * source-concepts-and-knowledge-bases plan redesigns this to produce
+   * many source concepts from the InspoBase as a whole.
+   * For now: concatenate captions from INSPO posts, fall back to
+   * owned-content synthesis if InspoBase is empty.
+   */
   async digest(brandId: string): Promise<{ content: string; attachedUrls: string[]; ownedContentSynthesis?: string | null }> {
-    const items = await this.prisma.inspoItem.findMany({
-      where: { brandId },
+    const memberships = await this.prisma.categoryMembership.findMany({
+      where: { brandId, category: 'INSPO' },
+      include: {
+        post: { select: { url: true, caption: true } },
+        socialProfile: { select: { username: true } },
+      },
       orderBy: { createdAt: 'desc' },
-      take: 50,
+      take: DEFAULT_DIGEST_LIMIT,
     })
 
     const parts: string[] = []
     const attachedUrls: string[] = []
 
-    for (const item of items) {
-      const line = [item.extractedHook, item.extractedTheme, item.note].filter(Boolean).join(' — ')
-      if (line) parts.push(line)
-      if (item.sourceUrl) attachedUrls.push(item.sourceUrl)
+    for (const m of memberships) {
+      if (m.post) {
+        if (m.post.caption) parts.push(m.post.caption)
+        if (m.post.url) attachedUrls.push(m.post.url)
+      } else if (m.socialProfile) {
+        parts.push(`@${m.socialProfile.username}`)
+      }
     }
 
     const hasInspoBaseSynthesis = await this.prisma.brandSynthesis.findFirst({
@@ -78,15 +139,15 @@ export class InspoService {
         orderBy: { createdAt: 'desc' },
         select: { content: true },
       })
-      
+
       if (ownedSynthesis) {
         ownedContentSynthesis = ownedSynthesis.content
       } else {
         try {
           const generated = await this.generateOwnedSynthesis(brandId)
           ownedContentSynthesis = generated.content_summary
-        } catch (err) {
-          // Auto generation fallback failed, proceed with null
+        } catch {
+          // generation fallback failed, proceed with null
         }
       }
     }
@@ -200,7 +261,7 @@ Devuelve un JSON con los campos:
 
     const userContent = `## ADN DE MARCA\n${brand.voicePrompt}\n\n## PUBLICACIONES PROPIAS (${posts.length} más recientes)\n${postsText}\n\nGenera el resumen de contenido.`
 
-    const { client, model, provider } = getClientForFeature('synthesis')
+    const { client, model } = getClientForFeature('synthesis')
 
     const result = await client.chatCompletion({
       model,
@@ -232,11 +293,10 @@ Devuelve un JSON con los campos:
         .catch(() => {})
     }
 
-    let parsed: any
     try {
-      parsed = JSON.parse(result.content)
+      const parsed = JSON.parse(result.content)
       const validated = SynthesisOutputSchema.parse(parsed)
-      
+
       const [savedContent, savedVoice] = await Promise.all([
         this.prisma.brandSynthesis.create({
           data: {
@@ -263,13 +323,15 @@ Devuelve un JSON con los campos:
         attachedUrls: savedContent.attachedUrls,
         createdAt: savedContent.createdAt,
       }
-    } catch (err) {
+    } catch {
       throw new BadGatewayException('LLM response was not valid JSON.')
     }
   }
 
   private async assertOwnership(id: string, brandId: string) {
-    const item = await this.prisma.inspoItem.findUnique({ where: { id } })
-    if (!item || item.brandId !== brandId) throw new NotFoundException('Inspo item not found')
+    const membership = await this.prisma.categoryMembership.findUnique({ where: { id } })
+    if (!membership || membership.brandId !== brandId || membership.category !== 'INSPO') {
+      throw new NotFoundException('Inspo membership not found')
+    }
   }
 }

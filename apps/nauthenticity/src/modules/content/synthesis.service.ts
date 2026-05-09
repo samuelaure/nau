@@ -257,7 +257,7 @@ export async function getDigest(brandId: string): Promise<BrandDigest> {
     where: { id: brandId },
     data: { inspoRequestCount: { increment: 1 } },
     select: {
-      brandId: true,
+      id: true,
       voicePrompt: true,
       inspoRequestCount: true,
     },
@@ -267,7 +267,7 @@ export async function getDigest(brandId: string): Promise<BrandDigest> {
   const shouldGenerate = count % 3 === 0;
 
   logger.info(
-    `[SynthesisService] Digest request #${count} for brand "${brand.brandId}" — shouldGenerate: ${shouldGenerate}`,
+    `[SynthesisService] Digest request #${count} for brand "${brand.id}" — shouldGenerate: ${shouldGenerate}`,
   );
 
   if (!shouldGenerate) {
@@ -279,7 +279,7 @@ export async function getDigest(brandId: string): Promise<BrandDigest> {
 
     if (cached) {
       logger.info(
-        `[SynthesisService] Returning cached Recent Synthesis for brand "${brand.brandId}"`,
+        `[SynthesisService] Returning cached Recent Synthesis for brand "${brand.id}"`,
       );
       return {
         content: cached.content,
@@ -292,7 +292,7 @@ export async function getDigest(brandId: string): Promise<BrandDigest> {
 
   // ── Fetch context for generation ──────────────────────────────────────────
 
-  const [recentSyntheses, globalSynthesis, newInspoItems] = await Promise.all([
+  const [recentSyntheses, globalSynthesis, newInspoMemberships] = await Promise.all([
     (prisma as any).brandSynthesis.findMany({
       where: { brandId, type: 'recent' },
       orderBy: { createdAt: 'desc' },
@@ -302,8 +302,8 @@ export async function getDigest(brandId: string): Promise<BrandDigest> {
       where: { brandId, type: 'global' },
       orderBy: { createdAt: 'desc' },
     }),
-    prisma.inspoItem.findMany({
-      where: { brandId, status: 'pending' },
+    prisma.categoryMembership.findMany({
+      where: { brandId, category: 'INSPO', postId: { not: null } },
       include: {
         post: { select: { url: true, caption: true } },
       },
@@ -340,15 +340,17 @@ export async function getDigest(brandId: string): Promise<BrandDigest> {
     });
 
     currentGlobalContent = globalResult.content;
-    logger.info(`[SynthesisService] Global Synthesis created for brand "${brand.brandId}"`);
+    logger.info(`[SynthesisService] Global Synthesis created for brand "${brand.id}"`);
   }
 
   // ── Recent Synthesis ──────────────────────────────────────────────────────
 
-  const newPostsForContext: NewPost[] = newInspoItems.map((item: any) => ({
-    url: item.post?.url ?? null,
-    caption: item.post?.caption ?? null,
-  }));
+  const newPostsForContext: NewPost[] = newInspoMemberships
+    .filter((m): m is typeof m & { post: { url: string | null; caption: string | null } } => !!m.post)
+    .map((m) => ({
+      url: m.post.url ?? null,
+      caption: m.post.caption ?? null,
+    }));
 
   const recentResult = await generateRecentSynthesis(
     brandId,
@@ -368,7 +370,7 @@ export async function getDigest(brandId: string): Promise<BrandDigest> {
     },
   });
 
-  logger.info(`[SynthesisService] Recent Synthesis created for brand "${brand.brandId}"`);
+  logger.info(`[SynthesisService] Recent Synthesis created for brand "${brand.id}"`);
 
   return {
     content: synthesis.content,

@@ -93,7 +93,7 @@ export class BrandContextService {
       if (!brand) throw new Error(`Brand ${brandId} not found`)
 
       // Load sources in parallel
-      const [ownedPosts, inspoItems, previousCtx] = await Promise.all([
+      const [ownedPosts, inspoPosts, previousCtx] = await Promise.all([
         sources.ownedProfile
           ? this.prisma.post.findMany({
               where: { socialProfile: { ownerId: brandId } },
@@ -103,24 +103,28 @@ export class BrandContextService {
             })
           : Promise.resolve([]),
         sources.inspoBase
-          ? this.prisma.inspoItem.findMany({
-              where: { brandId },
-              select: { note: true, extractedHook: true, extractedTheme: true, adaptedScript: true },
+          ? this.prisma.categoryMembership.findMany({
+              where: { brandId, category: 'INSPO', postId: { not: null } },
+              select: { post: { select: { url: true, caption: true } } },
               orderBy: { createdAt: 'desc' },
               take: 20,
             })
-          : Promise.resolve([]),
+          : Promise.resolve([] as Array<{ post: { url: string | null; caption: string | null } | null }>),
         sources.previousContext
           ? this.prisma.brandContext.findUnique({ where: { brandId }, select: { content: true } })
           : Promise.resolve(null),
       ])
+
+      const inspoPostsForLLM = inspoPosts
+        .filter((m): m is { post: { url: string | null; caption: string | null } } => !!m.post)
+        .map((m) => ({ url: m.post.url ?? null, caption: m.post.caption ?? null }))
 
       const context = await this.callLLM({
         brandId,
         manual: sources.manual,
         previousContext: previousCtx?.content as BrandContextShape | null ?? null,
         ownedPosts,
-        inspoItems,
+        inspoPosts: inspoPostsForLLM,
       })
 
       await this.saveContext(brandId, context)
@@ -139,9 +143,9 @@ export class BrandContextService {
     manual: string | null
     previousContext: BrandContextShape | null
     ownedPosts: { url: string | null; caption: string | null }[]
-    inspoItems: { note: string | null; extractedHook: string | null; extractedTheme: string | null; adaptedScript: string | null }[]
+    inspoPosts: { url: string | null; caption: string | null }[]
   }): Promise<BrandContextShape> {
-    const { brandId, manual, previousContext, ownedPosts, inspoItems } = args
+    const { brandId, manual, previousContext, ownedPosts, inspoPosts } = args
 
     const systemPrompt = `You are a brand strategist building a structured brand context for a content creation system.
 
@@ -185,17 +189,15 @@ Return ONLY valid JSON matching this shape:
       parts.push(`## OWNED PROFILE POSTS (${ownedPosts.length} most recent)\n${postsText}`)
     }
 
-    if (inspoItems.length > 0) {
-      const inspoText = inspoItems
-        .map((item, i) => {
+    if (inspoPosts.length > 0) {
+      const inspoText = inspoPosts
+        .map((p, i) => {
           const bits: string[] = [`Inspo ${i + 1}`]
-          if (item.extractedTheme) bits.push(`Theme: ${item.extractedTheme}`)
-          if (item.extractedHook) bits.push(`Hook: ${item.extractedHook}`)
-          if (item.note) bits.push(`Note: ${item.note}`)
+          if (p.caption) bits.push(`Caption: ${p.caption.slice(0, 300)}`)
           return bits.join('\n')
         })
         .join('\n\n')
-      parts.push(`## INSPOBASE (${inspoItems.length} items)\n${inspoText}`)
+      parts.push(`## INSPOBASE (${inspoPosts.length} posts)\n${inspoText}`)
     }
 
     if (parts.length === 0) {

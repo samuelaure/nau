@@ -15,10 +15,11 @@
 Once this plan is complete, tackle these in sequence:
 
 1. [`cross-brand-deduplication.md`](./cross-brand-deduplication.md) — shared-singleton profile/post records across brands
-2. [`replication-posts.md`](./replication-posts.md) — formalize "Plan for Replication" lifecycle and post-type extension
-3. [`repost-lifecycle.md`](./repost-lifecycle.md) — implement "Posts to Repost" flow with permission-request lifecycle
-4. [`project-entity.md`](./project-entity.md) — design and implement the Project entity
-5. [`mobile-app-architecture-refactor.md`](./mobile-app-architecture-refactor.md) — full mobile-app refactor (centralized processing, workspace scoping, data migration)
+2. [`post-enrichment-extensions.md`](./post-enrichment-extensions.md) — text-from-video / image OCR + bulk re-processing of historical posts
+3. [`replication-posts.md`](./replication-posts.md) — formalize "Plan for Replication" lifecycle and post-type extension
+4. [`repost-lifecycle.md`](./repost-lifecycle.md) — implement "Posts to Repost" flow with permission-request lifecycle
+5. [`project-entity.md`](./project-entity.md) — design and implement the Project entity
+6. [`mobile-app-architecture-refactor.md`](./mobile-app-architecture-refactor.md) — full mobile-app refactor (centralized processing, workspace scoping, data migration)
 
 ---
 

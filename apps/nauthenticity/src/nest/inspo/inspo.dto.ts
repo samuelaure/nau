@@ -1,32 +1,18 @@
-import { IsString, IsOptional, IsUrl } from 'class-validator'
+import { IsString, IsOptional, IsBoolean } from 'class-validator'
 
-export class CreateInspoItemDto {
+export class CreateInspoMembershipDto {
+  // Exactly one of these must be set.
   @IsOptional()
-  @IsUrl()
-  sourceUrl?: string
-
   @IsString()
-  type!: string
+  socialProfileId?: string
 
   @IsOptional()
   @IsString()
-  note?: string
+  postId?: string
 }
 
-export class UpdateInspoItemDto {
+export class UpdateInspoMembershipDto {
   @IsOptional()
-  @IsString()
-  note?: string
-
-  @IsOptional()
-  @IsString()
-  status?: string
-
-  @IsOptional()
-  @IsString()
-  extractedHook?: string
-
-  @IsOptional()
-  @IsString()
-  extractedTheme?: string
+  @IsBoolean()
+  isActive?: boolean
 }

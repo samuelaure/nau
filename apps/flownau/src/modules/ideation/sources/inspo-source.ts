@@ -38,7 +38,7 @@ export async function fetchBrandDigest(brandId: string): Promise<BrandDigest | n
     }
 
     if (!digest.content.trim()) {
-      logger.info(`[InspoSource] No InspoItems for brand ${brandId} — using DNA-only mode`)
+      logger.info(`[InspoSource] No InspoBase content for brand ${brandId} — using DNA-only mode`)
       return null
     }
 

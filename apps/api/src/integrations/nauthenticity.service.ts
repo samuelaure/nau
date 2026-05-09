@@ -68,22 +68,27 @@ export class NauthenticityService {
     // No-op: brand ownership has moved to 9naŭ API; nauthenticity no longer stores brand metadata
   }
 
-  async getInspoItems(brandId: string, filters?: { type?: string; status?: string }) {
-    const params = new URLSearchParams();
-    if (filters?.type) params.set('type', filters.type);
-    if (filters?.status) params.set('status', filters.status);
-    const qs = params.toString() ? `?${params.toString()}` : '';
-    return this.fetch(`/_service/brands/${brandId}/inspo${qs}`);
+  /**
+   * List a brand's InspoBase memberships.
+   * Each row is a CategoryMembership with category='INSPO', linking the brand
+   * to either a SocialProfile (profile-level) or a Post (post-level).
+   */
+  async getInspoMemberships(brandId: string) {
+    return this.fetch(`/_service/brands/${brandId}/inspo`);
   }
 
-  async createInspoItem(brandId: string, data: { sourceUrl?: string; type: string; note?: string }) {
+  /**
+   * Add a profile or post to the brand's InspoBase.
+   * Provide exactly one of socialProfileId or postId.
+   */
+  async createInspoMembership(brandId: string, data: { socialProfileId?: string; postId?: string }) {
     return this.fetch(`/_service/brands/${brandId}/inspo`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
-  async updateInspoItem(brandId: string, id: string, data: { note?: string; status?: string; extractedHook?: string; extractedTheme?: string }) {
+  async updateInspoMembership(brandId: string, id: string, data: { isActive?: boolean }) {
     return this.fetch(`/_service/brands/${brandId}/inspo/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),

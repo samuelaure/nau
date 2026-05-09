@@ -17,102 +17,111 @@ const DEFAULT_OWNED_POST_LIMIT = 20;
 // ---------------------------------------------------------------------------
 // Zod Schemas
 // ---------------------------------------------------------------------------
-const InspoCreateSchema = z.object({
-  brandId: z.string().min(1),
-  postUrl: z.string().url().optional(),
-  postId: z.string().optional(),
-  note: z.string().optional(),
-  type: z.enum(['inspo', 'replicate']),
-});
-
-const InspoProcessSchema = z.object({
-  extractedHook: z.string().optional(),
-  extractedTheme: z.string().optional(),
-  adaptedScript: z.string().optional(),
-});
+// Create an InspoBase membership. Caller may identify the target by:
+//   - postUrl (we resolve to a Post; create a profile-less link only if Post exists)
+//   - postId (direct post reference)
+//   - socialProfileId (profile-level membership)
+const InspoMembershipCreateSchema = z
+  .object({
+    brandId: z.string().min(1),
+    postUrl: z.string().url().optional(),
+    postId: z.string().optional(),
+    socialProfileId: z.string().optional(),
+  })
+  .refine(
+    (v) => Number(!!v.postUrl) + Number(!!v.postId) + Number(!!v.socialProfileId) === 1,
+    { message: 'Provide exactly one of postUrl, postId, or socialProfileId' },
+  );
 
 // ---------------------------------------------------------------------------
 // Controller
 // ---------------------------------------------------------------------------
 export const inspoController: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   // -------------------------------------------------------------------------
-  // 1. Create InspoItem
+  // 1. Create InspoBase membership
   // -------------------------------------------------------------------------
   fastify.post('/inspo', { preHandler: authenticate }, async (request, reply) => {
     try {
-      const { brandId, postUrl, postId, note, type } = InspoCreateSchema.parse(request.body);
+      const { brandId, postUrl, postId, socialProfileId } = InspoMembershipCreateSchema.parse(request.body);
 
-      // Verify brand intelligence record exists
       const brand = await prisma.brand.findUnique({ where: { id: brandId } });
       if (!brand) return reply.status(404).send({ error: 'Brand not found' });
 
-      // Resolve post reference
       let resolvedPostId: string | null = postId ?? null;
-
       if (!resolvedPostId && postUrl) {
-        // Try to find existing post by URL
         const existingPost = await prisma.post.findUnique({ where: { url: postUrl } });
         if (existingPost) {
           resolvedPostId = existingPost.id;
+        } else {
+          return reply.status(404).send({ error: 'Post not found in database. Scrape it first.' });
         }
-        // If post doesn't exist yet, we save without link — it can be scraped later
       }
 
-      const inspoItem = await prisma.inspoItem.create({
-        data: {
+      const existing = await prisma.categoryMembership.findFirst({
+        where: {
           brandId,
-          postId: resolvedPostId,
-          type,
-          note: note ?? null,
-          status: 'pending',
+          category: 'INSPO',
+          socialProfileId: socialProfileId ?? null,
+          postId: resolvedPostId ?? null,
         },
+        select: { id: true },
       });
+      const membership = existing
+        ? await prisma.categoryMembership.update({
+            where: { id: existing.id },
+            data: { isActive: true },
+          })
+        : await prisma.categoryMembership.create({
+            data: {
+              brandId,
+              category: 'INSPO',
+              socialProfileId: socialProfileId ?? null,
+              postId: resolvedPostId,
+              isActive: true,
+            },
+          });
 
-      logger.info(`[InspoBase] Created ${type} item for brand ${brandId} (ID: ${inspoItem.id})`);
-      return reply.status(201).send(inspoItem);
+      logger.info(`[InspoBase] Upserted membership for brand ${brandId} (ID: ${membership.id})`);
+      return reply.status(201).send(membership);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      logger.error(`[InspoBase] Error creating inspo item: ${msg}`);
+      logger.error(`[InspoBase] Error creating inspo membership: ${msg}`);
       return reply.status(400).send({ error: msg });
     }
   });
 
   // -------------------------------------------------------------------------
-  // 2. List InspoItems (filterable)
+  // 2. List InspoBase memberships
   // -------------------------------------------------------------------------
   fastify.get('/inspo', { preHandler: authenticate }, async (request, reply) => {
-    const { brandId, type, status } = request.query as {
-      brandId?: string;
-      type?: string;
-      status?: string;
-    };
+    const { brandId } = request.query as { brandId?: string };
 
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = { category: 'INSPO' };
     if (brandId) where.brandId = brandId;
-    if (type) where.type = type;
-    if (status) where.status = status;
 
-    const items = await prisma.inspoItem.findMany({
+    const memberships = await prisma.categoryMembership.findMany({
       where,
       include: {
         brand: { select: { workspaceId: true } },
-        post: { select: { url: true, caption: true, username: true } },
+        socialProfile: { select: { id: true, username: true, profileImageUrl: true } },
+        post: { select: { id: true, url: true, caption: true, username: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    return reply.send(items);
+    return reply.send(memberships);
   });
 
   // -------------------------------------------------------------------------
-  // 3. Get single InspoItem
+  // 3. Get single InspoBase membership
   // -------------------------------------------------------------------------
   fastify.get('/inspo/:id', { preHandler: authenticate }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const item = await prisma.inspoItem.findUnique({
+    const membership = await prisma.categoryMembership.findUnique({
       where: { id },
       include: {
         brand: { select: { voicePrompt: true } },
+        socialProfile: true,
         post: {
           include: {
             media: true,
@@ -122,61 +131,14 @@ export const inspoController: FastifyPluginAsync = async (fastify: FastifyInstan
       },
     });
 
-    if (!item) return reply.status(404).send({ error: 'InspoItem not found' });
-    return reply.send(item);
-  });
-
-  // -------------------------------------------------------------------------
-  // 4. Process InspoItem (AI extraction)
-  // -------------------------------------------------------------------------
-  fastify.post('/inspo/:id/process', { preHandler: authenticate }, async (request, reply) => {
-    const { id } = request.params as { id: string };
-
-    const item = await prisma.inspoItem.findUnique({
-      where: { id },
-      include: {
-        brand: { select: { voicePrompt: true } },
-        post: {
-          include: {
-            transcripts: { select: { text: true } },
-          },
-        },
-      },
-    });
-
-    if (!item) return reply.status(404).send({ error: 'InspoItem not found' });
-
-    // If manual data is provided, use it directly
-    const manualData = request.body as Record<string, unknown> | undefined;
-    if (manualData) {
-      try {
-        const parsed = InspoProcessSchema.parse(manualData);
-        const updated = await prisma.inspoItem.update({
-          where: { id },
-          data: {
-            ...parsed,
-            status: 'processed',
-          },
-        });
-        return reply.send(updated);
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return reply.status(400).send({ error: msg });
-      }
+    if (!membership || membership.category !== 'INSPO') {
+      return reply.status(404).send({ error: 'InspoBase membership not found' });
     }
-
-    // Otherwise mark as processed (AI processing deferred to ideation engine in flownau)
-    const updated = await prisma.inspoItem.update({
-      where: { id },
-      data: { status: 'processed' },
-    });
-
-    logger.info(`[InspoBase] Processed item ${id}`);
-    return reply.send(updated);
+    return reply.send(membership);
   });
 
   // -------------------------------------------------------------------------
-  // 5. Digest — Mechanical InspoBase Synthesis (Phase 11)
+  // 4. Digest — Mechanical InspoBase Synthesis (Phase 11)
   //    Includes ownedContentSynthesis as a fallback when no InspoBase
   //    synthesis (recent/global) exists yet for the brand.
   // -------------------------------------------------------------------------
@@ -193,9 +155,6 @@ export const inspoController: FastifyPluginAsync = async (fastify: FastifyInstan
     try {
       const digest = await getDigest(brandId);
 
-      // Check whether any InspoBase synthesis (recent or global) exists.
-      // If not, attach the latest owned_content synthesis as a fallback
-      // so that flownau always has some topic context to work with.
       const hasInspoBaseSynthesis = await (prisma as any).brandSynthesis.findFirst({
         where: { brandId, type: { in: ['recent', 'global'] } },
         select: { id: true },
@@ -220,10 +179,7 @@ export const inspoController: FastifyPluginAsync = async (fastify: FastifyInstan
   });
 
   // -------------------------------------------------------------------------
-  // 5b. Owned Content Synthesis — GET latest (cached)
-  //     GET /api/v1/brands/:id/owned-synthesis/latest
-  //     Returns the most recent owned_content BrandSynthesis, or null if none.
-  //     Used by the dashboard to display the cached synthesis without triggering generation.
+  // 4b. Owned Content Synthesis — GET latest (cached)
   // -------------------------------------------------------------------------
   fastify.get('/brands/:id/owned-synthesis/latest', { preHandler: authenticate }, async (request, reply) => {
     const { id: brandId } = request.params as { id: string };
@@ -241,11 +197,7 @@ export const inspoController: FastifyPluginAsync = async (fastify: FastifyInstan
   });
 
   // -------------------------------------------------------------------------
-  // 5c. Owned Content Synthesis — Manual trigger (POST)
-  //     POST /api/v1/brands/:id/owned-synthesis
-  //     Fetches the brand's owned SocialProfile posts and prompts the LLM in
-  //     Spanish to answer "¿De qué trata esta marca?". Persists the result
-  //     as a BrandSynthesis of type 'owned_content'.
+  // 4c. Owned Content Synthesis — Manual trigger (POST)
   // -------------------------------------------------------------------------
   fastify.post('/brands/:id/owned-synthesis', { preHandler: authenticate }, async (request, reply) => {
     const { id: brandId } = request.params as { id: string };
@@ -255,9 +207,7 @@ export const inspoController: FastifyPluginAsync = async (fastify: FastifyInstan
       select: {
         id: true,
         voicePrompt: true,
-        ownedProfiles: {
-          select: { id: true },
-        },
+        ownedProfiles: { select: { id: true } },
       },
     });
 
@@ -319,7 +269,7 @@ export const inspoController: FastifyPluginAsync = async (fastify: FastifyInstan
   });
 
   // -------------------------------------------------------------------------
-  // 6. Repost — Forward to flownaŭ
+  // 5. Repost — Forward to flownaŭ
   // -------------------------------------------------------------------------
   fastify.post('/repost', { preHandler: authenticate }, async (request, reply) => {
     const { brandId, postUrl } = request.body as { brandId?: string; postUrl?: string };
@@ -330,7 +280,6 @@ export const inspoController: FastifyPluginAsync = async (fastify: FastifyInstan
     const brand = await prisma.brand.findUnique({ where: { id: brandId } });
     if (!brand) return reply.status(404).send({ error: 'Brand not found' });
 
-    // Find the post
     const post = await prisma.post.findUnique({
       where: { url: postUrl },
       include: { media: true },
@@ -340,7 +289,6 @@ export const inspoController: FastifyPluginAsync = async (fastify: FastifyInstan
       return reply.status(404).send({ error: 'Post not found in database. Scrape it first.' });
     }
 
-    // Forward to flownaŭ content ingest (placeholder — flownau endpoint TBD)
     const flownauUrl = process.env.FLOWNAU_URL || 'http://flownau:3000';
 
     try {

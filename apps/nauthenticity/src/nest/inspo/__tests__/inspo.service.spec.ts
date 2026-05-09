@@ -1,14 +1,11 @@
 /**
  * InspoService unit tests.
  *
- * InspoService is a thin CRUD layer over Prisma. All Prisma methods are mocked
- * with jest-mock-extended so no real database connection is required.
- * Tests verify:
- *   - Correct Prisma calls are made with expected arguments
- *   - NotFoundException is thrown when ownership check fails
- *   - NotFoundException is thrown when an item is not found
+ * InspoService is a thin layer over Prisma's `categoryMembership` model
+ * (filtered to category='INSPO'). All Prisma methods are mocked with
+ * jest-mock-extended so no real database connection is required.
  */
-import { NotFoundException } from '@nestjs/common'
+import { BadRequestException, NotFoundException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { mockDeep, DeepMockProxy } from 'jest-mock-extended'
 import { InspoService } from '../inspo.service'
@@ -25,92 +22,146 @@ describe('InspoService', () => {
   })
 
   describe('create', () => {
-    it('calls prisma.inspoItem.create with brandId and dto merged', async () => {
-      const dto = { title: 'My Inspiration', type: 'image', url: 'https://example.com/img.jpg' }
-      const created = { id: 'item-1', brandId: 'brand-1', ...dto, createdAt: new Date() }
-      prisma.inspoItem.create.mockResolvedValue(created as any)
+    it('creates a profile-level INSPO membership when none exists', async () => {
+      const created = {
+        id: 'm-1',
+        brandId: 'brand-1',
+        category: 'INSPO',
+        socialProfileId: 'sp-1',
+        postId: null,
+      }
+      prisma.categoryMembership.findFirst.mockResolvedValue(null)
+      prisma.categoryMembership.create.mockResolvedValue(created as any)
 
-      const result = await service.create('brand-1', dto as any)
+      const result = await service.create('brand-1', { socialProfileId: 'sp-1' })
 
-      expect(prisma.inspoItem.create).toHaveBeenCalledWith({
-        data: { brandId: 'brand-1', ...dto },
-      })
+      expect(prisma.categoryMembership.findFirst).toHaveBeenCalled()
+      expect(prisma.categoryMembership.create).toHaveBeenCalled()
       expect(result).toEqual(created)
+    })
+
+    it('updates existing INSPO membership instead of creating duplicate', async () => {
+      prisma.categoryMembership.findFirst.mockResolvedValue({ id: 'm-existing' } as any)
+      const updated = { id: 'm-existing', isActive: true }
+      prisma.categoryMembership.update.mockResolvedValue(updated as any)
+
+      const result = await service.create('brand-1', { postId: 'p-1' })
+
+      expect(prisma.categoryMembership.findFirst).toHaveBeenCalled()
+      expect(prisma.categoryMembership.update).toHaveBeenCalledWith({
+        where: { id: 'm-existing' },
+        data: { isActive: true },
+      })
+      expect(result).toEqual(updated)
+    })
+
+    it('creates a post-level INSPO membership when none exists', async () => {
+      const created = {
+        id: 'm-2',
+        brandId: 'brand-1',
+        category: 'INSPO',
+        socialProfileId: null,
+        postId: 'p-1',
+      }
+      prisma.categoryMembership.findFirst.mockResolvedValue(null)
+      prisma.categoryMembership.create.mockResolvedValue(created as any)
+
+      const result = await service.create('brand-1', { postId: 'p-1' })
+
+      expect(prisma.categoryMembership.create).toHaveBeenCalled()
+      expect(result).toEqual(created)
+    })
+
+    it('throws BadRequestException if both socialProfileId and postId are provided', async () => {
+      await expect(
+        service.create('brand-1', { socialProfileId: 'sp-1', postId: 'p-1' }),
+      ).rejects.toBeInstanceOf(BadRequestException)
+    })
+
+    it('throws BadRequestException if neither is provided', async () => {
+      await expect(service.create('brand-1', {})).rejects.toBeInstanceOf(BadRequestException)
     })
   })
 
   describe('list', () => {
-    it('returns items filtered by brandId only when no extra filters', async () => {
-      prisma.inspoItem.findMany.mockResolvedValue([])
+    it('returns INSPO memberships for the brand', async () => {
+      prisma.categoryMembership.findMany.mockResolvedValue([])
       await service.list('brand-1')
-      expect(prisma.inspoItem.findMany).toHaveBeenCalledWith({
-        where: { brandId: 'brand-1' },
-        orderBy: { createdAt: 'desc' },
-      })
-    })
-
-    it('passes additional type and status filters to Prisma', async () => {
-      prisma.inspoItem.findMany.mockResolvedValue([])
-      await service.list('brand-1', { type: 'video', status: 'saved' })
-      expect(prisma.inspoItem.findMany).toHaveBeenCalledWith({
-        where: { brandId: 'brand-1', type: 'video', status: 'saved' },
-        orderBy: { createdAt: 'desc' },
-      })
+      expect(prisma.categoryMembership.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { brandId: 'brand-1', category: 'INSPO' } }),
+      )
     })
   })
 
   describe('findOne', () => {
-    it('returns the item when it exists', async () => {
-      const item = { id: 'item-1', brandId: 'brand-1' }
-      prisma.inspoItem.findUnique.mockResolvedValue(item as any)
-      const result = await service.findOne('item-1')
-      expect(result).toEqual(item)
+    it('returns the membership when it exists and is INSPO', async () => {
+      const m = { id: 'm-1', brandId: 'brand-1', category: 'INSPO' }
+      prisma.categoryMembership.findUnique.mockResolvedValue(m as any)
+      const result = await service.findOne('m-1')
+      expect(result).toEqual(m)
     })
 
-    it('throws NotFoundException when item does not exist', async () => {
-      prisma.inspoItem.findUnique.mockResolvedValue(null)
+    it('throws NotFoundException when membership is not INSPO', async () => {
+      prisma.categoryMembership.findUnique.mockResolvedValue({ id: 'm-1', category: 'BENCHMARK' } as any)
+      await expect(service.findOne('m-1')).rejects.toBeInstanceOf(NotFoundException)
+    })
+
+    it('throws NotFoundException when membership does not exist', async () => {
+      prisma.categoryMembership.findUnique.mockResolvedValue(null)
       await expect(service.findOne('missing-id')).rejects.toBeInstanceOf(NotFoundException)
     })
   })
 
   describe('update', () => {
-    it('updates the item when caller owns it', async () => {
-      const item = { id: 'item-1', brandId: 'brand-1' }
-      const updated = { ...item, title: 'Updated' }
-      prisma.inspoItem.findUnique.mockResolvedValue(item as any)
-      prisma.inspoItem.update.mockResolvedValue(updated as any)
+    it('updates the membership when caller owns it', async () => {
+      const m = { id: 'm-1', brandId: 'brand-1', category: 'INSPO' }
+      const updated = { ...m, isActive: false }
+      prisma.categoryMembership.findUnique.mockResolvedValue(m as any)
+      prisma.categoryMembership.update.mockResolvedValue(updated as any)
 
-      const result = await service.update('item-1', 'brand-1', { title: 'Updated' } as any)
+      const result = await service.update('m-1', 'brand-1', { isActive: false })
       expect(result).toEqual(updated)
     })
 
-    it('throws NotFoundException when caller does not own the item', async () => {
-      prisma.inspoItem.findUnique.mockResolvedValue({ id: 'item-1', brandId: 'other-brand' } as any)
-      await expect(service.update('item-1', 'brand-1', {} as any)).rejects.toBeInstanceOf(
-        NotFoundException,
-      )
+    it('throws NotFoundException when caller does not own the membership', async () => {
+      prisma.categoryMembership.findUnique.mockResolvedValue({
+        id: 'm-1',
+        brandId: 'other-brand',
+        category: 'INSPO',
+      } as any)
+      await expect(service.update('m-1', 'brand-1', {})).rejects.toBeInstanceOf(NotFoundException)
     })
 
-    it('throws NotFoundException when item does not exist', async () => {
-      prisma.inspoItem.findUnique.mockResolvedValue(null)
-      await expect(service.update('missing', 'brand-1', {} as any)).rejects.toBeInstanceOf(
-        NotFoundException,
-      )
+    it('throws NotFoundException when membership is not INSPO', async () => {
+      prisma.categoryMembership.findUnique.mockResolvedValue({
+        id: 'm-1',
+        brandId: 'brand-1',
+        category: 'COMMENT',
+      } as any)
+      await expect(service.update('m-1', 'brand-1', {})).rejects.toBeInstanceOf(NotFoundException)
     })
   })
 
   describe('delete', () => {
-    it('deletes the item when caller owns it', async () => {
-      prisma.inspoItem.findUnique.mockResolvedValue({ id: 'item-1', brandId: 'brand-1' } as any)
-      prisma.inspoItem.delete.mockResolvedValue({} as any)
+    it('deletes the membership when caller owns it', async () => {
+      prisma.categoryMembership.findUnique.mockResolvedValue({
+        id: 'm-1',
+        brandId: 'brand-1',
+        category: 'INSPO',
+      } as any)
+      prisma.categoryMembership.delete.mockResolvedValue({} as any)
 
-      await service.delete('item-1', 'brand-1')
-      expect(prisma.inspoItem.delete).toHaveBeenCalledWith({ where: { id: 'item-1' } })
+      await service.delete('m-1', 'brand-1')
+      expect(prisma.categoryMembership.delete).toHaveBeenCalledWith({ where: { id: 'm-1' } })
     })
 
-    it('throws NotFoundException when caller does not own the item', async () => {
-      prisma.inspoItem.findUnique.mockResolvedValue({ id: 'item-1', brandId: 'other' } as any)
-      await expect(service.delete('item-1', 'brand-1')).rejects.toBeInstanceOf(NotFoundException)
+    it('throws NotFoundException when caller does not own the membership', async () => {
+      prisma.categoryMembership.findUnique.mockResolvedValue({
+        id: 'm-1',
+        brandId: 'other',
+        category: 'INSPO',
+      } as any)
+      await expect(service.delete('m-1', 'brand-1')).rejects.toBeInstanceOf(NotFoundException)
     })
   })
 })

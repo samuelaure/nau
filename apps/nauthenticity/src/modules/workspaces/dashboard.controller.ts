@@ -3,31 +3,35 @@ import { prisma } from '../../modules/shared/prisma';
 
 export const dashboardController = async (fastify: FastifyInstance) => {
   // -------------------------------------------------------------------------
-  // TARGETS UI ENDPOINTS
+  // MEMBERSHIPS UI ENDPOINTS (URL kept as `/targets`; param renamed to `category`)
   // -------------------------------------------------------------------------
   fastify.get('/targets', async (request: FastifyRequest, reply: FastifyReply) => {
-    const { brandId, monitoringType } = request.query as { brandId?: string; monitoringType?: string };
+    const { brandId, category } = request.query as { brandId?: string; category?: string };
     if (!brandId) return reply.status(400).send({ error: 'Missing brandId' });
 
-    const targets = await prisma.socialProfileMonitor.findMany({
-      where: { brandId, monitoringType: monitoringType || undefined },
+    const memberships = await prisma.categoryMembership.findMany({
+      where: {
+        brandId,
+        category: category || undefined,
+        socialProfileId: { not: null },
+      },
       include: {
         socialProfile: { include: { _count: { select: { posts: true } } } },
       },
       orderBy: { createdAt: 'desc' },
     });
-    return reply.send(targets);
+    return reply.send(memberships);
   });
 
   fastify.patch('/targets/:id', async (request: FastifyRequest, reply: FastifyReply) => {
     const { id } = request.params as { id: string };
-    const { isActive, settings } = request.body as any;
+    const { isActive, category } = request.body as { isActive?: boolean; category?: string };
 
-    const dataToUpdate: any = {};
+    const dataToUpdate: { isActive?: boolean; category?: string } = {};
     if (isActive !== undefined) dataToUpdate.isActive = isActive;
-    if (settings !== undefined) dataToUpdate.settings = settings;
+    if (category !== undefined) dataToUpdate.category = category;
 
-    const updated = await prisma.socialProfileMonitor.update({
+    const updated = await prisma.categoryMembership.update({
       where: { id },
       data: dataToUpdate,
     });

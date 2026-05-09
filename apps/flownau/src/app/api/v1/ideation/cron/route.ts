@@ -36,31 +36,29 @@ export async function POST(request: NextRequest) {
       prisma.socialProfile.findFirst({ where: { brandId } }),
     ])
 
-    // Fetch inspo items from nauthenticity NestJS API
+    // Fetch InspoBase memberships (post-level only) from nauthenticity NestJS API.
+    // Each membership embeds its post; we use post.caption as the source-concept seed
+    // until Priority 3 of source-concepts-and-knowledge-bases redesigns this digest.
     const inspoRes = await fetch(
-      `${nauthUrl}/api/v1/_service/brands/${brandId}/inspo?status=pending`,
+      `${nauthUrl}/api/v1/_service/brands/${brandId}/inspo`,
       { headers: nauthHeaders },
     )
     const inspoData = (inspoRes.ok ? await inspoRes.json() : []) as Array<{
       id: string
-      type: string
-      note?: string
-      extractedHook?: string
-      extractedTheme?: string
-      adaptedScript?: string
+      postId: string | null
+      socialProfileId: string | null
+      post?: { url: string | null; caption: string | null } | null
     }>
 
-    if (inspoData.length === 0) {
-      return NextResponse.json({ success: true, message: 'No pending InspoItems to process.' })
+    const inspoPosts = inspoData.filter((m) => m.post && m.post.caption)
+
+    if (inspoPosts.length === 0) {
+      return NextResponse.json({ success: true, message: 'No InspoBase posts to process.' })
     }
 
     const brandName: string = account?.username ?? brandId
 
-    // Build topic from inspo items until Origin 3 is fully refactored
-    const topicLines = inspoData
-      .map((item) => [item.extractedTheme, item.extractedHook, item.note].filter(Boolean).join(' — '))
-      .filter(Boolean)
-    const topic = topicLines.join('\n')
+    const topic = inspoPosts.map((m) => m.post!.caption).filter(Boolean).join('\n')
 
     const brand = await prisma.brand.findUnique({
       where: { id: brandId },
@@ -74,16 +72,9 @@ export async function POST(request: NextRequest) {
       recentContent: [],
     })
 
-    // Mark inspo items as processed
-    await Promise.allSettled(
-      inspoData.map((item) =>
-        fetch(`${nauthUrl}/api/v1/_service/brands/${brandId}/inspo/${item.id}`, {
-          method: 'PATCH',
-          headers: nauthHeaders,
-          body: JSON.stringify({ status: 'processed' }),
-        }),
-      ),
-    )
+    // NOTE: Previous flow toggled InspoItem.status='processed' to mark items consumed.
+    // The new schema has no per-membership status; the redesigned digest pipeline
+    // (Priority 3 of source-concepts-and-knowledge-bases) will replace this entirely.
 
     // Persist as Post records
     if (account) {
@@ -120,7 +111,7 @@ export async function POST(request: NextRequest) {
       briefMd += `*IDEA ${idx + 1}*\n`
       briefMd += `${idea.concept}\n\n`
     })
-    briefMd += `_Basado en: ${inspoData.length} posts de Inspo Base._`
+    briefMd += `_Basado en: ${inspoPosts.length} posts de Inspo Base._`
 
     // Deliver via Zazŭ
     const zazuUrl = process.env.ZAZU_INTERNAL_URL || 'http://zazu-bot:3000'
