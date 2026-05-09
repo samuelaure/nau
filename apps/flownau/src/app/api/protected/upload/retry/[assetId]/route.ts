@@ -2,9 +2,8 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/modules/shared/prisma'
-import { flownau } from 'nau-storage'
 import { logger } from '@/lib/logger'
-import { enqueueOptimization, optimizeAssetBackground } from '../../confirm/route'
+import { enqueueOptimization } from '@/modules/asset/optimization-queue'
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ assetId: string }> }) {
   const { assetId } = await params
@@ -16,7 +15,6 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ as
     return NextResponse.json({ message: 'Already optimized' }, { status: 200 })
   }
 
-  // Reset to pending so the UI reflects it's queued again
   await prisma.asset.update({ where: { id: assetId }, data: { optimizationStatus: 'pending' } })
 
   const type = asset.type as 'VID' | 'AUD' | 'IMG'
@@ -24,18 +22,16 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ as
   const assetFolder =
     type === 'VID' ? ('videos' as const) : type === 'AUD' ? ('audios' as const) : ('images' as const)
 
-  enqueueOptimization(() =>
-    optimizeAssetBackground({
-      assetId,
-      cdnUrl: asset.url,
-      type,
-      mimeType: asset.mimeType,
-      ext,
-      contextAccountId: asset.brandId,
-      templateId: asset.templateId,
-      assetFolder,
-    }),
-  )
+  await enqueueOptimization({
+    assetId,
+    cdnUrl: asset.url,
+    type,
+    mimeType: asset.mimeType,
+    ext,
+    contextAccountId: asset.brandId,
+    templateId: asset.templateId,
+    assetFolder,
+  })
 
   logger.info({ assetId }, 'Asset optimization re-queued')
   return NextResponse.json({ success: true })
