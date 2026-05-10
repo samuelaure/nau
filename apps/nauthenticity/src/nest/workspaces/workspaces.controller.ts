@@ -105,4 +105,14 @@ export class WorkspacesController {
   createBrand(@Param('id') id: string, @Body() body: unknown, @Req() req: unknown, @Res() res: unknown) {
     return this.proxy(req, res, `/workspaces/${id}/brands`, 'POST', body)
   }
+
+  @Get(':id/projects')
+  getProjects(@Param('id') id: string, @Req() req: unknown, @Res() res: unknown) {
+    return this.proxy(req, res, `/workspaces/${id}/projects`)
+  }
+
+  @Post(':id/projects')
+  createProject(@Param('id') id: string, @Body() body: unknown, @Req() req: unknown, @Res() res: unknown) {
+    return this.proxy(req, res, `/workspaces/${id}/projects`, 'POST', body)
+  }
 }

@@ -1,38 +1,84 @@
 # Project Entity
 
-> New entity, peer of (or peer-level to) Brand. Stand-by — needs more design thought.
-> Out of scope of the source-concepts-and-knowledge-bases plan.
+> GTD "Project" container. Captures inside a Project are GTD "References" — profiles and posts
+> collected as reference/foundation material. Same nauthenticity machinery as Brand categories,
+> but scoped to a Project instead of a Brand.
 
-## What it is
-A **Project** is a captured collection of profiles/posts (and likely other inputs) that act as the **reference/foundation** for a creator project — for example:
-- Abundance Mindset Digital Product
-- Content Creation Digital Product
-- Karen's Survival Guide
+## Design decisions
 
-Captures into a Project behave the same as InspoBase / Comment / Benchmark categories (profile + post collection + the same feature suite — knowledge base, insights, "chat", search, custom extraction), but are scoped to the Project rather than to a Brand category.
+- **Path B** — `app.9nau.com` builds its own Project UI calling nauthenticity API directly.
+  nauthenticity dashboard gets a workspace view showing Brands + Projects in sections (admin/operator view).
+- **Brand-optional** — A Project always belongs to a Workspace; Brand link is optional.
+- **No published content** — Projects are pure reference/knowledge base. Not displayed in flownau.
+- **No analytics/insights UI** — but same underlying machinery is kept (CategoryMembership, SourceConcept, BrandContext-equivalent) so features work if needed later.
+- **`Project` in nauthenticity** — not `ProjectIntelligence`. Mirrors api's Project, same pattern as `Brand`.
+- **CategoryMembership extended** — `brandId` becomes nullable; `projectId` added (nullable). Check constraint: exactly one must be set.
 
-## Linking
-- A Project **may or may not be linked to a Brand**.
-- A Project is **always linked to a Workspace**.
-- This is a Brand-same-level (peer) entity — *or possibly a different shape entirely*. Open design question.
+## Schema
 
-## Where it lives in the UI
-- Likely managed/displayed by `app.9nau.com` and naŭ Mobile App (which is the mobile version of `app.9nau.com`).
+### `api` DB
 
-## Capture modal entry
-- Mobile app capture modal will get a "**Send Profile/Post to Project**" action — keep as a placeholder for now.
+```sql
+CREATE TABLE "Project" (
+  id          TEXT PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspaceId TEXT NOT NULL REFERENCES "Workspace"(id) ON DELETE CASCADE,
+  brandId     TEXT REFERENCES "Brand"(id) ON DELETE SET NULL,  -- optional
+  name        TEXT NOT NULL,
+  description TEXT,
+  isActive    BOOLEAN NOT NULL DEFAULT true,
+  createdAt   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updatedAt   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
 
-## Open design questions
-- Is a Project a true peer of Brand, or its own entity type?
-- Does it own its own version of the four-category structure (Own / Comment / InspoBase / Benchmark), or only the InspoBase-style "knowledge base" suite?
-- How do Project-scoped captures interact with the cross-brand de-duplication design from `source-concepts-and-knowledge-bases.md` (Priority 5)?
-- Does a Project ever produce its own published content, or is it a pure reference/knowledge base?
+### nauthenticity DB
+
+```sql
+-- Mirror of api's Project (same pattern as Brand)
+CREATE TABLE "Project" (
+  id          TEXT PRIMARY KEY,
+  workspaceId TEXT NOT NULL,
+  brandId     TEXT,              -- optional, denormalised from api
+  name        TEXT NOT NULL,
+  isActive    BOOLEAN NOT NULL DEFAULT true,
+  createdAt   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updatedAt   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Extend CategoryMembership to support Project ownership
+ALTER TABLE "CategoryMembership" ALTER COLUMN "brandId" DROP NOT NULL;
+ALTER TABLE "CategoryMembership" ADD COLUMN "projectId" TEXT REFERENCES "Project"(id) ON DELETE CASCADE;
+ALTER TABLE "CategoryMembership" ADD CONSTRAINT membership_owner_check
+  CHECK (("brandId" IS NOT NULL) != ("projectId" IS NOT NULL));
+```
+
+## Implementation plan
+
+### Phase 1 — api (identity control plane)
+1. Prisma schema: add `Project` model
+2. Migration
+3. NestJS module: `ProjectsModule` with CRUD (create, list by workspace, get, patch, delete/deactivate)
+4. Expose via `GET /workspaces/:id/projects`, `POST /workspaces/:id/projects`, `PATCH /projects/:id`, `DELETE /projects/:id`
+5. Service JWT guard on all routes (same as Brand)
+
+### Phase 2 — nauthenticity
+1. Prisma schema: add `Project` model + extend `CategoryMembership`
+2. Migration
+3. `ProjectsModule` (NestJS): upsert (called by api webhook or sync), get by id, list by workspace
+4. Extend `CategoryMembership` create/list/delete to accept `projectId` OR `brandId`
+5. Extend fanout processor and source-concept extraction to dispatch on project context
+6. Extend workspace view API to return `{ brands: [...], projects: [...] }`
+
+### Phase 3 — app.9nau.com
+1. Workspace page: show Brands + Projects sections
+2. Project list + create modal
+3. Project detail: captures tab (add profiles/posts), concepts tab, chat tab
+4. Calls nauthenticity API directly (same endpoints brands use, passing projectId)
+
+### Phase 4 — nauthenticity dashboard
+1. Workspace view: Brands section + Projects section (grouped)
+2. Project detail view (reuses same components as Brand detail)
 
 ## Status
-- Stand-by. Needs more thought before a real plan can be drafted.
 
----
-
-## User's notes (verbatim)
-
-> Send profile/post to Project: This is something that I need to think more about to how implement it... But to leave it here as future reference/planning, it's to capture ideas, concepts,... in form of profiles/posts as reference/fundation of a project like my Abundance Mindset Digital Product, or my Content Creation Digital Product, or Karen's Survival Guide... These captures behave equally as InspoBase, Commenting, Benchmark (profile & post collection + features), but are linked to a project, and the project may be linked to a brand or not, but for sure to a Workspace. So, this will involve to create a Brand-same-level-entity called Project (may be, that's why I say I need to think more about it), and problably it will be managed and displayed by app.9nau.com and naŭ Mobile App (which is the mobile version of app.9nau.com).
+**In progress** — implementation starting Phase 1.

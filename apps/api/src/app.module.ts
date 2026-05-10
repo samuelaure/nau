@@ -17,6 +17,7 @@ import { JournalModule } from './journal/journal.module';
 import { AuthModule } from './auth/auth.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
 import { BrandsModule } from './brands/brands.module';
+import { ProjectsModule } from './projects/projects.module';
 import { SocialProfilesModule } from './social-profiles/social-profiles.module';
 import { PromptsModule } from './prompts/prompts.module';
 import { UsageModule } from './usage/usage.module';
@@ -49,6 +50,7 @@ import { APP_GUARD } from '@nestjs/core';
     AuthModule,
     WorkspacesModule,
     BrandsModule,
+    ProjectsModule,
     SocialProfilesModule,
     PromptsModule,
     UsageModule,

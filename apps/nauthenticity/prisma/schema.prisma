@@ -157,6 +157,25 @@ model KnowledgeChunk {
 // Brand represents a brand's intelligence/configuration in nauthenticity.
 // id = flownau Brand.id (same as API Brand.id)
 
+// ── Project ───────────────────────────────────────────────────────────────────
+// Mirror of api's Project. Holds the same id; nauthenticity uses it as the
+// ownership anchor for ProjectMemberships (same role as Brand for categories).
+
+model Project {
+  id          String  @id // = api Project.id
+  workspaceId String
+  brandId     String?
+  name        String
+  isActive    Boolean @default(true)
+
+  categoryMemberships CategoryMembership[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([workspaceId])
+}
+
 model Brand {
   id                      String  @id // = flownau Brand.id = API Brand.id
   workspaceId             String  @default("")
@@ -245,8 +264,10 @@ model BrandContext {
 // Exactly one of (socialProfileId, postId) must be set per row.
 model CategoryMembership {
   id              String         @id @default(uuid())
-  brandId         String
-  brand           Brand          @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  brandId         String?
+  brand           Brand?         @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  projectId       String?
+  project         Project?       @relation(fields: [projectId], references: [id], onDelete: Cascade)
   socialProfileId String?
   socialProfile   SocialProfile? @relation(fields: [socialProfileId], references: [id], onDelete: Cascade)
   postId          String?
