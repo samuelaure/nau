@@ -204,15 +204,18 @@ function TextZone({ children, align = 'center' }: { children: React.ReactNode; a
 // ── Shared primitives ──────────────────────────────────────────────────────────
 
 function BrollBackground({ clip, overlayOpacity }: { clip?: BrollClip; overlayOpacity: number }) {
+  const frame = useCurrentFrame()
   if (!clip?.url) {
     return <div style={{ position: 'absolute', inset: 0, background: '#111' }} />
   }
   // OffthreadVideo at composition frame F shows source video frame (startFrom + F).
-  // Remotion advances F internally — startFrom is a fixed seek offset only.
-  // BROLL_REQUIRED_FRAMES guarantees every clip outlasts its scene, so no
-  // loop logic is needed. The old frame % clipFrames formula caused 2x speedup
-  // because it added frame to startFrom on top of Remotion's internal +F.
-  const startFrom = clip.startFrom ?? 0
+  // To loop a clip of length clipFrames: we need source frame = base + (F % clipFrames).
+  // Since Remotion adds F: startFrom + F = base + (F%clipFrames) → startFrom = base + (F%clipFrames) - F
+  // For F < clipFrames this equals base (normal playback). For F ≥ clipFrames it loops.
+  // startFrom goes negative when F > clipFrames, but startFrom+F is always a valid frame.
+  const base = clip.startFrom ?? 0
+  const clipFrames = clip.durationInFrames
+  const startFrom = clipFrames ? base + (frame % clipFrames) - frame : base
   return (
     <>
       <OffthreadVideo
