@@ -24,6 +24,14 @@ export class IngestionService {
     return { status: 'accepted', jobId: job.id, message: `Ingestion job queued for ${username}` }
   }
 
+  /** Queue ingestion silently — returns false if a job for this username is already active. */
+  async tryQueueIngestion(username: string, limit: number, updateSync?: boolean): Promise<boolean> {
+    const jobs = await ingestionQueue.getJobs(['active', 'waiting', 'delayed'])
+    if (jobs.some((j) => j.data.username === username)) return false
+    await ingestionQueue.add('start-ingestion', { username, limit, updateSync })
+    return true
+  }
+
   async abort(username: string) {
     for (const q of [ingestionQueue, downloadQueue, computeQueue]) {
       const jobs = await q.getJobs(['active', 'waiting', 'delayed'])

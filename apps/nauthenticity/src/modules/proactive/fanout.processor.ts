@@ -115,6 +115,11 @@ export const runProactiveFanout = async (now: Date = new Date()): Promise<void> 
       const brand = brandMap.get(brandId);
       if (!brand) continue;
 
+      const socialProfile = await prisma.socialProfile.findFirst({
+        where: { platform: 'instagram', username: item.ownerUsername },
+        select: { id: true },
+      });
+
       let localPost = await prisma.post.findFirst({
         where: {
           OR: [{ platformId: item.id }, { url: item.url }],
@@ -127,11 +132,17 @@ export const runProactiveFanout = async (now: Date = new Date()): Promise<void> 
             platformId: item.id,
             url: item.url,
             username: item.ownerUsername,
+            socialProfileId: socialProfile?.id ?? null,
             caption: item.caption ?? '',
             postedAt: new Date(item.timestamp),
             likes: Math.max(0, item.likesCount ?? 0),
             comments: Math.max(0, item.commentsCount ?? 0),
           },
+        });
+      } else if (!localPost.socialProfileId && socialProfile) {
+        await prisma.post.update({
+          where: { id: localPost.id },
+          data: { socialProfileId: socialProfile.id },
         });
       }
 

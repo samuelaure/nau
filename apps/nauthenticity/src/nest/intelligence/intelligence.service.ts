@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { IngestionService } from '../ingestion/ingestion.service'
 import { runProactiveFanout } from '../../modules/proactive/fanout.processor'
 import { generateReactiveComments } from '../../modules/proactive/reactive.service'
 
@@ -12,7 +13,10 @@ export function isCategory(value: unknown): value is Category {
 
 @Injectable()
 export class IntelligenceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ingestion: IngestionService,
+  ) {}
 
   async getIntelligence(brandId: string) {
     const intelligence = await this.prisma.brand.findUnique({
@@ -127,6 +131,15 @@ export class IntelligenceService {
         await this.prisma.categoryMembership.create({
           data: { ...ownerField, socialProfileId: profile.id, category: opts.category, isActive: opts.isActive ?? true },
         })
+      }
+
+      // For INSPO/BENCHMARK: auto-queue ingestion if not recently scraped (>24h or never).
+      // tryQueueIngestion is a no-op if a job for this username is already in-flight.
+      if (opts.category !== 'COMMENT') {
+        const staleThreshold = new Date(Date.now() - 24 * 60 * 60 * 1000)
+        if (!profile.lastScrapedAt || profile.lastScrapedAt < staleThreshold) {
+          this.ingestion.tryQueueIngestion(username, 30).catch(() => {})
+        }
       }
     }
     return { success: true }
