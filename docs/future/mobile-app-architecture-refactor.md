@@ -34,6 +34,14 @@ Before designing this refactor:
 - Identify all current capture types and where they currently display.
 - Identify integration points with naŭthenticity, flownaŭ, and any backend-for-frontend layer.
 
+### 5. Capture modal: create Brand or Project inline
+- The capture modal ("Send Profile/Post to...") must allow the user to **create a new Brand or Project** without leaving the modal flow.
+- On "Send to Brand" → if no brand exists or the user wants a new one, show an inline "New Brand" creation step (name → create → auto-select).
+- On "Send to Project" → same pattern: "New Project" inline creation step.
+- Both entities must be workspace-scoped; workspace context is already available in the modal.
+- API calls: `POST /workspaces/:id/brands` and `POST /workspaces/:id/projects` (already live in api).
+- nauthenticity sync is automatic (fires from api's ProjectsService/BrandsService on create).
+
 ## Status
 - Stand-by until source-concepts-and-knowledge-bases (Priority 1) lands.
 - Audit and refactor are their own multi-step efforts.

@@ -76,12 +76,17 @@ export class IntelligenceController {
   // -------------------------------------------------------------------------
 
   @Get('targets')
-  getProfileMemberships(@Query('brandId') brandId?: string, @Query('category') category?: string) {
-    if (!brandId) throw new BadRequestException('Missing brandId')
+  getProfileMemberships(
+    @Query('brandId') brandId?: string,
+    @Query('projectId') projectId?: string,
+    @Query('category') category?: string,
+  ) {
+    if (!brandId && !projectId) throw new BadRequestException('Missing brandId or projectId')
     if (category !== undefined && !isCategory(category)) {
       throw new BadRequestException(`Invalid category. Expected one of COMMENT, INSPO, BENCHMARK`)
     }
-    return this.intelligenceService.getProfileMemberships(brandId, category as Category | undefined)
+    const owner = brandId ? { brandId } : { projectId: projectId! }
+    return this.intelligenceService.getProfileMemberships(owner, category as Category | undefined)
   }
 
   @Post('targets')
@@ -89,18 +94,23 @@ export class IntelligenceController {
     @Body()
     body: {
       brandId?: string
+      projectId?: string
       usernames?: string[]
       category?: string
       isActive?: boolean
     },
   ) {
-    if (!body.brandId || !body.usernames?.length) {
-      throw new BadRequestException('brandId and usernames are required')
+    if (!body.brandId && !body.projectId) {
+      throw new BadRequestException('brandId or projectId is required')
+    }
+    if (!body.usernames?.length) {
+      throw new BadRequestException('usernames are required')
     }
     if (!body.category || !isCategory(body.category)) {
       throw new BadRequestException(`Missing or invalid category. Expected one of COMMENT, INSPO, BENCHMARK`)
     }
-    return this.intelligenceService.createProfileMemberships(body.brandId, body.usernames, {
+    const owner = body.brandId ? { brandId: body.brandId } : { projectId: body.projectId! }
+    return this.intelligenceService.createProfileMemberships(owner, body.usernames, {
       category: body.category as Category,
       isActive: body.isActive,
     })

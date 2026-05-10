@@ -94,4 +94,17 @@ export class NauthenticityService {
       body: JSON.stringify(data),
     });
   }
+
+  async syncProject(project: { id: string; workspaceId: string; brandId?: string | null; name: string; isActive: boolean }) {
+    this.logger.log(`Syncing project ${project.id} to nauthenticity`);
+    return this.fetch('/_service/projects/sync', {
+      method: 'POST',
+      body: JSON.stringify(project),
+    });
+  }
+
+  async deleteProject(projectId: string) {
+    this.logger.log(`Deleting project ${projectId} from nauthenticity`);
+    return this.fetch(`/_service/projects/${projectId}`, { method: 'DELETE' });
+  }
 }

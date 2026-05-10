@@ -99,10 +99,14 @@ export class IntelligenceService {
    * Called when a user adds usernames to one of: COMMENT, INSPO, BENCHMARK.
    */
   async createProfileMemberships(
-    brandId: string,
+    owner: { brandId: string; projectId?: never } | { projectId: string; brandId?: never },
     usernames: string[],
     opts: { category: Category; isActive?: boolean },
   ) {
+    const ownerField = 'brandId' in owner && owner.brandId
+      ? { brandId: owner.brandId }
+      : { projectId: (owner as { projectId: string }).projectId }
+
     for (const username of usernames) {
       const profile = await this.prisma.socialProfile.upsert({
         where: { platform_username: { platform: 'instagram', username } },
@@ -110,16 +114,8 @@ export class IntelligenceService {
         update: {},
       })
 
-      // Profile-level membership: enforced by partial unique index
-      // (brandId, category, socialProfileId) WHERE postId IS NULL.
-      // Prisma 7 disallows null in compound unique-key lookups, so we use findFirst + create/update.
       const existing = await this.prisma.categoryMembership.findFirst({
-        where: {
-          brandId,
-          category: opts.category,
-          socialProfileId: profile.id,
-          postId: null,
-        },
+        where: { ...ownerField, category: opts.category, socialProfileId: profile.id, postId: null },
         select: { id: true },
       })
       if (existing) {
@@ -129,12 +125,7 @@ export class IntelligenceService {
         })
       } else {
         await this.prisma.categoryMembership.create({
-          data: {
-            brandId,
-            socialProfileId: profile.id,
-            category: opts.category,
-            isActive: opts.isActive ?? true,
-          },
+          data: { ...ownerField, socialProfileId: profile.id, category: opts.category, isActive: opts.isActive ?? true },
         })
       }
     }
@@ -154,15 +145,17 @@ export class IntelligenceService {
 
     await this.prisma.categoryMembership.delete({ where: { id } })
 
-    // Default-absorption: if profile/post has no remaining non-OWN membership for this brand, add BENCHMARK
+    // Default-absorption only applies to brand memberships (not projects — pure reference, no BENCHMARK sink)
     const { brandId, socialProfileId, postId } = membership
-    const remaining = await this.prisma.categoryMembership.count({
-      where: { brandId, socialProfileId: socialProfileId ?? undefined, postId: postId ?? undefined },
-    })
-    if (remaining === 0) {
-      await this.prisma.categoryMembership.create({
-        data: { brandId, socialProfileId, postId, category: 'BENCHMARK', isActive: true },
+    if (brandId) {
+      const remaining = await this.prisma.categoryMembership.count({
+        where: { brandId, socialProfileId: socialProfileId ?? undefined, postId: postId ?? undefined },
       })
+      if (remaining === 0) {
+        await this.prisma.categoryMembership.create({
+          data: { brandId, socialProfileId, postId, category: 'BENCHMARK', isActive: true },
+        })
+      }
     }
 
     return { success: true }
@@ -191,16 +184,14 @@ export class IntelligenceService {
    * List profile-level memberships for a brand, optionally filtered by category.
    * (Post-level memberships are managed via the InspoBase / Benchmark/Study endpoints.)
    */
-  async getProfileMemberships(brandId: string, category?: Category) {
+  async getProfileMemberships(
+    owner: { brandId: string } | { projectId: string },
+    category?: Category,
+  ) {
+    const ownerFilter = 'brandId' in owner ? { brandId: owner.brandId } : { projectId: owner.projectId }
     return this.prisma.categoryMembership.findMany({
-      where: {
-        brandId,
-        category: category ?? undefined,
-        socialProfileId: { not: null },
-      },
-      include: {
-        socialProfile: { include: { _count: { select: { posts: true } } } },
-      },
+      where: { ...ownerFilter, category: category ?? undefined, socialProfileId: { not: null } },
+      include: { socialProfile: { include: { _count: { select: { posts: true } } } } },
       orderBy: { createdAt: 'desc' },
     })
   }
