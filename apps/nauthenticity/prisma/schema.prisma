@@ -18,6 +18,7 @@ model SocialProfile {
   id              String   @id @default(uuid())
   platform        String   @default("instagram")
   username        String
+  externalId      String?  // Instagram's stable numeric profile ID — never changes even if username does
   profileImageUrl String?
   totalPostCount  Int?
   lastScrapedAt   DateTime @default(now())

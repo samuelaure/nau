@@ -6,6 +6,7 @@ import {
 import { dispatchToZazu } from './zazu.dispatcher';
 import { logger } from '../../utils/logger';
 import { prisma } from '../../modules/shared/prisma';
+import { upsertSocialProfile } from '../../modules/shared/upsert-social-profile';
 import { toZonedTime } from 'date-fns-tz';
 import type { Brand, CategoryMembership, SocialProfile } from '../../../node_modules/.prisma/client';
 
@@ -115,9 +116,11 @@ export const runProactiveFanout = async (now: Date = new Date()): Promise<void> 
       const brand = brandMap.get(brandId);
       if (!brand) continue;
 
-      const socialProfile = await prisma.socialProfile.findFirst({
-        where: { platform: 'instagram', username: item.ownerUsername },
-        select: { id: true },
+      // Upsert using the stable Instagram numeric ID (ownerId) so renames don't create duplicates.
+      const socialProfile = await upsertSocialProfile({
+        platform: 'instagram',
+        username: item.ownerUsername,
+        externalId: item.ownerId ?? null,
       });
 
       let localPost = await prisma.post.findFirst({

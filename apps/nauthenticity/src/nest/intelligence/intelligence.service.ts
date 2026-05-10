@@ -4,6 +4,7 @@ import { runProactiveFanout } from '../../modules/proactive/fanout.processor'
 import { generateReactiveComments } from '../../modules/proactive/reactive.service'
 import { scrapePostByUrl } from '../../services/apify.service'
 import { downloadQueue } from '../../queues/download.queue'
+import { upsertSocialProfile } from '../../modules/shared/upsert-social-profile'
 
 export type Category = 'COMMENT' | 'INSPO' | 'BENCHMARK'
 export const CATEGORIES: readonly Category[] = ['COMMENT', 'INSPO', 'BENCHMARK'] as const
@@ -110,11 +111,7 @@ export class IntelligenceService {
       : { projectId: (owner as { projectId: string }).projectId }
 
     for (const username of usernames) {
-      const profile = await this.prisma.socialProfile.upsert({
-        where: { platform_username: { platform: 'instagram', username } },
-        create: { platform: 'instagram', username },
-        update: {},
-      })
+      const profile = await upsertSocialProfile({ platform: 'instagram', username })
 
       const existing = await this.prisma.categoryMembership.findFirst({
         where: { ...ownerField, category: opts.category, socialProfileId: profile.id, postId: null },
@@ -131,6 +128,16 @@ export class IntelligenceService {
         })
       }
 
+      // Clean up redundant post-level memberships for this owner+category that belong to this
+      // profile — they're now covered by the profile-level membership above.
+      await this.prisma.categoryMembership.deleteMany({
+        where: {
+          ...ownerField,
+          category: opts.category,
+          socialProfileId: null,
+          post: { socialProfileId: profile.id },
+        },
+      })
     }
     return { success: true }
   }
@@ -234,10 +241,10 @@ export class IntelligenceService {
       const username = scraped.author?.username ?? ''
 
       const socialProfile = username
-        ? await this.prisma.socialProfile.upsert({
-            where: { platform_username: { platform: 'instagram', username } },
-            create: { platform: 'instagram', username },
-            update: {},
+        ? await upsertSocialProfile({
+            platform: 'instagram',
+            username,
+            externalId: scraped.author.id ?? null,
           })
         : null
 

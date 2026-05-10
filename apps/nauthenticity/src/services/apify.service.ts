@@ -147,6 +147,7 @@ const mapNauPostToApifyPost = (post: NauIGPost): ApifyInstagramPost => {
 
 const mapNauProfileToApifyProfile = (profile: NauIGProfile): ApifyProfileInfo => {
   return {
+    id: profile.id,
     username: profile.username,
     fullName: profile.fullName,
     biography: profile.biography,
@@ -321,6 +322,7 @@ export const runInstagramScraper = async (
 };
 
 export interface ApifyProfileInfo {
+  id?: string;           // Instagram's stable numeric profile ID (pk)
   username: string;
   fullName?: string;
   biography?: string;
