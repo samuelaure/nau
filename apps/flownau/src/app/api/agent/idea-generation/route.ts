@@ -37,7 +37,14 @@ export async function POST(req: Request) {
     let sourceRef: string | null = null
     let priority = 2
 
-    if (source === 'automatic') {
+    if (source === 'capture') {
+      // Service-delivered capture (voicenote, specific capture) — topic and sourceRef come from body
+      if (!topic) {
+        return NextResponse.json({ error: 'Topic is required for capture source.' }, { status: 400 })
+      }
+      priority = 1
+      sourceRef = json.sourceRef ?? null
+    } else if (source === 'automatic') {
       const { fetchPendingSourceConcepts, generateSourceConcepts } = await import('@/modules/ideation/sources/inspo-source')
       let concepts = await fetchPendingSourceConcepts(brandId)
       if (concepts.length === 0) concepts = await generateSourceConcepts(brandId)

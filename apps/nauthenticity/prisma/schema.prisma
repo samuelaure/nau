@@ -173,6 +173,7 @@ model Brand {
   categoryMemberships CategoryMembership[]
   syntheses           BrandSynthesis[]
   sourceConcepts      SourceConcept[]
+  voicenotes          Voicenote[]
   context             BrandContext?
   feedbacks           CommentFeedback[]
 
@@ -198,6 +199,22 @@ model SourceConcept {
   consumedAt DateTime?
 
   @@index([brandId, status])
+}
+
+// ── Voicenote ─────────────────────────────────────────────────────────────────
+// A voicenote capture sent from Zazŭ. Stores the processed transcription and
+// synthesis received from Zazŭ. Drives SourceConcept generation per brand.
+
+model Voicenote {
+  id               String    @id @default(uuid())
+  brandId          String
+  brand            Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  cleanTranscription String  @db.Text
+  synthesis        String    @db.Text
+  sourceRef        String?   // zazu-bot Voicenote.id
+  createdAt        DateTime  @default(now())
+
+  @@index([brandId])
 }
 
 model BrandSynthesis {
