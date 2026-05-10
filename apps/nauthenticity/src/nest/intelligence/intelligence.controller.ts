@@ -187,4 +187,28 @@ export class IntelligenceController {
   triggerFanout() {
     return this.intelligenceService.triggerFanout()
   }
+
+  // -------------------------------------------------------------------------
+  // Individual post capture (dedup-aware)
+  // Checks if the post already exists; if so, only creates the membership link.
+  // -------------------------------------------------------------------------
+
+  @Post('capture-post')
+  capturePost(
+    @Body()
+    body: {
+      postUrl?: string
+      brandId?: string
+      projectId?: string
+      category?: string
+    },
+  ) {
+    if (!body.postUrl) throw new BadRequestException('postUrl is required')
+    if (!body.brandId && !body.projectId) throw new BadRequestException('brandId or projectId is required')
+    if (!body.category || !isCategory(body.category)) {
+      throw new BadRequestException('Missing or invalid category. Expected one of COMMENT, INSPO, BENCHMARK')
+    }
+    const owner = body.brandId ? { brandId: body.brandId } : { projectId: body.projectId! }
+    return this.intelligenceService.capturePost(owner, body.postUrl, body.category as Category)
+  }
 }

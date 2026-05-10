@@ -1,8 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
-import { IngestionService } from '../ingestion/ingestion.service'
 import { runProactiveFanout } from '../../modules/proactive/fanout.processor'
 import { generateReactiveComments } from '../../modules/proactive/reactive.service'
+import { scrapePostByUrl } from '../../services/apify.service'
+import { downloadQueue } from '../../queues/download.queue'
 
 export type Category = 'COMMENT' | 'INSPO' | 'BENCHMARK'
 export const CATEGORIES: readonly Category[] = ['COMMENT', 'INSPO', 'BENCHMARK'] as const
@@ -13,10 +14,7 @@ export function isCategory(value: unknown): value is Category {
 
 @Injectable()
 export class IntelligenceService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly ingestion: IngestionService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async getIntelligence(brandId: string) {
     const intelligence = await this.prisma.brand.findUnique({
@@ -133,14 +131,6 @@ export class IntelligenceService {
         })
       }
 
-      // For INSPO/BENCHMARK: auto-queue ingestion if not recently scraped (>24h or never).
-      // tryQueueIngestion is a no-op if a job for this username is already in-flight.
-      if (opts.category !== 'COMMENT') {
-        const staleThreshold = new Date(Date.now() - 24 * 60 * 60 * 1000)
-        if (!profile.lastScrapedAt || profile.lastScrapedAt < staleThreshold) {
-          this.ingestion.tryQueueIngestion(username, 30).catch(() => {})
-        }
-      }
     }
     return { success: true }
   }
@@ -191,6 +181,113 @@ export class IntelligenceService {
   triggerFanout() {
     runProactiveFanout().catch(() => {})
     return { success: true, message: 'Fanout initiated in background.' }
+  }
+
+  /**
+   * Capture an individual post into a brand/project membership.
+   *
+   * Dedup logic: if the Post already exists in DB and all its media are downloaded,
+   * we only create the CategoryMembership — no Apify call, no compute.
+   * If the Post is new, we scrape it once, store it, queue downloads, then link.
+   */
+  async capturePost(
+    owner: { brandId: string } | { projectId: string },
+    postUrl: string,
+    category: Category,
+  ) {
+    const ownerField = 'brandId' in owner ? { brandId: owner.brandId } : { projectId: (owner as { projectId: string }).projectId }
+
+    // 1. Check if post already exists and is fully processed
+    const existing = await this.prisma.post.findFirst({
+      where: { url: postUrl },
+      include: { media: true },
+    })
+
+    let postId: string
+
+    if (existing) {
+      const allDownloaded = existing.media.every((m) => m.storageUrl !== m.url)
+      if (allDownloaded || existing.media.length === 0) {
+        // Post is fully processed — just link, no compute
+        postId = existing.id
+      } else {
+        // Post exists but media download is incomplete — queue missing downloads only
+        postId = existing.id
+        for (const m of existing.media) {
+          if (m.storageUrl === m.url) {
+            await downloadQueue.add('process-media', {
+              postId: existing.id,
+              mediaId: m.id,
+              url: m.url,
+              type: m.type,
+              username: existing.username ?? '',
+            })
+          }
+        }
+      }
+    } else {
+      // Post is new — scrape once, store, queue downloads
+      const scraped = await scrapePostByUrl(postUrl)
+      if (!scraped) throw new NotFoundException('Post not found or could not be scraped')
+
+      const url = scraped.url ?? postUrl
+      const username = scraped.author?.username ?? ''
+
+      const socialProfile = username
+        ? await this.prisma.socialProfile.upsert({
+            where: { platform_username: { platform: 'instagram', username } },
+            create: { platform: 'instagram', username },
+            update: {},
+          })
+        : null
+
+      const post = await this.prisma.post.upsert({
+        where: { url },
+        create: {
+          platformId: scraped.id ?? scraped.shortcode,
+          url,
+          username,
+          socialProfileId: socialProfile?.id ?? null,
+          caption: scraped.caption ?? null,
+          postedAt: scraped.takenAt ? new Date(scraped.takenAt) : new Date(),
+          likes: Math.max(0, scraped.likesCount ?? 0),
+          comments: Math.max(0, scraped.commentsCount ?? 0),
+        },
+        update: { likes: Math.max(0, scraped.likesCount ?? 0), comments: Math.max(0, scraped.commentsCount ?? 0) },
+        include: { media: true },
+      })
+      postId = post.id
+
+      // Determine media items from scraped data
+      const mediaItems: { type: 'image' | 'video'; url: string }[] = scraped.media ?? []
+
+      for (let i = 0; i < mediaItems.length; i++) {
+        const mi = mediaItems[i]
+        const existing = post.media.find((m) => m.index === i)
+        let mediaId: string
+        if (existing) {
+          mediaId = existing.id
+        } else {
+          const created = await this.prisma.media.create({
+            data: { postId, type: mi.type, url: mi.url, storageUrl: mi.url, index: i },
+          })
+          mediaId = created.id
+        }
+        await downloadQueue.add('process-media', { postId, mediaId, url: mi.url, type: mi.type, username })
+      }
+    }
+
+    // 2. Create CategoryMembership linking this owner to the post
+    const existingMembership = await this.prisma.categoryMembership.findFirst({
+      where: { ...ownerField, category, postId, socialProfileId: null },
+    })
+    if (!existingMembership) {
+      await this.prisma.categoryMembership.create({
+        data: { ...ownerField, postId, category, isActive: true },
+      })
+    }
+
+    return { success: true, postId, reused: !!existing }
   }
 
   /**
