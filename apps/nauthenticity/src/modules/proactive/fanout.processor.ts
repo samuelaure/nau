@@ -158,6 +158,10 @@ export const runProactiveFanout = async (now: Date = new Date()): Promise<void> 
       );
 
       try {
+        const membership = brand.categoryMemberships.find(
+          (m) => m.socialProfile?.username === item.ownerUsername,
+        );
+
         const suggestionParams: CommentSuggestionParams = {
           post: {
             caption: item.caption ?? '',
@@ -166,10 +170,10 @@ export const runProactiveFanout = async (now: Date = new Date()): Promise<void> 
             targetUsername: item.ownerUsername,
           },
           brand: {
-            voicePrompt: brand.voicePrompt,
-            commentStrategy: brand.commentStrategy,
+            commentPrompt: brand.commentPrompt,
             suggestionsCount: brand.suggestionsCount,
           },
+          profileCommentPrompt: membership?.commentPrompt ?? null,
           lastSelectedComments,
         };
 

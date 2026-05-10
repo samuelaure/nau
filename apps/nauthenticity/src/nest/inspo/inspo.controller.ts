@@ -56,30 +56,6 @@ export class InspoController {
     return this.inspoService.delete(id, brandId)
   }
 
-  @Get('brands/:brandId/inspo/digest')
-  @UseGuards(JwtAuthGuard)
-  digest(@Param('brandId') brandId: string) {
-    return this.inspoService.digest(brandId)
-  }
-
-  @Get('brands/:brandId/owned-synthesis/latest')
-  @UseGuards(JwtAuthGuard)
-  getLatestOwnedSynthesis(@Param('brandId') brandId: string) {
-    return this.inspoService.getLatestOwnedSynthesis(brandId)
-  }
-
-  @Get('brands/:brandId/owned-voice/latest')
-  @UseGuards(JwtAuthGuard)
-  getLatestOwnedVoice(@Param('brandId') brandId: string) {
-    return this.inspoService.getLatestOwnedVoice(brandId)
-  }
-
-  @Post('brands/:brandId/owned-synthesis')
-  @UseGuards(JwtAuthGuard)
-  generateOwnedSynthesis(@Param('brandId') brandId: string) {
-    return this.inspoService.generateOwnedSynthesis(brandId)
-  }
-
   @Post('repost')
   @UseGuards(JwtAuthGuard)
   repost(@Body() body: { brandId?: string; postUrl?: string }) {
@@ -100,30 +76,6 @@ export class InspoController {
   @UseGuards(ServiceAuthGuard)
   listByService(@Param('brandId') brandId: string) {
     return this.inspoService.list(brandId)
-  }
-
-  @Get('_service/brands/:brandId/inspo/digest')
-  @UseGuards(ServiceAuthGuard)
-  digestByService(@Param('brandId') brandId: string) {
-    return this.inspoService.digest(brandId)
-  }
-
-  @Get('_service/brands/:brandId/owned-synthesis/latest')
-  @UseGuards(ServiceAuthGuard)
-  getLatestOwnedSynthesisByService(@Param('brandId') brandId: string) {
-    return this.inspoService.getLatestOwnedSynthesis(brandId)
-  }
-
-  @Get('_service/brands/:brandId/owned-voice/latest')
-  @UseGuards(ServiceAuthGuard)
-  getLatestOwnedVoiceByService(@Param('brandId') brandId: string) {
-    return this.inspoService.getLatestOwnedVoice(brandId)
-  }
-
-  @Post('_service/brands/:brandId/owned-synthesis')
-  @UseGuards(ServiceAuthGuard)
-  generateOwnedSynthesisByService(@Param('brandId') brandId: string) {
-    return this.inspoService.generateOwnedSynthesis(brandId)
   }
 
   @Patch('_service/brands/:brandId/inspo/:id')

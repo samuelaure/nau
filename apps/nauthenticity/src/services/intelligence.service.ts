@@ -3,14 +3,6 @@ import { z } from 'zod'
 import { logger } from '../utils/logger'
 
 // ---------------------------------------------------------------------------
-// Platform-level fallbacks — used when a brand has no configured voice/strategy
-// ---------------------------------------------------------------------------
-
-export const PLATFORM_DEFAULT_VOICE = `You are an authentic, engaging brand on Instagram. Write comments that are genuine, add value to the conversation, and reflect a professional yet approachable personality. Be concise, positive, and relevant to the post's content. Show real interest in the creator's work.`
-
-export const PLATFORM_DEFAULT_STRATEGY = `General growth strategy: engage meaningfully with content in your niche. Leave thoughtful comments that showcase expertise, spark curiosity, and build community — without being promotional.`
-
-// ---------------------------------------------------------------------------
 // Post Intelligence Extraction
 // ---------------------------------------------------------------------------
 
@@ -70,43 +62,37 @@ export interface CommentSuggestionParams {
     targetUsername: string
   }
   brand: {
-    voicePrompt: string
-    commentStrategy: string | null
+    commentPrompt: string | null
     suggestionsCount: number
   }
-  profileStrategy?: string | null
+  profileCommentPrompt?: string | null
   lastSelectedComments: string[]
 }
 
 function buildCommentSystemPrompt(params: CommentSuggestionParams): string {
-  const { brand, profileStrategy, lastSelectedComments, post } = params
+  const { brand, profileCommentPrompt, lastSelectedComments, post } = params
 
   const sections: string[] = []
 
   sections.push(
     `Generate exactly ${brand.suggestionsCount} comment suggestion(s) for the Instagram post below.` +
       ` The comments MUST be written in the same language as the post — detect it from the caption and/or transcript.` +
-      ` Follow all brand parameters defined below strictly.` +
       ` Return your answer as a JSON object: { "comments": ["string1", "string2", ...] }.`,
   )
 
-  const effectiveVoice = brand.voicePrompt?.trim() || PLATFORM_DEFAULT_VOICE
-  sections.push(`\n## BRAND VOICE & PERSONALITY\n${effectiveVoice}`)
-
-  const effectiveStrategy = brand.commentStrategy?.trim() || PLATFORM_DEFAULT_STRATEGY
-  if (effectiveStrategy) {
-    sections.push(`\n## BRAND COMMENT STRATEGY (current period)\n${effectiveStrategy}`)
+  if (brand.commentPrompt?.trim()) {
+    sections.push(`\n## COMMENT INSTRUCTIONS\n${brand.commentPrompt.trim()}`)
   }
 
-  if (profileStrategy?.trim()) {
-    sections.push(`\n## SPECIFIC STRATEGY FOR @${post.targetUsername}\n${profileStrategy.trim()}`)
+  if (profileCommentPrompt?.trim()) {
+    sections.push(`\n## SPECIFIC INSTRUCTIONS FOR @${post.targetUsername}\n${profileCommentPrompt.trim()}`)
   }
 
   if (lastSelectedComments.length > 0) {
     const numbered = lastSelectedComments.map((c, i) => `${i + 1}. ${c}`).join('\n')
     sections.push(
       `\n## RECENT COMMENTS SENT BY THIS BRAND\n` +
-        `(Use these for consistency and to avoid exact repetition — especially important when the strategy includes recurring messages like collaboration proposals.)\n` +
+        `(Use these for consistency and to avoid exact repetition.)\n` +
         numbered,
     )
   }

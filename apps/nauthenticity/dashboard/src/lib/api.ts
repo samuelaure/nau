@@ -395,30 +395,6 @@ export const generateComment = async (payload: { brandId: string; targetUrl: str
   return data;
 };
 
-export interface OwnedSynthesis {
-  id: string;
-  content: string;
-  attachedUrls: string[];
-  createdAt: string;
-}
-
-/** Fetch the latest owned content synthesis for a brand (if any). */
-export const getLatestOwnedSynthesis = async (brandId: string): Promise<OwnedSynthesis | null> => {
-  const { data } = await api.get<OwnedSynthesis | null>(`/brands/${brandId}/owned-synthesis/latest`);
-  return data;
-};
-
-/** Fetch the latest owned voice synthesis for a brand (if any). */
-export const getLatestOwnedVoice = async (brandId: string): Promise<OwnedSynthesis | null> => {
-  const { data } = await api.get<OwnedSynthesis | null>(`/brands/${brandId}/owned-voice/latest`);
-  return data;
-};
-
-/** Manually trigger (re)generation of owned content synthesis. */
-export const triggerOwnedSynthesis = async (brandId: string): Promise<any> => {
-  const { data } = await api.post<any>(`/brands/${brandId}/owned-synthesis`);
-  return data;
-};
 
 export const getBrandContext = async (brandId: string) => {
   const { data } = await api.get(`/brands/${brandId}/context`);

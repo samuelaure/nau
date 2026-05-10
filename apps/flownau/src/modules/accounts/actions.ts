@@ -209,35 +209,6 @@ export async function saveBrandContext(brandId: string, context: string) {
   revalidatePath('/dashboard')
 }
 
-/** Manually trigger owned content & voice synthesis in nauthenticity. */
-export async function updateOwnedSynthesis(brandId: string) {
-  await checkAuth()
-  const parsedId = IdSchema.parse(brandId)
-  
-  const nauthenticityUrl = process.env.NAUTHENTICITY_URL
-  const authSecret = process.env.AUTH_SECRET
-  if (!nauthenticityUrl || !authSecret) {
-    throw new Error('Nauthenticity configuration missing.')
-  }
-
-  const { signServiceToken } = await import('@nau/auth')
-  const token = await signServiceToken({ secret: authSecret, iss: 'flownau', aud: 'nauthenticity' })
-
-  const res = await fetch(`${nauthenticityUrl}/api/v1/_service/brands/${parsedId}/owned-synthesis`, {
-    method: 'POST',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}` 
-    },
-  })
-
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(`Failed to update synthesis: ${text}`)
-  }
-
-  revalidatePath('/dashboard')
-}
 
 /** Move a brand to another workspace (updates both 9naŭ API and local record). */
 export async function moveBrandToWorkspace(brandId: string, targetWorkspaceId: string) {

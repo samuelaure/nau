@@ -19,8 +19,7 @@ import { authenticate } from '../../utils/auth';
 const BrandUpsertSchema = z.object({
   workspaceId: z.string().min(1),
   mainUsername: z.string().optional().nullable(),
-  voicePrompt: z.string().min(1),
-  commentStrategy: z.string().optional().nullable(),
+  commentPrompt: z.string().optional().nullable(),
   suggestionsCount: z.number().int().min(1).max(10).default(3),
   windowStart: z
     .string()
@@ -161,8 +160,7 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
     },
   );
 
-  // Partial update — only update provided fields (no voicePrompt required)
-  // Uses upsert so it also works for brands with no intelligence record yet
+  // Partial update — only update provided fields
   fastify.patch(
     '/brands/:brandId/intelligence',
     { preHandler: authenticate },
@@ -170,7 +168,7 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
       const { brandId } = request.params as { brandId: string };
       try {
         const body = request.body as Record<string, unknown>;
-        const allowed = ['workspaceId', 'mainUsername', 'voicePrompt', 'commentStrategy', 'suggestionsCount', 'windowStart', 'windowEnd', 'timezone'];
+        const allowed = ['workspaceId', 'mainUsername', 'commentPrompt', 'suggestionsCount', 'windowStart', 'windowEnd', 'timezone'];
         const patch: Record<string, unknown> = {};
         for (const key of allowed) {
           if (key in body) patch[key] = body[key];
@@ -178,7 +176,7 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
         const intelligence = await prisma.brand.upsert({
           where: { id: brandId },
           update: patch,
-          create: { id: brandId, workspaceId: (patch.workspaceId as string) ?? '', voicePrompt: (patch.voicePrompt as string) ?? '', ...patch },
+          create: { id: brandId, workspaceId: (patch.workspaceId as string) ?? '', ...patch },
         });
         return reply.send(intelligence);
       } catch (e: unknown) {
@@ -202,18 +200,15 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
           where: { socialProfileId: { not: null } },
           select: { socialProfile: { select: { username: true } }, category: true },
         },
-        syntheses: { orderBy: { createdAt: 'desc' }, take: 1 },
       },
     });
     if (!intelligence) return reply.status(404).send({ error: 'Brand intelligence not found' });
 
     return reply.send({
       brandId: intelligence.id,
-      voicePrompt: intelligence.voicePrompt,
-      commentStrategy: intelligence.commentStrategy,
+      commentPrompt: intelligence.commentPrompt,
       suggestionsCount: intelligence.suggestionsCount,
       memberships: intelligence.categoryMemberships,
-      latestSynthesis: intelligence.syntheses[0] ?? null,
     });
   });
 
@@ -225,13 +220,13 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
       const { brandId } = request.params as { brandId: string };
       const intelligence = await prisma.brand.findUnique({
         where: { id: brandId },
-        select: { id: true, voicePrompt: true },
+        select: { id: true, commentPrompt: true },
       });
       if (!intelligence) return reply.status(404).send({ error: 'Brand intelligence not found' });
 
       return reply.send({
         brandId: intelligence.id,
-        voicePrompt: intelligence.voicePrompt.slice(0, 500),
+        commentPrompt: intelligence.commentPrompt?.slice(0, 500) ?? null,
       });
     },
   );

@@ -161,8 +161,9 @@ model Brand {
   id                      String  @id // = flownau Brand.id = API Brand.id
   workspaceId             String  @default("")
   mainUsername            String?
-  voicePrompt             String
+  voicePrompt             String?
   commentStrategy         String?
+  commentPrompt           String?
   suggestionsCount        Int     @default(3)
   windowStart             String?
   windowEnd               String?
@@ -171,7 +172,6 @@ model Brand {
 
   ownedProfiles       SocialProfile[]
   categoryMemberships CategoryMembership[]
-  syntheses           BrandSynthesis[]
   sourceConcepts      SourceConcept[]
   voicenotes          Voicenote[]
   context             BrandContext?
@@ -217,19 +217,6 @@ model Voicenote {
   @@index([brandId])
 }
 
-model BrandSynthesis {
-  id           String @id @default(uuid())
-  brandId      String
-  brand        Brand  @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  type         String
-  content      String @db.Text
-  attachedUrls Json   @default("[]")
-
-  createdAt DateTime @default(now())
-
-  @@index([brandId, type])
-}
-
 // ── Brand Context ──────────────────────────────────────────────────────────────
 // Structured brand identity context generated from owned posts, InspoBase,
 // previous context, and/or manual input. Pushed to flownau on every write.
@@ -266,6 +253,7 @@ model CategoryMembership {
   post            Post?          @relation(fields: [postId], references: [id], onDelete: Cascade)
   category        String
   isActive        Boolean        @default(true)
+  commentPrompt   String?
 
   createdAt DateTime @default(now())
 

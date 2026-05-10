@@ -65,8 +65,7 @@ Generate as many source concepts as genuinely capture distinct angles from this 
 Return JSON: { "concepts": [ { "content": "..." }, ... ] }
 Each "content" is a paragraph (30–60 words) describing the concept clearly enough for an ideation LLM to work from it independently.`
 
-    const voiceBlock = brand.voicePrompt ? `\n\n## BRAND VOICE\n${brand.voicePrompt.slice(0, 500)}` : ''
-    const userMessage = `## INSPOBASE\n${inspoLines.join('\n\n')}${voiceBlock}\n\nExtract source concepts.`
+    const userMessage = `## INSPOBASE\n${inspoLines.join('\n\n')}\n\nExtract source concepts.`
 
     const { client, model } = getClientForFeature('synthesis')
     const result = await client.chatCompletion({

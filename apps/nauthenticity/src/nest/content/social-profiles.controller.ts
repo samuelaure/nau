@@ -43,7 +43,6 @@ export class SocialProfilesController {
         create: {
           id: body.brandId,
           workspaceId: body.workspaceId || '',
-          voicePrompt: '',
         },
       })
     }

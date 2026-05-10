@@ -1,12 +1,12 @@
 'use client'
 
 import { useTransition, useEffect, useRef, useState } from 'react'
-import { updateBrand, updateOwnedSynthesis, saveBrandContext } from '@/modules/accounts/actions'
+import { updateBrand, saveBrandContext } from '@/modules/accounts/actions'
 import { Card } from '@/modules/shared/components/ui/Card'
 import { Button } from '@/modules/shared/components/ui/Button'
 import AccountSchedule from './AccountSchedule'
 import { cn } from '@/modules/shared/utils'
-import { RefreshCw, Check, AlertCircle } from 'lucide-react'
+import { Check } from 'lucide-react'
 
 type BrandSettingsTab = 'general' | 'schedule'
 
@@ -186,8 +186,6 @@ type Brand = {
 export default function BrandSettings({ brand, initialSchedule, initialTab }: { brand: Brand; initialSchedule: PostSchedule | null; initialTab?: BrandSettingsTab }) {
   const [tab, setTab] = useState<BrandSettingsTab>(initialTab ?? 'general')
   const [isPending, startTransition] = useTransition()
-  const [syncState, setSyncState] = useState<'idle' | 'syncing' | 'done' | 'error'>('idle')
-  const [syncError, setSyncError] = useState<string | null>(null)
   const [contextJson, setContextJson] = useState(
     brand.context ? JSON.stringify(brand.context, null, 2) : '',
   )
@@ -338,46 +336,6 @@ export default function BrandSettings({ brand, initialSchedule, initialTab }: { 
                 <p className="text-xs text-text-secondary mt-0.5">
                   AI-generated brand profile from nauthenticity — used in every content generation step as context. Sync to pull the latest from nauthenticity, or edit directly.
                 </p>
-              </div>
-
-              {/* Sync button */}
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  disabled={syncState === 'syncing'}
-                  onClick={async () => {
-                    setSyncState('syncing')
-                    setSyncError(null)
-                    try {
-                      await updateOwnedSynthesis(brand.id)
-                      setSyncState('done')
-                      setTimeout(() => setSyncState('idle'), 3000)
-                    } catch (err: unknown) {
-                      setSyncError(err instanceof Error ? err.message : 'Sync failed')
-                      setSyncState('error')
-                    }
-                  }}
-                  className={cn(
-                    'inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-all',
-                    syncState === 'syncing' && 'border-zinc-700 text-zinc-400 cursor-not-allowed',
-                    syncState === 'done' && 'border-emerald-700 text-emerald-400 bg-emerald-900/20',
-                    syncState === 'error' && 'border-red-700 text-red-400 bg-red-900/20',
-                    (syncState === 'idle') && 'border-zinc-700 text-zinc-200 hover:border-zinc-500 hover:bg-zinc-800/50',
-                  )}
-                >
-                  {syncState === 'syncing' ? (
-                    <><RefreshCw size={14} className="animate-spin" /> Syncing…</>
-                  ) : syncState === 'done' ? (
-                    <><Check size={14} /> Synced</>
-                  ) : syncState === 'error' ? (
-                    <><AlertCircle size={14} /> Sync failed</>
-                  ) : (
-                    <><RefreshCw size={14} /> Sync from nauthenticity</>
-                  )}
-                </button>
-                {syncState === 'error' && syncError && (
-                  <p className="text-xs text-red-400">{syncError}</p>
-                )}
               </div>
 
               {/* Context editor */}

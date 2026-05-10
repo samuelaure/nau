@@ -74,8 +74,7 @@ interface BrandFormProps {
 function BrandForm({ initial, workspaces = [], onSave, onCancel }: BrandFormProps) {
   const [workspaceId, setWorkspaceId] = useState(initial?.workspaceId ?? (workspaces[0]?.id ?? ''));
   const [name, setName] = useState(initial?.brandName ?? '');
-  const [voicePrompt, setVoicePrompt] = useState(initial?.voicePrompt ?? '');
-  const [commentStrategy, setCommentStrategy] = useState(initial?.commentStrategy ?? '');
+  const [commentPrompt, setCommentPrompt] = useState(initial?.commentPrompt ?? '');
   const [suggestionsCount, setSuggestionsCount] = useState(initial?.suggestionsCount ?? 3);
   const [windowStart, setWindowStart] = useState(initial?.windowStart ?? '');
   const [windowEnd, setWindowEnd] = useState(initial?.windowEnd ?? '');
@@ -94,8 +93,7 @@ function BrandForm({ initial, workspaces = [], onSave, onCancel }: BrandFormProp
 
     const payload: BrandCreatePayload = {
       brandName: name.trim(),
-      voicePrompt: voicePrompt.trim() || undefined,
-      commentStrategy: commentStrategy.trim() || null,
+      commentPrompt: commentPrompt.trim() || null,
       suggestionsCount,
       windowStart: windowStart || null,
       windowEnd: windowEnd || null,
@@ -169,39 +167,21 @@ function BrandForm({ initial, workspaces = [], onSave, onCancel }: BrandFormProp
         {/* Advanced fields */}
         {showAdvanced && (
           <>
-            {/* Voice Prompt */}
+            {/* Comment Prompt */}
             <div>
               <label style={labelStyle}>
-                <Brain size={11} style={{ display: 'inline', marginRight: '4px' }} />
-                Brand DNA — Voz &amp; Personalidad
+                <MessageSquare size={11} style={{ display: 'inline', marginRight: '4px' }} />
+                Instrucciones de Comentarios
               </label>
               <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginBottom: '8px' }}>
-                Define el tono, personalidad y forma de expresarse de esta marca. Si lo dejas vacío, se usará una voz genérica de plataforma.
+                Define el tono, voz y estrategia para los comentarios de esta marca. Puedes incluir personalidad, intención del período o cualquier instrucción específica.
               </p>
               <textarea
                 className="input-field"
                 style={{ minHeight: '130px', resize: 'vertical' }}
-                placeholder="Ej: Eres una marca enfocada en emprendimiento digital. Tono auténtico, cercano y motivador. Usas emojis con moderación. Evitas el lenguaje corporativo..."
-                value={voicePrompt}
-                onChange={e => setVoicePrompt(e.target.value)}
-              />
-            </div>
-
-            {/* Comment Strategy */}
-            <div>
-              <label style={labelStyle}>
-                <MessageSquare size={11} style={{ display: 'inline', marginRight: '4px' }} />
-                Estrategia de Comentarios (período actual)
-              </label>
-              <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginBottom: '8px' }}>
-                ¿Cuál es la intención general de los comentarios en este período? (crear autoridad, ganar alcance, generar curiosidad...)
-              </p>
-              <textarea
-                className="input-field"
-                style={{ minHeight: '90px', resize: 'vertical' }}
-                placeholder="Ej: Queremos ganar presencia y autoridad en la comunidad de fitness. Comentarios que aporten valor y generen curiosidad hacia nuestro perfil."
-                value={commentStrategy}
-                onChange={e => setCommentStrategy(e.target.value)}
+                placeholder="Ej: Somos una marca de fitness. Tono cercano y motivador. Queremos generar autoridad y curiosidad. Evitamos lenguaje corporativo. Objetivo: ganar visibilidad y conexión con comunidades fitness."
+                value={commentPrompt}
+                onChange={e => setCommentPrompt(e.target.value)}
               />
             </div>
 
@@ -659,9 +639,11 @@ export default function ClientBrandsList({ initialBrands }: { initialBrands: Bra
                     {brand.brandName}
                     {brand.isActive && <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--primary)', boxShadow: '0 0 8px var(--primary)', flexShrink: 0 }} />}
                   </h3>
-                  <p style={{ color: 'var(--text-dim)', fontSize: '0.78rem', fontStyle: 'italic', margin: '0 0 12px', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}>
-                    "{brand.voicePrompt}"
-                  </p>
+                  {brand.commentPrompt && (
+                    <p style={{ color: 'var(--text-dim)', fontSize: '0.78rem', fontStyle: 'italic', margin: '0 0 12px', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}>
+                      "{brand.commentPrompt}"
+                    </p>
+                  )}
                   <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
                       <ShieldCheck size={13} color="var(--primary)" /> {brand.targets?.length ?? 0} perfiles

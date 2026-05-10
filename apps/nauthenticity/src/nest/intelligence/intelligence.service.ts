@@ -34,7 +34,7 @@ export class IntelligenceService {
   }
 
   async upsertIntelligence(brandId: string, data: Record<string, unknown>) {
-    const allowed = ['workspaceId', 'mainUsername', 'voicePrompt', 'commentStrategy', 'suggestionsCount', 'windowStart', 'windowEnd', 'timezone']
+    const allowed = ['workspaceId', 'mainUsername', 'commentPrompt', 'suggestionsCount', 'windowStart', 'windowEnd', 'timezone']
     const patch: Record<string, unknown> = {}
     for (const key of allowed) {
       if (key in data) patch[key] = data[key]
@@ -44,7 +44,6 @@ export class IntelligenceService {
       create: {
         id: brandId,
         workspaceId: (patch.workspaceId as string) ?? '',
-        voicePrompt: (patch.voicePrompt as string) ?? '',
         ...patch,
       },
       update: patch,
@@ -59,27 +58,24 @@ export class IntelligenceService {
           where: { socialProfileId: { not: null } },
           select: { socialProfile: { select: { username: true } }, category: true },
         },
-        syntheses: { orderBy: { createdAt: 'desc' }, take: 1 },
       },
     })
     if (!intelligence) throw new NotFoundException('Brand intelligence not found')
     return {
       brandId: intelligence.id,
-      voicePrompt: intelligence.voicePrompt,
-      commentStrategy: intelligence.commentStrategy,
+      commentPrompt: intelligence.commentPrompt,
       suggestionsCount: intelligence.suggestionsCount,
       memberships: intelligence.categoryMemberships,
-      latestSynthesis: (intelligence as unknown as { syntheses: unknown[] }).syntheses[0] ?? null,
     }
   }
 
   async getDnaLight(brandId: string) {
     const intelligence = await this.prisma.brand.findUnique({
       where: { id: brandId },
-      select: { id: true, voicePrompt: true },
+      select: { id: true, commentPrompt: true },
     })
     if (!intelligence) throw new NotFoundException('Brand intelligence not found')
-    return { brandId: intelligence.id, voicePrompt: intelligence.voicePrompt.slice(0, 500) }
+    return { brandId: intelligence.id, commentPrompt: intelligence.commentPrompt?.slice(0, 500) ?? null }
   }
 
   async listServiceBrands(workspaceId: string) {

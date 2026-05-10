@@ -63,8 +63,7 @@ export const generateReactiveComments = async (
       targetUsername: post.username || 'unknown',
     },
     brand: {
-      voicePrompt: intelligence.voicePrompt,
-      commentStrategy: intelligence.commentStrategy,
+      commentPrompt: intelligence.commentPrompt,
       suggestionsCount: intelligence.suggestionsCount,
     },
     lastSelectedComments: lastFeedbacks.map((f) => f.commentText),

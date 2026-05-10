@@ -4,8 +4,6 @@ import { getClientForFeature } from '@nau/llm-client'
 import { PrismaService } from '../prisma/prisma.service'
 import { GenerateCommentDto, CommentFeedbackDto } from './benchmark.dto'
 
-const DEFAULT_VOICE = `You are an authentic, engaging brand on social media. Write comments that are genuine, add value to the conversation, and reflect a professional yet approachable personality. Be concise, positive, and relevant to the post's content.`
-
 @Injectable()
 export class BenchmarkService {
   private readonly logger = new Logger(BenchmarkService.name)
@@ -15,13 +13,10 @@ export class BenchmarkService {
   ) {}
 
   async generateComments(brandId: string, dto: GenerateCommentDto): Promise<{ suggestions: string[] }> {
-    const synthesis = await this.prisma.brandSynthesis.findFirst({
-      where: { brandId, type: 'voice' },
-    })
-    const voicePrompt = synthesis?.content ?? DEFAULT_VOICE
+    const brand = await this.prisma.brand.findUnique({ where: { id: brandId }, select: { commentPrompt: true } })
 
     const parts = [
-      `Brand voice: ${voicePrompt}`,
+      brand?.commentPrompt ? `Comment instructions: ${brand.commentPrompt}` : null,
       `Target post URL: ${dto.postUrl}`,
       dto.postCaption ? `Caption: ${dto.postCaption}` : null,
       dto.postTranscript ? `Transcript: ${dto.postTranscript}` : null,
@@ -74,24 +69,4 @@ export class BenchmarkService {
     })
   }
 
-  async getSynthesis(brandId: string, type: string) {
-    return this.prisma.brandSynthesis.findFirst({ where: { brandId, type } })
-  }
-
-  async listSyntheses(brandId: string) {
-    return this.prisma.brandSynthesis.findMany({ where: { brandId } })
-  }
-
-  async upsertSynthesis(brandId: string, type: string, content: string, attachedUrls: string[] = []) {
-    const existing = await this.prisma.brandSynthesis.findFirst({ where: { brandId, type } })
-    if (existing) {
-      return this.prisma.brandSynthesis.update({
-        where: { id: existing.id },
-        data: { content, attachedUrls },
-      })
-    }
-    return this.prisma.brandSynthesis.create({
-      data: { brandId, type, content, attachedUrls },
-    })
-  }
 }
