@@ -123,6 +123,30 @@ export interface UpdateBrandDto {
   handle?: string
 }
 
+export interface Project {
+  id: string
+  workspaceId: string
+  brandId?: string | null
+  name: string
+  description?: string | null
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateProjectDto {
+  name: string
+  description?: string
+  brandId?: string
+}
+
+export interface UpdateProjectDto {
+  name?: string
+  description?: string
+  brandId?: string | null
+  isActive?: boolean
+}
+
 export interface CreateSocialProfileDto {
   platform: SocialPlatform
   platformId: string

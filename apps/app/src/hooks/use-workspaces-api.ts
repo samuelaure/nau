@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api-client'
-import type { Workspace, Brand, WorkspaceMember, CreateBrandDto, UpdateBrandDto, WorkspaceRole } from '@9nau/types'
+import type { Workspace, Brand, WorkspaceMember, CreateBrandDto, UpdateBrandDto, WorkspaceRole, Project, CreateProjectDto, UpdateProjectDto } from '@9nau/types'
 
 export type WorkspaceWithRole = Workspace & { role: WorkspaceRole }
 export type { Workspace, Brand, WorkspaceMember }
@@ -74,6 +74,37 @@ export const useDeleteBrand = (workspaceId: string) => {
       qc.invalidateQueries({ queryKey: ['brands', workspaceId] })
       qc.invalidateQueries({ queryKey: ['workspaces'] })
     },
+  })
+}
+
+export const useGetProjects = (workspaceId: string | null) =>
+  useQuery<Project[]>({
+    queryKey: ['projects', workspaceId],
+    queryFn: () => apiClient.get(`/workspaces/${workspaceId}/projects`),
+    enabled: !!workspaceId,
+  })
+
+export const useCreateProject = (workspaceId: string) => {
+  const qc = useQueryClient()
+  return useMutation<Project, Error, CreateProjectDto>({
+    mutationFn: (body) => apiClient.post(`/workspaces/${workspaceId}/projects`, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects', workspaceId] }),
+  })
+}
+
+export const useUpdateProject = (projectId: string, workspaceId: string) => {
+  const qc = useQueryClient()
+  return useMutation<Project, Error, UpdateProjectDto>({
+    mutationFn: (body) => apiClient.patch(`/projects/${projectId}`, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects', workspaceId] }),
+  })
+}
+
+export const useDeleteProject = (workspaceId: string) => {
+  const qc = useQueryClient()
+  return useMutation<void, Error, { projectId: string }>({
+    mutationFn: ({ projectId }) => apiClient.delete(`/projects/${projectId}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects', workspaceId] }),
   })
 }
 

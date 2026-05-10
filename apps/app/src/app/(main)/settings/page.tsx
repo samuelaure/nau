@@ -4,23 +4,19 @@ import { useState } from 'react'
 import { Button } from '@9nau/ui/components/button'
 import { Input } from '@9nau/ui/components/input'
 import {
-  Plus, ChevronDown, ChevronRight, Users, Building2, Globe,
-  Pencil, Trash2, Check, X,
+  Plus, ChevronDown, ChevronRight, Users, Building2,
+  Trash2, Check, X,
 } from 'lucide-react'
 import {
   useGetWorkspaces,
   useCreateWorkspace,
   useRenameWorkspace,
   useDeleteWorkspace,
-  useGetBrands,
-  useCreateBrand,
-  useUpdateBrand,
-  useDeleteBrand,
   useGetMembers,
   useAddMember,
   useRemoveMember,
 } from '@/hooks/use-workspaces-api'
-import type { WorkspaceWithRole, Brand, WorkspaceMember } from '@/hooks/use-workspaces-api'
+import type { WorkspaceWithRole, WorkspaceMember } from '@/hooks/use-workspaces-api'
 import { WorkspaceRole } from '@9nau/types'
 
 export default function PlatformSettingsPage() {
@@ -29,7 +25,6 @@ export default function PlatformSettingsPage() {
 
   const [newWsName, setNewWsName] = useState('')
   const [expandedWs, setExpandedWs] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<Record<string, 'brands' | 'members'>>({})
 
   const handleCreateWorkspace = async () => {
     if (!newWsName.trim()) return
@@ -46,8 +41,7 @@ export default function PlatformSettingsPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Platform Workspaces</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Manage your organizations and their brands from this central control plane. Changes are
-          reflected instantly across all naŭ apps.
+          Manage workspaces and members. Projects and Brands are managed in the Projects section.
         </p>
       </div>
 
@@ -72,8 +66,6 @@ export default function PlatformSettingsPage() {
             workspace={ws}
             isExpanded={expandedWs === ws.id}
             onToggle={() => setExpandedWs(expandedWs === ws.id ? null : ws.id)}
-            activeTab={activeTab[ws.id] ?? 'brands'}
-            onTabChange={(tab) => setActiveTab((prev) => ({ ...prev, [ws.id]: tab }))}
           />
         ))}
         {(workspaces ?? []).length === 0 && (
@@ -90,14 +82,10 @@ function WorkspaceCard({
   workspace,
   isExpanded,
   onToggle,
-  activeTab,
-  onTabChange,
 }: {
   workspace: WorkspaceWithRole
   isExpanded: boolean
   onToggle: () => void
-  activeTab: 'brands' | 'members'
-  onTabChange: (tab: 'brands' | 'members') => void
 }) {
   const [renaming, setRenaming] = useState(false)
   const [newName, setNewName] = useState(workspace.name)
@@ -169,150 +157,11 @@ function WorkspaceCard({
       )}
 
       {isExpanded && (
-        <div className="px-4 pb-4">
-          <div className="flex gap-4 border-b border-gray-200 dark:border-gray-700 mt-3 mb-4">
-            {(['brands', 'members'] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => onTabChange(tab)}
-                className={`pb-2 text-sm font-medium capitalize border-b-2 transition-colors ${
-                  activeTab === tab
-                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                }`}
-              >
-                {tab === 'brands'
-                  ? <><Globe className="inline w-3.5 h-3.5 mr-1" />Brands</>
-                  : <><Users className="inline w-3.5 h-3.5 mr-1" />Members</>}
-              </button>
-            ))}
-          </div>
-
-          {activeTab === 'brands' && <BrandsPanel workspaceId={workspace.id} />}
-          {activeTab === 'members' && <MembersPanel workspaceId={workspace.id} isOwner={workspace.role === WorkspaceRole.OWNER} />}
+        <div className="px-4 pb-4 pt-3">
+          <MembersPanel workspaceId={workspace.id} isOwner={workspace.role === WorkspaceRole.OWNER} />
         </div>
       )}
     </div>
-  )
-}
-
-// ── BrandsPanel ───────────────────────────────────────────────────────────────
-
-function BrandsPanel({ workspaceId }: { workspaceId: string }) {
-  const { data: brands, isLoading } = useGetBrands(workspaceId)
-  const createBrand = useCreateBrand(workspaceId)
-  const deleteBrand = useDeleteBrand(workspaceId)
-  const [newName, setNewName] = useState('')
-  const [newTz, setNewTz] = useState('UTC')
-
-  const handleCreate = async () => {
-    if (!newName.trim()) return
-    await createBrand.mutateAsync({ name: newName.trim(), timezone: newTz })
-    setNewName('')
-    setNewTz('UTC')
-  }
-
-  const handleDelete = async (brand: Brand) => {
-    if (!confirm(`Delete brand "${brand.name}"? This cannot be undone.`)) return
-    await deleteBrand.mutateAsync({ brandId: brand.id })
-  }
-
-  return (
-    <div className="space-y-3">
-      {isLoading ? (
-        <p className="text-sm text-gray-400">Loading brands…</p>
-      ) : (
-        <ul className="space-y-1">
-          {(brands ?? []).map((b) => (
-            <BrandRow key={b.id} brand={b} workspaceId={workspaceId} onDelete={() => handleDelete(b)} />
-          ))}
-          {(brands ?? []).length === 0 && (
-            <li className="text-xs text-gray-400 italic">No brands yet.</li>
-          )}
-        </ul>
-      )}
-
-      <div className="flex gap-2 pt-1">
-        <Input
-          placeholder="Brand name…"
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          className="text-sm"
-          onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-        />
-        <Input
-          placeholder="Timezone (UTC)"
-          value={newTz}
-          onChange={(e) => setNewTz(e.target.value)}
-          className="text-sm w-36"
-        />
-        <Button size="sm" onClick={handleCreate} disabled={createBrand.isPending}>
-          <Plus className="w-3.5 h-3.5" />
-        </Button>
-      </div>
-    </div>
-  )
-}
-
-function BrandRow({ brand, workspaceId, onDelete }: { brand: Brand; workspaceId: string; onDelete: () => void }) {
-  const [renaming, setRenaming] = useState(false)
-  const [newName, setNewName] = useState(brand.name)
-  const updateBrand = useUpdateBrand(workspaceId, brand.id)
-
-  const handleRename = async () => {
-    if (!newName.trim() || newName === brand.name) { setRenaming(false); return }
-    await updateBrand.mutateAsync({ name: newName.trim() })
-    setRenaming(false)
-  }
-
-  if (renaming) {
-    return (
-      <li className="flex items-center gap-2 py-1 px-2">
-        <Input
-          autoFocus
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') handleRename(); if (e.key === 'Escape') setRenaming(false) }}
-          className="text-sm h-7 flex-1"
-        />
-        <button onClick={handleRename} disabled={updateBrand.isPending} className="p-1 text-green-600 hover:text-green-700">
-          <Check className="w-3.5 h-3.5" />
-        </button>
-        <button onClick={() => setRenaming(false)} className="p-1 text-gray-400 hover:text-gray-600">
-          <X className="w-3.5 h-3.5" />
-        </button>
-      </li>
-    )
-  }
-
-  return (
-    <li className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-gray-50 dark:hover:bg-gray-700/50 group">
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-gray-800 dark:text-gray-200">{brand.name}</span>
-        <span className="text-xs text-gray-400">{brand.timezone}</span>
-        {!brand.isActive && (
-          <span className="text-xs text-orange-400 bg-orange-50 dark:bg-orange-900/20 px-1.5 py-0.5 rounded">
-            inactive
-          </span>
-        )}
-      </div>
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button
-          onClick={() => setRenaming(true)}
-          className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded"
-          title="Rename brand"
-        >
-          <Pencil className="w-3.5 h-3.5" />
-        </button>
-        <button
-          onClick={onDelete}
-          className="p-1 text-gray-400 hover:text-red-500 rounded"
-          title="Delete brand"
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
-      </div>
-    </li>
   )
 }
 
