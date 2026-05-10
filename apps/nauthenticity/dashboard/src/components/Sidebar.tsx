@@ -174,12 +174,14 @@ export function Sidebar() {
   const location = useLocation();
 
   const brandMatch = location.pathname.match(/\/workspaces\/([^/]+)\/brands\/([^/]+)/);
+  const projectMatch = location.pathname.match(/\/workspaces\/([^/]+)\/projects\/([^/]+)/);
   const workspaceMatch = location.pathname.match(/\/workspaces\/([^/]+)/);
 
   const activeWorkspaceId = workspaceMatch
     ? workspaceMatch[1]
     : localStorage.getItem('nau_workspace_id');
   const activeBrandId = brandMatch ? brandMatch[2] : null;
+  const activeProjectId = projectMatch ? projectMatch[2] : null;
 
   const handleSignOut = () => {
     clearToken();
@@ -206,7 +208,6 @@ export function Sidebar() {
         {activeBrandId && activeWorkspaceId ? (
           <>
             <span className="sidebar-section-label">Brand Pages</span>
-
             {[
               { label: 'Content', to: `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}/content`, icon: LayoutDashboard },
               { label: 'Inspo', to: `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}/inspo`, icon: Lightbulb },
@@ -215,13 +216,20 @@ export function Sidebar() {
               { label: 'Benchmark', to: `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}/benchmark`, icon: BarChart2 },
               { label: 'Settings', to: `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}/settings`, icon: Settings },
             ].map(({ label, to, icon: Icon }) => (
-              <Link
-                key={to}
-                to={to}
-                className={`sidebar-link${isActive(to) ? ' sidebar-link--active' : ''}`}
-              >
-                <Icon size={17} />
-                {label}
+              <Link key={to} to={to} className={`sidebar-link${isActive(to) ? ' sidebar-link--active' : ''}`}>
+                <Icon size={17} />{label}
+              </Link>
+            ))}
+          </>
+        ) : activeProjectId && activeWorkspaceId ? (
+          <>
+            <span className="sidebar-section-label">Project Pages</span>
+            {[
+              { label: 'Captures', to: `/workspaces/${activeWorkspaceId}/projects/${activeProjectId}/captures`, icon: Lightbulb },
+              { label: 'Settings', to: `/workspaces/${activeWorkspaceId}/projects/${activeProjectId}/settings`, icon: Settings },
+            ].map(({ label, to, icon: Icon }) => (
+              <Link key={to} to={to} className={`sidebar-link${isActive(to) ? ' sidebar-link--active' : ''}`}>
+                <Icon size={17} />{label}
               </Link>
             ))}
           </>

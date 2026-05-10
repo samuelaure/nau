@@ -320,6 +320,61 @@ export const getBrandOwnedProfiles = async (brandId: string) => {
   return data;
 };
 
+// ── Projects ──────────────────────────────────────────────────────────────────
+
+export interface NauProject {
+  id: string;
+  workspaceId: string;
+  brandId?: string | null;
+  name: string;
+  description?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const getWorkspaceOverview = async (workspaceId: string): Promise<{ brands: NauBrand[]; projects: NauProject[] }> => {
+  const { data } = await api.get(`/workspace/${workspaceId}/overview`);
+  return data;
+};
+
+export const getProjects = async (workspaceId: string): Promise<NauProject[]> => {
+  const { data } = await api.get<NauProject[]>(`/workspaces/${workspaceId}/projects`);
+  return data;
+};
+
+export const createProject = async (workspaceId: string, name: string, description?: string): Promise<NauProject> => {
+  const { data } = await api.post<NauProject>(`/workspaces/${workspaceId}/projects`, { name, description });
+  return data;
+};
+
+export const updateProject = async (projectId: string, patch: { name?: string; description?: string; isActive?: boolean }): Promise<NauProject> => {
+  const { data } = await api.patch<NauProject>(`/projects/${projectId}`, patch);
+  return data;
+};
+
+export const deleteProject = async (projectId: string): Promise<void> => {
+  await api.delete(`/projects/${projectId}`);
+};
+
+export const getProjectTargets = async (projectId: string, category?: string) => {
+  const url = category
+    ? `/targets?projectId=${projectId}&category=${category}`
+    : `/targets?projectId=${projectId}`;
+  const { data } = await api.get(url);
+  return data;
+};
+
+export const addProjectTarget = async (payload: {
+  projectId: string;
+  usernames: string[];
+  category: string;
+  isActive?: boolean;
+}) => {
+  const { data } = await api.post(`/targets`, payload);
+  return data;
+};
+
 export const getInspoItems = async (brandId: string) => {
   const { data } = await api.get(`/brands/${brandId}/inspo`);
   return data;
