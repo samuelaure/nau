@@ -164,7 +164,7 @@ export async function notifyNextInLine(brandId: string): Promise<void> {
     where: {
       brandId,
       scheduledAt: { lte: thirtyMin, gte: now },
-      status: 'RENDERED_PENDING',
+      status: { in: ['RENDERED_PENDING', 'DRAFT_PENDING'] },
     },
     orderBy: { scheduledAt: 'asc' },
     select: { id: true, scheduledAt: true, brand: { select: { name: true, workspaceId: true } } },
