@@ -48,10 +48,10 @@ export async function POST(req: NextRequest) {
       },
     })
     if (duplicate) {
-      return NextResponse.json(
-        { error: 'DUPLICATE', existing: duplicate, message: `This file already exists as "${duplicate.systemFilename}"` },
-        { status: 409 },
-      )
+      const message = duplicate.optimizationStatus === 'purged'
+        ? `This file was previously uploaded and split into segments. Re-uploading is not allowed.`
+        : `This file already exists as "${duplicate.systemFilename}"`
+      return NextResponse.json({ error: 'DUPLICATE', existing: duplicate, message }, { status: 409 })
     }
   }
 

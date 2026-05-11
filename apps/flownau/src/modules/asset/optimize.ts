@@ -1,5 +1,5 @@
 import { prisma } from '@/modules/shared/prisma'
-import { storage } from '@/modules/shared/r2'
+import { storage, keyFromCdnUrl } from '@/modules/shared/r2'
 import { flownau } from 'nau-storage'
 import {
   compressVideo,
@@ -39,6 +39,7 @@ function downloadToTemp(url: string, destPath: string): Promise<void> {
 interface SplitContext {
   assetId: string
   compressedPath: string
+  duration: number
   contextAccountId: string | null
   templateId: string | null
   assetFolder: 'videos' | 'audios' | 'images'
@@ -46,12 +47,15 @@ interface SplitContext {
 }
 
 export async function splitAndStoreSegments(ctx: SplitContext): Promise<void> {
-  const { assetId, compressedPath, contextAccountId, templateId, assetFolder, brandId } = ctx
+  const { assetId, compressedPath, duration, contextAccountId, templateId, assetFolder, brandId } = ctx
   const segmentPattern = getTempPath(`split_${assetId}_%03d.mp4`)
   const segmentDir = path.dirname(segmentPattern)
   const segmentBase = path.basename(segmentPattern)
 
-  const segmentCount = await splitVideo(compressedPath, segmentPattern, MAX_SEGMENT_SECS)
+  // Divide into equal parts, each staying under MAX_SEGMENT_SECS.
+  const numSegments = Math.ceil(duration / MAX_SEGMENT_SECS)
+  const segmentSecs = duration / numSegments
+  const segmentCount = await splitVideo(compressedPath, segmentPattern, segmentSecs)
 
   const segmentPaths: string[] = []
   for (let i = 0; ; i++) {
@@ -112,12 +116,24 @@ export async function splitAndStoreSegments(ctx: SplitContext): Promise<void> {
     await fs.unlink(segPath).catch(() => {})
   }
 
+  // Purge the parent's R2 files — segments are the canonical assets now.
+  // The DB row is kept with optimizationStatus='purged' so the hash blocks re-uploads.
+  const parent = await prisma.asset.findUnique({ where: { id: assetId }, select: { r2Key: true, thumbnailUrl: true } })
+  if (parent) {
+    const keysToDelete = [parent.r2Key]
+    if (parent.thumbnailUrl) {
+      const thumbKey = keyFromCdnUrl(parent.thumbnailUrl)
+      if (thumbKey && thumbKey !== parent.r2Key) keysToDelete.push(thumbKey)
+    }
+    await storage.deleteMany(keysToDelete).catch((err) => logger.warn({ assetId, err }, '[split] Failed to purge parent R2 files'))
+  }
+
   await prisma.asset.update({
     where: { id: assetId },
-    data: { optimizationStatus: 'split' },
+    data: { optimizationStatus: 'purged', r2Key: '', url: '', thumbnailUrl: null },
   })
 
-  logger.info({ assetId, segments: segmentPaths.length }, '[split] Asset split complete')
+  logger.info({ assetId, segments: segmentPaths.length }, '[split] Asset split complete — parent purged')
 }
 
 export async function optimizeAsset(args: OptimizationJobData): Promise<void> {
@@ -213,6 +229,7 @@ export async function optimizeAsset(args: OptimizationJobData): Promise<void> {
       await splitAndStoreSegments({
         assetId,
         compressedPath: outputPath,
+        duration,
         contextAccountId,
         templateId,
         assetFolder,
