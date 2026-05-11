@@ -5,7 +5,7 @@ import { Button } from '@9nau/ui/components/button'
 import { Input } from '@9nau/ui/components/input'
 import {
   Plus, ChevronDown, ChevronRight, Users, Building2,
-  Trash2, Check, X,
+  Trash2, Check, X, PencilLine,
 } from 'lucide-react'
 import {
   useGetWorkspaces,
@@ -124,7 +124,7 @@ function WorkspaceCard({
               className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded transition-colors"
               title="Rename workspace"
             >
-              <Pencil className="w-3.5 h-3.5" />
+              <PencilLine className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); handleDelete() }}

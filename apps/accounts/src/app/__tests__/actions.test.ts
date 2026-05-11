@@ -137,7 +137,7 @@ describe('registerAction', () => {
 describe('logoutAction', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('calls /auth/logout with the refresh token and deletes both cookies', async () => {
+  it('calls /auth/logout with the refresh token and clears both cookies', async () => {
     cookieSpy.get.mockReturnValue({ value: 'rt-token-abc' })
     global.fetch = vi.fn().mockResolvedValue({ ok: true })
 
@@ -147,18 +147,18 @@ describe('logoutAction', () => {
       expect.stringContaining('/auth/logout'),
       expect.objectContaining({ method: 'POST' }),
     )
-    expect(cookieSpy.delete).toHaveBeenCalledWith('nau_at')
-    expect(cookieSpy.delete).toHaveBeenCalledWith('nau_rt')
+    expect(cookieSpy.set).toHaveBeenCalledWith('nau_at', '', expect.objectContaining({ maxAge: 0 }))
+    expect(cookieSpy.set).toHaveBeenCalledWith('nau_rt', '', expect.objectContaining({ maxAge: 0 }))
   })
 
-  it('still deletes cookies even when logout API call fails', async () => {
+  it('still clears cookies even when logout API call fails', async () => {
     cookieSpy.get.mockReturnValue({ value: 'rt-token-abc' })
     global.fetch = vi.fn().mockRejectedValue(new Error('network'))
 
     await logoutAction()
 
-    expect(cookieSpy.delete).toHaveBeenCalledWith('nau_at')
-    expect(cookieSpy.delete).toHaveBeenCalledWith('nau_rt')
+    expect(cookieSpy.set).toHaveBeenCalledWith('nau_at', '', expect.objectContaining({ maxAge: 0 }))
+    expect(cookieSpy.set).toHaveBeenCalledWith('nau_rt', '', expect.objectContaining({ maxAge: 0 }))
   })
 
   it('skips the API call when no refresh token cookie is present', async () => {
@@ -168,6 +168,6 @@ describe('logoutAction', () => {
     await logoutAction()
 
     expect(global.fetch).not.toHaveBeenCalled()
-    expect(cookieSpy.delete).toHaveBeenCalledTimes(2)
+    expect(cookieSpy.set).toHaveBeenCalledTimes(2)
   })
 })
