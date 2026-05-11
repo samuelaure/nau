@@ -73,6 +73,7 @@ export async function POST(req: Request) {
         hashtags: draftResult.hashtags,
         templateId: selectedTemplate.id,
         status: 'DRAFT_APPROVED',
+        postSynthesis: draftResult.postSynthesis || null,
         llmTrace: { draftTrace: draftResult.trace } as unknown as Prisma.InputJsonValue,
       },
     })

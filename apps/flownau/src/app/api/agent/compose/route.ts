@@ -139,6 +139,7 @@ export async function POST(req: Request) {
           hashtags: result.hashtags,
           status: draftStatus,
           templateId: resolvedTemplateId,
+          postSynthesis: result.postSynthesis || null,
           llmTrace: { ...(existingTrace?.llmTrace as object ?? {}), draftTrace: result.trace } as unknown as Prisma.InputJsonValue,
         },
       })
@@ -154,6 +155,7 @@ export async function POST(req: Request) {
           status: draftStatus,
           source: 'manual',
           templateId: resolvedTemplateId,
+          postSynthesis: result.postSynthesis || null,
           llmTrace: { draftTrace: result.trace } as unknown as Prisma.InputJsonValue,
         },
       })

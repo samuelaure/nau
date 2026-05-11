@@ -298,6 +298,9 @@ model Post {
   userPostedManually Boolean   @default(false)
   publishedAt        DateTime?
 
+  // ── Nauthenticity synthesis (generated at draft time, synced on publish) ────
+  postSynthesis String? @db.Text
+
   // ── LLM observability ──────────────────────────────────────────────────────
   // { ideaTrace: { provider, model, registryId, systemPrompt, userMessage, generatedAt },
   //   draftTrace: { provider, model, registryId, systemPrompt, userMessage, generatedAt } }

@@ -18,6 +18,7 @@ import { BenchmarkModule } from './benchmark/benchmark.module'
 import { ScrapingModule } from './scraping/scraping.module'
 import { BrandContextModule } from './brand-context/brand-context.module'
 import { ProjectsModule } from './projects/projects.module'
+import { PostsModule } from './posts/posts.module'
 import { HealthController } from './health/health.controller'
 import { AuthCallbackController } from './auth/auth-callback.controller'
 
@@ -49,6 +50,7 @@ import { AuthCallbackController } from './auth/auth-callback.controller'
     ScrapingModule,
     BrandContextModule,
     ProjectsModule,
+    PostsModule,
   ],
   controllers: [HealthController, AuthCallbackController],
   providers: [

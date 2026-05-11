@@ -37,6 +37,7 @@ export interface DraftPipelineResult {
   templateId: string
   format: string
   trace: LlmTrace
+  postSynthesis: string
 }
 
 export async function runDraftPipeline(input: DraftPipelineInput): Promise<DraftPipelineResult> {
@@ -86,9 +87,9 @@ export async function runDraftPipeline(input: DraftPipelineInput): Promise<Draft
   logger.info({ brandId, templateId, format }, '[DraftPipeline] Prompt assembled')
 
   if (HEAD_TALK_FORMATS.has(format)) {
-    return runHeadTalkPath({ brandId, templateId, format, systemPrompt, userMessage, ideaText, layers })
+    return runHeadTalkPath({ brandId, templateId, format, systemPrompt, userMessage, ideaText, layers, language })
   }
-  return runSlotPath({ brandId, templateId, format, systemPrompt, userMessage, template: mergedTemplate, ideaText, layers })
+  return runSlotPath({ brandId, templateId, format, systemPrompt, userMessage, template: mergedTemplate, ideaText, layers, language })
 }
 
 // ─── Head-talk path (structured output via parseCompletion) ───────────────────
@@ -101,8 +102,9 @@ async function runHeadTalkPath(args: {
   userMessage: string
   ideaText: string
   layers: Record<string, string>
+  language: string
 }): Promise<DraftPipelineResult> {
-  const { brandId, templateId, format, systemPrompt, userMessage, layers } = args
+  const { brandId, templateId, format, systemPrompt, userMessage, layers, language } = args
 
   const { client: llm, model, registryId, provider } = await getAdminModelClient('drafting')
 
@@ -131,6 +133,8 @@ async function runHeadTalkPath(args: {
   const caption = typeof creative.caption === 'string' ? creative.caption : ''
   const hashtags = Array.isArray(creative.hashtags) ? creative.hashtags : []
 
+  const postSynthesis = await generateSynthesis(caption, creative as unknown as Record<string, unknown>, language)
+
   logger.info({ brandId, templateId }, '[DraftPipeline] HeadTalk composition complete')
 
   return {
@@ -139,6 +143,7 @@ async function runHeadTalkPath(args: {
     hashtags,
     templateId,
     format,
+    postSynthesis,
     trace: { provider, model, registryId, systemPrompt, userMessage, generatedAt: new Date().toISOString() },
   }
 }
@@ -154,8 +159,9 @@ async function runSlotPath(args: {
   template: { slotSchema: unknown }
   ideaText: string
   layers: Record<string, string>
+  language: string
 }): Promise<DraftPipelineResult> {
-  const { brandId, templateId, format, template, layers } = args
+  const { brandId, templateId, format, template, layers, language } = args
   let { systemPrompt, userMessage } = args
 
   if (!template.slotSchema) throw new Error(`Template ${templateId} has no slotSchema`)
@@ -212,6 +218,8 @@ async function runSlotPath(args: {
   const hashtags = Array.isArray(parsed.hashtags) ? (parsed.hashtags as string[]) : []
   const brollMood = (parsed.brollMood as string) ?? ''
 
+  const postSynthesis = await generateSynthesis(caption, { slots }, language)
+
   logger.info({ brandId, templateId, slotKeys: Object.keys(slots), brollMood }, '[DraftPipeline] Slot composition complete')
 
   return {
@@ -221,6 +229,7 @@ async function runSlotPath(args: {
     brollMood,
     templateId,
     format,
+    postSynthesis,
     trace: { provider, model, registryId, systemPrompt, userMessage, generatedAt: new Date().toISOString() },
   }
 }
@@ -283,6 +292,33 @@ function mergeSlotOverrides(
     if (!ov) return slot
     return { ...slot, ...(ov.intention !== undefined && { intention: ov.intention }), ...(ov.minWords !== undefined && { minWords: ov.minWords }), ...(ov.maxWords !== undefined && { maxWords: ov.maxWords }) }
   })
+}
+
+async function generateSynthesis(caption: string, creative: Record<string, unknown>, language: string): Promise<string> {
+  const { client: llm, model } = await getAdminModelClient('drafting')
+  const slots = (creative as { slots?: Record<string, string> }).slots
+  const contentSample = slots
+    ? Object.values(slots).join(' ').slice(0, 600)
+    : Object.values(creative).filter((v) => typeof v === 'string').join(' ').slice(0, 600)
+
+  try {
+    const result = await llm.chatCompletion({
+      model,
+      temperature: 0.3,
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an intelligence analyst. Given social media post content, write a concise 1-2 sentence synthesis describing the main topic, key insights, and content themes. Write in the same language as the content. No preamble.',
+        },
+        { role: 'user', content: `Caption: ${caption}\n\nContent: ${contentSample}` },
+      ],
+      timeoutMs: 15_000,
+      maxTokens: 200,
+    })
+    return result.content?.trim() ?? ''
+  } catch {
+    return ''
+  }
 }
 
 function buildUserMessage(
