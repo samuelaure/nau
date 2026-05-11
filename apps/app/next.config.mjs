@@ -1,3 +1,6 @@
+import { readFileSync } from 'fs'
+const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url)))
+
 const securityHeaders = [
   { key: 'X-DNS-Prefetch-Control', value: 'on' },
   { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
@@ -25,6 +28,7 @@ const securityHeaders = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  env: { NEXT_PUBLIC_APP_VERSION: version },
   async headers() {
     return [{ source: '/(.*)', headers: securityHeaders }]
   },

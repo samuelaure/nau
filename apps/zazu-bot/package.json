@@ -1,6 +1,6 @@
 {
   "name": "@zazu/bot",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "scripts": {
     "predev": "dotenv -e ../../.env.development -e .env.development -- pnpm --filter @zazu/db exec prisma migrate deploy && dotenv -e ../../.env.development -e .env.development -- pnpm --filter @zazu/db exec prisma generate",

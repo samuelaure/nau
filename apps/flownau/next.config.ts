@@ -1,5 +1,8 @@
 import path from 'path'
+import { readFileSync } from 'fs'
 import type { NextConfig } from 'next'
+
+const { version } = JSON.parse(readFileSync(path.join(__dirname, 'package.json'), 'utf-8')) as { version: string }
 
 const securityHeaders = [
   { key: 'X-DNS-Prefetch-Control', value: 'on' },
@@ -27,6 +30,7 @@ const securityHeaders = [
 ]
 
 const nextConfig: NextConfig = {
+  env: { NEXT_PUBLIC_APP_VERSION: version },
   turbopack: {
     resolveAlias: {
       '@prisma/client': './node_modules/.prisma/client',

@@ -41,6 +41,8 @@ export default async function SettingsPage() {
           ))}
         </div>
       )}
+
+      <p className="text-xs text-text-secondary mt-8">flownaŭ v{process.env.NEXT_PUBLIC_APP_VERSION}</p>
     </div>
   )
 }

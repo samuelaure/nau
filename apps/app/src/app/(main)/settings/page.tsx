@@ -72,6 +72,10 @@ export default function PlatformSettingsPage() {
           <p className="text-center text-sm text-gray-400 py-8">No workspaces yet. Create one above.</p>
         )}
       </div>
+
+      <p className="text-xs text-gray-400 dark:text-gray-600 pt-4">
+        naŭ app v{process.env.NEXT_PUBLIC_APP_VERSION}
+      </p>
     </div>
   )
 }

@@ -1,6 +1,6 @@
 {
   "name": "nauthenticity",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Brand intelligence service — scraping, transcription, semantic search, InspoBase, comment suggestions",
   "main": "dist/main.js",
   "private": true,

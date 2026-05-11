@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Building2, Users, Loader2, Check, Settings } from 'lucide-react';
+import pkg from '../../package.json';
 
 type Workspace = { id: string; name: string };
 type Member = {
@@ -332,6 +333,9 @@ export function WorkspaceSettings() {
           )}
         </div>
       </div>
+      <p style={{ marginTop: '32px', fontSize: '11px', color: '#484f58' }}>
+        naŭthenticity v{pkg.version}
+      </p>
     </div>
   );
 }

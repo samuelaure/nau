@@ -171,6 +171,35 @@ ssh nau "docker logs nauthenticity --tail=30 -f"
 
 ---
 
+### Version Bumping (Before Every Deploy)
+
+Versions are bumped manually in each app's `package.json` before merging to `main`. The version is displayed in every app's settings page and exposed via `/health` endpoints.
+
+**Rules:**
+- `PATCH` (x.x.**1**) — bug fixes, CI changes, dependency updates, config tweaks
+- `MINOR` (x.**1**.0) — new features, new API endpoints, new DB tables/columns, behaviour changes
+- `MAJOR` (**1**.0.0) — breaking changes: dropped endpoints, renamed fields, schema redesigns, auth changes
+
+**Which apps to bump:**
+Only bump apps with actual code changes in the deploy. Leave unchanged apps as-is.
+
+| App | package.json | Where version appears |
+|-----|-------------|----------------------|
+| `api` | `apps/api/package.json` | `GET /health` → `version` field |
+| `accounts` | `apps/accounts/package.json` | — (auth-only app, no settings UI) |
+| `app` | `apps/app/package.json` | Settings page footer |
+| `flownau` | `apps/flownau/package.json` | Settings page footer + `GET /api/v1/health` |
+| `nauthenticity` | `apps/nauthenticity/package.json` | `GET /health` + dashboard workspace settings footer |
+| `nauthenticity/dashboard` | `apps/nauthenticity/dashboard/package.json` | Keep in sync with `nauthenticity` |
+| `zazu-bot` | `apps/zazu-bot/package.json` | — (no UI) |
+| `zazu-dashboard` | `apps/zazu-dashboard/package.json` | — (no settings page yet) |
+
+**Checklist:**
+- [ ] Bumped version in `package.json` for every app that changed
+- [ ] `nauthenticity/dashboard` version matches `nauthenticity` version
+
+---
+
 ## Architecture overview
 
 ```
