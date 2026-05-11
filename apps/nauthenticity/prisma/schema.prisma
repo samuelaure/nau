@@ -29,10 +29,25 @@ model SocialProfile {
 
   posts               Post[]
   categoryMemberships CategoryMembership[]
+  syncSnapshots       ProfileSyncSnapshot[]
 
   @@unique([platform, username])
   @@index([platform, username])
   @@index([ownerId])
+}
+
+model ProfileSyncSnapshot {
+  id              String        @id @default(uuid())
+  socialProfileId String
+  socialProfile   SocialProfile @relation(fields: [socialProfileId], references: [id], onDelete: Cascade)
+
+  igPostCount     Int
+  nauPostCount    Int
+  scrapeTriggered Boolean       @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([socialProfileId, createdAt(sort: Desc)])
 }
 
 // ── Scraped Content ───────────────────────────────────────────────────────────

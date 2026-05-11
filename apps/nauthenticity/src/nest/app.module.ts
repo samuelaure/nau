@@ -19,6 +19,7 @@ import { ScrapingModule } from './scraping/scraping.module'
 import { BrandContextModule } from './brand-context/brand-context.module'
 import { ProjectsModule } from './projects/projects.module'
 import { PostsModule } from './posts/posts.module'
+import { ProfileSyncModule } from './profile-sync/profile-sync.module'
 import { HealthController } from './health/health.controller'
 import { AuthCallbackController } from './auth/auth-callback.controller'
 
@@ -51,6 +52,7 @@ import { AuthCallbackController } from './auth/auth-callback.controller'
     BrandContextModule,
     ProjectsModule,
     PostsModule,
+    ProfileSyncModule,
   ],
   controllers: [HealthController, AuthCallbackController],
   providers: [

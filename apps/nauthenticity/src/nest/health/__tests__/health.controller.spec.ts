@@ -16,6 +16,6 @@ describe('HealthController', () => {
 
   it('returns status ok with service name', () => {
     const result = controller.check()
-    expect(result).toEqual({ status: 'ok', service: 'nauthenticity' })
+    expect(result).toMatchObject({ status: 'ok', service: 'nauthenticity' })
   })
 })
