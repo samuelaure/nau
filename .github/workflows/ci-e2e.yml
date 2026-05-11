@@ -1,4 +1,6 @@
 name: CI — E2E (Playwright)
+# Temporarily disabled — E2E suite needs overhaul. Re-enable when taken over.
+# See docs/future/ for the plan.
 
 # E2E tests run on push to main and on PRs that touch any app or the E2E suite itself.
 # They require a running set of services, provided by docker-compose.
@@ -10,8 +12,9 @@ name: CI — E2E (Playwright)
 # The test database is seeded by the api app's seed script before tests run.
 # See apps/api/prisma/seed.ts and the "Seed test database" step below.
 on:
+  workflow_dispatch: # manual trigger only until E2E suite is overhauled
   push:
-    branches: [main]
+    branches: ['__disabled__']
     paths:
       - 'apps/**'
       - 'packages/**'
