@@ -2,7 +2,10 @@ import { Controller, Get } from '@nestjs/common';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-const { version } = JSON.parse(readFileSync(join(__dirname, '../../package.json'), 'utf-8')) as { version: string };
+let version = 'unknown';
+try {
+  version = (JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf-8')) as { version: string }).version;
+} catch { /* version stays 'unknown' if pkg not found */ }
 
 @Controller('health')
 export class HealthController {
