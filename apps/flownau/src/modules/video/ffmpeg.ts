@@ -174,6 +174,35 @@ export function generateThumbnail(inputPath: string, outputPath: string): Promis
 }
 
 /**
+ * Splits a video into fixed-length segments using stream copy (no re-encode).
+ * outputPattern must be a printf-style path e.g. "/tmp/seg_%03d.mp4".
+ * Returns the number of segments produced.
+ */
+export function splitVideo(inputPath: string, outputPattern: string, segmentSecs: number): Promise<number> {
+  return new Promise((resolve, reject) => {
+    let segmentCount = 0
+    ffmpeg(inputPath)
+      .outputOptions([
+        '-c copy',
+        '-f segment',
+        `-segment_time ${segmentSecs}`,
+        '-reset_timestamps 1',
+      ])
+      .on('start', (cmd) => logger.debug({ cmd }, 'Spawned FFmpeg (split)'))
+      .on('progress', (p) => {
+        // segment muxer emits a new timemark each time a segment is closed
+        if (p.timemark) segmentCount++
+      })
+      .on('error', (err) => { logger.error({ err }, 'Video split error'); reject(err) })
+      .on('end', () => {
+        logger.info({ segmentCount }, 'Video split finished')
+        resolve(segmentCount)
+      })
+      .save(outputPattern)
+  })
+}
+
+/**
  * Extracts the duration (in seconds) of a media file via ffprobe.
  */
 export function getDuration(inputPath: string): Promise<number | undefined> {

@@ -8,6 +8,7 @@ import { WorkspaceSettings } from './pages/WorkspaceSettings';
 import { WorkspacesList } from './pages/WorkspacesList';
 import { BrandsList } from './pages/BrandsList';
 import { BrandLayout } from './pages/BrandLayout';
+import { ProjectLayout } from './pages/ProjectLayout';
 import { RequireAuth } from './components/RequireAuth';
 import { Sidebar } from './components/Sidebar';
 import './index.css';
@@ -41,6 +42,10 @@ function App() {
                       <Route
                         path="/workspaces/:workspaceId/brands/:brandId/*"
                         element={<BrandLayout />}
+                      />
+                      <Route
+                        path="/workspaces/:workspaceId/projects/:projectId/*"
+                        element={<ProjectLayout />}
                       />
                       <Route path="/dashboard" element={<Navigate to="/workspaces" replace />} />
                       <Route path="/accounts/*" element={<Navigate to="/workspaces" replace />} />

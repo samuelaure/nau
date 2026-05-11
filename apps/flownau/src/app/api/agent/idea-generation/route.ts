@@ -30,32 +30,36 @@ export async function POST(req: Request) {
     })
 
     const language = brand?.language ?? 'Spanish'
-    const count = typeof countOverride === 'number' ? countOverride : (brand?.ideationCount ?? 9)
+    const count = typeof countOverride === 'number' ? countOverride : (brand?.ideationCount ?? undefined)
 
     // Resolve topic: for automatic source fetch digest from nauthenticity; for manual require it from body
     let topic: string = topicFromBody?.trim() ?? ''
     let sourceRef: string | null = null
     let priority = 2
 
-    if (source === 'automatic') {
-      const { fetchBrandDigest } = await import('@/modules/ideation/sources/inspo-source')
-      const digest = await fetchBrandDigest(brandId)
+    if (source === 'capture') {
+      // Service-delivered capture (voicenote, specific capture) — topic and sourceRef come from body
+      if (!topic) {
+        return NextResponse.json({ error: 'Topic is required for capture source.' }, { status: 400 })
+      }
+      priority = 1
+      sourceRef = json.sourceRef ?? null
+    } else if (source === 'automatic') {
+      const { fetchPendingSourceConcepts, generateSourceConcepts } = await import('@/modules/ideation/sources/inspo-source')
+      let concepts = await fetchPendingSourceConcepts(brandId)
+      if (concepts.length === 0) concepts = await generateSourceConcepts(brandId)
 
-      if (!digest?.content?.trim()) {
+      if (concepts.length === 0) {
         return NextResponse.json(
-          { error: 'No InspoBase digest available. Run a nauthenticity scrape first.' },
+          { error: 'No source concepts available. Add posts or profiles to InspoBase first.' },
           { status: 422 },
         )
       }
 
-      topic = digest.content
+      // Use the first pending concept as the topic for this brainstorm session
+      topic = concepts[0].content
       priority = 3
-      sourceRef =
-        digest.attachedUrls.length > 0
-          ? digest.attachedUrls.length === 1
-            ? digest.attachedUrls[0]
-            : JSON.stringify(digest.attachedUrls)
-          : null
+      sourceRef = concepts[0].id
     }
 
     if (!topic) {

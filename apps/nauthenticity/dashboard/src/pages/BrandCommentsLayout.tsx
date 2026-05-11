@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate, NavLink, useLocation } from 'react-router-dom';
-import { BrandMonitoredView } from './BrandMonitoredView';
+import { BrandCommentView } from './BrandCommentView';
 import { BrandSinglePostsView } from './BrandSinglePostsView';
 
 export const BrandCommentsLayout = () => {
@@ -49,7 +49,7 @@ export const BrandCommentsLayout = () => {
       </div>
 
       <Routes>
-        <Route path="monitored" element={<BrandMonitoredView />} />
+        <Route path="monitored" element={<BrandCommentView />} />
         <Route path="single" element={<BrandSinglePostsView />} />
         <Route path="*" element={<Navigate to="monitored" replace />} />
       </Routes>

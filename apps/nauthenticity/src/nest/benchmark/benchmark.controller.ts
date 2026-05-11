@@ -26,28 +26,7 @@ export class BenchmarkController {
     return this.benchmarkService.listFeedback(brandId)
   }
 
-  @Get('brands/:brandId/synthesis')
-  @UseGuards(JwtAuthGuard)
-  listSyntheses(@Param('brandId') brandId: string) {
-    return this.benchmarkService.listSyntheses(brandId)
-  }
-
-  @Get('brands/:brandId/synthesis/:type')
-  @UseGuards(JwtAuthGuard)
-  getSynthesis(@Param('brandId') brandId: string, @Param('type') type: string) {
-    return this.benchmarkService.getSynthesis(brandId, type)
-  }
-
   // Service routes
-  @Post('_service/brands/:brandId/synthesis')
-  @UseGuards(ServiceAuthGuard)
-  upsertSynthesis(
-    @Param('brandId') brandId: string,
-    @Body() body: { type: string; content: string; attachedUrls?: string[] },
-  ) {
-    return this.benchmarkService.upsertSynthesis(brandId, body.type, body.content, body.attachedUrls)
-  }
-
   @Post('_service/brands/:brandId/generate-comment')
   @UseGuards(ServiceAuthGuard)
   generateCommentsByService(@Param('brandId') brandId: string, @Body() dto: GenerateCommentDto) {

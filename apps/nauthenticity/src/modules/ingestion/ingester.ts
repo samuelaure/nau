@@ -1,5 +1,6 @@
 import { runInstagramScraper } from '../../services/apify.service';
 import { prisma } from '../../modules/shared/prisma';
+import { upsertSocialProfile } from '../../modules/shared/upsert-social-profile';
 import { downloadQueue } from '../../queues/download.queue';
 import { logger } from '../../utils/logger';
 
@@ -11,22 +12,13 @@ export const ingestProfile = async (
 ) => {
   logger.info(`[Ingester] Starting ingestion for ${username}`);
 
-  // 0. Ensure SocialProfile exists (Identity)
-  let account = await prisma.socialProfile.findFirst({
-    where: { platform: 'instagram', username },
+  // 0. Ensure SocialProfile exists (Identity) — use externalId for stable dedup once known.
+  // externalId is populated after scraping; on first call we only have username.
+  let account = await upsertSocialProfile({
+    platform: 'instagram',
+    username,
+    extraUpdate: { lastScrapedAt: new Date() },
   });
-
-  if (!account) {
-    account = await prisma.socialProfile.create({
-      data: { platform: 'instagram', username, lastScrapedAt: new Date() },
-    });
-  } else {
-    // Update lastScrapedAt
-    account = await prisma.socialProfile.update({
-      where: { id: account.id },
-      data: { lastScrapedAt: new Date() },
-    });
-  }
 
   let oldestPostDate: string | undefined;
   if (options.updateSync) {
@@ -99,20 +91,25 @@ export const ingestProfile = async (
 
     items = scrapeResult.items;
 
-    // Immediately update the main account with the high-res profile found during the feed scrape
+    // Immediately update the main account with the high-res profile found during the feed scrape.
+    // Also store externalId (Instagram's stable numeric ID) so future lookups are rename-proof.
     if (scrapeResult.profile && scrapeResult.profile.username) {
       const hdUrl = scrapeResult.profile.profilePicUrlHD || scrapeResult.profile.profilePicUrl;
-      if (scrapeResult.profile.postsCount != null) {
-        await prisma.socialProfile.updateMany({
-          where: { username: scrapeResult.profile.username },
-          data: { totalPostCount: scrapeResult.profile.postsCount },
-        });
-      }
+      // Re-upsert by externalId now that we have it — this merges any username-keyed record
+      // with the now-known stable ID, and handles username renames correctly.
+      account = await upsertSocialProfile({
+        platform: 'instagram',
+        username: scrapeResult.profile.username,
+        externalId: scrapeResult.profile.id ?? null,
+        extraUpdate: {
+          ...(scrapeResult.profile.postsCount != null ? { totalPostCount: scrapeResult.profile.postsCount } : {}),
+        },
+      });
       if (hdUrl) {
         // Only set the Instagram URL as a placeholder if no R2-hosted URL is stored yet
         await prisma.socialProfile.updateMany({
           where: {
-            username: scrapeResult.profile.username,
+            id: account.id,
             NOT: { profileImageUrl: { startsWith: 'https://media.9nau.com' } },
           },
           data: { profileImageUrl: hdUrl },

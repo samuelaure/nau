@@ -1010,6 +1010,9 @@ importers:
       form-data:
         specifier: ^4.0.5
         version: 4.0.5
+      nau-storage:
+        specifier: workspace:*
+        version: link:../../packages/storage
       node-cron:
         specifier: ^4.2.1
         version: 4.2.1

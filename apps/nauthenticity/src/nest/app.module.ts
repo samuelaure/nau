@@ -17,6 +17,7 @@ import { SchedulerModule } from './scheduler/scheduler.module'
 import { BenchmarkModule } from './benchmark/benchmark.module'
 import { ScrapingModule } from './scraping/scraping.module'
 import { BrandContextModule } from './brand-context/brand-context.module'
+import { ProjectsModule } from './projects/projects.module'
 import { HealthController } from './health/health.controller'
 import { AuthCallbackController } from './auth/auth-callback.controller'
 
@@ -47,6 +48,7 @@ import { AuthCallbackController } from './auth/auth-callback.controller'
     BenchmarkModule,
     ScrapingModule,
     BrandContextModule,
+    ProjectsModule,
   ],
   controllers: [HealthController, AuthCallbackController],
   providers: [

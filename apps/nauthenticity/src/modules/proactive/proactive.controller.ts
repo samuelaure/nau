@@ -19,8 +19,7 @@ import { authenticate } from '../../utils/auth';
 const BrandUpsertSchema = z.object({
   workspaceId: z.string().min(1),
   mainUsername: z.string().optional().nullable(),
-  voicePrompt: z.string().min(1),
-  commentStrategy: z.string().optional().nullable(),
+  commentPrompt: z.string().optional().nullable(),
   suggestionsCount: z.number().int().min(1).max(10).default(3),
   windowStart: z
     .string()
@@ -34,20 +33,18 @@ const BrandUpsertSchema = z.object({
     .nullable(),
 });
 
-const MonitoringTypeEnum = z.enum(['content', 'benchmark', 'inspiration']);
+const CategoryEnum = z.enum(['COMMENT', 'INSPO', 'BENCHMARK']);
 
-const MonitorCreateSchema = z.object({
+const MembershipCreateSchema = z.object({
   brandId: z.string().min(1),
   usernames: z.array(z.string().min(1)),
-  monitoringType: MonitoringTypeEnum.default('content'),
+  category: CategoryEnum,
   isActive: z.boolean().default(true),
-  settings: z.record(z.any()).optional().nullable(),
 });
 
-const MonitorUpdateSchema = z.object({
-  monitoringType: MonitoringTypeEnum.optional(),
+const MembershipUpdateSchema = z.object({
+  category: CategoryEnum.optional(),
   isActive: z.boolean().optional(),
-  settings: z.record(z.any()).optional().nullable(),
 });
 
 const FeedbackSchema = z.object({
@@ -126,13 +123,13 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
       const intelligence = await prisma.brand.findUnique({
         where: { id: brandId },
         include: {
-          monitors: {
+          categoryMemberships: {
             select: {
               id: true,
               socialProfile: { select: { username: true } },
-              monitoringType: true,
+              postId: true,
+              category: true,
               isActive: true,
-              settings: true,
               createdAt: true,
             },
           },
@@ -163,8 +160,7 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
     },
   );
 
-  // Partial update — only update provided fields (no voicePrompt required)
-  // Uses upsert so it also works for brands with no intelligence record yet
+  // Partial update — only update provided fields
   fastify.patch(
     '/brands/:brandId/intelligence',
     { preHandler: authenticate },
@@ -172,7 +168,7 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
       const { brandId } = request.params as { brandId: string };
       try {
         const body = request.body as Record<string, unknown>;
-        const allowed = ['workspaceId', 'mainUsername', 'voicePrompt', 'commentStrategy', 'suggestionsCount', 'windowStart', 'windowEnd', 'timezone'];
+        const allowed = ['workspaceId', 'mainUsername', 'commentPrompt', 'suggestionsCount', 'windowStart', 'windowEnd', 'timezone'];
         const patch: Record<string, unknown> = {};
         for (const key of allowed) {
           if (key in body) patch[key] = body[key];
@@ -180,7 +176,7 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
         const intelligence = await prisma.brand.upsert({
           where: { id: brandId },
           update: patch,
-          create: { id: brandId, workspaceId: (patch.workspaceId as string) ?? '', voicePrompt: (patch.voicePrompt as string) ?? '', ...patch },
+          create: { id: brandId, workspaceId: (patch.workspaceId as string) ?? '', ...patch },
         });
         return reply.send(intelligence);
       } catch (e: unknown) {
@@ -200,19 +196,19 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
     const intelligence = await prisma.brand.findUnique({
       where: { id: brandId },
       include: {
-        monitors: { select: { socialProfile: { select: { username: true } }, settings: true } },
-        syntheses: { orderBy: { createdAt: 'desc' }, take: 1 },
+        categoryMemberships: {
+          where: { socialProfileId: { not: null } },
+          select: { socialProfile: { select: { username: true } }, category: true },
+        },
       },
     });
     if (!intelligence) return reply.status(404).send({ error: 'Brand intelligence not found' });
 
     return reply.send({
       brandId: intelligence.id,
-      voicePrompt: intelligence.voicePrompt,
-      commentStrategy: intelligence.commentStrategy,
+      commentPrompt: intelligence.commentPrompt,
       suggestionsCount: intelligence.suggestionsCount,
-      targets: intelligence.monitors,
-      latestSynthesis: intelligence.syntheses[0] ?? null,
+      memberships: intelligence.categoryMemberships,
     });
   });
 
@@ -224,13 +220,13 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
       const { brandId } = request.params as { brandId: string };
       const intelligence = await prisma.brand.findUnique({
         where: { id: brandId },
-        select: { id: true, voicePrompt: true },
+        select: { id: true, commentPrompt: true },
       });
       if (!intelligence) return reply.status(404).send({ error: 'Brand intelligence not found' });
 
       return reply.send({
         brandId: intelligence.id,
-        voicePrompt: intelligence.voicePrompt.slice(0, 500),
+        commentPrompt: intelligence.commentPrompt?.slice(0, 500) ?? null,
       });
     },
   );
@@ -250,11 +246,11 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
     const brands = await prisma.brand.findMany({
       where: { workspaceId },
       include: {
-        monitors: {
+        categoryMemberships: {
+          where: { socialProfileId: { not: null } },
           select: {
             socialProfile: { select: { username: true } },
-            settings: true,
-            monitoringType: true,
+            category: true,
           },
         },
       },
@@ -295,13 +291,7 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
   // -------------------------------------------------------------------------
   fastify.post('/targets', { preHandler: authenticate }, async (request, reply) => {
     try {
-      const {
-        brandId,
-        usernames,
-        monitoringType,
-        isActive,
-        settings,
-      } = MonitorCreateSchema.parse(request.body);
+      const { brandId, usernames, category, isActive } = MembershipCreateSchema.parse(request.body);
 
       for (const username of usernames) {
         const profile = await prisma.socialProfile.upsert({
@@ -310,21 +300,20 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
           update: {},
         });
 
-        await prisma.socialProfileMonitor.upsert({
-          where: { brandId_socialProfileId: { brandId, socialProfileId: profile.id } },
-          create: {
-            brandId,
-            socialProfileId: profile.id,
-            monitoringType,
-            isActive,
-            settings: settings ?? null,
-          },
-          update: {
-            monitoringType,
-            isActive,
-            settings: settings !== undefined ? settings : undefined,
-          },
+        const existing = await prisma.categoryMembership.findFirst({
+          where: { brandId, category, socialProfileId: profile.id, postId: null },
+          select: { id: true },
         });
+        if (existing) {
+          await prisma.categoryMembership.update({
+            where: { id: existing.id },
+            data: { isActive },
+          });
+        } else {
+          await prisma.categoryMembership.create({
+            data: { brandId, socialProfileId: profile.id, category, isActive },
+          });
+        }
       }
 
       return reply.send({ success: true });
@@ -334,22 +323,39 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
     }
   });
 
+  // Update a profile-level membership identified by (brandId, username, category).
+  // Category is required because the same brand+profile may exist in multiple categories.
   fastify.put(
     '/targets/:brandId/:username',
     { preHandler: authenticate },
     async (request, reply) => {
       const { brandId, username } = request.params as { brandId: string; username: string };
+      const { category: queryCategory } = request.query as { category?: string };
       try {
-        const data = MonitorUpdateSchema.parse(request.body);
+        const data = MembershipUpdateSchema.parse(request.body);
+        const targetCategory = queryCategory ?? data.category;
+        if (!targetCategory) {
+          return reply.status(400).send({ error: 'Missing category (query or body)' });
+        }
         const profile = await prisma.socialProfile.findUnique({
           where: { platform_username: { platform: 'instagram', username } },
         });
         if (!profile) return reply.status(404).send({ error: 'SocialProfile not found' });
-        const target = await prisma.socialProfileMonitor.update({
-          where: { brandId_socialProfileId: { brandId, socialProfileId: profile.id } },
+        const target = await prisma.categoryMembership.findFirst({
+          where: {
+            brandId,
+            category: targetCategory,
+            socialProfileId: profile.id,
+            postId: null,
+          },
+          select: { id: true },
+        });
+        if (!target) return reply.status(404).send({ error: 'Membership not found' });
+        const updated = await prisma.categoryMembership.update({
+          where: { id: target.id },
           data,
         });
-        return reply.send(target);
+        return reply.send(updated);
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
         return reply.status(400).send({ error: msg });
@@ -358,17 +364,26 @@ export const proactiveController: FastifyPluginAsync = async (fastify: FastifyIn
   );
 
   fastify.delete('/targets', { preHandler: authenticate }, async (request, reply) => {
-    const { brandId, username } = request.query as { brandId: string; username: string };
-    if (!brandId || !username) {
-      return reply.status(400).send({ error: 'Missing required query params: brandId, username' });
+    const { brandId, username, category } = request.query as {
+      brandId: string;
+      username: string;
+      category?: string;
+    };
+    if (!brandId || !username || !category) {
+      return reply
+        .status(400)
+        .send({ error: 'Missing required query params: brandId, username, category' });
     }
     const profile = await prisma.socialProfile.findUnique({
       where: { platform_username: { platform: 'instagram', username } },
     });
     if (!profile) return reply.status(404).send({ error: 'SocialProfile not found' });
-    await prisma.socialProfileMonitor.delete({
-      where: { brandId_socialProfileId: { brandId, socialProfileId: profile.id } },
+    const target = await prisma.categoryMembership.findFirst({
+      where: { brandId, category, socialProfileId: profile.id, postId: null },
+      select: { id: true },
     });
+    if (!target) return reply.status(404).send({ error: 'Membership not found' });
+    await prisma.categoryMembership.delete({ where: { id: target.id } });
     return reply.send({ success: true });
   });
 

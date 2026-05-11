@@ -305,10 +305,6 @@ export default function BrandPosts({ brandId, workspaceId }: { brandId: string; 
   const [brainstormCount, setBrainstormCount] = useState<number | ''>('')
   const [brainstormSource, setBrainstormSource] = useState<'manual' | 'automatic'>('manual')
 
-  // Manual idea modal
-  const [manualOpen, setManualOpen] = useState(false)
-  const [manualText, setManualText] = useState('')
-
   // Ideation prompt — savedIdeationPrompt is the DB value; ideationCustomPrompt is the per-generation editable copy
   const [savedIdeationPrompt, setSavedIdeationPrompt] = useState('')
   const [ideationCustomPrompt, setIdeationCustomPrompt] = useState('')
@@ -316,8 +312,6 @@ export default function BrandPosts({ brandId, workspaceId }: { brandId: string; 
   const [promptDraft, setPromptDraft] = useState('')
   const [savingPrompt, setSavingPrompt] = useState(false)
   const [brainstormShowPrompt, setBrainstormShowPrompt] = useState(false)
-  const [manualShowPrompt, setManualShowPrompt] = useState(false)
-
   // Composer prompt — savedComposerPrompt is the DB value; draftCustomPrompt is the per-generation editable copy
   const [savedComposerPrompt, setSavedComposerPrompt] = useState('')
   const [draftCustomPrompt, setDraftCustomPrompt] = useState('')
@@ -497,25 +491,6 @@ const handleSavePrompt = async (text: string) => {
     }
   }
 
-  const handleCreateManualIdea = async () => {
-    if (!manualText.trim()) return
-    const toastId = toast.loading('Creating idea…')
-    try {
-      const res = await fetch('/api/ideas', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brandId, ideaText: manualText, source: 'manual', priority: 2, status: 'IDEA_PENDING' }),
-      })
-      if (!res.ok) throw new Error('Failed to create idea')
-      toast.success('Idea created!', { id: toastId })
-      setManualText('')
-      setManualOpen(false)
-      fetchIdeas()
-    } catch (err: any) {
-      toast.error(err.message, { id: toastId })
-    }
-  }
-
   const handleGenerate = async () => {
     if (brainstormSource === 'manual' && !brainstormConcept.trim()) {
       toast.error('Please enter a topic.')
@@ -674,9 +649,6 @@ const handleSavePrompt = async (text: string) => {
             <SlidersHorizontal size={12} />
             {ideationCustomPrompt ? 'Prompt set' : 'Set prompt'}
           </button>
-          <Button onClick={() => setManualOpen(true)} size="sm" variant="outline">
-            + Add Idea
-          </Button>
           <Button
             onClick={() => setBrainstormOpen(true)}
             size="sm"
@@ -873,7 +845,7 @@ const handleSavePrompt = async (text: string) => {
               </div>
             )}
             <div className="flex items-center gap-3">
-              <label className="text-xs text-text-secondary whitespace-nowrap">Count (leave blank for default)</label>
+              <label className="text-xs text-text-secondary whitespace-nowrap">Count (leave blank — AI decides)</label>
               <input
                 type="number" min={1} max={20}
                 value={brainstormCount}
@@ -1058,56 +1030,6 @@ const handleSavePrompt = async (text: string) => {
                 className="bg-accent text-white"
               >
                 <Shuffle className="w-4 h-4 mr-2" />Re-compose
-              </Button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {/* ── Manual idea modal ─────────────────────────────────────────────────── */}
-      {manualOpen && (
-        <Modal isOpen={true} onClose={() => setManualOpen(false)}>
-          <div className="space-y-4">
-            <h2 className="text-xl font-heading font-semibold">Add Idea</h2>
-            <textarea
-              autoFocus
-              className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-sm min-h-[120px]"
-              value={manualText}
-              onChange={e => setManualText(e.target.value)}
-              placeholder="Write the concept — hook, angle, educational value…"
-            />
-            <div>
-              <button
-                onClick={() => setManualShowPrompt(v => !v)}
-                className={cn(
-                  'flex items-center gap-1.5 text-xs transition-colors',
-                  ideationCustomPrompt ? 'text-amber-300 hover:text-amber-200' : 'text-text-secondary hover:text-white',
-                )}
-              >
-                <SlidersHorizontal size={11} />
-                {ideationCustomPrompt ? 'Ideation prompt set' : 'Add ideation prompt'}
-                <ChevronDown size={11} className={cn('transition-transform', manualShowPrompt && 'rotate-180')} />
-              </button>
-              {manualShowPrompt && (
-                <div className="mt-2 flex flex-col gap-2">
-                  <textarea
-                    value={ideationCustomPrompt}
-                    onChange={e => setIdeationCustomPrompt(e.target.value)}
-                    placeholder={"What angles, constraints or filters should shape the ideas?\n\ne.g. 'Focus on founder-led, behind-the-scenes content. Avoid motivational clichés. Ideas should resonate with early-stage founders, not investors. Never suggest list-based formats.'"}
-                    className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-xs text-white resize-y min-h-[80px]"
-                  />
-                  {ideationCustomPrompt !== savedIdeationPrompt && (
-                    <Button size="sm" variant="outline" onClick={() => setIdeationCustomPrompt(savedIdeationPrompt)} className="self-end text-xs text-amber-400 border-amber-500/30">
-                      Reset to saved
-                    </Button>
-                  )}
-                </div>
-              )}
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setManualOpen(false)}>Cancel</Button>
-              <Button onClick={handleCreateManualIdea} className="bg-accent text-white" disabled={!manualText.trim()}>
-                Save Idea
               </Button>
             </div>
           </div>

@@ -5,6 +5,7 @@ import { NoteInput } from '@/components/notes/note-input'
 import { Dashboard } from '@/components/dashboard/Dashboard'
 import { JournalView } from '@/components/journal/JournalView'
 import { SearchView } from '@/components/search/SearchView'
+import { ProjectsView } from '@/components/projects/ProjectsView'
 import { useGetBlocks } from '@/hooks/use-blocks-api'
 import { groupBlocksByDate, buildHierarchy, formatDisplayDate } from '@9nau/core'
 import { Block } from '@9nau/types'
@@ -81,6 +82,10 @@ export default function HomePage() {
 
   if (activeView === 'search') {
     return <SearchView />
+  }
+
+  if (activeView === 'projects') {
+    return <ProjectsView />
   }
 
   return (

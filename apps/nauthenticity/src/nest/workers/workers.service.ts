@@ -106,13 +106,25 @@ export class WorkersService implements OnApplicationBootstrap, OnApplicationShut
         const needsTranscription = videoMedia.filter((m) => !m.transcript)
 
         if (needsTranscription.length === 0) {
-          this.logger.warn(`[Recovery] Run ${run.id} stuck in transcribing but all done — advancing to embedding`)
-          await prisma.scrapingRun.update({ where: { id: run.id }, data: { phase: 'embedding' } })
-          await computeQueue.add('embed-batch', { runId: run.id, username })
+          this.logger.warn(`[Recovery] Run ${run.id} stuck in transcribing but all done — advancing to synthesizing`)
+          await prisma.scrapingRun.update({ where: { id: run.id }, data: { phase: 'synthesizing' } })
+          await computeQueue.add('synthesize-batch', { runId: run.id, username })
         } else {
           this.logger.warn(`[Recovery] Run ${run.id} stuck in transcribing — re-queuing (${needsTranscription.length} videos remaining)`)
           await computeQueue.add('transcribe-batch', { runId: run.id, username })
         }
+      }
+
+      // Runs stuck in 'synthesizing': re-queue — synthesize-batch is idempotent (skips posts that already have postSynthesis).
+      const stuckInSynthesizing = await prisma.scrapingRun.findMany({
+        where: { phase: 'synthesizing', status: 'pending', isPaused: false },
+        include: { posts: { select: { username: true } } },
+      })
+      for (const run of stuckInSynthesizing) {
+        const username = run.posts[0]?.username
+        if (!username) continue
+        this.logger.warn(`[Recovery] Run ${run.id} stuck in synthesizing — re-queuing`)
+        await computeQueue.add('synthesize-batch', { runId: run.id, username })
       }
     } catch (err) {
       this.logger.error(`[Recovery] Startup recovery failed: ${err}`)

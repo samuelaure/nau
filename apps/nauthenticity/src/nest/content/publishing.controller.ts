@@ -14,32 +14,34 @@ export class PublishingController {
   ) {}
 
   /**
-   * PUT /social-profile-targets/{targetId}/publishing
-   * Mark a profile as owned by a brand and sync to flownau
+   * PUT /social-profile-targets/{membershipId}/publishing
+   * Mark a profile as owned (OWN category) by a brand and sync to flownau.
+   * Identifies the profile via a CategoryMembership row id.
    */
-  @Put('social-profile-targets/:targetId/publishing')
+  @Put('social-profile-targets/:membershipId/publishing')
   @HttpCode(HttpStatus.OK)
   async setPublishing(
-    @Param('targetId') targetId: string,
+    @Param('membershipId') membershipId: string,
     @Body() body: { isOwned: boolean },
   ) {
-    const monitor = await this.prisma.socialProfileMonitor.findUnique({
-      where: { id: targetId },
+    const membership = await this.prisma.categoryMembership.findUnique({
+      where: { id: membershipId },
       include: { socialProfile: true, brand: true },
     })
-    if (!monitor) throw new Error('Monitor not found')
+    if (!membership) throw new Error('Membership not found')
+    if (!membership.socialProfileId) throw new Error('Membership is not profile-level')
 
     if (body.isOwned) {
       await this.prisma.socialProfile.update({
-        where: { id: monitor.socialProfileId },
-        data: { ownerId: monitor.brandId },
+        where: { id: membership.socialProfileId },
+        data: { ownerId: membership.brandId },
       })
 
       const serviceKey = this.config.get('NAU_SERVICE_KEY') || ''
-      await this.syncService.syncToFlownau(monitor.socialProfileId, serviceKey)
+      await this.syncService.syncToFlownau(membership.socialProfileId, serviceKey)
     } else {
       await this.prisma.socialProfile.update({
-        where: { id: monitor.socialProfileId },
+        where: { id: membership.socialProfileId },
         data: { ownerId: null },
       })
     }

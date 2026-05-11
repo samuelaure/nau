@@ -450,53 +450,23 @@ export async function smartFillCalendar(brandId: string): Promise<SmartFillResul
   let ideasGenerated = 0
   let noDigest = false
 
-  // Generate ideas in batches until we have enough to cover the gap
+  // Generate ideas via source concepts until we have enough to cover the gap
   if (totalIdeas < slotsNeeded) {
-    const { fetchBrandDigest } = await import('@/modules/ideation/sources/inspo-source')
-    const { generateContentIdeas } = await import('@/modules/ideation/ideation.service')
-    const digest = await fetchBrandDigest(brandId)
-
-    if (!digest?.content?.trim()) {
+    const result = await generateIdeasFromSourceConcepts(brandId, brand)
+    if (!result.hasConcepts) {
       noDigest = true
-      logger.warn({ brandId }, '[SMART_FILL] Idea generation skipped — no digest available')
+      logger.warn({ brandId }, '[SMART_FILL] Idea generation skipped — no source concepts available')
     } else {
-      const recentPosts = await prisma.post.findMany({
-        where: { brandId, createdAt: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) }, caption: { not: null } },
-        select: { caption: true },
-        take: 30,
-      })
-      const autoApprove = brand.autoApproveIdeas
-      const batchSize = brand.ideationCount
-
+      totalIdeas = await countAvailableIdeas()
+      ideasGenerated = totalIdeas
+      // If still short after one generation round, run again (concepts were regenerated)
       while (totalIdeas < slotsNeeded) {
-        const count = Math.min(batchSize, slotsNeeded - totalIdeas)
-        const output = await generateContentIdeas({
-          topic: digest.content,
-          language: brand.language,
-          count,
-          recentContent: recentPosts.map((p) => p.caption!.slice(0, 100)),
-          userInstructions: brand.ideationCustomPrompt ?? null,
-        })
-        const batchId = crypto.randomUUID()
-        for (const idea of output.ideas) {
-          await prisma.post.create({
-            data: {
-              brandId,
-              ideaText: idea.concept,
-              angle: idea.angle,
-              status: autoApprove ? 'IDEA_APPROVED' : 'IDEA_PENDING',
-              source: 'automatic',
-              priority: 3,
-              generationBatchId: batchId,
-              llmTrace: { ideaTrace: output.trace } as unknown as Prisma.InputJsonValue,
-            },
-          })
-        }
-        ideasGenerated += output.ideas.length
+        const again = await generateIdeasFromSourceConcepts(brandId, brand)
+        if (!again.hasConcepts) break
         totalIdeas = await countAvailableIdeas()
-
-        // Safety: if generation produced 0 ideas, break to avoid infinite loop
-        if (output.ideas.length === 0) break
+        // Safety: if count didn't grow, break to avoid infinite loop
+        if (totalIdeas <= ideasGenerated) break
+        ideasGenerated = totalIdeas
       }
       logger.info({ brandId, ideasGenerated }, '[SMART_FILL] Ideas generated')
     }
@@ -532,108 +502,83 @@ export async function smartFillCalendar(brandId: string): Promise<SmartFillResul
   }
 }
 
-// ─── Single-batch idea generation (for batch-rule unblocking) ────────────────
+// ─── Shared idea generation via source concepts ───────────────────────────────
 
-async function tryGenerateNewBatch(
+async function generateIdeasFromSourceConcepts(
   brandId: string,
-  brand: { ideationCount: number; autoApproveIdeas: boolean; language: string; ideationCustomPrompt?: string | null },
-): Promise<{ hasDigest: boolean }> {
+  brand: { autoApproveIdeas: boolean; language: string; ideationCustomPrompt?: string | null },
+): Promise<{ hasConcepts: boolean }> {
   try {
-    const { fetchBrandDigest } = await import('@/modules/ideation/sources/inspo-source')
+    const { fetchPendingSourceConcepts, generateSourceConcepts, markSourceConceptConsumed } =
+      await import('@/modules/ideation/sources/inspo-source')
     const { generateContentIdeas } = await import('@/modules/ideation/ideation.service')
 
-    const digest = await fetchBrandDigest(brandId)
-    if (!digest?.content?.trim()) return { hasDigest: false }
+    let concepts = await fetchPendingSourceConcepts(brandId)
+    if (concepts.length === 0) concepts = await generateSourceConcepts(brandId)
+    if (concepts.length === 0) return { hasConcepts: false }
 
     const recentPosts = await prisma.post.findMany({
       where: { brandId, createdAt: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) }, caption: { not: null } },
       select: { caption: true },
       take: 30,
     })
-    const output = await generateContentIdeas({
-      topic: digest.content,
-      language: brand.language,
-      count: brand.ideationCount,
-      recentContent: recentPosts.map((p) => p.caption!.slice(0, 100)),
-      userInstructions: brand.ideationCustomPrompt ?? null,
-    })
-    const batchId = crypto.randomUUID()
-    for (const idea of output.ideas) {
-      await prisma.post.create({
-        data: {
-          brandId,
-          ideaText: idea.concept,
-          angle: idea.angle,
-          status: brand.autoApproveIdeas ? 'IDEA_APPROVED' : 'IDEA_PENDING',
-          source: 'automatic',
-          priority: 3,
-          generationBatchId: batchId,
-          llmTrace: { ideaTrace: output.trace } as unknown as Prisma.InputJsonValue,
-        },
+    const recentContent = recentPosts.map((p) => p.caption!.slice(0, 100))
+
+    for (const concept of concepts) {
+      const output = await generateContentIdeas({
+        topic: concept.content,
+        language: brand.language,
+        recentContent,
+        userInstructions: brand.ideationCustomPrompt ?? null,
       })
+      const batchId = crypto.randomUUID()
+      await Promise.all(output.ideas.map((idea) =>
+        prisma.post.create({
+          data: {
+            brandId,
+            ideaText: idea.concept,
+            angle: idea.angle,
+            status: brand.autoApproveIdeas ? 'IDEA_APPROVED' : 'IDEA_PENDING',
+            source: 'automatic',
+            priority: 3,
+            sourceRef: concept.id,
+            generationBatchId: batchId,
+            llmTrace: { ideaTrace: output.trace } as unknown as Prisma.InputJsonValue,
+          },
+        }),
+      ))
+      await markSourceConceptConsumed(concept.id)
+      logger.info({ brandId, conceptId: concept.id, count: output.ideas.length }, '[COVERAGE] Ideas generated from source concept')
     }
-    logger.info({ brandId, count: output.ideas.length, batchId }, '[COVERAGE] Generated new batch for batch-rule unblocking')
-    return { hasDigest: true }
+
+    return { hasConcepts: true }
   } catch (err) {
-    logger.error({ brandId, err }, '[COVERAGE] tryGenerateNewBatch failed')
-    return { hasDigest: false }
+    logger.error({ brandId, err }, '[COVERAGE] generateIdeasFromSourceConcepts failed')
+    return { hasConcepts: false }
   }
+}
+
+// ─── Single-batch idea generation (for batch-rule unblocking) ────────────────
+
+async function tryGenerateNewBatch(
+  brandId: string,
+  brand: { ideationCount: number; autoApproveIdeas: boolean; language: string; ideationCustomPrompt?: string | null },
+): Promise<{ hasDigest: boolean }> {
+  const result = await generateIdeasFromSourceConcepts(brandId, brand)
+  return { hasDigest: result.hasConcepts }
 }
 
 // ─── Idea generation trigger ──────────────────────────────────────────────────
 
-async function triggerIdeaGeneration(brandId: string, ideationCount: number): Promise<boolean> {
-  try {
-    const { fetchBrandDigest } = await import('@/modules/ideation/sources/inspo-source')
-    const { generateContentIdeas } = await import('@/modules/ideation/ideation.service')
-
-    const brand = await prisma.brand.findUnique({
-      where: { id: brandId },
-      select: { language: true, autoApproveIdeas: true, ideationCustomPrompt: true },
-    })
-
-    const digest = await fetchBrandDigest(brandId)
-    if (!digest?.content?.trim()) {
-      logger.warn({ brandId }, '[COVERAGE] Idea generation skipped — no digest/topic available')
-      return false
-    }
-
-    const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)
-    const recentPosts = await prisma.post.findMany({
-      where: { brandId, createdAt: { gte: fourteenDaysAgo }, caption: { not: null } },
-      select: { caption: true },
-      take: 30,
-    })
-
-    const output = await generateContentIdeas({
-      topic: digest.content,
-      language: brand?.language ?? 'Spanish',
-      count: ideationCount,
-      recentContent: recentPosts.map((p) => p.caption!.slice(0, 100)),
-      userInstructions: brand?.ideationCustomPrompt ?? null,
-    })
-
-    const autoApprove = brand?.autoApproveIdeas ?? false
-    const batchId = crypto.randomUUID()
-    for (const idea of output.ideas) {
-      await prisma.post.create({
-        data: {
-          brandId,
-          ideaText: idea.concept,
-          angle: idea.angle,
-          status: autoApprove ? 'IDEA_APPROVED' : 'IDEA_PENDING',
-          source: 'automatic',
-          priority: 3,
-          generationBatchId: batchId,
-          llmTrace: { ideaTrace: output.trace } as unknown as Prisma.InputJsonValue,
-        },
-      })
-    }
-
-    logger.info({ brandId, ideationCount: output.ideas.length }, '[COVERAGE] Triggered idea generation')
-    return true
-  } catch (err) {
-    logger.error({ brandId, err }, '[COVERAGE] Failed to trigger idea generation')
-    return false
-  }
+async function triggerIdeaGeneration(brandId: string, _ideationCount: number): Promise<boolean> {
+  const brand = await prisma.brand.findUnique({
+    where: { id: brandId },
+    select: { language: true, autoApproveIdeas: true, ideationCustomPrompt: true },
+  })
+  const result = await generateIdeasFromSourceConcepts(brandId, {
+    autoApproveIdeas: brand?.autoApproveIdeas ?? false,
+    language: brand?.language ?? 'Spanish',
+    ideationCustomPrompt: brand?.ideationCustomPrompt,
+  })
+  return result.hasConcepts
 }

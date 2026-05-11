@@ -29,6 +29,7 @@ model User {
   nauUserId        String?         // 9naŭ User.id once linked
   messages         Message[]
   features         UserFeature[]
+  voicenotes       Voicenote[]
   deliveryWindow   DeliveryWindow?
   notifications    NotificationQueue[]
   createdAt        DateTime        @default(now())
@@ -68,6 +69,19 @@ model DeliveryWindow {
   startHour Int      @default(9)  // 0-23
   endHour   Int      @default(18) // 0-23
   timeZone  String   @default("UTC")
+}
+
+model Voicenote {
+  id                 String   @id @default(uuid())
+  userId             String
+  user               User     @relation(fields: [userId], references: [id])
+  audioStorageUrl    String
+  rawTranscription   String
+  cleanTranscription String
+  synthesis          String
+  createdAt          DateTime @default(now())
+
+  @@index([userId])
 }
 
 model NotificationQueue {

@@ -320,6 +320,61 @@ export const getBrandOwnedProfiles = async (brandId: string) => {
   return data;
 };
 
+// ── Projects ──────────────────────────────────────────────────────────────────
+
+export interface NauProject {
+  id: string;
+  workspaceId: string;
+  brandId?: string | null;
+  name: string;
+  description?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const getWorkspaceOverview = async (workspaceId: string): Promise<{ brands: NauBrand[]; projects: NauProject[] }> => {
+  const { data } = await api.get(`/workspace/${workspaceId}/overview`);
+  return data;
+};
+
+export const getProjects = async (workspaceId: string): Promise<NauProject[]> => {
+  const { data } = await api.get<NauProject[]>(`/workspaces/${workspaceId}/projects`);
+  return data;
+};
+
+export const createProject = async (workspaceId: string, name: string, description?: string): Promise<NauProject> => {
+  const { data } = await api.post<NauProject>(`/workspaces/${workspaceId}/projects`, { name, description });
+  return data;
+};
+
+export const updateProject = async (projectId: string, patch: { name?: string; description?: string; isActive?: boolean }): Promise<NauProject> => {
+  const { data } = await api.patch<NauProject>(`/projects/${projectId}`, patch);
+  return data;
+};
+
+export const deleteProject = async (projectId: string): Promise<void> => {
+  await api.delete(`/projects/${projectId}`);
+};
+
+export const getProjectTargets = async (projectId: string, category?: string) => {
+  const url = category
+    ? `/targets?projectId=${projectId}&category=${category}`
+    : `/targets?projectId=${projectId}`;
+  const { data } = await api.get(url);
+  return data;
+};
+
+export const addProjectTarget = async (payload: {
+  projectId: string;
+  usernames: string[];
+  category: string;
+  isActive?: boolean;
+}) => {
+  const { data } = await api.post(`/targets`, payload);
+  return data;
+};
+
 export const getInspoItems = async (brandId: string) => {
   const { data } = await api.get(`/brands/${brandId}/inspo`);
   return data;
@@ -335,9 +390,28 @@ export const updateInspoItem = async (id: string, brandId: string, updates: any)
   return data;
 };
 
+// Maps the dashboard's legacy targetType values to the new CategoryMembership.category enum.
+// 'single_post' has no profile-level analogue — it now routes through the InspoBase / Benchmark
+// post-level endpoints; that page will be refactored separately.
+function targetTypeToCategory(targetType?: string): string | undefined {
+  if (!targetType) return undefined;
+  switch (targetType) {
+    case 'monitored':
+      return 'COMMENT';
+    case 'benchmark':
+      return 'BENCHMARK';
+    case 'inspiration':
+    case 'inspo':
+      return 'INSPO';
+    default:
+      return targetType.toUpperCase();
+  }
+}
+
 export const getBrandTargets = async (brandId: string, targetType?: string) => {
-  const url = targetType
-    ? `/targets?brandId=${brandId}&targetType=${targetType}`
+  const category = targetTypeToCategory(targetType);
+  const url = category
+    ? `/targets?brandId=${brandId}&category=${category}`
     : `/targets?brandId=${brandId}`;
   const { data } = await api.get(url);
   return data;
@@ -351,7 +425,14 @@ export const addBrandTarget = async (payload: {
   initialDownloadCount?: number;
   autoUpdate?: boolean;
 }) => {
-  const { data } = await api.post(`/targets`, payload);
+  const { brandId, username, targetType, isActive } = payload;
+  const category = targetTypeToCategory(targetType);
+  const { data } = await api.post(`/targets`, {
+    brandId,
+    usernames: [username],
+    category,
+    isActive,
+  });
   return data;
 };
 
@@ -359,7 +440,8 @@ export const updateBrandTarget = async (
   id: string,
   updates: { isActive?: boolean; autoUpdate?: boolean; initialDownloadCount?: number },
 ) => {
-  const { data } = await api.patch(`/targets/${id}`, updates);
+  const { isActive } = updates;
+  const { data } = await api.patch(`/targets/${id}`, { isActive });
   return data;
 };
 
@@ -368,30 +450,6 @@ export const generateComment = async (payload: { brandId: string; targetUrl: str
   return data;
 };
 
-export interface OwnedSynthesis {
-  id: string;
-  content: string;
-  attachedUrls: string[];
-  createdAt: string;
-}
-
-/** Fetch the latest owned content synthesis for a brand (if any). */
-export const getLatestOwnedSynthesis = async (brandId: string): Promise<OwnedSynthesis | null> => {
-  const { data } = await api.get<OwnedSynthesis | null>(`/brands/${brandId}/owned-synthesis/latest`);
-  return data;
-};
-
-/** Fetch the latest owned voice synthesis for a brand (if any). */
-export const getLatestOwnedVoice = async (brandId: string): Promise<OwnedSynthesis | null> => {
-  const { data } = await api.get<OwnedSynthesis | null>(`/brands/${brandId}/owned-voice/latest`);
-  return data;
-};
-
-/** Manually trigger (re)generation of owned content synthesis. */
-export const triggerOwnedSynthesis = async (brandId: string): Promise<any> => {
-  const { data } = await api.post<any>(`/brands/${brandId}/owned-synthesis`);
-  return data;
-};
 
 export const getBrandContext = async (brandId: string) => {
   const { data } = await api.get(`/brands/${brandId}/context`);

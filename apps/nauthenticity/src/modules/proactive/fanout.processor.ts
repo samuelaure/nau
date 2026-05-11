@@ -6,15 +6,16 @@ import {
 import { dispatchToZazu } from './zazu.dispatcher';
 import { logger } from '../../utils/logger';
 import { prisma } from '../../modules/shared/prisma';
+import { upsertSocialProfile } from '../../modules/shared/upsert-social-profile';
 import { toZonedTime } from 'date-fns-tz';
-import type { Brand, SocialProfileMonitor, SocialProfile } from '../../../node_modules/.prisma/client';
+import type { Brand, CategoryMembership, SocialProfile } from '../../../node_modules/.prisma/client';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type BrandWithMonitors = Brand & {
-  monitors: (SocialProfileMonitor & { socialProfile: SocialProfile })[];
+type BrandWithCommentMemberships = Brand & {
+  categoryMemberships: (CategoryMembership & { socialProfile: SocialProfile | null })[];
 };
 
 // ---------------------------------------------------------------------------
@@ -48,12 +49,12 @@ export const runProactiveFanout = async (now: Date = new Date()): Promise<void> 
 
   const allBrands = (await prisma.brand.findMany({
     include: {
-      monitors: {
-        where: { monitoringType: 'content', isActive: true },
+      categoryMemberships: {
+        where: { category: 'COMMENT', isActive: true, socialProfileId: { not: null } },
         include: { socialProfile: true },
       },
     },
-  })) as BrandWithMonitors[];
+  })) as BrandWithCommentMemberships[];
 
   if (allBrands.length === 0) {
     logger.info(`[FanoutProcessor] No active brands. Exiting.`);
@@ -67,9 +68,10 @@ export const runProactiveFanout = async (now: Date = new Date()): Promise<void> 
     const thresholdMs = inWindow ? 15 * 60 * 1000 : 60 * 60 * 1000;
     const cutoff = new Date(now.getTime() - thresholdMs);
 
-    for (const target of brand.monitors) {
-      const lastScrape = target.socialProfile.lastScrapedAt;
-      const profileUsername = target.socialProfile.username;
+    for (const membership of brand.categoryMemberships) {
+      if (!membership.socialProfile) continue;
+      const lastScrape = membership.socialProfile.lastScrapedAt;
+      const profileUsername = membership.socialProfile.username;
       if (!lastScrape || lastScrape < cutoff) {
         if (!eligibleTargets.has(profileUsername)) {
           eligibleTargets.set(profileUsername, new Set());
@@ -114,6 +116,13 @@ export const runProactiveFanout = async (now: Date = new Date()): Promise<void> 
       const brand = brandMap.get(brandId);
       if (!brand) continue;
 
+      // Upsert using the stable Instagram numeric ID (ownerId) so renames don't create duplicates.
+      const socialProfile = await upsertSocialProfile({
+        platform: 'instagram',
+        username: item.ownerUsername,
+        externalId: item.ownerId ?? null,
+      });
+
       let localPost = await prisma.post.findFirst({
         where: {
           OR: [{ platformId: item.id }, { url: item.url }],
@@ -126,11 +135,17 @@ export const runProactiveFanout = async (now: Date = new Date()): Promise<void> 
             platformId: item.id,
             url: item.url,
             username: item.ownerUsername,
+            socialProfileId: socialProfile?.id ?? null,
             caption: item.caption ?? '',
             postedAt: new Date(item.timestamp),
             likes: Math.max(0, item.likesCount ?? 0),
             comments: Math.max(0, item.commentsCount ?? 0),
           },
+        });
+      } else if (!localPost.socialProfileId && socialProfile) {
+        await prisma.post.update({
+          where: { id: localPost.id },
+          data: { socialProfileId: socialProfile.id },
         });
       }
 
@@ -152,13 +167,15 @@ export const runProactiveFanout = async (now: Date = new Date()): Promise<void> 
       });
       const lastSelectedComments = lastSelectedFeedbacks.map((f) => f.commentText);
 
-      const brandTarget = brand.monitors.find((t) => t.socialProfile.username === item.ownerUsername);
-
       logger.info(
         `[FanoutProcessor] Generating ${brand.suggestionsCount} comment(s) for brand ${brandId} on @${item.ownerUsername}...`,
       );
 
       try {
+        const membership = brand.categoryMemberships.find(
+          (m) => m.socialProfile?.username === item.ownerUsername,
+        );
+
         const suggestionParams: CommentSuggestionParams = {
           post: {
             caption: item.caption ?? '',
@@ -167,11 +184,10 @@ export const runProactiveFanout = async (now: Date = new Date()): Promise<void> 
             targetUsername: item.ownerUsername,
           },
           brand: {
-            voicePrompt: brand.voicePrompt,
-            commentStrategy: brand.commentStrategy,
+            commentPrompt: brand.commentPrompt,
             suggestionsCount: brand.suggestionsCount,
           },
-          // profileStrategy: brandTarget?.settings ?? null,
+          profileCommentPrompt: membership?.commentPrompt ?? null,
           lastSelectedComments,
         };
 

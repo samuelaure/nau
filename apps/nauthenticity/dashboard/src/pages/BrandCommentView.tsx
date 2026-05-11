@@ -5,7 +5,7 @@ import { getBrandTargets, addBrandTarget, updateBrandTarget, getAccount } from '
 import { Plus, ChevronRight, Activity, Eye, EyeOff } from 'lucide-react';
 import { PostGrid } from '../components/PostGrid';
 
-export const BrandMonitoredView = () => {
+export const BrandCommentView = () => {
   const { brandId } = useParams<{ brandId: string }>();
   const queryClient = useQueryClient();
   const [newUsername, setNewUsername] = useState('');

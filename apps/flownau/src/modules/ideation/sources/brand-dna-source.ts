@@ -3,7 +3,7 @@ import { renderBrandContextBlock } from '@/modules/prompts/brand-context'
 
 /**
  * Fetches the brand DNA — a rendered BrandContext block — for ideation fallback.
- * Used when InspoItems are unavailable.
+ * Used when no InspoBase content is available.
  */
 export async function getBrandDNA(brandId: string): Promise<string> {
   const brand = await prisma.brand.findUnique({

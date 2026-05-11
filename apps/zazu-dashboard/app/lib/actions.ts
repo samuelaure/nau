@@ -203,8 +203,7 @@ export interface Brand {
   userId?: string;
   brandName?: string;
   name?: string; // 9naŭ Brand.name
-  voicePrompt?: string;
-  commentStrategy?: string | null;
+  commentPrompt?: string | null;
   suggestionsCount?: number;
   windowStart?: string | null;
   windowEnd?: string | null;
@@ -225,8 +224,7 @@ export interface NauWorkspace {
 
 export interface BrandCreatePayload {
   brandName: string;
-  voicePrompt?: string;
-  commentStrategy?: string | null;
+  commentPrompt?: string | null;
   suggestionsCount?: number;
   windowStart?: string | null;
   windowEnd?: string | null;
@@ -358,8 +356,7 @@ export async function getBrands(): Promise<Brand[]> {
           name: b.name,
           brandName: b.name,
           timezone: b.timezone ?? 'UTC',
-          voicePrompt: intel?.voicePrompt ?? '',
-          commentStrategy: intel?.commentStrategy ?? '',
+          commentPrompt: intel?.commentPrompt ?? null,
           suggestionsCount: intel?.suggestionsCount ?? 3,
           windowStart: intel?.windowStart ?? null,
           windowEnd: intel?.windowEnd ?? null,
@@ -398,17 +395,22 @@ export async function createBrand(payload: BrandCreatePayload & { workspaceId: s
     if (!res9.ok) throw new Error(await res9.text());
     const brand9 = await res9.json() as { id: string; name: string };
 
-    // 2. Initialize voice synthesis in Nauthenticity (optional)
-    if (payload.voicePrompt) {
+    // 2. Initialize intelligence in Nauthenticity (optional)
+    if (payload.commentPrompt || payload.suggestionsCount || payload.windowStart || payload.windowEnd) {
       const nautHeaders = await getNautHeaders();
-      await fetch(`${getNautUrl()}/api/v1/_service/brands/${brand9.id}/synthesis`, {
-        method: 'POST',
+      await fetch(`${getNautUrl()}/api/v1/brands/${brand9.id}/intelligence`, {
+        method: 'PATCH',
         headers: nautHeaders,
-        body: JSON.stringify({ type: 'voice', content: payload.voicePrompt }),
+        body: JSON.stringify({
+          workspaceId: payload.workspaceId,
+          commentPrompt: payload.commentPrompt,
+          suggestionsCount: payload.suggestionsCount,
+          windowStart: payload.windowStart,
+          windowEnd: payload.windowEnd,
+          timezone: payload.timezone,
+        }),
       }).catch(() => undefined);
     }
-    const resN = { ok: true };
-    if (!resN.ok) throw new Error(await resN.text());
 
     revalidatePath('/brands');
     return { success: true, data: { ...brand9, brandName: brand9.name } };
@@ -438,15 +440,20 @@ export async function updateBrand(brandId: string, payload: BrandUpdatePayload &
 
     // 2. Update intelligence in Nauthenticity
     const nautHeaders = await getNautHeaders();
-    const res = await fetch(`${getNautUrl()}/api/v1/brands/${encodeURIComponent(brandId)}/synthesis`, {
-      method: 'PUT',
+    await fetch(`${getNautUrl()}/api/v1/brands/${encodeURIComponent(brandId)}/intelligence`, {
+      method: 'PATCH',
       headers: nautHeaders,
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await res.text());
-    
+      body: JSON.stringify({
+        commentPrompt: payload.commentPrompt,
+        suggestionsCount: payload.suggestionsCount,
+        windowStart: payload.windowStart,
+        windowEnd: payload.windowEnd,
+        timezone: payload.timezone,
+      }),
+    }).catch(() => undefined);
+
     revalidatePath('/brands');
-    return { success: true, data: (await res.json()) as Brand };
+    return { success: true };
   } catch (error: unknown) {
     console.error('[actions] updateBrand error:', error);
     return { success: false, error: error instanceof Error ? error.message : String(error) };

@@ -11,7 +11,7 @@ import {
   UseGuards,
   BadRequestException,
 } from '@nestjs/common'
-import { IntelligenceService } from './intelligence.service'
+import { IntelligenceService, isCategory, type Category } from './intelligence.service'
 import { AnyAuthGuard } from '../auth/any-auth.guard'
 
 @Controller()
@@ -71,52 +71,83 @@ export class IntelligenceController {
   }
 
   // -------------------------------------------------------------------------
-  // Targets
+  // Memberships (URL kept as `/targets` for now — internal name is "membership")
+  // category: 'COMMENT' | 'INSPO' | 'BENCHMARK'
   // -------------------------------------------------------------------------
 
   @Get('targets')
-  getTargets(@Query('brandId') brandId?: string, @Query('monitoringType') monitoringType?: string) {
-    if (!brandId) throw new BadRequestException('Missing brandId')
-    return this.intelligenceService.getTargets(brandId, monitoringType)
+  getProfileMemberships(
+    @Query('brandId') brandId?: string,
+    @Query('projectId') projectId?: string,
+    @Query('category') category?: string,
+  ) {
+    if (!brandId && !projectId) throw new BadRequestException('Missing brandId or projectId')
+    if (category !== undefined && !isCategory(category)) {
+      throw new BadRequestException(`Invalid category. Expected one of COMMENT, INSPO, BENCHMARK`)
+    }
+    const owner = brandId ? { brandId } : { projectId: projectId! }
+    return this.intelligenceService.getProfileMemberships(owner, category as Category | undefined)
   }
 
   @Post('targets')
-  createTargets(
+  createProfileMemberships(
     @Body()
     body: {
       brandId?: string
+      projectId?: string
       usernames?: string[]
-      monitoringType?: string
-      settings?: Record<string, unknown>
+      category?: string
       isActive?: boolean
     },
   ) {
-    if (!body.brandId || !body.usernames?.length) {
-      throw new BadRequestException('brandId and usernames are required')
+    if (!body.brandId && !body.projectId) {
+      throw new BadRequestException('brandId or projectId is required')
     }
-    return this.intelligenceService.createTargets(body.brandId, body.usernames, body)
+    if (!body.usernames?.length) {
+      throw new BadRequestException('usernames are required')
+    }
+    if (!body.category || !isCategory(body.category)) {
+      throw new BadRequestException(`Missing or invalid category. Expected one of COMMENT, INSPO, BENCHMARK`)
+    }
+    const owner = body.brandId ? { brandId: body.brandId } : { projectId: body.projectId! }
+    return this.intelligenceService.createProfileMemberships(owner, body.usernames, {
+      category: body.category as Category,
+      isActive: body.isActive,
+    })
   }
 
   @Put('targets/:id')
-  updateTarget(
+  updateMembership(
     @Param('id') id: string,
-    @Body() body: Record<string, unknown>,
+    @Body() body: { isActive?: boolean; category?: string },
   ) {
-    return this.intelligenceService.updateTarget(id, body)
+    if (body.category !== undefined && !isCategory(body.category)) {
+      throw new BadRequestException(`Invalid category. Expected one of COMMENT, INSPO, BENCHMARK`)
+    }
+    return this.intelligenceService.updateMembership(id, {
+      isActive: body.isActive,
+      category: body.category as Category | undefined,
+    })
   }
 
   @Patch('targets/:id')
-  patchTarget(
+  patchMembership(
     @Param('id') id: string,
-    @Body() body: { isActive?: boolean; settings?: Record<string, unknown> },
+    @Body() body: { isActive?: boolean; category?: string },
   ) {
-    return this.intelligenceService.patchTarget(id, body)
+    if (body.category !== undefined && !isCategory(body.category)) {
+      throw new BadRequestException(`Invalid category. Expected one of COMMENT, INSPO, BENCHMARK`)
+    }
+    return this.intelligenceService.updateMembership(id, {
+      isActive: body.isActive,
+      category: body.category as Category | undefined,
+    })
   }
 
   @Delete('targets')
-  deleteTarget(@Query('id') id?: string) {
-    if (!id) throw new BadRequestException('Missing target id')
-    return this.intelligenceService.deleteTarget(id)
+  deleteMembership(@Query('id') id?: string) {
+    if (!id) throw new BadRequestException('Missing membership id')
+    return this.intelligenceService.deleteMembership(id)
   }
 
   // -------------------------------------------------------------------------
@@ -155,5 +186,29 @@ export class IntelligenceController {
   @Post('trigger-fanout')
   triggerFanout() {
     return this.intelligenceService.triggerFanout()
+  }
+
+  // -------------------------------------------------------------------------
+  // Individual post capture (dedup-aware)
+  // Checks if the post already exists; if so, only creates the membership link.
+  // -------------------------------------------------------------------------
+
+  @Post('capture-post')
+  capturePost(
+    @Body()
+    body: {
+      postUrl?: string
+      brandId?: string
+      projectId?: string
+      category?: string
+    },
+  ) {
+    if (!body.postUrl) throw new BadRequestException('postUrl is required')
+    if (!body.brandId && !body.projectId) throw new BadRequestException('brandId or projectId is required')
+    if (!body.category || !isCategory(body.category)) {
+      throw new BadRequestException('Missing or invalid category. Expected one of COMMENT, INSPO, BENCHMARK')
+    }
+    const owner = body.brandId ? { brandId: body.brandId } : { projectId: body.projectId! }
+    return this.intelligenceService.capturePost(owner, body.postUrl, body.category as Category)
   }
 }

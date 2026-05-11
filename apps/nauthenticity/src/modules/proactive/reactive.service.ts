@@ -47,26 +47,14 @@ export const generateReactiveComments = async (
     });
   }
 
-  // 3. Fetch Profile Strategy
-  const socialProfile = post.username
-    ? await prisma.socialProfile.findUnique({
-        where: { platform_username: { platform: 'instagram', username: post.username } },
-      })
-    : null
-  const target = socialProfile
-    ? await prisma.socialProfileMonitor.findUnique({
-        where: { brandId_socialProfileId: { brandId, socialProfileId: socialProfile.id } },
-      })
-    : null
-
-  // 4. Fetch Last Selected Comments
+  // 3. Fetch Last Selected Comments
   const lastFeedbacks = await prisma.commentFeedback.findMany({
     where: { brandId, isSelected: true },
     orderBy: { sentAt: 'desc' },
     take: 5,
   });
 
-  // 5. Generate
+  // 4. Generate
   const params: CommentSuggestionParams = {
     post: {
       caption: post.caption || '',
@@ -75,11 +63,9 @@ export const generateReactiveComments = async (
       targetUsername: post.username || 'unknown',
     },
     brand: {
-      voicePrompt: intelligence.voicePrompt,
-      commentStrategy: intelligence.commentStrategy,
+      commentPrompt: intelligence.commentPrompt,
       suggestionsCount: intelligence.suggestionsCount,
     },
-    // profileStrategy: target?.settings || null,
     lastSelectedComments: lastFeedbacks.map((f) => f.commentText),
   };
 

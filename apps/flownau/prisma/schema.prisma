@@ -122,14 +122,21 @@ model Asset {
   updatedAt        DateTime  @updatedAt
   thumbnailUrl        String?
   duration            Float?
-  optimizationStatus  String  @default("pending") // pending | processing | done | failed
+  optimizationStatus  String  @default("pending") // pending | processing | done | failed | split
   description      String?   @db.Text
   tags             String[]  @default([])
   lastUsedAt       DateTime?
   usageCount       Int       @default(0)
 
-  brand    Brand?    @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  template Template? @relation(fields: [templateId], references: [id])
+  // Split-video tracking: long videos (>27s) are split into segments.
+  // Original asset gets optimizationStatus='split'; segments point back via splitFromId.
+  splitFromId  String?
+  splitIndex   Int?    // 0-based segment index; null for non-split assets
+
+  brand      Brand?    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  template   Template? @relation(fields: [templateId], references: [id])
+  splitFrom  Asset?    @relation("AssetSplits", fields: [splitFromId], references: [id])
+  splitParts Asset[]   @relation("AssetSplits")
 }
 
 model Template {

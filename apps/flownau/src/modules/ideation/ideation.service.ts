@@ -36,7 +36,7 @@ export interface IdeationOutputWithTrace extends IdeationOutput {
 export interface GenerationRequest {
   topic: string
   language?: string
-  count: number
+  count?: number
   recentContent?: string[]
   userInstructions?: string | null
   brandContext?: string | null
@@ -87,7 +87,11 @@ export async function generateContentIdeas(req: GenerationRequest): Promise<Idea
 }
 
 function buildUserMessage(req: GenerationRequest): string {
-  let msg = `Generate exactly ${req.count} ideas about:\n\n${req.topic}`
+  const countInstruction = req.count != null
+    ? `Generate exactly ${req.count} ideas`
+    : `Generate as many ideas as genuinely capture distinct angles — be moderate, quality over quantity`
+
+  let msg = `${countInstruction} about:\n\n${req.topic}`
 
   if (req.recentContent && req.recentContent.length > 0) {
     msg += `\n\nRECENT PUBLISHED CONTENT — do not repeat these topics:\n`

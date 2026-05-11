@@ -27,6 +27,8 @@ const bot = new Telegraf<ZazuContext>(token);
 // --- 1. Skill Registration ---
 import { triageSkill } from './triage-skill';
 import { summarySkill } from './summary-skill';
+import { voicenoteSkill } from './voicenote-skill';
+skillManager.register(voicenoteSkill);
 skillManager.register(triageSkill);
 skillManager.register(summarySkill);
 skillManager.register(new ConversationalSkill());
@@ -101,33 +103,101 @@ bot.start(async (ctx) => {
   }
 });
 
-// --- 4. Brand Selection Callback Handler ---
+// --- 4. Callback Handlers ---
 bot.on('callback_query', async (ctx) => {
   if (!ctx.callbackQuery || !('data' in ctx.callbackQuery)) return;
 
   const data = ctx.callbackQuery.data;
-  if (!data?.startsWith('triage_brand:')) return;
+  if (!data) return;
 
-  await ctx.answerCbQuery();
-
-  const brandToken = data.replace('triage_brand:', '');
-  const brandId = brandToken === 'auto' ? null : brandToken;
-
-  const text: string | undefined = ctx.session?.pendingTriageText;
-
-  if (!text) {
-    await ctx.editMessageText('⚠️ No encontré el texto pendiente. Envía el mensaje de voz de nuevo.');
+  // ── Triage brand selection ──
+  if (data.startsWith('triage_brand:')) {
+    await ctx.answerCbQuery();
+    const brandToken = data.replace('triage_brand:', '');
+    const brandId = brandToken === 'auto' ? null : brandToken;
+    const text: string | undefined = ctx.session?.pendingTriageText;
+    if (!text) {
+      await ctx.editMessageText('⚠️ No encontré el texto pendiente. Envía el mensaje de voz de nuevo.');
+      return;
+    }
+    ctx.session.pendingTriageText = undefined;
+    ctx.session.pendingTriageUserId = undefined;
+    const label = brandId ? `marca seleccionada` : `auto-detección de marca`;
+    await ctx.editMessageText(`⏳ Procesando con ${label}...`);
+    await triageSkill.runTriage(ctx as any, text, brandId);
     return;
   }
 
-  // Clear pending session state
-  ctx.session.pendingTriageText = undefined;
-  ctx.session.pendingTriageUserId = undefined;
+  // ── Voicenote brand selection ──
+  if (data.startsWith('vnote_')) {
+    await ctx.answerCbQuery();
 
-  const label = brandId ? `marca seleccionada` : `auto-detección de marca`;
-  await ctx.editMessageText(`⏳ Procesando con ${label}...`);
+    const brands: Array<{ id: string; name: string }> = ctx.session?.pendingVoicenoteBrands ?? [];
+    let selected: string[] = ctx.session?.selectedVoicenoteBrandIds ?? [];
 
-  await triageSkill.runTriage(ctx as any, text, brandId);
+    if (data === 'vnote_all') {
+      selected = brands.map((b) => b.id);
+      ctx.session.selectedVoicenoteBrandIds = selected;
+      const updatedButtons = brands.map((b) => ([{
+        text: `✅ ${b.name}`,
+        callback_data: `vnote_brand_${b.id}`,
+      }]));
+      await ctx.editMessageReplyMarkup({
+        inline_keyboard: [
+          ...updatedButtons,
+          [
+            { text: '✅ Todas', callback_data: 'vnote_all' },
+            { text: '▶️ Confirmar', callback_data: 'vnote_confirm' },
+          ],
+        ],
+      });
+      return;
+    }
+
+    if (data.startsWith('vnote_brand_')) {
+      const brandId = data.replace('vnote_brand_', '');
+      selected = selected.includes(brandId)
+        ? selected.filter((id) => id !== brandId)
+        : [...selected, brandId];
+      ctx.session.selectedVoicenoteBrandIds = selected;
+      const updatedButtons = brands.map((b) => ([{
+        text: selected.includes(b.id) ? `✅ ${b.name}` : `☐ ${b.name}`,
+        callback_data: `vnote_brand_${b.id}`,
+      }]));
+      await ctx.editMessageReplyMarkup({
+        inline_keyboard: [
+          ...updatedButtons,
+          [
+            { text: '✅ Todas', callback_data: 'vnote_all' },
+            { text: '▶️ Confirmar', callback_data: 'vnote_confirm' },
+          ],
+        ],
+      });
+      return;
+    }
+
+    if (data === 'vnote_confirm') {
+      if (selected.length === 0) {
+        await ctx.answerCbQuery('Selecciona al menos una marca.');
+        return;
+      }
+      const voicenoteId: string = ctx.session?.pendingVoicenoteId;
+      const cleanTranscription: string = ctx.session?.pendingVoicenoteClean;
+      const synthesis: string = ctx.session?.pendingVoicenoteSynthesis;
+
+      ctx.session.pendingVoicenoteId = undefined;
+      ctx.session.pendingVoicenoteClean = undefined;
+      ctx.session.pendingVoicenoteSynthesis = undefined;
+      ctx.session.pendingVoicenoteBrands = undefined;
+      ctx.session.selectedVoicenoteBrandIds = undefined;
+
+      const selectedNames = brands.filter((b) => selected.includes(b.id)).map((b) => b.name).join(', ');
+      await ctx.editMessageText(`⏳ Enviando captura a: ${selectedNames}...`);
+
+      await voicenoteSkill.dispatchToBrands(voicenoteId, cleanTranscription, synthesis, selected);
+      await ctx.editMessageText(`✅ Captura enviada a: *${selectedNames}*. Las ideas se están generando.`, { parse_mode: 'Markdown' });
+    }
+  }
 });
 
 // --- 5. Unified Message Dispatcher ---

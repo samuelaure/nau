@@ -18,6 +18,7 @@ model SocialProfile {
   id              String   @id @default(uuid())
   platform        String   @default("instagram")
   username        String
+  externalId      String?  // Instagram's stable numeric profile ID — never changes even if username does
   profileImageUrl String?
   totalPostCount  Int?
   lastScrapedAt   DateTime @default(now())
@@ -26,8 +27,8 @@ model SocialProfile {
   ownerId String?
   owner   Brand?  @relation(fields: [ownerId], references: [id], onDelete: SetNull)
 
-  posts    Post[]
-  monitors SocialProfileMonitor[]
+  posts               Post[]
+  categoryMemberships CategoryMembership[]
 
   @@unique([platform, username])
   @@index([platform, username])
@@ -52,14 +53,15 @@ model Post {
   engagementScore Float?
   collaborators   Json?
   intelligence    Json?
+  postSynthesis   String?  @db.Text
 
   runId String?
   run   ScrapingRun? @relation(fields: [runId], references: [id])
 
-  media       Media[]
-  transcripts Transcript[]
-  feedbacks   CommentFeedback[]
-  inspoItems  InspoItem[]
+  media               Media[]
+  transcripts         Transcript[]
+  feedbacks           CommentFeedback[]
+  categoryMemberships CategoryMembership[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -156,24 +158,18 @@ model KnowledgeChunk {
 // Brand represents a brand's intelligence/configuration in nauthenticity.
 // id = flownau Brand.id (same as API Brand.id)
 
-model Brand {
-  id                      String  @id // = flownau Brand.id = API Brand.id
-  workspaceId             String  @default("")
-  mainUsername            String?
-  voicePrompt             String
-  commentStrategy         String?
-  suggestionsCount        Int     @default(3)
-  windowStart             String?
-  windowEnd               String?
-  timezone                String  @default("UTC")
-  inspoRequestCount       Int     @default(0)
+// ── Project ───────────────────────────────────────────────────────────────────
+// Mirror of api's Project. Holds the same id; nauthenticity uses it as the
+// ownership anchor for ProjectMemberships (same role as Brand for categories).
 
-  ownedProfiles SocialProfile[]
-  monitors      SocialProfileMonitor[]
-  syntheses     BrandSynthesis[]
-  context       BrandContext?
-  feedbacks     CommentFeedback[]
-  inspoItems    InspoItem[]
+model Project {
+  id          String  @id // = api Project.id
+  workspaceId String
+  brandId     String?
+  name        String
+  isActive    Boolean @default(true)
+
+  categoryMemberships CategoryMembership[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -181,17 +177,64 @@ model Brand {
   @@index([workspaceId])
 }
 
-model BrandSynthesis {
-  id           String @id @default(uuid())
-  brandId      String
-  brand        Brand  @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  type         String
-  content      String @db.Text
-  attachedUrls Json   @default("[]")
+model Brand {
+  id                      String  @id // = flownau Brand.id = API Brand.id
+  workspaceId             String  @default("")
+  mainUsername            String?
+  voicePrompt             String?
+  commentStrategy         String?
+  commentPrompt           String?
+  suggestionsCount        Int     @default(3)
+  windowStart             String?
+  windowEnd               String?
+  timezone                String  @default("UTC")
+  inspoRequestCount       Int     @default(0)
+
+  ownedProfiles       SocialProfile[]
+  categoryMemberships CategoryMembership[]
+  sourceConcepts      SourceConcept[]
+  voicenotes          Voicenote[]
+  context             BrandContext?
+  feedbacks           CommentFeedback[]
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@index([brandId, type])
+  @@index([workspaceId])
+}
+
+// ── SourceConcept ─────────────────────────────────────────────────────────────
+// A distilled idea angle extracted from an InspoBase (or future: voicenote, specific capture).
+// Each pending concept drives one idea-generation batch in flownau.
+// sourceType values: 'inspo_base' | 'voicenote' | 'specific_post' | 'specific_profile'
+// status values: 'pending' | 'consumed'
+model SourceConcept {
+  id         String    @id @default(uuid())
+  brandId    String
+  brand      Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  content    String    @db.Text
+  sourceType String    @default("inspo_base")
+  status     String    @default("pending")
+  createdAt  DateTime  @default(now())
+  consumedAt DateTime?
+
+  @@index([brandId, status])
+}
+
+// ── Voicenote ─────────────────────────────────────────────────────────────────
+// A voicenote capture sent from Zazŭ. Stores the processed transcription and
+// synthesis received from Zazŭ. Drives SourceConcept generation per brand.
+
+model Voicenote {
+  id               String    @id @default(uuid())
+  brandId          String
+  brand            Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  cleanTranscription String  @db.Text
+  synthesis        String    @db.Text
+  sourceRef        String?   // zazu-bot Voicenote.id
+  createdAt        DateTime  @default(now())
+
+  @@index([brandId])
 }
 
 // ── Brand Context ──────────────────────────────────────────────────────────────
@@ -209,22 +252,40 @@ model BrandContext {
   updatedAt   DateTime  @updatedAt
 }
 
-// A SocialProfileMonitor links a Brand to a SocialProfile it monitors.
-// monitoringType: "content" (comment generation) | "benchmark" (analytics) | "inspiration"
-model SocialProfileMonitor {
-  id              String        @id @default(uuid())
-  brandId         String
-  brand           Brand         @relation(fields: [brandId], references: [id])
-  socialProfileId String
-  socialProfile   SocialProfile @relation(fields: [socialProfileId], references: [id])
-  monitoringType  String        @default("content")
-  isActive        Boolean       @default(true)
-  settings        Json?
+// CategoryMembership links a Brand to either a SocialProfile or a Post under one of the
+// non-OWN categories. OWN ownership lives separately on SocialProfile.ownerId (1:1).
+//
+// category values:
+//   "COMMENT"   — proactive comment-suggestion monitoring (profile-level only)
+//   "INSPO"     — InspoBase membership (profile-level OR post-level)
+//   "BENCHMARK" — benchmark/study membership (profile-level OR post-level); also the default-
+//                 absorption sink: when a profile/post is removed from INSPO and COMMENT and
+//                 has no other membership, it is moved to BENCHMARK rather than deleted.
+//
+// Exactly one of (socialProfileId, postId) must be set per row.
+model CategoryMembership {
+  id              String         @id @default(uuid())
+  brandId         String?
+  brand           Brand?         @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  projectId       String?
+  project         Project?       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  socialProfileId String?
+  socialProfile   SocialProfile? @relation(fields: [socialProfileId], references: [id], onDelete: Cascade)
+  postId          String?
+  post            Post?          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  category        String
+  isActive        Boolean        @default(true)
+  commentPrompt   String?
 
   createdAt DateTime @default(now())
 
-  @@unique([brandId, socialProfileId])
-  @@index([brandId])
+  // Note: actual uniqueness is enforced by two partial unique indexes (raw SQL in migration):
+  //   - (brandId, category, socialProfileId) WHERE postId IS NULL
+  //   - (brandId, category, postId)          WHERE socialProfileId IS NULL
+  // Postgres treats NULL as distinct in standard unique constraints, so we use partial indexes instead.
+  @@index([brandId, category])
+  @@index([socialProfileId])
+  @@index([postId])
 }
 
 model CommentFeedback {
@@ -241,26 +302,3 @@ model CommentFeedback {
   @@index([brandId])
 }
 
-// ── Inspo ─────────────────────────────────────────────────────────────────────
-
-model InspoItem {
-  id              String  @id @default(uuid())
-  brandId         String
-  brand           Brand   @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  postId          String?
-  post            Post?   @relation(fields: [postId], references: [id])
-  sourceUrl       String?
-  type            String
-  note            String? @db.Text
-  status          String  @default("pending")
-  extractedHook   String? @db.Text
-  extractedTheme  String?
-  adaptedScript   String? @db.Text
-  injectedContext String? @db.Text
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([brandId])
-  @@index([brandId, status])
-}
