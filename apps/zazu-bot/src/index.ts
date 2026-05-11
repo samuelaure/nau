@@ -50,7 +50,7 @@ bot.start(async (ctx) => {
     const linkToken = startParam.slice('link-'.length);
     try {
       const headers = await buildServiceHeaders('9nau-api');
-      const resp = await fetch(`${nauApiUrl}/_service/auth/link-token/verify`, {
+      const resp = await fetch(`${nauApiUrl}/auth/link-token/verify`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ token: linkToken, telegramId: user.telegramId.toString() }),
@@ -58,7 +58,7 @@ bot.start(async (ctx) => {
       if (resp.ok) {
         const data = await resp.json() as { ok: boolean };
         if (data.ok) {
-          const userResp = await fetch(`${nauApiUrl}/_service/auth/by-telegram/${user.telegramId}`, { headers });
+          const userResp = await fetch(`${nauApiUrl}/auth/by-telegram/${user.telegramId}`, { headers });
           if (userResp.ok) {
             const found = await userResp.json() as { found: boolean; user?: { id: string } };
             if (found.found && found.user?.id) {
@@ -78,7 +78,7 @@ bot.start(async (ctx) => {
   if (!user.nauUserId) {
     try {
       const headers = await buildServiceHeaders('9nau-api');
-      const resp = await fetch(`${nauApiUrl}/_service/auth/by-telegram/${user.telegramId}`, { headers });
+      const resp = await fetch(`${nauApiUrl}/auth/by-telegram/${user.telegramId}`, { headers });
       if (resp.ok) {
         const data = await resp.json() as { found: boolean; user?: { id: string } };
         if (data.found && data.user?.id) {
