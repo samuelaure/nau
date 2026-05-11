@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Param, Post, Req, UseGuards } from '@nestjs/common'
+import { Request } from 'express'
 import { ProjectsService } from './projects.service'
 import { ServiceAuthGuard } from '../auth/service-auth.guard'
 import { AnyAuthGuard } from '../auth/any-auth.guard'
@@ -11,8 +12,9 @@ export class ProjectsController {
 
   @Get('workspace/:workspaceId/overview')
   @UseGuards(AnyAuthGuard)
-  getOverview(@Param('workspaceId') workspaceId: string) {
-    return this.svc.getWorkspaceOverview(workspaceId)
+  getOverview(@Param('workspaceId') workspaceId: string, @Req() req: Request) {
+    const token = (req.headers['authorization'] as string)?.replace('Bearer ', '') ?? ''
+    return this.svc.getWorkspaceOverview(workspaceId, token)
   }
 
   // ── Project CRUD (user-facing, proxied from workspaces controller to api) ──

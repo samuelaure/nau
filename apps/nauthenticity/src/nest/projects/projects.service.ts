@@ -51,18 +51,19 @@ export class ProjectsService {
     return this.prisma.project.delete({ where: { id: projectId } })
   }
 
-  async getWorkspaceOverview(workspaceId: string) {
-    const [brands, projects] = await Promise.all([
-      this.prisma.brand.findMany({
-        where: { workspaceId },
-        select: { id: true, workspaceId: true, mainUsername: true, commentPrompt: true, suggestionsCount: true, timezone: true, createdAt: true },
-        orderBy: { createdAt: 'asc' },
-      }),
+  async getWorkspaceOverview(workspaceId: string, userToken: string) {
+    const nauApiUrl = process.env['NAU_API_URL'] ?? 'https://api.9nau.com'
+
+    const [apiBrands, projects] = await Promise.all([
+      fetch(`${nauApiUrl}/workspaces/${workspaceId}/brands`, {
+        headers: { Authorization: `Bearer ${userToken}` },
+      }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
       this.prisma.project.findMany({
         where: { workspaceId },
         orderBy: { createdAt: 'asc' },
       }),
     ])
-    return { brands, projects }
+
+    return { brands: apiBrands, projects }
   }
 }
