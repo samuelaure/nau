@@ -5,6 +5,7 @@ import { runAutonomousScheduler } from '@/modules/scheduling/scheduling.service'
 import { checkAllTokens } from '@/modules/publisher/instagram-token'
 import { acquireLock, releaseLock } from '@/modules/shared/rate-limit'
 import { logger, logError } from '@/modules/shared/logger'
+import { notifyTodayDigest, notifyNextInLine } from '@/modules/notifications/approval-notifications'
 
 const USER_MANAGED_FORMATS = new Set(['head_talk', 'replicate'])
 const RENDER_TIMEOUT_MS = 15 * 60 * 1000
@@ -135,6 +136,13 @@ function safe(name: string, fn: () => Promise<void>) {
   return () => fn().catch((err) => logError(`[Cron:${name}] Unhandled error`, err))
 }
 
+async function runApprovalNotifications() {
+  const brands = await prisma.brand.findMany({ select: { id: true } })
+  await Promise.allSettled(
+    brands.flatMap((b) => [notifyTodayDigest(b.id), notifyNextInLine(b.id)]),
+  )
+}
+
 export async function startInternalCron() {
   const { default: cron } = await import('node-cron')
 
@@ -149,6 +157,9 @@ export async function startInternalCron() {
 
   // Instagram token refresh — once daily at 03:00
   cron.schedule('0 3 * * *', safe('TokenRefresh', runTokenRefresh))
+
+  // Approval notifications — every 5 minutes (today digest + next-in-line)
+  cron.schedule('*/5 * * * *', safe('ApprovalNotifications', runApprovalNotifications))
 
   logger.info('[InternalCron] Scheduler started')
 }

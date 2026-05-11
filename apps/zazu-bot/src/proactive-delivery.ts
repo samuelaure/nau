@@ -20,17 +20,17 @@ export class ProactiveDeliverySystem {
   private setupRoutes() {
     this.app.post('/api/internal/notify', requireServiceAuth, async (req, res) => {
       // Parse Payload
-      const payload = req.body; 
-      if (!payload.userId) return res.status(400).json({ error: 'Missing userId' });
+      const payload = req.body;
 
-      // 3. Resolve Internal User (Telegram ID -> UUID)
+      // 3. Resolve Internal User (naŭ UUID -> Zazu user)
       try {
-        const tgId = BigInt(payload.userId);
-        let user = await prisma.user.findUnique({ where: { telegramId: tgId } });
-        
+        const { nauUserId } = payload;
+        if (!nauUserId) return res.status(400).json({ error: 'Missing nauUserId' });
+
+        const user = await prisma.user.findFirst({ where: { nauUserId } });
         if (!user) {
-          logger.info(`[ProactiveGateway] Creating placeholder user for Telegram ID: ${payload.userId}`);
-          user = await prisma.user.create({ data: { telegramId: tgId } });
+          logger.warn({ nauUserId }, '[ProactiveGateway] No Zazu user linked to nauUserId — notification dropped');
+          return res.status(404).json({ error: 'No Zazu user linked to this nauUserId' });
         }
 
         // 4. Evaluate Time Window
@@ -166,10 +166,11 @@ export class ProactiveDeliverySystem {
 
        // Split items by type to format differently
        const journalItems = items.filter(i => (i.payloadJson as any).type === 'journal_summary');
-       const briefItems = items.filter(i => (i.payloadJson as any).type === 'content_brief');
-       const suggestionItems = items.filter(i => 
-         (i.payloadJson as any).type !== 'journal_summary' && 
-         (i.payloadJson as any).type !== 'content_brief'
+       const MARKDOWN_TYPES = new Set(['content_brief', 'calendar_fill_blocked', 'approval_digest_today', 'approval_digest_tomorrow', 'approval_next_in_line']);
+       const briefItems = items.filter(i => MARKDOWN_TYPES.has((i.payloadJson as any).type));
+       const suggestionItems = items.filter(i =>
+         (i.payloadJson as any).type !== 'journal_summary' &&
+         !MARKDOWN_TYPES.has((i.payloadJson as any).type)
        );
 
        // 1. Process Journal Summaries

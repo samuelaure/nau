@@ -49,13 +49,23 @@ class TemplateDeck {
 
 async function notifyViaZazu(brandId: string, markdown: string): Promise<void> {
   const zazuUrl = process.env.ZAZU_INTERNAL_URL || 'http://zazu-bot:3000'
+  const secret = process.env.AUTH_SECRET
+  if (!secret) return
   try {
-    const secret = process.env.AUTH_SECRET!
-    const token = await signServiceToken({ iss: 'flownau', aud: '9nau-api', secret })
+    const brand = await prisma.brand.findUnique({ where: { id: brandId }, select: { workspaceId: true } })
+    if (!brand) return
+    const apiUrl = process.env.NAU_API_URL || 'http://api:3000'
+    const serviceToken = await signServiceToken({ iss: 'flownau', aud: '9nau-api', secret })
+    const targetRes = await fetch(`${apiUrl}/workspaces/_service/${brand.workspaceId}/notification-target`, {
+      headers: { Authorization: `Bearer ${serviceToken}` },
+    })
+    if (!targetRes.ok) return
+    const { nauUserId } = (await targetRes.json()) as { nauUserId: string }
+    const notifyToken = await signServiceToken({ iss: 'flownau', aud: 'zazu-bot', secret })
     await fetch(`${zazuUrl}/api/internal/notify`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'calendar_fill_blocked', payload: { brandId, markdown } }),
+      headers: { Authorization: `Bearer ${notifyToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nauUserId, type: 'calendar_fill_blocked', brandId, markdown }),
     })
   } catch {
     logger.warn({ brandId }, '[COVERAGE] Failed to send Zazŭ notification')

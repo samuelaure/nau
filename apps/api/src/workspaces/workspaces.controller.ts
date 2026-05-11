@@ -3,6 +3,7 @@ import { WorkspaceRole } from '@prisma/client';
 import { WorkspacesService } from './workspaces.service';
 import { CreateWorkspaceDto, AddMemberDto } from './workspaces.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ServiceAuthGuard } from '../common/guards/service-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { IsString } from 'class-validator';
 import type { AccessTokenPayload } from '@nau/types';
@@ -109,5 +110,11 @@ export class WorkspacesController {
     @Param('inviteId') inviteId: string,
   ) {
     return this.svc.deleteInvite(user.sub, workspaceId, inviteId);
+  }
+
+  @Get('_service/:workspaceId/notification-target')
+  @UseGuards(ServiceAuthGuard)
+  getNotificationTarget(@Param('workspaceId') workspaceId: string) {
+    return this.svc.getNotificationTarget(workspaceId);
   }
 }

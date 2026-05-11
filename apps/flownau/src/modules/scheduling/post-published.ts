@@ -2,6 +2,7 @@ import { prisma } from '@/modules/shared/prisma'
 import { logger } from '@/modules/shared/logger'
 import { runCoverageChecks } from './coverage.service'
 import { signServiceToken } from '@nau/auth'
+import { notifyTomorrowDigest } from '@/modules/notifications/approval-notifications'
 
 export async function onPostPublished(postId: string, brandId: string): Promise<void> {
   await prisma.postSlot.updateMany({
@@ -15,6 +16,10 @@ export async function onPostPublished(postId: string, brandId: string): Promise<
 
   syncToNauthenticity(postId, brandId).catch((err) => {
     logger.error({ postId, brandId, err }, '[POST_PUBLISHED] Nauthenticity sync failed')
+  })
+
+  maybeNotifyTomorrowDigest(brandId).catch((err) => {
+    logger.error({ postId, brandId, err }, '[POST_PUBLISHED] Tomorrow digest notification failed')
   })
 
   // Dynamic import to avoid pulling nau-storage into the instrumentation hook's static module graph
@@ -84,5 +89,24 @@ async function syncToNauthenticity(postId: string, brandId: string): Promise<voi
     logger.error({ postId, status: res.status, body: text }, '[POST_PUBLISHED] Nauthenticity sync HTTP error')
   } else {
     logger.info({ postId, nauthenticityProfileId }, '[POST_PUBLISHED] Synced post to nauthenticity')
+  }
+}
+
+async function maybeNotifyTomorrowDigest(brandId: string): Promise<void> {
+  const now = new Date()
+  const endOfDay = new Date(now)
+  endOfDay.setHours(23, 59, 59, 999)
+
+  // Only trigger if no more posts are scheduled for today after this one
+  const remaining = await prisma.post.count({
+    where: {
+      brandId,
+      scheduledAt: { gt: now, lte: endOfDay },
+      status: { notIn: ['PUBLISHED', 'FAILED'] },
+    },
+  })
+
+  if (remaining === 0) {
+    await notifyTomorrowDigest(brandId)
   }
 }
