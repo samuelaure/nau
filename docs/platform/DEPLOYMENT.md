@@ -125,24 +125,7 @@ ssh nau "docker exec nauthenticity curl -s http://localhost:3000/queue | jq '{do
 
 If a queue was active before deploy, jobs should resume automatically via startup recovery.
 
-#### 4. One-time migrations (run when applicable)
-
-Some deployments include data normalization scripts that must be run once after the migration is applied. Check whether any apply to the current deploy:
-
-**Asset split normalization** (deploy that includes `20260510120000_asset_split_tracking`):
-Splits all existing VID assets longer than 27s into ≤27s segments so they qualify for b-roll selection.
-
-```bash
-# Dry-run first — shows affected assets without writing
-ssh nau "docker exec flownau npx tsx scripts/normalize-asset-splits.ts --dry-run"
-
-# Run for real when satisfied
-ssh nau "docker exec flownau npx tsx scripts/normalize-asset-splits.ts"
-```
-
-Safe to re-run. Assets already marked `optimizationStatus='split'` are skipped.
-
-#### 5. Check for new failures
+#### 4. Check for new failures
 
 ```bash
 ssh nau "docker exec nauthenticity curl -s http://localhost:3000/queue | jq '{dlFailed:.download.counts.failed, optFailed:.optimization.counts.failed, computeFailed:.compute.counts.failed}'"
