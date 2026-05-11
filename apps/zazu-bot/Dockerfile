@@ -12,6 +12,7 @@ COPY tsconfig.base.json ./
 COPY packages/auth ./packages/auth
 COPY packages/types ./packages/types
 COPY packages/logger ./packages/logger
+COPY packages/storage ./packages/storage
 COPY packages/zazu-db ./packages/zazu-db
 COPY packages/skills-core ./packages/skills-core
 COPY packages/feature-conversational ./packages/feature-conversational

@@ -33,13 +33,13 @@ vi.mock('next/headers', () => ({
 // ── Mock @nau/auth ─────────────────────────────────────────────────────────────
 vi.mock('@nau/auth', () => ({
   buildAccessTokenCookie: vi.fn(
-    (token: string) => `nau_access_token=${token}; Path=/; HttpOnly; Secure; SameSite=Lax`,
+    (token: string) => `nau_at=${token}; Path=/; HttpOnly; Secure; SameSite=Lax`,
   ),
   buildRefreshTokenCookie: vi.fn(
-    (token: string) => `nau_refresh_token=${token}; Path=/; HttpOnly; Secure; SameSite=Lax`,
+    (token: string) => `nau_rt=${token}; Path=/; HttpOnly; Secure; SameSite=Lax`,
   ),
-  COOKIE_ACCESS_TOKEN: 'nau_access_token',
-  COOKIE_REFRESH_TOKEN: 'nau_refresh_token',
+  COOKIE_ACCESS_TOKEN: 'nau_at',
+  COOKIE_REFRESH_TOKEN: 'nau_rt',
 }))
 
 // ── Import SUT after mocks ─────────────────────────────────────────────────────
@@ -54,7 +54,7 @@ describe('loginAction', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       headers: {
-        getSetCookie: () => ['nau_access_token=abc; Path=/; HttpOnly; Secure; SameSite=Lax'],
+        getSetCookie: () => ['nau_at=abc; Path=/; HttpOnly; Secure; SameSite=Lax'],
       },
       json: async () => ({}),
     })
@@ -147,8 +147,8 @@ describe('logoutAction', () => {
       expect.stringContaining('/auth/logout'),
       expect.objectContaining({ method: 'POST' }),
     )
-    expect(cookieSpy.delete).toHaveBeenCalledWith('nau_access_token')
-    expect(cookieSpy.delete).toHaveBeenCalledWith('nau_refresh_token')
+    expect(cookieSpy.delete).toHaveBeenCalledWith('nau_at')
+    expect(cookieSpy.delete).toHaveBeenCalledWith('nau_rt')
   })
 
   it('still deletes cookies even when logout API call fails', async () => {
@@ -157,8 +157,8 @@ describe('logoutAction', () => {
 
     await logoutAction()
 
-    expect(cookieSpy.delete).toHaveBeenCalledWith('nau_access_token')
-    expect(cookieSpy.delete).toHaveBeenCalledWith('nau_refresh_token')
+    expect(cookieSpy.delete).toHaveBeenCalledWith('nau_at')
+    expect(cookieSpy.delete).toHaveBeenCalledWith('nau_rt')
   })
 
   it('skips the API call when no refresh token cookie is present', async () => {

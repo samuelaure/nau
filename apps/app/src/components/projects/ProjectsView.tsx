@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, FolderOpen, Globe, Pencil, Trash2, Check, X } from 'lucide-react'
+import { Plus, FolderOpen, Globe, PencilLine, Trash2, Check, X } from 'lucide-react'
 import { Button } from '@9nau/ui/components/button'
 import { Input } from '@9nau/ui/components/input'
 import { cn } from '@9nau/ui/lib/utils'
@@ -189,7 +189,7 @@ function ProjectRow({
       </div>
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <button onClick={() => setRenaming(true)} className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded">
-          <Pencil className="w-3.5 h-3.5" />
+          <PencilLine className="w-3.5 h-3.5" />
         </button>
         <button onClick={onDelete} className="p-1 text-gray-400 hover:text-red-500 rounded">
           <Trash2 className="w-3.5 h-3.5" />
@@ -310,7 +310,7 @@ function BrandRow({
       </div>
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <button onClick={() => setRenaming(true)} className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded">
-          <Pencil className="w-3.5 h-3.5" />
+          <PencilLine className="w-3.5 h-3.5" />
         </button>
         <button onClick={onDelete} className="p-1 text-gray-400 hover:text-red-500 rounded">
           <Trash2 className="w-3.5 h-3.5" />
