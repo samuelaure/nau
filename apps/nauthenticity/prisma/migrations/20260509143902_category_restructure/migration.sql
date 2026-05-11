@@ -66,8 +66,7 @@ SELECT
     true,
     "createdAt"
 FROM "InspoItem"
-WHERE "postId" IS NOT NULL
-ON CONFLICT ("brandId", "category", "socialProfileId", "postId") DO NOTHING;
+WHERE "postId" IS NOT NULL;
 
 -- Step 4: Drop old tables
 ALTER TABLE "InspoItem" DROP CONSTRAINT "InspoItem_brandId_fkey";
