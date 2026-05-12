@@ -76,7 +76,7 @@ export function BrandSwitcher() {
 
   const activeBrand = brands.find((b) => b.id === activeBrandId);
   const activeProject = projects.find((p) => p.id === activeProjectId);
-  const label = activeBrand?.name ?? activeProject?.name ?? 'Workspace Overview';
+  const label = activeBrand?.name ?? activeProject?.name ?? 'All Brands/Projects';
 
   const handleSelectBrand = (brandId: string | null) => {
     setOpen(false);
@@ -135,7 +135,7 @@ export function BrandSwitcher() {
             onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
           >
-            Workspace Overview
+            All Brands/Projects
           </button>
 
           {/* Brands section */}

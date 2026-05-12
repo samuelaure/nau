@@ -3,6 +3,7 @@ import { Request } from 'express'
 import { ProjectsService } from './projects.service'
 import { ServiceAuthGuard } from '../auth/service-auth.guard'
 import { AnyAuthGuard } from '../auth/any-auth.guard'
+import { COOKIE_ACCESS_TOKEN, extractBearerToken } from '@nau/auth'
 
 @Controller()
 export class ProjectsController {
@@ -13,7 +14,7 @@ export class ProjectsController {
   @Get('workspace/:workspaceId/overview')
   @UseGuards(AnyAuthGuard)
   getOverview(@Param('workspaceId') workspaceId: string, @Req() req: Request) {
-    const token = (req.headers['authorization'] as string)?.replace('Bearer ', '') ?? ''
+    const token = (req as any).cookies?.[COOKIE_ACCESS_TOKEN] ?? extractBearerToken(req.headers['authorization']) ?? ''
     return this.svc.getWorkspaceOverview(workspaceId, token)
   }
 
