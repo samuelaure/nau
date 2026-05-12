@@ -13,7 +13,7 @@ type Brand = { id: string; name: string }
 class VoicenoteSkillImpl implements ZazuSkill {
   id = 'voicenote-capture'
   name = 'Voicenote Capture'
-  priority = 50
+  priority = 1010
 
   async canHandle(ctx: ZazuContext): Promise<boolean> {
     if (!ctx.message || !('voice' in ctx.message)) return false

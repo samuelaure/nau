@@ -6,7 +6,7 @@ import { buildServiceHeaders } from './lib/service-auth';
 export class SummarySkill implements ZazuSkill {
   id = 'core-summary';
   name = 'Period Summary Engine';
-  priority = 90; // High priority, just under Triage (100)
+  priority = 1015;
 
   async canHandle(ctx: ZazuContext): Promise<boolean> {
     const text = ctx.textContent?.toLowerCase() || '';

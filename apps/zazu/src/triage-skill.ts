@@ -35,7 +35,7 @@ async function callTriageApi(text: string, userId: string, brandId: string | nul
 export class TriageSkill implements ZazuSkill {
   id = 'core-triage';
   name = 'Triage Core Engine';
-  priority = 100;
+  priority = 1020;
 
   async canHandle(ctx: ZazuContext): Promise<boolean> {
     const user = ctx.dbUser;
