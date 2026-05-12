@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
     briefMd += `_Basado en: ${inspoPosts.length} posts de Inspo Base._`
 
     // Deliver via Zazŭ
-    const zazuUrl = process.env.ZAZU_INTERNAL_URL || 'http://zazu-bot:3000'
+    const zazuUrl = process.env.ZAZU_INTERNAL_URL || 'http://zazu:3000'
     try {
       const zazuHeaders = await nauApiHeaders()
       await fetch(`${zazuUrl}/api/internal/notify`, {

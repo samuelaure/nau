@@ -60,10 +60,8 @@ export async function generateTelegramLinkToken(): Promise<{ deepLink?: string; 
   if (!res.ok) return { error: 'Failed to generate link token' }
   const { token: linkToken } = await res.json() as { token: string }
 
-  const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME
-  if (!botUsername) return { error: 'Bot username not configured' }
-
-  return { deepLink: `https://t.me/${botUsername}?start=link-${linkToken}` }
+  const accountsUrl = process.env.NEXT_PUBLIC_ACCOUNTS_URL ?? 'https://accounts.9nau.com'
+  return { deepLink: `${accountsUrl}/telegram/link?token=${linkToken}` }
 }
 
 export async function triggerAssetSync() {

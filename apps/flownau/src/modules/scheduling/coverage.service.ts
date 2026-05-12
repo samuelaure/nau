@@ -48,7 +48,7 @@ class TemplateDeck {
 // ─── Zazŭ notification ───────────────────────────────────────────────────────
 
 async function notifyViaZazu(brandId: string, markdown: string): Promise<void> {
-  const zazuUrl = process.env.ZAZU_INTERNAL_URL || 'http://zazu-bot:3000'
+  const zazuUrl = process.env.ZAZU_INTERNAL_URL || 'http://zazu:3000'
   const secret = process.env.AUTH_SECRET
   if (!secret) return
   try {
@@ -61,7 +61,7 @@ async function notifyViaZazu(brandId: string, markdown: string): Promise<void> {
     })
     if (!targetRes.ok) return
     const { nauUserId } = (await targetRes.json()) as { nauUserId: string }
-    const notifyToken = await signServiceToken({ iss: 'flownau', aud: 'zazu-bot', secret })
+    const notifyToken = await signServiceToken({ iss: 'flownau', aud: 'zazu', secret })
     await fetch(`${zazuUrl}/api/internal/notify`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${notifyToken}`, 'Content-Type': 'application/json' },

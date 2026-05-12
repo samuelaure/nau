@@ -38,12 +38,13 @@ model Session {
 }
 
 model AuthLinkToken {
-  id        String   @id @default(cuid())
-  token     String   @unique
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expiresAt DateTime
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  token      String   @unique
+  userId     String?  // null in bot-initiated flow (user unknown until accounts page login)
+  telegramId String?  // null in app-initiated flow (unknown until bot catches the deep link)
+  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
 }
 
 model ServiceClient {

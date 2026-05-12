@@ -35,7 +35,7 @@ jobs:
           check "app"            "https://app.9nau.com"
           check "flownau"        "https://flownau.9nau.com"
           check "nauthenticity"  "https://nauthenticity.9nau.com/health"
-          check "zazu-dashboard" "https://zazu.9nau.com"
+          check "zazu"           "https://zazu.9nau.com/health"
 
           echo "FAILED<<EOF" >> $GITHUB_OUTPUT
           printf "%b" "$FAILED" >> $GITHUB_OUTPUT

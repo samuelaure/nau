@@ -42,14 +42,13 @@ jobs:
 
             # Create app directories (idempotent, mkdir -p is safe)
             echo "  → Creating directory structure"
-            mkdir -p ~/apps/{api,flownau,accounts,app,nauthenticity,zazu-bot,zazu-dashboard,whatsnau}
+            mkdir -p ~/apps/{api,flownau,accounts,app,nauthenticity,zazu,whatsnau}
             echo "    ✓ ~/apps/api"
             echo "    ✓ ~/apps/flownau"
             echo "    ✓ ~/apps/accounts"
             echo "    ✓ ~/apps/app"
             echo "    ✓ ~/apps/nauthenticity"
-            echo "    ✓ ~/apps/zazu-bot"
-            echo "    ✓ ~/apps/zazu-dashboard"
+            echo "    ✓ ~/apps/zazu"
             echo "    ✓ ~/apps/whatsnau"
 
             # Pull pgvector image (required for nauthenticity)

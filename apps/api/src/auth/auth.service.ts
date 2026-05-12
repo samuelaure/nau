@@ -11,7 +11,7 @@ import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto, RegisterDto } from './auth.dto';
 
-const LINK_TOKEN_TTL_MS = 5 * 60 * 1000;
+const LINK_TOKEN_TTL_MS = 15 * 60 * 1000;
 
 async function notifyAdminNewUser(email: string, name?: string): Promise<void> {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
@@ -173,6 +173,7 @@ export class AuthService {
     return { found: true, user: safe };
   }
 
+  // App-initiated: called with user JWT (userId known, telegramId unknown)
   async generateLinkToken(userId: string): Promise<{ token: string }> {
     await this.prisma.authLinkToken.deleteMany({ where: { userId } });
     const token = crypto.randomBytes(32).toString('hex');
@@ -182,13 +183,36 @@ export class AuthService {
     return { token };
   }
 
+  // Bot-initiated: called with service JWT (telegramId known, userId unknown until accounts login)
+  async generateLinkTokenForTelegram(telegramId: string): Promise<{ token: string }> {
+    await this.prisma.authLinkToken.deleteMany({ where: { telegramId } });
+    const token = crypto.randomBytes(32).toString('hex');
+    await this.prisma.authLinkToken.create({
+      data: { token, telegramId, expiresAt: new Date(Date.now() + LINK_TOKEN_TTL_MS) },
+    });
+    return { token };
+  }
+
+  // App-initiated verify: called by bot with service JWT — telegramId provided by caller
   async verifyLinkToken(token: string, telegramId: string): Promise<{ ok: boolean }> {
     const record = await this.prisma.authLinkToken.findUnique({ where: { token } });
     if (!record || record.expiresAt < new Date()) {
       throw new UnauthorizedException('Invalid or expired link token');
     }
+    if (!record.userId) throw new UnauthorizedException('Invalid token type');
     await this.prisma.authLinkToken.delete({ where: { token } });
     return this.linkTelegram(record.userId, telegramId);
+  }
+
+  // Bot-initiated verify: called by accounts page with user JWT — telegramId stored on token
+  async verifyLinkTokenFromAccounts(token: string, userId: string): Promise<{ ok: boolean }> {
+    const record = await this.prisma.authLinkToken.findUnique({ where: { token } });
+    if (!record || record.expiresAt < new Date()) {
+      throw new UnauthorizedException('Invalid or expired link token');
+    }
+    if (!record.telegramId) throw new UnauthorizedException('Invalid token type');
+    await this.prisma.authLinkToken.delete({ where: { token } });
+    return this.linkTelegram(userId, record.telegramId);
   }
 
   async linkTelegram(userId: string, telegramId: string) {
@@ -197,7 +221,21 @@ export class AuthService {
       throw new ConflictException('Telegram account already linked to another user');
     }
     await this.prisma.user.update({ where: { id: userId }, data: { telegramId } });
+    await this.notifyZazuLink(telegramId, userId).catch(() => { /* non-critical */ });
     return { ok: true };
+  }
+
+  private async notifyZazuLink(telegramId: string, nauUserId: string): Promise<void> {
+    const zazuUrl = process.env.ZAZU_INTERNAL_URL;
+    const secret = process.env.AUTH_SECRET;
+    if (!zazuUrl || !secret) return;
+    const { signServiceToken } = await import('@nau/auth');
+    const token = await signServiceToken({ iss: '9nau-api', aud: 'zazu', secret });
+    await fetch(`${zazuUrl}/api/internal/users/${telegramId}`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nauUserId }),
+    });
   }
 
   async findByEmail(email: string) {

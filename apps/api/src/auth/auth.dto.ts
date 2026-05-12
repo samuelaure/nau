@@ -42,6 +42,16 @@ export class VerifyLinkTokenDto {
   telegramId!: string;
 }
 
+export class GenerateBotLinkTokenDto {
+  @IsString()
+  telegramId!: string;
+}
+
+export class VerifyAccountsLinkTokenDto {
+  @IsString()
+  token!: string;
+}
+
 export class SetDefaultWorkspaceDto {
   @IsString()
   workspaceId!: string;
