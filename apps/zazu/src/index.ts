@@ -213,6 +213,7 @@ bot.on('message', async (ctx) => {
 async function launchBot(retries = 5): Promise<void> {
   try {
     logger.info('Zazŭ Bot Nucleus is online (Modular Mode)');
+    await bot.telegram.setChatMenuButton({ menuButton: { type: 'default' } });
     await bot.launch();
   } catch (err: unknown) {
     const is409 = err instanceof Error && err.message.includes('409');
