@@ -67,23 +67,12 @@ export const BrandCommentView = () => {
         />
       ) : (
         <>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '2rem',
-            }}
-          >
-            <p style={{ color: '#8b949e', margin: 0 }}>
-              Profiles being constantly monitored for proactive comment suggestions.
-            </p>
-          </div>
-
           {/* Add Form */}
+          <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', padding: '1.5rem', borderRadius: '12px', marginBottom: '2rem' }}>
+            <h3 style={{ margin: '0 0 1rem 0' }}>Add Monitored Profile</h3>
           <form
             onSubmit={handleAddSubmit}
-            style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem' }}
+            style={{ display: 'flex', gap: '0.5rem' }}
           >
             <input
               type="text"
@@ -120,6 +109,7 @@ export const BrandCommentView = () => {
               )}
             </button>
           </form>
+          </div>
 
           {/* Targets List */}
           <div

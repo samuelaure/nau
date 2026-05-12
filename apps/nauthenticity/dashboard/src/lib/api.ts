@@ -394,8 +394,24 @@ export const addProjectTarget = async (payload: {
   return data;
 };
 
-export const getInspoItems = async (brandId: string) => {
+export const getInspoMemberships = async (brandId: string) => {
   const { data } = await api.get(`/brands/${brandId}/inspo`);
+  return data;
+};
+
+/** @deprecated Use getInspoMemberships */
+export const getInspoItems = getInspoMemberships;
+
+export const addInspoByUsername = async (brandId: string, username: string) =>
+  addBrandTarget({ brandId, username, targetType: 'inspo', isActive: true });
+
+export const addInspoByPostUrl = async (brandId: string, postUrl: string) => {
+  const { data } = await api.post(`/brands/${brandId}/inspo/by-url`, { postUrl });
+  return data;
+};
+
+export const getVoicenotes = async (brandId: string) => {
+  const { data } = await api.get(`/brands/${brandId}/voicenotes`);
   return data;
 };
 

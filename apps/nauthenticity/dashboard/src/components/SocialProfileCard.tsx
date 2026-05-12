@@ -200,7 +200,7 @@ export const SocialProfileCard = ({
           onMouseLeave={(e) => {
             (e.currentTarget as HTMLElement).style.background = '#58a6ff';
           }}
-          onClick={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); handleSelect(); }}
         >
           View Content
         </button>

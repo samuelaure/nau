@@ -59,6 +59,14 @@ Return only valid JSON: { "cleanTranscription": "...", "synthesis": "..." }`,
     }
   }
 
+  async listForBrand(brandId: string) {
+    return this.prisma.voicenote.findMany({
+      where: { brandId },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    })
+  }
+
   async createFromCapture(
     brandId: string,
     data: { cleanTranscription: string; synthesis: string; sourceRef?: string },

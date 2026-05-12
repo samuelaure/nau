@@ -95,6 +95,12 @@ export class InspoService {
     }
   }
 
+  async addByPostUrl(brandId: string, postUrl: string) {
+    const post = await this.prisma.post.findUnique({ where: { url: postUrl }, select: { id: true } })
+    if (!post) throw new NotFoundException('Post not found. It may not have been scraped yet.')
+    return this.create(brandId, { postId: post.id })
+  }
+
   async repost(brandId: string, postUrl: string) {
     const brand = await this.prisma.brand.findUnique({ where: { id: brandId } })
     if (!brand) throw new NotFoundException('Brand not found')
