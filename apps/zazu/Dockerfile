@@ -17,7 +17,7 @@ COPY packages/zazu-db ./packages/zazu-db
 COPY packages/skills-core ./packages/skills-core
 COPY packages/feature-conversational ./packages/feature-conversational
 COPY packages/llm-client ./packages/llm-client
-COPY apps/zazu-bot ./apps/zazu-bot
+COPY apps/zazu ./apps/zazu
 
 RUN pnpm install --frozen-lockfile
 
@@ -34,4 +34,4 @@ COPY --from=builder /app ./
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "cd packages/zazu-db && npx prisma migrate deploy && cd /app && node apps/zazu-bot/dist/index.js"]
+CMD ["sh", "-c", "cd packages/zazu-db && npx prisma migrate deploy && cd /app && node apps/zazu/dist/index.js"]
