@@ -24,7 +24,7 @@ export async function middleware(req: NextRequest) {
     if (session) {
       const params = req.nextUrl.searchParams
       const redirectTo = params.get('redirect_uri') ?? params.get('continue') ?? DEFAULT_REDIRECT
-      const res = NextResponse.redirect(redirectTo)
+      const res = NextResponse.redirect(new URL(redirectTo, req.url))
       newCookies?.forEach((c) => res.headers.append('Set-Cookie', c))
       return res
     }

@@ -1,6 +1,6 @@
 'use client'
 
-import { Video, Zap, LayoutDashboard, LogOut } from 'lucide-react'
+import { Video, Zap, LayoutDashboard, LogOut, Settings } from 'lucide-react'
 
 const APPS = [
   {
@@ -29,7 +29,18 @@ const APPS = [
   },
 ]
 
-export function AppPicker() {
+const ADMIN_APP = {
+  key: 'admin',
+  name: 'accounts',
+  description: 'User management, Zazŭ messaging, and platform admin.',
+  icon: Settings,
+  url: '/admin/zazu',
+  color: '#f59e0b',
+}
+
+export function AppPicker({ isAdmin }: { isAdmin: boolean }) {
+  const apps = isAdmin ? [...APPS, ADMIN_APP] : APPS
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[radial-gradient(circle_at_top_right,#1e1b4b,#000)] p-6 gap-10">
       <div className="text-center">
@@ -40,8 +51,8 @@ export function AppPicker() {
         <p className="text-white/50 text-sm">Choose an app to continue.</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-3xl">
-        {APPS.map(({ key, name, description, icon: Icon, url, color }) => (
+      <div className={`grid grid-cols-1 gap-4 w-full max-w-3xl ${apps.length === 4 ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
+        {apps.map(({ key, name, description, icon: Icon, url, color }) => (
           <a
             key={key}
             href={url}
