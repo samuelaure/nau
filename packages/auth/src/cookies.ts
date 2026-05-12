@@ -14,7 +14,7 @@ export function buildAccessTokenCookie(token: string, opts: SetCookieOptions = {
     'Path=/',
     'HttpOnly',
     'SameSite=Lax',
-    'Max-Age=900',
+    'Max-Age=3600',
   ]
   if (opts.domain) parts.push(`Domain=${opts.domain}`)
   if (opts.secure ?? true) parts.push('Secure')

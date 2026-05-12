@@ -1,4 +1,4 @@
-import { Controller, Get, Req, Res, HttpStatus } from '@nestjs/common'
+import { Controller, Get, Post, Req, Res, HttpStatus } from '@nestjs/common'
 import type { Request, Response } from 'express'
 import jwt from 'jsonwebtoken'
 import { config } from '../../config'
@@ -38,7 +38,7 @@ export class AuthCallbackController {
       if (!data.accessToken) return null
 
       const cookies = [
-        `nau_at=${data.accessToken}; Path=/; Domain=${cookieDomain}; Max-Age=900; HttpOnly; SameSite=Lax${isSecure ? '; Secure' : ''}`,
+        `nau_at=${data.accessToken}; Path=/; Domain=${cookieDomain}; Max-Age=3600; HttpOnly; SameSite=Lax${isSecure ? '; Secure' : ''}`,
       ]
       if (data.refreshToken) {
         cookies.push(
@@ -49,6 +49,20 @@ export class AuthCallbackController {
     } catch {
       return null
     }
+  }
+
+  // Token refresh proxy: SPA can't call the 9nau API directly, so this proxies
+  // the refresh request and forwards the resulting Set-Cookie headers.
+  @Post('refresh')
+  async refresh(@Req() req: Request, @Res() res: Response) {
+    const rt = req.cookies?.['nau_rt'] as string | undefined
+    if (!rt) return res.status(HttpStatus.UNAUTHORIZED).json({ error: 'No refresh token' })
+
+    const refreshed = await this.tryRefresh(rt)
+    if (!refreshed) return res.status(HttpStatus.UNAUTHORIZED).json({ error: 'Session expired' })
+
+    res.setHeader('Set-Cookie', refreshed.setCookies)
+    return res.json({ ok: true })
   }
 
   // SSO callback: accounts sets nau_at on .9nau.com and redirects here.
