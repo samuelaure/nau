@@ -55,6 +55,9 @@ bot.start(async (ctx) => {
 
 // --- /link Command ---
 bot.command('link', async (ctx) => {
+  if (ctx.dbUser.nauUserId) {
+    return ctx.reply('✅ Tu cuenta naŭ ya está vinculada. No necesitas hacer nada más.');
+  }
   return sendLinkPrompt(ctx, ctx.dbUser);
 });
 

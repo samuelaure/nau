@@ -34,14 +34,23 @@ export function TelegramLinkConfirm({ token }: { token: string }) {
   }
 
   if (state === 'success') {
+    const botUsername = process.env['NEXT_PUBLIC_TELEGRAM_BOT_USERNAME']
     return (
       <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="max-w-sm w-full text-center space-y-3">
+        <div className="max-w-sm w-full text-center space-y-4">
           <p className="text-2xl">✅</p>
           <p className="text-lg font-medium">¡Cuenta vinculada!</p>
           <p className="text-sm text-muted-foreground">
-            Tu cuenta naŭ ya está conectada con Telegram. Puedes volver al bot.
+            Tu cuenta naŭ ya está conectada con Telegram. Recibirás una confirmación en el bot.
           </p>
+          {botUsername && (
+            <a
+              href={`https://t.me/${botUsername}`}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[#2AABEE] text-white rounded-lg font-medium text-sm hover:opacity-90 transition-opacity"
+            >
+              Volver a Zazŭ →
+            </a>
+          )}
         </div>
       </div>
     )

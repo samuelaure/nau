@@ -63,6 +63,10 @@ export class ProactiveDeliverySystem {
       if (!nauUserId) return res.status(400).json({ error: 'Missing nauUserId' });
       try {
         await prisma.user.updateMany({ where: { telegramId: BigInt(String(telegramId)) }, data: { nauUserId } });
+        this.bot.telegram.sendMessage(
+          String(telegramId),
+          '✅ ¡Cuenta vinculada! Tu cuenta naŭ Platform está conectada. Ya puedes recibir notificaciones y enviar ideas de voz.',
+        ).catch(() => { /* non-critical */ });
         return res.status(200).json({ ok: true });
       } catch (err: any) {
         return res.status(500).json({ error: err.message });
