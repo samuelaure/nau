@@ -21,5 +21,5 @@ export {
 export type { SignServiceTokenOptions } from './core'
 export type { SetCookieOptions } from './cookies'
 
-export { getSession, requireSession, getSessionFromCookieStore, getOrRefreshSession } from './nextjs'
-export type { RefreshResult } from './nextjs'
+export { getSession, requireSession, getSessionFromCookieStore, getOrRefreshSession, getOrRefreshSessionFromCookieStore } from './nextjs'
+export type { RefreshResult, RefreshResultWithToken } from './nextjs'
