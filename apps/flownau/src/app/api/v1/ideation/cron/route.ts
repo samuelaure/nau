@@ -62,13 +62,12 @@ export async function POST(request: NextRequest) {
 
     const brand = await prisma.brand.findUnique({
       where: { id: brandId },
-      select: { language: true, ideationCount: true },
+      select: { language: true },
     })
 
     const result = await generateContentIdeas({
       topic,
       language: brand?.language ?? 'Spanish',
-      count: brand?.ideationCount ?? 9,
       recentContent: [],
     })
 

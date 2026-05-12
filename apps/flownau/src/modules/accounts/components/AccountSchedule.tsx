@@ -18,7 +18,6 @@ interface PostSchedule {
 interface AccountScheduleProps {
   brandId: string
   initialSchedule: PostSchedule | null
-  initialIdeationCount: number
   initialAutoApproveIdeas: boolean
   initialCoverageHorizonDays: number
 }
@@ -79,12 +78,11 @@ const TIMEZONES = [
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function AccountSchedule({ brandId, initialSchedule, initialIdeationCount, initialAutoApproveIdeas, initialCoverageHorizonDays }: AccountScheduleProps) {
+export default function AccountSchedule({ brandId, initialSchedule, initialAutoApproveIdeas, initialCoverageHorizonDays }: AccountScheduleProps) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [availableFormats, setAvailableFormats] = useState<string[]>([])
-  const [ideationCount, setIdeationCount] = useState(initialIdeationCount)
   const [autoApproveIdeas, setAutoApproveIdeas] = useState(initialAutoApproveIdeas)
   const [coverageHorizonDays, setCoverageHorizonDays] = useState(initialCoverageHorizonDays)
 
@@ -188,7 +186,7 @@ export default function AccountSchedule({ brandId, initialSchedule, initialIdeat
         fetch(`/api/brands/${brandId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ideationCount, autoApproveIdeas, coverageHorizonDays }),
+          body: JSON.stringify({ autoApproveIdeas, coverageHorizonDays }),
         }),
       ])
       if (!scheduleRes.ok) {
@@ -306,20 +304,6 @@ export default function AccountSchedule({ brandId, initialSchedule, initialIdeat
       <Card className="p-6 flex flex-col gap-5">
         <h3 className="font-semibold text-white">Idea Generation</h3>
         <div className="flex gap-6 flex-wrap items-end">
-          <div>
-            <label className="form-label block mb-1">
-              Ideas per generation
-              <span className="text-xs font-normal ml-2 opacity-70">Ideas generated per brainstorm session.</span>
-            </label>
-            <input
-              type="number"
-              min={1}
-              max={30}
-              value={ideationCount}
-              onChange={(e) => setIdeationCount(Number(e.target.value))}
-              className="bg-gray-950 border border-border text-white rounded p-2.5 text-sm w-24"
-            />
-          </div>
           <div className="pb-1">
             <label className="flex items-center gap-3 cursor-pointer">
               <input
