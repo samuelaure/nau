@@ -3,7 +3,7 @@ import { acquireLock } from '@/modules/shared/rate-limit'
 import { logger, logError } from '@/modules/shared/logger'
 import { signServiceToken } from '@nau/auth'
 
-const ZAZU_URL = () => process.env.ZAZU_INTERNAL_URL || 'http://zazu-bot:3000'
+const ZAZU_URL = () => process.env.ZAZU_INTERNAL_URL || 'http://zazu:3000'
 const API_URL = () => process.env.NAU_API_URL || 'http://api:3000'
 
 async function resolveNauUserId(workspaceId: string): Promise<string | null> {
@@ -26,7 +26,7 @@ async function resolveNauUserId(workspaceId: string): Promise<string | null> {
 async function sendZazuNotification(nauUserId: string, type: string, payload: Record<string, unknown>): Promise<void> {
   const secret = process.env.AUTH_SECRET
   if (!secret) return
-  const token = await signServiceToken({ iss: 'flownau', aud: 'zazu-bot', secret })
+  const token = await signServiceToken({ iss: 'flownau', aud: 'zazu', secret })
   await fetch(`${ZAZU_URL()}/api/internal/notify`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },

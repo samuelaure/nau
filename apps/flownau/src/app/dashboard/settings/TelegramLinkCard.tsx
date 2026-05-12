@@ -46,14 +46,12 @@ export default function TelegramLinkCard({ linked }: { linked: boolean }) {
           </p>
           {deepLink ? (
             <div className="flex flex-col gap-3">
-              <p className="text-sm text-text-secondary">Open the link below in Telegram to complete the connection:</p>
+              <p className="text-sm text-text-secondary">Click below to confirm the connection:</p>
               <a
                 href={deepLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-[#2AABEE] text-white rounded-lg font-medium text-sm w-fit hover:opacity-90 transition-opacity"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-brand-primary text-white rounded-lg font-medium text-sm w-fit hover:opacity-90 transition-opacity"
               >
-                Open Zazŭ in Telegram →
+                Connect Telegram →
               </a>
               <p className="text-xs text-text-secondary">Link expires in 15 minutes.</p>
             </div>

@@ -18,7 +18,7 @@ import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { ServiceAuthGuard } from '../common/guards/service-auth.guard';
 import { CurrentUser } from './current-user.decorator';
-import { LinkTelegramDto, LoginDto, RegisterDto, SetDefaultWorkspaceDto, VerifyLinkTokenDto } from './auth.dto';
+import { GenerateBotLinkTokenDto, LinkTelegramDto, LoginDto, RegisterDto, SetDefaultWorkspaceDto, VerifyAccountsLinkTokenDto, VerifyLinkTokenDto } from './auth.dto';
 import {
   buildAccessTokenCookie,
   buildRefreshTokenCookie,
@@ -92,16 +92,32 @@ export class AuthController {
     return this.auth.linkTelegram(user.sub, dto.telegramId);
   }
 
+  // App-initiated: logged-in user generates token → deep link to bot
   @Post('link-token')
   @UseGuards(JwtAuthGuard)
   generateLinkToken(@CurrentUser() user: AccessTokenPayload) {
     return this.auth.generateLinkToken(user.sub);
   }
 
+  // Bot-initiated: bot generates token with telegramId → link to accounts page
+  @Post('link-token/bot')
+  @UseGuards(ServiceAuthGuard)
+  generateBotLinkToken(@Body() dto: GenerateBotLinkTokenDto) {
+    return this.auth.generateLinkTokenForTelegram(dto.telegramId);
+  }
+
+  // App-initiated verify: bot calls with telegramId after user clicks deep link
   @Post('link-token/verify')
   @UseGuards(ServiceAuthGuard)
   verifyLinkToken(@Body() dto: VerifyLinkTokenDto) {
     return this.auth.verifyLinkToken(dto.token, dto.telegramId);
+  }
+
+  // Bot-initiated verify: accounts page calls after logged-in user confirms
+  @Post('link-token/verify-from-accounts')
+  @UseGuards(JwtAuthGuard)
+  verifyLinkTokenFromAccounts(@CurrentUser() user: AccessTokenPayload, @Body() dto: VerifyAccountsLinkTokenDto) {
+    return this.auth.verifyLinkTokenFromAccounts(dto.token, user.sub);
   }
 
   @Get('by-telegram/:telegramId')

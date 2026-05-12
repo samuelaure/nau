@@ -115,7 +115,7 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
             docker network create nau-network 2>/dev/null || true
-            mkdir -p ~/apps/{api,flownau,accounts,app,nauthenticity,zazu-bot,zazu-dashboard,whatsnau}
+            mkdir -p ~/apps/{api,flownau,accounts,app,nauthenticity,zazu,whatsnau}
             docker pull pgvector/pgvector:pg16 2>/dev/null || true
 
   deploy:

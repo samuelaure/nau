@@ -27,7 +27,6 @@ import { defineConfig, devices } from '@playwright/test'
 
 const BASE_ACCOUNTS = process.env.PLAYWRIGHT_BASE_URL_ACCOUNTS ?? 'http://localhost:3002'
 const BASE_APP = process.env.PLAYWRIGHT_BASE_URL_APP ?? 'http://localhost:3001'
-const BASE_ZAZU_DASHBOARD = process.env.PLAYWRIGHT_BASE_URL_ZAZU_DASHBOARD ?? 'http://localhost:3003'
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -81,14 +80,5 @@ export default defineConfig({
       },
     },
 
-    // ── zazu-dashboard ──────────────────────────────────────────────────
-    {
-      name: 'zazu-dashboard',
-      testMatch: 'zazu-dashboard/**/*.spec.ts',
-      use: {
-        baseURL: BASE_ZAZU_DASHBOARD,
-        ...devices['Desktop Chrome'],
-      },
-    },
   ],
 })

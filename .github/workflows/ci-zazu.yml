@@ -1,19 +1,19 @@
-name: CI — accounts
+name: CI — zazu
 
-# Next.js 14 SSO identity hub. Uses Vitest + @testing-library/react.
-# Server actions are tested by mocking fetch and next/headers — no real API needed.
+# Express + Telegraf Telegram bot. Uses Vitest.
+# SkillManager and service-auth middleware tested with mocked Telegraf contexts.
 on:
   push:
     branches: [main]
     paths:
-      - 'apps/accounts/**'
+      - 'apps/zazu/**'
       - 'packages/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
-      - '.github/workflows/ci-accounts.yml'
+      - '.github/workflows/ci-zazu.yml'
   pull_request:
     paths:
-      - 'apps/accounts/**'
+      - 'apps/zazu/**'
       - 'packages/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
@@ -24,6 +24,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NODE_ENV: test
+      AUTH_SECRET: ci-test-secret-32-chars-minimum!!
+      TELEGRAM_BOT_TOKEN: ci-bot-token
 
     steps:
       - uses: actions/checkout@v4
@@ -37,14 +39,14 @@ jobs:
         run: pnpm build --filter='./packages/**'
 
       - name: Run unit tests with coverage
-        run: pnpm --filter=@9nau/accounts test:ci
+        run: pnpm --filter=@zazu/bot test:ci
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: accounts-coverage
-          path: apps/accounts/coverage/
+          name: zazu-coverage
+          path: apps/zazu/coverage/
           retention-days: 7
 
   build:
@@ -59,12 +61,10 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Build workspace packages
-        run: pnpm build --filter='./packages/**'
       - name: Typecheck
-        run: pnpm turbo typecheck --filter=@9nau/accounts
+        run: pnpm turbo typecheck --filter=@zazu/bot
       - name: Build
-        run: pnpm turbo build --filter=@9nau/accounts
+        run: pnpm turbo build --filter=@zazu/bot
 
   publish:
     name: Build & push image
@@ -85,17 +85,11 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: .
-          file: apps/accounts/Dockerfile
+          file: apps/zazu/Dockerfile
           push: true
           tags: |
-            ghcr.io/samuelaure/nau/accounts:latest
-            ghcr.io/samuelaure/nau/accounts:sha-${{ github.sha }}
-          build-args: |
-            NEXT_PUBLIC_API_URL=https://api.9nau.com
-            NEXT_PUBLIC_ACCOUNTS_URL=https://accounts.9nau.com
-            NEXT_PUBLIC_APP_URL=https://app.9nau.com
-            NEXT_PUBLIC_FLOWNAU_URL=https://flownau.9nau.com
-            NEXT_PUBLIC_NAUTHENTICITY_URL=https://nauthenticity.9nau.com
+            ghcr.io/samuelaure/nau/zazu:latest
+            ghcr.io/samuelaure/nau/zazu:sha-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -131,8 +125,8 @@ jobs:
           host: ${{ secrets.DEPLOY_SSH_HOST }}
           username: root
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: apps/accounts/docker-compose.yml
-          target: ~/apps/accounts/
+          source: apps/zazu/docker-compose.yml
+          target: ~/apps/zazu/
           strip_components: 2
       - uses: appleboy/ssh-action@v1
         env:
@@ -144,8 +138,10 @@ jobs:
           envs: GITHUB_TOKEN
           script: |
             echo "$GITHUB_TOKEN" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            echo "${{ secrets.ACCOUNTS_ENV_FILE }}" > ~/apps/accounts/.env
-            cd ~/apps/accounts
+            echo "${{ secrets.ZAZU_ENV_FILE }}" > ~/apps/zazu/.env
+            cd ~/apps/zazu
             docker compose pull
+            docker compose up -d zazu-postgres
+            docker compose run --rm --no-deps zazu npx prisma migrate deploy
             docker compose up -d
             docker image prune -f || true
