@@ -70,7 +70,7 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
   await job.updateProgress(10)
 
   // ── Passthrough: user-managed formats (head_talk, replicate) ──────────────────
-  const USER_MANAGED_FORMATS = new Set(['head_talk', 'replicate'])
+  const USER_MANAGED_FORMATS = new Set(['head_talk', 'trial_head_talk', 'replicate'])
   if (USER_MANAGED_FORMATS.has(post.format ?? '') && post.userUploadedMediaUrl) {
     const renderTimeMs = Date.now() - startTime
     await prisma.renderJob.update({

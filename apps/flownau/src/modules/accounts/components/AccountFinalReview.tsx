@@ -19,6 +19,7 @@ const FORMAT_ICON: Record<string, React.ElementType> = {
   reel: Film,
   trial_reel: Play,
   head_talk: Mic,
+  trial_head_talk: Play,
   carousel: LayoutGrid,
   single_image: ImageIcon,
 }
@@ -27,6 +28,7 @@ const FORMAT_LABEL: Record<string, string> = {
   reel: 'Reel',
   trial_reel: 'Trial Reel',
   head_talk: 'Head Talk',
+  trial_head_talk: 'Trial Head Talk',
   carousel: 'Carousel',
   single_image: 'Single Image',
 }

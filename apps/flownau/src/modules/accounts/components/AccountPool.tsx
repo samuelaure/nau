@@ -26,6 +26,7 @@ const FORMAT_ICON: Record<string, React.ElementType> = {
   reel: Film,
   trial_reel: Play,
   head_talk: Mic,
+  trial_head_talk: Play,
   carousel: LayoutGrid,
   static_post: ImageIcon,
   story: Play,
@@ -35,6 +36,7 @@ const FORMAT_LABEL: Record<string, string> = {
   reel: 'Reel',
   trial_reel: 'Trial Reel',
   head_talk: 'Head Talk',
+  trial_head_talk: 'Trial Head Talk',
   carousel: 'Carousel',
   static_post: 'Static Post',
   story: 'Story',
@@ -221,7 +223,7 @@ export default function AccountPool({
       <div className="flex flex-col gap-3">
         {compositions.map((comp) => {
           const isDraft = comp.status === 'DRAFT'
-          const isHeadTalk = comp.format === 'head_talk'
+          const isHeadTalk = comp.format === 'head_talk' || comp.format === 'trial_head_talk'
           const FormatIcon = FORMAT_ICON[comp.format] ?? Film
           const busy = actioningId === comp.id
           const scenes: any[] = comp.creative?.scenes ?? []

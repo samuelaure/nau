@@ -51,9 +51,11 @@ function getDisplayStatus(dbStatus: string): DisplayStatus {
 // The post's format is rewritten to match the destination slot when dropped, so a
 // Reel post dropped onto a Trial Reel slot publishes with trial_params, and vice versa.
 const REEL_FAMILY = new Set(['reel', 'trial_reel'])
+const HEAD_TALK_FAMILY = new Set(['head_talk', 'trial_head_talk'])
 function formatsCompatible(a: string, b: string): boolean {
   if (a === b) return true
   if (REEL_FAMILY.has(a) && REEL_FAMILY.has(b)) return true
+  if (HEAD_TALK_FAMILY.has(a) && HEAD_TALK_FAMILY.has(b)) return true
   return false
 }
 
@@ -63,7 +65,7 @@ type SecondaryTag = 'Replicate' | 'Record' | 'Approve' | 'Approved' | null
 function getSecondaryTag(format: string, display: DisplayStatus, dbStatus?: string): SecondaryTag {
   if (display === 'Draft') {
     if (format === 'replicate') return 'Replicate'
-    if (format === 'head_talk') return 'Record'
+    if (format === 'head_talk' || format === 'trial_head_talk') return 'Record'
   }
   if (display === 'Ready' && dbStatus === 'RENDERED_PENDING') return 'Approve'
   if (display === 'Ready' && dbStatus === 'RENDERED_APPROVED') return 'Approved'
@@ -90,6 +92,7 @@ const FORMAT_ICON: Record<string, React.ElementType> = {
   reel: Film,
   trial_reel: Play,
   head_talk: Mic,
+  trial_head_talk: Play,
   carousel: LayoutGrid,
   static_post: ImageIcon,
   story: Play,
@@ -99,6 +102,7 @@ const FORMAT_LABEL: Record<string, string> = {
   reel: 'Reel',
   trial_reel: 'Trial Reel',
   head_talk: 'Head Talk',
+  trial_head_talk: 'Trial Head Talk',
   carousel: 'Carousel',
   static_post: 'Image',
   story: 'Story',
@@ -108,6 +112,7 @@ const FORMAT_COLOR: Record<string, string> = {
   reel: 'bg-blue-500/15 border-blue-500/30 text-blue-200',
   trial_reel: 'bg-indigo-500/15 border-indigo-500/30 text-indigo-200',
   head_talk: 'bg-purple-500/15 border-purple-500/30 text-purple-200',
+  trial_head_talk: 'bg-violet-500/15 border-violet-500/30 text-violet-200',
   carousel: 'bg-pink-500/15 border-pink-500/30 text-pink-200',
   static_post: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-200',
   story: 'bg-orange-500/15 border-orange-500/30 text-orange-200',
@@ -505,10 +510,10 @@ function ReelContent({
 }
 
 function FormatContent({ comp, actioning, onSaved }: { comp: Composition; actioning: boolean; onSaved: () => void }) {
-  if (comp.format === 'head_talk') {
+  if (HEAD_TALK_FAMILY.has(comp.format)) {
     return <HeadTalkContent comp={comp} actioning={actioning} onSaved={onSaved} />
   }
-  if (comp.format === 'reel' || comp.format === 'trial_reel') {
+  if (REEL_FAMILY.has(comp.format)) {
     return <ReelContent comp={comp} actioning={actioning} onSaved={onSaved} />
   }
   return null
@@ -809,6 +814,30 @@ function CompositionModal({
     }
   }
 
+  const handleToggleTrial = async () => {
+    const isCurrentlyTrial = comp.format === 'trial_reel' || comp.format === 'trial_head_talk'
+    const newFormat = comp.format === 'reel' ? 'trial_reel'
+      : comp.format === 'trial_reel' ? 'reel'
+      : comp.format === 'head_talk' ? 'trial_head_talk'
+      : 'head_talk'
+    setActioning(true)
+    try {
+      const res = await fetch(`/api/posts/${comp.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ format: newFormat }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success(isCurrentlyTrial ? 'Switched to regular post.' : 'Switched to Trial.')
+      setComp((prev) => ({ ...prev, format: newFormat }))
+      onRefresh()
+    } catch {
+      toast.error('Failed to toggle Trial')
+    } finally {
+      setActioning(false)
+    }
+  }
+
   const handleCancelRender = async () => {
     setActioning(true)
     try {
@@ -938,6 +967,29 @@ function CompositionModal({
 
         {/* Body */}
         <div className="px-6 py-5 flex flex-col gap-4 overflow-y-auto flex-1 min-h-0">
+          {/* Trial toggle — only for reel/trial_reel and head_talk/trial_head_talk */}
+          {(REEL_FAMILY.has(comp.format) || HEAD_TALK_FAMILY.has(comp.format)) && (
+            <div className="flex items-center justify-between px-4 py-2.5 rounded-lg bg-white/5 border border-white/10">
+              <div>
+                <p className="text-sm font-medium text-white">Trial</p>
+                <p className="text-xs text-text-secondary">Post as Instagram Trial — shown to non-followers first</p>
+              </div>
+              <button
+                onClick={handleToggleTrial}
+                disabled={actioning}
+                className={cn(
+                  'relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-40',
+                  (comp.format === 'trial_reel' || comp.format === 'trial_head_talk') ? 'bg-accent' : 'bg-white/20',
+                )}
+              >
+                <span className={cn(
+                  'absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200',
+                  (comp.format === 'trial_reel' || comp.format === 'trial_head_talk') ? 'translate-x-5' : 'translate-x-0',
+                )} />
+              </button>
+            </div>
+          )}
+
           {/* Scheduled time */}
           <div className="flex items-start gap-3">
             <Clock size={15} className="text-text-secondary mt-0.5 shrink-0" />
@@ -952,7 +1004,7 @@ function CompositionModal({
           </div>
 
           {/* ── REEL layout ─────────────────────────────────────────────────── */}
-          {(comp.format === 'reel' || comp.format === 'trial_reel') && (() => {
+          {REEL_FAMILY.has(comp.format) && (() => {
             const hasVideo = !!(comp.videoUrl || comp.renderedVideoUrl)
             return (
               <>
@@ -991,7 +1043,7 @@ function CompositionModal({
           })()}
 
           {/* ── HEAD TALK layout ─────────────────────────────────────────────── */}
-          {comp.format === 'head_talk' && (() => {
+          {HEAD_TALK_FAMILY.has(comp.format) && (() => {
             const hasVideo = !!(comp.videoUrl || comp.renderedVideoUrl || comp.userUploadedMediaUrl)
             return (
               <>
@@ -1180,7 +1232,7 @@ function CompositionModal({
 
             {/* Draft → approve to start rendering */}
             {comp.status === 'DRAFT_PENDING' && (
-              !(comp.format === 'reel' || comp.format === 'trial_reel') ||
+              !(REEL_FAMILY.has(comp.format)) ||
               !!(comp.creative as Record<string, unknown> | null)?.slots
             ) && (
               <Button size="sm" onClick={handleApproveDraft} disabled={actioning} className="gap-1.5 bg-accent hover:bg-accent/80">

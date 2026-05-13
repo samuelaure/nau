@@ -14,6 +14,7 @@ const FORMAT_ICON: Record<string, React.ElementType> = {
   reel: Film,
   trial_reel: Play,
   head_talk: Mic,
+  trial_head_talk: Play,
   carousel: LayoutGrid,
   static_post: ImageIcon,
 }
@@ -22,6 +23,7 @@ const FORMAT_COLOR: Record<string, string> = {
   reel: 'bg-blue-500/15 text-blue-300 border-blue-500/20',
   trial_reel: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/20',
   head_talk: 'bg-purple-500/15 text-purple-300 border-purple-500/20',
+  trial_head_talk: 'bg-violet-500/15 text-violet-300 border-violet-500/20',
   carousel: 'bg-pink-500/15 text-pink-300 border-pink-500/20',
   static_post: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/20',
 }
@@ -661,8 +663,8 @@ export default function AccountTemplates({ brandId }: { brandId: string }) {
   const visibleTemplates = activeTab === 'enabled' ? enabled : activeTab === 'disabled' ? disabled : templates
 
   const reelTemplates = visibleTemplates.filter((t) => t.format === 'reel' || t.format === 'trial_reel')
-  const headTalkTemplates = visibleTemplates.filter((t) => t.format === 'head_talk')
-  const otherTemplates = visibleTemplates.filter((t) => t.format !== 'reel' && t.format !== 'trial_reel' && t.format !== 'head_talk')
+  const headTalkTemplates = visibleTemplates.filter((t) => t.format === 'head_talk' || t.format === 'trial_head_talk')
+  const otherTemplates = visibleTemplates.filter((t) => t.format !== 'reel' && t.format !== 'trial_reel' && t.format !== 'head_talk' && t.format !== 'trial_head_talk')
 
   const groups = [
     { label: 'Reels', items: reelTemplates, cols: 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4' },

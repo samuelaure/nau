@@ -37,7 +37,7 @@ export async function compressPublishedPost(postId: string): Promise<void> {
   })
   if (!post) return
 
-  const isVideoFormat = post.format === 'reel' || post.format === 'trial_reel' || post.format === 'head_talk'
+  const isVideoFormat = post.format === 'reel' || post.format === 'trial_reel' || post.format === 'head_talk' || post.format === 'trial_head_talk'
   if (!isVideoFormat || !post.videoUrl) return
 
   const tmpIn = path.join(os.tmpdir(), `flownau_archive_in_${postId}.mp4`)

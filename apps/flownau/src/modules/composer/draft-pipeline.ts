@@ -8,7 +8,7 @@ import type { LlmTrace } from '@/modules/ideation/ideation.service'
 import type { SlotDef } from '../../../prisma/seeds/templates'
 
 
-const HEAD_TALK_FORMATS = new Set(['head_talk'])
+const HEAD_TALK_FORMATS = new Set(['head_talk', 'trial_head_talk'])
 
 const HeadTalkSchema = z.object({
   hook: z.string().describe('Opening hook — max 2 sentences. Wins attention in the first 2 seconds.'),
