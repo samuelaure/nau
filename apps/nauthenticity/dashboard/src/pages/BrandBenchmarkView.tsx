@@ -68,21 +68,11 @@ export const BrandBenchmarkView = () => {
       ) : (
         <>
           <div style={{ marginBottom: '2rem' }}>
-            <h1
-              style={{
-                margin: 0,
-                fontSize: '2rem',
-                marginBottom: '0.5rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-              }}
-            >
-              <BarChart2 size={28} /> Benchmarks
+            <h1 style={{ margin: 0, fontSize: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <BarChart2 size={28} style={{ color: '#0969da' }} /> Benchmarks
             </h1>
-            <p style={{ color: '#8b949e', margin: 0 }}>
-              Track competitor and peer profiles to analyze their engagement metrics and visual
-              patterns.
+            <p style={{ color: '#8b949e', margin: '0.5rem 0 0 0' }}>
+              Track competitor and peer profiles to analyze their engagement metrics and visual patterns.
             </p>
           </div>
 
@@ -179,6 +169,10 @@ export const BrandBenchmarkView = () => {
             </form>
           </div>
 
+          <section>
+            <h2 style={{ fontSize: '1.25rem', margin: '0 0 1rem 0', border: 'none', color: '#c9d1d9', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <BarChart2 size={18} /> Benchmark Targets ({targets?.length ?? 0})
+            </h2>
           <div
             style={{
               display: 'grid',
@@ -210,6 +204,7 @@ export const BrandBenchmarkView = () => {
               </div>
             )}
           </div>
+          </section>
         </>
       )}
     </div>
@@ -405,20 +400,8 @@ const BenchmarkProfileViewer = ({ username, onBack }: { username: string; onBack
   if (isError || !account)
     return (
       <div>
-        <button
-          onClick={onBack}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: '#58a6ff',
-            cursor: 'pointer',
-            marginBottom: '1rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-          }}
-        >
-          &larr; Back to targets
+        <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#58a6ff', cursor: 'pointer', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '4px', padding: 0, fontWeight: 500 }}>
+          &larr; Back to Benchmarks
         </button>
         <div style={{ color: 'red' }}>Account data could not be loaded.</div>
       </div>
@@ -426,76 +409,19 @@ const BenchmarkProfileViewer = ({ username, onBack }: { username: string; onBack
 
   return (
     <div className="fade-in">
-      <button
-        onClick={onBack}
-        style={{
-          background: 'none',
-          border: 'none',
-          color: '#58a6ff',
-          cursor: 'pointer',
-          marginBottom: '1rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '4px',
-          padding: 0,
-          fontWeight: 500,
-        }}
-      >
+      <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#58a6ff', cursor: 'pointer', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '4px', padding: 0, fontWeight: 500 }}>
         &larr; Back to Benchmarks
       </button>
 
-      <div
-        style={{
-          marginBottom: '2rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-        }}
-      >
-        <div>
-          <h2
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              margin: 0,
-              border: 'none',
-            }}
-          >
-            <BarChart2 size={24} style={{ color: '#0969da' }} />@{username}
-          </h2>
-          <p style={{ color: '#8b949e', margin: '0.5rem 0 0 0' }}>
-            Raw metric tracking and visual profiling.
-          </p>
-        </div>
-
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <div
-            style={{
-              textAlign: 'center',
-              background: 'var(--card-bg)',
-              border: '1px solid var(--border)',
-              padding: '1rem',
-              borderRadius: '8px',
-              minWidth: '100px',
-            }}
-          >
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{account.posts.length}</div>
-            <div style={{ fontSize: '0.8rem', color: '#8b949e', textTransform: 'uppercase' }}>
-              Posts Crawled
-            </div>
-          </div>
-        </div>
+      <div style={{ marginBottom: '2rem' }}>
+        <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, border: 'none' }}>
+          <BarChart2 size={24} style={{ color: '#0969da' }} /> @{username}
+        </h2>
+        <p style={{ color: '#8b949e', margin: '0.5rem 0 0 0' }}>Raw metric tracking and visual profiling.</p>
       </div>
 
-      <h3
-        style={{
-          borderBottom: '1px solid var(--border)',
-          paddingBottom: '0.5rem',
-          marginBottom: '1rem',
-        }}
-      >
-        Captured Content
+      <h3 style={{ fontSize: '1.25rem', margin: '0 0 1rem 0', border: 'none', color: '#c9d1d9', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <BarChart2 size={18} /> Captured Content ({account.posts.length})
       </h3>
       <PostGrid posts={account.posts} sort="recent" />
 
