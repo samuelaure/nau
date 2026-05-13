@@ -310,7 +310,7 @@ export default function AccountPool({
                   </Button>
                 )}
 
-                {isHeadTalk && comp.status !== 'PUBLISHED' && (
+                {isHeadTalk && ['APPROVED', 'DRAFT_APPROVED'].includes(comp.status) && (
                   <>
                     <input
                       ref={(el) => { uploadRefs.current[comp.id] = el }}
