@@ -169,7 +169,6 @@ export default async function WorkspaceOverviewPage({
               brand={{
                 id: localBrand.id,
                 language: localBrand.language,
-                ideationCount: localBrand.ideationCount,
                 autoApproveIdeas: localBrand.autoApproveIdeas,
                 shortCode: localBrand.shortCode,
                 coverageHorizonDays: localBrand.coverageHorizonDays,

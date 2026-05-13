@@ -114,7 +114,7 @@ interface Check1Result {
 export async function runCoverageChecks(brandId: string): Promise<CoverageResult> {
   const brand = await prisma.brand.findUnique({
     where: { id: brandId },
-    select: { coverageHorizonDays: true, ideationCount: true, autoApproveIdeas: true, language: true },
+    select: { coverageHorizonDays: true, autoApproveIdeas: true, language: true },
   })
   if (!brand) throw new Error(`Brand ${brandId} not found`)
 
@@ -135,7 +135,7 @@ export async function runCoverageChecks(brandId: string): Promise<CoverageResult
 async function runCheck1(
   brandId: string,
   horizonDays: number,
-  brand: { ideationCount: number; autoApproveIdeas: boolean; language: string; ideationCustomPrompt?: string | null },
+  brand: { autoApproveIdeas: boolean; language: string; ideationCustomPrompt?: string | null },
   source: 'manual' | 'automatic' = 'manual',
 ): Promise<Check1Result> {
   const targetEnd = new Date(Date.now() + (horizonDays) * 24 * 60 * 60 * 1000)
@@ -390,7 +390,7 @@ async function runCheck1(
     }
 
     // Truly no ideas — trigger generation
-    ideasGenerated = await triggerIdeaGeneration(brandId, brand.ideationCount)
+    ideasGenerated = await triggerIdeaGeneration(brandId)
     break
   }
 
@@ -430,7 +430,7 @@ export interface SmartFillResult {
 export async function smartFillCalendar(brandId: string): Promise<SmartFillResult> {
   const brand = await prisma.brand.findUnique({
     where: { id: brandId },
-    select: { coverageHorizonDays: true, ideationCount: true, autoApproveIdeas: true, language: true, ideationCustomPrompt: true },
+    select: { coverageHorizonDays: true, autoApproveIdeas: true, language: true, ideationCustomPrompt: true },
   })
   if (!brand) throw new Error(`Brand ${brandId} not found`)
 
@@ -572,7 +572,7 @@ async function generateIdeasFromSourceConcepts(
 
 async function tryGenerateNewBatch(
   brandId: string,
-  brand: { ideationCount: number; autoApproveIdeas: boolean; language: string; ideationCustomPrompt?: string | null },
+  brand: { autoApproveIdeas: boolean; language: string; ideationCustomPrompt?: string | null },
 ): Promise<{ hasDigest: boolean }> {
   const result = await generateIdeasFromSourceConcepts(brandId, brand)
   return { hasDigest: result.hasConcepts }
@@ -580,7 +580,7 @@ async function tryGenerateNewBatch(
 
 // ─── Idea generation trigger ──────────────────────────────────────────────────
 
-async function triggerIdeaGeneration(brandId: string, _ideationCount: number): Promise<boolean> {
+async function triggerIdeaGeneration(brandId: string): Promise<boolean> {
   const brand = await prisma.brand.findUnique({
     where: { id: brandId },
     select: { language: true, autoApproveIdeas: true, ideationCustomPrompt: true },

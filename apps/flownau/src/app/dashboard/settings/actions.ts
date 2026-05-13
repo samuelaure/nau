@@ -4,8 +4,7 @@ import { prisma } from '@/modules/shared/prisma'
 import { revalidatePath } from 'next/cache'
 import { syncR2Assets } from '@/modules/video/r2-sync-service'
 import { getAuthUser } from '@/lib/auth'
-import { cookies } from 'next/headers'
-import { COOKIE_ACCESS_TOKEN } from '@nau/auth'
+import { getValidToken } from '@/lib/auth'
 import { z } from 'zod'
 
 const SettingSchema = z.object({
@@ -47,8 +46,7 @@ export async function setSetting(formData: FormData) {
 }
 
 export async function generateTelegramLinkToken(): Promise<{ deepLink?: string; error?: string }> {
-  const cookieStore = await cookies()
-  const token = cookieStore.get(COOKIE_ACCESS_TOKEN)?.value
+  const token = await getValidToken()
   if (!token) return { error: 'Not authenticated' }
 
   const nauApiUrl = process.env.NAU_API_URL ?? 'http://9nau-api:3000'

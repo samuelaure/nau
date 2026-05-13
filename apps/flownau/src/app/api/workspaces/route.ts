@@ -1,14 +1,12 @@
 export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { COOKIE_ACCESS_TOKEN } from '@nau/auth'
+import { getValidToken } from '@/lib/auth'
 
 const NAU_API_URL = process.env.NAU_API_URL || 'https://api.9nau.com'
 
 export async function GET() {
-  const cookieStore = await cookies()
-  const token = cookieStore.get(COOKIE_ACCESS_TOKEN)?.value
+  const token = await getValidToken()
   const res = await fetch(`${NAU_API_URL}/workspaces`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   })
@@ -18,8 +16,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const cookieStore = await cookies()
-  const token = cookieStore.get(COOKIE_ACCESS_TOKEN)?.value
+  const token = await getValidToken()
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json()

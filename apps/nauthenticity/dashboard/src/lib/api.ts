@@ -9,14 +9,33 @@ export const api = axios.create({
   withCredentials: true,
 });
 
-// On 401, session has expired — redirect to logout which clears cookies and returns to landing.
+// On 401: attempt a silent token refresh, then retry the original request once.
+// Multiple concurrent 401s share a single refresh call via the pending promise.
+let pendingRefresh: Promise<void> | null = null;
+
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      window.location.replace('/auth/logout');
+  async (error) => {
+    const original = error.config;
+    if (error.response?.status !== 401 || original._retried) {
+      if (error.response?.status === 401) window.location.replace('/auth/logout');
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
+    original._retried = true;
+
+    if (!pendingRefresh) {
+      pendingRefresh = fetch('/auth/refresh', { method: 'POST', credentials: 'include' })
+        .then((r) => { if (!r.ok) throw new Error('refresh failed') })
+        .finally(() => { pendingRefresh = null });
+    }
+
+    try {
+      await pendingRefresh;
+      return api(original);
+    } catch {
+      window.location.replace('/auth/logout');
+      return Promise.reject(error);
+    }
   },
 );
 
@@ -375,8 +394,24 @@ export const addProjectTarget = async (payload: {
   return data;
 };
 
-export const getInspoItems = async (brandId: string) => {
+export const getInspoMemberships = async (brandId: string) => {
   const { data } = await api.get(`/brands/${brandId}/inspo`);
+  return data;
+};
+
+/** @deprecated Use getInspoMemberships */
+export const getInspoItems = getInspoMemberships;
+
+export const addInspoByUsername = async (brandId: string, username: string) =>
+  addBrandTarget({ brandId, username, targetType: 'inspo', isActive: true });
+
+export const addInspoByPostUrl = async (brandId: string, postUrl: string) => {
+  const { data } = await api.post(`/brands/${brandId}/inspo/by-url`, { postUrl });
+  return data;
+};
+
+export const getVoicenotes = async (brandId: string) => {
+  const { data } = await api.get(`/brands/${brandId}/voicenotes`);
   return data;
 };
 

@@ -56,6 +56,13 @@ export class InspoController {
     return this.inspoService.delete(id, brandId)
   }
 
+  @Post('brands/:brandId/inspo/by-url')
+  @UseGuards(JwtAuthGuard)
+  addByUrl(@Param('brandId') brandId: string, @Body() body: { postUrl?: string }) {
+    if (!body.postUrl) throw new BadRequestException('postUrl is required')
+    return this.inspoService.addByPostUrl(brandId, body.postUrl)
+  }
+
   @Post('repost')
   @UseGuards(JwtAuthGuard)
   repost(@Body() body: { brandId?: string; postUrl?: string }) {

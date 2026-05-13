@@ -1,18 +1,26 @@
-import { Controller, Post, Body, Param, UseGuards } from '@nestjs/common'
+import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common'
 import { VoicenoteService } from './voicenote.service'
 import { ServiceAuthGuard } from '../auth/service-auth.guard'
+import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 
-@Controller('api/v1/_service')
-@UseGuards(ServiceAuthGuard)
+@Controller()
 export class VoicenoteController {
   constructor(private readonly voicenoteService: VoicenoteService) {}
 
-  @Post('audio/process')
+  @Get('brands/:brandId/voicenotes')
+  @UseGuards(JwtAuthGuard)
+  listForBrand(@Param('brandId') brandId: string) {
+    return this.voicenoteService.listForBrand(brandId)
+  }
+
+  @Post('api/v1/_service/audio/process')
+  @UseGuards(ServiceAuthGuard)
   async processAudio(@Body() body: { audioUrl: string }) {
     return this.voicenoteService.processAudio(body.audioUrl)
   }
 
-  @Post('brands/:brandId/voicenotes')
+  @Post('api/v1/_service/brands/:brandId/voicenotes')
+  @UseGuards(ServiceAuthGuard)
   async createFromCapture(
     @Param('brandId') brandId: string,
     @Body() body: { cleanTranscription: string; synthesis: string; sourceRef?: string },

@@ -14,7 +14,7 @@ import {
   DEFAULT_PRINCIPLES_PROMPT,
 } from '@/modules/shared/pipeline-defaults'
 import { z } from 'zod'
-import { COOKIE_ACCESS_TOKEN } from '@nau/auth'
+import { getValidToken } from '@/lib/auth'
 
 const SocialProfileSchema = z.object({
   username: z.string().min(1, 'Username is required').transform((val) => val.replace(/^@/, '')),
@@ -101,8 +101,7 @@ export async function addBrand(formData: FormData): Promise<{ id: string; worksp
   const name = (formData.get('brandName') as string | null)?.trim()
   if (!name) throw new Error('Brand name is required')
 
-  const cookieStore = await import('next/headers').then((m) => m.cookies())
-  const token = cookieStore.get(COOKIE_ACCESS_TOKEN)?.value
+  const token = await getValidToken()
   const nauApiUrl = process.env.NAU_API_URL ?? 'http://9nau-api:3000'
 
   const res = await fetch(`${nauApiUrl}/workspaces/${workspaceId}/brands`, {
@@ -216,8 +215,7 @@ export async function moveBrandToWorkspace(brandId: string, targetWorkspaceId: s
   const parsedId = IdSchema.parse(brandId)
   const parsedWsId = IdSchema.parse(targetWorkspaceId)
 
-  const cookieStore = await import('next/headers').then((m) => m.cookies())
-  const token = cookieStore.get(COOKIE_ACCESS_TOKEN)?.value
+  const token = await getValidToken()
   const nauApiUrl = process.env.NAU_API_URL ?? 'http://9nau-api:3000'
 
   const brand = await prisma.brand.findUnique({ where: { id: parsedId } })

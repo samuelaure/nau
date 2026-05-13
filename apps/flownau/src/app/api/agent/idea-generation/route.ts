@@ -26,11 +26,11 @@ export async function POST(req: Request) {
 
     const brand = await prisma.brand.findUnique({
       where: { id: brandId },
-      select: { language: true, ideationCount: true, ideationCustomPrompt: true, name: true, context: true },
+      select: { language: true, ideationCustomPrompt: true, name: true, context: true },
     })
 
     const language = brand?.language ?? 'Spanish'
-    const count = typeof countOverride === 'number' ? countOverride : (brand?.ideationCount ?? undefined)
+    const count = typeof countOverride === 'number' ? countOverride : undefined
 
     // Resolve topic: for automatic source fetch digest from nauthenticity; for manual require it from body
     let topic: string = topicFromBody?.trim() ?? ''

@@ -175,7 +175,6 @@ function FontPicker({ name, defaultValue }: { name: string; defaultValue: string
 type Brand = {
   id: string
   language: string
-  ideationCount: number
   autoApproveIdeas: boolean
   shortCode: string | null
   coverageHorizonDays: number
@@ -387,7 +386,7 @@ export default function BrandSettings({ brand, initialSchedule, initialTab }: { 
         </Card>
       )}
 
-      {tab === 'schedule' && <AccountSchedule brandId={brand.id} initialSchedule={initialSchedule} initialIdeationCount={brand.ideationCount} initialAutoApproveIdeas={brand.autoApproveIdeas} initialCoverageHorizonDays={brand.coverageHorizonDays} />}
+      {tab === 'schedule' && <AccountSchedule brandId={brand.id} initialSchedule={initialSchedule} initialAutoApproveIdeas={brand.autoApproveIdeas} initialCoverageHorizonDays={brand.coverageHorizonDays} />}
     </div>
   )
 }

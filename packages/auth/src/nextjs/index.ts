@@ -54,6 +54,91 @@ export interface RefreshResult {
   newCookies?: string[]
 }
 
+export interface RefreshResultWithToken {
+  session: AccessTokenPayload | null
+  token: string | null
+}
+
+// Minimal mutable cookie store interface — avoids hard Next.js dependency in this package.
+interface MutableCookieStore {
+  get(name: string): { value: string } | undefined
+  set(name: string, value: string, options: object): void
+}
+
+/**
+ * Variant of getOrRefreshSession for use in server actions and route handlers,
+ * where the cookie store is available via Next.js cookies() and is mutable.
+ * Refreshes the AT if expired and writes the new cookies back to the store so
+ * subsequent calls within the same request see the updated token.
+ */
+export async function getOrRefreshSessionFromCookieStore(
+  cookieStore: MutableCookieStore,
+): Promise<RefreshResultWithToken> {
+  const at = cookieStore.get(COOKIE_ACCESS_TOKEN)?.value
+
+  if (at) {
+    try {
+      const session = await verifyAccessToken(at, getSecret())
+      return { session, token: at }
+    } catch (err) {
+      if (!(err instanceof AuthError && err.code === 'EXPIRED')) {
+        return { session: null, token: null }
+      }
+    }
+  }
+
+  const rt = cookieStore.get(COOKIE_REFRESH_TOKEN)?.value
+  if (!rt) return { session: null, token: null }
+
+  const apiUrl = process.env['NAU_API_URL'] ?? 'https://api.9nau.com'
+  const cookieDomain = process.env['COOKIE_DOMAIN'] ?? '.9nau.com'
+  const isSecure = process.env['NODE_ENV'] === 'production'
+
+  try {
+    const res = await fetch(`${apiUrl}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: `${COOKIE_REFRESH_TOKEN}=${rt}` },
+    })
+    if (!res.ok) return { session: null, token: null }
+
+    let newAt: string | null = null
+    let newRt: string | null = null
+
+    const apiSetCookies = res.headers.getSetCookie?.() ?? []
+    if (apiSetCookies.length > 0) {
+      const atHeader = apiSetCookies.find((h) => h.startsWith(`${COOKIE_ACCESS_TOKEN}=`))
+      const rtHeader = apiSetCookies.find((h) => h.startsWith(`${COOKIE_REFRESH_TOKEN}=`))
+      if (!atHeader) return { session: null, token: null }
+      newAt = atHeader.split(';')[0].split('=').slice(1).join('=')
+      if (rtHeader) newRt = rtHeader.split(';')[0].split('=').slice(1).join('=')
+    } else {
+      const data = (await res.json()) as { accessToken?: string; refreshToken?: string }
+      if (!data.accessToken) return { session: null, token: null }
+      newAt = data.accessToken
+      newRt = data.refreshToken ?? null
+    }
+
+    const session = await verifyAccessToken(newAt, getSecret())
+
+    try {
+      cookieStore.set(COOKIE_ACCESS_TOKEN, newAt, {
+        httpOnly: true, sameSite: 'lax', maxAge: 3600, path: '/', domain: cookieDomain, secure: isSecure,
+      })
+      if (newRt) {
+        cookieStore.set(COOKIE_REFRESH_TOKEN, newRt, {
+          httpOnly: true, sameSite: 'strict', maxAge: 30 * 24 * 60 * 60, path: '/', domain: cookieDomain, secure: isSecure,
+        })
+      }
+    } catch {
+      // cookieStore.set() throws in server components — that's fine, middleware handles those.
+    }
+
+    return { session, token: newAt }
+  } catch {
+    return { session: null, token: null }
+  }
+}
+
 /**
  * Attempts to verify the access token. If it is expired and a refresh token is
  * present, silently calls the auth API to rotate tokens. Returns the session and,

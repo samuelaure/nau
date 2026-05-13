@@ -1,4 +1,4 @@
-import { getSessionFromCookieStore, COOKIE_ACCESS_TOKEN } from '@nau/auth'
+import { getOrRefreshSessionFromCookieStore } from '@nau/auth'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { NextResponse } from 'next/server'
@@ -29,11 +29,19 @@ export function adminUnauthorized(): NextResponse {
   return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 }
 
-export async function getAuthUser(): Promise<AuthUser | null> {
+async function getAuthContext(): Promise<{ user: AuthUser; token: string } | null> {
   const cookieStore = await cookies()
-  const session = await getSessionFromCookieStore(cookieStore)
-  if (!session) return null
-  return { id: session.sub, workspaceId: session.workspaceId }
+  const { session, token } = await getOrRefreshSessionFromCookieStore(cookieStore)
+  if (!session || !token) return null
+  return { user: { id: session.sub, workspaceId: session.workspaceId }, token }
+}
+
+export async function getAuthUser(): Promise<AuthUser | null> {
+  return (await getAuthContext())?.user ?? null
+}
+
+export async function getValidToken(): Promise<string | null> {
+  return (await getAuthContext())?.token ?? null
 }
 
 export async function requireAuth(): Promise<AuthUser> {
@@ -51,28 +59,24 @@ export async function requireAuth(): Promise<AuthUser> {
  * Usage: const denied = await checkBrandAccessForRoute(brandId); if (denied) return denied;
  */
 export async function checkBrandAccessForRoute(brandId: string): Promise<NextResponse | null> {
-  const user = await getAuthUser()
-  if (!user) {
+  const ctx = await getAuthContext()
+  if (!ctx) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const nauApiUrl = process.env.NAU_API_URL ?? 'http://9nau-api:3000'
-  const cookieStore = await cookies()
-  const token = cookieStore.get(COOKIE_ACCESS_TOKEN)?.value
   let workspaceIds: string[] = []
-  if (token) {
-    try {
-      const res = await fetch(`${nauApiUrl}/workspaces`, {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: 'no-store',
-      })
-      if (res.ok) {
-        const workspaces = (await res.json()) as { id: string }[]
-        workspaceIds = workspaces.map((w) => w.id)
-      }
-    } catch {
-      // fall through — workspaceIds stays empty, brand lookup will fail → 403
+  try {
+    const res = await fetch(`${nauApiUrl}/workspaces`, {
+      headers: { Authorization: `Bearer ${ctx.token}` },
+      cache: 'no-store',
+    })
+    if (res.ok) {
+      const workspaces = (await res.json()) as { id: string }[]
+      workspaceIds = workspaces.map((w) => w.id)
     }
+  } catch {
+    // fall through — workspaceIds stays empty, brand lookup will fail → 403
   }
 
   const brand = await prisma.brand.findFirst({

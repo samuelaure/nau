@@ -25,7 +25,7 @@ async function notifyAdminNewUser(email: string, name?: string): Promise<void> {
     body: JSON.stringify({ chat_id: chatId, text }),
   });
 }
-const ACCESS_TOKEN_TTL = '15m';
+const ACCESS_TOKEN_TTL = '1h';
 const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 function generateOpaqueToken(): string {
@@ -275,7 +275,7 @@ export class AuthService {
       data: { userId, tokenFamily, tokenHash, expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS) },
     });
 
-    return { accessToken, refreshToken: rawRefresh, expiresIn: 900 };
+    return { accessToken, refreshToken: rawRefresh, expiresIn: 3600 };
   }
 
   async setDefaultWorkspace(userId: string, workspaceId: string) {
