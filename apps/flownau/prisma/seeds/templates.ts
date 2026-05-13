@@ -155,6 +155,70 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     },
   },
 
+  // ─── Head Talk: Contrarian Take (15-30s) ─────────────────────────────────
+  {
+    name: 'Head Talk — Contrarian Take',
+    format: 'head_talk',
+    remotionId: '',
+    sceneType: 'head_talk',
+    scope: 'system',
+    description: 'Opens by naming a widely-held belief, flips it with a single precise counter-claim, then proves it fast. Drives comments, saves, and shares. Best for 15–30 s clips that position the creator as a sharp contrarian thinker.',
+    systemPrompt: HEAD_TALK_SYSTEM_PROMPT,
+    contentSchema: {
+      format: 'head_talk',
+      targetDurationSeconds: '15-30',
+      structure: 'common-belief → flip → proof → cta',
+      sections: [
+        { key: 'hook', label: 'Hook — Name the Belief & Flip It', intention: 'State a widely-held belief in the niche — then immediately flip it. "Everyone says [X]. That\'s wrong." or "[Conventional wisdom]. I disagree." The flip must be specific, not vague. Do not soften it. The viewer should feel a jolt of surprise or mild offense. Max 2 sentences.', maxWords: 30 },
+        { key: 'body', label: 'The Proof', intention: 'Give the single strongest reason the contrarian claim is correct. One mechanism, one data point, one lived observation — not a list. Concrete and specific. The viewer should think "I never thought of it that way." 15-30s = 60-90 spoken words.', maxWords: 90 },
+        { key: 'cta', label: 'CTA', intention: 'Invite the debate openly. "Tell me I\'m wrong in the comments." or a direct follow prompt that frames them as open-minded for agreeing. Max 1 sentence.', maxWords: 20 },
+      ],
+    },
+    schemaJson: {
+      type: 'object',
+      required: ['hook', 'body', 'cta', 'caption', 'hashtags'],
+      properties: {
+        hook: { type: 'string', description: 'Belief + flip — max 30 words' },
+        body: { type: 'string', description: 'Single proof — max 90 words' },
+        cta: { type: 'string', description: 'Debate invite — max 20 words' },
+        caption: { type: 'string', description: 'Instagram caption' },
+        hashtags: { type: 'array', items: { type: 'string' } },
+      },
+    },
+  },
+
+  // ─── Head Talk: Before & After (30-45s) ──────────────────────────────────
+  {
+    name: 'Head Talk — Before & After',
+    format: 'head_talk',
+    remotionId: '',
+    sceneType: 'head_talk',
+    scope: 'system',
+    description: 'Opens at the "before" state with a specific detail, pivots to the turning point, then shows the "after" with equally concrete numbers or facts. Builds credibility through transformation evidence. Best for 30–45 s authority and trust-building clips.',
+    systemPrompt: HEAD_TALK_SYSTEM_PROMPT,
+    contentSchema: {
+      format: 'head_talk',
+      targetDurationSeconds: '30-45',
+      structure: 'before → turning-point → after → lesson → cta',
+      sections: [
+        { key: 'hook', label: 'Hook — The Before', intention: 'Drop the viewer into a specific "before" moment — a number, a feeling, a situation that is recognisably bad or stuck. Be concrete: "12 months ago I was [specific state]." Avoid vague openers. The specificity is what makes it credible and relatable. Max 3 sentences.', maxWords: 45 },
+        { key: 'body', label: 'Turning Point + After + Lesson', intention: 'Name the single decision or insight that changed things (turning point — keep it to 1 sentence). Then show the "after" with a specific result (a number, a change, a capability). Extract the transferable lesson in 1-2 sentences — what made the difference that the viewer can apply. 30-45s = 110-150 spoken words.', maxWords: 150 },
+        { key: 'cta', label: 'CTA', intention: 'Bridge to the viewer\'s situation: "If you\'re in the before right now..." or a follow prompt that positions future content as the roadmap. Max 2 sentences.', maxWords: 30 },
+      ],
+    },
+    schemaJson: {
+      type: 'object',
+      required: ['hook', 'body', 'cta', 'caption', 'hashtags'],
+      properties: {
+        hook: { type: 'string', description: 'Before state — max 45 words' },
+        body: { type: 'string', description: 'Turning point + after + lesson — max 150 words' },
+        cta: { type: 'string', description: 'Bridge CTA — max 30 words' },
+        caption: { type: 'string', description: 'Instagram caption' },
+        hashtags: { type: 'array', items: { type: 'string' } },
+      },
+    },
+  },
+
   // ─── Head Talk: Case Story (30-45s) ──────────────────────────────────────
   {
     name: 'Head Talk — Case Story',
