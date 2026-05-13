@@ -14,7 +14,7 @@ const ComposeRequestSchema = z.object({
   prompt: z.string().min(3),
   brandId: z.string(),
   format: z
-    .enum(['reel', 'trial_reel', 'head_talk', 'carousel', 'static_post', 'story'])
+    .enum(['reel', 'trial_reel', 'head_talk', 'trial_head_talk', 'carousel', 'static_post', 'story'])
     .default('reel'),
   postId: z.string().optional(),
   templateId: z.string().optional(),

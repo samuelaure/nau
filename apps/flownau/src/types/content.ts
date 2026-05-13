@@ -6,6 +6,7 @@ export type ContentFormat =
   | 'reel'
   | 'trial_reel'
   | 'head_talk'
+  | 'trial_head_talk'
   | 'carousel'
   | 'static_post'
   | 'story'

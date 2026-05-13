@@ -90,7 +90,7 @@ export async function runAutonomousScheduler(): Promise<{
         : new Date(now)
 
     for (const comp of orderedComps) {
-      const timesToUse = comp.format === 'trial_reel' ? trialPostingTimes : postingTimes
+      const timesToUse = (comp.format === 'trial_reel' || comp.format === 'trial_head_talk') ? trialPostingTimes : postingTimes
       if (timesToUse.length === 0) continue
 
       const nextSlot = calculateNextSlot(baseline, timesToUse, planner.timezone)

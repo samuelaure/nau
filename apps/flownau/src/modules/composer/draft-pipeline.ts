@@ -8,7 +8,7 @@ import type { LlmTrace } from '@/modules/ideation/ideation.service'
 import type { SlotDef } from '../../../prisma/seeds/templates'
 
 
-const HEAD_TALK_FORMATS = new Set(['head_talk'])
+const HEAD_TALK_FORMATS = new Set(['head_talk', 'trial_head_talk'])
 
 const HeadTalkSchema = z.object({
   hook: z.string().describe('Opening hook — max 2 sentences. Wins attention in the first 2 seconds.'),
@@ -48,7 +48,7 @@ export async function runDraftPipeline(input: DraftPipelineInput): Promise<Draft
   const [template, brand, brandTemplateConfig] = await Promise.all([
     prisma.template.findUnique({
       where: { id: templateId },
-      select: { format: true, systemPrompt: true, slotSchema: true, schemaJson: true, contentSchema: true },
+      select: { format: true, slotSchema: true, schemaJson: true, contentSchema: true },
     }),
     prisma.brand.findUnique({
       where: { id: brandId },
@@ -69,7 +69,13 @@ export async function runDraftPipeline(input: DraftPipelineInput): Promise<Draft
 
   const slotOverrides = (brandTemplateConfig?.slotOverrides ?? null) as Record<string, { intention?: string; minWords?: number; maxWords?: number }> | null
   const captionOverride = slotOverrides?.['caption'] ?? null
-  const mergedTemplate = slotOverrides ? { ...template, slotSchema: mergeSlotOverrides(template.slotSchema, slotOverrides) } : template
+  const mergedTemplate = slotOverrides
+    ? {
+        ...template,
+        slotSchema: mergeSlotOverrides(template.slotSchema, slotOverrides),
+        contentSchema: mergeContentSchemaOverrides(template.contentSchema, slotOverrides),
+      }
+    : template
 
   const templateSchema = buildTemplateSchemaBlock(format, mergedTemplate, captionOverride)
 
@@ -280,6 +286,28 @@ function buildTemplateSchemaBlock(
   }
 
   return null
+}
+
+function mergeContentSchemaOverrides(
+  contentSchema: unknown,
+  overrides: Record<string, { intention?: string; minWords?: number; maxWords?: number }>,
+): unknown {
+  if (!contentSchema || typeof contentSchema !== 'object') return contentSchema
+  const cs = contentSchema as Record<string, unknown>
+  if (!Array.isArray(cs.sections)) return contentSchema
+  return {
+    ...cs,
+    sections: (cs.sections as Array<{ key: string; intention: string; minWords?: number; maxWords: number }>).map((s) => {
+      const ov = overrides[s.key]
+      if (!ov) return s
+      return {
+        ...s,
+        ...(ov.intention !== undefined && { intention: ov.intention }),
+        ...(ov.minWords !== undefined && { minWords: ov.minWords }),
+        ...(ov.maxWords !== undefined && { maxWords: ov.maxWords }),
+      }
+    }),
+  }
 }
 
 function mergeSlotOverrides(

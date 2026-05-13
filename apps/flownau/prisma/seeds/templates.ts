@@ -26,7 +26,6 @@ interface TemplateDefinition {
   remotionId: string
   sceneType: string
   scope: string
-  systemPrompt: string
   description?: string
   previewUrl?: string
   slotSchema?: SlotDef[]
@@ -36,150 +35,125 @@ interface TemplateDefinition {
 
 // ─── SYSTEM TEMPLATES ─────────────────────────────────────────────────────────
 
-const HEAD_TALK_SYSTEM_PROMPT = `You are a content creator who understands one fundamental truth about human attention: people do not stop scrolling for information — they stop for feeling.
-
-Your job is to manufacture that feeling, then justify it.
-
-Human decisions run on two systems. System 1 is fast, emotional, reflexive. System 2 is slow, rational, deliberate — it justifies what System 1 already decided.
-Viral content wins System 1 in the first two seconds, then gives System 2 enough to feel good about sharing it.
-
-Hook → activates System 1. Body → satisfies System 2. CTA → closes the loop.
-
-VOICE: Speak like the smartest person in the room who doesn't need anyone to know it. Confident without arrogance. Direct without coldness.
-You are talking to one specific person who is already thinking about this topic and will leave the moment they feel condescended to or sold at.
-
-CRAFT RULES:
-- Short sentences. Active verbs. Concrete nouns.
-- "17%" beats "many". Specificity is the enemy of vagueness.
-- Speak to one person: "you" not "people".
-- Never open with "Today I want to talk about…" or the brand name.
-- CTA: one action, closes the loop the hook opened. Not "follow for more content".
-- No caveats or disclaimers in the hook.
-- NEVER mention usernames or @handles.`
-
 export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
 
-  // ─── Head Talk: Hook-First (15-30s) ──────────────────────────────────────
+  // ─── Head Talk: Does This Happen to You (15-30s) ─────────────────────────
   {
-    name: 'Head Talk — Hook First',
+    name: 'Head Talk — Does This Happen to You',
     format: 'head_talk',
     remotionId: '',
     sceneType: 'head_talk',
     scope: 'system',
-    description: 'Opens with a scroll-stopping hook, delivers core insight, closes with a CTA. The go-to structure for educational and opinion content. Best for 15–30 s talking-head clips.',
-    systemPrompt: HEAD_TALK_SYSTEM_PROMPT,
+    description: 'Opens with a hyper-specific personal moment or feeling the creator genuinely experienced, shares it without moralising, then asks if the viewer has felt the same. No teaching, no proof — just two people talking. Drives comments and DMs. Best for 15–30 s community-building clips.',
     contentSchema: {
       format: 'head_talk',
       targetDurationSeconds: '15-30',
-      structure: 'hook → body → cta',
+      structure: 'personal-moment → honest-reflection → open-question',
       sections: [
-        { key: 'hook', label: 'Hook', intention: 'Stop the scroll in 2 seconds using NOVELTY, TENSION, IDENTITY SIGNAL, or STATUS THREAT. Never start with "Today I want to talk about". Single punchy sentence or question.', maxWords: 25 },
-        { key: 'body', label: 'Body', intention: 'Deliver the core insight or value. Concrete, specific, no filler. Short paragraphs — one idea each. 15-30s = 60-90 spoken words.', maxWords: 90 },
-        { key: 'cta', label: 'CTA', intention: 'One action that closes the loop the hook opened. Feels like a natural ending. Follow / save / comment [specific prompt].', maxWords: 20 },
+        { key: 'hook', label: 'Hook — The Personal Moment', intention: 'Drop into a specific, real-feeling moment the creator experienced — a thought, a feeling, a situation. Not a lesson. Not a claim. Just "this happened to me / I noticed this about myself." Specific enough to be recognisable: "I was [doing X] and suddenly I felt..." or "The other day I caught myself doing [Y] and I couldn\'t stop thinking about it." Max 3 sentences. No moralising. Just the moment.', maxWords: 40 },
+        { key: 'body', label: 'Honest Reflection', intention: 'The creator sits with the experience — what they thought, felt, noticed, or couldn\'t figure out. Not an answer. Not advice. More like thinking out loud. Slightly vulnerable, genuinely curious. The viewer should feel like they\'re listening in on an honest internal monologue, not a polished lesson. 15-30s = 60-90 spoken words.', maxWords: 90 },
+        { key: 'cta', label: 'Open Question', intention: 'A genuine, open question directed at the viewer. Not rhetorical. Not leading. The creator actually wants to know: "Does this happen to you?" / "Am I the only one?" / "I\'d love to know if you\'ve been through this — tell me in the comments." Warm, low-pressure. Max 2 sentences.', maxWords: 25 },
       ],
     },
     schemaJson: {
       type: 'object',
       required: ['hook', 'body', 'cta', 'caption', 'hashtags'],
       properties: {
-        hook: { type: 'string', description: 'Opening hook — max 25 words' },
-        body: { type: 'string', description: 'Main content body — max 90 words' },
-        cta: { type: 'string', description: 'Call to action — max 20 words' },
-        caption: { type: 'string', description: 'Instagram caption for publishing' },
-        hashtags: { type: 'array', items: { type: 'string' }, description: 'Hashtags without # prefix' },
-      },
-    },
-  },
-
-  // ─── Head Talk: Pain of Niche (15-30s) ───────────────────────────────────
-  {
-    name: 'Head Talk — Pain of Niche',
-    format: 'head_talk',
-    remotionId: '',
-    sceneType: 'head_talk',
-    scope: 'system',
-    description: 'Names the specific frustration your audience feels daily, validates it, then offers a reframe. High-empathy format that builds trust fast. Best for 15–30 s clips targeting a tight niche.',
-    systemPrompt: HEAD_TALK_SYSTEM_PROMPT,
-    contentSchema: {
-      format: 'head_talk',
-      targetDurationSeconds: '15-30',
-      structure: 'pain-naming → validation → reframe',
-      sections: [
-        { key: 'hook', label: 'Hook — Name the Pain', intention: 'Name the specific pain or frustration the niche feels every day. Be precise — not "struggling" but the exact feeling or situation. "That moment when you..." or "You know that feeling of..." Max 2 sentences.', maxWords: 30 },
-        { key: 'body', label: 'Validation + Reframe', intention: 'Validate why this pain is not their fault (systemic, not personal). Then offer one reframe or first step that changes how they see it. 15-30s = 60-90 spoken words.', maxWords: 90 },
-        { key: 'cta', label: 'CTA', intention: 'Soft, warm close. Invite them to follow for more, or ask a reflective question for comments. 1 sentence.', maxWords: 20 },
-      ],
-    },
-    schemaJson: {
-      type: 'object',
-      required: ['hook', 'body', 'cta', 'caption', 'hashtags'],
-      properties: {
-        hook: { type: 'string', description: 'Pain-naming hook — max 30 words' },
-        body: { type: 'string', description: 'Validation + reframe — max 90 words' },
-        cta: { type: 'string', description: 'Soft close — max 20 words' },
+        hook: { type: 'string', description: 'Personal moment — max 40 words' },
+        body: { type: 'string', description: 'Honest reflection — max 90 words' },
+        cta: { type: 'string', description: 'Open question — max 25 words' },
         caption: { type: 'string', description: 'Instagram caption' },
         hashtags: { type: 'array', items: { type: 'string' } },
       },
     },
   },
 
-  // ─── Head Talk: Relatable Story (30-45s) ─────────────────────────────────
+  // ─── Head Talk: Niche Tea (15-30s) ────────────────────────────────────────
   {
-    name: 'Head Talk — Relatable Story',
+    name: 'Head Talk — Niche Tea',
     format: 'head_talk',
     remotionId: '',
     sceneType: 'head_talk',
     scope: 'system',
-    description: 'Drops into a hyper-specific fictional moment the viewer recognises as their own, then extracts a lesson. Drives comments and saves. Best for 30–45 s emotional storytelling.',
-    systemPrompt: HEAD_TALK_SYSTEM_PROMPT,
+    description: 'Points at something happening inside the niche — a pattern, a behaviour, a thing people say or do — with the tone of a trusted friend who noticed something and can\'t not mention it. Not a lecture. Not a takedown. Soft-polemic: the creator has a clear perspective but leaves room for the audience to chime in. Best for 15–30 s high-engagement clips that turn the niche into the subject.',
     contentSchema: {
       format: 'head_talk',
-      targetDurationSeconds: '30-45',
-      structure: 'scene-set → recognition → lesson → cta',
+      targetDurationSeconds: '15-30',
+      structure: 'the-thing → honest-take → invite',
       sections: [
-        { key: 'hook', label: 'Scene-Set Hook', intention: 'Drop into a specific fictional-but-believable moment. A thought, a place, a decision. "You\'re sitting at your desk and..." Make it so specific it feels real — the viewer thinks "that\'s me". No framing like "story time". Just start in the scene. Max 3 sentences.', maxWords: 45 },
-        { key: 'body', label: 'Recognition + Lesson', intention: 'Name what the person in the scene was feeling or thinking (recognition — the viewer should feel seen). Then pivot to the lesson or insight that changes everything. 30-45s = 110-150 spoken words.', maxWords: 150 },
-        { key: 'cta', label: 'CTA', intention: 'Invite reflection or action. "Has this happened to you? Tell me below." or "Follow — I share these every week." Max 2 sentences.', maxWords: 30 },
+        { key: 'hook', label: 'Hook — Name The Thing', intention: 'Point at something specific happening in or around the niche — a trend, a belief, a behaviour, a thing people post, say, or do — without immediately judging it. Name it like you\'re pulling your friend aside: "Okay so I need to talk about [thing]." or "Have you noticed that everyone in [niche] is now [doing X]?" Specific and recognisable to insiders. Max 2 sentences.', maxWords: 35 },
+        { key: 'body', label: 'The Honest Take', intention: 'The creator\'s real perspective on the thing — not a rant, not a verdict, but an honest, slightly cheeky observation. Can be mildly provocative. Should feel like what you\'d say to a friend over coffee, not what you\'d say in a debate. Use "I think", "I\'ve noticed", "what gets me is" — keeps it personal, not preachy. A small piece of nuance or inside knowledge that makes followers feel like they\'re in the know. 15-30s = 60-90 spoken words.', maxWords: 90 },
+        { key: 'cta', label: 'Invite', intention: 'Pull the audience into the conversation: "What do you think?" / "Tell me I\'m not the only one who sees this." / "Am I off base here?" Genuinely open — the creator doesn\'t need to be right, they\'re curious. Max 1 sentence.', maxWords: 20 },
       ],
     },
     schemaJson: {
       type: 'object',
       required: ['hook', 'body', 'cta', 'caption', 'hashtags'],
       properties: {
-        hook: { type: 'string', description: 'Scene-set hook — max 45 words' },
-        body: { type: 'string', description: 'Recognition + lesson — max 150 words' },
-        cta: { type: 'string', description: 'CTA — max 30 words' },
+        hook: { type: 'string', description: 'Name the thing — max 35 words' },
+        body: { type: 'string', description: 'Honest take — max 90 words' },
+        cta: { type: 'string', description: 'Invite — max 20 words' },
         caption: { type: 'string', description: 'Instagram caption' },
         hashtags: { type: 'array', items: { type: 'string' } },
       },
     },
   },
 
-  // ─── Head Talk: Case Story (30-45s) ──────────────────────────────────────
+  // ─── Head Talk: Contrarian Take (15-30s) ─────────────────────────────────
   {
-    name: 'Head Talk — Case Story',
+    name: 'Head Talk — Contrarian Take',
     format: 'head_talk',
     remotionId: '',
     sceneType: 'head_talk',
     scope: 'system',
-    description: 'Tells a composite client/character story: problem → turning point → result with specific numbers → lesson. Social proof without testimonials. Best for 30–45 s authority-building clips.',
-    systemPrompt: HEAD_TALK_SYSTEM_PROMPT,
+    description: 'Opens by naming a widely-held belief, flips it with a single precise counter-claim, then proves it fast. Drives comments, saves, and shares. Best for 15–30 s clips that position the creator as a sharp contrarian thinker.',
     contentSchema: {
       format: 'head_talk',
-      targetDurationSeconds: '30-45',
-      structure: 'character → problem → turning point → result → lesson → cta',
+      targetDurationSeconds: '15-30',
+      structure: 'common-belief → flip → proof → cta',
       sections: [
-        { key: 'hook', label: 'Character Hook', intention: 'Introduce a composite fictional person in one vivid sentence — their role, situation, or defining trait — then immediately their problem. "María, a solo founder two weeks from running out of cash, was about to make a decision that would define the next three years." Numbers and specifics make it real. Max 3 sentences.', maxWords: 50 },
-        { key: 'body', label: 'Story + Lesson', intention: 'Walk through: the action they took, the result (with specific numbers or details), and the lesson extracted. Keep it believable, not fantastical. 30-45s = 120-160 spoken words.', maxWords: 160 },
-        { key: 'cta', label: 'CTA', intention: 'Bridge from the story to the viewer. "If you\'re in that situation right now..." or "This is what I teach every week." Max 2 sentences.', maxWords: 30 },
+        { key: 'hook', label: 'Hook — Name the Belief & Flip It', intention: 'State a widely-held belief in the niche — then immediately flip it. "Everyone says [X]. That\'s wrong." or "[Conventional wisdom]. I disagree." The flip must be specific, not vague. Do not soften it. The viewer should feel a jolt of surprise or mild offense. Max 2 sentences.', maxWords: 30 },
+        { key: 'body', label: 'The Proof', intention: 'Give the single strongest reason the contrarian claim is correct. One mechanism, one data point, one lived observation — not a list. Concrete and specific. The viewer should think "I never thought of it that way." 15-30s = 60-90 spoken words.', maxWords: 90 },
+        { key: 'cta', label: 'CTA', intention: 'Invite the debate openly. "Tell me I\'m wrong in the comments." or a direct follow prompt that frames them as open-minded for agreeing. Max 1 sentence.', maxWords: 20 },
       ],
     },
     schemaJson: {
       type: 'object',
       required: ['hook', 'body', 'cta', 'caption', 'hashtags'],
       properties: {
-        hook: { type: 'string', description: 'Character + problem hook — max 50 words' },
-        body: { type: 'string', description: 'Story + lesson — max 160 words' },
+        hook: { type: 'string', description: 'Belief + flip — max 30 words' },
+        body: { type: 'string', description: 'Single proof — max 90 words' },
+        cta: { type: 'string', description: 'Debate invite — max 20 words' },
+        caption: { type: 'string', description: 'Instagram caption' },
+        hashtags: { type: 'array', items: { type: 'string' } },
+      },
+    },
+  },
+
+  // ─── Head Talk: Before & After (30-45s) ──────────────────────────────────
+  {
+    name: 'Head Talk — Before & After',
+    format: 'head_talk',
+    remotionId: '',
+    sceneType: 'head_talk',
+    scope: 'system',
+    description: 'Opens at the "before" state with a specific detail, pivots to the turning point, then shows the "after" with equally concrete numbers or facts. Builds credibility through transformation evidence. Best for 30–45 s authority and trust-building clips.',
+    contentSchema: {
+      format: 'head_talk',
+      targetDurationSeconds: '30-45',
+      structure: 'before → turning-point → after → lesson → cta',
+      sections: [
+        { key: 'hook', label: 'Hook — The Before', intention: 'Drop the viewer into a specific "before" moment — a number, a feeling, a situation that is recognisably bad or stuck. Be concrete: "12 months ago I was [specific state]." Avoid vague openers. The specificity is what makes it credible and relatable. Max 3 sentences.', maxWords: 45 },
+        { key: 'body', label: 'Turning Point + After + Lesson', intention: 'Name the single decision or insight that changed things (turning point — keep it to 1 sentence). Then show the "after" with a specific result (a number, a change, a capability). Extract the transferable lesson in 1-2 sentences — what made the difference that the viewer can apply. 30-45s = 110-150 spoken words.', maxWords: 150 },
+        { key: 'cta', label: 'CTA', intention: 'Bridge to the viewer\'s situation: "If you\'re in the before right now..." or a follow prompt that positions future content as the roadmap. Max 2 sentences.', maxWords: 30 },
+      ],
+    },
+    schemaJson: {
+      type: 'object',
+      required: ['hook', 'body', 'cta', 'caption', 'hashtags'],
+      properties: {
+        hook: { type: 'string', description: 'Before state — max 45 words' },
+        body: { type: 'string', description: 'Turning point + after + lesson — max 150 words' },
         cta: { type: 'string', description: 'Bridge CTA — max 30 words' },
         caption: { type: 'string', description: 'Instagram caption' },
         hashtags: { type: 'array', items: { type: 'string' } },
@@ -196,7 +170,6 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     scope: 'system',
     previewUrl: 'https://media.9nau.com/flownau/accounts/cmogyjn5a0006gcv46nis4o0l/outputs/cmoo6vorl0007v4v4oy5qiq3e.mp4',
     description: 'One punchy line — max 8 words — displayed over full-screen B-roll. Pure pattern interrupt. ~4 s total. Use for quotes, provocations, or single-idea statements that land without context.',
-    systemPrompt: 'You are filling content slots for a short-form video reel. Follow each slot\'s intention and word limit exactly. Never mention usernames or @handles.',
     slotSchema: [
       {
         key: 'text1',
@@ -232,7 +205,6 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     scope: 'system',
     previewUrl: 'https://media.9nau.com/flownau/accounts/cmogyjn5a0006gcv46nis4o0l/outputs/cmoo6vork0003v4v4v0f7jhx5.mp4',
     description: 'One complete paragraph — up to 40 words — displayed over B-roll as the viewer reads along. Meditative pace. ~6.5 s. Best for a nuanced take, a belief, or a self-contained insight that benefits from dwell time.',
-    systemPrompt: 'You are filling content slots for a short-form video reel. Follow each slot\'s intention and word limit exactly. Never mention usernames or @handles.',
     slotSchema: [
       {
         key: 'text1',
@@ -269,7 +241,6 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     scope: 'system',
     previewUrl: 'https://media.9nau.com/flownau/accounts/cmogyjn5a0006gcv46nis4o0l/outputs/cmoo6vork0002v4v4is5hqueg.mp4',
     description: 'Two scenes: a short hook (≤8 words) that creates tension, followed by the payoff reveal (≤25 words). The gap between them keeps the viewer watching. ~8 s total. Best for curiosity-driven content and contrarian takes.',
-    systemPrompt: 'You are filling content slots for a short-form video reel. CRITICAL: these two slots are NOT independent — they are one continuous thought split across two screens. Write the full thought first, then split it: text1 is the first fragment that creates unresolved tension, text2 is the resolution. A viewer watching back-to-back should feel they read one seamless sentence or idea. Never mention usernames or @handles.',
     slotSchema: [
       {
         key: 'text1',
@@ -316,7 +287,6 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     scope: 'system',
     previewUrl: 'https://media.9nau.com/flownau/accounts/cmogyjn5a0006gcv46nis4o0l/outputs/cmoo6vorl0008v4v4fyywc8cv.mp4',
     description: 'Three scenes forming a mini story arc: punchy opener (≤8 w) → development (≤20 w) → landing line (≤8 w). ~11 s total. The most complete reel structure — best for ideas that need setup and resolution.',
-    systemPrompt: 'You are filling content slots for a short-form video reel. CRITICAL: these three slots are one unified piece of writing split across three screens — not three separate ideas. Write the complete arc first (opening tension → development → landing resolution), then carve it into the three slots at the natural break points. A viewer watching all three back-to-back should feel they followed one coherent thought from start to finish. Never mention usernames or @handles.',
     slotSchema: [
       {
         key: 'text1',
@@ -372,6 +342,10 @@ const REMOVED_TEMPLATE_NAMES = [
   'Reel — Long Form Value',
   'Reel — Before & After',
   'Reel — Story Arc',
+  'Head Talk — Hook First',
+  'Head Talk — Pain of Niche',
+  'Head Talk — Relatable Story',
+  'Head Talk — Case Story',
 ]
 
 export async function seedSystemTemplates(prisma: PrismaClient): Promise<void> {
@@ -395,7 +369,6 @@ export async function seedSystemTemplates(prisma: PrismaClient): Promise<void> {
         remotionId: t.remotionId,
         sceneType: t.sceneType,
         scope: 'system',
-        systemPrompt: t.systemPrompt,
         description: t.description ?? null,
         previewUrl: t.previewUrl ?? null,
         contentSchema: t.contentSchema,
@@ -404,7 +377,6 @@ export async function seedSystemTemplates(prisma: PrismaClient): Promise<void> {
         useBrandAssets: false,
       },
       update: {
-        systemPrompt: t.systemPrompt,
         description: t.description ?? null,
         previewUrl: t.previewUrl ?? null,
         contentSchema: t.contentSchema,

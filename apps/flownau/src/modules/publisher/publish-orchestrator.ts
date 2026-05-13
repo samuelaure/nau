@@ -65,8 +65,10 @@ export async function publishComposition(post: PostForPublish): Promise<PublishR
 
   switch (post.format) {
     case 'reel':
+    case 'head_talk':
       result = await publishReel({ accessToken: validToken, igUserId, videoUrl: post.videoUrl, caption, coverUrl: post.coverUrl ?? undefined })
       break
+    case 'trial_head_talk':
     case 'trial_reel': {
       const trialResult = await publishTrialReel({ accessToken: validToken, igUserId, videoUrl: post.videoUrl, caption })
       // 2207081 = account doesn't meet trial reel follower requirement — non-transient, fall back to regular reel
