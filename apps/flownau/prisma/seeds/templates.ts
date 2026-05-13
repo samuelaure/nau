@@ -37,99 +37,6 @@ interface TemplateDefinition {
 
 export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
 
-  // ─── Head Talk: Hook-First (15-30s) ──────────────────────────────────────
-  {
-    name: 'Head Talk — Hook First',
-    format: 'head_talk',
-    remotionId: '',
-    sceneType: 'head_talk',
-    scope: 'system',
-    description: 'Opens with a scroll-stopping hook, delivers core insight, closes with a CTA. The go-to structure for educational and opinion content. Best for 15–30 s talking-head clips.',
-    contentSchema: {
-      format: 'head_talk',
-      targetDurationSeconds: '15-30',
-      structure: 'hook → body → cta',
-      sections: [
-        { key: 'hook', label: 'Hook', intention: 'Stop the scroll in 2 seconds using NOVELTY, TENSION, IDENTITY SIGNAL, or STATUS THREAT. Never start with "Today I want to talk about". Single punchy sentence or question.', maxWords: 25 },
-        { key: 'body', label: 'Body', intention: 'Deliver the core insight or value. Concrete, specific, no filler. Short paragraphs — one idea each. 15-30s = 60-90 spoken words.', maxWords: 90 },
-        { key: 'cta', label: 'CTA', intention: 'One action that closes the loop the hook opened. Feels like a natural ending. Follow / save / comment [specific prompt].', maxWords: 20 },
-      ],
-    },
-    schemaJson: {
-      type: 'object',
-      required: ['hook', 'body', 'cta', 'caption', 'hashtags'],
-      properties: {
-        hook: { type: 'string', description: 'Opening hook — max 25 words' },
-        body: { type: 'string', description: 'Main content body — max 90 words' },
-        cta: { type: 'string', description: 'Call to action — max 20 words' },
-        caption: { type: 'string', description: 'Instagram caption for publishing' },
-        hashtags: { type: 'array', items: { type: 'string' }, description: 'Hashtags without # prefix' },
-      },
-    },
-  },
-
-  // ─── Head Talk: Pain of Niche (15-30s) ───────────────────────────────────
-  {
-    name: 'Head Talk — Pain of Niche',
-    format: 'head_talk',
-    remotionId: '',
-    sceneType: 'head_talk',
-    scope: 'system',
-    description: 'Names the specific frustration your audience feels daily, validates it, then offers a reframe. High-empathy format that builds trust fast. Best for 15–30 s clips targeting a tight niche.',
-    contentSchema: {
-      format: 'head_talk',
-      targetDurationSeconds: '15-30',
-      structure: 'pain-naming → validation → reframe',
-      sections: [
-        { key: 'hook', label: 'Hook — Name the Pain', intention: 'Name the specific pain or frustration the niche feels every day. Be precise — not "struggling" but the exact feeling or situation. "That moment when you..." or "You know that feeling of..." Max 2 sentences.', maxWords: 30 },
-        { key: 'body', label: 'Validation + Reframe', intention: 'Validate why this pain is not their fault (systemic, not personal). Then offer one reframe or first step that changes how they see it. 15-30s = 60-90 spoken words.', maxWords: 90 },
-        { key: 'cta', label: 'CTA', intention: 'Soft, warm close. Invite them to follow for more, or ask a reflective question for comments. 1 sentence.', maxWords: 20 },
-      ],
-    },
-    schemaJson: {
-      type: 'object',
-      required: ['hook', 'body', 'cta', 'caption', 'hashtags'],
-      properties: {
-        hook: { type: 'string', description: 'Pain-naming hook — max 30 words' },
-        body: { type: 'string', description: 'Validation + reframe — max 90 words' },
-        cta: { type: 'string', description: 'Soft close — max 20 words' },
-        caption: { type: 'string', description: 'Instagram caption' },
-        hashtags: { type: 'array', items: { type: 'string' } },
-      },
-    },
-  },
-
-  // ─── Head Talk: Relatable Story (30-45s) ─────────────────────────────────
-  {
-    name: 'Head Talk — Relatable Story',
-    format: 'head_talk',
-    remotionId: '',
-    sceneType: 'head_talk',
-    scope: 'system',
-    description: 'Drops into a hyper-specific fictional moment the viewer recognises as their own, then extracts a lesson. Drives comments and saves. Best for 30–45 s emotional storytelling.',
-    contentSchema: {
-      format: 'head_talk',
-      targetDurationSeconds: '30-45',
-      structure: 'scene-set → recognition → lesson → cta',
-      sections: [
-        { key: 'hook', label: 'Scene-Set Hook', intention: 'Drop into a specific fictional-but-believable moment. A thought, a place, a decision. "You\'re sitting at your desk and..." Make it so specific it feels real — the viewer thinks "that\'s me". No framing like "story time". Just start in the scene. Max 3 sentences.', maxWords: 45 },
-        { key: 'body', label: 'Recognition + Lesson', intention: 'Name what the person in the scene was feeling or thinking (recognition — the viewer should feel seen). Then pivot to the lesson or insight that changes everything. 30-45s = 110-150 spoken words.', maxWords: 150 },
-        { key: 'cta', label: 'CTA', intention: 'Invite reflection or action. "Has this happened to you? Tell me below." or "Follow — I share these every week." Max 2 sentences.', maxWords: 30 },
-      ],
-    },
-    schemaJson: {
-      type: 'object',
-      required: ['hook', 'body', 'cta', 'caption', 'hashtags'],
-      properties: {
-        hook: { type: 'string', description: 'Scene-set hook — max 45 words' },
-        body: { type: 'string', description: 'Recognition + lesson — max 150 words' },
-        cta: { type: 'string', description: 'CTA — max 30 words' },
-        caption: { type: 'string', description: 'Instagram caption' },
-        hashtags: { type: 'array', items: { type: 'string' } },
-      },
-    },
-  },
-
   // ─── Head Talk: Does This Happen to You (15-30s) ─────────────────────────
   {
     name: 'Head Talk — Does This Happen to You',
@@ -247,37 +154,6 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
       properties: {
         hook: { type: 'string', description: 'Before state — max 45 words' },
         body: { type: 'string', description: 'Turning point + after + lesson — max 150 words' },
-        cta: { type: 'string', description: 'Bridge CTA — max 30 words' },
-        caption: { type: 'string', description: 'Instagram caption' },
-        hashtags: { type: 'array', items: { type: 'string' } },
-      },
-    },
-  },
-
-  // ─── Head Talk: Case Story (30-45s) ──────────────────────────────────────
-  {
-    name: 'Head Talk — Case Story',
-    format: 'head_talk',
-    remotionId: '',
-    sceneType: 'head_talk',
-    scope: 'system',
-    description: 'Tells a composite client/character story: problem → turning point → result with specific numbers → lesson. Social proof without testimonials. Best for 30–45 s authority-building clips.',
-    contentSchema: {
-      format: 'head_talk',
-      targetDurationSeconds: '30-45',
-      structure: 'character → problem → turning point → result → lesson → cta',
-      sections: [
-        { key: 'hook', label: 'Character Hook', intention: 'Introduce a composite fictional person in one vivid sentence — their role, situation, or defining trait — then immediately their problem. "María, a solo founder two weeks from running out of cash, was about to make a decision that would define the next three years." Numbers and specifics make it real. Max 3 sentences.', maxWords: 50 },
-        { key: 'body', label: 'Story + Lesson', intention: 'Walk through: the action they took, the result (with specific numbers or details), and the lesson extracted. Keep it believable, not fantastical. 30-45s = 120-160 spoken words.', maxWords: 160 },
-        { key: 'cta', label: 'CTA', intention: 'Bridge from the story to the viewer. "If you\'re in that situation right now..." or "This is what I teach every week." Max 2 sentences.', maxWords: 30 },
-      ],
-    },
-    schemaJson: {
-      type: 'object',
-      required: ['hook', 'body', 'cta', 'caption', 'hashtags'],
-      properties: {
-        hook: { type: 'string', description: 'Character + problem hook — max 50 words' },
-        body: { type: 'string', description: 'Story + lesson — max 160 words' },
         cta: { type: 'string', description: 'Bridge CTA — max 30 words' },
         caption: { type: 'string', description: 'Instagram caption' },
         hashtags: { type: 'array', items: { type: 'string' } },
