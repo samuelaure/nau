@@ -6,21 +6,20 @@ import { signServiceToken } from '@nau/auth';
 export class NauthenticityService {
   private readonly logger = new Logger(NauthenticityService.name);
   private readonly baseUrl: string;
-  private readonly authSecret: string;
 
   constructor(private configService: ConfigService) {
     this.baseUrl = this.configService.get<string>(
       'NAUTHENTICITY_URL',
       'http://nauthenticity:4000',
     );
-    this.authSecret = this.configService.getOrThrow<string>('AUTH_SECRET');
   }
 
   private async serviceHeaders(): Promise<Record<string, string>> {
+    const secret = this.configService.getOrThrow<string>('AUTH_SECRET');
     const token = await signServiceToken({
       iss: '9nau-api',
       aud: 'nauthenticity',
-      secret: this.authSecret,
+      secret,
     });
     return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
   }
