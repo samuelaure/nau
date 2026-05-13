@@ -26,7 +26,6 @@ interface TemplateDefinition {
   remotionId: string
   sceneType: string
   scope: string
-  systemPrompt: string
   description?: string
   previewUrl?: string
   slotSchema?: SlotDef[]
@@ -35,27 +34,6 @@ interface TemplateDefinition {
 }
 
 // ─── SYSTEM TEMPLATES ─────────────────────────────────────────────────────────
-
-const HEAD_TALK_SYSTEM_PROMPT = `You are a content creator who understands one fundamental truth about human attention: people do not stop scrolling for information — they stop for feeling.
-
-Your job is to manufacture that feeling, then justify it.
-
-Human decisions run on two systems. System 1 is fast, emotional, reflexive. System 2 is slow, rational, deliberate — it justifies what System 1 already decided.
-Viral content wins System 1 in the first two seconds, then gives System 2 enough to feel good about sharing it.
-
-Hook → activates System 1. Body → satisfies System 2. CTA → closes the loop.
-
-VOICE: Speak like the smartest person in the room who doesn't need anyone to know it. Confident without arrogance. Direct without coldness.
-You are talking to one specific person who is already thinking about this topic and will leave the moment they feel condescended to or sold at.
-
-CRAFT RULES:
-- Short sentences. Active verbs. Concrete nouns.
-- "17%" beats "many". Specificity is the enemy of vagueness.
-- Speak to one person: "you" not "people".
-- Never open with "Today I want to talk about…" or the brand name.
-- CTA: one action, closes the loop the hook opened. Not "follow for more content".
-- No caveats or disclaimers in the hook.
-- NEVER mention usernames or @handles.`
 
 export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
 
@@ -67,7 +45,6 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     sceneType: 'head_talk',
     scope: 'system',
     description: 'Opens with a scroll-stopping hook, delivers core insight, closes with a CTA. The go-to structure for educational and opinion content. Best for 15–30 s talking-head clips.',
-    systemPrompt: HEAD_TALK_SYSTEM_PROMPT,
     contentSchema: {
       format: 'head_talk',
       targetDurationSeconds: '15-30',
@@ -99,7 +76,6 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     sceneType: 'head_talk',
     scope: 'system',
     description: 'Names the specific frustration your audience feels daily, validates it, then offers a reframe. High-empathy format that builds trust fast. Best for 15–30 s clips targeting a tight niche.',
-    systemPrompt: HEAD_TALK_SYSTEM_PROMPT,
     contentSchema: {
       format: 'head_talk',
       targetDurationSeconds: '15-30',
@@ -131,7 +107,6 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     sceneType: 'head_talk',
     scope: 'system',
     description: 'Drops into a hyper-specific fictional moment the viewer recognises as their own, then extracts a lesson. Drives comments and saves. Best for 30–45 s emotional storytelling.',
-    systemPrompt: HEAD_TALK_SYSTEM_PROMPT,
     contentSchema: {
       format: 'head_talk',
       targetDurationSeconds: '30-45',
@@ -163,7 +138,6 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     sceneType: 'head_talk',
     scope: 'system',
     description: 'Opens with a hyper-specific personal moment or feeling the creator genuinely experienced, shares it without moralising, then asks if the viewer has felt the same. No teaching, no proof — just two people talking. Drives comments and DMs. Best for 15–30 s community-building clips.',
-    systemPrompt: HEAD_TALK_SYSTEM_PROMPT,
     contentSchema: {
       format: 'head_talk',
       targetDurationSeconds: '15-30',
@@ -195,7 +169,6 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     sceneType: 'head_talk',
     scope: 'system',
     description: 'Points at something happening inside the niche — a pattern, a behaviour, a thing people say or do — with the tone of a trusted friend who noticed something and can\'t not mention it. Not a lecture. Not a takedown. Soft-polemic: the creator has a clear perspective but leaves room for the audience to chime in. Best for 15–30 s high-engagement clips that turn the niche into the subject.',
-    systemPrompt: HEAD_TALK_SYSTEM_PROMPT,
     contentSchema: {
       format: 'head_talk',
       targetDurationSeconds: '15-30',
@@ -227,7 +200,6 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     sceneType: 'head_talk',
     scope: 'system',
     description: 'Opens by naming a widely-held belief, flips it with a single precise counter-claim, then proves it fast. Drives comments, saves, and shares. Best for 15–30 s clips that position the creator as a sharp contrarian thinker.',
-    systemPrompt: HEAD_TALK_SYSTEM_PROMPT,
     contentSchema: {
       format: 'head_talk',
       targetDurationSeconds: '15-30',
@@ -259,7 +231,6 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     sceneType: 'head_talk',
     scope: 'system',
     description: 'Opens at the "before" state with a specific detail, pivots to the turning point, then shows the "after" with equally concrete numbers or facts. Builds credibility through transformation evidence. Best for 30–45 s authority and trust-building clips.',
-    systemPrompt: HEAD_TALK_SYSTEM_PROMPT,
     contentSchema: {
       format: 'head_talk',
       targetDurationSeconds: '30-45',
@@ -291,7 +262,6 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     sceneType: 'head_talk',
     scope: 'system',
     description: 'Tells a composite client/character story: problem → turning point → result with specific numbers → lesson. Social proof without testimonials. Best for 30–45 s authority-building clips.',
-    systemPrompt: HEAD_TALK_SYSTEM_PROMPT,
     contentSchema: {
       format: 'head_talk',
       targetDurationSeconds: '30-45',
@@ -324,7 +294,6 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     scope: 'system',
     previewUrl: 'https://media.9nau.com/flownau/accounts/cmogyjn5a0006gcv46nis4o0l/outputs/cmoo6vorl0007v4v4oy5qiq3e.mp4',
     description: 'One punchy line — max 8 words — displayed over full-screen B-roll. Pure pattern interrupt. ~4 s total. Use for quotes, provocations, or single-idea statements that land without context.',
-    systemPrompt: 'You are filling content slots for a short-form video reel. Follow each slot\'s intention and word limit exactly. Never mention usernames or @handles.',
     slotSchema: [
       {
         key: 'text1',
@@ -360,7 +329,6 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     scope: 'system',
     previewUrl: 'https://media.9nau.com/flownau/accounts/cmogyjn5a0006gcv46nis4o0l/outputs/cmoo6vork0003v4v4v0f7jhx5.mp4',
     description: 'One complete paragraph — up to 40 words — displayed over B-roll as the viewer reads along. Meditative pace. ~6.5 s. Best for a nuanced take, a belief, or a self-contained insight that benefits from dwell time.',
-    systemPrompt: 'You are filling content slots for a short-form video reel. Follow each slot\'s intention and word limit exactly. Never mention usernames or @handles.',
     slotSchema: [
       {
         key: 'text1',
@@ -397,7 +365,6 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     scope: 'system',
     previewUrl: 'https://media.9nau.com/flownau/accounts/cmogyjn5a0006gcv46nis4o0l/outputs/cmoo6vork0002v4v4is5hqueg.mp4',
     description: 'Two scenes: a short hook (≤8 words) that creates tension, followed by the payoff reveal (≤25 words). The gap between them keeps the viewer watching. ~8 s total. Best for curiosity-driven content and contrarian takes.',
-    systemPrompt: 'You are filling content slots for a short-form video reel. CRITICAL: these two slots are NOT independent — they are one continuous thought split across two screens. Write the full thought first, then split it: text1 is the first fragment that creates unresolved tension, text2 is the resolution. A viewer watching back-to-back should feel they read one seamless sentence or idea. Never mention usernames or @handles.',
     slotSchema: [
       {
         key: 'text1',
@@ -444,7 +411,6 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     scope: 'system',
     previewUrl: 'https://media.9nau.com/flownau/accounts/cmogyjn5a0006gcv46nis4o0l/outputs/cmoo6vorl0008v4v4fyywc8cv.mp4',
     description: 'Three scenes forming a mini story arc: punchy opener (≤8 w) → development (≤20 w) → landing line (≤8 w). ~11 s total. The most complete reel structure — best for ideas that need setup and resolution.',
-    systemPrompt: 'You are filling content slots for a short-form video reel. CRITICAL: these three slots are one unified piece of writing split across three screens — not three separate ideas. Write the complete arc first (opening tension → development → landing resolution), then carve it into the three slots at the natural break points. A viewer watching all three back-to-back should feel they followed one coherent thought from start to finish. Never mention usernames or @handles.',
     slotSchema: [
       {
         key: 'text1',
@@ -523,7 +489,6 @@ export async function seedSystemTemplates(prisma: PrismaClient): Promise<void> {
         remotionId: t.remotionId,
         sceneType: t.sceneType,
         scope: 'system',
-        systemPrompt: t.systemPrompt,
         description: t.description ?? null,
         previewUrl: t.previewUrl ?? null,
         contentSchema: t.contentSchema,
@@ -532,7 +497,6 @@ export async function seedSystemTemplates(prisma: PrismaClient): Promise<void> {
         useBrandAssets: false,
       },
       update: {
-        systemPrompt: t.systemPrompt,
         description: t.description ?? null,
         previewUrl: t.previewUrl ?? null,
         contentSchema: t.contentSchema,

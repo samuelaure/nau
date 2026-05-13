@@ -48,7 +48,7 @@ export async function runDraftPipeline(input: DraftPipelineInput): Promise<Draft
   const [template, brand, brandTemplateConfig] = await Promise.all([
     prisma.template.findUnique({
       where: { id: templateId },
-      select: { format: true, systemPrompt: true, slotSchema: true, schemaJson: true, contentSchema: true },
+      select: { format: true, slotSchema: true, schemaJson: true, contentSchema: true },
     }),
     prisma.brand.findUnique({
       where: { id: brandId },
