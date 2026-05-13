@@ -155,6 +155,70 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     },
   },
 
+  // ─── Head Talk: Does This Happen to You (15-30s) ─────────────────────────
+  {
+    name: 'Head Talk — Does This Happen to You',
+    format: 'head_talk',
+    remotionId: '',
+    sceneType: 'head_talk',
+    scope: 'system',
+    description: 'Opens with a hyper-specific personal moment or feeling the creator genuinely experienced, shares it without moralising, then asks if the viewer has felt the same. No teaching, no proof — just two people talking. Drives comments and DMs. Best for 15–30 s community-building clips.',
+    systemPrompt: HEAD_TALK_SYSTEM_PROMPT,
+    contentSchema: {
+      format: 'head_talk',
+      targetDurationSeconds: '15-30',
+      structure: 'personal-moment → honest-reflection → open-question',
+      sections: [
+        { key: 'hook', label: 'Hook — The Personal Moment', intention: 'Drop into a specific, real-feeling moment the creator experienced — a thought, a feeling, a situation. Not a lesson. Not a claim. Just "this happened to me / I noticed this about myself." Specific enough to be recognisable: "I was [doing X] and suddenly I felt..." or "The other day I caught myself doing [Y] and I couldn\'t stop thinking about it." Max 3 sentences. No moralising. Just the moment.', maxWords: 40 },
+        { key: 'body', label: 'Honest Reflection', intention: 'The creator sits with the experience — what they thought, felt, noticed, or couldn\'t figure out. Not an answer. Not advice. More like thinking out loud. Slightly vulnerable, genuinely curious. The viewer should feel like they\'re listening in on an honest internal monologue, not a polished lesson. 15-30s = 60-90 spoken words.', maxWords: 90 },
+        { key: 'cta', label: 'Open Question', intention: 'A genuine, open question directed at the viewer. Not rhetorical. Not leading. The creator actually wants to know: "Does this happen to you?" / "Am I the only one?" / "I\'d love to know if you\'ve been through this — tell me in the comments." Warm, low-pressure. Max 2 sentences.', maxWords: 25 },
+      ],
+    },
+    schemaJson: {
+      type: 'object',
+      required: ['hook', 'body', 'cta', 'caption', 'hashtags'],
+      properties: {
+        hook: { type: 'string', description: 'Personal moment — max 40 words' },
+        body: { type: 'string', description: 'Honest reflection — max 90 words' },
+        cta: { type: 'string', description: 'Open question — max 25 words' },
+        caption: { type: 'string', description: 'Instagram caption' },
+        hashtags: { type: 'array', items: { type: 'string' } },
+      },
+    },
+  },
+
+  // ─── Head Talk: Niche Tea (15-30s) ────────────────────────────────────────
+  {
+    name: 'Head Talk — Niche Tea',
+    format: 'head_talk',
+    remotionId: '',
+    sceneType: 'head_talk',
+    scope: 'system',
+    description: 'Points at something happening inside the niche — a pattern, a behaviour, a thing people say or do — with the tone of a trusted friend who noticed something and can\'t not mention it. Not a lecture. Not a takedown. Soft-polemic: the creator has a clear perspective but leaves room for the audience to chime in. Best for 15–30 s high-engagement clips that turn the niche into the subject.',
+    systemPrompt: HEAD_TALK_SYSTEM_PROMPT,
+    contentSchema: {
+      format: 'head_talk',
+      targetDurationSeconds: '15-30',
+      structure: 'the-thing → honest-take → invite',
+      sections: [
+        { key: 'hook', label: 'Hook — Name The Thing', intention: 'Point at something specific happening in or around the niche — a trend, a belief, a behaviour, a thing people post, say, or do — without immediately judging it. Name it like you\'re pulling your friend aside: "Okay so I need to talk about [thing]." or "Have you noticed that everyone in [niche] is now [doing X]?" Specific and recognisable to insiders. Max 2 sentences.', maxWords: 35 },
+        { key: 'body', label: 'The Honest Take', intention: 'The creator\'s real perspective on the thing — not a rant, not a verdict, but an honest, slightly cheeky observation. Can be mildly provocative. Should feel like what you\'d say to a friend over coffee, not what you\'d say in a debate. Use "I think", "I\'ve noticed", "what gets me is" — keeps it personal, not preachy. A small piece of nuance or inside knowledge that makes followers feel like they\'re in the know. 15-30s = 60-90 spoken words.', maxWords: 90 },
+        { key: 'cta', label: 'Invite', intention: 'Pull the audience into the conversation: "What do you think?" / "Tell me I\'m not the only one who sees this." / "Am I off base here?" Genuinely open — the creator doesn\'t need to be right, they\'re curious. Max 1 sentence.', maxWords: 20 },
+      ],
+    },
+    schemaJson: {
+      type: 'object',
+      required: ['hook', 'body', 'cta', 'caption', 'hashtags'],
+      properties: {
+        hook: { type: 'string', description: 'Name the thing — max 35 words' },
+        body: { type: 'string', description: 'Honest take — max 90 words' },
+        cta: { type: 'string', description: 'Invite — max 20 words' },
+        caption: { type: 'string', description: 'Instagram caption' },
+        hashtags: { type: 'array', items: { type: 'string' } },
+      },
+    },
+  },
+
   // ─── Head Talk: Contrarian Take (15-30s) ─────────────────────────────────
   {
     name: 'Head Talk — Contrarian Take',
