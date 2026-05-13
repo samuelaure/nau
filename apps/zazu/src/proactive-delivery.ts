@@ -18,6 +18,8 @@ export class ProactiveDeliverySystem {
   }
 
   private setupRoutes() {
+    this.app.get('/health', (_req, res) => res.json({ ok: true }));
+
     this.app.post('/api/internal/notify', requireServiceAuth, async (req, res) => {
       // Parse Payload
       const payload = req.body;
