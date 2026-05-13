@@ -342,6 +342,10 @@ const REMOVED_TEMPLATE_NAMES = [
   'Reel — Long Form Value',
   'Reel — Before & After',
   'Reel — Story Arc',
+  'Head Talk — Hook First',
+  'Head Talk — Pain of Niche',
+  'Head Talk — Relatable Story',
+  'Head Talk — Case Story',
 ]
 
 export async function seedSystemTemplates(prisma: PrismaClient): Promise<void> {
