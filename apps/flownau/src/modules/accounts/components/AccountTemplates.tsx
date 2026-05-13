@@ -410,13 +410,15 @@ function TemplateModal({
               )}
             </div>
 
-            {/* Slot overrides — text slots for slot-based templates */}
-            {slotSchema && slotSchema.length > 0 && (
+            {/* Slot / section overrides — editable for both reels (slotSchema) and head talks (contentSchema sections) */}
+            {(slotSchema && slotSchema.length > 0 || htSections && htSections.length > 0) && (
               <div className="space-y-2">
-                <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">What the AI fills in</p>
-                <p className="text-[11px] text-gray-600">Click a slot to customize its instructions for this brand.</p>
+                <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">
+                  {slotSchema ? 'What the AI fills in' : 'Script sections'}
+                </p>
+                <p className="text-[11px] text-gray-600">Click a section to customize its instructions for this brand.</p>
                 <div className="space-y-2">
-                  {slotSchema.map((s) => (
+                  {(slotSchema ?? htSections!).map((s) => (
                     <SlotOverrideRow
                       key={s.key}
                       slot={s}
@@ -440,24 +442,6 @@ function TemplateModal({
                 onRestore={handleSlotRestore}
               />
             </div>
-
-            {/* Read-only head-talk / content schema sections */}
-            {!slotSchema && htSections && htSections.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">Script structure</p>
-                <div className="space-y-2">
-                  {htSections.map((s) => (
-                    <div key={s.key} className="bg-gray-900 border border-gray-800 rounded-lg p-3 space-y-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-semibold text-white">{s.label}</span>
-                        <span className="text-[10px] text-gray-600 shrink-0">max {s.maxWords}w</span>
-                      </div>
-                      <p className="text-[11px] text-text-secondary leading-relaxed">{s.intention}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
             {/* Custom prompt */}
             <div className="space-y-2">

@@ -69,7 +69,13 @@ export async function runDraftPipeline(input: DraftPipelineInput): Promise<Draft
 
   const slotOverrides = (brandTemplateConfig?.slotOverrides ?? null) as Record<string, { intention?: string; minWords?: number; maxWords?: number }> | null
   const captionOverride = slotOverrides?.['caption'] ?? null
-  const mergedTemplate = slotOverrides ? { ...template, slotSchema: mergeSlotOverrides(template.slotSchema, slotOverrides) } : template
+  const mergedTemplate = slotOverrides
+    ? {
+        ...template,
+        slotSchema: mergeSlotOverrides(template.slotSchema, slotOverrides),
+        contentSchema: mergeContentSchemaOverrides(template.contentSchema, slotOverrides),
+      }
+    : template
 
   const templateSchema = buildTemplateSchemaBlock(format, mergedTemplate, captionOverride)
 
@@ -280,6 +286,28 @@ function buildTemplateSchemaBlock(
   }
 
   return null
+}
+
+function mergeContentSchemaOverrides(
+  contentSchema: unknown,
+  overrides: Record<string, { intention?: string; minWords?: number; maxWords?: number }>,
+): unknown {
+  if (!contentSchema || typeof contentSchema !== 'object') return contentSchema
+  const cs = contentSchema as Record<string, unknown>
+  if (!Array.isArray(cs.sections)) return contentSchema
+  return {
+    ...cs,
+    sections: (cs.sections as Array<{ key: string; intention: string; minWords?: number; maxWords: number }>).map((s) => {
+      const ov = overrides[s.key]
+      if (!ov) return s
+      return {
+        ...s,
+        ...(ov.intention !== undefined && { intention: ov.intention }),
+        ...(ov.minWords !== undefined && { minWords: ov.minWords }),
+        ...(ov.maxWords !== undefined && { maxWords: ov.maxWords }),
+      }
+    }),
+  }
 }
 
 function mergeSlotOverrides(
