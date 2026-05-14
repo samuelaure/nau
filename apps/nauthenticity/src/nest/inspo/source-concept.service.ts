@@ -60,7 +60,30 @@ export class SourceConceptService {
       take: 20,
     })
 
-    const totalItems = recentMemberships.length + randomMemberships.length + profileMemberships.length
+    // Owned profile posts: recent posts from profiles this brand owns
+    const ownedProfileIds = brand.ownedProfiles.map((p) => p.id)
+    const ownedPosts = ownedProfileIds.length > 0
+      ? await this.prisma.post.findMany({
+          where: { socialProfileId: { in: ownedProfileIds } },
+          select: { postSynthesis: true, caption: true },
+          orderBy: { postedAt: 'desc' },
+          take: 20,
+        })
+      : []
+
+    const voicenotes = await this.prisma.voicenote.findMany({
+      where: { brandId },
+      select: { cleanTranscription: true, synthesis: true },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    })
+
+    const totalItems =
+      recentMemberships.length +
+      randomMemberships.length +
+      profileMemberships.length +
+      ownedPosts.length +
+      voicenotes.length
     if (totalItems === 0) {
       throw new UnprocessableEntityException('InspoBase is empty — add posts or profiles first.')
     }
@@ -86,17 +109,25 @@ export class SourceConceptService {
         inspoLines.push(`Profile: @${m.socialProfile.username}`)
       }
     }
+    for (const p of ownedPosts) {
+      const text = p.postSynthesis ?? p.caption
+      if (text) inspoLines.push(`[Own content] ${text}`)
+    }
+    for (const v of voicenotes) {
+      const text = v.synthesis ?? v.cleanTranscription
+      if (text) inspoLines.push(`[Voicenote] ${text}`)
+    }
 
-    const systemPrompt = `You are a creative content strategist. You receive a brand's InspoBase — a curated collection of inspiring posts and profiles — and you extract distinct, actionable source concepts from it as a whole.
+    const systemPrompt = `You are a creative content strategist. You receive a brand's full inspiration pool — a curated mix of inspiring posts and profiles, the brand's own published content, and voice notes from the brand team — and you extract distinct, actionable source concepts from it as a whole.
 
 A source concept is a rich, self-contained angle or topic that can drive a separate batch of content ideas. Each concept must be distinct: no overlap, no repetition.
 
-Generate as many source concepts as genuinely capture distinct angles from this InspoBase — be moderate, quality over quantity.
+Generate as many source concepts as genuinely capture distinct angles — be moderate, quality over quantity.
 
 Return JSON: { "concepts": [ { "content": "..." }, ... ] }
 Each "content" is a paragraph (30–60 words) describing the concept clearly enough for an ideation LLM to work from it independently.`
 
-    const userMessage = `## INSPOBASE\n${inspoLines.join('\n\n')}\n\nExtract source concepts.`
+    const userMessage = `## INSPIRATION POOL\n${inspoLines.join('\n\n')}\n\nExtract source concepts.`
 
     const { client, model } = getClientForFeature('synthesis')
     const result = await client.chatCompletion({
