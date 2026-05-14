@@ -13,13 +13,13 @@ export class VoicenoteController {
     return this.voicenoteService.listForBrand(brandId)
   }
 
-  @Post('api/v1/_service/audio/process')
+  @Post('_service/audio/process')
   @UseGuards(ServiceAuthGuard)
   async processAudio(@Body() body: { audioUrl: string }) {
     return this.voicenoteService.processAudio(body.audioUrl)
   }
 
-  @Post('api/v1/_service/brands/:brandId/voicenotes')
+  @Post('_service/brands/:brandId/voicenotes')
   @UseGuards(ServiceAuthGuard)
   async createFromCapture(
     @Param('brandId') brandId: string,
