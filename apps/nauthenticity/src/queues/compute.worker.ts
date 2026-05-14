@@ -605,8 +605,8 @@ const handleSynthesizeBatch = async (
     });
 
     const post = posts[i];
-    const caption = post.caption?.slice(0, 800) ?? '';
-    const transcript = post.transcripts[0]?.text?.slice(0, 800) ?? '';
+    const caption = post.caption ?? '';
+    const transcript = post.transcripts[0]?.text ?? '';
 
     if (!caption && !transcript) continue;
 
@@ -622,7 +622,7 @@ const handleSynthesizeBatch = async (
         messages: [
           {
             role: 'system',
-            content: 'You are a content analyst. Given social media post content, write a compact synthesis (2-4 sentences) that captures the core idea, angle, and tone. Focus on what makes this post distinctive and useful as inspiration. Be direct and specific.',
+            content: 'You are a content analyst. Analyse the provided social media post and write a concise, objective synthesis capturing its core topic, angle, tone, and distinctive qualities. Use as many sentences as needed to represent the post faithfully. Be direct and specific.',
           },
           { role: 'user', content: contentBlock },
         ],
