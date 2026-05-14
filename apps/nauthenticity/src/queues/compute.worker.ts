@@ -574,6 +574,46 @@ const handleTranscribeBatch = async (
   }
 };
 
+// Checks whether a profile has accumulated enough new synthesized posts to warrant
+// a soft-update of its ProfileSynthesis. Runs inline (no NestJS DI needed).
+const triggerProfileSynthesisSoftUpdate = async (socialProfileId: string): Promise<void> => {
+  const [existing, profile] = await Promise.all([
+    prisma.profileSynthesis.findUnique({ where: { socialProfileId } }),
+    prisma.socialProfile.findUnique({
+      where: { id: socialProfileId },
+      select: {
+        username: true,
+        synthesisTriggerThreshold: true,
+        _count: { select: { posts: { where: { postSynthesis: { not: null } } } } },
+      },
+    }),
+  ]);
+
+  if (!profile) return;
+
+  const postCount = profile._count.posts;
+  const threshold = profile.synthesisTriggerThreshold;
+
+  if (!existing) {
+    if (postCount < threshold) return;
+  } else {
+    const newSince = postCount - existing.postCountAtGeneration;
+    if (newSince < threshold) return;
+  }
+
+  // Threshold reached — generate profile synthesis via internal HTTP to keep DI out of worker
+  const authSecret = config.authSecret;
+  if (!authSecret) return;
+
+  const { signServiceToken } = await import('@nau/auth');
+  const token = await signServiceToken({ secret: authSecret, iss: 'nauthenticity-worker', aud: 'nauthenticity' });
+  const port = config.port ?? 3000;
+  await fetch(`http://localhost:${port}/api/v1/social-profiles/${socialProfileId}/synthesis/generate`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  }).catch(() => {});
+};
+
 const handleSynthesizeBatch = async (
   job: Job,
   runId: string,
@@ -584,7 +624,7 @@ const handleSynthesizeBatch = async (
 
   const posts = await prisma.post.findMany({
     where: { runId, postSynthesis: null },
-    select: { id: true, caption: true, transcripts: { select: { text: true }, take: 1 } },
+    select: { id: true, caption: true, socialProfileId: true, transcripts: { select: { text: true }, take: 1 } },
   });
 
   if (posts.length === 0) return;
@@ -605,8 +645,8 @@ const handleSynthesizeBatch = async (
     });
 
     const post = posts[i];
-    const caption = post.caption?.slice(0, 800) ?? '';
-    const transcript = post.transcripts[0]?.text?.slice(0, 800) ?? '';
+    const caption = post.caption ?? '';
+    const transcript = post.transcripts[0]?.text ?? '';
 
     if (!caption && !transcript) continue;
 
@@ -615,23 +655,88 @@ const handleSynthesizeBatch = async (
       transcript && `Transcript: ${transcript}`,
     ].filter(Boolean).join('\n');
 
-    try {
-      const result = await client.chatCompletion({
-        model,
-        temperature: 0.3,
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a content analyst. Given social media post content, write a compact synthesis (2-4 sentences) that captures the core idea, angle, and tone. Focus on what makes this post distinctive and useful as inspiration. Be direct and specific.',
-          },
-          { role: 'user', content: contentBlock },
-        ],
-      });
+    // Check if post is tagged INSPO for any brand
+    const inspoMembership = await prisma.categoryMembership.findFirst({
+      where: { postId: post.id, category: 'INSPO', isActive: true, brandId: { not: null } },
+      select: { brandId: true },
+    });
+    const isInspo = !!inspoMembership;
 
-      await prisma.post.update({
-        where: { id: post.id },
-        data: { postSynthesis: result.content.trim() },
-      });
+    try {
+      if (isInspo) {
+        // INSPO path: JSON response with synthesis + sourceConcepts
+        const result = await client.chatCompletion({
+          model,
+          temperature: 0.4,
+          messages: [
+            {
+              role: 'system',
+              content: `You are a content analyst. Analyse the provided social media post and return JSON with two fields:
+1. "synthesis": a concise, objective synthesis capturing its core topic, angle, tone, and distinctive qualities. Use as many sentences as needed.
+2. "sourceConcepts": an array of 1-3 distinct content angles (each 30-60 words) that could independently drive a separate ideation batch. Each concept must be self-contained and actionable.
+
+Return only valid JSON: { "synthesis": "...", "sourceConcepts": ["...", "..."] }`,
+            },
+            { role: 'user', content: contentBlock },
+          ],
+          responseFormat: { type: 'json_object' },
+        });
+
+        let synthesis: string;
+        let sourceConcepts: string[] = [];
+
+        try {
+          const parsed = JSON.parse(result.content) as { synthesis?: string; sourceConcepts?: unknown[] };
+          synthesis = typeof parsed.synthesis === 'string' ? parsed.synthesis.trim() : result.content.trim();
+          sourceConcepts = Array.isArray(parsed.sourceConcepts)
+            ? parsed.sourceConcepts.filter((c): c is string => typeof c === 'string')
+            : [];
+        } catch {
+          synthesis = result.content.trim();
+        }
+
+        await prisma.post.update({ where: { id: post.id }, data: { postSynthesis: synthesis } });
+
+        if (sourceConcepts.length > 0 && inspoMembership.brandId) {
+          await Promise.all(
+            sourceConcepts.map(async (content) => {
+              const concept = await prisma.sourceConcept.create({
+                data: {
+                  brandId: inspoMembership.brandId as string,
+                  content,
+                  sourceType: 'specific_post',
+                  status: 'pending',
+                },
+              });
+              await prisma.sourceConceptSource.create({
+                data: { sourceConceptId: concept.id, postId: post.id },
+              });
+            }),
+          );
+        }
+      } else {
+        // Standard path: plain text synthesis
+        const result = await client.chatCompletion({
+          model,
+          temperature: 0.3,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a content analyst. Analyse the provided social media post and write a concise, objective synthesis capturing its core topic, angle, tone, and distinctive qualities. Use as many sentences as needed to represent the post faithfully. Be direct and specific.',
+            },
+            { role: 'user', content: contentBlock },
+          ],
+        });
+
+        await prisma.post.update({
+          where: { id: post.id },
+          data: { postSynthesis: result.content.trim() },
+        });
+      }
+
+      if (post.socialProfileId) {
+        triggerProfileSynthesisSoftUpdate(post.socialProfileId).catch(() => {});
+      }
     } catch (err) {
       logger.error({ postId: post.id, err }, '[SYNTHESIZE] Failed to synthesize post');
     }

@@ -14,21 +14,21 @@ export class SourceConceptController {
     return this.sourceConceptService.generateFromInspoBase(brandId)
   }
 
-  // User-facing: list pending concepts
+  // User-facing: list pending concepts (freshness-filtered, for dashboard/debug)
   @Get('brands/:brandId/source-concepts')
   @UseGuards(JwtAuthGuard)
   listPending(@Param('brandId') brandId: string) {
     return this.sourceConceptService.listPending(brandId)
   }
 
-  // Service-to-service: flownau pulls pending concepts
+  // Service-to-service: flownau gets concepts — returns pending pool or generates new if empty
   @Get('_service/brands/:brandId/source-concepts')
   @UseGuards(ServiceAuthGuard)
-  listPendingService(@Param('brandId') brandId: string) {
-    return this.sourceConceptService.listPending(brandId)
+  getOrGenerateService(@Param('brandId') brandId: string) {
+    return this.sourceConceptService.getOrGenerateForBrand(brandId)
   }
 
-  // Service-to-service: flownau triggers generation
+  // Service-to-service: explicit generation (bypasses dynamic serving, forces new generation)
   @Post('_service/brands/:brandId/source-concepts/generate')
   @UseGuards(ServiceAuthGuard)
   generateService(@Param('brandId') brandId: string) {
@@ -41,5 +41,12 @@ export class SourceConceptController {
   @HttpCode(HttpStatus.OK)
   consumeService(@Param('id') id: string) {
     return this.sourceConceptService.markConsumed(id)
+  }
+
+  // User-facing: retroactively generate source concepts for already-synthesized INSPO posts
+  @Post('brands/:brandId/source-concepts/retroactive')
+  @UseGuards(JwtAuthGuard)
+  generateRetroactive(@Param('brandId') brandId: string) {
+    return this.sourceConceptService.generateRetroactiveForBrand(brandId)
   }
 }

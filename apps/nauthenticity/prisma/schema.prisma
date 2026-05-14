@@ -23,13 +23,19 @@ model SocialProfile {
   totalPostCount  Int?
   lastScrapedAt   DateTime @default(now())
 
+  // How many new synthesized posts trigger a soft-update of the profile synthesis (min 36)
+  synthesisTriggerThreshold Int @default(36)
+
   // Ownership — the ONE brand that publishes to this profile
   ownerId String?
   owner   Brand?  @relation(fields: [ownerId], references: [id], onDelete: SetNull)
 
-  posts               Post[]
-  categoryMemberships CategoryMembership[]
-  syncSnapshots       ProfileSyncSnapshot[]
+  posts                  Post[]
+  categoryMemberships    CategoryMembership[]
+  syncSnapshots          ProfileSyncSnapshot[]
+  profileSynthesis       ProfileSynthesis?
+  profileSynthesisHistory ProfileSynthesisHistory[]
+  sourceConceptSources   SourceConceptSource[]
 
   @@unique([platform, username])
   @@index([platform, username])
@@ -75,8 +81,9 @@ model Post {
 
   media               Media[]
   transcripts         Transcript[]
-  feedbacks           CommentFeedback[]
-  categoryMemberships CategoryMembership[]
+  feedbacks            CommentFeedback[]
+  categoryMemberships  CategoryMembership[]
+  sourceConceptSources SourceConceptSource[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -192,18 +199,25 @@ model Project {
   @@index([workspaceId])
 }
 
+enum FreshnessUnit {
+  WEEKS
+  MONTHS
+}
+
 model Brand {
-  id                      String  @id // = flownau Brand.id = API Brand.id
-  workspaceId             String  @default("")
-  mainUsername            String?
-  voicePrompt             String?
-  commentStrategy         String?
-  commentPrompt           String?
-  suggestionsCount        Int     @default(3)
-  windowStart             String?
-  windowEnd               String?
-  timezone                String  @default("UTC")
-  inspoRequestCount       Int     @default(0)
+  id                           String        @id // = flownau Brand.id = API Brand.id
+  workspaceId                  String        @default("")
+  mainUsername                 String?
+  voicePrompt                  String?
+  commentStrategy              String?
+  commentPrompt                String?
+  suggestionsCount             Int           @default(3)
+  windowStart                  String?
+  windowEnd                    String?
+  timezone                     String        @default("UTC")
+  inspoRequestCount            Int           @default(0)
+  sourceConceptFreshnessPeriod Int           @default(2)
+  sourceConceptFreshnessUnit   FreshnessUnit @default(WEEKS)
 
   ownedProfiles       SocialProfile[]
   categoryMemberships CategoryMembership[]
@@ -233,7 +247,49 @@ model SourceConcept {
   createdAt  DateTime  @default(now())
   consumedAt DateTime?
 
+  sources SourceConceptSource[]
+
   @@index([brandId, status])
+}
+
+// Links a SourceConcept back to the specific post(s) or profile it was derived from.
+model SourceConceptSource {
+  id              String        @id @default(uuid())
+  sourceConceptId String
+  sourceConcept   SourceConcept @relation(fields: [sourceConceptId], references: [id], onDelete: Cascade)
+  postId          String?
+  post            Post?         @relation(fields: [postId], references: [id], onDelete: SetNull)
+  socialProfileId String?
+  socialProfile   SocialProfile? @relation(fields: [socialProfileId], references: [id], onDelete: SetNull)
+
+  @@index([sourceConceptId])
+  @@index([postId])
+  @@index([socialProfileId])
+}
+
+// ── Profile Synthesis ─────────────────────────────────────────────────────────
+// A holistic LLM-generated synthesis of a social profile derived from its posts' syntheses.
+// One per profile (upserted). Previous versions archived in ProfileSynthesisHistory.
+model ProfileSynthesis {
+  id                   String        @id @default(uuid())
+  socialProfileId      String        @unique
+  socialProfile        SocialProfile @relation(fields: [socialProfileId], references: [id], onDelete: Cascade)
+  content              String        @db.Text
+  postCountAtGeneration Int
+  generatedAt          DateTime      @default(now())
+}
+
+// Archives previous ProfileSynthesis values before overwrite.
+model ProfileSynthesisHistory {
+  id                   String        @id @default(uuid())
+  socialProfileId      String
+  socialProfile        SocialProfile @relation(fields: [socialProfileId], references: [id], onDelete: Cascade)
+  content              String        @db.Text
+  postCountAtGeneration Int
+  generatedAt          DateTime
+  archivedAt           DateTime      @default(now())
+
+  @@index([socialProfileId, archivedAt(sort: Desc)])
 }
 
 // ── Voicenote ─────────────────────────────────────────────────────────────────

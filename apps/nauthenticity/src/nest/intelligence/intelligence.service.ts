@@ -37,7 +37,7 @@ export class IntelligenceService {
   }
 
   async upsertIntelligence(brandId: string, data: Record<string, unknown>) {
-    const allowed = ['workspaceId', 'mainUsername', 'commentPrompt', 'suggestionsCount', 'windowStart', 'windowEnd', 'timezone']
+    const allowed = ['workspaceId', 'mainUsername', 'commentPrompt', 'suggestionsCount', 'windowStart', 'windowEnd', 'timezone', 'sourceConceptFreshnessPeriod', 'sourceConceptFreshnessUnit']
     const patch: Record<string, unknown> = {}
     for (const key of allowed) {
       if (key in data) patch[key] = data[key]

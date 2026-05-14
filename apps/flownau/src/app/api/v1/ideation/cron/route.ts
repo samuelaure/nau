@@ -3,15 +3,10 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { generateContentIdeas } from '@/modules/ideation/ideation.service'
+import { fetchPendingSourceConcepts, markSourceConceptConsumed } from '@/modules/ideation/sources/inspo-source'
 import { prisma } from '@/modules/shared/prisma'
 import { validateServiceToken, unauthorizedResponse } from '@/modules/shared/nau-auth'
 import { signServiceToken } from '@nau/auth'
-
-async function serviceHeaders(): Promise<Record<string, string>> {
-  const secret = process.env.AUTH_SECRET!
-  const token = await signServiceToken({ iss: 'flownau', aud: 'nauthenticity', secret })
-  return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
-}
 
 async function nauApiHeaders(): Promise<Record<string, string>> {
   const secret = process.env.AUTH_SECRET!
@@ -30,35 +25,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required field: brandId' }, { status: 400 })
     }
 
-    const nauthUrl = process.env.NAUTHENTICITY_URL || 'http://nauthenticity:4000'
-    const [nauthHeaders, account] = await Promise.all([
-      serviceHeaders(),
-      prisma.socialProfile.findFirst({ where: { brandId } }),
-    ])
+    const account = await prisma.socialProfile.findFirst({ where: { brandId } })
 
-    // Fetch InspoBase memberships (post-level only) from nauthenticity NestJS API.
-    // Each membership embeds its post; we use post.caption as the source-concept seed
-    // until Priority 3 of source-concepts-and-knowledge-bases redesigns this digest.
-    const inspoRes = await fetch(
-      `${nauthUrl}/api/v1/_service/brands/${brandId}/inspo`,
-      { headers: nauthHeaders },
-    )
-    const inspoData = (inspoRes.ok ? await inspoRes.json() : []) as Array<{
-      id: string
-      postId: string | null
-      socialProfileId: string | null
-      post?: { url: string | null; caption: string | null } | null
-    }>
+    // Fetch source concepts — pool-first, auto-generates if pool is empty
+    const sourceConcepts = await fetchPendingSourceConcepts(brandId)
 
-    const inspoPosts = inspoData.filter((m) => m.post && m.post.caption)
-
-    if (inspoPosts.length === 0) {
-      return NextResponse.json({ success: true, message: 'No InspoBase posts to process.' })
+    if (sourceConcepts.length === 0) {
+      return NextResponse.json({ success: true, message: 'No source concepts available.' })
     }
 
+    // Use up to 5 concepts per ideation run
+    const batch = sourceConcepts.slice(0, 5)
     const brandName: string = account?.username ?? brandId
-
-    const topic = inspoPosts.map((m) => m.post!.caption).filter(Boolean).join('\n')
+    const topic = batch.map((c) => c.content).join('\n\n')
 
     const brand = await prisma.brand.findUnique({
       where: { id: brandId },
@@ -71,9 +50,8 @@ export async function POST(request: NextRequest) {
       recentContent: [],
     })
 
-    // NOTE: Previous flow toggled InspoItem.status='processed' to mark items consumed.
-    // The new schema has no per-membership status; the redesigned digest pipeline
-    // (Priority 3 of source-concepts-and-knowledge-bases) will replace this entirely.
+    // Mark all concepts in this batch as consumed
+    await Promise.all(batch.map((c) => markSourceConceptConsumed(c.id)))
 
     // Persist as Post records
     if (account) {
@@ -110,7 +88,7 @@ export async function POST(request: NextRequest) {
       briefMd += `*IDEA ${idx + 1}*\n`
       briefMd += `${idea.concept}\n\n`
     })
-    briefMd += `_Basado en: ${inspoPosts.length} posts de Inspo Base._`
+    briefMd += `_Basado en: ${batch.length} conceptos de fuente._`
 
     // Deliver via Zazŭ
     const zazuUrl = process.env.ZAZU_INTERNAL_URL || 'http://zazu:3000'
