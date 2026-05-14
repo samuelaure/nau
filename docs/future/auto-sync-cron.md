@@ -59,3 +59,29 @@ Competitor profiles: 0 2  * * *    (daily at 02:00 UTC)
 ```
 
 Deploy window: 03:00–06:00 UTC (same as worker-touching deploys — see DEPLOYMENT.md).
+
+---
+
+## InspoBase Profiles — Currently Not Monitored
+
+**Finding (2026-05-15):** The existing fanout cron (`runProactiveFanout`, every 15 min) only processes `CategoryMembership` where `category: 'COMMENT'`. InspoBase profiles (`category: 'INSPO'`) are entirely excluded — they are never scraped automatically. New posts from InspoBase accounts only appear in nauthenticity when a user manually triggers an ingest from the dashboard.
+
+**User note:** This should be reviewed and improved.
+
+### Proposed approach
+
+Add InspoBase profiles to the auto-sync schedule at a lower cadence than comment profiles — they don't need near-real-time freshness, but should update regularly to feed the source concept and synthesis pipelines.
+
+Suggested cadence: **once per day** (e.g. 03:00 UTC), per brand's active INSPO profiles.
+
+Implementation options:
+1. **Extend the existing auto-sync cron** (once built) — add `category: 'INSPO'` profiles to the daily competitor slot, triggering a lightweight ingest (new posts only, `updateSync: true`)
+2. **Separate INSPO sync job** — keeps comment fanout (latency-sensitive) fully isolated from bulk INSPO ingestion (throughput-sensitive)
+
+Option 2 is preferred: INSPO ingestion is heavier (full pipeline: download, transcribe, synthesize, embed) and should not share queue priority with the comment fanout which needs to be fast.
+
+### Cron schedule suggestion
+
+```
+INSPO profiles:  0 3 * * *   (daily at 03:00 UTC, per brand)
+```
