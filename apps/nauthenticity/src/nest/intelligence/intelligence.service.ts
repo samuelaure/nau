@@ -310,7 +310,14 @@ export class IntelligenceService {
       where: { ...ownerFilter, category: category ?? undefined },
       include: {
         socialProfile: { include: { _count: { select: { posts: true } } } },
-        post: { select: { id: true, url: true, caption: true, postedAt: true } },
+        post: {
+          select: {
+            id: true, url: true, caption: true, postedAt: true,
+            likes: true, comments: true, views: true, engagementScore: true,
+            username: true, collaborators: true,
+            media: { select: { id: true, type: true, storageUrl: true, thumbnailUrl: true, duration: true } },
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     })
