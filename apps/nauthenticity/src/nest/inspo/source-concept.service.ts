@@ -125,4 +125,82 @@ Each "content" is a paragraph (30–60 words) describing the concept clearly eno
       data: { status: 'consumed', consumedAt: new Date() },
     })
   }
+
+  // Retroactively generate source concepts for INSPO posts that already have a
+  // postSynthesis but no SourceConceptSource linking them (i.e. processed before Phase 4).
+  async generateRetroactiveForBrand(brandId: string): Promise<{ generated: number }> {
+    const brand = await this.prisma.brand.findUnique({ where: { id: brandId } })
+    if (!brand) throw new NotFoundException('Brand not found')
+
+    // All INSPO post memberships for this brand where post has synthesis
+    const memberships = await this.prisma.categoryMembership.findMany({
+      where: { brandId, category: 'INSPO', isActive: true, postId: { not: null } },
+      include: { post: { select: { id: true, caption: true, postSynthesis: true } } },
+    })
+
+    // Exclude posts already linked to a SourceConceptSource
+    const linkedPostIds = await this.prisma.sourceConceptSource
+      .findMany({ where: { postId: { not: null } }, select: { postId: true } })
+      .then((rows) => new Set(rows.map((r) => r.postId)))
+
+    const unprocessed = memberships.filter(
+      (m) => m.post?.postSynthesis && !linkedPostIds.has(m.postId),
+    )
+
+    if (unprocessed.length === 0) return { generated: 0 }
+
+    const { client, model } = getClientForFeature('synthesis')
+    let generated = 0
+
+    // Process in batches of 10 to avoid overwhelming the LLM
+    for (let i = 0; i < unprocessed.length; i += 10) {
+      const batch = unprocessed.slice(i, i + 10)
+      await Promise.all(
+        batch.map(async (m) => {
+          const post = m.post!
+          const contentBlock = [
+            post.postSynthesis && `Synthesis: ${post.postSynthesis}`,
+            post.caption && `Caption: ${post.caption}`,
+          ].filter(Boolean).join('\n')
+
+          try {
+            const result = await client.chatCompletion({
+              model,
+              temperature: 0.4,
+              messages: [
+                {
+                  role: 'system',
+                  content: `You are a content strategist. Given a social media post synthesis (and optional caption), extract 1-3 distinct source concepts (each 30-60 words) that could independently drive a separate content ideation batch. Each concept must be self-contained and actionable.
+Return JSON: { "sourceConcepts": ["...", "..."] }`,
+                },
+                { role: 'user', content: contentBlock },
+              ],
+              responseFormat: { type: 'json_object' },
+            })
+
+            const parsed = JSON.parse(result.content) as { sourceConcepts?: unknown[] }
+            const concepts = Array.isArray(parsed.sourceConcepts)
+              ? parsed.sourceConcepts.filter((c): c is string => typeof c === 'string')
+              : []
+
+            await Promise.all(
+              concepts.map(async (content) => {
+                const concept = await this.prisma.sourceConcept.create({
+                  data: { brandId, content, sourceType: 'specific_post', status: 'pending' },
+                })
+                await this.prisma.sourceConceptSource.create({
+                  data: { sourceConceptId: concept.id, postId: post.id },
+                })
+                generated++
+              }),
+            )
+          } catch {
+            // Non-fatal: skip individual post failures
+          }
+        }),
+      )
+    }
+
+    return { generated }
+  }
 }

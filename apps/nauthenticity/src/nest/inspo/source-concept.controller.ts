@@ -42,4 +42,11 @@ export class SourceConceptController {
   consumeService(@Param('id') id: string) {
     return this.sourceConceptService.markConsumed(id)
   }
+
+  // User-facing: retroactively generate source concepts for already-synthesized INSPO posts
+  @Post('brands/:brandId/source-concepts/retroactive')
+  @UseGuards(JwtAuthGuard)
+  generateRetroactive(@Param('brandId') brandId: string) {
+    return this.sourceConceptService.generateRetroactiveForBrand(brandId)
+  }
 }
