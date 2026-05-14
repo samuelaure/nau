@@ -110,6 +110,7 @@ export class IntelligenceService {
       ? { brandId: owner.brandId }
       : { projectId: (owner as { projectId: string }).projectId }
 
+    let absorbedPostCount = 0
     for (const username of usernames) {
       const profile = await upsertSocialProfile({ platform: 'instagram', username })
 
@@ -130,7 +131,7 @@ export class IntelligenceService {
 
       // Clean up redundant post-level memberships for this owner+category that belong to this
       // profile — they're now covered by the profile-level membership above.
-      await this.prisma.categoryMembership.deleteMany({
+      const { count: absorbedCount } = await this.prisma.categoryMembership.deleteMany({
         where: {
           ...ownerField,
           category: opts.category,
@@ -138,8 +139,9 @@ export class IntelligenceService {
           post: { socialProfileId: profile.id },
         },
       })
+      absorbedPostCount += absorbedCount
     }
-    return { success: true }
+    return { success: true, absorbedPostCount }
   }
 
   async updateMembership(id: string, data: { isActive?: boolean; category?: Category }) {
@@ -149,22 +151,41 @@ export class IntelligenceService {
     return this.prisma.categoryMembership.update({ where: { id }, data: patch })
   }
 
-  async deleteMembership(id: string) {
+  async deleteMembership(id: string, action: 'benchmark' | 'remove' = 'benchmark') {
     const membership = await this.prisma.categoryMembership.findUnique({ where: { id } })
     if (!membership) return { success: true }
 
+    const { brandId, socialProfileId, postId } = membership
+
+    // Check if this is the last membership for this brand+entity before deleting
+    const siblingCount = brandId
+      ? await this.prisma.categoryMembership.count({
+          where: {
+            id: { not: id },
+            brandId,
+            socialProfileId: socialProfileId ?? undefined,
+            postId: postId ?? undefined,
+          },
+        })
+      : 1 // project memberships: never absorb
+
     await this.prisma.categoryMembership.delete({ where: { id } })
 
-    // Default-absorption only applies to brand memberships (not projects — pure reference, no BENCHMARK sink)
-    const { brandId, socialProfileId, postId } = membership
-    if (brandId) {
-      const remaining = await this.prisma.categoryMembership.count({
-        where: { brandId, socialProfileId: socialProfileId ?? undefined, postId: postId ?? undefined },
-      })
-      if (remaining === 0) {
+    if (brandId && siblingCount === 0) {
+      if (action === 'benchmark') {
+        // Move to Benchmark as the default holding category
         await this.prisma.categoryMembership.create({
           data: { brandId, socialProfileId, postId, category: 'BENCHMARK', isActive: true },
         })
+      } else {
+        // Hard-delete the profile/post itself if no other brand holds it globally
+        if (socialProfileId) {
+          const globalCount = await this.prisma.categoryMembership.count({ where: { socialProfileId } })
+          if (globalCount === 0) await this.prisma.socialProfile.delete({ where: { id: socialProfileId } }).catch(() => {})
+        } else if (postId) {
+          const globalCount = await this.prisma.categoryMembership.count({ where: { postId } })
+          if (globalCount === 0) await this.prisma.post.delete({ where: { id: postId } }).catch(() => {})
+        }
       }
     }
 

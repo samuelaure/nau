@@ -474,6 +474,11 @@ export const addBrandTarget = async (payload: {
   return data;
 };
 
+export const removeBrandTarget = async (membershipId: string, action: 'benchmark' | 'remove' = 'benchmark') => {
+  const { data } = await api.delete(`/targets?id=${membershipId}&action=${action}`);
+  return data;
+};
+
 export const updateBrandTarget = async (
   id: string,
   updates: { isActive?: boolean; autoUpdate?: boolean; initialDownloadCount?: number },

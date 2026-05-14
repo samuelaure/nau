@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation, Routes, Route, Navigate, NavLink } from 'react-router-dom';
-import { getBrandTargets, addBrandTarget, capturePostByUrl, getAccount, getProfileImageUrl, type Post } from '../lib/api';
-import { Plus, ArrowLeft, X } from 'lucide-react';
+import { getBrandTargets, addBrandTarget, capturePostByUrl, removeBrandTarget, getAccount, getProfileImageUrl, type Post } from '../lib/api';
+import { Plus, ArrowLeft, X, Trash2, AlertTriangle } from 'lucide-react';
 import { SocialProfileCard } from '../components/SocialProfileCard';
 import { PostGrid } from '../components/PostGrid';
 
@@ -44,6 +44,9 @@ export const BrandCategoryLayout = ({
   const [modalOpen, setModalOpen] = useState(false);
   const [input, setInput] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const [absorbedToast, setAbsorbedToast] = useState<string | null>(null);
+  const [removeConfirm, setRemoveConfirm] = useState<{ membershipId: string; label: string } | null>(null);
+  const [removing, setRemoving] = useState<string | null>(null);
 
   const queryKey = ['targets', brandId, category];
 
@@ -56,10 +59,15 @@ export const BrandCategoryLayout = ({
   const addUsernameMutation = useMutation({
     mutationFn: (username: string) =>
       addBrandTarget({ brandId: brandId!, username, targetType, isActive: true }),
-    onSuccess: () => {
+    onSuccess: (data) => {
       setInput('');
       setModalOpen(false);
       queryClient.invalidateQueries({ queryKey });
+      if (data?.absorbedPostCount > 0) {
+        setAbsorbedToast(
+          `${data.absorbedPostCount} post${data.absorbedPostCount > 1 ? 's' : ''} you'd previously added from this profile individually ${data.absorbedPostCount > 1 ? 'are' : 'is'} now grouped under this profile — they're still here, just accessible from the profile view.`
+        );
+      }
     },
   });
 
@@ -71,6 +79,34 @@ export const BrandCategoryLayout = ({
       queryClient.invalidateQueries({ queryKey });
     },
   });
+
+  const handleRemove = useCallback(async (membershipId: string, label: string) => {
+    // Check if this is the last category for this profile/post
+    const allMemberships: any[] = memberships ?? [];
+    const targetMembership = allMemberships.find((m: any) => m.id === membershipId);
+    if (!targetMembership) return;
+
+    const entityId = targetMembership.socialProfileId ?? targetMembership.post?.id ?? targetMembership.postId;
+    const siblingCount = allMemberships.filter((m: any) =>
+      m.id !== membershipId &&
+      ((targetMembership.socialProfileId && m.socialProfileId === targetMembership.socialProfileId) ||
+       (entityId && (m.post?.id === entityId || m.postId === entityId)))
+    ).length;
+
+    if (siblingCount === 0) {
+      // Last category — ask the user what to do
+      setRemoveConfirm({ membershipId, label });
+    } else {
+      // Still in other categories, just remove this one silently
+      setRemoving(membershipId);
+      try {
+        await removeBrandTarget(membershipId, 'remove');
+        queryClient.invalidateQueries({ queryKey });
+      } finally {
+        setRemoving(null);
+      }
+    }
+  }, [memberships, queryClient, queryKey]);
 
   const isPending = addUsernameMutation.isPending || addPostUrlMutation.isPending;
   const isError = addUsernameMutation.isError || addPostUrlMutation.isError;
@@ -179,18 +215,85 @@ export const BrandCategoryLayout = ({
       <Routes>
         <Route
           path="profiles"
-          element={isLoading ? <div>Loading...</div> : <ProfilesTab profiles={profileMemberships} />}
+          element={isLoading ? <div>Loading...</div> : (
+            <ProfilesTab profiles={profileMemberships} onRemove={handleRemove} removing={removing} />
+          )}
         />
         <Route path="profiles/:username" element={<ProfileDetailView title={title} />} />
         <Route
           path="posts"
-          element={isLoading ? <div>Loading...</div> : <PostsTab postMemberships={postMemberships} />}
+          element={isLoading ? <div>Loading...</div> : (
+            <PostsTab postMemberships={postMemberships} onRemove={handleRemove} removing={removing} />
+          )}
         />
         {extraTabs.map(tab => (
           <Route key={tab.key} path={tab.key} element={<>{tab.content}</>} />
         ))}
         <Route path="*" element={<Navigate to="profiles" replace />} />
       </Routes>
+
+      {/* Absorbed posts toast */}
+      {absorbedToast && (
+        <div style={{ position: 'fixed', bottom: '2rem', left: '50%', transform: 'translateX(-50%)', background: '#1c2128', border: '1px solid rgba(88,166,255,0.3)', borderRadius: '10px', padding: '1rem 1.5rem', maxWidth: '480px', zIndex: 2000, display: 'flex', alignItems: 'flex-start', gap: '0.75rem', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+          <AlertTriangle size={18} style={{ color: '#e3b341', flexShrink: 0, marginTop: '2px' }} />
+          <p style={{ margin: 0, fontSize: '0.85rem', color: '#c9d1d9', lineHeight: '1.5' }}>{absorbedToast}</p>
+          <button onClick={() => setAbsorbedToast(null)} style={{ background: 'none', border: 'none', color: '#8b949e', cursor: 'pointer', padding: '0', flexShrink: 0 }}><X size={16} /></button>
+        </div>
+      )}
+
+      {/* Remove confirmation modal */}
+      {removeConfirm && (
+        <div
+          onClick={() => setRemoveConfirm(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: '14px', padding: '2rem', width: '440px', maxWidth: '90vw', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <AlertTriangle size={20} style={{ color: '#e3b341', flexShrink: 0 }} />
+              <h2 style={{ margin: 0, fontSize: '1.15rem' }}>Not in any other category</h2>
+            </div>
+            <p style={{ margin: 0, color: '#8b949e', fontSize: '0.9rem', lineHeight: '1.6' }}>
+              <strong style={{ color: '#f0f6fc' }}>{removeConfirm.label}</strong> isn't in any other category. What would you like to do?
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <button
+                onClick={async () => {
+                  setRemoving(removeConfirm.membershipId);
+                  setRemoveConfirm(null);
+                  try {
+                    await removeBrandTarget(removeConfirm.membershipId, 'benchmark');
+                    queryClient.invalidateQueries({ queryKey });
+                  } finally { setRemoving(null); }
+                }}
+                style={{ padding: '0.75rem 1rem', borderRadius: '8px', background: 'rgba(88,166,255,0.1)', border: '1px solid rgba(88,166,255,0.3)', color: '#58a6ff', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600, textAlign: 'left' }}
+              >
+                📌 Move to Benchmarks
+                <span style={{ display: 'block', fontSize: '0.78rem', color: '#8b949e', fontWeight: 400, marginTop: '2px' }}>Keep it in your library under Benchmarks for future reference.</span>
+              </button>
+              <button
+                onClick={async () => {
+                  setRemoving(removeConfirm.membershipId);
+                  setRemoveConfirm(null);
+                  try {
+                    await removeBrandTarget(removeConfirm.membershipId, 'remove');
+                    queryClient.invalidateQueries({ queryKey });
+                  } finally { setRemoving(null); }
+                }}
+                style={{ padding: '0.75rem 1rem', borderRadius: '8px', background: 'rgba(248,81,73,0.1)', border: '1px solid rgba(248,81,73,0.3)', color: '#f85149', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600, textAlign: 'left' }}
+              >
+                🗑️ Remove completely
+                <span style={{ display: 'block', fontSize: '0.78rem', color: '#8b949e', fontWeight: 400, marginTop: '2px' }}>Remove it from your brand. It'll be fully deleted if no other brand uses it.</span>
+              </button>
+              <button onClick={() => setRemoveConfirm(null)} style={{ background: 'none', border: 'none', color: '#8b949e', cursor: 'pointer', fontSize: '0.85rem', padding: '0.25rem 0' }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add Modal */}
       {modalOpen && (
@@ -259,7 +362,7 @@ export const BrandCategoryLayout = ({
 
 // ── Profiles Tab ──────────────────────────────────────────────────────────────
 
-const ProfilesTab = ({ profiles }: { profiles: any[] }) => {
+const ProfilesTab = ({ profiles, onRemove, removing }: { profiles: any[]; onRemove: (id: string, label: string) => void; removing: string | null }) => {
   const navigate = useNavigate();
 
   if (profiles.length === 0) {
@@ -277,6 +380,7 @@ const ProfilesTab = ({ profiles }: { profiles: any[] }) => {
           key={m.id}
           profile={m.socialProfile}
           onSelect={(username) => navigate(`../profiles/${username}`)}
+          onDelete={async () => onRemove(m.id, `@${m.socialProfile?.username ?? 'profile'}`)}
         />
       ))}
     </div>
@@ -349,7 +453,7 @@ const ProfileDetailView = ({ title }: { title: string }) => {
 
 // ── Posts Tab ─────────────────────────────────────────────────────────────────
 
-const PostsTab = ({ postMemberships }: { postMemberships: any[] }) => {
+const PostsTab = ({ postMemberships, onRemove, removing }: { postMemberships: any[]; onRemove: (id: string, label: string) => void; removing: string | null }) => {
   if (postMemberships.length === 0) {
     return (
       <div style={{ padding: '3rem', textAlign: 'center', color: '#8b949e', border: '1px dashed var(--border)', borderRadius: '12px' }}>
@@ -358,14 +462,32 @@ const PostsTab = ({ postMemberships }: { postMemberships: any[] }) => {
     );
   }
 
-  const posts: Post[] = postMemberships.map((m: any) => ({
-    ...m.post,
-    instagramUrl: m.post.url,
-    likes: m.post.likes ?? 0,
-    comments: m.post.comments ?? 0,
-    media: m.post.media ?? [],
-    collaborators: m.post.collaborators ?? [],
-  }));
-
-  return <PostGrid posts={posts} sort="recent" />;
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.75rem' }}>
+      {postMemberships.map((m: any) => {
+        const post: Post = {
+          ...m.post,
+          instagramUrl: m.post.url,
+          likes: m.post.likes ?? 0,
+          comments: m.post.comments ?? 0,
+          media: m.post.media ?? [],
+          collaborators: m.post.collaborators ?? [],
+        };
+        const label = m.post.username ? `@${m.post.username} post` : 'post';
+        return (
+          <div key={m.id} style={{ position: 'relative' }}>
+            <PostGrid posts={[post]} sort="recent" />
+            <button
+              onClick={() => onRemove(m.id, label)}
+              disabled={removing === m.id}
+              title="Remove from this category"
+              style={{ position: 'absolute', top: '6px', right: '6px', background: 'rgba(0,0,0,0.7)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', color: removing === m.id ? '#555' : '#f85149', cursor: 'pointer', padding: '4px 6px', display: 'flex', alignItems: 'center', zIndex: 10 }}
+            >
+              <Trash2 size={13} />
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
 };

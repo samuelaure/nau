@@ -145,9 +145,10 @@ export class IntelligenceController {
   }
 
   @Delete('targets')
-  deleteMembership(@Query('id') id?: string) {
+  deleteMembership(@Query('id') id?: string, @Query('action') action?: string) {
     if (!id) throw new BadRequestException('Missing membership id')
-    return this.intelligenceService.deleteMembership(id)
+    const resolvedAction = action === 'remove' ? 'remove' : 'benchmark'
+    return this.intelligenceService.deleteMembership(id, resolvedAction)
   }
 
   // -------------------------------------------------------------------------
