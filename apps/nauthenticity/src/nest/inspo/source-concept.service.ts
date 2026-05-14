@@ -150,11 +150,34 @@ Each "content" is a paragraph (30–60 words) describing the concept clearly eno
     return created
   }
 
+  // Returns pending concepts that are within the brand's freshness window, in random order.
   async listPending(brandId: string) {
-    return this.prisma.sourceConcept.findMany({
-      where: { brandId, status: 'pending' },
-      orderBy: { createdAt: 'asc' },
+    const brand = await this.prisma.brand.findUnique({
+      where: { id: brandId },
+      select: { sourceConceptFreshnessPeriod: true, sourceConceptFreshnessUnit: true },
     })
+
+    const period = brand?.sourceConceptFreshnessPeriod ?? 2
+    const unit = brand?.sourceConceptFreshnessUnit ?? 'WEEKS'
+    const cutoff = new Date()
+    if (unit === 'WEEKS') cutoff.setDate(cutoff.getDate() - period * 7)
+    else cutoff.setMonth(cutoff.getMonth() - period)
+
+    return this.prisma.$queryRaw<Array<{ id: string; brandId: string; content: string; sourceType: string; status: string; createdAt: Date; consumedAt: Date | null }>>`
+      SELECT id, "brandId", content, "sourceType", status, "createdAt", "consumedAt"
+      FROM "SourceConcept"
+      WHERE "brandId" = ${brandId}
+        AND status = 'pending'
+        AND "createdAt" >= ${cutoff}
+      ORDER BY RANDOM()
+    `
+  }
+
+  // Returns pending concepts from the freshness pool; generates new ones only when pool is empty.
+  async getOrGenerateForBrand(brandId: string) {
+    const pending = await this.listPending(brandId)
+    if (pending.length > 0) return pending
+    return this.generateFromInspoBase(brandId)
   }
 
   async markConsumed(id: string) {
