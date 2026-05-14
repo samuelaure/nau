@@ -187,13 +187,45 @@ export class WorkspacesService {
     return this.prisma.workspaceMember.delete({ where: { id: member.id } });
   }
 
-  async getNotificationTarget(workspaceId: string): Promise<{ nauUserIds: string[] }> {
+  async getNotificationTarget(workspaceId: string, app?: string): Promise<{ nauUserIds: string[] }> {
     const members = await this.prisma.workspaceMember.findMany({
       where: { workspaceId },
-      select: { userId: true },
+      select: { userId: true, notificationSettings: true },
     });
     if (!members.length) throw new NotFoundException('Workspace has no members');
-    return { nauUserIds: members.map(m => m.userId) };
+    const eligible = app
+      ? members.filter(m => {
+          const settings = (m.notificationSettings ?? {}) as Record<string, boolean>;
+          return settings[app] !== false;
+        })
+      : members;
+    return { nauUserIds: eligible.map(m => m.userId) };
+  }
+
+  async updateMemberNotificationSettings(
+    actorId: string,
+    workspaceId: string,
+    targetUserId: string,
+    app: string,
+    enabled: boolean,
+  ): Promise<void> {
+    const actor = await this.assertMembership(actorId, workspaceId);
+    const canManageOthers = actor.role === WorkspaceRole.OWNER || actor.role === WorkspaceRole.ADMIN;
+    if (!canManageOthers && actorId !== targetUserId) {
+      throw new ForbiddenException('You can only change your own notification settings');
+    }
+
+    const target = await this.prisma.workspaceMember.findUnique({
+      where: { userId_workspaceId: { userId: targetUserId, workspaceId } },
+      select: { notificationSettings: true },
+    });
+    if (!target) throw new NotFoundException('Member not found');
+
+    const current = (target.notificationSettings ?? {}) as Record<string, boolean>;
+    await this.prisma.workspaceMember.update({
+      where: { userId_workspaceId: { userId: targetUserId, workspaceId } },
+      data: { notificationSettings: { ...current, [app]: enabled } },
+    });
   }
 
   async assertMembership(userId: string, workspaceId: string) {

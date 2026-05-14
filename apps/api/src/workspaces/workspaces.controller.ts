@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { WorkspaceRole } from '@prisma/client';
 import { WorkspacesService } from './workspaces.service';
 import { CreateWorkspaceDto, AddMemberDto } from './workspaces.dto';
@@ -114,7 +114,22 @@ export class WorkspacesController {
 
   @Get('_service/:workspaceId/notification-target')
   @UseGuards(ServiceAuthGuard)
-  getNotificationTarget(@Param('workspaceId') workspaceId: string) {
-    return this.svc.getNotificationTarget(workspaceId);
+  getNotificationTarget(
+    @Param('workspaceId') workspaceId: string,
+    @Query('app') app?: string,
+  ) {
+    return this.svc.getNotificationTarget(workspaceId, app);
+  }
+
+  @Patch(':workspaceId/members/:targetUserId/notifications')
+  @UseGuards(JwtAuthGuard)
+  updateNotificationSettings(
+    @CurrentUser() user: AccessTokenPayload,
+    @Param('workspaceId') workspaceId: string,
+    @Param('targetUserId') targetUserId: string,
+    @Body('app') app: string,
+    @Body('enabled') enabled: boolean,
+  ) {
+    return this.svc.updateMemberNotificationSettings(user.sub, workspaceId, targetUserId, app, enabled);
   }
 }

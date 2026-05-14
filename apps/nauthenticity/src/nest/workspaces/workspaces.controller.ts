@@ -51,6 +51,17 @@ export class WorkspacesController {
     return proxyToApi(req, res, `/workspaces/${id}/members/${userId}`, 'DELETE')
   }
 
+  @Patch(':id/members/:userId/notifications')
+  updateNotifications(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @Body() body: unknown,
+    @Req() req: unknown,
+    @Res() res: unknown,
+  ) {
+    return proxyToApi(req, res, `/workspaces/${id}/members/${userId}/notifications`, 'PATCH', body)
+  }
+
   @Get(':id/brands')
   getBrands(@Param('id') id: string, @Req() req: unknown, @Res() res: unknown) {
     return proxyToApi(req, res, `/workspaces/${id}/brands`)

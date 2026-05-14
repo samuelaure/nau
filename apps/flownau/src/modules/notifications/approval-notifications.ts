@@ -11,7 +11,7 @@ async function resolveNauUserIds(workspaceId: string): Promise<string[]> {
   if (!secret) return []
   try {
     const token = await signServiceToken({ iss: 'flownau', aud: '9nau-api', secret })
-    const res = await fetch(`${API_URL()}/workspaces/_service/${workspaceId}/notification-target`, {
+    const res = await fetch(`${API_URL()}/workspaces/_service/${workspaceId}/notification-target?app=flownau`, {
       headers: { Authorization: `Bearer ${token}` },
     })
     if (!res.ok) return []

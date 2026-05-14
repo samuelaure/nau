@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Building2, Users, Loader2, Check, Settings } from 'lucide-react';
+import { Building2, Users, Loader2, Check, Settings, Bell, BellOff } from 'lucide-react';
 import pkg from '../../package.json';
 
 type Workspace = { id: string; name: string };
 type Member = {
   id: string;
+  userId: string;
   role: string;
+  notificationSettings: Record<string, boolean>;
   user: { id: string; email: string; name: string | null };
 };
 
@@ -45,7 +47,7 @@ export function WorkspaceSettings() {
     // Load members separately
     fetch(`/api/v1/workspaces/${workspaceId}/members`, { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : []))
-      .then((data: Member[]) => setMembers(data))
+      .then((data: { members?: Member[] } | Member[]) => setMembers(Array.isArray(data) ? data : (data.members ?? [])))
       .catch(() => {})
       .finally(() => setMembersLoading(false));
   }, [workspaceId]);
@@ -73,6 +75,31 @@ export function WorkspaceSettings() {
 
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviting, setInviting] = useState(false);
+  const [togglingNotifId, setTogglingNotifId] = useState<string | null>(null);
+
+  const handleToggleNotification = async (member: Member) => {
+    if (!workspaceId) return;
+    const enabled = member.notificationSettings?.nauthenticity !== false;
+    setTogglingNotifId(member.user.id);
+    try {
+      const res = await fetch(`/api/v1/workspaces/${workspaceId}/members/${member.user.id}/notifications`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ app: 'nauthenticity', enabled: !enabled }),
+      });
+      if (!res.ok) throw new Error();
+      setMembers(members.map((m) =>
+        m.id === member.id
+          ? { ...m, notificationSettings: { ...m.notificationSettings, nauthenticity: !enabled } }
+          : m
+      ));
+    } catch {
+      alert('Failed to update notification settings.');
+    } finally {
+      setTogglingNotifId(null);
+    }
+  };
 
   const handleInvite = async () => {
     if (!inviteEmail.trim() || !workspaceId) return;
@@ -311,6 +338,21 @@ export function WorkspaceSettings() {
                     >
                       {m.role}
                     </span>
+                    {(() => {
+                      const notifEnabled = m.notificationSettings?.nauthenticity !== false;
+                      return (
+                        <button
+                          onClick={() => handleToggleNotification(m)}
+                          disabled={togglingNotifId === m.user.id}
+                          title={notifEnabled ? 'Disable naŭthenticity notifications' : 'Enable naŭthenticity notifications'}
+                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', color: notifEnabled ? '#58a6ff' : '#484f58' }}
+                        >
+                          {togglingNotifId === m.user.id
+                            ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                            : notifEnabled ? <Bell size={14} /> : <BellOff size={14} />}
+                        </button>
+                      );
+                    })()}
                     {m.role !== 'owner' && (
                       <button
                         onClick={() => handleRemove(m.user.id)}

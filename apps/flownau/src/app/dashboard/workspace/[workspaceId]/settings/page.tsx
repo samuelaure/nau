@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { Loader2, Users, Building2, UserPlus, Trash2, Copy, RefreshCw, Clock } from 'lucide-react'
+import { Loader2, Users, Building2, UserPlus, Trash2, Copy, RefreshCw, Clock, Bell, BellOff } from 'lucide-react'
 import { Card } from '@/modules/shared/components/ui/Card'
 import { Input } from '@/modules/shared/components/ui/Input'
 import { Button } from '@/modules/shared/components/ui/Button'
@@ -14,7 +14,9 @@ const ACCOUNTS_URL = process.env.NEXT_PUBLIC_ACCOUNTS_URL ?? 'https://accounts.9
 
 type Member = {
   id: string
+  userId: string
   role: string
+  notificationSettings: Record<string, boolean>
   user: { id: string; email: string; name: string | null }
 }
 
@@ -49,6 +51,7 @@ export default function WorkspaceSettingsPage() {
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
+  const [togglingNotifId, setTogglingNotifId] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -155,6 +158,29 @@ export default function WorkspaceSettingsPage() {
     }
   }
 
+  const handleToggleNotification = async (member: Member) => {
+    const enabled = member.notificationSettings?.flownau !== false
+    setTogglingNotifId(member.user.id)
+    try {
+      const res = await fetch(`/api/workspaces/${workspaceId}/members/${member.user.id}/notifications`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ app: 'flownau', enabled: !enabled }),
+      })
+      if (!res.ok) throw new Error()
+      setMembers((prev) => prev.map((m) =>
+        m.id === member.id
+          ? { ...m, notificationSettings: { ...m.notificationSettings, flownau: !enabled } }
+          : m
+      ))
+      toast.success(!enabled ? 'Notifications enabled' : 'Notifications disabled')
+    } catch {
+      toast.error('Failed to update notification settings')
+    } finally {
+      setTogglingNotifId(null)
+    }
+  }
+
   const handleCopyInviteLink = (token: string) => {
     const url = `${ACCOUNTS_URL}/register?invite=${token}`
     navigator.clipboard.writeText(url)
@@ -251,6 +277,21 @@ export default function WorkspaceSettingsPage() {
                   <span className="text-xs capitalize bg-gray-800 text-text-secondary px-2 py-0.5 rounded-full">
                     {m.role.toLowerCase()}
                   </span>
+                  {(canManage || m.user.id === currentUserId) && (() => {
+                    const notifEnabled = m.notificationSettings?.flownau !== false
+                    return (
+                      <button
+                        onClick={() => handleToggleNotification(m)}
+                        disabled={togglingNotifId === m.user.id}
+                        className={`transition-colors disabled:opacity-50 ${notifEnabled ? 'text-primary hover:text-text-secondary' : 'text-text-secondary hover:text-primary'}`}
+                        title={notifEnabled ? 'Disable flownaŭ notifications' : 'Enable flownaŭ notifications'}
+                      >
+                        {togglingNotifId === m.user.id
+                          ? <Loader2 size={14} className="animate-spin" />
+                          : notifEnabled ? <Bell size={14} /> : <BellOff size={14} />}
+                      </button>
+                    )
+                  })()}
                   {canManage && m.user.id !== currentUserId && m.role !== 'OWNER' && m.role !== 'owner' && (
                     <button
                       onClick={() => handleRemove(m)}

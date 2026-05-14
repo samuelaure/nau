@@ -56,7 +56,7 @@ async function notifyViaZazu(brandId: string, markdown: string): Promise<void> {
     if (!brand) return
     const apiUrl = process.env.NAU_API_URL || 'http://api:3000'
     const serviceToken = await signServiceToken({ iss: 'flownau', aud: '9nau-api', secret })
-    const targetRes = await fetch(`${apiUrl}/workspaces/_service/${brand.workspaceId}/notification-target`, {
+    const targetRes = await fetch(`${apiUrl}/workspaces/_service/${brand.workspaceId}/notification-target?app=flownau`, {
       headers: { Authorization: `Bearer ${serviceToken}` },
     })
     if (!targetRes.ok) return

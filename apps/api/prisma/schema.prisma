@@ -78,11 +78,12 @@ model Workspace {
 }
 
 model WorkspaceMember {
-  id          String        @id @default(cuid())
-  userId      String
-  workspaceId String
-  role        WorkspaceRole @default(OWNER)
-  createdAt   DateTime      @default(now())
+  id                   String        @id @default(cuid())
+  userId               String
+  workspaceId          String
+  role                 WorkspaceRole @default(OWNER)
+  notificationSettings Json          @default("{}")
+  createdAt            DateTime      @default(now())
 
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
