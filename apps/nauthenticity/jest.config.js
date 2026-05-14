@@ -26,6 +26,10 @@ module.exports = {
     '^node-cron$': '<rootDir>/src/__mocks__/empty-module.js',
     '^fastify$': '<rootDir>/src/__mocks__/empty-module.js',
     '^@fastify/(.*)$': '<rootDir>/src/__mocks__/empty-module.js',
+    '^jsdom$': '<rootDir>/src/__mocks__/empty-module.js',
+    '^@mozilla/readability$': '<rootDir>/src/__mocks__/empty-module.js',
+    '^youtube-transcript$': '<rootDir>/src/__mocks__/empty-module.js',
+    '^ytdl-core$': '<rootDir>/src/__mocks__/empty-module.js',
   },
   globals: {
     'ts-jest': {
