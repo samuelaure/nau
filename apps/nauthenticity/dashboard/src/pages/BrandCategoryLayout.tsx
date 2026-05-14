@@ -209,7 +209,8 @@ export const BrandCategoryLayout = ({
             {tabs.map(tab => (
               <NavLink
                 key={tab.key}
-                to={tab.key}
+                to={`../${tab.key}`}
+                relative="path"
                 style={({ isActive }) => ({
                   textDecoration: 'none',
                   color: isActive ? '#58a6ff' : '#8b949e',
