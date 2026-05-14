@@ -574,6 +574,46 @@ const handleTranscribeBatch = async (
   }
 };
 
+// Checks whether a profile has accumulated enough new synthesized posts to warrant
+// a soft-update of its ProfileSynthesis. Runs inline (no NestJS DI needed).
+const triggerProfileSynthesisSoftUpdate = async (socialProfileId: string): Promise<void> => {
+  const [existing, profile] = await Promise.all([
+    prisma.profileSynthesis.findUnique({ where: { socialProfileId } }),
+    prisma.socialProfile.findUnique({
+      where: { id: socialProfileId },
+      select: {
+        username: true,
+        synthesisTriggerThreshold: true,
+        _count: { select: { posts: { where: { postSynthesis: { not: null } } } } },
+      },
+    }),
+  ]);
+
+  if (!profile) return;
+
+  const postCount = profile._count.posts;
+  const threshold = profile.synthesisTriggerThreshold;
+
+  if (!existing) {
+    if (postCount < threshold) return;
+  } else {
+    const newSince = postCount - existing.postCountAtGeneration;
+    if (newSince < threshold) return;
+  }
+
+  // Threshold reached — generate profile synthesis via internal HTTP to keep DI out of worker
+  const authSecret = config.authSecret;
+  if (!authSecret) return;
+
+  const { signServiceToken } = await import('@nau/auth');
+  const token = await signServiceToken({ secret: authSecret, iss: 'nauthenticity-worker', aud: 'nauthenticity' });
+  const port = config.port ?? 3000;
+  await fetch(`http://localhost:${port}/api/v1/social-profiles/${socialProfileId}/synthesis/generate`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  }).catch(() => {});
+};
+
 const handleSynthesizeBatch = async (
   job: Job,
   runId: string,
@@ -584,7 +624,7 @@ const handleSynthesizeBatch = async (
 
   const posts = await prisma.post.findMany({
     where: { runId, postSynthesis: null },
-    select: { id: true, caption: true, transcripts: { select: { text: true }, take: 1 } },
+    select: { id: true, caption: true, socialProfileId: true, transcripts: { select: { text: true }, take: 1 } },
   });
 
   if (posts.length === 0) return;
@@ -632,6 +672,10 @@ const handleSynthesizeBatch = async (
         where: { id: post.id },
         data: { postSynthesis: result.content.trim() },
       });
+
+      if (post.socialProfileId) {
+        triggerProfileSynthesisSoftUpdate(post.socialProfileId).catch(() => {});
+      }
     } catch (err) {
       logger.error({ postId: post.id, err }, '[SYNTHESIZE] Failed to synthesize post');
     }

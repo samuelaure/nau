@@ -1,7 +1,9 @@
 import {
   Controller,
   Get,
+  Post,
   Put,
+  Patch,
   Param,
   Query,
   Body,
@@ -12,12 +14,17 @@ import {
 } from '@nestjs/common'
 import type { Response } from 'express'
 import { ContentService } from './content.service'
+import { ProfileSynthesisService } from './profile-synthesis.service'
 import { AnyAuthGuard } from '../auth/any-auth.guard'
+import { ServiceAuthGuard } from '../auth/service-auth.guard'
 
 @Controller()
 @UseGuards(AnyAuthGuard)
 export class ContentController {
-  constructor(private readonly contentService: ContentService) {}
+  constructor(
+    private readonly contentService: ContentService,
+    private readonly profileSynthesisService: ProfileSynthesisService,
+  ) {}
 
   @Get('brands/:brandId/owned-profiles')
   getOwnedProfiles(@Param('brandId') brandId: string) {
@@ -80,5 +87,26 @@ export class ContentController {
   searchPost(@Body() body: { query?: string; username?: string; limit?: number }) {
     if (!body.query) throw new BadRequestException('Query is required')
     return this.contentService.search(body.query, body.username, body.limit ?? 10)
+  }
+
+  // ── Profile Synthesis ──────────────────────────────────────────────────────
+
+  @Get('social-profiles/:id/synthesis')
+  getProfileSynthesis(@Param('id') id: string) {
+    return this.profileSynthesisService.getSynthesis(id)
+  }
+
+  @Post('social-profiles/:id/synthesis/generate')
+  @UseGuards(ServiceAuthGuard)
+  generateProfileSynthesis(@Param('id') id: string) {
+    return this.profileSynthesisService.generateForProfile(id)
+  }
+
+  @Patch('social-profiles/:id/synthesis/threshold')
+  updateSynthesisThreshold(
+    @Param('id') id: string,
+    @Body() body: { threshold: number },
+  ) {
+    return this.profileSynthesisService.updateThreshold(id, body.threshold)
   }
 }
