@@ -110,7 +110,12 @@ export class GroqClient implements LLMClient {
     throw new Error('Groq does not support embeddings. Use OpenAI for embedding operations.')
   }
 
-  async transcribe(_options: TranscriptionOptions): Promise<TranscriptionResult> {
-    throw new Error('Groq transcription is not supported via this client. Use OpenAI (Whisper).')
+  async transcribe(options: TranscriptionOptions): Promise<TranscriptionResult> {
+    const transcription = await this.client.audio.transcriptions.create({
+      file: options.file,
+      model: options.model,
+      language: options.language,
+    })
+    return { text: transcription.text }
   }
 }

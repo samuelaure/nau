@@ -85,6 +85,13 @@ export const MODEL_REGISTRY: Record<string, ModelDefinition> = {
     capabilities: ['transcription'],
     description: 'OpenAI Whisper — audio transcription',
   },
+  'groq/whisper-large-v3-turbo': {
+    id: 'groq/whisper-large-v3-turbo',
+    provider: 'groq',
+    apiModel: 'whisper-large-v3-turbo',
+    capabilities: ['transcription'],
+    description: 'Groq Whisper Large v3 Turbo — free tier, <1s latency',
+  },
   // ── Groq ──────────────────────────────────────────────────────────────────
   'groq/llama-3.3-70b': {
     id: 'groq/llama-3.3-70b',

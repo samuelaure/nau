@@ -52,7 +52,7 @@ const DEFAULT_FEATURE_MODELS: Record<LLMFeature, string> = {
   synthesis:           'openai/gpt-4o',
   benchmark:           'openai/gpt-4o-mini',
   embedding:           'openai/text-embedding-3-small',
-  transcription:       'openai/whisper-1',
+  transcription:       'groq/whisper-large-v3-turbo',
 }
 
 /** Convert a feature name to its env-var override key. */
