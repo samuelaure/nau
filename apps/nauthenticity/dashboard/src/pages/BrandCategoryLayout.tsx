@@ -362,7 +362,7 @@ export const BrandCategoryLayout = ({
 
 // ── Profiles Tab ──────────────────────────────────────────────────────────────
 
-const ProfilesTab = ({ profiles, onRemove, removing }: { profiles: any[]; onRemove: (id: string, label: string) => void; removing: string | null }) => {
+const ProfilesTab = ({ profiles, onRemove }: { profiles: any[]; onRemove: (id: string, label: string) => void; removing: string | null }) => {
   const navigate = useNavigate();
 
   if (profiles.length === 0) {
