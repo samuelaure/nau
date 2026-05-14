@@ -14,15 +14,16 @@ import { LoginDto, RegisterDto } from './auth.dto';
 const LINK_TOKEN_TTL_MS = 15 * 60 * 1000;
 
 async function notifyAdminNewUser(email: string, name?: string): Promise<void> {
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.ADMIN_TELEGRAM_CHAT_ID;
-  if (!botToken || !chatId) return;
+  const zazuUrl = process.env.ZAZU_INTERNAL_URL;
+  const secret = process.env.AUTH_SECRET;
+  if (!zazuUrl || !secret) return;
   const displayName = name ? `${name} (${email})` : email;
-  const text = `🎉 New user registered: ${displayName}`;
-  await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+  const { signServiceToken } = await import('@nau/auth');
+  const token = await signServiceToken({ iss: '9nau-api', aud: 'zazu', secret });
+  await fetch(`${zazuUrl}/api/internal/notify-admin`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text }),
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: `🎉 New user registered: ${displayName}` }),
   });
 }
 const ACCESS_TOKEN_TTL = '1h';
