@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, UnprocessableEntityException } from '@ne
 import { PrismaService } from '../prisma/prisma.service'
 import { getClientForFeature, reportUsage } from '@nau/llm-client'
 import { ConfigService } from '@nestjs/config'
-import { Prisma } from '@prisma/client'
+import { Prisma } from '../../../../node_modules/.prisma/client'
 import { z } from 'zod'
 
 const SourceConceptsOutputSchema = z.object({
