@@ -6,20 +6,19 @@ import { signServiceToken } from '@nau/auth'
 const ZAZU_URL = () => process.env.ZAZU_INTERNAL_URL || 'http://zazu:3000'
 const API_URL = () => process.env.NAU_API_URL || 'http://api:3000'
 
-async function resolveNauUserId(workspaceId: string): Promise<string | null> {
+async function resolveNauUserIds(workspaceId: string): Promise<string[]> {
   const secret = process.env.AUTH_SECRET
-  if (!secret) return null
+  if (!secret) return []
   try {
     const token = await signServiceToken({ iss: 'flownau', aud: '9nau-api', secret })
     const res = await fetch(`${API_URL()}/workspaces/_service/${workspaceId}/notification-target`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-    // Endpoint lives at /workspaces/_service/:id/notification-target
-    if (!res.ok) return null
-    const body = (await res.json()) as { nauUserId: string }
-    return body.nauUserId
+    if (!res.ok) return []
+    const body = (await res.json()) as { nauUserIds: string[] }
+    return body.nauUserIds ?? []
   } catch {
-    return null
+    return []
   }
 }
 
@@ -32,6 +31,15 @@ async function sendZazuNotification(nauUserId: string, type: string, payload: Re
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ nauUserId, type, ...payload }),
   })
+}
+
+async function notifyAllMembers(workspaceId: string, type: string, payload: Record<string, unknown>): Promise<void> {
+  const userIds = await resolveNauUserIds(workspaceId)
+  if (!userIds.length) {
+    logger.warn({ workspaceId }, '[ApprovalNotif] Could not resolve any nauUserIds')
+    return
+  }
+  await Promise.all(userIds.map(id => sendZazuNotification(id, type, payload).catch(err => logError('[ApprovalNotif] Failed to send notification', err))))
 }
 
 function calendarUrl(workspaceId: string, brandId: string): string {
@@ -87,11 +95,6 @@ export async function notifyTodayDigest(brandId: string): Promise<void> {
   if (pendingPosts.length === 0) return
 
   const brand = pendingPosts[0].brand
-  const nauUserId = await resolveNauUserId(brand.workspaceId)
-  if (!nauUserId) {
-    logger.warn({ brandId }, '[ApprovalNotif] Could not resolve nauUserId for today digest')
-    return
-  }
 
   const postLines = pendingPosts
     .map((p) => `• [Post ${formatTime(p.scheduledAt!)}](${postUrl(brand.workspaceId, p.id)})`)
@@ -99,11 +102,11 @@ export async function notifyTodayDigest(brandId: string): Promise<void> {
 
   const markdown = `📅 *${brand.name} — Today's Posts Need Approval*\n\n${postLines}\n\n[Go to Calendar](${calendarUrl(brand.workspaceId, brandId)})`
 
-  await sendZazuNotification(nauUserId, 'approval_digest_today', {
+  await notifyAllMembers(brand.workspaceId, 'approval_digest_today', {
     brandId,
     brandName: brand.name,
     markdown,
-  }).catch((err) => logError('[ApprovalNotif] Failed to send today digest', err))
+  })
 }
 
 // ─── Tomorrow digest ───────────────────────────────────────────────────────────
@@ -135,23 +138,17 @@ export async function notifyTomorrowDigest(brandId: string): Promise<void> {
   const acquired = await acquireLock(dedupKey, 24 * 60 * 60 * 1000)
   if (!acquired) return
 
-  const nauUserId = await resolveNauUserId(brand.workspaceId)
-  if (!nauUserId) {
-    logger.warn({ brandId }, '[ApprovalNotif] Could not resolve nauUserId for tomorrow digest')
-    return
-  }
-
   const postLines = pendingPosts
     .map((p) => `• [Post ${formatTime(p.scheduledAt!)}](${postUrl(brand.workspaceId, p.id)})`)
     .join('\n')
 
   const markdown = `🌅 *${brand.name} — Tomorrow's Posts Need Approval*\n\n${postLines}\n\n[Go to Calendar](${calendarUrl(brand.workspaceId, brandId)})`
 
-  await sendZazuNotification(nauUserId, 'approval_digest_tomorrow', {
+  await notifyAllMembers(brand.workspaceId, 'approval_digest_tomorrow', {
     brandId,
     brandName: brand.name,
     markdown,
-  }).catch((err) => logError('[ApprovalNotif] Failed to send tomorrow digest', err))
+  })
 }
 
 // ─── Next-in-line urgent ───────────────────────────────────────────────────────
@@ -177,15 +174,9 @@ export async function notifyNextInLine(brandId: string): Promise<void> {
   if (!acquired) return
 
   const brand = post.brand
-  const nauUserId = await resolveNauUserId(brand.workspaceId)
-  if (!nauUserId) {
-    logger.warn({ brandId, postId: post.id }, '[ApprovalNotif] Could not resolve nauUserId for next-in-line')
-    return
-  }
-
   const markdown = `⚠️ *${brand.name} — Post needs urgent approval*\n\nScheduled at *${formatTime(post.scheduledAt!)}* and still pending your review.\n\n[Approve Now](${postUrl(brand.workspaceId, post.id)}) · [Calendar](${calendarUrl(brand.workspaceId, brandId)})`
 
-  await sendZazuNotification(nauUserId, 'approval_next_in_line', {
+  await notifyAllMembers(brand.workspaceId, 'approval_next_in_line', {
     brandId,
     brandName: brand.name,
     postId: post.id,

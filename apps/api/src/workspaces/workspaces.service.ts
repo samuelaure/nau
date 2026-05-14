@@ -187,13 +187,13 @@ export class WorkspacesService {
     return this.prisma.workspaceMember.delete({ where: { id: member.id } });
   }
 
-  async getNotificationTarget(workspaceId: string): Promise<{ nauUserId: string }> {
-    const owner = await this.prisma.workspaceMember.findFirst({
-      where: { workspaceId, role: WorkspaceRole.OWNER },
+  async getNotificationTarget(workspaceId: string): Promise<{ nauUserIds: string[] }> {
+    const members = await this.prisma.workspaceMember.findMany({
+      where: { workspaceId },
       select: { userId: true },
     });
-    if (!owner) throw new NotFoundException('Workspace owner not found');
-    return { nauUserId: owner.userId };
+    if (!members.length) throw new NotFoundException('Workspace has no members');
+    return { nauUserIds: members.map(m => m.userId) };
   }
 
   async assertMembership(userId: string, workspaceId: string) {

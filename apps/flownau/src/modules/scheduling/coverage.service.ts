@@ -60,13 +60,15 @@ async function notifyViaZazu(brandId: string, markdown: string): Promise<void> {
       headers: { Authorization: `Bearer ${serviceToken}` },
     })
     if (!targetRes.ok) return
-    const { nauUserId } = (await targetRes.json()) as { nauUserId: string }
+    const { nauUserIds } = (await targetRes.json()) as { nauUserIds: string[] }
     const notifyToken = await signServiceToken({ iss: 'flownau', aud: 'zazu', secret })
-    await fetch(`${zazuUrl}/api/internal/notify`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${notifyToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nauUserId, type: 'calendar_fill_blocked', brandId, markdown }),
-    })
+    await Promise.all((nauUserIds ?? []).map(nauUserId =>
+      fetch(`${zazuUrl}/api/internal/notify`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${notifyToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nauUserId, type: 'calendar_fill_blocked', brandId, markdown }),
+      }).catch(() => { /* non-critical */ })
+    ))
   } catch {
     logger.warn({ brandId }, '[COVERAGE] Failed to send Zazŭ notification')
   }
