@@ -28,7 +28,7 @@ interface AccountScheduleProps {
 // reel templates also enable trial_reel slots in the chain.
 const FORMAT_EXPANSIONS: Record<string, string[]> = {
   reel: ['reel', 'trial_reel'],
-  head_talk: ['head_talk'],
+  head_talk: ['head_talk', 'trial_head_talk'],
   carousel: ['carousel'],
 }
 
@@ -36,6 +36,7 @@ const FORMAT_LABEL: Record<string, string> = {
   reel: 'Reel',
   trial_reel: 'Trial Reel',
   head_talk: 'Head Talk',
+  trial_head_talk: 'Trial Head Talk',
   carousel: 'Carousel',
 }
 
@@ -213,6 +214,7 @@ export default function AccountSchedule({ brandId, initialSchedule, initialAutoA
     reel: 'bg-accent/20 text-accent border-accent/30',
     trial_reel: 'bg-accent/10 text-accent/70 border-accent/20',
     head_talk: 'bg-violet-500/20 text-violet-300 border-violet-500/30',
+    trial_head_talk: 'bg-violet-500/10 text-violet-300/70 border-violet-500/20',
     carousel: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
   }
 
