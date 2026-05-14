@@ -2,7 +2,6 @@ import { Injectable, NotFoundException, UnprocessableEntityException } from '@ne
 import { PrismaService } from '../prisma/prisma.service'
 import { getClientForFeature, reportUsage } from '@nau/llm-client'
 import { ConfigService } from '@nestjs/config'
-import { Prisma } from '../../../../node_modules/.prisma/client'
 import { z } from 'zod'
 
 const SourceConceptsOutputSchema = z.object({
@@ -33,32 +32,23 @@ export class SourceConceptService {
 
     const recentPostIds = new Set(recentMemberships.map((m) => m.postId).filter(Boolean))
 
-    // Random selection: up to 20 random INSPO post memberships excluding already-selected
-    const randomMemberships: Array<{ postId: string; postSynthesis: string | null; caption: string | null }> =
-      recentPostIds.size > 0
-        ? await this.prisma.$queryRaw<Array<{ postId: string; postSynthesis: string | null; caption: string | null }>>`
-            SELECT cm."postId", p."postSynthesis", p.caption
-            FROM "CategoryMembership" cm
-            JOIN "Post" p ON p.id = cm."postId"
-            WHERE cm."brandId" = ${brandId}
-              AND cm.category = 'INSPO'
-              AND cm."isActive" = true
-              AND cm."postId" IS NOT NULL
-              AND cm."postId" NOT IN (${Prisma.join(Array.from(recentPostIds) as string[])})
-            ORDER BY RANDOM()
-            LIMIT 20
-          `
-        : await this.prisma.$queryRaw<Array<{ postId: string; postSynthesis: string | null; caption: string | null }>>`
-            SELECT cm."postId", p."postSynthesis", p.caption
-            FROM "CategoryMembership" cm
-            JOIN "Post" p ON p.id = cm."postId"
-            WHERE cm."brandId" = ${brandId}
-              AND cm.category = 'INSPO'
-              AND cm."isActive" = true
-              AND cm."postId" IS NOT NULL
-            ORDER BY RANDOM()
-            LIMIT 20
-          `
+    // Random selection: fetch all remaining INSPO post memberships excluding already-selected, shuffle in JS
+    const excludeIds = Array.from(recentPostIds) as string[]
+    const allOtherMemberships = await this.prisma.categoryMembership.findMany({
+      where: {
+        brandId,
+        category: 'INSPO',
+        isActive: true,
+        postId: excludeIds.length > 0 ? { notIn: excludeIds } : { not: null },
+      },
+      include: { post: { select: { id: true, postSynthesis: true, caption: true } } },
+    })
+    // Fisher-Yates shuffle then take 20
+    for (let i = allOtherMemberships.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [allOtherMemberships[i], allOtherMemberships[j]] = [allOtherMemberships[j], allOtherMemberships[i]]
+    }
+    const randomMemberships = allOtherMemberships.slice(0, 20)
 
     const profileMemberships = await this.prisma.categoryMembership.findMany({
       where: { brandId, category: 'INSPO', isActive: true, socialProfileId: { not: null } },
@@ -83,7 +73,8 @@ export class SourceConceptService {
       if (text) inspoLines.push(text)
     }
     for (const m of randomMemberships) {
-      const text = m.postSynthesis ?? m.caption
+      if (!m.post) continue
+      const text = m.post.postSynthesis ?? m.post.caption
       if (text) inspoLines.push(text)
     }
     for (const m of profileMemberships) {
