@@ -173,19 +173,82 @@ export class IntelligenceService {
 
     if (brandId && siblingCount === 0) {
       if (action === 'benchmark') {
-        // Move to Benchmark as the default holding category
         await this.prisma.categoryMembership.create({
           data: { brandId, socialProfileId, postId, category: 'BENCHMARK', isActive: true },
         })
       } else {
-        // Hard-delete the profile/post itself if no other brand holds it globally
-        if (socialProfileId) {
-          const globalCount = await this.prisma.categoryMembership.count({ where: { socialProfileId } })
-          if (globalCount === 0) await this.prisma.socialProfile.delete({ where: { id: socialProfileId } }).catch(() => {})
-        } else if (postId) {
-          const globalCount = await this.prisma.categoryMembership.count({ where: { postId } })
-          if (globalCount === 0) await this.prisma.post.delete({ where: { id: postId } }).catch(() => {})
-        }
+        // Soft-delete: move to Trash with 30-day TTL
+        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        await this.prisma.trashItem.create({
+          data: { brandId, socialProfileId, postId, originalCategory: membership.category, expiresAt },
+        })
+      }
+    }
+
+    return { success: true }
+  }
+
+  async getTrashItems(brandId: string) {
+    const now = new Date()
+    // Lazily expire items past their TTL on read
+    await this.prisma.trashItem.deleteMany({ where: { brandId, expiresAt: { lte: now } } })
+    return this.prisma.trashItem.findMany({
+      where: { brandId },
+      include: {
+        socialProfile: { select: { id: true, username: true, profileImageUrl: true, platform: true } },
+        post: { select: { id: true, url: true, username: true, media: { select: { storageUrl: true, thumbnailUrl: true, type: true }, take: 1 } } },
+      },
+      orderBy: { deletedAt: 'desc' },
+    })
+  }
+
+  async restoreTrashItem(id: string) {
+    const item = await this.prisma.trashItem.findUnique({ where: { id } })
+    if (!item) throw new NotFoundException('Trash item not found')
+
+    // Re-create the membership (upsert in case it was re-added while in trash)
+    const existing = await this.prisma.categoryMembership.findFirst({
+      where: {
+        brandId: item.brandId,
+        category: item.originalCategory,
+        socialProfileId: item.socialProfileId ?? undefined,
+        postId: item.postId ?? undefined,
+      },
+    })
+    if (!existing) {
+      await this.prisma.categoryMembership.create({
+        data: {
+          brandId: item.brandId,
+          socialProfileId: item.socialProfileId,
+          postId: item.postId,
+          category: item.originalCategory,
+          isActive: true,
+        },
+      })
+    }
+
+    await this.prisma.trashItem.delete({ where: { id } })
+    return { success: true }
+  }
+
+  async permanentlyDeleteTrashItem(id: string) {
+    const item = await this.prisma.trashItem.findUnique({ where: { id } })
+    if (!item) throw new NotFoundException('Trash item not found')
+
+    await this.prisma.trashItem.delete({ where: { id } })
+
+    // GC: hard-delete the entity if no brand holds it anywhere
+    if (item.socialProfileId) {
+      const membershipCount = await this.prisma.categoryMembership.count({ where: { socialProfileId: item.socialProfileId } })
+      const trashCount = await this.prisma.trashItem.count({ where: { socialProfileId: item.socialProfileId } })
+      if (membershipCount === 0 && trashCount === 0) {
+        await this.prisma.socialProfile.delete({ where: { id: item.socialProfileId } }).catch(() => {})
+      }
+    } else if (item.postId) {
+      const membershipCount = await this.prisma.categoryMembership.count({ where: { postId: item.postId } })
+      const trashCount = await this.prisma.trashItem.count({ where: { postId: item.postId } })
+      if (membershipCount === 0 && trashCount === 0) {
+        await this.prisma.post.delete({ where: { id: item.postId } }).catch(() => {})
       }
     }
 

@@ -152,6 +152,26 @@ export class IntelligenceController {
   }
 
   // -------------------------------------------------------------------------
+  // Trash
+  // -------------------------------------------------------------------------
+
+  @Get('trash')
+  getTrashItems(@Query('brandId') brandId?: string) {
+    if (!brandId) throw new BadRequestException('Missing brandId')
+    return this.intelligenceService.getTrashItems(brandId)
+  }
+
+  @Post('trash/:id/restore')
+  restoreTrashItem(@Param('id') id: string) {
+    return this.intelligenceService.restoreTrashItem(id)
+  }
+
+  @Delete('trash/:id')
+  permanentlyDeleteTrashItem(@Param('id') id: string) {
+    return this.intelligenceService.permanentlyDeleteTrashItem(id)
+  }
+
+  // -------------------------------------------------------------------------
   // Reactive comment generation and feedback
   // -------------------------------------------------------------------------
 

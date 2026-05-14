@@ -479,6 +479,31 @@ export const removeBrandTarget = async (membershipId: string, action: 'benchmark
   return data;
 };
 
+export const getTrashItems = async (brandId: string) => {
+  const { data } = await api.get(`/trash?brandId=${brandId}`);
+  return data as TrashItem[];
+};
+
+export const restoreTrashItem = async (id: string) => {
+  const { data } = await api.post(`/trash/${id}/restore`);
+  return data;
+};
+
+export const permanentlyDeleteTrashItem = async (id: string) => {
+  const { data } = await api.delete(`/trash/${id}`);
+  return data;
+};
+
+export interface TrashItem {
+  id: string;
+  brandId: string;
+  originalCategory: string;
+  deletedAt: string;
+  expiresAt: string;
+  socialProfile?: { id: string; username: string; profileImageUrl: string | null; platform: string } | null;
+  post?: { id: string; url: string; username: string | null; media: { storageUrl: string | null; thumbnailUrl: string | null; type: string }[] } | null;
+}
+
 export const updateBrandTarget = async (
   id: string,
   updates: { isActive?: boolean; autoUpdate?: boolean; initialDownloadCount?: number },

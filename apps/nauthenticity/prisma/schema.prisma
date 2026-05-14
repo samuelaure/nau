@@ -36,6 +36,7 @@ model SocialProfile {
   profileSynthesis       ProfileSynthesis?
   profileSynthesisHistory ProfileSynthesisHistory[]
   sourceConceptSources   SourceConceptSource[]
+  trashItems             TrashItem[]
 
   @@unique([platform, username])
   @@index([platform, username])
@@ -84,6 +85,7 @@ model Post {
   feedbacks            CommentFeedback[]
   categoryMemberships  CategoryMembership[]
   sourceConceptSources SourceConceptSource[]
+  trashItems           TrashItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -223,6 +225,7 @@ model Brand {
   voicenotes          Voicenote[]
   context             BrandContext?
   feedbacks           CommentFeedback[]
+  trashItems          TrashItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -369,5 +372,21 @@ model CommentFeedback {
   sentAt DateTime @default(now())
 
   @@index([brandId])
+}
+
+model TrashItem {
+  id               String         @id @default(uuid())
+  brandId          String
+  brand            Brand          @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  socialProfileId  String?
+  socialProfile    SocialProfile? @relation(fields: [socialProfileId], references: [id], onDelete: Cascade)
+  postId           String?
+  post             Post?          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  originalCategory String
+  deletedAt        DateTime       @default(now())
+  expiresAt        DateTime
+
+  @@index([brandId])
+  @@index([expiresAt])
 }
 

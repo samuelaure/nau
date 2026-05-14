@@ -17,6 +17,7 @@ import {
   Video,
   Building2,
   Settings,
+  Trash2,
 } from 'lucide-react';
 
 type Workspace = { id: string; name: string };
@@ -215,6 +216,7 @@ export function Sidebar() {
               { label: 'Comments', to: `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}/comments`, icon: MessageSquare },
               { label: 'Benchmark', to: `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}/benchmark`, icon: BarChart2 },
               { label: 'Settings', to: `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}/settings`, icon: Settings },
+              { label: 'Trash', to: `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}/trash`, icon: Trash2 },
             ].map(({ label, to, icon: Icon }) => (
               <Link key={to} to={to} className={`sidebar-link${isActive(to) ? ' sidebar-link--active' : ''}`}>
                 <Icon size={17} />{label}
