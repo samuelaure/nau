@@ -208,8 +208,6 @@ model Brand {
   id                           String        @id // = flownau Brand.id = API Brand.id
   workspaceId                  String        @default("")
   mainUsername                 String?
-  voicePrompt                  String?
-  commentStrategy              String?
   commentPrompt                String?
   suggestionsCount             Int           @default(3)
   windowStart                  String?
