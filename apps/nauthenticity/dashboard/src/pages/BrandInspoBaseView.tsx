@@ -1,12 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { getInspoDigest, getVoicenotes } from '../lib/api';
-import { Sparkles, RefreshCw, ExternalLink } from 'lucide-react';
+import { Sparkles, RefreshCw, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { BrandCategoryLayout } from './BrandCategoryLayout';
 
 export const BrandInspoBaseView = () => {
   const { brandId } = useParams<{ brandId: string }>();
+  const [showSynthesis, setShowSynthesis] = useState(false);
 
   const { data: digest, isFetching: fetchingDigest, refetch: refetchDigest } = useQuery({
     queryKey: ['inspo-digest', brandId],
@@ -28,7 +30,30 @@ export const BrandInspoBaseView = () => {
       icon={<Sparkles size={28} style={{ color: '#d29922' }} />}
       accentColor="#d29922"
       description="Profiles and posts that fuel your brand's creative direction."
-      extraHeaderContent={<SynthesisSection digest={digest} fetching={fetchingDigest} onRefetch={refetchDigest} />}
+      extraActionButtons={
+        <button
+          onClick={() => setShowSynthesis(v => !v)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '0.4rem',
+            padding: '0.5rem 1rem', fontSize: '0.9rem',
+            background: showSynthesis ? 'rgba(210,153,34,0.15)' : 'rgba(255,255,255,0.05)',
+            color: showSynthesis ? '#d29922' : '#8b949e',
+            border: `1px solid ${showSynthesis ? 'rgba(210,153,34,0.4)' : 'var(--border)'}`,
+            borderRadius: '6px', cursor: 'pointer', transition: 'all 0.15s',
+          }}
+        >
+          <Sparkles size={14} />
+          Creative Direction
+          {showSynthesis ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </button>
+      }
+      headerPanelContent={showSynthesis ? (
+        <SynthesisPanel
+          digest={digest}
+          fetching={fetchingDigest}
+          onRefetch={refetchDigest}
+        />
+      ) : null}
       extraTabs={[
         {
           key: 'voicenotes',
@@ -40,7 +65,7 @@ export const BrandInspoBaseView = () => {
   );
 };
 
-const SynthesisSection = ({
+const SynthesisPanel = ({
   digest,
   fetching,
   onRefetch,
@@ -49,33 +74,34 @@ const SynthesisSection = ({
   fetching: boolean;
   onRefetch: () => void;
 }) => (
-  <section style={{ marginBottom: '2rem' }}>
+  <div style={{ background: 'var(--card-bg)', border: '1px solid rgba(210,153,34,0.3)', borderRadius: '12px', padding: '1.5rem' }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#c9d1d9' }}>
-        <Sparkles size={18} style={{ color: '#d29922' }} />
-        <h2 style={{ fontSize: '1.25rem', margin: 0, border: 'none' }}>Current Creative Direction</h2>
-      </div>
+      <span style={{ fontSize: '0.85rem', color: '#8b949e', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        Current Creative Direction
+      </span>
       <button
         onClick={onRefetch}
         disabled={fetching}
-        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.9rem', background: 'rgba(88, 166, 255, 0.1)', color: '#58a6ff', border: '1px solid rgba(88, 166, 255, 0.3)', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}
+        style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.8rem', background: 'rgba(88,166,255,0.1)', color: '#58a6ff', border: '1px solid rgba(88,166,255,0.3)', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
       >
-        <RefreshCw size={14} className={fetching ? 'spin' : ''} />
-        {fetching ? 'Synthesizing...' : 'Trigger Synthesis'}
+        <RefreshCw size={12} className={fetching ? 'spin' : ''} />
+        {fetching ? 'Synthesizing…' : 'Re-generate'}
       </button>
     </div>
 
     {digest ? (
-      <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: '12px', padding: '1.5rem', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: 'linear-gradient(to bottom, #d29922, #58a6ff)' }} />
-        <p style={{ lineHeight: '1.6', fontSize: '1.05rem', color: '#f0f6fc', whiteSpace: 'pre-wrap', margin: 0 }}>{digest.content}</p>
+      <div style={{ position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, width: '3px', height: '100%', background: 'linear-gradient(to bottom, #d29922, #58a6ff)', borderRadius: '2px' }} />
+        <p style={{ paddingLeft: '1rem', lineHeight: '1.6', fontSize: '1rem', color: '#f0f6fc', whiteSpace: 'pre-wrap', margin: 0 }}>
+          {digest.content}
+        </p>
         {digest.attachedUrls?.length > 0 && (
-          <div style={{ marginTop: '1.5rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
-            <span style={{ fontSize: '0.8rem', color: '#8b949e', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Top Influences</span>
-            <div style={{ display: 'flex', gap: '8px', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+          <div style={{ paddingLeft: '1rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+            <span style={{ fontSize: '0.75rem', color: '#8b949e', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Top Influences</span>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '0.4rem', flexWrap: 'wrap' }}>
               {digest.attachedUrls.map((url: string) => (
-                <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.85rem', color: '#58a6ff', textDecoration: 'none', background: 'rgba(88, 166, 255, 0.1)', padding: '4px 10px', borderRadius: '100px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <ExternalLink size={12} />
+                <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.8rem', color: '#58a6ff', textDecoration: 'none', background: 'rgba(88,166,255,0.1)', padding: '3px 10px', borderRadius: '100px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <ExternalLink size={11} />
                   {url.split('/p/')[1]?.split('/')[0] || 'View Post'}
                 </a>
               ))}
@@ -84,11 +110,11 @@ const SynthesisSection = ({
         )}
       </div>
     ) : (
-      <div style={{ padding: '2rem', textAlign: 'center', color: '#8b949e', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px dashed var(--border)' }}>
-        No synthesis generated yet. Add some inspo items and trigger one.
-      </div>
+      <p style={{ margin: 0, color: '#8b949e', fontSize: '0.9rem' }}>
+        No synthesis generated yet. Add inspo items first, then hit Re-generate.
+      </p>
     )}
-  </section>
+  </div>
 );
 
 const VoicenotesTab = ({ voicenotes, loading }: { voicenotes: any[]; loading: boolean }) => {
