@@ -16,6 +16,7 @@ enum OnboardingState {
 enum Role {
   USER
   ASSISTANT
+  ADMIN
 }
 
 model User {
@@ -31,8 +32,9 @@ model User {
   features         UserFeature[]
   voicenotes       Voicenote[]
   deliveryWindow   DeliveryWindow?
-  notifications    NotificationQueue[]
-  createdAt        DateTime        @default(now())
+  notifications              NotificationQueue[]
+  forwardNotificationsToAdmin Boolean           @default(false)
+  createdAt                  DateTime           @default(now())
 }
 
 model Message {
@@ -82,6 +84,13 @@ model Voicenote {
   createdAt          DateTime @default(now())
 
   @@index([userId])
+}
+
+model Broadcast {
+  id        String   @id @default(uuid())
+  message   String
+  sentCount Int      @default(0)
+  createdAt DateTime @default(now())
 }
 
 model NotificationQueue {
