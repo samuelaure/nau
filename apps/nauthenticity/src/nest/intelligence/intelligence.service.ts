@@ -5,6 +5,8 @@ import { generateReactiveComments } from '../../modules/proactive/reactive.servi
 import { scrapePostByUrl } from '../../services/apify.service'
 import { downloadQueue } from '../../queues/download.queue'
 import { upsertSocialProfile } from '../../modules/shared/upsert-social-profile'
+import { extractVideoId, fetchYoutubeMetadata } from '../../services/youtube-ingest.service'
+import { computeQueue } from '../../queues/compute.queue'
 
 export type Category = 'COMMENT' | 'INSPO' | 'BENCHMARK'
 export const CATEGORIES: readonly Category[] = ['COMMENT', 'INSPO', 'BENCHMARK'] as const
@@ -155,7 +157,7 @@ export class IntelligenceService {
     const membership = await this.prisma.categoryMembership.findUnique({ where: { id } })
     if (!membership) return { success: true }
 
-    const { brandId, socialProfileId, postId } = membership
+    const { brandId, socialProfileId, postId, youtubeVideoId, blogPostId } = membership
 
     // Check if this is the last membership for this brand+entity before deleting
     const siblingCount = brandId
@@ -172,7 +174,7 @@ export class IntelligenceService {
     await this.prisma.categoryMembership.delete({ where: { id } })
 
     if (brandId && siblingCount === 0) {
-      if (action === 'benchmark') {
+      if (action === 'benchmark' && !youtubeVideoId && !blogPostId) {
         await this.prisma.categoryMembership.create({
           data: { brandId, socialProfileId, postId, category: 'BENCHMARK', isActive: true },
         })
@@ -180,7 +182,7 @@ export class IntelligenceService {
         // Soft-delete: move to Trash with 30-day TTL
         const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
         await this.prisma.trashItem.create({
-          data: { brandId, socialProfileId, postId, originalCategory: membership.category, expiresAt },
+          data: { brandId, socialProfileId, postId, youtubeVideoId, blogPostId, originalCategory: membership.category, expiresAt },
         })
       }
     }
@@ -197,6 +199,8 @@ export class IntelligenceService {
       include: {
         socialProfile: { select: { id: true, username: true, profileImageUrl: true, platform: true } },
         post: { select: { id: true, url: true, username: true, media: { select: { storageUrl: true, thumbnailUrl: true, type: true }, take: 1 } } },
+        youtubeVideo: { select: { id: true, url: true, title: true, channelName: true, videoId: true } },
+        blogPost: { select: { id: true, url: true, title: true, author: true } },
       },
       orderBy: { deletedAt: 'desc' },
     })
@@ -213,6 +217,8 @@ export class IntelligenceService {
         category: item.originalCategory,
         socialProfileId: item.socialProfileId ?? undefined,
         postId: item.postId ?? undefined,
+        youtubeVideoId: item.youtubeVideoId ?? undefined,
+        blogPostId: item.blogPostId ?? undefined,
       },
     })
     if (!existing) {
@@ -221,6 +227,8 @@ export class IntelligenceService {
           brandId: item.brandId,
           socialProfileId: item.socialProfileId,
           postId: item.postId,
+          youtubeVideoId: item.youtubeVideoId,
+          blogPostId: item.blogPostId,
           category: item.originalCategory,
           isActive: true,
         },
@@ -249,6 +257,18 @@ export class IntelligenceService {
       const trashCount = await this.prisma.trashItem.count({ where: { postId: item.postId } })
       if (membershipCount === 0 && trashCount === 0) {
         await this.prisma.post.delete({ where: { id: item.postId } }).catch(() => {})
+      }
+    } else if (item.youtubeVideoId) {
+      const membershipCount = await this.prisma.categoryMembership.count({ where: { youtubeVideoId: item.youtubeVideoId } })
+      const trashCount = await this.prisma.trashItem.count({ where: { youtubeVideoId: item.youtubeVideoId } })
+      if (membershipCount === 0 && trashCount === 0) {
+        await this.prisma.youtubeVideo.delete({ where: { id: item.youtubeVideoId } }).catch(() => {})
+      }
+    } else if (item.blogPostId) {
+      const membershipCount = await this.prisma.categoryMembership.count({ where: { blogPostId: item.blogPostId } })
+      const trashCount = await this.prisma.trashItem.count({ where: { blogPostId: item.blogPostId } })
+      if (membershipCount === 0 && trashCount === 0) {
+        await this.prisma.blogPost.delete({ where: { id: item.blogPostId } }).catch(() => {})
       }
     }
 
@@ -379,6 +399,77 @@ export class IntelligenceService {
     }
 
     return { success: true, postId, reused: !!existing }
+  }
+
+  async addInspoUrl(brandId: string, url: string) {
+    const videoId = extractVideoId(url)
+
+    if (videoId) {
+      const meta = await fetchYoutubeMetadata(videoId)
+      const video = await this.prisma.youtubeVideo.upsert({
+        where: { brandId_videoId: { brandId, videoId } },
+        create: {
+          brandId,
+          url,
+          videoId,
+          title: meta.title,
+          channelName: meta.channelName,
+          durationSeconds: meta.durationSeconds,
+          status: 'pending',
+        },
+        update: {},
+      })
+
+      const existing = await this.prisma.categoryMembership.findFirst({
+        where: { brandId, youtubeVideoId: video.id, category: 'INSPO' },
+      })
+      if (!existing) {
+        await this.prisma.categoryMembership.create({
+          data: { brandId, youtubeVideoId: video.id, category: 'INSPO', isActive: true },
+        })
+      }
+
+      await computeQueue.add('youtube-ingest', { youtubeVideoId: video.id })
+      return { type: 'youtube' as const, id: video.id, status: video.status }
+    }
+
+    // Blog path
+    const normalizedUrl = url.split('?')[0].replace(/\/$/, '')
+    const post = await this.prisma.blogPost.upsert({
+      where: { brandId_url: { brandId, url: normalizedUrl } },
+      create: { brandId, url: normalizedUrl, status: 'pending' },
+      update: {},
+    })
+
+    const existing = await this.prisma.categoryMembership.findFirst({
+      where: { brandId, blogPostId: post.id, category: 'INSPO' },
+    })
+    if (!existing) {
+      await this.prisma.categoryMembership.create({
+        data: { brandId, blogPostId: post.id, category: 'INSPO', isActive: true },
+      })
+    }
+
+    await computeQueue.add('blog-ingest', { blogPostId: post.id })
+    return { type: 'blog' as const, id: post.id, status: post.status }
+  }
+
+  async getYoutubeVideos(brandId: string) {
+    const memberships = await this.prisma.categoryMembership.findMany({
+      where: { brandId, category: 'INSPO', isActive: true, youtubeVideoId: { not: null } },
+      include: { youtubeVideo: true },
+      orderBy: { createdAt: 'desc' },
+    })
+    return memberships.map((m) => ({ membershipId: m.id, ...m.youtubeVideo! }))
+  }
+
+  async getBlogPosts(brandId: string) {
+    const memberships = await this.prisma.categoryMembership.findMany({
+      where: { brandId, category: 'INSPO', isActive: true, blogPostId: { not: null } },
+      include: { blogPost: true },
+      orderBy: { createdAt: 'desc' },
+    })
+    return memberships.map((m) => ({ membershipId: m.id, ...m.blogPost! }))
   }
 
   /**

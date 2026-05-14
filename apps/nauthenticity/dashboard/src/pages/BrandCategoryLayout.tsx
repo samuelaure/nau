@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation, Routes, Route, Navigate, NavLink } from 'react-router-dom';
-import { getBrandTargets, addBrandTarget, capturePostByUrl, removeBrandTarget, getAccount, getProfileImageUrl, type Post } from '../lib/api';
+import { getBrandTargets, addBrandTarget, capturePostByUrl, removeBrandTarget, addInspoUrl, getAccount, getProfileImageUrl, type Post } from '../lib/api';
 import { Plus, ArrowLeft, X, Trash2, AlertTriangle } from 'lucide-react';
 import { SocialProfileCard } from '../components/SocialProfileCard';
 import { PostGrid } from '../components/PostGrid';
@@ -24,8 +24,10 @@ interface BrandCategoryLayoutProps {
   extraTabs?: ExtraTab[];
 }
 
-function detectInputType(input: string): 'post' | 'profile' {
+function detectInputType(input: string): 'post' | 'profile' | 'youtube' | 'blog' {
   const s = input.trim();
+  if (/(?:youtube\.com\/watch|youtu\.be\/|youtube\.com\/shorts\/)/.test(s)) return 'youtube';
+  if (s.startsWith('http') && !s.includes('instagram.com')) return 'blog';
   return s.includes('/p/') || s.includes('/reel/') ? 'post' : 'profile';
 }
 
@@ -80,6 +82,16 @@ export const BrandCategoryLayout = ({
     },
   });
 
+  const addInspoUrlMutation = useMutation({
+    mutationFn: (url: string) => addInspoUrl(brandId!, url),
+    onSuccess: () => {
+      setInput('');
+      setModalOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['inspo-youtube', brandId] });
+      queryClient.invalidateQueries({ queryKey: ['inspo-blog', brandId] });
+    },
+  });
+
   const handleRemove = useCallback(async (membershipId: string, label: string) => {
     // Check if this is the last category for this profile/post
     const allMemberships: any[] = memberships ?? [];
@@ -108,18 +120,22 @@ export const BrandCategoryLayout = ({
     }
   }, [memberships, queryClient, queryKey]);
 
-  const isPending = addUsernameMutation.isPending || addPostUrlMutation.isPending;
-  const isError = addUsernameMutation.isError || addPostUrlMutation.isError;
+  const isPending = addUsernameMutation.isPending || addPostUrlMutation.isPending || addInspoUrlMutation.isPending;
+  const isError = addUsernameMutation.isError || addPostUrlMutation.isError || addInspoUrlMutation.isError;
   const errorMsg =
     (addUsernameMutation.error as any)?.response?.data?.message ||
     (addPostUrlMutation.error as any)?.response?.data?.message ||
+    (addInspoUrlMutation.error as any)?.response?.data?.message ||
     'Failed to add. Check the URL and try again.';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const value = input.trim();
     if (!value || !brandId) return;
-    if (detectInputType(value) === 'post') {
+    const type = detectInputType(value);
+    if (type === 'youtube' || type === 'blog') {
+      addInspoUrlMutation.mutate(value);
+    } else if (type === 'post') {
       addPostUrlMutation.mutate(value);
     } else {
       let clean = value;
@@ -137,6 +153,7 @@ export const BrandCategoryLayout = ({
       setInput('');
       addUsernameMutation.reset();
       addPostUrlMutation.reset();
+      addInspoUrlMutation.reset();
     }
   }, [modalOpen]);
 
@@ -314,7 +331,7 @@ export const BrandCategoryLayout = ({
             </div>
 
             <p style={{ margin: 0, color: '#8b949e', fontSize: '0.9rem', lineHeight: '1.5' }}>
-              Paste an Instagram profile URL, @username, or post/reel URL. We'll detect which one it is automatically.
+              Paste an Instagram profile, post, YouTube video, or blog URL. We'll detect the type automatically.
             </p>
 
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -324,18 +341,18 @@ export const BrandCategoryLayout = ({
                   type="text"
                   value={input}
                   onChange={e => setInput(e.target.value)}
-                  placeholder="@username, profile URL, or post URL"
+                  placeholder="@username, Instagram URL, YouTube URL, or blog URL"
                   style={{ width: '100%', padding: '0.75rem 1rem', background: 'rgba(0,0,0,0.25)', border: '1px solid var(--border)', color: 'white', borderRadius: '8px', fontSize: '1rem', boxSizing: 'border-box' }}
                 />
                 {inputType && (
                   <span style={{
                     position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
                     fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em',
-                    color: inputType === 'post' ? '#a371f7' : '#3fb950',
-                    background: inputType === 'post' ? 'rgba(163,113,247,0.15)' : 'rgba(63,185,80,0.15)',
+                    color: inputType === 'post' ? '#a371f7' : inputType === 'youtube' ? '#ff4444' : inputType === 'blog' ? '#e3b341' : '#3fb950',
+                    background: inputType === 'post' ? 'rgba(163,113,247,0.15)' : inputType === 'youtube' ? 'rgba(255,68,68,0.15)' : inputType === 'blog' ? 'rgba(227,179,65,0.15)' : 'rgba(63,185,80,0.15)',
                     padding: '2px 8px', borderRadius: '100px',
                   }}>
-                    {inputType === 'post' ? 'Post' : 'Profile'}
+                    {inputType === 'post' ? 'Post' : inputType === 'youtube' ? 'YouTube' : inputType === 'blog' ? 'Blog' : 'Profile'}
                   </span>
                 )}
               </div>
@@ -350,7 +367,7 @@ export const BrandCategoryLayout = ({
                 disabled={isPending || !input.trim()}
                 style={{ padding: '0.75rem', fontSize: '0.95rem', fontWeight: 600 }}
               >
-                {isPending ? 'Adding...' : `Add ${inputType === 'post' ? 'Post' : 'Profile'}`}
+                {isPending ? 'Adding...' : inputType === 'post' ? 'Add Post' : inputType === 'youtube' ? 'Add YouTube Video' : inputType === 'blog' ? 'Add Blog Post' : 'Add Profile'}
               </button>
             </form>
           </div>

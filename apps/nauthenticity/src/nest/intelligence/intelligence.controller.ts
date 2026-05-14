@@ -172,6 +172,26 @@ export class IntelligenceController {
   }
 
   // -------------------------------------------------------------------------
+  // InspoBase URL ingestion (YouTube + Blog)
+  // -------------------------------------------------------------------------
+
+  @Post('brands/:brandId/inspo/url')
+  addInspoUrl(@Param('brandId') brandId: string, @Body() body: { url?: string }) {
+    if (!body.url) throw new BadRequestException('url is required')
+    return this.intelligenceService.addInspoUrl(brandId, body.url)
+  }
+
+  @Get('brands/:brandId/inspo/youtube')
+  getYoutubeVideos(@Param('brandId') brandId: string) {
+    return this.intelligenceService.getYoutubeVideos(brandId)
+  }
+
+  @Get('brands/:brandId/inspo/blog')
+  getBlogPosts(@Param('brandId') brandId: string) {
+    return this.intelligenceService.getBlogPosts(brandId)
+  }
+
+  // -------------------------------------------------------------------------
   // Reactive comment generation and feedback
   // -------------------------------------------------------------------------
 

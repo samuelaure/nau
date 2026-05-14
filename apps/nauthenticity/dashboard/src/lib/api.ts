@@ -418,6 +418,21 @@ export const getVoicenotes = async (brandId: string) => {
   return data;
 };
 
+export const addInspoUrl = async (brandId: string, url: string) => {
+  const { data } = await api.post(`/brands/${brandId}/inspo/url`, { url });
+  return data;
+};
+
+export const getYoutubeVideos = async (brandId: string) => {
+  const { data } = await api.get(`/brands/${brandId}/inspo/youtube`);
+  return data as Array<{ id: string; membershipId: string; videoId: string; url: string; title: string | null; channelName: string | null; durationSeconds: number | null; status: string; failureReason: string | null; createdAt: string }>;
+};
+
+export const getBlogPosts = async (brandId: string) => {
+  const { data } = await api.get(`/brands/${brandId}/inspo/blog`);
+  return data as Array<{ id: string; membershipId: string; url: string; title: string | null; author: string | null; status: string; failureReason: string | null; createdAt: string }>;
+};
+
 export const getInspoDigest = async (brandId: string) => {
   const { data } = await api.get(`/brands/${brandId}/inspo/digest`);
   return data;
