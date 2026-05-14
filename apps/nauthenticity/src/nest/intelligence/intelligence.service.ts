@@ -307,8 +307,11 @@ export class IntelligenceService {
   ) {
     const ownerFilter = 'brandId' in owner ? { brandId: owner.brandId } : { projectId: owner.projectId }
     return this.prisma.categoryMembership.findMany({
-      where: { ...ownerFilter, category: category ?? undefined, socialProfileId: { not: null } },
-      include: { socialProfile: { include: { _count: { select: { posts: true } } } } },
+      where: { ...ownerFilter, category: category ?? undefined },
+      include: {
+        socialProfile: { include: { _count: { select: { posts: true } } } },
+        post: { select: { id: true, url: true, caption: true, postedAt: true } },
+      },
       orderBy: { createdAt: 'desc' },
     })
   }

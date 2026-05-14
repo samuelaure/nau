@@ -1,27 +1,36 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { getBrandTargets, addBrandTarget, updateBrandTarget, getAccount } from '../lib/api';
-import { Plus, ChevronRight, Activity, Eye, EyeOff } from 'lucide-react';
-import { PostGrid } from '../components/PostGrid';
+import { getBrandTargets, addBrandTarget, updateBrandTarget, capturePostByUrl } from '../lib/api';
+import { Activity, Plus, User, Link as LinkIcon, ExternalLink, Eye, EyeOff } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 
 export const BrandCommentView = () => {
   const { brandId } = useParams<{ brandId: string }>();
   const queryClient = useQueryClient();
-  const [newUsername, setNewUsername] = useState('');
-  const [selectedUsername, setSelectedUsername] = useState<string | null>(null);
+  const [usernameInput, setUsernameInput] = useState('');
+  const [postUrlInput, setPostUrlInput] = useState('');
 
-  const { data: targets, isLoading } = useQuery({
-    queryKey: ['targets', brandId, 'monitored'],
+  const { data: memberships, isLoading } = useQuery({
+    queryKey: ['targets', brandId, 'COMMENT'],
     queryFn: () => getBrandTargets(brandId!, 'monitored'),
     enabled: !!brandId,
   });
 
-  const addMutation = useMutation({
-    mutationFn: addBrandTarget,
+  const addUsernameMutation = useMutation({
+    mutationFn: (username: string) =>
+      addBrandTarget({ brandId: brandId!, username, targetType: 'monitored', isActive: true }),
     onSuccess: () => {
-      setNewUsername('');
-      queryClient.invalidateQueries({ queryKey: ['targets', brandId, 'monitored'] });
+      setUsernameInput('');
+      queryClient.invalidateQueries({ queryKey: ['targets', brandId, 'COMMENT'] });
+    },
+  });
+
+  const addPostUrlMutation = useMutation({
+    mutationFn: (postUrl: string) => capturePostByUrl(brandId!, postUrl, 'COMMENT'),
+    onSuccess: () => {
+      setPostUrlInput('');
+      queryClient.invalidateQueries({ queryKey: ['targets', brandId, 'COMMENT'] });
     },
   });
 
@@ -29,177 +38,215 @@ export const BrandCommentView = () => {
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
       updateBrandTarget(id, { isActive }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['targets', brandId, 'monitored'] });
+      queryClient.invalidateQueries({ queryKey: ['targets', brandId, 'COMMENT'] });
     },
   });
 
-  const handleAddSubmit = (e: React.FormEvent) => {
+  const handleAddUsername = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUsername.trim() || !brandId) return;
-    let cleanUsername = newUsername.trim();
-    if (cleanUsername.includes('instagram.com/')) {
-      cleanUsername = cleanUsername.split('instagram.com/')[1].split('/')[0];
-    }
-    if (cleanUsername.startsWith('@')) cleanUsername = cleanUsername.slice(1);
-    addMutation.mutate({ brandId, username: cleanUsername, targetType: 'monitored', isActive: true });
+    let clean = usernameInput.trim();
+    if (clean.includes('instagram.com/')) clean = clean.split('instagram.com/')[1].split('/')[0];
+    if (clean.startsWith('@')) clean = clean.slice(1);
+    if (!clean || !brandId) return;
+    addUsernameMutation.mutate(clean);
   };
 
-  if (isLoading) return <div>Loading Monitored Profiles...</div>;
+  const handleAddPostUrl = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!postUrlInput.trim() || !brandId) return;
+    addPostUrlMutation.mutate(postUrlInput.trim());
+  };
+
+  if (isLoading) return <div>Loading Comments...</div>;
+
+  const profileMemberships = (memberships ?? []).filter((m: any) => m.socialProfile);
+  const postMemberships = (memberships ?? []).filter((m: any) => m.post);
 
   return (
     <div className="fade-in">
-      {selectedUsername ? (
-        <MonitoredProfileViewer
-          username={selectedUsername}
-          onBack={() => setSelectedUsername(null)}
-        />
-      ) : (
-        <>
-          <div style={{ marginBottom: '2rem' }}>
-            <h1 style={{ margin: 0, fontSize: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Activity size={28} style={{ color: '#3fb950' }} /> Comments
-            </h1>
-            <p style={{ color: '#8b949e', margin: '0.5rem 0 0 0' }}>
-              Profiles monitored for proactive comment generation.
-            </p>
-          </div>
-
-          <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', padding: '1.5rem', borderRadius: '12px', marginBottom: '2rem' }}>
-            <h3 style={{ margin: '0 0 1rem 0' }}>Add Monitored Profile</h3>
-            <form onSubmit={handleAddSubmit} style={{ display: 'flex', gap: '0.5rem' }}>
-              <input
-                type="text"
-                value={newUsername}
-                onChange={(e) => setNewUsername(e.target.value)}
-                placeholder="@username or Instagram URL"
-                style={{
-                  background: 'rgba(0,0,0,0.2)',
-                  border: '1px solid var(--border)',
-                  color: 'white',
-                  padding: '0.6rem 1rem',
-                  borderRadius: '6px',
-                  flexGrow: 1,
-                  maxWidth: '400px',
-                }}
-              />
-              <button
-                type="submit"
-                className="btn-primary"
-                disabled={addMutation.isPending || !newUsername.trim()}
-                style={{ padding: '0.6rem 1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-              >
-                {addMutation.isPending ? 'Adding...' : <><Plus size={18} /> Add Target</>}
-              </button>
-            </form>
-          </div>
-
-          <section>
-            <h2 style={{ fontSize: '1.25rem', margin: '0 0 1rem 0', border: 'none', color: '#c9d1d9', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Activity size={18} /> Monitored Profiles ({targets?.length ?? 0})
-            </h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
-              {targets?.map((target: any) => (
-                <div
-                  key={target.id}
-                  style={{
-                    background: 'var(--card-bg)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '10px',
-                    padding: '1.2rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    cursor: 'pointer',
-                    opacity: target.isActive ? 1 : 0.6,
-                    transition: 'border-color 0.2s',
-                  }}
-                  onClick={(e) => {
-                    if ((e.target as HTMLElement).closest('button')) return;
-                    setSelectedUsername(target.socialProfile?.username);
-                  }}
-                >
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      @{target.socialProfile?.username}
-                    </h3>
-                    <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.8rem', color: '#8b949e', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Activity size={12} />
-                      {target.socialProfile?._count?.posts || 0} posts captured
-                    </p>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleMutation.mutate({ id: target.id, isActive: !target.isActive });
-                      }}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: target.isActive ? '#3fb950' : '#8b949e',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '4px',
-                        fontSize: '0.7rem',
-                      }}
-                      title={target.isActive ? 'Monitoring Active. Click to pause.' : 'Monitoring Paused. Click to resume.'}
-                    >
-                      {target.isActive ? <Eye size={20} /> : <EyeOff size={20} />}
-                      {target.isActive ? 'ACTIVE' : 'PAUSED'}
-                    </button>
-                    <ChevronRight size={20} style={{ color: '#8b949e' }} />
-                  </div>
-                </div>
-              ))}
-              {targets?.length === 0 && (
-                <div style={{ gridColumn: '1 / -1', padding: '3rem', textAlign: 'center', color: '#8b949e', border: '1px dashed var(--border)', borderRadius: '12px' }}>
-                  No monitored profiles yet. Add one to start processing proactive comments.
-                </div>
-              )}
-            </div>
-          </section>
-        </>
-      )}
-    </div>
-  );
-};
-
-const MonitoredProfileViewer = ({ username, onBack }: { username: string; onBack: () => void }) => {
-  const { data: account, isLoading, isError } = useQuery({
-    queryKey: ['account', username],
-    queryFn: () => getAccount(username),
-  });
-
-  if (isLoading) return <div>Loading posts for @{username}...</div>;
-  if (isError || !account)
-    return (
-      <div>
-        <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#58a6ff', cursor: 'pointer', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '4px', padding: 0, fontWeight: 500 }}>
-          &larr; Back to Monitored Profiles
-        </button>
-        <div style={{ color: 'red' }}>Account data could not be loaded. It may not have been scraped yet.</div>
-      </div>
-    );
-
-  return (
-    <div className="fade-in">
-      <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#58a6ff', cursor: 'pointer', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '4px', padding: 0, fontWeight: 500 }}>
-        &larr; Back to Monitored Profiles
-      </button>
       <div style={{ marginBottom: '2rem' }}>
-        <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, border: 'none' }}>
-          <Activity size={24} style={{ color: '#3fb950' }} /> @{username}
-        </h2>
-        <p style={{ color: '#8b949e', margin: '0.5rem 0 0 0' }}>Showing captured posts available for comment generation.</p>
+        <h1 style={{ margin: 0, fontSize: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Activity size={28} style={{ color: '#3fb950' }} /> Comments
+        </h1>
+        <p style={{ color: '#8b949e', margin: '0.5rem 0 0 0' }}>
+          Profiles and posts monitored for proactive comment generation.
+        </p>
       </div>
-      <PostGrid posts={account.posts} sort="recent" />
-      {account.posts.length === 0 && (
-        <div style={{ padding: '3rem', textAlign: 'center', color: '#8b949e', background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border)' }}>
-          No posts downloaded yet for this profile.
+
+      {/* Add Forms */}
+      <div
+        style={{
+          background: 'var(--card-bg)',
+          border: '1px solid var(--border)',
+          padding: '1.5rem',
+          borderRadius: '12px',
+          marginBottom: '2rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1rem',
+        }}
+      >
+        <h3 style={{ margin: '0 0 0.5rem 0' }}>Add to Comments</h3>
+
+        <form onSubmit={handleAddUsername} style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ position: 'relative', flexGrow: 1, maxWidth: '400px' }}>
+            <User size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#8b949e' }} />
+            <input
+              type="text"
+              value={usernameInput}
+              onChange={(e) => setUsernameInput(e.target.value)}
+              placeholder="@username or profile URL"
+              style={{
+                width: '100%',
+                padding: '0.6rem 1rem 0.6rem 2rem',
+                background: 'rgba(0,0,0,0.2)',
+                border: '1px solid var(--border)',
+                color: 'white',
+                borderRadius: '6px',
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
+          <button
+            type="submit"
+            className="btn-primary"
+            disabled={addUsernameMutation.isPending || !usernameInput.trim()}
+            style={{ padding: '0.6rem 1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', whiteSpace: 'nowrap' }}
+          >
+            <Plus size={16} />
+            {addUsernameMutation.isPending ? 'Adding...' : 'Add Profile'}
+          </button>
+        </form>
+
+        <form onSubmit={handleAddPostUrl} style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ position: 'relative', flexGrow: 1, maxWidth: '400px' }}>
+            <LinkIcon size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#8b949e' }} />
+            <input
+              type="text"
+              value={postUrlInput}
+              onChange={(e) => setPostUrlInput(e.target.value)}
+              placeholder="Instagram post URL"
+              style={{
+                width: '100%',
+                padding: '0.6rem 1rem 0.6rem 2rem',
+                background: 'rgba(0,0,0,0.2)',
+                border: '1px solid var(--border)',
+                color: 'white',
+                borderRadius: '6px',
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
+          <button
+            type="submit"
+            className="btn-primary"
+            disabled={addPostUrlMutation.isPending || !postUrlInput.trim()}
+            style={{ padding: '0.6rem 1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', whiteSpace: 'nowrap' }}
+          >
+            <Plus size={16} />
+            {addPostUrlMutation.isPending ? 'Adding...' : 'Add Post'}
+          </button>
+        </form>
+
+        {(addUsernameMutation.isError || addPostUrlMutation.isError) && (
+          <p style={{ margin: 0, color: '#f85149', fontSize: '0.85rem' }}>
+            {(addUsernameMutation.error as any)?.response?.data?.message ||
+              (addPostUrlMutation.error as any)?.response?.data?.message ||
+              'Failed to add.'}
+          </p>
+        )}
+      </div>
+
+      {/* Profiles */}
+      <section style={{ marginBottom: '3rem' }}>
+        <h2 style={{ fontSize: '1.25rem', margin: '0 0 1rem 0', border: 'none', color: '#c9d1d9', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <User size={18} /> Profiles ({profileMemberships.length})
+        </h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '1rem' }}>
+          {profileMemberships.map((m: any) => (
+            <div
+              key={m.id}
+              style={{
+                background: 'var(--card-bg)',
+                border: '1px solid var(--border)',
+                borderRadius: '10px',
+                padding: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                opacity: m.isActive ? 1 : 0.6,
+              }}
+            >
+              <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#333', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666' }}>
+                {m.socialProfile.profileImageUrl ? (
+                  <img src={m.socialProfile.profileImageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <User size={18} />
+                )}
+              </div>
+              <div style={{ overflow: 'hidden', flexGrow: 1 }}>
+                <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>@{m.socialProfile.username}</div>
+                <div style={{ fontSize: '0.75rem', color: '#8b949e' }}>
+                  {m.socialProfile._count?.posts || 0} posts captured
+                </div>
+              </div>
+              <button
+                onClick={() => toggleMutation.mutate({ id: m.id, isActive: !m.isActive })}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: m.isActive ? '#3fb950' : '#8b949e',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '2px',
+                  fontSize: '0.65rem',
+                  flexShrink: 0,
+                }}
+                title={m.isActive ? 'Active — click to pause' : 'Paused — click to resume'}
+              >
+                {m.isActive ? <Eye size={18} /> : <EyeOff size={18} />}
+                {m.isActive ? 'ON' : 'OFF'}
+              </button>
+            </div>
+          ))}
+          {profileMemberships.length === 0 && (
+            <div style={{ gridColumn: '1 / -1', padding: '2rem', textAlign: 'center', color: '#8b949e', border: '1px dashed var(--border)', borderRadius: '10px' }}>
+              No profiles added yet.
+            </div>
+          )}
         </div>
-      )}
+      </section>
+
+      {/* Posts */}
+      <section>
+        <h2 style={{ fontSize: '1.25rem', margin: '0 0 1rem 0', border: 'none', color: '#c9d1d9', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <LinkIcon size={18} /> Posts ({postMemberships.length})
+        </h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+          {postMemberships.map((m: any) => (
+            <div key={m.id} style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: '10px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ fontSize: '0.85rem', color: '#c9d1d9', lineHeight: '1.5', maxHeight: '4.5em', overflow: 'hidden' }}>
+                {m.post.caption || <span style={{ color: '#8b949e' }}>No caption</span>}
+              </div>
+              {m.post.url && (
+                <a href={m.post.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.75rem', color: '#58a6ff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <ExternalLink size={12} /> View on Instagram
+                </a>
+              )}
+              <div style={{ fontSize: '0.75rem', color: '#8b949e' }}>
+                {formatDistanceToNow(new Date(m.createdAt), { addSuffix: true })}
+              </div>
+            </div>
+          ))}
+          {postMemberships.length === 0 && (
+            <div style={{ gridColumn: '1 / -1', padding: '2rem', textAlign: 'center', color: '#8b949e', border: '1px dashed var(--border)', borderRadius: '10px' }}>
+              No posts added yet. Paste an Instagram post URL above.
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
 };

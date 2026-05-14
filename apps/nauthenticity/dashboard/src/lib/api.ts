@@ -405,10 +405,13 @@ export const getInspoItems = getInspoMemberships;
 export const addInspoByUsername = async (brandId: string, username: string) =>
   addBrandTarget({ brandId, username, targetType: 'inspo', isActive: true });
 
-export const addInspoByPostUrl = async (brandId: string, postUrl: string) => {
-  const { data } = await api.post(`/brands/${brandId}/inspo/by-url`, { postUrl });
+export const capturePostByUrl = async (brandId: string, postUrl: string, category: string) => {
+  const { data } = await api.post('/capture-post', { brandId, postUrl, category });
   return data;
 };
+
+export const addInspoByPostUrl = (brandId: string, postUrl: string) =>
+  capturePostByUrl(brandId, postUrl, 'INSPO');
 
 export const getVoicenotes = async (brandId: string) => {
   const { data } = await api.get(`/brands/${brandId}/voicenotes`);

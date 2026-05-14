@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
-  getInspoMemberships,
+  getBrandTargets,
   getInspoDigest,
   addInspoByUsername,
   addInspoByPostUrl,
@@ -18,8 +18,8 @@ export const BrandInspoBaseView = () => {
   const [postUrlInput, setPostUrlInput] = useState('');
 
   const { data: memberships, isLoading: loadingItems } = useQuery({
-    queryKey: ['inspo-memberships', brandId],
-    queryFn: () => getInspoMemberships(brandId!),
+    queryKey: ['targets', brandId, 'INSPO'],
+    queryFn: () => getBrandTargets(brandId!, 'inspo'),
     enabled: !!brandId,
   });
 
@@ -39,7 +39,7 @@ export const BrandInspoBaseView = () => {
     mutationFn: (username: string) => addInspoByUsername(brandId!, username),
     onSuccess: () => {
       setUsernameInput('');
-      queryClient.invalidateQueries({ queryKey: ['inspo-memberships', brandId] });
+      queryClient.invalidateQueries({ queryKey: ['targets', brandId, 'INSPO'] });
     },
   });
 
@@ -47,7 +47,7 @@ export const BrandInspoBaseView = () => {
     mutationFn: (postUrl: string) => addInspoByPostUrl(brandId!, postUrl),
     onSuccess: () => {
       setPostUrlInput('');
-      queryClient.invalidateQueries({ queryKey: ['inspo-memberships', brandId] });
+      queryClient.invalidateQueries({ queryKey: ['targets', brandId, 'INSPO'] });
     },
   });
 

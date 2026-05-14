@@ -1,445 +1,236 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { getBrandTargets, addBrandTarget, updateBrandTarget, getAccount } from '../lib/api';
-import { Activity, Plus, BarChart2, Save, Settings2 } from 'lucide-react';
-import { PostGrid } from '../components/PostGrid';
+import { getBrandTargets, addBrandTarget, updateBrandTarget, capturePostByUrl } from '../lib/api';
+import { BarChart2, Plus, User, Link as LinkIcon, ExternalLink } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 
 export const BrandBenchmarkView = () => {
   const { brandId } = useParams<{ brandId: string }>();
   const queryClient = useQueryClient();
-  const [newUsername, setNewUsername] = useState('');
-  const [newInitialCount, setNewInitialCount] = useState<number>(20);
-  const [newAutoUpdate, setNewAutoUpdate] = useState<boolean>(true);
-  const [selectedUsername, setSelectedUsername] = useState<string | null>(null);
+  const [usernameInput, setUsernameInput] = useState('');
+  const [postUrlInput, setPostUrlInput] = useState('');
 
-  const { data: targets, isLoading } = useQuery({
-    queryKey: ['targets', brandId, 'benchmark'],
+  const { data: memberships, isLoading } = useQuery({
+    queryKey: ['targets', brandId, 'BENCHMARK'],
     queryFn: () => getBrandTargets(brandId!, 'benchmark'),
     enabled: !!brandId,
   });
 
-  const addMutation = useMutation({
-    mutationFn: addBrandTarget,
+  const addUsernameMutation = useMutation({
+    mutationFn: (username: string) =>
+      addBrandTarget({ brandId: brandId!, username, targetType: 'benchmark', isActive: true }),
     onSuccess: () => {
-      setNewUsername('');
-      setNewInitialCount(20);
-      setNewAutoUpdate(true);
-      queryClient.invalidateQueries({ queryKey: ['targets', brandId, 'benchmark'] });
+      setUsernameInput('');
+      queryClient.invalidateQueries({ queryKey: ['targets', brandId, 'BENCHMARK'] });
     },
   });
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: any }) => updateBrandTarget(id, updates),
+  const addPostUrlMutation = useMutation({
+    mutationFn: (postUrl: string) => capturePostByUrl(brandId!, postUrl, 'BENCHMARK'),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['targets', brandId, 'benchmark'] });
+      setPostUrlInput('');
+      queryClient.invalidateQueries({ queryKey: ['targets', brandId, 'BENCHMARK'] });
     },
   });
 
-  const handleAddSubmit = (e: React.FormEvent) => {
+  const toggleMutation = useMutation({
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
+      updateBrandTarget(id, { isActive }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['targets', brandId, 'BENCHMARK'] });
+    },
+  });
+
+  const handleAddUsername = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUsername.trim() || !brandId) return;
+    let clean = usernameInput.trim();
+    if (clean.includes('instagram.com/')) clean = clean.split('instagram.com/')[1].split('/')[0];
+    if (clean.startsWith('@')) clean = clean.slice(1);
+    if (!clean || !brandId) return;
+    addUsernameMutation.mutate(clean);
+  };
 
-    let cleanUsername = newUsername.trim();
-    if (cleanUsername.includes('instagram.com/')) {
-      cleanUsername = cleanUsername.split('instagram.com/')[1].split('/')[0];
-    }
-    if (cleanUsername.startsWith('@')) cleanUsername = cleanUsername.slice(1);
-
-    addMutation.mutate({
-      brandId,
-      username: cleanUsername,
-      targetType: 'benchmark',
-      isActive: true,
-      initialDownloadCount: Number(newInitialCount) || 20,
-      autoUpdate: newAutoUpdate,
-    });
+  const handleAddPostUrl = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!postUrlInput.trim() || !brandId) return;
+    addPostUrlMutation.mutate(postUrlInput.trim());
   };
 
   if (isLoading) return <div>Loading Benchmarks...</div>;
 
+  const profileMemberships = (memberships ?? []).filter((m: any) => m.socialProfile);
+  const postMemberships = (memberships ?? []).filter((m: any) => m.post);
+
   return (
     <div className="fade-in">
-      {selectedUsername ? (
-        <BenchmarkProfileViewer
-          username={selectedUsername}
-          onBack={() => setSelectedUsername(null)}
-        />
-      ) : (
-        <>
-          <div style={{ marginBottom: '2rem' }}>
-            <h1 style={{ margin: 0, fontSize: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <BarChart2 size={28} style={{ color: '#0969da' }} /> Benchmarks
-            </h1>
-            <p style={{ color: '#8b949e', margin: '0.5rem 0 0 0' }}>
-              Track competitor and peer profiles to analyze their engagement metrics and visual patterns.
-            </p>
-          </div>
-
-          <div
-            style={{
-              background: 'var(--card-bg)',
-              border: '1px solid var(--border)',
-              padding: '1.5rem',
-              borderRadius: '12px',
-              marginBottom: '2rem',
-            }}
-          >
-            <h3 style={{ margin: '0 0 1rem 0' }}>Add Benchmark Target</h3>
-            <form
-              onSubmit={handleAddSubmit}
-              style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end' }}
-            >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flexGrow: 1 }}>
-                <label style={{ fontSize: '0.85rem', color: '#8b949e' }}>Target Username</label>
-                <input
-                  type="text"
-                  value={newUsername}
-                  onChange={(e) => setNewUsername(e.target.value)}
-                  placeholder="@competitor"
-                  style={{
-                    background: 'rgba(0,0,0,0.2)',
-                    border: '1px solid var(--border)',
-                    color: 'white',
-                    padding: '0.6rem 1rem',
-                    borderRadius: '6px',
-                  }}
-                />
-              </div>
-              <div
-                style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '150px' }}
-              >
-                <label style={{ fontSize: '0.85rem', color: '#8b949e' }}>Initial Download</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="500"
-                  value={newInitialCount}
-                  onChange={(e) => setNewInitialCount(parseInt(e.target.value))}
-                  style={{
-                    background: 'rgba(0,0,0,0.2)',
-                    border: '1px solid var(--border)',
-                    color: 'white',
-                    padding: '0.6rem 1rem',
-                    borderRadius: '6px',
-                  }}
-                />
-              </div>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  paddingBottom: '0.5rem',
-                }}
-              >
-                <input
-                  type="checkbox"
-                  id="autoUpdateCheck"
-                  checked={newAutoUpdate}
-                  onChange={(e) => setNewAutoUpdate(e.target.checked)}
-                />
-                <label
-                  htmlFor="autoUpdateCheck"
-                  style={{ fontSize: '0.85rem', color: '#8b949e', cursor: 'pointer' }}
-                >
-                  Auto-Update
-                </label>
-              </div>
-              <button
-                type="submit"
-                className="btn-primary"
-                disabled={addMutation.isPending || !newUsername.trim()}
-                style={{
-                  padding: '0.6rem 1.2rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  height: '42px',
-                }}
-              >
-                {addMutation.isPending ? (
-                  'Saving...'
-                ) : (
-                  <>
-                    <Plus size={18} /> Add
-                  </>
-                )}
-              </button>
-            </form>
-          </div>
-
-          <section>
-            <h2 style={{ fontSize: '1.25rem', margin: '0 0 1rem 0', border: 'none', color: '#c9d1d9', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <BarChart2 size={18} /> Benchmark Targets ({targets?.length ?? 0})
-            </h2>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
-              gap: '1rem',
-            }}
-          >
-            {targets?.map((target: any) => (
-              <BenchmarkTargetCard
-                key={target.id}
-                target={target}
-                onSelect={() => setSelectedUsername(target.socialProfile?.username)}
-                onUpdate={(updates) => updateMutation.mutate({ id: target.id, updates })}
-              />
-            ))}
-
-            {targets?.length === 0 && (
-              <div
-                style={{
-                  gridColumn: '1 / -1',
-                  padding: '3rem',
-                  textAlign: 'center',
-                  color: '#8b949e',
-                  border: '1px dashed var(--border)',
-                  borderRadius: '12px',
-                }}
-              >
-                No benchmark targets added. Start tracking competitors to analyze their content.
-              </div>
-            )}
-          </div>
-          </section>
-        </>
-      )}
-    </div>
-  );
-};
-
-const BenchmarkTargetCard = ({
-  target,
-  onSelect,
-  onUpdate,
-}: {
-  target: any;
-  onSelect: () => void;
-  onUpdate: (u: any) => void;
-}) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [formState, setFormState] = useState({
-    autoUpdate: target.autoUpdate ?? true,
-    initialDownloadCount: target.initialDownloadCount ?? 20,
-    isActive: target.isActive,
-  });
-
-  const handleSave = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onUpdate(formState);
-    setIsEditing(false);
-  };
-
-  return (
-    <div
-      style={{
-        background: 'var(--card-bg)',
-        border: '1px solid var(--border)',
-        borderRadius: '10px',
-        padding: '1.2rem',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '1rem',
-        cursor: isEditing ? 'default' : 'pointer',
-        transition: 'border-color 0.2s',
-        opacity: target.isActive ? 1 : 0.6,
-      }}
-      onClick={() => {
-        if (!isEditing) onSelect();
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <h3
-            style={{
-              margin: 0,
-              fontSize: '1.1rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-            }}
-          >
-            @{target.socialProfile?.username}
-          </h3>
-          <p
-            style={{
-              margin: '0.2rem 0 0 0',
-              fontSize: '0.8rem',
-              color: '#8b949e',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-            }}
-          >
-            <Activity size={12} />
-            {target.socialProfile?._count?.posts || 0} posts captured
-          </p>
-        </div>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsEditing(!isEditing);
-          }}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: '#8b949e',
-            cursor: 'pointer',
-            padding: '4px',
-          }}
-        >
-          <Settings2 size={18} />
-        </button>
+      <div style={{ marginBottom: '2rem' }}>
+        <h1 style={{ margin: 0, fontSize: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <BarChart2 size={28} style={{ color: '#0969da' }} /> Benchmarks
+        </h1>
+        <p style={{ color: '#8b949e', margin: '0.5rem 0 0 0' }}>
+          Profiles and posts tracked for competitive analysis and visual benchmarking.
+        </p>
       </div>
 
-      {isEditing && (
-        <div
-          style={{
-            marginTop: '0.5rem',
-            paddingTop: '1rem',
-            borderTop: '1px dashed var(--border)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.8rem',
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <label style={{ fontSize: '0.85rem', color: '#c9d1d9' }}>Auto-update (Cron)</label>
+      {/* Add Forms */}
+      <div
+        style={{
+          background: 'var(--card-bg)',
+          border: '1px solid var(--border)',
+          padding: '1.5rem',
+          borderRadius: '12px',
+          marginBottom: '2rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1rem',
+        }}
+      >
+        <h3 style={{ margin: '0 0 0.5rem 0' }}>Add to Benchmarks</h3>
+
+        <form onSubmit={handleAddUsername} style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ position: 'relative', flexGrow: 1, maxWidth: '400px' }}>
+            <User size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#8b949e' }} />
             <input
-              type="checkbox"
-              checked={formState.autoUpdate}
-              onChange={(e) => setFormState((s) => ({ ...s, autoUpdate: e.target.checked }))}
-            />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <label style={{ fontSize: '0.85rem', color: '#c9d1d9' }}>Active Target</label>
-            <input
-              type="checkbox"
-              checked={formState.isActive}
-              onChange={(e) => setFormState((s) => ({ ...s, isActive: e.target.checked }))}
-            />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <label style={{ fontSize: '0.85rem', color: '#c9d1d9' }}>Download Limit</label>
-            <input
-              type="number"
-              min="1"
-              max="500"
-              value={formState.initialDownloadCount}
-              onChange={(e) =>
-                setFormState((s) => ({ ...s, initialDownloadCount: parseInt(e.target.value) }))
-              }
+              type="text"
+              value={usernameInput}
+              onChange={(e) => setUsernameInput(e.target.value)}
+              placeholder="@username or profile URL"
               style={{
-                width: '80px',
-                padding: '4px',
+                width: '100%',
+                padding: '0.6rem 1rem 0.6rem 2rem',
                 background: 'rgba(0,0,0,0.2)',
                 border: '1px solid var(--border)',
                 color: 'white',
-                borderRadius: '4px',
+                borderRadius: '6px',
+                boxSizing: 'border-box',
               }}
             />
           </div>
           <button
-            onClick={handleSave}
+            type="submit"
             className="btn-primary"
-            style={{
-              padding: '0.4rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.5rem',
-              marginTop: '0.5rem',
-            }}
+            disabled={addUsernameMutation.isPending || !usernameInput.trim()}
+            style={{ padding: '0.6rem 1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', whiteSpace: 'nowrap' }}
           >
-            <Save size={14} /> Update Config
+            <Plus size={16} />
+            {addUsernameMutation.isPending ? 'Adding...' : 'Add Profile'}
           </button>
-        </div>
-      )}
+        </form>
 
-      {!isEditing && (
-        <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.75rem', color: '#8b949e' }}>
-          <span
-            style={{
-              background: 'rgba(255,255,255,0.05)',
-              padding: '2px 8px',
-              borderRadius: '4px',
-            }}
+        <form onSubmit={handleAddPostUrl} style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ position: 'relative', flexGrow: 1, maxWidth: '400px' }}>
+            <LinkIcon size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#8b949e' }} />
+            <input
+              type="text"
+              value={postUrlInput}
+              onChange={(e) => setPostUrlInput(e.target.value)}
+              placeholder="Instagram post URL"
+              style={{
+                width: '100%',
+                padding: '0.6rem 1rem 0.6rem 2rem',
+                background: 'rgba(0,0,0,0.2)',
+                border: '1px solid var(--border)',
+                color: 'white',
+                borderRadius: '6px',
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
+          <button
+            type="submit"
+            className="btn-primary"
+            disabled={addPostUrlMutation.isPending || !postUrlInput.trim()}
+            style={{ padding: '0.6rem 1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', whiteSpace: 'nowrap' }}
           >
-            Auto: {target.autoUpdate ? 'ON' : 'OFF'}
-          </span>
-          <span
-            style={{
-              background: 'rgba(255,255,255,0.05)',
-              padding: '2px 8px',
-              borderRadius: '4px',
-            }}
-          >
-            Limit: {target.initialDownloadCount || 'Default'}
-          </span>
-        </div>
-      )}
-    </div>
-  );
-};
+            <Plus size={16} />
+            {addPostUrlMutation.isPending ? 'Adding...' : 'Add Post'}
+          </button>
+        </form>
 
-const BenchmarkProfileViewer = ({ username, onBack }: { username: string; onBack: () => void }) => {
-  const {
-    data: account,
-    isLoading,
-    isError,
-  } = useQuery({
-    queryKey: ['account', username],
-    queryFn: () => getAccount(username),
-  });
-
-  if (isLoading) return <div>Loading benchmark data for @{username}...</div>;
-  if (isError || !account)
-    return (
-      <div>
-        <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#58a6ff', cursor: 'pointer', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '4px', padding: 0, fontWeight: 500 }}>
-          &larr; Back to Benchmarks
-        </button>
-        <div style={{ color: 'red' }}>Account data could not be loaded.</div>
+        {(addUsernameMutation.isError || addPostUrlMutation.isError) && (
+          <p style={{ margin: 0, color: '#f85149', fontSize: '0.85rem' }}>
+            {(addUsernameMutation.error as any)?.response?.data?.message ||
+              (addPostUrlMutation.error as any)?.response?.data?.message ||
+              'Failed to add.'}
+          </p>
+        )}
       </div>
-    );
 
-  return (
-    <div className="fade-in">
-      <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#58a6ff', cursor: 'pointer', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '4px', padding: 0, fontWeight: 500 }}>
-        &larr; Back to Benchmarks
-      </button>
-
-      <div style={{ marginBottom: '2rem' }}>
-        <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, border: 'none' }}>
-          <BarChart2 size={24} style={{ color: '#0969da' }} /> @{username}
+      {/* Profiles */}
+      <section style={{ marginBottom: '3rem' }}>
+        <h2 style={{ fontSize: '1.25rem', margin: '0 0 1rem 0', border: 'none', color: '#c9d1d9', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <User size={18} /> Profiles ({profileMemberships.length})
         </h2>
-        <p style={{ color: '#8b949e', margin: '0.5rem 0 0 0' }}>Raw metric tracking and visual profiling.</p>
-      </div>
-
-      <h3 style={{ fontSize: '1.25rem', margin: '0 0 1rem 0', border: 'none', color: '#c9d1d9', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <BarChart2 size={18} /> Captured Content ({account.posts.length})
-      </h3>
-      <PostGrid posts={account.posts} sort="recent" />
-
-      {account.posts.length === 0 && (
-        <div
-          style={{
-            padding: '3rem',
-            textAlign: 'center',
-            color: '#8b949e',
-            background: 'var(--card-bg)',
-            borderRadius: '12px',
-            border: '1px solid var(--border)',
-          }}
-        >
-          No posts downloaded yet for this competitor. Add an initial download sync via the API to
-          hydrate.
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '1rem' }}>
+          {profileMemberships.map((m: any) => (
+            <div
+              key={m.id}
+              style={{
+                background: 'var(--card-bg)',
+                border: '1px solid var(--border)',
+                borderRadius: '10px',
+                padding: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                opacity: m.isActive ? 1 : 0.6,
+                cursor: 'pointer',
+              }}
+              onClick={() => toggleMutation.mutate({ id: m.id, isActive: !m.isActive })}
+              title={m.isActive ? 'Active — click to deactivate' : 'Inactive — click to activate'}
+            >
+              <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#333', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666' }}>
+                {m.socialProfile.profileImageUrl ? (
+                  <img src={m.socialProfile.profileImageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <User size={18} />
+                )}
+              </div>
+              <div style={{ overflow: 'hidden' }}>
+                <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>@{m.socialProfile.username}</div>
+                <div style={{ fontSize: '0.75rem', color: '#8b949e' }}>
+                  {m.socialProfile._count?.posts || 0} posts captured
+                </div>
+              </div>
+            </div>
+          ))}
+          {profileMemberships.length === 0 && (
+            <div style={{ gridColumn: '1 / -1', padding: '2rem', textAlign: 'center', color: '#8b949e', border: '1px dashed var(--border)', borderRadius: '10px' }}>
+              No profiles added yet.
+            </div>
+          )}
         </div>
-      )}
+      </section>
+
+      {/* Posts */}
+      <section>
+        <h2 style={{ fontSize: '1.25rem', margin: '0 0 1rem 0', border: 'none', color: '#c9d1d9', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <LinkIcon size={18} /> Posts ({postMemberships.length})
+        </h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+          {postMemberships.map((m: any) => (
+            <div key={m.id} style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: '10px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ fontSize: '0.85rem', color: '#c9d1d9', lineHeight: '1.5', maxHeight: '4.5em', overflow: 'hidden' }}>
+                {m.post.caption || <span style={{ color: '#8b949e' }}>No caption</span>}
+              </div>
+              {m.post.url && (
+                <a href={m.post.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.75rem', color: '#58a6ff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <ExternalLink size={12} /> View on Instagram
+                </a>
+              )}
+              <div style={{ fontSize: '0.75rem', color: '#8b949e' }}>
+                {formatDistanceToNow(new Date(m.createdAt), { addSuffix: true })}
+              </div>
+            </div>
+          ))}
+          {postMemberships.length === 0 && (
+            <div style={{ gridColumn: '1 / -1', padding: '2rem', textAlign: 'center', color: '#8b949e', border: '1px dashed var(--border)', borderRadius: '10px' }}>
+              No posts added yet. Paste an Instagram post URL above.
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
 };
