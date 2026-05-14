@@ -76,6 +76,20 @@ export class ProactiveDeliverySystem {
       }
     });
 
+    // ── Admin: system notification (api → admin Telegram) ────────────────────
+
+    this.app.post('/api/internal/notify-admin', requireServiceAuth, async (req, res) => {
+      const { message } = req.body as { message?: string };
+      if (!message) return res.status(400).json({ error: 'Missing message' });
+      if (!ADMIN_TELEGRAM_ID) return res.status(503).json({ error: 'ADMIN_TELEGRAM_ID not configured' });
+      try {
+        await this.bot.telegram.sendMessage(ADMIN_TELEGRAM_ID, message);
+        return res.status(200).json({ ok: true });
+      } catch (err: any) {
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
     // ── Admin: direct message ─────────────────────────────────────────────────
 
     this.app.post('/api/internal/admin/message', requireServiceAuth, async (req, res) => {
