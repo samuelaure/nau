@@ -78,12 +78,36 @@ export class SourceConceptService {
       take: 10,
     })
 
+    const youtubeVideos = await this.prisma.youtubeVideo.findMany({
+      where: {
+        brandId,
+        status: 'ready',
+        categoryMemberships: { some: { brandId, category: 'INSPO', isActive: true } },
+      },
+      select: { title: true, synthesis: true },
+      orderBy: { createdAt: 'desc' },
+      take: 15,
+    })
+
+    const blogPosts = await this.prisma.blogPost.findMany({
+      where: {
+        brandId,
+        status: 'ready',
+        categoryMemberships: { some: { brandId, category: 'INSPO', isActive: true } },
+      },
+      select: { title: true, synthesis: true },
+      orderBy: { createdAt: 'desc' },
+      take: 15,
+    })
+
     const totalItems =
       recentMemberships.length +
       randomMemberships.length +
       profileMemberships.length +
       ownedPosts.length +
-      voicenotes.length
+      voicenotes.length +
+      youtubeVideos.length +
+      blogPosts.length
     if (totalItems === 0) {
       throw new UnprocessableEntityException('InspoBase is empty — add posts or profiles first.')
     }
@@ -118,7 +142,14 @@ export class SourceConceptService {
       if (text) inspoLines.push(`[Voicenote] ${text}`)
     }
 
-    const systemPrompt = `You are a creative content strategist. You receive a brand's full inspiration pool — a curated mix of inspiring posts and profiles, the brand's own published content, and voice notes from the brand team — and you extract distinct, actionable source concepts from it as a whole.
+    for (const v of youtubeVideos) {
+      if (v.synthesis) inspoLines.push(`[YouTube: ${v.title ?? 'video'}] ${v.synthesis}`)
+    }
+    for (const b of blogPosts) {
+      if (b.synthesis) inspoLines.push(`[Blog: ${b.title ?? 'article'}] ${b.synthesis}`)
+    }
+
+    const systemPrompt = `You are a creative content strategist. You receive a brand's full inspiration pool — a curated mix of inspiring posts and profiles, the brand's own published content, voice notes from the brand team, YouTube videos, and blog posts — and you extract distinct, actionable source concepts from it as a whole.
 
 A source concept is a rich, self-contained angle or topic that can drive a separate batch of content ideas. Each concept must be distinct: no overlap, no repetition.
 

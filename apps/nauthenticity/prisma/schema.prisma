@@ -226,6 +226,10 @@ model Brand {
   context             BrandContext?
   feedbacks           CommentFeedback[]
   trashItems          TrashItem[]
+  youtubeVideos       YoutubeVideo[]
+  blogPosts           BlogPost[]
+
+  youtubeDurationExceededCount Int @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -345,6 +349,10 @@ model CategoryMembership {
   socialProfile   SocialProfile? @relation(fields: [socialProfileId], references: [id], onDelete: Cascade)
   postId          String?
   post            Post?          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  youtubeVideoId  String?
+  youtubeVideo    YoutubeVideo?  @relation(fields: [youtubeVideoId], references: [id], onDelete: Cascade)
+  blogPostId      String?
+  blogPost        BlogPost?      @relation(fields: [blogPostId], references: [id], onDelete: Cascade)
   category        String
   isActive        Boolean        @default(true)
   commentPrompt   String?
@@ -382,11 +390,64 @@ model TrashItem {
   socialProfile    SocialProfile? @relation(fields: [socialProfileId], references: [id], onDelete: Cascade)
   postId           String?
   post             Post?          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  youtubeVideoId   String?
+  youtubeVideo     YoutubeVideo?  @relation(fields: [youtubeVideoId], references: [id], onDelete: Cascade)
+  blogPostId       String?
+  blogPost         BlogPost?      @relation(fields: [blogPostId], references: [id], onDelete: Cascade)
   originalCategory String
   deletedAt        DateTime       @default(now())
   expiresAt        DateTime
 
   @@index([brandId])
   @@index([expiresAt])
+}
+
+// ── YouTube Videos ────────────────────────────────────────────────────────────
+// A YouTube video added to a brand's InspoBase. Status lifecycle: pending → processing → ready | failed.
+
+model YoutubeVideo {
+  id              String   @id @default(uuid())
+  brandId         String
+  brand           Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  url             String
+  videoId         String
+  title           String?
+  channelName     String?
+  durationSeconds Int?
+  transcript      String?  @db.Text
+  synthesis       String?  @db.Text
+  status          String   @default("pending")
+  failureReason   String?
+  createdAt       DateTime @default(now())
+
+  categoryMemberships CategoryMembership[]
+  trashItems          TrashItem[]
+
+  @@unique([brandId, videoId])
+  @@index([brandId, status])
+}
+
+// ── Blog Posts ────────────────────────────────────────────────────────────────
+// A blog post URL added to a brand's InspoBase. Status lifecycle: pending → processing → ready | failed.
+
+model BlogPost {
+  id            String    @id @default(uuid())
+  brandId       String
+  brand         Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  url           String
+  title         String?
+  author        String?
+  publishedAt   DateTime?
+  rawText       String?   @db.Text
+  synthesis     String?   @db.Text
+  status        String    @default("pending")
+  failureReason String?
+  createdAt     DateTime  @default(now())
+
+  categoryMemberships CategoryMembership[]
+  trashItems          TrashItem[]
+
+  @@unique([brandId, url])
+  @@index([brandId, status])
 }
 

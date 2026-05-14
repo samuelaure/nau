@@ -8,6 +8,14 @@ import fs from 'fs';
 import path from 'path';
 import ffmpeg from 'fluent-ffmpeg';
 import { transcribeAudio } from '../services/transcription.service';
+import {
+  extractVideoId,
+  fetchYoutubeMetadata,
+  fetchTranscriptAutoCaption,
+  downloadAudioAndTranscribe,
+  DurationLimitExceededError,
+} from '../services/youtube-ingest.service';
+import { scrapeAndParse } from '../services/blog-ingest.service';
 import { logContextStorage } from '../utils/context';
 import { computeQueue } from './compute.queue';
 import { downloadQueue } from './download.queue';
@@ -784,6 +792,118 @@ const handleEmbedBatch = async (
   }
 };
 
+// ---------------------------------------------------------------------------
+// Standalone Job Handlers (not part of the scraping pipeline)
+// ---------------------------------------------------------------------------
+
+const handleYoutubeIngest = async (job: Job): Promise<void> => {
+  const { youtubeVideoId } = job.data as { youtubeVideoId: string };
+
+  await prisma.youtubeVideo.update({ where: { id: youtubeVideoId }, data: { status: 'processing' } });
+
+  const video = await prisma.youtubeVideo.findUnique({ where: { id: youtubeVideoId } });
+  if (!video) throw new Error(`YoutubeVideo ${youtubeVideoId} not found`);
+
+  const { getClientForFeature } = await import('@nau/llm-client');
+  const { client, model } = getClientForFeature('synthesis');
+
+  try {
+    let transcript: string;
+
+    try {
+      transcript = await fetchTranscriptAutoCaption(video.videoId);
+    } catch (captionErr) {
+      logger.warn({ youtubeVideoId, captionErr }, 'auto-caption failed, falling back to audio download');
+      const durationSeconds = video.durationSeconds ?? 0;
+      transcript = await downloadAudioAndTranscribe(video.videoId, durationSeconds);
+    }
+
+    const result = await client.chatCompletion({
+      model,
+      temperature: 0.3,
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You are a content analyst. Analyse the provided YouTube video transcript and write a concise, objective synthesis capturing its core topic, angle, tone, and distinctive qualities. Use as many sentences as needed to represent the content faithfully. Be direct and specific.',
+        },
+        { role: 'user', content: transcript },
+      ],
+    });
+
+    await prisma.youtubeVideo.update({
+      where: { id: youtubeVideoId },
+      data: { transcript, synthesis: result.content.trim(), status: 'ready' },
+    });
+  } catch (err) {
+    if (err instanceof DurationLimitExceededError) {
+      await prisma.youtubeVideo.update({
+        where: { id: youtubeVideoId },
+        data: { status: 'failed', failureReason: 'duration_limit_exceeded' },
+      });
+      await prisma.brand.update({
+        where: { id: video.brandId },
+        data: { youtubeDurationExceededCount: { increment: 1 } },
+      });
+      return;
+    }
+    const failureReason = err instanceof Error ? err.message : String(err);
+    await prisma.youtubeVideo.update({
+      where: { id: youtubeVideoId },
+      data: { status: 'failed', failureReason },
+    });
+    throw err;
+  }
+};
+
+const handleBlogIngest = async (job: Job): Promise<void> => {
+  const { blogPostId } = job.data as { blogPostId: string };
+
+  await prisma.blogPost.update({ where: { id: blogPostId }, data: { status: 'processing' } });
+
+  const post = await prisma.blogPost.findUnique({ where: { id: blogPostId } });
+  if (!post) throw new Error(`BlogPost ${blogPostId} not found`);
+
+  const { getClientForFeature } = await import('@nau/llm-client');
+  const { client, model } = getClientForFeature('synthesis');
+
+  try {
+    const article = await scrapeAndParse(post.url);
+
+    const result = await client.chatCompletion({
+      model,
+      temperature: 0.3,
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You are a content analyst. Analyse the provided blog post and write a concise, objective synthesis capturing its core topic, angle, tone, and distinctive qualities. Use as many sentences as needed. Be direct and specific.',
+        },
+        { role: 'user', content: `Title: ${article.title ?? 'Unknown'}\n\n${article.rawText}` },
+      ],
+    });
+
+    await prisma.blogPost.update({
+      where: { id: blogPostId },
+      data: {
+        title: article.title,
+        author: article.author,
+        publishedAt: article.publishedAt,
+        rawText: article.rawText,
+        synthesis: result.content.trim(),
+        status: 'ready',
+      },
+    });
+  } catch (err) {
+    const failureReason = err instanceof Error ? err.message : String(err);
+    await prisma.blogPost.update({
+      where: { id: blogPostId },
+      data: { status: 'failed', failureReason },
+    });
+    throw err;
+  }
+};
+
 /** Dispatch table mapping each step name to its handler. */
 const STEP_HANDLERS: Record<
   PipelineStepName,
@@ -818,6 +938,10 @@ export const computeWorker = new Worker(
         const run = await prisma.scrapingRun.findUnique({ where: { id: runId } });
         return run?.isPaused ?? false;
       };
+
+      // Standalone jobs (not part of the scraping pipeline)
+      if (job.name === 'youtube-ingest') return handleYoutubeIngest(job);
+      if (job.name === 'blog-ingest') return handleBlogIngest(job);
 
       const stepName = job.name as PipelineStepName;
       const handler = STEP_HANDLERS[stepName];
