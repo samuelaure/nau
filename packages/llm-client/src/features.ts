@@ -74,6 +74,14 @@ export function resolveFeatureModel(feature: LLMFeature): ModelDefinition {
 }
 
 /**
+ * Ordered fallback chains per feature.
+ * Primary model (from env override or default) is always tried first regardless of chain order.
+ */
+export const FEATURE_FALLBACK_CHAINS: Partial<Record<LLMFeature, string[]>> = {
+  transcription: ['groq/whisper-large-v3-turbo', 'openai/whisper-1'],
+}
+
+/**
  * Returns all current feature→model assignments (useful for admin/debug endpoints).
  */
 export function getFeatureModelMap(): Record<LLMFeature, { registryId: string; apiModel: string; provider: string }> {

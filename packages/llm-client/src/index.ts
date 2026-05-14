@@ -31,7 +31,7 @@ export type { UsageReportOptions } from './usage-reporter'
 
 export type { LLMFeature } from './features'
 export type { ModelDefinition, ModelCapability, LLMProvider } from './registry'
-export { getFeatureModelMap } from './features'
+export { getFeatureModelMap, FEATURE_FALLBACK_CHAINS } from './features'
 export { MODEL_REGISTRY } from './registry'
 
 // Re-export file utility needed for audio transcription uploads
@@ -41,7 +41,8 @@ export { toFile } from 'openai'
 // Primary API — feature-based client resolution
 // ---------------------------------------------------------------------------
 
-import { resolveFeatureModel, type LLMFeature } from './features'
+import { resolveFeatureModel, FEATURE_FALLBACK_CHAINS, type LLMFeature } from './features'
+import { resolveModel } from './registry'
 import { type LLMClient } from './types'
 
 export interface FeatureClient {
@@ -73,6 +74,26 @@ export function getClientForFeature(feature: LLMFeature): FeatureClient {
     registryId: modelDef.id,
     provider: modelDef.provider,
   }
+}
+
+/**
+ * Returns an ordered list of FeatureClients for a feature's fallback chain.
+ * Index 0 is the primary (respects env override); remaining entries are fallbacks.
+ * Features with no defined chain return a single-item array.
+ */
+export function getFeatureFallbackChain(feature: LLMFeature): FeatureClient[] {
+  const primary = resolveFeatureModel(feature)
+  const chain = FEATURE_FALLBACK_CHAINS[feature] ?? []
+  const orderedIds = [primary.id, ...chain.filter((id) => id !== primary.id)]
+  return orderedIds.map((id) => {
+    const def = resolveModel(id)
+    return {
+      client: createProviderClient(def.provider),
+      model: def.apiModel,
+      registryId: def.id,
+      provider: def.provider,
+    }
+  })
 }
 
 // ---------------------------------------------------------------------------
