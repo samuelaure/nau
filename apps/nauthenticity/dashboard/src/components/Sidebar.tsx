@@ -5,7 +5,6 @@ import { BrandSwitcher } from './BrandSwitcher';
 import {
   LayoutDashboard,
   Lightbulb,
-  Users,
   MessageSquare,
   BarChart2,
   LogOut,
@@ -210,9 +209,8 @@ export function Sidebar() {
           <>
             <span className="sidebar-section-label">Brand Pages</span>
             {[
-              { label: 'Content', to: `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}/content`, icon: LayoutDashboard },
+              { label: 'Own Profiles', to: `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}/content`, icon: LayoutDashboard },
               { label: 'Inspo', to: `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}/inspo`, icon: Lightbulb },
-              { label: 'Social Profiles', to: `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}/profiles`, icon: Users },
               { label: 'Comments', to: `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}/comments`, icon: MessageSquare },
               { label: 'Benchmark', to: `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}/benchmark`, icon: BarChart2 },
               { label: 'Settings', to: `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}/settings`, icon: Settings },
