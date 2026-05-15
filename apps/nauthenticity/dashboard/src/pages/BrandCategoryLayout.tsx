@@ -5,6 +5,7 @@ import { getBrandTargets, addBrandTarget, capturePostByUrl, removeBrandTarget, a
 import { Plus, ArrowLeft, X, Trash2, AlertTriangle } from 'lucide-react';
 import { SocialProfileCard } from '../components/SocialProfileCard';
 import { PostGrid } from '../components/PostGrid';
+import { CreateContentButton } from '../components/CreateContentButton';
 
 interface ExtraTab {
   key: string;
@@ -234,14 +235,14 @@ export const BrandCategoryLayout = ({
         <Route
           path="profiles"
           element={isLoading ? <div>Loading...</div> : (
-            <ProfilesTab profiles={profileMemberships} onRemove={handleRemove} removing={removing} />
+            <ProfilesTab profiles={profileMemberships} onRemove={handleRemove} removing={removing} brandId={brandId!} category={category} />
           )}
         />
-        <Route path="profiles/:username" element={<ProfileDetailView title={title} />} />
+        <Route path="profiles/:username" element={<ProfileDetailView title={title} brandId={brandId!} category={category} />} />
         <Route
           path="posts"
           element={isLoading ? <div>Loading...</div> : (
-            <PostsTab postMemberships={postMemberships} onRemove={handleRemove} removing={removing} />
+            <PostsTab postMemberships={postMemberships} onRemove={handleRemove} removing={removing} brandId={brandId!} category={category} />
           )}
         />
         {extraTabs.map(tab => (
@@ -380,7 +381,7 @@ export const BrandCategoryLayout = ({
 
 // ── Profiles Tab ──────────────────────────────────────────────────────────────
 
-const ProfilesTab = ({ profiles, onRemove }: { profiles: any[]; onRemove: (id: string, label: string) => void; removing: string | null }) => {
+const ProfilesTab = ({ profiles, onRemove, brandId, category }: { profiles: any[]; onRemove: (id: string, label: string) => void; removing: string | null; brandId: string; category: string }) => {
   const navigate = useNavigate();
 
   if (profiles.length === 0) {
@@ -394,12 +395,16 @@ const ProfilesTab = ({ profiles, onRemove }: { profiles: any[]; onRemove: (id: s
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
       {profiles.map((m: any) => (
-        <SocialProfileCard
-          key={m.id}
-          profile={m.socialProfile}
-          onSelect={(username) => navigate(`../profiles/${username}`)}
-          onDelete={async () => onRemove(m.id, `@${m.socialProfile?.username ?? 'profile'}`)}
-        />
+        <div key={m.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <SocialProfileCard
+            profile={m.socialProfile}
+            onSelect={(username) => navigate(`../profiles/${username}`)}
+            onDelete={async () => onRemove(m.id, `@${m.socialProfile?.username ?? 'profile'}`)}
+          />
+          {category === 'INSPO' && m.socialProfile?.id && (
+            <CreateContentButton brandId={brandId} itemType="profile" itemId={m.socialProfile.id} />
+          )}
+        </div>
       ))}
     </div>
   );
@@ -407,7 +412,7 @@ const ProfilesTab = ({ profiles, onRemove }: { profiles: any[]; onRemove: (id: s
 
 // ── Profile Detail ────────────────────────────────────────────────────────────
 
-const ProfileDetailView = ({ title }: { title: string }) => {
+const ProfileDetailView = ({ title, brandId, category }: { title: string; brandId: string; category: string }) => {
   const { username } = useParams<{ username: string }>();
   const navigate = useNavigate();
   const [sort, setSort] = useState<'recent' | 'oldest' | 'likes' | 'comments'>('recent');
@@ -460,6 +465,23 @@ const ProfileDetailView = ({ title }: { title: string }) => {
             <div style={{ padding: '3rem', textAlign: 'center', color: '#8b949e', background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border)' }}>
               No posts captured yet for this profile.
             </div>
+          ) : category === 'INSPO' ? (
+            <div className="posts-grid">
+              {[...account.posts].sort((a, b) => {
+                if (sort === 'recent') return new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime();
+                if (sort === 'oldest') return new Date(a.postedAt).getTime() - new Date(b.postedAt).getTime();
+                if (sort === 'likes') return b.likes - a.likes;
+                if (sort === 'comments') return b.comments - a.comments;
+                return 0;
+              }).map((post: any) => (
+                <div key={post.id} style={{ position: 'relative' }}>
+                  <PostGrid posts={[post]} sort="recent" />
+                  <div style={{ position: 'absolute', bottom: '6px', left: '6px', zIndex: 10 }}>
+                    <CreateContentButton brandId={brandId} itemType="post" itemId={post.id} />
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
             <PostGrid posts={account.posts} sort={sort} />
           )}
@@ -471,7 +493,7 @@ const ProfileDetailView = ({ title }: { title: string }) => {
 
 // ── Posts Tab ─────────────────────────────────────────────────────────────────
 
-const PostsTab = ({ postMemberships, onRemove, removing }: { postMemberships: any[]; onRemove: (id: string, label: string) => void; removing: string | null }) => {
+const PostsTab = ({ postMemberships, onRemove, removing, brandId, category }: { postMemberships: any[]; onRemove: (id: string, label: string) => void; removing: string | null; brandId: string; category: string }) => {
   if (postMemberships.length === 0) {
     return (
       <div style={{ padding: '3rem', textAlign: 'center', color: '#8b949e', border: '1px dashed var(--border)', borderRadius: '12px' }}>
@@ -503,6 +525,11 @@ const PostsTab = ({ postMemberships, onRemove, removing }: { postMemberships: an
             >
               <Trash2 size={13} />
             </button>
+            {category === 'INSPO' && (
+              <div style={{ position: 'absolute', bottom: '6px', left: '6px', zIndex: 10 }}>
+                <CreateContentButton brandId={brandId} itemType="post" itemId={m.post.id} />
+              </div>
+            )}
           </div>
         );
       })}

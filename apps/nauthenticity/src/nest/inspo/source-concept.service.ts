@@ -319,4 +319,118 @@ Return JSON: { "sourceConcepts": ["...", "..."] }`,
 
     return { generated }
   }
+
+  // ── Dispatch a concept from a specific InspoBase item to flownau ideation ──
+
+  async dispatchFromItem(
+    brandId: string,
+    itemType: 'post' | 'profile' | 'voicenote' | 'youtube' | 'blog',
+    itemId: string,
+  ): Promise<{ dispatched: boolean; conceptId: string }> {
+    const flownauUrl = this.config.get<string>('FLOWNAU_URL')
+    const authSecret = this.config.get<string>('AUTH_SECRET')
+    if (!flownauUrl || !authSecret) throw new Error('FLOWNAU_URL or AUTH_SECRET not configured')
+
+    const concept = await this.resolveOrCreateConcept(brandId, itemType, itemId)
+    if (!concept) throw new NotFoundException(`No source concept available for this ${itemType}`)
+
+    const { signServiceToken } = await import('@nau/auth')
+    const axios = (await import('axios')).default
+    const token = await signServiceToken({ secret: authSecret, iss: 'nauthenticity', aud: 'flownau' })
+
+    await axios.post(
+      `${flownauUrl}/api/v1/_service/ideation`,
+      { brandId, topic: concept.content, sourceRef: concept.id },
+      { headers: { Authorization: `Bearer ${token}` }, timeout: 120_000 },
+    )
+
+    await this.prisma.sourceConcept.update({
+      where: { id: concept.id },
+      data: { status: 'consumed', consumedAt: new Date() },
+    })
+
+    return { dispatched: true, conceptId: concept.id }
+  }
+
+  private async resolveOrCreateConcept(
+    brandId: string,
+    itemType: 'post' | 'profile' | 'voicenote' | 'youtube' | 'blog',
+    itemId: string,
+  ) {
+    // Try existing pending concept linked to this item first
+    const existing = await this.findPendingConceptForItem(itemType, itemId)
+    if (existing) return existing
+
+    // For types that store a synthesis, create a transient concept on the fly
+    if (itemType === 'post') {
+      const post = await this.prisma.post.findUnique({ where: { id: itemId }, select: { postSynthesis: true, caption: true } })
+      const content = post?.postSynthesis ?? post?.caption
+      if (!content) return null
+      const concept = await this.prisma.sourceConcept.create({
+        data: { brandId, content, sourceType: 'specific_post', status: 'pending' },
+      })
+      await this.prisma.sourceConceptSource.create({ data: { sourceConceptId: concept.id, postId: itemId } })
+      return concept
+    }
+
+    if (itemType === 'voicenote') {
+      const v = await this.prisma.voicenote.findUnique({ where: { id: itemId }, select: { synthesis: true } })
+      if (!v?.synthesis) return null
+      const concept = await this.prisma.sourceConcept.create({
+        data: { brandId, content: v.synthesis, sourceType: 'voicenote', status: 'pending' },
+      })
+      return concept
+    }
+
+    if (itemType === 'youtube') {
+      const video = await this.prisma.youtubeVideo.findUnique({ where: { id: itemId }, select: { synthesis: true } })
+      if (!video?.synthesis) return null
+      return this.prisma.sourceConcept.create({
+        data: { brandId, content: video.synthesis, sourceType: 'inspo_base', status: 'pending' },
+      })
+    }
+
+    if (itemType === 'blog') {
+      const post = await this.prisma.blogPost.findUnique({ where: { id: itemId }, select: { synthesis: true, title: true } })
+      const content = post?.synthesis ?? post?.title
+      if (!content) return null
+      return this.prisma.sourceConcept.create({
+        data: { brandId, content, sourceType: 'inspo_base', status: 'pending' },
+      })
+    }
+
+    // profile — only use an existing concept, never generate on the fly
+    return null
+  }
+
+  private async findPendingConceptForItem(
+    itemType: 'post' | 'profile' | 'voicenote' | 'youtube' | 'blog',
+    itemId: string,
+  ) {
+    if (itemType === 'post') {
+      const src = await this.prisma.sourceConceptSource.findFirst({
+        where: { postId: itemId, sourceConcept: { status: 'pending' } },
+        include: { sourceConcept: true },
+        orderBy: { sourceConcept: { createdAt: 'asc' } },
+      })
+      return src?.sourceConcept ?? null
+    }
+    if (itemType === 'profile') {
+      const src = await this.prisma.sourceConceptSource.findFirst({
+        where: { socialProfileId: itemId, sourceConcept: { status: 'pending' } },
+        include: { sourceConcept: true },
+        orderBy: { sourceConcept: { createdAt: 'asc' } },
+      })
+      return src?.sourceConcept ?? null
+    }
+    if (itemType === 'voicenote') {
+      const voicenote = await this.prisma.voicenote.findUnique({ where: { id: itemId }, select: { brandId: true, synthesis: true } })
+      if (!voicenote) return null
+      return this.prisma.sourceConcept.findFirst({
+        where: { brandId: voicenote.brandId, sourceType: 'voicenote', status: 'pending', content: voicenote.synthesis },
+      })
+    }
+    // youtube and blog don't link via SourceConceptSource — always create fresh
+    return null
+  }
 }

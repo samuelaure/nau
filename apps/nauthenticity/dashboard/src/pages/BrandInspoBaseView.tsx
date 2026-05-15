@@ -5,6 +5,7 @@ import { Sparkles, Youtube, FileText } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { BrandCategoryLayout } from './BrandCategoryLayout';
 import { StatusBadge } from '../components/StatusBadge';
+import { CreateContentButton } from '../components/CreateContentButton';
 
 export const BrandInspoBaseView = () => {
   const { brandId } = useParams<{ brandId: string }>();
@@ -39,24 +40,25 @@ export const BrandInspoBaseView = () => {
         {
           key: 'voicenotes',
           label: `Voicenotes${!loadingVoicenotes ? ` (${voicenotes?.length ?? 0})` : ''}`,
-          content: <VoicenotesTab voicenotes={voicenotes ?? []} loading={loadingVoicenotes} />,
+          content: <VoicenotesTab voicenotes={voicenotes ?? []} loading={loadingVoicenotes} brandId={brandId!} />,
         },
         {
           key: 'youtube',
           label: `YouTube${!loadingYoutube ? ` (${youtubeVideos?.length ?? 0})` : ''}`,
-          content: <YoutubeTab videos={youtubeVideos ?? []} loading={loadingYoutube} />,
+          content: <YoutubeTab videos={youtubeVideos ?? []} loading={loadingYoutube} brandId={brandId!} />,
         },
         {
           key: 'blog',
           label: `Blog${!loadingBlog ? ` (${blogPosts?.length ?? 0})` : ''}`,
-          content: <BlogTab posts={blogPosts ?? []} loading={loadingBlog} />,
+          content: <BlogTab posts={blogPosts ?? []} loading={loadingBlog} brandId={brandId!} />,
         },
       ]}
     />
   );
 };
 
-const VoicenotesTab = ({ voicenotes, loading }: { voicenotes: any[]; loading: boolean }) => {
+
+const VoicenotesTab = ({ voicenotes, loading, brandId }: { voicenotes: any[]; loading: boolean; brandId: string }) => {
   if (loading) return <div style={{ color: '#8b949e' }}>Loading voicenotes...</div>;
 
   if (voicenotes.length === 0) {
@@ -71,9 +73,12 @@ const VoicenotesTab = ({ voicenotes, loading }: { voicenotes: any[]; loading: bo
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       {voicenotes.map((v: any) => (
         <div key={v.id} style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: '10px', padding: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <span style={{ fontSize: '0.75rem', color: '#8b949e' }}>
-            {formatDistanceToNow(new Date(v.createdAt), { addSuffix: true })}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '0.75rem', color: '#8b949e' }}>
+              {formatDistanceToNow(new Date(v.createdAt), { addSuffix: true })}
+            </span>
+            <CreateContentButton brandId={brandId} itemType="voicenote" itemId={v.id} />
+          </div>
           <p style={{ margin: 0, fontSize: '0.9rem', color: '#c9d1d9', lineHeight: '1.6' }}>{v.cleanTranscription}</p>
           {v.synthesis && (
             <div style={{ paddingTop: '0.75rem', borderTop: '1px solid var(--border)' }}>
@@ -87,7 +92,7 @@ const VoicenotesTab = ({ voicenotes, loading }: { voicenotes: any[]; loading: bo
   );
 };
 
-const YoutubeTab = ({ videos, loading }: { videos: ReturnType<typeof getYoutubeVideos> extends Promise<infer T> ? T : never; loading: boolean }) => {
+const YoutubeTab = ({ videos, loading, brandId }: { videos: ReturnType<typeof getYoutubeVideos> extends Promise<infer T> ? T : never; loading: boolean; brandId: string }) => {
   if (loading) return <div style={{ color: '#8b949e' }}>Loading YouTube videos...</div>;
 
   if (videos.length === 0) {
@@ -127,6 +132,7 @@ const YoutubeTab = ({ videos, loading }: { videos: ReturnType<typeof getYoutubeV
                 {v.failureReason === 'duration_limit_exceeded' ? 'Video exceeds 60-minute limit' : v.failureReason}
               </span>
             )}
+            {v.status === 'done' && <CreateContentButton brandId={brandId} itemType="youtube" itemId={v.id} />}
           </div>
         </div>
       ))}
@@ -134,7 +140,7 @@ const YoutubeTab = ({ videos, loading }: { videos: ReturnType<typeof getYoutubeV
   );
 };
 
-const BlogTab = ({ posts, loading }: { posts: ReturnType<typeof getBlogPosts> extends Promise<infer T> ? T : never; loading: boolean }) => {
+const BlogTab = ({ posts, loading, brandId }: { posts: ReturnType<typeof getBlogPosts> extends Promise<infer T> ? T : never; loading: boolean; brandId: string }) => {
   if (loading) return <div style={{ color: '#8b949e' }}>Loading blog posts...</div>;
 
   if (posts.length === 0) {
@@ -172,6 +178,7 @@ const BlogTab = ({ posts, loading }: { posts: ReturnType<typeof getBlogPosts> ex
               {p.failureReason && (
                 <span style={{ fontSize: '0.72rem', color: '#f85149' }}>{p.failureReason}</span>
               )}
+              {p.status === 'done' && <CreateContentButton brandId={brandId} itemType="blog" itemId={p.id} />}
             </div>
             <FileText size={16} style={{ color: '#8b949e', flexShrink: 0, marginTop: '2px' }} />
           </div>
