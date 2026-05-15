@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import {
-  Loader2, X, Film, Mic, Play, Pencil,
+  Loader2, X, Film, Mic, Play, Pencil, Copy,
   LayoutGrid, ImageIcon, Clock, Layers, Volume2, VolumeX,
   ToggleLeft, ToggleRight,
 } from 'lucide-react'
@@ -240,11 +240,13 @@ function TemplateModal({
   brandId,
   onClose,
   onRefresh,
+  onDuplicated,
 }: {
   template: Template
   brandId: string
   onClose: () => void
   onRefresh: () => void
+  onDuplicated: (newTemplate: Template) => void
 }) {
   const config = template.brandConfigs?.[0]
   const [isEnabled, setIsEnabled] = useState(config?.enabled ?? false)
@@ -257,6 +259,7 @@ function TemplateModal({
   const [saving, setSaving] = useState(false)
   const [savingPrompt, setSavingPrompt] = useState(false)
   const [savingName, setSavingName] = useState(false)
+  const [duplicating, setDuplicating] = useState(false)
   const [muted, setMuted] = useState(true)
   const videoRef = useRef<HTMLVideoElement>(null)
 
@@ -339,6 +342,25 @@ function TemplateModal({
       toast.error('Failed to save name')
     } finally {
       setSavingName(false)
+    }
+  }
+
+  const duplicate = async () => {
+    setDuplicating(true)
+    try {
+      const res = await fetch('/api/account-templates/duplicate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brandId, templateId: template.id }),
+      })
+      if (!res.ok) throw new Error()
+      const { template: newTemplate } = await res.json() as { template: Template }
+      await onRefresh()
+      onDuplicated(newTemplate)
+    } catch {
+      toast.error('Failed to duplicate template')
+    } finally {
+      setDuplicating(false)
     }
   }
 
@@ -433,9 +455,19 @@ function TemplateModal({
                 </span>
               </div>
             </div>
-            <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors shrink-0 mt-0.5">
-              <X size={16} />
-            </button>
+            <div className="flex items-center gap-2 shrink-0 mt-0.5">
+              <button
+                onClick={duplicate}
+                disabled={duplicating}
+                title="Duplicate template"
+                className="text-gray-500 hover:text-white transition-colors disabled:opacity-50"
+              >
+                {duplicating ? <Loader2 size={15} className="animate-spin" /> : <Copy size={15} />}
+              </button>
+              <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+                <X size={16} />
+              </button>
+            </div>
           </div>
 
           <div className="p-5 space-y-5">
@@ -789,6 +821,7 @@ export default function AccountTemplates({ brandId }: { brandId: string }) {
             fetchTemplates()
             setSelected((prev) => prev ? { ...prev } : null)
           }}
+          onDuplicated={(newTemplate) => setSelected(newTemplate)}
         />
       )}
     </div>
