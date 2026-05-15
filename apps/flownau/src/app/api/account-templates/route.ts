@@ -60,7 +60,7 @@ export async function GET(req: Request) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json()
-    const { brandId, templateId, autoApproveDraft, autoApprovePost, enabled, customPrompt, slotOverrides } = body
+    const { brandId, templateId, autoApproveDraft, autoApprovePost, enabled, customName, customPrompt, slotOverrides } = body
 
     if (!brandId || !templateId) {
       return NextResponse.json({ error: 'Missing brandId or templateId' }, { status: 400 })
@@ -74,6 +74,7 @@ export async function PUT(req: Request) {
         autoApproveDraft: autoApproveDraft ?? false,
         autoApprovePost: autoApprovePost ?? false,
         enabled: enabled ?? true,
+        customName: customName ?? null,
         customPrompt: customPrompt ?? null,
         slotOverrides: slotOverrides ?? null,
       },
@@ -81,11 +82,15 @@ export async function PUT(req: Request) {
         ...(autoApproveDraft !== undefined && { autoApproveDraft }),
         ...(autoApprovePost !== undefined && { autoApprovePost }),
         ...(enabled !== undefined && { enabled }),
+        ...(customName !== undefined && { customName: customName || null }),
         ...(customPrompt !== undefined && { customPrompt: customPrompt || null }),
         ...(slotOverrides !== undefined && { slotOverrides: slotOverrides || null }),
       },
     })
 
+    if (customName !== undefined) {
+      await recordPromptChange('brand_account_template', config.id, 'customName', customName)
+    }
     if (customPrompt !== undefined) {
       await recordPromptChange('brand_account_template', config.id, 'customPrompt', customPrompt)
     }

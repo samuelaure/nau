@@ -41,6 +41,39 @@ const BrandContextSchema = z.object({
 
 export type BrandContextShape = z.infer<typeof BrandContextSchema>
 
+function renderToPlainText(ctx: BrandContextShape): string {
+  const lines: string[] = []
+
+  if (ctx.identity?.oneLiner) lines.push(`About: ${ctx.identity.oneLiner}`)
+  if (ctx.identity?.niche) lines.push(`Niche: ${ctx.identity.niche}`)
+
+  if (ctx.audience?.description) lines.push(`Audience: ${ctx.audience.description}`)
+  if (ctx.audience?.pains?.length) lines.push(`Audience pains: ${ctx.audience.pains.join('; ')}`)
+  if (ctx.audience?.aspirations?.length) lines.push(`Audience aspirations: ${ctx.audience.aspirations.join('; ')}`)
+
+  if (ctx.pillars?.length) {
+    const list = ctx.pillars.map(p => p.description ? `${p.name} (${p.description})` : p.name).join('; ')
+    lines.push(`Content pillars: ${list}`)
+  }
+
+  if (ctx.voice) {
+    const bits: string[] = []
+    if (ctx.voice.descriptors?.length) bits.push(ctx.voice.descriptors.join(', '))
+    if (ctx.voice.register) bits.push(`register: ${ctx.voice.register}`)
+    if (ctx.voice.energy) bits.push(`energy: ${ctx.voice.energy}`)
+    if (ctx.voice.pov) bits.push(`POV: ${ctx.voice.pov}`)
+    if (bits.length) lines.push(`Voice: ${bits.join(' · ')}`)
+  }
+
+  if (ctx.doDont?.do?.length) lines.push(`Do: ${ctx.doDont.do.join('; ')}`)
+  if (ctx.doDont?.dont?.length) lines.push(`Don't: ${ctx.doDont.dont.join('; ')}`)
+
+  if (ctx.positioning?.pov) lines.push(`POV: ${ctx.positioning.pov}`)
+  if (ctx.positioning?.contrasts?.length) lines.push(`Pushes back against: ${ctx.positioning.contrasts.join('; ')}`)
+
+  return lines.join('\n')
+}
+
 export interface GenerateSources {
   ownedProfile: boolean
   inspoBase: boolean
@@ -76,13 +109,25 @@ export class BrandContextService {
     })
   }
 
-  async saveContext(brandId: string, content: BrandContextShape): Promise<void> {
+  async saveContext(brandId: string, content: BrandContextShape | string): Promise<void> {
+    const text = typeof content === 'string' ? content : renderToPlainText(content)
     await this.prisma.brandContext.upsert({
       where: { brandId },
-      create: { brandId, status: 'ready', content: content as any, generatedAt: new Date() },
-      update: { status: 'ready', content: content as any, generatedAt: new Date() },
+      create: { brandId, status: 'ready', content: text, generatedAt: new Date() },
+      update: { status: 'ready', content: text, generatedAt: new Date() },
     })
-    void this.pushToFlownau(brandId, content)
+    const record = await this.prisma.brandContext.findUnique({ where: { brandId }, select: { customAdditions: true } })
+    void this.pushToFlownau(brandId, text, record?.customAdditions ?? null)
+  }
+
+  async saveCustomAdditions(brandId: string, customAdditions: string): Promise<void> {
+    const record = await this.prisma.brandContext.upsert({
+      where: { brandId },
+      create: { brandId, status: 'idle', customAdditions },
+      update: { customAdditions },
+      select: { content: true },
+    })
+    void this.pushToFlownau(brandId, record.content ?? null, customAdditions)
   }
 
   // ── Internal ────────────────────────────────────────────────────────────────
@@ -122,7 +167,7 @@ export class BrandContextService {
       const context = await this.callLLM({
         brandId,
         manual: sources.manual,
-        previousContext: previousCtx?.content as BrandContextShape | null ?? null,
+        previousContext: previousCtx?.content ?? null,
         ownedPosts,
         inspoPosts: inspoPostsForLLM,
       })
@@ -141,7 +186,7 @@ export class BrandContextService {
   private async callLLM(args: {
     brandId: string
     manual: string | null
-    previousContext: BrandContextShape | null
+    previousContext: string | null
     ownedPosts: { url: string | null; caption: string | null }[]
     inspoPosts: { url: string | null; caption: string | null }[]
   }): Promise<BrandContextShape> {
@@ -174,8 +219,8 @@ Return ONLY valid JSON matching this shape:
       parts.push(`## MANUAL INPUT (highest priority — treat as direct instructions)\n${manual.trim()}`)
     }
 
-    if (previousContext) {
-      parts.push(`## PREVIOUS BRAND CONTEXT (refine and evolve, don't just repeat)\n${JSON.stringify(previousContext, null, 2)}`)
+    if (previousContext?.trim()) {
+      parts.push(`## PREVIOUS BRAND CONTEXT (refine and evolve, don't just repeat)\n${previousContext.trim()}`)
     }
 
     if (ownedPosts.length > 0) {
@@ -242,7 +287,9 @@ Return ONLY valid JSON matching this shape:
     return BrandContextSchema.parse(parsed)
   }
 
-  private async pushToFlownau(brandId: string, content: BrandContextShape): Promise<void> {
+  private async pushToFlownau(brandId: string, content: string | null, customAdditions: string | null = null): Promise<void> {
+    const combined = [content?.trim(), customAdditions?.trim()].filter(Boolean).join('\n\nCustom additions:\n')
+    if (!combined) return
     const flownauUrl = this.config.get<string>('FLOWNAU_URL') || 'http://localhost:3003'
     const authSecret = this.config.get<string>('AUTH_SECRET')
 
@@ -257,7 +304,7 @@ Return ONLY valid JSON matching this shape:
 
       await axios.patch(
         `${flownauUrl}/api/internal/brands/${brandId}/context`,
-        { context: content },
+        { context: combined },
         {
           headers: {
             'Content-Type': 'application/json',

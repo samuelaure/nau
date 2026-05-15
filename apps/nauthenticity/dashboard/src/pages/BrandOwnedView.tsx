@@ -8,7 +8,8 @@ import { Loader, Send, RefreshCw, Sparkles, ChevronDown, ChevronUp, Save } from 
 
 interface BrandContextRecord {
   status: 'none' | 'idle' | 'generating' | 'ready' | 'failed';
-  content?: Record<string, unknown> | null;
+  content?: string | null;
+  customAdditions?: string | null;
   sources?: Record<string, unknown> | null;
   generatedAt?: string | null;
   updatedAt?: string;
@@ -36,6 +37,8 @@ function BrandContextCard({ brandId }: { brandId: string }) {
   });
   const [editedContent, setEditedContent] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+  const [customAdditions, setCustomAdditions] = useState('');
+  const [customAdditionsDirty, setCustomAdditionsDirty] = useState(false);
 
   const { data: ctx, isLoading } = useQuery<BrandContextRecord>({
     queryKey: ['brand-context', brandId],
@@ -66,9 +69,27 @@ function BrandContextCard({ brandId }: { brandId: string }) {
   // Sync edit textarea when context loads
   useEffect(() => {
     if (ctx?.content && !isEditing) {
-      setEditedContent(JSON.stringify(ctx.content, null, 2));
+      setEditedContent(ctx.content);
     }
   }, [ctx?.content, isEditing]);
+
+  // Sync custom additions once on load (never overwrite if user is editing)
+  useEffect(() => {
+    if (!customAdditionsDirty && ctx?.customAdditions != null) {
+      setCustomAdditions(ctx.customAdditions);
+    }
+  }, [ctx?.customAdditions]);
+
+  const saveCustomAdditionsMutation = useMutation({
+    mutationFn: async () => {
+      const { data } = await api.patch(`/brands/${brandId}/context/custom-additions`, { customAdditions });
+      return data;
+    },
+    onSuccess: () => {
+      setCustomAdditionsDirty(false);
+      queryClient.invalidateQueries({ queryKey: ['brand-context', brandId] });
+    },
+  });
 
   const generateMutation = useMutation({
     mutationFn: async () => {
@@ -90,13 +111,7 @@ function BrandContextCard({ brandId }: { brandId: string }) {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(editedContent);
-      } catch {
-        throw new Error('Invalid JSON — fix the content before saving.');
-      }
-      const { data } = await api.patch(`/brands/${brandId}/context`, { content: parsed });
+      const { data } = await api.patch(`/brands/${brandId}/context`, { content: editedContent.trim() });
       return data;
     },
     onSuccess: () => {
@@ -240,9 +255,9 @@ function BrandContextCard({ brandId }: { brandId: string }) {
       ) : hasContext ? (
         <div>
           <textarea
-            value={isEditing ? editedContent : JSON.stringify(ctx.content, null, 2)}
+            value={isEditing ? editedContent : (ctx.content ?? '')}
             onChange={(e) => { setIsEditing(true); setEditedContent(e.target.value); }}
-            onFocus={() => setIsEditing(true)}
+            onFocus={() => { if (!isEditing) { setIsEditing(true); setEditedContent(ctx.content ?? ''); } }}
             style={{
               width: '100%',
               minHeight: '240px',
@@ -251,14 +266,14 @@ function BrandContextCard({ brandId }: { brandId: string }) {
               border: '1px solid var(--border)',
               borderRadius: '6px',
               color: 'var(--text-primary)',
-              fontSize: '0.8rem',
-              fontFamily: 'monospace',
+              fontSize: '0.875rem',
+              lineHeight: '1.6',
               resize: 'vertical',
               boxSizing: 'border-box',
             }}
           />
           <p style={{ margin: '0.4rem 0 0 0', fontSize: '0.78rem', color: '#6b7280' }}>
-            Edit JSON directly and click Save — changes sync to flownau automatically.
+            Edit directly and click Save — changes sync to flownau automatically.
           </p>
         </div>
       ) : (
@@ -266,6 +281,50 @@ function BrandContextCard({ brandId }: { brandId: string }) {
           No brand context yet. Click Generate to create one from owned posts, InspoBase, or a manual description.
         </p>
       )}
+
+      {/* Custom Additions */}
+      <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <div>
+            <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>Custom Additions</p>
+            <p style={{ margin: '0.15rem 0 0 0', fontSize: '0.78rem', color: '#6b7280' }}>
+              Persists across regeneration. Appended to the brand context sent to content generation.
+            </p>
+          </div>
+          {customAdditionsDirty && (
+            <button
+              onClick={() => saveCustomAdditionsMutation.mutate()}
+              disabled={saveCustomAdditionsMutation.isPending}
+              className="btn-primary"
+              style={{ padding: '0.4rem 0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem' }}
+            >
+              {saveCustomAdditionsMutation.isPending ? <Loader size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={13} />}
+              Save
+            </button>
+          )}
+        </div>
+        <textarea
+          value={customAdditions}
+          onChange={(e) => { setCustomAdditions(e.target.value); setCustomAdditionsDirty(true); }}
+          placeholder={'Add any extra details, rules, or notes that the AI should always consider for this brand...\n\nExamples:\n• Always reference our founding story in 2018\n• Never mention pricing directly\n• The founder\'s name is María and she often appears on camera'}
+          style={{
+            width: '100%',
+            minHeight: '120px',
+            padding: '0.75rem',
+            background: 'var(--bg)',
+            border: '1px solid var(--border)',
+            borderRadius: '6px',
+            color: 'var(--text-primary)',
+            fontSize: '0.875rem',
+            lineHeight: '1.6',
+            resize: 'vertical',
+            boxSizing: 'border-box',
+          }}
+        />
+        {saveCustomAdditionsMutation.isError && (
+          <p style={{ margin: '0.3rem 0 0 0', fontSize: '0.78rem', color: '#f87171' }}>Save failed. Try again.</p>
+        )}
+      </div>
 
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>

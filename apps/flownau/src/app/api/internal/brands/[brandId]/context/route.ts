@@ -7,7 +7,7 @@ import { prisma } from '@/modules/shared/prisma'
 /**
  * PATCH /api/internal/brands/:brandId/context
  * Called by nauthenticity after generating or saving brand context.
- * Writes Brand.context (BrandContext JSON) for prompt kernel consumption.
+ * Writes Brand.context (plain text) for prompt kernel consumption.
  */
 export async function PATCH(
   req: NextRequest,
@@ -19,8 +19,8 @@ export async function PATCH(
   const body = await req.json()
   const { context } = body as { context: unknown }
 
-  if (!context || typeof context !== 'object') {
-    return NextResponse.json({ error: 'context must be an object' }, { status: 400 })
+  if (!context || typeof context !== 'string') {
+    return NextResponse.json({ error: 'context must be a string' }, { status: 400 })
   }
 
   await prisma.brand.update({

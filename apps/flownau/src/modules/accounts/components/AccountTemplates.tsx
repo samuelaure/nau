@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import {
-  Loader2, X, Film, Mic, Play,
+  Loader2, X, Film, Mic, Play, Pencil, Copy,
   LayoutGrid, ImageIcon, Clock, Layers, Volume2, VolumeX,
   ToggleLeft, ToggleRight,
 } from 'lucide-react'
@@ -53,6 +53,7 @@ type Template = {
     enabled: boolean
     autoApproveDraft: boolean
     autoApprovePost: boolean
+    customName?: string | null
     customPrompt?: string | null
     slotOverrides?: SlotOverrides | null
   }> | null
@@ -239,20 +240,26 @@ function TemplateModal({
   brandId,
   onClose,
   onRefresh,
+  onDuplicated,
 }: {
   template: Template
   brandId: string
   onClose: () => void
   onRefresh: () => void
+  onDuplicated: (newTemplate: Template) => void
 }) {
   const config = template.brandConfigs?.[0]
   const [isEnabled, setIsEnabled] = useState(config?.enabled ?? false)
   const [autoApproveDraft, setAutoApproveDraft] = useState(config?.autoApproveDraft ?? false)
   const [autoApprovePost, setAutoApprovePost] = useState(config?.autoApprovePost ?? false)
+  const [customName, setCustomName] = useState(config?.customName ?? '')
+  const [editingName, setEditingName] = useState(false)
   const [customPrompt, setCustomPrompt] = useState(config?.customPrompt ?? '')
   const [slotOverrides, setSlotOverrides] = useState<SlotOverrides>(config?.slotOverrides ?? {})
   const [saving, setSaving] = useState(false)
   const [savingPrompt, setSavingPrompt] = useState(false)
+  const [savingName, setSavingName] = useState(false)
+  const [duplicating, setDuplicating] = useState(false)
   const [muted, setMuted] = useState(true)
   const videoRef = useRef<HTMLVideoElement>(null)
 
@@ -319,6 +326,44 @@ function TemplateModal({
     }
   }
 
+  const saveCustomName = async () => {
+    setSavingName(true)
+    try {
+      const res = await fetch('/api/account-templates', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brandId, templateId: template.id, customName: customName || null }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success('Name saved')
+      setEditingName(false)
+      onRefresh()
+    } catch {
+      toast.error('Failed to save name')
+    } finally {
+      setSavingName(false)
+    }
+  }
+
+  const duplicate = async () => {
+    setDuplicating(true)
+    try {
+      const res = await fetch('/api/account-templates/duplicate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brandId, templateId: template.id }),
+      })
+      if (!res.ok) throw new Error()
+      const { template: newTemplate } = await res.json() as { template: Template }
+      await onRefresh()
+      onDuplicated(newTemplate)
+    } catch {
+      toast.error('Failed to duplicate template')
+    } finally {
+      setDuplicating(false)
+    }
+  }
+
   const handleSlotChange = (key: string, patch: { intention?: string; minWords?: number; maxWords?: number } | null) => {
     const next = { ...slotOverrides }
     if (patch === null) { delete next[key] } else { next[key] = { ...next[key], ...patch } }
@@ -379,15 +424,50 @@ function TemplateModal({
                 <FormatIcon size={14} />
               </div>
               <div className="min-w-0">
-                <h2 className="font-semibold text-sm leading-tight">{template.name}</h2>
+                {editingName ? (
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      autoFocus
+                      value={customName}
+                      onChange={(e) => setCustomName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') saveCustomName(); if (e.key === 'Escape') setEditingName(false) }}
+                      placeholder={template.name}
+                      className="text-sm font-semibold bg-gray-800 border border-gray-600 rounded px-2 py-0.5 text-white focus:outline-none focus:border-gray-400 w-40"
+                    />
+                    <button onClick={saveCustomName} disabled={savingName} className="text-[11px] text-green-400 hover:text-green-300 disabled:opacity-50">
+                      {savingName ? '…' : 'Save'}
+                    </button>
+                    <button onClick={() => { setCustomName(config?.customName ?? ''); setEditingName(false) }} className="text-[11px] text-gray-500 hover:text-gray-300">
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={() => setEditingName(true)} className="group flex items-center gap-1 text-left">
+                    <h2 className="font-semibold text-sm leading-tight group-hover:text-white/80 transition-colors">
+                      {customName || template.name}
+                    </h2>
+                    {customName && <span className="text-[10px] text-gray-600 group-hover:text-gray-500">(custom)</span>}
+                    <Pencil size={11} className="text-gray-700 group-hover:text-gray-400 transition-colors shrink-0" />
+                  </button>
+                )}
                 <span className={cn('text-[10px] px-1.5 py-0.5 rounded border mt-0.5 inline-block', FORMAT_COLOR[template.format] ?? 'bg-white/5 text-white/40 border-gray-800')}>
                   {template.format.replace('_', ' ')}
                 </span>
               </div>
             </div>
-            <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors shrink-0 mt-0.5">
-              <X size={16} />
-            </button>
+            <div className="flex items-center gap-2 shrink-0 mt-0.5">
+              <button
+                onClick={duplicate}
+                disabled={duplicating}
+                title="Duplicate template"
+                className="text-gray-500 hover:text-white transition-colors disabled:opacity-50"
+              >
+                {duplicating ? <Loader2 size={15} className="animate-spin" /> : <Copy size={15} />}
+              </button>
+              <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+                <X size={16} />
+              </button>
+            </div>
           </div>
 
           <div className="p-5 space-y-5">
@@ -592,7 +672,7 @@ function TemplateCard({
       {/* Info */}
       <div className="p-3 flex flex-col gap-1.5 flex-1">
         <div className="flex items-start justify-between gap-1.5">
-          <p className="text-xs font-semibold leading-snug line-clamp-2 group-hover:text-white transition-colors flex-1">{template.name}</p>
+          <p className="text-xs font-semibold leading-snug line-clamp-2 group-hover:text-white transition-colors flex-1">{config?.customName || template.name}</p>
           <div className="flex items-center gap-1 shrink-0">
             {(config?.customPrompt || (config?.slotOverrides && Object.keys(config.slotOverrides).length > 0)) && (
               <span className="text-[9px] px-1 py-0.5 rounded border bg-amber-500/10 text-amber-400 border-amber-500/20" title="Custom prompt set">
@@ -741,6 +821,7 @@ export default function AccountTemplates({ brandId }: { brandId: string }) {
             fetchTemplates()
             setSelected((prev) => prev ? { ...prev } : null)
           }}
+          onDuplicated={(newTemplate) => setSelected(newTemplate)}
         />
       )}
     </div>

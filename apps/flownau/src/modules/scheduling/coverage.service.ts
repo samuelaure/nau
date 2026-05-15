@@ -458,12 +458,21 @@ export async function smartFillCalendar(brandId: string): Promise<SmartFillResul
       where: { brandId, status: { in: ['IDEA_PENDING', 'IDEA_APPROVED'] } },
     })
 
+  const countUnscheduledDrafts = () =>
+    prisma.post.count({
+      where: { brandId, status: { in: ['DRAFT_PENDING', 'DRAFT_APPROVED'] }, scheduledAt: null, postSlot: null },
+    })
+
   let totalIdeas = await countAvailableIdeas()
   let ideasGenerated = 0
   let noDigest = false
 
+  // Unscheduled drafts will be allocated first by runCheck1, so factor them into
+  // the gap before deciding whether to generate new ideas.
+  const unscheduledDrafts = await countUnscheduledDrafts()
+
   // Generate ideas via source concepts until we have enough to cover the gap
-  if (totalIdeas < slotsNeeded) {
+  if (totalIdeas + unscheduledDrafts < slotsNeeded) {
     const result = await generateIdeasFromSourceConcepts(brandId, brand)
     if (!result.hasConcepts) {
       noDigest = true

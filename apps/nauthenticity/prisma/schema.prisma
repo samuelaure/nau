@@ -322,10 +322,11 @@ model BrandContext {
   brandId     String    @unique
   brand       Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
   status      String    @default("idle") // idle | generating | ready | failed
-  content     Json?     // BrandContext JSON matching flownau BrandContext shape
-  sources     Json?     // { ownedProfile: bool, inspoBase: bool, previousContext: bool, manual: string|null }
-  generatedAt DateTime?
-  updatedAt   DateTime  @updatedAt
+  content          String?   // Plain-text brand context (rendered from generated JSON, user-editable)
+  customAdditions  String?   // User-written additions — persists across regeneration
+  sources          Json?     // { ownedProfile: bool, inspoBase: bool, previousContext: bool, manual: string|null }
+  generatedAt      DateTime?
+  updatedAt        DateTime  @updatedAt
 }
 
 // CategoryMembership links a Brand to either a SocialProfile or a Post under one of the

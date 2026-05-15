@@ -48,7 +48,17 @@ Resonance operates at the central route through three mechanisms: identity expre
 
 Quality criteria: concrete over abstract — a named example beats a category, specificity signals authenticity and aids recall. Write for one person; content addressed to everyone lands for no one. Every piece opens a tension and resolves it — the ending is the inevitable completion of what the opening began, not an appendage.
 
-Never use @handles or social media usernames. Never restate the source idea verbatim.`
+Never use @handles or social media usernames. Never restate the source idea verbatim.
+
+## FORMATTING
+
+Short-form content is consumed vertically and fast. Apply these rules unconditionally — they are not suggestions:
+
+- **Separate every paragraph with a blank line.** Never run two or more paragraphs together without a blank line between them.
+- **Keep paragraphs short.** 1–3 sentences per paragraph maximum. If a paragraph is getting long, break it.
+- **No walls of text.** A block of 4+ lines without a break will lose the reader before they reach the point.
+
+These rules apply to every text field — script body, hook, caption, CTA, and any other output field.`
 
 const BASES: Record<'ideation' | 'draft', string> = {
   ideation: IDEATION_BASE,

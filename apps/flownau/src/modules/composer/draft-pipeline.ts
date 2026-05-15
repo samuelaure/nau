@@ -273,7 +273,7 @@ function buildTemplateSchemaBlock(
 
     const captionLine = buildCaptionInstruction(captionOverride)
 
-    return `SLOTS TO FILL:\n${slotBlock}\n${multiSlotRule}\nAlso write:\n${captionLine}\n• hashtags — 5–10 relevant hashtags (without # prefix)\n• brollMood — 1-2 mood/theme keywords for B-roll asset selection\n\nFORMATTING: Use \\n to separate paragraphs within a slot. Do not collapse everything into a single paragraph.\n\nRespond ONLY with valid JSON matching the schema. Never mention @handles.`
+    return `SLOTS TO FILL:\n${slotBlock}\n${multiSlotRule}\nAlso write:\n${captionLine}\n• hashtags — 5–10 relevant hashtags (without # prefix)\n• brollMood — 1-2 mood/theme keywords for B-roll asset selection\n\nRespond ONLY with valid JSON matching the schema. Never mention @handles.`
   }
 
   if (template.contentSchema) {
