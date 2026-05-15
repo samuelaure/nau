@@ -31,7 +31,10 @@ export class VoicenoteService implements OnModuleInit {
     )
   }
 
-  async processAudio(audioUrl: string): Promise<{ rawTranscription: string; cleanTranscription: string; synthesis: string }> {
+  async processAudio(audioUrl: string, brandId?: string): Promise<{ rawTranscription: string; cleanTranscription: string; synthesis: string }> {
+    const language = brandId
+      ? ((await this.prisma.brand.findUnique({ where: { id: brandId }, select: { language: true } }))?.language ?? 'Spanish')
+      : 'Spanish'
     const tmpPath = path.join(os.tmpdir(), `nau-voice-${Date.now()}.ogg`)
 
     try {
@@ -50,6 +53,8 @@ export class VoicenoteService implements OnModuleInit {
             content: `You receive a raw voice transcription from a content creator. Return JSON with two fields:
 - "cleanTranscription": the transcription cleaned of filler words, repeated phrases, and disfluencies, with proper punctuation. Keep all meaning intact.
 - "synthesis": a 2–4 sentence interpretation of the core idea, intent, and key themes the creator expressed. Write it as a rich content angle that an ideation LLM can work from.
+
+Write all output in ${language}.
 
 Return only valid JSON: { "cleanTranscription": "...", "synthesis": "..." }`,
           },

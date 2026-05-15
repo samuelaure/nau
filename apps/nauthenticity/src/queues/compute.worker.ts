@@ -670,6 +670,10 @@ const handleSynthesizeBatch = async (
     });
     const isInspo = !!inspoMembership;
 
+    const brandLanguage = inspoMembership?.brandId
+      ? (await prisma.brand.findUnique({ where: { id: inspoMembership.brandId }, select: { language: true } }))?.language ?? 'Spanish'
+      : 'Spanish';
+
     try {
       if (isInspo) {
         // INSPO path: JSON response with synthesis + sourceConcepts
@@ -682,6 +686,8 @@ const handleSynthesizeBatch = async (
               content: `You are a content analyst. Analyse the provided social media post and return JSON with two fields:
 1. "synthesis": a concise, objective synthesis capturing its core topic, angle, tone, and distinctive qualities. Use as many sentences as needed.
 2. "sourceConcepts": an array of 1-3 distinct content angles (each 30-60 words) that could independently drive a separate ideation batch. Each concept must be self-contained and actionable.
+
+Write all output in ${brandLanguage}.
 
 Return only valid JSON: { "synthesis": "...", "sourceConcepts": ["...", "..."] }`,
             },
@@ -730,7 +736,7 @@ Return only valid JSON: { "synthesis": "...", "sourceConcepts": ["...", "..."] }
           messages: [
             {
               role: 'system',
-              content: 'You are a content analyst. Analyse the provided social media post and write a concise, objective synthesis capturing its core topic, angle, tone, and distinctive qualities. Use as many sentences as needed to represent the post faithfully. Be direct and specific.',
+              content: `You are a content analyst. Analyse the provided social media post and write a concise, objective synthesis capturing its core topic, angle, tone, and distinctive qualities. Use as many sentences as needed to represent the post faithfully. Be direct and specific.\n\nWrite all output in ${brandLanguage}.`,
             },
             { role: 'user', content: contentBlock },
           ],
@@ -807,6 +813,8 @@ const handleYoutubeIngest = async (job: Job): Promise<void> => {
   const { getClientForFeature } = await import('@nau/llm-client');
   const { client, model } = getClientForFeature('synthesis');
 
+  const brandLanguage = (await prisma.brand.findUnique({ where: { id: video.brandId }, select: { language: true } }))?.language ?? 'Spanish';
+
   try {
     let transcript: string;
 
@@ -824,8 +832,7 @@ const handleYoutubeIngest = async (job: Job): Promise<void> => {
       messages: [
         {
           role: 'system',
-          content:
-            'You are a content analyst. Analyse the provided YouTube video transcript and write a concise, objective synthesis capturing its core topic, angle, tone, and distinctive qualities. Use as many sentences as needed to represent the content faithfully. Be direct and specific.',
+          content: `You are a content analyst. Analyse the provided YouTube video transcript and write a concise, objective synthesis capturing its core topic, angle, tone, and distinctive qualities. Use as many sentences as needed to represent the content faithfully. Be direct and specific.\n\nWrite all output in ${brandLanguage}.`,
         },
         { role: 'user', content: transcript },
       ],
@@ -867,6 +874,8 @@ const handleBlogIngest = async (job: Job): Promise<void> => {
   const { getClientForFeature } = await import('@nau/llm-client');
   const { client, model } = getClientForFeature('synthesis');
 
+  const brandLanguage = (await prisma.brand.findUnique({ where: { id: post.brandId }, select: { language: true } }))?.language ?? 'Spanish';
+
   try {
     const article = await scrapeAndParse(post.url);
 
@@ -876,8 +885,7 @@ const handleBlogIngest = async (job: Job): Promise<void> => {
       messages: [
         {
           role: 'system',
-          content:
-            'You are a content analyst. Analyse the provided blog post and write a concise, objective synthesis capturing its core topic, angle, tone, and distinctive qualities. Use as many sentences as needed. Be direct and specific.',
+          content: `You are a content analyst. Analyse the provided blog post and write a concise, objective synthesis capturing its core topic, angle, tone, and distinctive qualities. Use as many sentences as needed. Be direct and specific.\n\nWrite all output in ${brandLanguage}.`,
         },
         { role: 'user', content: `Title: ${article.title ?? 'Unknown'}\n\n${article.rawText}` },
       ],

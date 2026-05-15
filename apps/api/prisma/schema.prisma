@@ -117,6 +117,7 @@ model Brand {
   workspaceId String
   name        String
   handle      String
+  language    String   @default("Spanish")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

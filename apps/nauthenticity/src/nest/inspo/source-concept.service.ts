@@ -155,6 +155,8 @@ A source concept is a rich, self-contained angle or topic that can drive a separ
 
 Generate as many source concepts as genuinely capture distinct angles — be moderate, quality over quantity.
 
+Write all output in ${brand.language}.
+
 Return JSON: { "concepts": [ { "content": "..." }, ... ] }
 Each "content" is a paragraph (30–60 words) describing the concept clearly enough for an ideation LLM to work from it independently.`
 

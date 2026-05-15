@@ -1,0 +1,1 @@
+ALTER TABLE "Brand" ADD COLUMN "language" TEXT NOT NULL DEFAULT 'Spanish';

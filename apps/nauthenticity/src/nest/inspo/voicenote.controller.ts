@@ -15,8 +15,8 @@ export class VoicenoteController {
 
   @Post('_service/audio/process')
   @UseGuards(ServiceAuthGuard)
-  async processAudio(@Body() body: { audioUrl: string }) {
-    return this.voicenoteService.processAudio(body.audioUrl)
+  async processAudio(@Body() body: { audioUrl: string; brandId?: string }) {
+    return this.voicenoteService.processAudio(body.audioUrl, body.brandId)
   }
 
   @Post('_service/brands/:brandId/voicenotes')

@@ -164,8 +164,10 @@ export class BrandContextService {
         .filter((m): m is { post: { url: string | null; caption: string | null } } => !!m.post)
         .map((m) => ({ url: m.post.url ?? null, caption: m.post.caption ?? null }))
 
+      const brandRecord = await this.prisma.brand.findUnique({ where: { id: brandId }, select: { language: true } })
       const context = await this.callLLM({
         brandId,
+        language: brandRecord?.language ?? 'Spanish',
         manual: sources.manual,
         previousContext: previousCtx?.content ?? null,
         ownedPosts,
@@ -185,12 +187,13 @@ export class BrandContextService {
 
   private async callLLM(args: {
     brandId: string
+    language: string
     manual: string | null
     previousContext: string | null
     ownedPosts: { url: string | null; caption: string | null }[]
     inspoPosts: { url: string | null; caption: string | null }[]
   }): Promise<BrandContextShape> {
-    const { brandId, manual, previousContext, ownedPosts, inspoPosts } = args
+    const { brandId, language, manual, previousContext, ownedPosts, inspoPosts } = args
 
     const systemPrompt = `You are a brand strategist building a structured brand context for a content creation system.
 
@@ -201,6 +204,7 @@ Requirements:
 - Every field should reflect real signals from the sources provided.
 - Omit sections you have no evidence for — do not fabricate.
 - Keep all values concise: strings under 120 characters, arrays under 6 items.
+- Write all output in ${language}.
 
 Return ONLY valid JSON matching this shape:
 {
