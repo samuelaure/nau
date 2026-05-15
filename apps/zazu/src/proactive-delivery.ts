@@ -256,7 +256,8 @@ export class ProactiveDeliverySystem {
           take: limit + 1,
         });
         const hasMore = broadcasts.length > limit;
-        return res.status(200).json({ items: broadcasts.slice(0, limit), hasMore });
+        const items = broadcasts.slice(0, limit).map(b => ({ ...b, kind: 'broadcast' }));
+        return res.status(200).json({ items, hasMore });
       } catch (err: any) {
         return res.status(500).json({ error: err.message });
       }
