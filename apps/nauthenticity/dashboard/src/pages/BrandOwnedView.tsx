@@ -8,7 +8,7 @@ import { Loader, Send, RefreshCw, Sparkles, ChevronDown, ChevronUp, Save } from 
 
 interface BrandContextRecord {
   status: 'none' | 'idle' | 'generating' | 'ready' | 'failed';
-  content?: Record<string, unknown> | null;
+  content?: string | null;
   sources?: Record<string, unknown> | null;
   generatedAt?: string | null;
   updatedAt?: string;
@@ -66,7 +66,7 @@ function BrandContextCard({ brandId }: { brandId: string }) {
   // Sync edit textarea when context loads
   useEffect(() => {
     if (ctx?.content && !isEditing) {
-      setEditedContent(JSON.stringify(ctx.content, null, 2));
+      setEditedContent(ctx.content);
     }
   }, [ctx?.content, isEditing]);
 
@@ -90,13 +90,7 @@ function BrandContextCard({ brandId }: { brandId: string }) {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(editedContent);
-      } catch {
-        throw new Error('Invalid JSON — fix the content before saving.');
-      }
-      const { data } = await api.patch(`/brands/${brandId}/context`, { content: parsed });
+      const { data } = await api.patch(`/brands/${brandId}/context`, { content: editedContent.trim() });
       return data;
     },
     onSuccess: () => {
@@ -240,9 +234,9 @@ function BrandContextCard({ brandId }: { brandId: string }) {
       ) : hasContext ? (
         <div>
           <textarea
-            value={isEditing ? editedContent : JSON.stringify(ctx.content, null, 2)}
+            value={isEditing ? editedContent : (ctx.content ?? '')}
             onChange={(e) => { setIsEditing(true); setEditedContent(e.target.value); }}
-            onFocus={() => setIsEditing(true)}
+            onFocus={() => { if (!isEditing) { setIsEditing(true); setEditedContent(ctx.content ?? ''); } }}
             style={{
               width: '100%',
               minHeight: '240px',
@@ -251,14 +245,14 @@ function BrandContextCard({ brandId }: { brandId: string }) {
               border: '1px solid var(--border)',
               borderRadius: '6px',
               color: 'var(--text-primary)',
-              fontSize: '0.8rem',
-              fontFamily: 'monospace',
+              fontSize: '0.875rem',
+              lineHeight: '1.6',
               resize: 'vertical',
               boxSizing: 'border-box',
             }}
           />
           <p style={{ margin: '0.4rem 0 0 0', fontSize: '0.78rem', color: '#6b7280' }}>
-            Edit JSON directly and click Save — changes sync to flownau automatically.
+            Edit directly and click Save — changes sync to flownau automatically.
           </p>
         </div>
       ) : (

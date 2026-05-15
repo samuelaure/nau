@@ -23,7 +23,7 @@ model Brand {
   coverageHorizonDays  Int      @default(7)
   ideationCustomPrompt String?  @db.Text // user-edited from Ideas tab; campaign-level intent for ideation
   draftCustomPrompt    String?  @db.Text // user-edited from Calendar tab; campaign-level intent for drafting
-  context              Json? // BrandContext: nauthenticity-generated, user-editable
+  context              String? // BrandContext: nauthenticity-generated plain text, user-editable
   brandIdentity        Json? // { primaryColor, secondaryColor, titleFont, bodyFont, overlayOpacity, logoUrl }
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
