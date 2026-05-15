@@ -177,6 +177,7 @@ model BrandTemplateConfig {
   autoApproveDraft Boolean  @default(false)
   autoApprovePost  Boolean  @default(false) // autoApproveRendered — kept as autoApprovePost
   enabled          Boolean  @default(true)
+  customName       String?
   customPrompt     String?
   slotOverrides    Json?
   createdAt        DateTime @default(now())
