@@ -116,7 +116,18 @@ export class BrandContextService {
       create: { brandId, status: 'ready', content: text, generatedAt: new Date() },
       update: { status: 'ready', content: text, generatedAt: new Date() },
     })
-    void this.pushToFlownau(brandId, text)
+    const record = await this.prisma.brandContext.findUnique({ where: { brandId }, select: { customAdditions: true } })
+    void this.pushToFlownau(brandId, text, record?.customAdditions ?? null)
+  }
+
+  async saveCustomAdditions(brandId: string, customAdditions: string): Promise<void> {
+    const record = await this.prisma.brandContext.upsert({
+      where: { brandId },
+      create: { brandId, status: 'idle', customAdditions },
+      update: { customAdditions },
+      select: { content: true },
+    })
+    void this.pushToFlownau(brandId, record.content ?? null, customAdditions)
   }
 
   // ── Internal ────────────────────────────────────────────────────────────────
@@ -276,7 +287,9 @@ Return ONLY valid JSON matching this shape:
     return BrandContextSchema.parse(parsed)
   }
 
-  private async pushToFlownau(brandId: string, content: string): Promise<void> {
+  private async pushToFlownau(brandId: string, content: string | null, customAdditions: string | null = null): Promise<void> {
+    const combined = [content?.trim(), customAdditions?.trim()].filter(Boolean).join('\n\nCustom additions:\n')
+    if (!combined) return
     const flownauUrl = this.config.get<string>('FLOWNAU_URL') || 'http://localhost:3003'
     const authSecret = this.config.get<string>('AUTH_SECRET')
 
@@ -291,7 +304,7 @@ Return ONLY valid JSON matching this shape:
 
       await axios.patch(
         `${flownauUrl}/api/internal/brands/${brandId}/context`,
-        { context: content },
+        { context: combined },
         {
           headers: {
             'Content-Type': 'application/json',

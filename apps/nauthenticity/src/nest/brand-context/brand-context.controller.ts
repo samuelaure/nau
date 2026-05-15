@@ -38,4 +38,13 @@ export class BrandContextController {
     await this.brandContextService.saveContext(brandId, body.content)
     return { success: true }
   }
+
+  @Patch('brands/:brandId/context/custom-additions')
+  async saveCustomAdditions(
+    @Param('brandId') brandId: string,
+    @Body() body: { customAdditions: string },
+  ) {
+    await this.brandContextService.saveCustomAdditions(brandId, body.customAdditions ?? '')
+    return { success: true }
+  }
 }
