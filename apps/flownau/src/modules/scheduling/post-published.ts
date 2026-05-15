@@ -5,11 +5,6 @@ import { signServiceToken } from '@nau/auth'
 import { notifyTomorrowDigest } from '@/modules/notifications/approval-notifications'
 
 export async function onPostPublished(postId: string, brandId: string): Promise<void> {
-  await prisma.postSlot.updateMany({
-    where: { postId },
-    data: { status: 'published' },
-  })
-
   runCoverageChecks(brandId).catch((err) => {
     logger.error({ brandId, postId, err }, '[POST_PUBLISHED] Coverage check failed')
   })

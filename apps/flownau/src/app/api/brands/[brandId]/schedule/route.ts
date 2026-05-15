@@ -6,7 +6,6 @@ import { getAuthUser } from '@/lib/auth'
 import { checkBrandAccessForRoute } from '@/lib/auth'
 import { logError } from '@/modules/shared/logger'
 import { z } from 'zod'
-import { materializeSlots } from '@/modules/scheduling/slot-materializer'
 
 const ScheduleUpsertSchema = z.object({
   formatChain: z.array(z.string()).min(1),
@@ -45,28 +44,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ bran
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
     }
 
-    const data = parsed.data
     const schedule = await prisma.postSchedule.upsert({
       where: { brandId },
-      create: { brandId, ...data },
-      update: data,
+      create: { brandId, ...parsed.data },
+      update: parsed.data,
     })
-
-    // Re-materialize slots so calendar reflects the new schedule immediately.
-    // Delete ALL empty slots (past + future) and reset chain position so the
-    // new format order starts fresh without stale state from the old schedule.
-    if (data.isActive) {
-      const brand = await prisma.brand.findUnique({
-        where: { id: brandId },
-        select: { coverageHorizonDays: true },
-      })
-      const horizon = brand?.coverageHorizonDays ?? 7
-      await prisma.postSlot.deleteMany({ where: { brandId, status: 'empty' } })
-      // Also reset any phantom filled slots (postId=null) left by deleted posts
-      await prisma.postSlot.deleteMany({ where: { brandId, status: 'filled', postId: null } })
-      await prisma.postSchedule.update({ where: { brandId }, data: { chainPosition: 0 } })
-      await materializeSlots(brandId, horizon)
-    }
 
     return NextResponse.json({ schedule })
   } catch (error) {

@@ -118,63 +118,7 @@ const FORMAT_COLOR: Record<string, string> = {
   story: 'bg-orange-500/15 border-orange-500/30 text-orange-200',
 }
 
-// ─── Slot chip (empty PostSlot placeholder) — droppable ──────────────────────
-
-function SlotChip({
-  slot,
-  dragState,
-  onDrop,
-}: {
-  slot: PostSlot
-  dragState: DragState | null
-  onDrop: (slotId: string, scheduledAt: string) => void
-}) {
-  const FormatIcon = FORMAT_ICON[slot.format] ?? Film
-  const canDrop = !!dragState && formatsCompatible(dragState.format, slot.format)
-  const [over, setOver] = useState(false)
-
-  return (
-    <div
-      onDragOver={(e) => { if (canDrop) { e.preventDefault(); setOver(true) } }}
-      onDragLeave={() => setOver(false)}
-      onDrop={(e) => { e.preventDefault(); setOver(false); if (canDrop) onDrop(slot.id, slot.scheduledAt) }}
-      className={cn(
-        'w-full rounded p-1.5 flex flex-col gap-0.5 text-[10px] border border-dashed transition-colors',
-        over && canDrop
-          ? 'border-accent bg-accent/10 text-accent'
-          : canDrop && dragState
-            ? 'border-accent/40 text-accent/50'
-            : 'border-white/10 text-white/25',
-      )}
-    >
-      <div className="flex items-center gap-1">
-        <FormatIcon size={9} className="shrink-0" />
-        <span className="font-medium truncate">{FORMAT_LABEL[slot.format] ?? slot.format}</span>
-      </div>
-      <span className="text-[9px] opacity-60 pl-3">{fmtTime(slot.scheduledAt)}</span>
-      <span className="text-[9px] pl-3">{over && canDrop ? 'Drop here' : 'Empty slot'}</span>
-    </div>
-  )
-}
-
-// ─── Generating slot placeholder ─────────────────────────────────────────────
-
-function GeneratingSlotChip({ slot }: { slot: PostSlot }) {
-  const FormatIcon = FORMAT_ICON[slot.format] ?? Film
-  return (
-    <div className="w-full rounded p-1.5 flex flex-col gap-0.5 text-[10px] border border-white/15 bg-white/4 animate-pulse">
-      <div className="flex items-center gap-1 text-white/40">
-        <FormatIcon size={9} className="shrink-0" />
-        <span className="font-medium truncate">{FORMAT_LABEL[slot.format] ?? slot.format}</span>
-        <Loader2 size={8} className="ml-auto animate-spin opacity-60 shrink-0" />
-      </div>
-      <span className="text-[9px] opacity-40 pl-3">{fmtTime(slot.scheduledAt)}</span>
-      <span className="text-[9px] pl-3 text-white/30">Generating…</span>
-    </div>
-  )
-}
-
-// ─── Between-slot drop zone ───────────────────────────────────────────────────
+// ─── Between-post drop zone ───────────────────────────────────────────────────
 
 function BetweenDropZone({
   beforeTime,
@@ -213,22 +157,6 @@ function BetweenDropZone({
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-type PostSlot = {
-  id: string
-  format: string
-  status: string
-  scheduledAt: string
-  post: {
-    id: string
-    status: string
-    format: string | null
-    caption: string | null
-    scheduledAt: string | null
-    createdAt: string
-    userUploadedMediaUrl: string | null
-  } | null
-}
 
 type Composition = {
   id: string
@@ -612,7 +540,7 @@ function CompositionModal({
       const res = await fetch(`/api/posts/${comp.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scheduledAt: null, releaseSlot: true }),
+        body: JSON.stringify({ scheduledAt: null }),
       })
       if (!res.ok) throw new Error()
       toast.success('Post unscheduled.')
@@ -1380,13 +1308,11 @@ function CompositionChip({
 
 export default function AccountCalendar({ brandId, workspaceId }: { brandId: string; workspaceId?: string }) {
   const [compositions, setCompositions] = useState<Composition[]>([])
-  const [slots, setSlots] = useState<PostSlot[]>([])
   const [dragState, setDragState] = useState<DragState | null>(null)
   const [loading, setLoading] = useState(true)
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()))
   const [selected, setSelected] = useState<Composition | null>(null)
   const [runningCoverage, setRunningCoverage] = useState(false)
-  const [generatingSlotIds, setGeneratingSlotIds] = useState<Set<string>>(new Set())
   const [draftCustomPrompt, setDraftCustomPrompt] = useState<string>('')
   const [draftCustomPromptDraft, setDraftCustomPromptDraft] = useState<string>('')
   const [draftCustomPromptModalOpen, setDraftCustomPromptModalOpen] = useState(false)
@@ -1403,15 +1329,10 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
 
   const fetchCompositions = useCallback(async () => {
     try {
-      const [compRes, slotRes] = await Promise.all([
-        fetch(`/api/compositions?brandId=${brandId}`),
-        fetch(`/api/brands/${brandId}/slots`),
-      ])
+      const compRes = await fetch(`/api/compositions?brandId=${brandId}`)
       const compData = await compRes.json()
-      const slotData = await slotRes.json()
       const comps = compData.compositions || []
       setCompositions(comps)
-      setSlots(slotData.slots || [])
       setSelected(prev => prev ? (comps.find((c: Composition) => c.id === prev.id) ?? prev) : null)
     } catch {
       toast.error('Failed to load calendar')
@@ -1509,15 +1430,9 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
       .filter((c) => { const d = calendarDate(c); return d && isSameDay(new Date(d), day) })
       .sort((a, b) => { const da = calendarDate(a)!; const db = calendarDate(b)!; return da < db ? -1 : 1 })
 
-  const emptySlotsForDay = (day: Date) =>
-    slots.filter((s) => s.status === 'empty' && isSameDay(new Date(s.scheduledAt), day))
-
   const unscheduled = compositions.filter((c) => !calendarDate(c))
 
   const handleRunCoverage = async () => {
-    // Immediately mark all current empty slots as generating for optimistic UI
-    const emptyIds = new Set(slots.filter((s) => s.status === 'empty').map((s) => s.id))
-    setGeneratingSlotIds(emptyIds)
     setRunningCoverage(true)
     const loadingId = toast.loading('Filling calendar…')
     try {
@@ -1528,11 +1443,11 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
 
       const r = data.result as {
         alreadyFull: boolean
-        slotsNeeded: number
+        postsNeeded: number
         ideasGenerated: number
         noDigest: boolean
         approvedIdeas: number
-        slotsFilled: number
+        postsFilled: number
         skippedByBatchRule: number
         needsApproval: number
       }
@@ -1542,101 +1457,61 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
         return
       }
 
-      // Step 1: report idea generation
       if (r.ideasGenerated > 0) {
         toast.info(`Generated ${r.ideasGenerated} new idea${r.ideasGenerated === 1 ? '' : 's'} to fill the queue.`)
-      } else if (r.noDigest && r.approvedIdeas < r.slotsNeeded) {
+      } else if (r.noDigest && r.approvedIdeas < r.postsNeeded) {
         toast.warning('Could not auto-generate ideas — no InspoBase digest available. Add topics manually in the Ideas tab.')
       }
 
-      // Step 2: batch-rule skips
       if (r.skippedByBatchRule > 0) {
         toast.warning(
-          `${r.skippedByBatchRule} slot${r.skippedByBatchRule === 1 ? '' : 's'} left empty — all available ideas come from the same batch. Generate or approve ideas from a different session in the Ideas tab.`,
+          `${r.skippedByBatchRule} post${r.skippedByBatchRule === 1 ? '' : 's'} left unscheduled — all available ideas come from the same batch. Generate or approve ideas from a different session in the Ideas tab.`,
           { duration: 10000 },
         )
       }
 
-      // Step 3: approval gap
       if (r.needsApproval > 0) {
         toast.warning(
           r.approvedIdeas === 0
-            ? `${r.slotsNeeded} slot${r.slotsNeeded === 1 ? '' : 's'} to fill but no ideas are approved yet. Approve some in the Ideas tab to get started.`
-            : `${r.slotsNeeded} slot${r.slotsNeeded === 1 ? '' : 's'} to fill but only ${r.approvedIdeas} idea${r.approvedIdeas === 1 ? '' : 's'} approved. Approve ${r.needsApproval} more in the Ideas tab.`,
+            ? `${r.postsNeeded} post${r.postsNeeded === 1 ? '' : 's'} to schedule but no ideas are approved yet. Approve some in the Ideas tab to get started.`
+            : `${r.postsNeeded} post${r.postsNeeded === 1 ? '' : 's'} to schedule but only ${r.approvedIdeas} idea${r.approvedIdeas === 1 ? '' : 's'} approved. Approve ${r.needsApproval} more in the Ideas tab.`,
           { duration: 8000 },
         )
       }
 
-      // Step 4: final scheduling result
-      const remaining = r.slotsNeeded - r.slotsFilled
-      if (r.slotsFilled === 0 && r.needsApproval > 0) {
-        // All blocked on approval — main message was already shown above
+      const remaining = r.postsNeeded - r.postsFilled
+      if (r.postsFilled === 0 && r.needsApproval > 0) {
+        // approval message already shown above
       } else if (remaining > 0) {
         toast.success(
-          `${r.slotsFilled} of ${r.slotsNeeded} post${r.slotsNeeded === 1 ? '' : 's'} scheduled. Approve ${remaining} more idea${remaining === 1 ? '' : 's'} and run Fill Calendar again to complete it.`,
+          `${r.postsFilled} of ${r.postsNeeded} post${r.postsNeeded === 1 ? '' : 's'} scheduled. Approve ${remaining} more idea${remaining === 1 ? '' : 's'} and run Fill Calendar again to complete it.`,
           { duration: 8000 },
         )
       } else {
-        toast.success(`Calendar filled — ${r.slotsFilled} post${r.slotsFilled === 1 ? '' : 's'} scheduled.`)
+        toast.success(`Calendar filled — ${r.postsFilled} post${r.postsFilled === 1 ? '' : 's'} scheduled.`)
       }
 
       await fetchCompositions()
-      setGeneratingSlotIds(new Set())
     } catch (err) {
       toast.dismiss(loadingId)
       toast.error(err instanceof Error ? err.message : 'Fill calendar failed')
-      setGeneratingSlotIds(new Set())
     } finally {
       setRunningCoverage(false)
     }
   }
 
-  const handleDrop = async (postId: string, scheduledAt: string, slotId?: string) => {
+  const handleDrop = async (postId: string, scheduledAt: string) => {
     setDragState(null)
 
-    // Resolve the destination slot format so we can rewrite the post's format
-    // when dropping across compatible formats (e.g. reel → trial_reel).
-    const targetSlot = slotId ? slots.find((s) => s.id === slotId) : null
-    const targetFormat = targetSlot?.format ?? null
-
-    // Optimistic update: update the moved post's scheduledAt + format if it changed
     setCompositions((prev) =>
-      prev.map((c) =>
-        c.id === postId
-          ? { ...c, scheduledAt, ...(targetFormat ? { format: targetFormat } : {}) }
-          : c,
-      ),
+      prev.map((c) => c.id === postId ? { ...c, scheduledAt } : c),
     )
-
-    // Optimistic slot updates
-    setSlots((prev) => {
-      let next = prev
-      // Release the old slot this post was in (if any)
-      next = next.map((s) =>
-        s.post?.id === postId ? { ...s, status: 'empty', post: null } : s,
-      )
-      // Fill the new target slot (if dropping onto a named slot)
-      if (slotId) {
-        next = next.map((s) =>
-          s.id === slotId ? { ...s, status: 'filled', post: null } : s,
-        )
-      }
-      return next
-    })
 
     try {
       await fetch(`/api/posts/${postId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        // Always send releaseSlot so the backend clears the old slot even when dropping to free space.
-        // When dropping onto a slot with a different (compatible) format, rewrite the post's format
-        // so it publishes correctly (Instagram trial flag follows trial_reel slots).
-        body: JSON.stringify({
-          scheduledAt,
-          releaseSlot: true,
-          ...(slotId ? { slotId } : {}),
-          ...(targetFormat ? { format: targetFormat } : {}),
-        }),
+        body: JSON.stringify({ scheduledAt }),
       })
       fetchCompositions()
     } catch {
@@ -1747,7 +1622,6 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
           {weekDays.map((day) => {
             const isToday = isSameDay(day, today)
             const dayComps = forDay(day)
-            const dayEmptySlots = emptySlotsForDay(day)
             return (
               <div
                 key={day.toISOString()}
@@ -1765,7 +1639,7 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
                   </p>
                 </div>
 
-                {dayComps.length === 0 && dayEmptySlots.length === 0 ? (
+                {dayComps.length === 0 ? (
                   <div className="flex-1 flex items-center justify-center">
                     {dragState ? (
                       <BetweenDropZone
@@ -1780,52 +1654,34 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
                   </div>
                 ) : (
                   <div className="flex flex-col gap-1">
-                    {/* Merge and sort all chips by time for accurate between-drop zones */}
-                    {(() => {
-                      type ChipItem =
-                        | { kind: 'comp'; data: Composition; time: string }
-                        | { kind: 'slot'; data: PostSlot; time: string }
-                      const items: ChipItem[] = [
-                        ...dayComps.map(c => ({ kind: 'comp' as const, data: c, time: (calendarDate(c) ?? c.scheduledAt)! })),
-                        ...dayEmptySlots.map(s => ({ kind: 'slot' as const, data: s, time: s.scheduledAt })),
-                      ].sort((a, b) => a.time < b.time ? -1 : 1)
-
-                      return items.map((item, idx) => (
-                        <div key={item.kind === 'comp' ? item.data.id : item.data.id}>
+                    {dayComps.map((comp, idx) => {
+                      const time = (calendarDate(comp) ?? comp.scheduledAt)!
+                      return (
+                        <div key={comp.id}>
                           <BetweenDropZone
-                            beforeTime={idx > 0 ? items[idx - 1].time : null}
-                            afterTime={item.time}
+                            beforeTime={idx > 0 ? (calendarDate(dayComps[idx - 1]!) ?? dayComps[idx - 1]!.scheduledAt) : null}
+                            afterTime={time}
                             dragState={dragState}
                             onDrop={(t) => handleDrop(dragState!.postId, t)}
                           />
-                          {item.kind === 'comp' ? (
-                            <CompositionChip
-                              comp={item.data}
-                              onClick={() => setSelected(item.data)}
-                              dragState={dragState}
-                              onDragStart={() => setDragState({ postId: item.data.id, format: item.data.format })}
-                              onDragEnd={() => setDragState(null)}
-                            />
-                          ) : generatingSlotIds.has(item.data.id) ? (
-                            <GeneratingSlotChip slot={item.data} />
-                          ) : (
-                            <SlotChip
-                              slot={item.data}
-                              dragState={dragState}
-                              onDrop={(slotId, scheduledAt) => handleDrop(dragState!.postId, scheduledAt, slotId)}
-                            />
-                          )}
-                          {idx === items.length - 1 && (
+                          <CompositionChip
+                            comp={comp}
+                            onClick={() => setSelected(comp)}
+                            dragState={dragState}
+                            onDragStart={() => setDragState({ postId: comp.id, format: comp.format })}
+                            onDragEnd={() => setDragState(null)}
+                          />
+                          {idx === dayComps.length - 1 && (
                             <BetweenDropZone
-                              beforeTime={item.time}
+                              beforeTime={time}
                               afterTime={null}
                               dragState={dragState}
                               onDrop={(t) => handleDrop(dragState!.postId, t)}
                             />
                           )}
                         </div>
-                      ))
-                    })()}
+                      )
+                    })}
                   </div>
                 )}
               </div>
@@ -1841,7 +1697,7 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
             Unscheduled
           </p>
           <p className="text-[11px] text-text-secondary mb-3">
-            Drag any post (scheduled or unscheduled) onto a matching empty slot, or between slots to set a custom time.
+            Drag any post to the calendar to set a scheduled time.
           </p>
           <div className="flex flex-wrap gap-2">
             {unscheduled.map((comp) => {

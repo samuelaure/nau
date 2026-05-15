@@ -50,30 +50,8 @@ export async function POST(req: Request) {
     const denied = await checkBrandAccessForRoute(brandId)
     if (denied) return denied
 
-    // ── Format + slot resolution ──────────────────────────────────────────────
+    // ── Format resolution ─────────────────────────────────────────────────────
     let format = requestedFormat
-    let targetSlotId: string | null = null
-    let targetSlotScheduledAt: Date | null = null
-
-    if (!postId) {
-      const templateFormat = templateId
-        ? (await prisma.template.findUnique({ where: { id: templateId }, select: { format: true } }))?.format ?? null
-        : null
-
-      if (templateId && templateFormat) {
-        const slot = await prisma.postSlot.findFirst({
-          where: { brandId, status: 'empty', format: templateFormat, scheduledAt: { gt: new Date() } },
-          orderBy: { scheduledAt: 'asc' },
-        })
-        if (slot) { targetSlotId = slot.id; targetSlotScheduledAt = slot.scheduledAt; format = templateFormat as typeof format }
-      } else if (!templateId) {
-        const slot = await prisma.postSlot.findFirst({
-          where: { brandId, status: 'empty', scheduledAt: { gt: new Date() } },
-          orderBy: { scheduledAt: 'asc' },
-        })
-        if (slot) { targetSlotId = slot.id; targetSlotScheduledAt = slot.scheduledAt; format = slot.format as typeof format }
-      }
-    }
 
     // ── Template resolution ───────────────────────────────────────────────────
     let resolvedTemplateId: string | undefined = templateId
@@ -159,13 +137,6 @@ export async function POST(req: Request) {
           llmTrace: { draftTrace: result.trace } as unknown as Prisma.InputJsonValue,
         },
       })
-    }
-
-    if (targetSlotId && targetSlotScheduledAt && updatedPost) {
-      await prisma.post.update({ where: { id: updatedPost.id }, data: { scheduledAt: targetSlotScheduledAt } })
-      await prisma.postSlot.update({ where: { id: targetSlotId }, data: { status: 'filled', postId: updatedPost.id } })
-      updatedPost = { ...updatedPost, scheduledAt: targetSlotScheduledAt }
-      logger.info({ postId: updatedPost.id, slotId: targetSlotId }, '[COMPOSE] Post assigned to slot')
     }
 
     logger.info({ postId: updatedPost.id, format: result.format }, '[COMPOSE] Composition complete')

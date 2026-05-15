@@ -49,10 +49,6 @@ export async function GET(request: Request) {
           socialProfile: { ...profile, accessToken: profile.accessToken },
         })
         if (result.success) {
-          await prisma.contentPlanner.updateMany({
-            where: { brandId: post.brandId, isDefault: true },
-            data: { lastPostedAt: now },
-          })
           results.push({ postId: post.id, status: 'success' })
         } else {
           throw new Error(result.error || 'Unknown publish error')
