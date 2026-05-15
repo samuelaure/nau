@@ -345,17 +345,11 @@ function HeadTalkContent({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        {!hideLabel && <p className="text-xs text-text-secondary uppercase tracking-wider">Script</p>}
-        {!editing && (
-          <button onClick={() => setEditing(true)} className="text-xs text-accent hover:underline ml-auto">
-            Edit
-          </button>
-        )}
-      </div>
+      {!hideLabel && <p className="text-xs text-text-secondary uppercase tracking-wider">Script</p>}
       {editing ? (
         <>
           <textarea
+            autoFocus
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             rows={10}
@@ -370,9 +364,15 @@ function HeadTalkContent({
           </div>
         </>
       ) : draft ? (
-        <p className="text-sm text-white leading-relaxed whitespace-pre-wrap">{draft}</p>
+        <p
+          onClick={() => setEditing(true)}
+          className="text-sm text-white leading-relaxed whitespace-pre-wrap cursor-text rounded px-3 py-2.5 bg-white/5 border border-transparent hover:border-white/10 transition-colors"
+        >{draft}</p>
       ) : (
-        <p className="text-sm text-text-secondary italic">No script yet.</p>
+        <p
+          onClick={() => setEditing(true)}
+          className="text-sm text-text-secondary italic cursor-text rounded px-3 py-2.5 bg-white/5 border border-transparent hover:border-white/10 transition-colors"
+        >No script yet. Click to write.</p>
       )}
     </div>
   )
@@ -420,14 +420,7 @@ function ReelContent({
   if (slots && Object.keys(slots).length > 0) {
     return (
       <div className="flex flex-col gap-2 pt-3">
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-text-secondary uppercase tracking-wider">Content</p>
-          {!editing && (
-            <button onClick={() => setEditing(true)} className="text-xs text-accent hover:underline">
-              Edit
-            </button>
-          )}
-        </div>
+        <p className="text-xs text-text-secondary uppercase tracking-wider">Content</p>
 
         {editing ? (
           <>
@@ -435,6 +428,7 @@ function ReelContent({
               <div key={key} className="flex flex-col gap-1">
                 <p className="text-[10px] font-mono text-accent uppercase tracking-wide">{key}</p>
                 <textarea
+                  autoFocus={key === Object.keys(slotDrafts)[0]}
                   value={slotDrafts[key]}
                   onChange={(e) => setSlotDrafts((prev) => ({ ...prev, [key]: e.target.value }))}
                   rows={3}
@@ -453,9 +447,9 @@ function ReelContent({
             </div>
           </>
         ) : (
-          <>
+          <div onClick={() => setEditing(true)} className="flex flex-col gap-2 cursor-text">
             {Object.entries(slotDrafts).map(([key, val]) => (
-              <div key={key} className="rounded-lg bg-white/5 border border-white/10 px-3 py-2.5 flex flex-col gap-0.5">
+              <div key={key} className="rounded-lg bg-white/5 border border-transparent hover:border-white/10 transition-colors px-3 py-2.5 flex flex-col gap-0.5">
                 <p className="text-[10px] font-mono text-accent uppercase tracking-wide">{key}</p>
                 <p className="text-sm text-white leading-relaxed whitespace-pre-wrap">{val}</p>
               </div>
@@ -463,7 +457,7 @@ function ReelContent({
             {creative?.brollMood && (
               <p className="text-[11px] text-text-secondary italic">B-roll mood: {creative.brollMood}</p>
             )}
-          </>
+          </div>
         )}
       </div>
     )
@@ -1081,17 +1075,11 @@ function CompositionModal({
 
           {/* Caption — always last */}
           <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-text-secondary uppercase tracking-wider">Caption</p>
-              {!editingCaption && (
-                <button onClick={() => setEditingCaption(true)} className="text-xs text-accent hover:underline">
-                  Edit
-                </button>
-              )}
-            </div>
+            <p className="text-xs text-text-secondary uppercase tracking-wider">Caption</p>
             {editingCaption ? (
               <>
                 <textarea
+                  autoFocus
                   value={captionDraft}
                   onChange={(e) => setCaptionDraft(e.target.value)}
                   rows={5}
@@ -1105,9 +1093,15 @@ function CompositionModal({
                 </div>
               </>
             ) : captionDraft ? (
-              <p className="text-sm text-white leading-relaxed whitespace-pre-wrap">{captionDraft}</p>
+              <p
+                onClick={() => setEditingCaption(true)}
+                className="text-sm text-white leading-relaxed whitespace-pre-wrap cursor-text rounded px-3 py-2.5 bg-white/5 border border-transparent hover:border-white/10 transition-colors"
+              >{captionDraft}</p>
             ) : (
-              <p className="text-sm text-text-secondary italic">No caption yet.</p>
+              <p
+                onClick={() => setEditingCaption(true)}
+                className="text-sm text-text-secondary italic cursor-text rounded px-3 py-2.5 bg-white/5 border border-transparent hover:border-white/10 transition-colors"
+              >No caption yet. Click to write.</p>
             )}
           </div>
 
