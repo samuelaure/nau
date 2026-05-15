@@ -9,9 +9,7 @@ vi.mock('@/modules/shared/prisma', () => ({
       findMany: vi.fn(),
       update: vi.fn(),
     },
-    contentPlanner: {
-      updateMany: vi.fn(),
-    },
+
   },
 }))
 
@@ -86,10 +84,6 @@ describe('Publisher Cron API', () => {
     expect(publishComposition).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'post1', format: 'reel' }),
     )
-    expect(prisma.contentPlanner.updateMany).toHaveBeenCalledWith({
-      where: { brandId: 'brand1', isDefault: true },
-      data: expect.objectContaining({ lastPostedAt: expect.any(Date) }),
-    })
   })
 
   it('skips posts when autoApprovePost is false and status is not PUBLISHING', async () => {

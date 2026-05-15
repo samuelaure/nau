@@ -421,7 +421,7 @@ const ProfilesTab = ({ profiles, onRemove }: { profiles: any[]; onRemove: (id: s
 
 // ── Profile Detail ────────────────────────────────────────────────────────────
 
-const ProfileDetailView = ({ title, category }: { title: string; category: 'INSPO' | 'COMMENT' | 'BENCHMARK' }) => {
+const ProfileDetailView = ({ title, category: _category }: { title: string; category: 'INSPO' | 'COMMENT' | 'BENCHMARK' }) => {
   const { username } = useParams<{ username: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
