@@ -549,7 +549,7 @@ export const generateBrandContext = async (brandId: string, sources: {
   return data;
 };
 
-export const saveBrandContext = async (brandId: string, content: Record<string, unknown>) => {
+export const saveBrandContext = async (brandId: string, content: string) => {
   const { data } = await api.patch(`/brands/${brandId}/context`, { content });
   return data;
 };
@@ -561,5 +561,14 @@ export const syncSocialProfile = async (payload: { username: string; brandId?: s
 
 export const syncProfilesToFlownau = async (brandId: string) => {
   const { data } = await api.post(`/brands/${brandId}/social-profiles/sync-to-flownau`);
+  return data;
+};
+
+export const dispatchSourceConcept = async (
+  brandId: string,
+  itemType: 'post' | 'profile' | 'voicenote' | 'youtube' | 'blog',
+  itemId: string,
+) => {
+  const { data } = await api.post(`/brands/${brandId}/source-concepts/dispatch`, { itemType, itemId });
   return data;
 };

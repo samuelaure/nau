@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, UseGuards, HttpCode, HttpStatus } from '@nestjs/common'
+import { Controller, Get, Post, Patch, Param, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common'
 import { SourceConceptService } from './source-concept.service'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { ServiceAuthGuard } from '../auth/service-auth.guard'
@@ -48,5 +48,16 @@ export class SourceConceptController {
   @UseGuards(JwtAuthGuard)
   generateRetroactive(@Param('brandId') brandId: string) {
     return this.sourceConceptService.generateRetroactiveForBrand(brandId)
+  }
+
+  // User-facing: dispatch a concept from a specific InspoBase item to flownau ideation
+  @Post('brands/:brandId/source-concepts/dispatch')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  dispatch(
+    @Param('brandId') brandId: string,
+    @Body() body: { itemType: 'post' | 'profile' | 'voicenote' | 'youtube' | 'blog'; itemId: string },
+  ) {
+    return this.sourceConceptService.dispatchFromItem(brandId, body.itemType, body.itemId)
   }
 }
