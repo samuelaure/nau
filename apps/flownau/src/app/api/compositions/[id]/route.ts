@@ -53,7 +53,6 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     const post = await prisma.post.findUnique({ where: { id } })
     if (!post) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    await prisma.postSlot.updateMany({ where: { postId: id }, data: { status: 'empty', postId: null } })
     await prisma.post.delete({ where: { id } })
 
     const r2Keys = new Set([

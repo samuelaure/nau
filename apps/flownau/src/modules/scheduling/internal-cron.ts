@@ -1,7 +1,6 @@
 import { prisma } from '@/modules/shared/prisma'
 import { addRenderJob, renderQueue } from '@/modules/renderer/render-queue'
 import { publishComposition } from '@/modules/publisher/publish-orchestrator'
-import { runAutonomousScheduler } from '@/modules/scheduling/scheduling.service'
 import { checkAllTokens } from '@/modules/publisher/instagram-token'
 import { acquireLock, releaseLock } from '@/modules/shared/rate-limit'
 import { logger, logError } from '@/modules/shared/logger'
@@ -41,10 +40,6 @@ async function runPublisher() {
         socialProfile: { ...profile, accessToken: profile.accessToken },
       })
       if (result.success) {
-        await prisma.contentPlanner.updateMany({
-          where: { brandId: post.brandId, isDefault: true },
-          data: { lastPostedAt: now },
-        })
         published++
       } else {
         throw new Error(result.error || 'Unknown publish error')
@@ -108,14 +103,6 @@ async function runRenderer() {
 }
 
 
-async function runScheduler() {
-  try {
-    const { slotted, autoScheduled } = await runAutonomousScheduler()
-    logger.info(`[Cron:Scheduler] Slotted ${slotted}, auto-scheduled ${autoScheduled}`)
-  } catch (err) {
-    logError('[Cron:Scheduler] Error', err)
-  }
-}
 
 async function runTokenRefresh() {
   const lockKey = 'cron:token-refresh:lock'
@@ -151,9 +138,6 @@ export async function startInternalCron() {
 
   // Renderer safety-net — every 10 minutes
   cron.schedule('*/10 * * * *', safe('Renderer', runRenderer))
-
-  // AI slot scheduler — once daily at 00:05
-  cron.schedule('5 0 * * *', safe('Scheduler', runScheduler))
 
   // Instagram token refresh — once daily at 03:00
   cron.schedule('0 3 * * *', safe('TokenRefresh', runTokenRefresh))

@@ -528,19 +528,14 @@ const handleSavePrompt = async (text: string) => {
     setOpenIdea(null)
     const toastId = toast.loading('Composing draft…')
     try {
-      // Resolve format + template: explicit selection > idea format > next empty slot > random enabled template
+      // Resolve format + template: explicit selection > idea format > random enabled template
       let finalFormat: string = idea.format ?? ''
       let resolvedTemplateId: string = templateId
       if (resolvedTemplateId) {
         finalFormat = templates.find(t => t.id === resolvedTemplateId)?.format ?? finalFormat
       }
       if (!finalFormat) {
-        const slotRes = await fetch(`/api/brands/${brandId}/slots?limit=1`)
-        const slotData = slotRes.ok ? await slotRes.json() : null
-        const nextEmptySlot = slotData?.slots?.find((s: any) => s.status === 'empty')
-        if (nextEmptySlot?.format) {
-          finalFormat = nextEmptySlot.format
-        } else if (templates.length > 0) {
+        if (templates.length > 0) {
           const picked = templates[Math.floor(Math.random() * templates.length)]
           finalFormat = picked.format ?? 'reel'
           if (!resolvedTemplateId) resolvedTemplateId = picked.id

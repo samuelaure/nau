@@ -6,7 +6,6 @@ import { getAuthUser } from '@/lib/auth'
 import { checkBrandAccessForRoute } from '@/lib/auth'
 import { logError } from '@/modules/shared/logger'
 import { z } from 'zod'
-import { materializeSlots } from '@/modules/scheduling/slot-materializer'
 import { recordPromptChange } from '@/modules/shared/prompt-history'
 
 const BrandPatchSchema = z.object({
@@ -55,12 +54,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ br
     }
     if (parsed.data.draftCustomPrompt !== undefined) {
       await recordPromptChange('brand', brandId, 'draftCustomPrompt', parsed.data.draftCustomPrompt)
-    }
-
-    // Re-materialize slots when the coverage horizon changes so new slots
-    // appear immediately without requiring a schedule re-save.
-    if (parsed.data.coverageHorizonDays !== undefined) {
-      await materializeSlots(brandId, parsed.data.coverageHorizonDays)
     }
 
     return NextResponse.json({ brand })

@@ -17,7 +17,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ bran
     const from = url.searchParams.get('from')
     const to = url.searchParams.get('to')
 
-    // Default window: today → coverageHorizonDays ahead
     const brand = await prisma.brand.findUnique({
       where: { id: brandId },
       select: { coverageHorizonDays: true },
@@ -26,7 +25,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ bran
     const defaultFrom = new Date()
     const defaultTo = new Date(Date.now() + horizonDays * 24 * 60 * 60 * 1000)
 
-    const slots = await prisma.postSlot.findMany({
+    // Return scheduled posts in the same shape the calendar UI expects.
+    // status mapping: PUBLISHED → "published", anything else with scheduledAt → "filled"
+    const posts = await prisma.post.findMany({
       where: {
         brandId,
         scheduledAt: {
@@ -35,20 +36,32 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ bran
         },
       },
       orderBy: { scheduledAt: 'asc' },
-      include: {
-        post: {
-          select: {
-            id: true,
-            status: true,
-            format: true,
-            caption: true,
-            scheduledAt: true,
-            createdAt: true,
-            userUploadedMediaUrl: true,
-          },
-        },
+      select: {
+        id: true,
+        status: true,
+        format: true,
+        caption: true,
+        scheduledAt: true,
+        createdAt: true,
+        userUploadedMediaUrl: true,
       },
     })
+
+    const slots = posts.map((p) => ({
+      id: p.id,
+      scheduledAt: p.scheduledAt!.toISOString(),
+      format: p.format ?? '',
+      status: p.status === 'PUBLISHED' ? 'published' : 'filled',
+      post: {
+        id: p.id,
+        status: p.status,
+        format: p.format,
+        caption: p.caption,
+        scheduledAt: p.scheduledAt?.toISOString() ?? null,
+        createdAt: p.createdAt.toISOString(),
+        userUploadedMediaUrl: p.userUploadedMediaUrl,
+      },
+    }))
 
     return NextResponse.json({ slots })
   } catch (error) {

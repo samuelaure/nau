@@ -1,16 +1,13 @@
 import type { Prisma } from '@/generated/prisma'
 import { prisma } from '@/modules/shared/prisma'
 import { logger } from '@/modules/shared/logger'
-import { materializeSlots } from './slot-materializer'
 import { runDraftPipeline } from '@/modules/composer/draft-pipeline'
 import { getRecentDraftContext } from '@/modules/composer/recent-context.service'
 import { triggerRenderForPost } from '@/modules/renderer/render-queue'
 import { shuffle } from '@/modules/video/utils/assets'
 import { signServiceToken } from '@nau/auth'
 
-
 // ─── Template deck: shuffle-drain per format ──────────────────────────────────
-// Ensures even distribution: each template is used once before any repeats.
 
 type TemplateDeckEntry = { templateId: string; autoApproveDraft: boolean; template: { id: string; format: string; systemPrompt: string | null; contentSchema: unknown; slotSchema: unknown; remotionId: string } }
 
@@ -36,7 +33,6 @@ class TemplateDeck {
 
     const deck = this.decks.get(key)!
     if (deck.length === 0) {
-      // All templates used once — refill and reshuffle
       this.decks.set(key, shuffle([...this.originals.get(key)!]))
       deck.push(...this.decks.get(key)!)
     }
@@ -75,7 +71,7 @@ async function notifyViaZazu(brandId: string, markdown: string): Promise<void> {
 }
 
 // ─── Batch-rule window ────────────────────────────────────────────────────────
-// No two consecutive slots from the same generationBatch; gap of 2 slots required.
+// No two consecutive scheduled posts from the same generationBatch; gap of 2 required.
 
 const BATCH_GAP = 2
 
@@ -90,345 +86,125 @@ function batchExcludeFilter(recentBatchIds: (string | null)[]) {
   }
 }
 
-// ─── Main entry point ─────────────────────────────────────────────────────────
+// ─── Time placement helpers ───────────────────────────────────────────────────
 
-export interface CoverageResult {
-  check1: Check1Result
+/**
+ * Converts a local HH:MM (in fractional minutes) on a given UTC day to UTC.
+ * DST-aware via Intl.DateTimeFormat offset detection.
+ */
+function localTimeToUTC(utcDay: Date, localH: number, localM: number, timezone: string): Date {
+  const candidate = new Date(utcDay)
+  candidate.setUTCHours(localH, localM, 0, 0)
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false,
+    }).formatToParts(candidate)
+    const displayH = parseInt(parts.find((p) => p.type === 'hour')?.value ?? String(localH))
+    const displayM = parseInt(parts.find((p) => p.type === 'minute')?.value ?? String(localM))
+    const diffMins = displayH * 60 + displayM - (localH * 60 + localM)
+    return new Date(candidate.getTime() - diffMins * 60_000)
+  } catch {
+    return candidate
+  }
 }
 
-interface Check1Result {
-  slotsInHorizon: number
-  filledSlots: number
-  emptySlots: number
-  slotsFilledNow: number
-  skippedByBatchRule: number
-  ideasGenerated: boolean
-  notifyUserApproveIdeas: boolean
-  noDigest: boolean
+function startOfTodayInTimezone(timezone: string): Date {
+  try {
+    const now = new Date()
+    const [year, month, day] = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(now).split('-').map(Number)
+    return new Date(Date.UTC(year, month - 1, day))
+  } catch {
+    const now = new Date()
+    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  }
+}
+
+function toLocalDateStr(d: Date, timezone: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d)
 }
 
 /**
- * Runs after every successful PUBLISHED transition.
- * Ensures scheduling coverage (DRAFT_PENDING/APPROVED in calendar) for coverageHorizonDays.
- * Render is event-driven: every transition into DRAFT_APPROVED enqueues its own
- * render via triggerRenderForPost, so no separate render-coverage check is needed.
+ * Computes N evenly-spaced UTC posting times for a given day within the posting window.
+ * N=1 → [windowStart], N=2 → [windowStart, windowEnd], N≥3 → start + i*(range/(N-1)).
+ * For today, times in the past or within 1 hour of now are filtered out.
  */
-export async function runCoverageChecks(brandId: string): Promise<CoverageResult> {
-  const brand = await prisma.brand.findUnique({
-    where: { id: brandId },
-    select: { coverageHorizonDays: true, autoApproveIdeas: true, language: true },
-  })
-  if (!brand) throw new Error(`Brand ${brandId} not found`)
+function computeIdealTimes(
+  windowStart: string,
+  windowEnd: string,
+  N: number,
+  timezone: string,
+  day: Date,
+  isToday: boolean,
+): Date[] {
+  const [sh, sm] = windowStart.split(':').map(Number)
+  const [eh, em] = windowEnd.split(':').map(Number)
+  const startMins = sh * 60 + sm
+  const endMins = eh * 60 + em
 
-  const horizonDays = brand.coverageHorizonDays
+  const times: Date[] = []
+  if (N === 1) {
+    times.push(localTimeToUTC(day, sh, sm, timezone))
+  } else {
+    const interval = (endMins - startMins) / (N - 1)
+    for (let i = 0; i < N; i++) {
+      const mins = startMins + i * interval
+      times.push(localTimeToUTC(day, Math.floor(mins / 60), Math.round(mins % 60), timezone))
+    }
+  }
 
-  // Materialize slots first so they exist for the check
-  await materializeSlots(brandId, horizonDays)
+  if (!isToday) return times
 
-  const check1 = await runCheck1(brandId, horizonDays, brand, 'automatic')
-
-  logger.info({ brandId, check1 }, '[COVERAGE] Coverage check complete')
-
-  return { check1 }
+  const bufferMs = 60 * 60 * 1000 // 1 hour
+  const cutoff = Date.now() + bufferMs
+  return times.filter((t) => t.getTime() >= cutoff)
 }
 
-// ─── Check 1: Scheduling coverage ────────────────────────────────────────────
-
-async function runCheck1(
-  brandId: string,
-  horizonDays: number,
-  brand: { autoApproveIdeas: boolean; language: string; ideationCustomPrompt?: string | null },
-  source: 'manual' | 'automatic' = 'manual',
-): Promise<Check1Result> {
-  const targetEnd = new Date(Date.now() + (horizonDays) * 24 * 60 * 60 * 1000)
-
-  // Count all slots in horizon
-  const now = new Date()
-  const [allSlots, filledSlots] = await Promise.all([
-    prisma.postSlot.count({ where: { brandId, scheduledAt: { gt: now, lte: targetEnd } } }),
-    prisma.postSlot.count({
-      where: { brandId, scheduledAt: { gt: now, lte: targetEnd }, status: { in: ['filled', 'published'] } },
-    }),
-  ])
-
-  const emptySlots = allSlots - filledSlots
-
-  if (emptySlots === 0) {
-    return { slotsInHorizon: allSlots, filledSlots, emptySlots: 0, slotsFilledNow: 0, skippedByBatchRule: 0, ideasGenerated: false, notifyUserApproveIdeas: false, noDigest: false }
-  }
-
-  // Get empty slots ordered by scheduledAt — only future ones
-  const emptySlotRecords = await prisma.postSlot.findMany({
-    where: { brandId, scheduledAt: { gt: now, lte: targetEnd }, status: 'empty' },
-    orderBy: { scheduledAt: 'asc' },
-  })
-
-  let slotsFilledNow = 0
-  let skippedByBatchRule = 0
-  let ideasGenerated = false
-  let notifyUserApproveIdeas = false
-  let noDigest = false
-
-  const deck = new TemplateDeck()
-
-  // Initialise the batch-rule window from the 2 slots immediately before our fill window
-  const recentBatchIds: (string | null)[] = []
-  if (emptySlotRecords.length > 0) {
-    const priorSlots = await prisma.postSlot.findMany({
-      where: { brandId, scheduledAt: { lt: emptySlotRecords[0]!.scheduledAt }, status: { in: ['filled', 'published'] } },
-      orderBy: { scheduledAt: 'desc' },
-      take: BATCH_GAP,
-      include: { post: { select: { generationBatchId: true } } },
-    })
-    priorSlots.reverse().forEach((s) => recentBatchIds.push(s.post?.generationBatchId ?? null))
-  }
-
-  const advanceBatchWindow = (batchId: string | null) => {
-    recentBatchIds.push(batchId)
-    if (recentBatchIds.length > BATCH_GAP) recentBatchIds.shift()
-  }
-
-  for (const slot of emptySlotRecords) {
-    const batchFilter = batchExcludeFilter(recentBatchIds)
-
-    // First: try to find an existing unscheduled draft respecting the batch rule
-    const existingDraft = await prisma.post.findFirst({
-      where: {
-        brandId,
-        status: { in: ['DRAFT_PENDING', 'DRAFT_APPROVED'] },
-        scheduledAt: null,
-        postSlot: null,
-        AND: [
-          { OR: [{ format: null }, { format: slot.format }] },
-          ...(Object.keys(batchFilter).length > 0 ? [batchFilter] : []),
-        ],
-      },
-      orderBy: { createdAt: 'asc' },
-    })
-
-    if (existingDraft) {
-      await prisma.post.update({
-        where: { id: existingDraft.id },
-        data: { format: existingDraft.format ?? slot.format, scheduledAt: slot.scheduledAt },
-      })
-      await prisma.postSlot.update({
-        where: { id: slot.id },
-        data: { status: 'filled', postId: existingDraft.id },
-      })
-      advanceBatchWindow(existingDraft.generationBatchId)
-      slotsFilledNow++
-      logger.info({ brandId, slotId: slot.id, postId: existingDraft.id }, '[COVERAGE] Slot filled by existing unscheduled draft')
-      continue
-    }
-
-    // Second: try to find an IDEA_APPROVED post respecting the batch rule
-    const candidate = await prisma.post.findFirst({
-      where: {
-        brandId,
-        status: 'IDEA_APPROVED',
-        postSlot: null,
-        AND: [
-          { OR: [{ format: null }, { format: slot.format }] },
-          ...(Object.keys(batchFilter).length > 0 ? [batchFilter] : []),
-        ],
-      },
-      orderBy: { createdAt: 'asc' },
-    })
-
-    if (candidate) {
-      const templateConfig = await deck.pick(brandId, slot.format)
-      const templateId = templateConfig?.template.id ?? undefined
-
-      try {
-        let creative: unknown
-        let caption = ''
-        let hashtags: string[] = []
-        let resolvedTemplateId: string | null = templateId ?? null
-
-        if (!templateId) throw new Error('No template resolved for slot')
-        const recentContext = await getRecentDraftContext(brandId)
-        const draftResult = await runDraftPipeline({ ideaText: candidate.ideaText ?? '', brandId, templateId, recentContext })
-        creative = draftResult.creative
-        caption = draftResult.caption
-        hashtags = draftResult.hashtags
-        resolvedTemplateId = draftResult.templateId
-        const draftTrace = draftResult.trace
-
-        const autoApproveDraft = templateConfig?.autoApproveDraft ?? false
-        const draftStatus = autoApproveDraft ? 'DRAFT_APPROVED' : 'DRAFT_PENDING'
-
-        const existingTrace = await prisma.post.findUnique({ where: { id: candidate.id }, select: { llmTrace: true } })
-        await prisma.post.update({
-          where: { id: candidate.id },
-          data: {
-            format: slot.format,
-            creative: creative as unknown as Prisma.InputJsonValue,
-            caption,
-            hashtags,
-            templateId: resolvedTemplateId,
-            status: draftStatus,
-            scheduledAt: slot.scheduledAt,
-            llmTrace: { ...(existingTrace?.llmTrace as object ?? {}), draftTrace } as unknown as Prisma.InputJsonValue,
-          },
-        })
-        await prisma.postSlot.update({
-          where: { id: slot.id },
-          data: { status: 'filled', postId: candidate.id },
-        })
-
-        advanceBatchWindow(candidate.generationBatchId)
-        slotsFilledNow++
-        logger.info({ brandId, slotId: slot.id, postId: candidate.id, format: slot.format, draftStatus }, '[COVERAGE] Slot filled via auto-compose')
-
-        if (draftStatus === 'DRAFT_APPROVED') {
-          await triggerRenderForPost(candidate.id).catch((err) =>
-            logger.error({ postId: candidate.id, err }, '[COVERAGE] triggerRenderForPost failed'),
-          )
-        }
-      } catch (err) {
-        logger.error({ brandId, slotId: slot.id, err }, '[COVERAGE] Auto-compose failed for slot')
-      }
-      continue
-    }
-
-    // No candidate passed batch filter — check if any approved ideas exist at all
-    const anyApproved = await prisma.post.count({
-      where: { brandId, status: 'IDEA_APPROVED', postSlot: null, OR: [{ format: null }, { format: slot.format }] },
-    })
-
-    if (anyApproved > 0) {
-      // All approved ideas are from recently-used batches — need a new batch
-      logger.info({ brandId, slotId: slot.id, recentBatchIds }, '[COVERAGE] Batch rule blocked all candidates — attempting idea generation')
-
-      const generated = await tryGenerateNewBatch(brandId, brand)
-
-      if (!generated.hasDigest) {
-        noDigest = true
-        skippedByBatchRule++
-        if (source === 'automatic') {
-          const brandName = (await prisma.brand.findUnique({ where: { id: brandId }, select: { name: true } }))?.name ?? brandId
-          await notifyViaZazu(brandId, `⚠️ *Calendar fill blocked* — _${brandName}_\n\nAll approved ideas are from the same batch. Could not generate new ideas: no InspoBase digest available.\n\n${skippedByBatchRule} slot(s) left unfilled.`)
-        }
-        logger.warn({ brandId, slotId: slot.id }, '[COVERAGE] Batch rule: skipping slot — no digest for new batch')
-        continue
-      }
-
-      if (!brand.autoApproveIdeas) {
-        notifyUserApproveIdeas = true
-        skippedByBatchRule++
-        if (source === 'automatic') {
-          const brandName = (await prisma.brand.findUnique({ where: { id: brandId }, select: { name: true } }))?.name ?? brandId
-          await notifyViaZazu(brandId, `⚠️ *Calendar fill blocked* — _${brandName}_\n\nNew ideas were generated to satisfy the batch rule, but auto-approve is off.\n\nPlease approve ideas in the Ideas tab to continue filling the calendar.`)
-        }
-        logger.warn({ brandId, slotId: slot.id }, '[COVERAGE] Batch rule: skipping slot — new ideas pending approval')
-        continue
-      }
-
-      // Ideas were generated and auto-approved — retry this slot
-      const retryCandidate = await prisma.post.findFirst({
-        where: {
-          brandId,
-          status: 'IDEA_APPROVED',
-          postSlot: null,
-          AND: [
-            { OR: [{ format: null }, { format: slot.format }] },
-            ...(Object.keys(batchFilter).length > 0 ? [batchFilter] : []),
-          ],
-        },
-        orderBy: { createdAt: 'asc' },
-      })
-
-      if (!retryCandidate) {
-        skippedByBatchRule++
-        logger.warn({ brandId, slotId: slot.id }, '[COVERAGE] Batch rule: skipping slot — retry candidate not found after generation')
-        continue
-      }
-
-      // Fall through: re-use the same compose logic via a tail-recursive-style push
-      // Simplest: push this slot back at the front and let the next iteration handle it.
-      // Instead, inline the compose for the retry candidate here.
-      const templateConfig = await deck.pick(brandId, slot.format)
-      const templateId = templateConfig?.template.id ?? undefined
-      try {
-        let creative: unknown
-        let caption = ''
-        let hashtags: string[] = []
-        let resolvedTemplateId: string | null = templateId ?? null
-
-        if (!templateId) throw new Error('No template resolved for slot')
-        const recentContext = await getRecentDraftContext(brandId)
-        const draftResult = await runDraftPipeline({ ideaText: retryCandidate.ideaText ?? '', brandId, templateId, recentContext })
-        creative = draftResult.creative
-        caption = draftResult.caption
-        hashtags = draftResult.hashtags
-        resolvedTemplateId = draftResult.templateId
-        const draftTrace = draftResult.trace
-
-        const autoApproveDraft = templateConfig?.autoApproveDraft ?? false
-        const draftStatus = autoApproveDraft ? 'DRAFT_APPROVED' : 'DRAFT_PENDING'
-
-        const existingRetryTrace = await prisma.post.findUnique({ where: { id: retryCandidate.id }, select: { llmTrace: true } })
-        await prisma.post.update({ where: { id: retryCandidate.id }, data: { format: slot.format, creative: creative as unknown as Prisma.InputJsonValue, caption, hashtags, templateId: resolvedTemplateId, status: draftStatus, scheduledAt: slot.scheduledAt, llmTrace: { ...(existingRetryTrace?.llmTrace as object ?? {}), draftTrace } as unknown as Prisma.InputJsonValue } })
-        await prisma.postSlot.update({ where: { id: slot.id }, data: { status: 'filled', postId: retryCandidate.id } })
-
-        advanceBatchWindow(retryCandidate.generationBatchId)
-        slotsFilledNow++
-        logger.info({ brandId, slotId: slot.id, postId: retryCandidate.id }, '[COVERAGE] Slot filled via auto-compose after batch-rule generation')
-
-        if (draftStatus === 'DRAFT_APPROVED') {
-          await triggerRenderForPost(retryCandidate.id).catch((err) => logger.error({ postId: retryCandidate.id, err }, '[COVERAGE] triggerRenderForPost failed'))
-        }
-      } catch (err) {
-        logger.error({ brandId, slotId: slot.id, err }, '[COVERAGE] Auto-compose failed for retry candidate')
-      }
-      continue
-    }
-
-    // No approved ideas at all (not a batch-rule issue)
-    const pendingCount = await prisma.post.count({ where: { brandId, status: 'IDEA_PENDING' } })
-    if (pendingCount > 0) {
-      notifyUserApproveIdeas = true
-      break
-    }
-
-    // Truly no ideas — trigger generation
-    ideasGenerated = await triggerIdeaGeneration(brandId)
-    break
-  }
-
-  return {
-    slotsInHorizon: allSlots,
-    filledSlots: filledSlots + slotsFilledNow,
-    emptySlots,
-    slotsFilledNow,
-    skippedByBatchRule,
-    ideasGenerated,
-    notifyUserApproveIdeas,
-    noDigest,
-  }
-}
-
-// ─── Smart fill (manual trigger) ─────────────────────────────────────────────
+// ─── Public result types ──────────────────────────────────────────────────────
 
 export interface SmartFillResult {
   alreadyFull: boolean
-  slotsNeeded: number           // empty slots at the start of this run
-  ideasGenerated: number        // new ideas created during this run
-  noDigest: boolean             // generation skipped — no inspo digest available
-  approvedIdeas: number         // approved ideas available when slot-filling ran
-  slotsFilled: number           // slots actually filled
-  skippedByBatchRule: number    // slots skipped because batch-rule blocked all candidates
-  needsApproval: number         // more approvals still needed to fill remaining slots
+  postsNeeded: number
+  ideasGenerated: number
+  noDigest: boolean
+  approvedIdeas: number
+  postsFilled: number
+  skippedByBatchRule: number
+  needsApproval: number
 }
 
-/**
- * Manual "Fill Calendar" trigger.
- * 1. Materialise slots for the full coverage horizon.
- * 2. Count the gap (empty slots).
- * 3. If total ideas < gap, generate ideas in batches until covered (or digest runs out).
- * 4. Fill slots using approved ideas (composing drafts as needed).
- * 5. Return rich status for the UI notification.
- */
+export interface CoverageResult {
+  postsFilled: number
+}
+
+// ─── Automatic fill (on publish) ─────────────────────────────────────────────
+
+export async function runCoverageChecks(brandId: string): Promise<CoverageResult> {
+  const brand = await prisma.brand.findUnique({
+    where: { id: brandId },
+    select: { coverageHorizonDays: true, autoApproveIdeas: true, language: true, ideationCustomPrompt: true },
+  })
+  if (!brand) throw new Error(`Brand ${brandId} not found`)
+
+  const { postsFilled } = await fillCalendarForBrand(brandId, brand, 'automatic')
+  logger.info({ brandId, postsFilled }, '[COVERAGE] Coverage check complete')
+  return { postsFilled }
+}
+
+// ─── Manual fill (Fill Calendar button) ──────────────────────────────────────
+
 export async function smartFillCalendar(brandId: string): Promise<SmartFillResult> {
   const brand = await prisma.brand.findUnique({
     where: { id: brandId },
@@ -436,94 +212,327 @@ export async function smartFillCalendar(brandId: string): Promise<SmartFillResul
   })
   if (!brand) throw new Error(`Brand ${brandId} not found`)
 
-  const horizonDays = brand.coverageHorizonDays
-  await materializeSlots(brandId, horizonDays)
+  return fillCalendarForBrand(brandId, brand, 'manual')
+}
 
-  const targetEnd = new Date(Date.now() + (horizonDays) * 24 * 60 * 60 * 1000)
-  const now = new Date()
+// ─── Core fill engine ─────────────────────────────────────────────────────────
 
-  const [allSlots, filledSlots] = await Promise.all([
-    prisma.postSlot.count({ where: { brandId, scheduledAt: { lte: targetEnd, gt: now } } }),
-    prisma.postSlot.count({ where: { brandId, scheduledAt: { lte: targetEnd, gt: now }, status: { in: ['filled', 'published'] } } }),
-  ])
-  const slotsNeeded = allSlots - filledSlots
-
-  if (slotsNeeded === 0) {
-    return { alreadyFull: true, slotsNeeded: 0, ideasGenerated: 0, noDigest: false, approvedIdeas: 0, slotsFilled: 0, skippedByBatchRule: 0, needsApproval: 0 }
+async function fillCalendarForBrand(
+  brandId: string,
+  brand: { coverageHorizonDays: number; autoApproveIdeas: boolean; language: string; ideationCustomPrompt?: string | null },
+  source: 'manual' | 'automatic',
+): Promise<SmartFillResult> {
+  const schedule = await prisma.postSchedule.findUnique({ where: { brandId } })
+  if (!schedule || !schedule.isActive || schedule.formatChain.length === 0) {
+    return { alreadyFull: true, postsNeeded: 0, ideasGenerated: 0, noDigest: false, approvedIdeas: 0, postsFilled: 0, skippedByBatchRule: 0, needsApproval: 0 }
   }
 
-  // Count all available ideas (pending + approved — not yet turned into drafts)
-  const countAvailableIdeas = () =>
-    prisma.post.count({
-      where: { brandId, status: { in: ['IDEA_PENDING', 'IDEA_APPROVED'] } },
-    })
+  const horizonDays = brand.coverageHorizonDays
+  const todayLocal = startOfTodayInTimezone(schedule.timezone)
+  const horizonEnd = new Date(todayLocal.getTime() + horizonDays * 24 * 60 * 60 * 1000)
+  const todayStr = toLocalDateStr(new Date(), schedule.timezone)
 
-  const countUnscheduledDrafts = () =>
-    prisma.post.count({
-      where: { brandId, status: { in: ['DRAFT_PENDING', 'DRAFT_APPROVED'] }, scheduledAt: null, postSlot: null },
-    })
+  // Load all posts with scheduledAt in horizon to determine per-day counts
+  const existingPosts = await prisma.post.findMany({
+    where: { brandId, scheduledAt: { gte: todayLocal, lt: horizonEnd } },
+    select: { scheduledAt: true },
+    orderBy: { scheduledAt: 'asc' },
+  })
 
-  let totalIdeas = await countAvailableIdeas()
+  // Count per local date
+  const countByDate: Record<string, number> = {}
+  for (const p of existingPosts) {
+    const d = toLocalDateStr(p.scheduledAt!, schedule.timezone)
+    countByDate[d] = (countByDate[d] ?? 0) + 1
+  }
+
+  // Compute total posts needed across all days
+  let postsNeeded = 0
+  const dayStart = new Date(todayLocal)
+  while (dayStart < horizonEnd) {
+    const localDate = toLocalDateStr(dayStart, schedule.timezone)
+    const existing = countByDate[localDate] ?? 0
+    postsNeeded += Math.max(0, schedule.dailyFrequency - existing)
+    dayStart.setUTCDate(dayStart.getUTCDate() + 1)
+  }
+
+  if (postsNeeded === 0) {
+    return { alreadyFull: true, postsNeeded: 0, ideasGenerated: 0, noDigest: false, approvedIdeas: 0, postsFilled: 0, skippedByBatchRule: 0, needsApproval: 0 }
+  }
+
+  // Pre-generate ideas if we're short
   let ideasGenerated = 0
   let noDigest = false
+  const countAvailable = () => prisma.post.count({
+    where: { brandId, status: { in: ['IDEA_PENDING', 'IDEA_APPROVED'] } },
+  })
+  const countUnscheduledDrafts = () => prisma.post.count({
+    where: { brandId, status: { in: ['DRAFT_PENDING', 'DRAFT_APPROVED'] }, scheduledAt: null },
+  })
 
-  // Unscheduled drafts will be allocated first by runCheck1, so factor them into
-  // the gap before deciding whether to generate new ideas.
-  const unscheduledDrafts = await countUnscheduledDrafts()
-
-  // Generate ideas via source concepts until we have enough to cover the gap
-  if (totalIdeas + unscheduledDrafts < slotsNeeded) {
+  const [available, unscheduledDrafts] = await Promise.all([countAvailable(), countUnscheduledDrafts()])
+  if (available + unscheduledDrafts < postsNeeded) {
     const result = await generateIdeasFromSourceConcepts(brandId, brand)
     if (!result.hasConcepts) {
       noDigest = true
-      logger.warn({ brandId }, '[SMART_FILL] Idea generation skipped — no source concepts available')
     } else {
-      totalIdeas = await countAvailableIdeas()
-      ideasGenerated = totalIdeas
-      // If still short after one generation round, run again (concepts were regenerated)
-      while (totalIdeas < slotsNeeded) {
+      let total = await countAvailable()
+      ideasGenerated = total
+      while (total < postsNeeded) {
         const again = await generateIdeasFromSourceConcepts(brandId, brand)
         if (!again.hasConcepts) break
-        totalIdeas = await countAvailableIdeas()
-        // Safety: if count didn't grow, break to avoid infinite loop
-        if (totalIdeas <= ideasGenerated) break
-        ideasGenerated = totalIdeas
+        const next = await countAvailable()
+        if (next <= total) break
+        total = next
+        ideasGenerated = total
       }
-      logger.info({ brandId, ideasGenerated }, '[SMART_FILL] Ideas generated')
     }
   }
 
-  // Count approved ideas available for slot-filling
-  const approvedIdeas = await prisma.post.count({
-    where: { brandId, status: 'IDEA_APPROVED' },
+  const approvedIdeas = await prisma.post.count({ where: { brandId, status: 'IDEA_APPROVED' } })
+
+  // ── Day-by-day fill loop ──────────────────────────────────────────────────
+  const deck = new TemplateDeck()
+  let chainPos = schedule.chainPosition
+  let postsFilled = 0
+  let skippedByBatchRule = 0
+  let notifyUserApproveIdeas = false
+
+  // Initialise batch-rule window from last 2 scheduled posts before the horizon
+  const recentBatchIds: (string | null)[] = []
+  const priorPosts = await prisma.post.findMany({
+    where: { brandId, scheduledAt: { lt: todayLocal }, status: { notIn: ['IDEA_PENDING', 'IDEA_APPROVED'] } },
+    orderBy: { scheduledAt: 'desc' },
+    take: BATCH_GAP,
+    select: { generationBatchId: true },
   })
+  priorPosts.reverse().forEach((p) => recentBatchIds.push(p.generationBatchId ?? null))
 
-  // Run slot-filling (same logic as Check 1, minus the idea generation since we did it above)
-  const check1 = await runCheck1(brandId, horizonDays, brand, 'manual')
-  const slotsFilled = check1.slotsFilledNow
+  const advanceBatchWindow = (batchId: string | null) => {
+    recentBatchIds.push(batchId)
+    if (recentBatchIds.length > BATCH_GAP) recentBatchIds.shift()
+  }
 
-  const remainingEmpty = slotsNeeded - slotsFilled
-  // How many more approved ideas are needed to fill the rest
-  const approvedAfterFill = await prisma.post.count({
-    where: { brandId, status: 'IDEA_APPROVED' },
-  })
-  const needsApproval = Math.max(0, remainingEmpty - approvedAfterFill)
+  // Reload existing post times per day (including ones just added during this run)
+  // We track occupied times in memory to avoid N+1 re-queries
+  const occupiedByDate: Record<string, number[]> = {}
+  for (const p of existingPosts) {
+    const d = toLocalDateStr(p.scheduledAt!, schedule.timezone)
+    ;(occupiedByDate[d] ??= []).push(p.scheduledAt!.getTime())
+  }
 
-  logger.info({ brandId, slotsNeeded, slotsFilled, ideasGenerated, approvedIdeas, needsApproval }, '[SMART_FILL] Complete')
+  const dayLoop = new Date(todayLocal)
+  while (dayLoop < horizonEnd) {
+    const localDate = toLocalDateStr(dayLoop, schedule.timezone)
+    const isToday = localDate === todayStr
+    const existingCount = countByDate[localDate] ?? 0
+    const toFill = Math.max(0, schedule.dailyFrequency - existingCount)
+
+    if (toFill > 0) {
+      const idealTimes = computeIdealTimes(
+        schedule.windowStart,
+        schedule.windowEnd,
+        schedule.dailyFrequency,
+        schedule.timezone,
+        dayLoop,
+        isToday,
+      )
+
+      const TOLERANCE_MS = 4 * 60 * 1000
+      const occupied = occupiedByDate[localDate] ?? []
+      const freeTimes = idealTimes.filter((t) =>
+        !occupied.some((o) => Math.abs(o - t.getTime()) <= TOLERANCE_MS),
+      ).slice(0, toFill)
+
+      for (const targetTime of freeTimes) {
+        const format = schedule.formatChain[chainPos % schedule.formatChain.length]!
+        chainPos++
+
+        const batchFilter = batchExcludeFilter(recentBatchIds)
+        const batchAnd = Object.keys(batchFilter).length > 0 ? [batchFilter] : []
+
+        // Tier 1: unscheduled draft
+        const existingDraft = await prisma.post.findFirst({
+          where: {
+            brandId,
+            status: { in: ['DRAFT_PENDING', 'DRAFT_APPROVED'] },
+            scheduledAt: null,
+            AND: [{ OR: [{ format: null }, { format }] }, ...batchAnd],
+          },
+          orderBy: { createdAt: 'asc' },
+        })
+
+        if (existingDraft) {
+          await prisma.post.update({
+            where: { id: existingDraft.id },
+            data: { format: existingDraft.format ?? format, scheduledAt: targetTime },
+          })
+          advanceBatchWindow(existingDraft.generationBatchId)
+          postsFilled++
+          ;(occupiedByDate[localDate] ??= []).push(targetTime.getTime())
+          countByDate[localDate] = (countByDate[localDate] ?? 0) + 1
+          logger.info({ brandId, postId: existingDraft.id, targetTime }, '[COVERAGE] Scheduled existing draft')
+          continue
+        }
+
+        // Tier 2: IDEA_APPROVED → auto-compose
+        const candidate = await prisma.post.findFirst({
+          where: {
+            brandId,
+            status: 'IDEA_APPROVED',
+            AND: [{ OR: [{ format: null }, { format }] }, ...batchAnd],
+          },
+          orderBy: { createdAt: 'asc' },
+        })
+
+        if (candidate) {
+          const filled = await composeAndSchedule(brandId, candidate, format, targetTime, deck)
+          if (filled) {
+            advanceBatchWindow(candidate.generationBatchId)
+            postsFilled++
+            ;(occupiedByDate[localDate] ??= []).push(targetTime.getTime())
+            countByDate[localDate] = (countByDate[localDate] ?? 0) + 1
+          }
+          continue
+        }
+
+        // No candidate — check if blocked by batch rule or truly empty
+        const anyApproved = await prisma.post.count({
+          where: { brandId, status: 'IDEA_APPROVED', OR: [{ format: null }, { format }] },
+        })
+
+        if (anyApproved > 0) {
+          // Batch rule is blocking — try generating a new batch
+          const generated = await tryGenerateNewBatch(brandId, brand)
+          if (!generated.hasDigest) {
+            noDigest = true
+            skippedByBatchRule++
+            if (source === 'automatic') {
+              const name = (await prisma.brand.findUnique({ where: { id: brandId }, select: { name: true } }))?.name ?? brandId
+              await notifyViaZazu(brandId, `⚠️ *Calendar fill blocked* — _${name}_\n\nAll approved ideas are from the same batch. Could not generate new ideas: no InspoBase digest available.\n\n${skippedByBatchRule} post(s) left unfilled.`)
+            }
+            continue
+          }
+          if (!brand.autoApproveIdeas) {
+            notifyUserApproveIdeas = true
+            skippedByBatchRule++
+            if (source === 'automatic') {
+              const name = (await prisma.brand.findUnique({ where: { id: brandId }, select: { name: true } }))?.name ?? brandId
+              await notifyViaZazu(brandId, `⚠️ *Calendar fill blocked* — _${name}_\n\nNew ideas were generated to satisfy the batch rule, but auto-approve is off.\n\nPlease approve ideas in the Ideas tab to continue filling the calendar.`)
+            }
+            continue
+          }
+          // Retry with the fresh batch
+          const retryCandidate = await prisma.post.findFirst({
+            where: {
+              brandId,
+              status: 'IDEA_APPROVED',
+              AND: [{ OR: [{ format: null }, { format }] }, ...batchAnd],
+            },
+            orderBy: { createdAt: 'asc' },
+          })
+          if (retryCandidate) {
+            const filled = await composeAndSchedule(brandId, retryCandidate, format, targetTime, deck)
+            if (filled) {
+              advanceBatchWindow(retryCandidate.generationBatchId)
+              postsFilled++
+              ;(occupiedByDate[localDate] ??= []).push(targetTime.getTime())
+              countByDate[localDate] = (countByDate[localDate] ?? 0) + 1
+            }
+          } else {
+            skippedByBatchRule++
+          }
+          continue
+        }
+
+        // Truly no ideas at all
+        const pendingCount = await prisma.post.count({ where: { brandId, status: 'IDEA_PENDING' } })
+        if (pendingCount > 0) {
+          notifyUserApproveIdeas = true
+          break
+        }
+        await triggerIdeaGeneration(brandId)
+        break
+      }
+    }
+
+    dayLoop.setUTCDate(dayLoop.getUTCDate() + 1)
+  }
+
+  // Persist advanced chain position
+  const newChainPos = chainPos % schedule.formatChain.length
+  if (newChainPos !== schedule.chainPosition) {
+    await prisma.postSchedule.update({ where: { brandId }, data: { chainPosition: newChainPos } })
+  }
+
+  const needsApproval = notifyUserApproveIdeas
+    ? Math.max(0, postsNeeded - postsFilled - skippedByBatchRule)
+    : 0
+
+  logger.info({ brandId, postsNeeded, postsFilled, ideasGenerated, skippedByBatchRule }, '[COVERAGE] Fill complete')
 
   return {
     alreadyFull: false,
-    slotsNeeded,
+    postsNeeded,
     ideasGenerated,
-    noDigest: noDigest || check1.noDigest,
+    noDigest,
     approvedIdeas,
-    slotsFilled,
-    skippedByBatchRule: check1.skippedByBatchRule,
+    postsFilled,
+    skippedByBatchRule,
     needsApproval,
   }
 }
 
-// ─── Shared idea generation via source concepts ───────────────────────────────
+// ─── Compose a post and assign a scheduled time ───────────────────────────────
+
+async function composeAndSchedule(
+  brandId: string,
+  candidate: { id: string; ideaText: string; generationBatchId: string | null; llmTrace: unknown },
+  format: string,
+  targetTime: Date,
+  deck: TemplateDeck,
+): Promise<boolean> {
+  const templateConfig = await deck.pick(brandId, format)
+  if (!templateConfig) {
+    logger.warn({ brandId, postId: candidate.id, format }, '[COVERAGE] No template for format — skipping')
+    return false
+  }
+  try {
+    const recentContext = await getRecentDraftContext(brandId)
+    const draftResult = await runDraftPipeline({
+      ideaText: candidate.ideaText ?? '',
+      brandId,
+      templateId: templateConfig.template.id,
+      recentContext,
+    })
+    const draftStatus = templateConfig.autoApproveDraft ? 'DRAFT_APPROVED' : 'DRAFT_PENDING'
+    await prisma.post.update({
+      where: { id: candidate.id },
+      data: {
+        format,
+        creative: draftResult.creative as unknown as Prisma.InputJsonValue,
+        caption: draftResult.caption,
+        hashtags: draftResult.hashtags,
+        templateId: draftResult.templateId,
+        status: draftStatus,
+        scheduledAt: targetTime,
+        llmTrace: { ...(candidate.llmTrace as object ?? {}), draftTrace: draftResult.trace } as unknown as Prisma.InputJsonValue,
+      },
+    })
+    if (draftStatus === 'DRAFT_APPROVED') {
+      await triggerRenderForPost(candidate.id).catch((err) =>
+        logger.error({ postId: candidate.id, err }, '[COVERAGE] triggerRenderForPost failed'),
+      )
+    }
+    logger.info({ brandId, postId: candidate.id, format, draftStatus, targetTime }, '[COVERAGE] Post composed and scheduled')
+    return true
+  } catch (err) {
+    logger.error({ brandId, postId: candidate.id, err }, '[COVERAGE] Auto-compose failed')
+    return false
+  }
+}
+
+// ─── Idea generation helpers ──────────────────────────────────────────────────
 
 async function generateIdeasFromSourceConcepts(
   brandId: string,
@@ -571,15 +580,12 @@ async function generateIdeasFromSourceConcepts(
       await markSourceConceptConsumed(concept.id)
       logger.info({ brandId, conceptId: concept.id, count: output.ideas.length }, '[COVERAGE] Ideas generated from source concept')
     }
-
     return { hasConcepts: true }
   } catch (err) {
     logger.error({ brandId, err }, '[COVERAGE] generateIdeasFromSourceConcepts failed')
     return { hasConcepts: false }
   }
 }
-
-// ─── Single-batch idea generation (for batch-rule unblocking) ────────────────
 
 async function tryGenerateNewBatch(
   brandId: string,
@@ -589,17 +595,14 @@ async function tryGenerateNewBatch(
   return { hasDigest: result.hasConcepts }
 }
 
-// ─── Idea generation trigger ──────────────────────────────────────────────────
-
-async function triggerIdeaGeneration(brandId: string): Promise<boolean> {
+async function triggerIdeaGeneration(brandId: string): Promise<void> {
   const brand = await prisma.brand.findUnique({
     where: { id: brandId },
     select: { language: true, autoApproveIdeas: true, ideationCustomPrompt: true },
   })
-  const result = await generateIdeasFromSourceConcepts(brandId, {
+  await generateIdeasFromSourceConcepts(brandId, {
     autoApproveIdeas: brand?.autoApproveIdeas ?? false,
     language: brand?.language ?? 'Spanish',
     ideationCustomPrompt: brand?.ideationCustomPrompt,
   })
-  return result.hasConcepts
 }

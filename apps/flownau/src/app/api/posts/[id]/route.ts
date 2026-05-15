@@ -35,8 +35,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const denied2 = await checkBrandAccessForRoute(post.brandId); if (denied2) return denied2
 
     const {
-      slotId,
-      releaseSlot,
       status,
       ideaText,
       format,
@@ -102,27 +100,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       )
     }
 
-    // Handle slot assignment / rescheduling:
-    // Release the post's previous slot (if any), then claim the new one.
-    if (slotId || releaseSlot) {
-      const previousSlot = await prisma.postSlot.findFirst({
-        where: { postId: id },
-        select: { id: true },
-      })
-      if (previousSlot && previousSlot.id !== slotId) {
-        await prisma.postSlot.update({
-          where: { id: previousSlot.id },
-          data: { status: 'empty', postId: null },
-        })
-      }
-      if (slotId) {
-        await prisma.postSlot.update({
-          where: { id: slotId },
-          data: { status: 'filled', postId: id },
-        })
-      }
-    }
-
     return NextResponse.json({ post: updated })
   } catch (error) {
     logError('PATCH /api/posts/[id]', error)
@@ -137,12 +114,6 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     if (!post) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     const denied3 = await checkBrandAccessForRoute(post.brandId); if (denied3) return denied3
 
-    // Free the slot before deleting so it stays in the calendar as empty
-    // rather than becoming a phantom filled slot with no post.
-    await prisma.postSlot.updateMany({
-      where: { postId: id },
-      data: { status: 'empty', postId: null },
-    })
     await prisma.post.delete({ where: { id } })
 
     // Delete all R2 files associated with this post.

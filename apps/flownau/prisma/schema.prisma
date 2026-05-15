@@ -35,7 +35,6 @@ model Brand {
   posts                Post[]
   contentPlans         ContentPlan[]
   postSchedule         PostSchedule?
-  postSlots            PostSlot[]
 }
 
 // ── PostSchedule ───────────────────────────────────────────────────────────────
@@ -57,26 +56,6 @@ model PostSchedule {
   updatedAt DateTime @updatedAt
 }
 
-// ── PostSlot ───────────────────────────────────────────────────────────────────
-// A materialized calendar entry. Created by the slot materialization service.
-// Filled when an IDEA_APPROVED post is auto-composed into it.
-model PostSlot {
-  id      String @id @default(cuid())
-  brandId String
-  brand   Brand  @relation(fields: [brandId], references: [id], onDelete: Cascade)
-
-  scheduledAt DateTime // exact UTC datetime for this slot
-  format      String // format assigned by chain position
-  status      String   @default("empty") // empty | filled | published
-
-  postId String? @unique // null until filled
-  post   Post?   @relation(fields: [postId], references: [id])
-
-  createdAt DateTime @default(now())
-
-  @@unique([brandId, scheduledAt])
-  @@index([brandId, status])
-}
 
 // ── SocialProfile ──────────────────────────────────────────────────────────────
 // A posting channel — the endpoint of the brand's content pipeline.
@@ -313,7 +292,6 @@ model Post {
   brand     Brand      @relation(fields: [brandId], references: [id], onDelete: Cascade)
   template  Template?  @relation(fields: [templateId], references: [id])
   renderJob RenderJob?
-  postSlot  PostSlot?
 
   @@index([brandId, status])
   @@index([generationBatchId])
@@ -355,25 +333,6 @@ model ContentPlan {
   @@unique([brandId, date])
 }
 
-model ContentPlanner {
-  id                  String    @id @default(cuid())
-  brandId             String // 9naŭ Brand.id
-  workspaceId         String // 9naŭ Workspace.id
-  name                String
-  isDefault           Boolean   @default(false)
-  autoApproveSchedule Boolean   @default(false)
-  strategistPrompt    String?   @db.Text
-  daysToPlan          Int       @default(7)
-  frequencyDays       Int       @default(1)
-  reelsPerDay         Int       @default(5)
-  trialReelsPerDay    Int       @default(5)
-  postingTimes        Json      @default("[]")
-  trialPostingTimes   Json      @default("[]")
-  timezone            String    @default("Europe/Madrid")
-  lastPostedAt        DateTime?
-
-  @@unique([brandId, name])
-}
 
 model PromptHistory {
   id          String    @id @default(cuid())
