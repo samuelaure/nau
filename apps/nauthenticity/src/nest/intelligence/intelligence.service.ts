@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { IngestionService } from '../ingestion/ingestion.service'
 import { runProactiveFanout } from '../../modules/proactive/fanout.processor'
 import { generateReactiveComments } from '../../modules/proactive/reactive.service'
 import { scrapePostByUrl } from '../../services/apify.service'
@@ -7,6 +8,8 @@ import { downloadQueue } from '../../queues/download.queue'
 import { upsertSocialProfile } from '../../modules/shared/upsert-social-profile'
 import { extractVideoId, fetchYoutubeMetadata } from '../../services/youtube-ingest.service'
 import { computeQueue } from '../../queues/compute.queue'
+
+const RECENT_SCRAPE_THRESHOLD_DAYS = 7
 
 export type Category = 'COMMENT' | 'INSPO' | 'BENCHMARK'
 export const CATEGORIES: readonly Category[] = ['COMMENT', 'INSPO', 'BENCHMARK'] as const
@@ -17,7 +20,10 @@ export function isCategory(value: unknown): value is Category {
 
 @Injectable()
 export class IntelligenceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ingestion: IngestionService,
+  ) {}
 
   async getIntelligence(brandId: string) {
     const intelligence = await this.prisma.brand.findUnique({
@@ -113,6 +119,7 @@ export class IntelligenceService {
       : { projectId: (owner as { projectId: string }).projectId }
 
     let absorbedPostCount = 0
+    let scrapeQueued = false
     for (const username of usernames) {
       const profile = await upsertSocialProfile({ platform: 'instagram', username })
 
@@ -142,8 +149,16 @@ export class IntelligenceService {
         },
       })
       absorbedPostCount += absorbedCount
+
+      if (opts.category === 'INSPO') {
+        const staleThreshold = new Date(Date.now() - RECENT_SCRAPE_THRESHOLD_DAYS * 24 * 60 * 60 * 1000)
+        if (!profile.lastScrapedAt || profile.lastScrapedAt < staleThreshold) {
+          const queued = await this.ingestion.tryQueueIngestion(username, 30)
+          if (queued) scrapeQueued = true
+        }
+      }
     }
-    return { success: true, absorbedPostCount }
+    return { success: true, absorbedPostCount, scrapeQueued }
   }
 
   async updateMembership(id: string, data: { isActive?: boolean; category?: Category }) {

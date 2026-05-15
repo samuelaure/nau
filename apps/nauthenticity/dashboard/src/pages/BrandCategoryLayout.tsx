@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation, Routes, Route, Navigate, NavLink } from 'react-router-dom';
-import { getBrandTargets, addBrandTarget, capturePostByUrl, removeBrandTarget, addInspoUrl, getAccount, getProfileImageUrl, type Post } from '../lib/api';
+import { getBrandTargets, addBrandTarget, capturePostByUrl, removeBrandTarget, addInspoUrl, getAccount, getProfileImageUrl, ingestAccount, type Post } from '../lib/api';
 import { Plus, ArrowLeft, X, Trash2, AlertTriangle } from 'lucide-react';
 import { SocialProfileCard } from '../components/SocialProfileCard';
 import { PostGrid } from '../components/PostGrid';
@@ -47,6 +47,7 @@ export const BrandCategoryLayout = ({
   const [input, setInput] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const [absorbedToast, setAbsorbedToast] = useState<string | null>(null);
+  const [scrapeToast, setScrapeToast] = useState(false);
   const [removeConfirm, setRemoveConfirm] = useState<{ membershipId: string; label: string } | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
 
@@ -69,6 +70,10 @@ export const BrandCategoryLayout = ({
         setAbsorbedToast(
           `${data.absorbedPostCount} post${data.absorbedPostCount > 1 ? 's' : ''} you'd previously added from this profile individually ${data.absorbedPostCount > 1 ? 'are' : 'is'} now grouped under this profile — they're still here, just accessible from the profile view.`
         );
+      }
+      if (data?.scrapeQueued) {
+        setScrapeToast(true);
+        setTimeout(() => setScrapeToast(false), 5000);
       }
     },
   });
@@ -237,7 +242,7 @@ export const BrandCategoryLayout = ({
             <ProfilesTab profiles={profileMemberships} onRemove={handleRemove} removing={removing} />
           )}
         />
-        <Route path="profiles/:username" element={<ProfileDetailView title={title} />} />
+        <Route path="profiles/:username" element={<ProfileDetailView title={title} category={category} />} />
         <Route
           path="posts"
           element={isLoading ? <div>Loading...</div> : (
@@ -256,6 +261,15 @@ export const BrandCategoryLayout = ({
           <AlertTriangle size={18} style={{ color: '#e3b341', flexShrink: 0, marginTop: '2px' }} />
           <p style={{ margin: 0, fontSize: '0.85rem', color: '#c9d1d9', lineHeight: '1.5' }}>{absorbedToast}</p>
           <button onClick={() => setAbsorbedToast(null)} style={{ background: 'none', border: 'none', color: '#8b949e', cursor: 'pointer', padding: '0', flexShrink: 0 }}><X size={16} /></button>
+        </div>
+      )}
+
+      {/* Scrape queued toast */}
+      {scrapeToast && (
+        <div style={{ position: 'fixed', bottom: absorbedToast ? '8rem' : '2rem', left: '50%', transform: 'translateX(-50%)', background: '#1c2128', border: '1px solid rgba(63,185,80,0.3)', borderRadius: '10px', padding: '1rem 1.5rem', maxWidth: '480px', zIndex: 2000, display: 'flex', alignItems: 'center', gap: '0.75rem', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+          <span style={{ fontSize: '1rem' }}>🔄</span>
+          <p style={{ margin: 0, fontSize: '0.85rem', color: '#c9d1d9', lineHeight: '1.5' }}>Scraping started — posts will appear shortly.</p>
+          <button onClick={() => setScrapeToast(false)} style={{ background: 'none', border: 'none', color: '#8b949e', cursor: 'pointer', padding: '0', flexShrink: 0 }}><X size={16} /></button>
         </div>
       )}
 
@@ -407,16 +421,33 @@ const ProfilesTab = ({ profiles, onRemove }: { profiles: any[]; onRemove: (id: s
 
 // ── Profile Detail ────────────────────────────────────────────────────────────
 
-const ProfileDetailView = ({ title }: { title: string }) => {
+const ProfileDetailView = ({ title, category }: { title: string; category: 'INSPO' | 'COMMENT' | 'BENCHMARK' }) => {
   const { username } = useParams<{ username: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [sort, setSort] = useState<'recent' | 'oldest' | 'likes' | 'comments'>('recent');
+  const [scrapeStatus, setScrapeStatus] = useState<'idle' | 'pending' | 'done'>('idle');
 
   const { data: account, isLoading } = useQuery({
     queryKey: ['account', username],
     queryFn: () => getAccount(username!),
     enabled: !!username,
   });
+
+  const handleScrape = async (limit: number) => {
+    if (!username || scrapeStatus === 'pending') return;
+    setScrapeStatus('pending');
+    try {
+      await ingestAccount({ username, limit });
+      setScrapeStatus('done');
+      setTimeout(() => {
+        setScrapeStatus('idle');
+        queryClient.invalidateQueries({ queryKey: ['account', username] });
+      }, 3000);
+    } catch {
+      setScrapeStatus('idle');
+    }
+  };
 
   return (
     <div className="fade-in">
@@ -437,9 +468,25 @@ const ProfileDetailView = ({ title }: { title: string }) => {
               alt={account.username}
               style={{ width: '72px', height: '72px', borderRadius: '50%', border: '2px solid var(--border)', backgroundColor: 'var(--bg-card)', padding: account.profileImageUrl ? '0' : '10px', objectFit: 'cover' }}
             />
-            <div>
+            <div style={{ flex: 1 }}>
               <h2 style={{ margin: 0, fontSize: '1.75rem' }}>@{account.username}</h2>
               <span style={{ color: '#8b949e', fontSize: '0.9rem' }}>{account.posts?.length ?? 0} posts captured</span>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                onClick={() => handleScrape(30)}
+                disabled={scrapeStatus !== 'idle'}
+                style={{ padding: '0.4rem 0.9rem', borderRadius: '8px', background: 'rgba(63,185,80,0.1)', border: '1px solid rgba(63,185,80,0.3)', color: '#3fb950', cursor: scrapeStatus !== 'idle' ? 'default' : 'pointer', fontSize: '0.82rem', fontWeight: 600, opacity: scrapeStatus !== 'idle' ? 0.6 : 1 }}
+              >
+                {scrapeStatus === 'pending' ? 'Scraping…' : scrapeStatus === 'done' ? 'Queued ✓' : '↻ Quick scrape'}
+              </button>
+              <button
+                onClick={() => handleScrape(200)}
+                disabled={scrapeStatus !== 'idle'}
+                style={{ padding: '0.4rem 0.9rem', borderRadius: '8px', background: 'rgba(88,166,255,0.1)', border: '1px solid rgba(88,166,255,0.3)', color: '#58a6ff', cursor: scrapeStatus !== 'idle' ? 'default' : 'pointer', fontSize: '0.82rem', fontWeight: 600, opacity: scrapeStatus !== 'idle' ? 0.6 : 1 }}
+              >
+                Full scrape (200)
+              </button>
             </div>
           </div>
 
