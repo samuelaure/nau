@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { ConfigService } from '@nestjs/config'
 import { getClientForFeature } from '@nau/llm-client'
@@ -71,8 +71,11 @@ Return only valid JSON: { "cleanTranscription": "...", "synthesis": "..." }`,
     brandId: string,
     data: { cleanTranscription: string; synthesis: string; sourceRef?: string },
   ) {
-    const brand = await this.prisma.brand.findUnique({ where: { id: brandId } })
-    if (!brand) throw new NotFoundException('Brand not found')
+    await this.prisma.brand.upsert({
+      where: { id: brandId },
+      create: { id: brandId, workspaceId: '' },
+      update: {},
+    })
 
     // Store voicenote
     const voicenote = await this.prisma.voicenote.create({
