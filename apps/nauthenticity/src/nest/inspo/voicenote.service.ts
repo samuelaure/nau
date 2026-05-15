@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { ConfigService } from '@nestjs/config'
 import { getClientForFeature } from '@nau/llm-client'
@@ -16,24 +16,30 @@ const VoiceProcessOutputSchema = z.object({
 })
 
 @Injectable()
-export class VoicenoteService {
+export class VoicenoteService implements OnModuleInit {
+  private readonly logger = new Logger(VoicenoteService.name)
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
   ) {}
 
+  onModuleInit() {
+    // Flush any concepts that failed to push during a previous lifecycle (e.g. deploy mid-request)
+    this.flushPendingConcepts().catch((err) =>
+      this.logger.error('[VoicenoteService] Startup flush failed', err),
+    )
+  }
+
   async processAudio(audioUrl: string): Promise<{ rawTranscription: string; cleanTranscription: string; synthesis: string }> {
     const tmpPath = path.join(os.tmpdir(), `nau-voice-${Date.now()}.ogg`)
 
     try {
-      // Download audio file from CDN URL
       const resp = await axios.get(audioUrl, { responseType: 'arraybuffer', timeout: 30_000 })
       fs.writeFileSync(tmpPath, Buffer.from(resp.data))
 
-      // Transcribe via Whisper
       const { text: rawTranscription } = await transcribeAudio(tmpPath)
 
-      // Clean and synthesize via LLM
       const { client, model } = getClientForFeature('synthesis')
       const result = await client.chatCompletion({
         model,
@@ -77,7 +83,6 @@ Return only valid JSON: { "cleanTranscription": "...", "synthesis": "..." }`,
       update: {},
     })
 
-    // Store voicenote
     const voicenote = await this.prisma.voicenote.create({
       data: {
         brandId,
@@ -87,7 +92,6 @@ Return only valid JSON: { "cleanTranscription": "...", "synthesis": "..." }`,
       },
     })
 
-    // Create a single SourceConcept from the synthesis
     const concept = await this.prisma.sourceConcept.create({
       data: {
         brandId,
@@ -97,16 +101,39 @@ Return only valid JSON: { "cleanTranscription": "...", "synthesis": "..." }`,
       },
     })
 
-    // Push immediately to flownau — if it fails, concept stays pending for coverage service
-    await this.pushConceptToFlownau(brandId, concept.id, concept.content)
+    const pushed = await this.pushConceptToFlownau(brandId, concept.id, concept.content)
+    if (!pushed) {
+      this.logger.warn({ brandId, conceptId: concept.id }, '[VoicenoteService] Push to flownau failed — concept stays pending for recovery flush')
+    }
 
     return { voicenote, concept }
   }
 
-  private async pushConceptToFlownau(brandId: string, conceptId: string, topic: string): Promise<void> {
+  // Flush all pending voicenote SourceConcepts that were never delivered to flownau.
+  // Called on startup and can be triggered manually.
+  async flushPendingConcepts(): Promise<void> {
+    const pending = await this.prisma.sourceConcept.findMany({
+      where: { sourceType: 'voicenote', status: 'pending' },
+    })
+    if (pending.length === 0) return
+
+    this.logger.log(`[VoicenoteService] Flushing ${pending.length} pending voicenote concept(s)`)
+
+    for (const concept of pending) {
+      const pushed = await this.pushConceptToFlownau(concept.brandId, concept.id, concept.content)
+      if (!pushed) {
+        this.logger.warn({ conceptId: concept.id, brandId: concept.brandId }, '[VoicenoteService] Flush: push still failing')
+      }
+    }
+  }
+
+  private async pushConceptToFlownau(brandId: string, conceptId: string, topic: string): Promise<boolean> {
     const flownauUrl = this.config.get<string>('FLOWNAU_URL')
     const authSecret = this.config.get<string>('AUTH_SECRET')
-    if (!flownauUrl || !authSecret) return
+    if (!flownauUrl || !authSecret) {
+      this.logger.error('[VoicenoteService] FLOWNAU_URL or AUTH_SECRET not set — cannot push concept')
+      return false
+    }
 
     try {
       const token = await signServiceToken({ secret: authSecret, iss: 'nauthenticity', aud: 'flownau' })
@@ -119,8 +146,11 @@ Return only valid JSON: { "cleanTranscription": "...", "synthesis": "..." }`,
         where: { id: conceptId },
         data: { status: 'consumed', consumedAt: new Date() },
       })
-    } catch {
-      // Stays pending — coverage service will pick it up on next trigger
+      this.logger.log({ brandId, conceptId }, '[VoicenoteService] Concept pushed to flownau and ideation triggered')
+      return true
+    } catch (err) {
+      this.logger.error({ brandId, conceptId, err }, '[VoicenoteService] Failed to push concept to flownau')
+      return false
     }
   }
 }
