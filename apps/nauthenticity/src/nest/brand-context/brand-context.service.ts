@@ -307,7 +307,10 @@ Return ONLY valid JSON matching this shape:
   }
 
   private async pushToFlownau(brandId: string, content: string | null, customAdditions: string | null = null): Promise<void> {
-    const combined = [content?.trim(), customAdditions?.trim()].filter(Boolean).join('\n\nCustom additions:\n')
+    const combined = [
+      customAdditions?.trim() ? `Custom additions:\n${customAdditions.trim()}` : null,
+      content?.trim() ?? null,
+    ].filter(Boolean).join('\n\n')
     if (!combined) return
     const flownauUrl = this.config.get<string>('FLOWNAU_URL') || 'http://localhost:3003'
     const authSecret = this.config.get<string>('AUTH_SECRET')
