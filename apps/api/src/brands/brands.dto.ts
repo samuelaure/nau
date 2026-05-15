@@ -18,4 +18,8 @@ export class UpdateBrandDto {
   @IsOptional()
   @IsString()
   handle?: string;
+
+  @IsOptional()
+  @IsString()
+  language?: string;
 }

@@ -215,6 +215,7 @@ model Brand {
   windowStart                  String?
   windowEnd                    String?
   timezone                     String        @default("UTC")
+  language                     String        @default("Spanish")
   inspoRequestCount            Int           @default(0)
   sourceConceptFreshnessPeriod Int           @default(2)
   sourceConceptFreshnessUnit   FreshnessUnit @default(WEEKS)

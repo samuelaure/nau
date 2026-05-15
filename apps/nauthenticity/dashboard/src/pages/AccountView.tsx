@@ -57,7 +57,7 @@ export const AccountView = () => {
             style={{ width: '80px', height: '80px', borderRadius: '50%', border: '2px solid var(--border)', objectFit: 'cover' }}
           />
         ) : (
-          <div style={{ width: '80px', height: '80px', borderRadius: '50%', border: '2px solid var(--border)', background: 'var(--card-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', color: 'var(--text-secondary)', flexShrink: 0 }}>
+          <div style={{ width: '80px', height: '80px', borderRadius: '50%', border: '2px solid var(--border)', background: 'var(--bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', color: 'var(--text-secondary)', flexShrink: 0 }}>
             {account.username[0]?.toUpperCase()}
           </div>
         )}
@@ -76,7 +76,7 @@ export const AccountView = () => {
           style={{
             padding: '0.5rem',
             borderRadius: '4px',
-            background: 'var(--card-bg)',
+            background: 'var(--bg-card)',
             color: 'var(--text-primary)',
             border: '1px solid var(--border)',
           }}
@@ -143,7 +143,7 @@ export const AccountView = () => {
             min={1}
             max={10000}
             style={{
-              background: 'var(--card-bg)',
+              background: 'var(--bg-card)',
               border: '1px solid var(--border)',
               color: 'var(--text-primary)',
               padding: '0.5rem',

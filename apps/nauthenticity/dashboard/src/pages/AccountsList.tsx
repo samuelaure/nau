@@ -48,7 +48,7 @@ export const AccountsList = () => {
                 {getMediaUrl(account.profileImageUrl ?? undefined) ? (
                   <img src={getMediaUrl(account.profileImageUrl ?? undefined)} alt={account.username} className="avatar" />
                 ) : (
-                  <div className="avatar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--card-bg)', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                  <div className="avatar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-card)', color: 'var(--text-secondary)', fontWeight: 600 }}>
                     {account.username[0]?.toUpperCase()}
                   </div>
                 )}

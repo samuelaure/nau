@@ -87,8 +87,8 @@ export default async function WorkspaceOverviewPage({
     // Upsert local Brand record so it always exists before rendering
     const localBrand = await prisma.brand.upsert({
       where: { id: brandId },
-      create: { id: brandId, workspaceId, name: nauBrand.name },
-      update: { name: nauBrand.name },
+      create: { id: brandId, workspaceId, name: nauBrand.name, language: (nauBrand as any).language ?? 'Spanish' },
+      update: { name: nauBrand.name, language: (nauBrand as any).language ?? undefined },
     })
 
     const socialProfiles = await prisma.socialProfile.findMany({

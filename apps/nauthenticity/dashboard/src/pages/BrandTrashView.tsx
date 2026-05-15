@@ -110,7 +110,7 @@ const TrashItemRow = ({
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: '1rem',
-      background: 'var(--card-bg)', border: '1px solid var(--border)',
+      background: 'var(--bg-card)', border: '1px solid var(--border)',
       borderRadius: '10px', padding: '0.9rem 1.1rem',
     }}>
       {thumbnail ? (

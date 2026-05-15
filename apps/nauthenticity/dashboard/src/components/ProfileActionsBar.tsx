@@ -43,7 +43,7 @@ export const ProfileActionsBar = ({ username, postCount = 0 }: ProfileActionsBar
           max={10000}
           disabled={ingestMutation.isPending}
           style={{
-            background: 'var(--card-bg)',
+            background: 'var(--bg-card)',
             border: '1px solid var(--border)',
             color: 'var(--text-primary)',
             padding: '0.5rem',

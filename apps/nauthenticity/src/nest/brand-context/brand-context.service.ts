@@ -91,7 +91,22 @@ export class BrandContextService {
   ) {}
 
   async getContext(brandId: string) {
-    return this.prisma.brandContext.findUnique({ where: { brandId } })
+    const record = await this.prisma.brandContext.findUnique({ where: { brandId } })
+    if (!record?.content) return record
+
+    // Migrate legacy records where content was cast from JSON to TEXT verbatim
+    try {
+      const parsed = JSON.parse(record.content)
+      if (parsed && typeof parsed === 'object') {
+        const plain = renderToPlainText(BrandContextSchema.parse(parsed))
+        await this.prisma.brandContext.update({ where: { brandId }, data: { content: plain } })
+        return { ...record, content: plain }
+      }
+    } catch {
+      // already plain text — no action needed
+    }
+
+    return record
   }
 
   async generateContext(brandId: string, sources: GenerateSources): Promise<void> {
@@ -164,8 +179,10 @@ export class BrandContextService {
         .filter((m): m is { post: { url: string | null; caption: string | null } } => !!m.post)
         .map((m) => ({ url: m.post.url ?? null, caption: m.post.caption ?? null }))
 
+      const brandRecord = await this.prisma.brand.findUnique({ where: { id: brandId }, select: { language: true } })
       const context = await this.callLLM({
         brandId,
+        language: brandRecord?.language ?? 'Spanish',
         manual: sources.manual,
         previousContext: previousCtx?.content ?? null,
         ownedPosts,
@@ -185,12 +202,13 @@ export class BrandContextService {
 
   private async callLLM(args: {
     brandId: string
+    language: string
     manual: string | null
     previousContext: string | null
     ownedPosts: { url: string | null; caption: string | null }[]
     inspoPosts: { url: string | null; caption: string | null }[]
   }): Promise<BrandContextShape> {
-    const { brandId, manual, previousContext, ownedPosts, inspoPosts } = args
+    const { brandId, language, manual, previousContext, ownedPosts, inspoPosts } = args
 
     const systemPrompt = `You are a brand strategist building a structured brand context for a content creation system.
 
@@ -201,6 +219,7 @@ Requirements:
 - Every field should reflect real signals from the sources provided.
 - Omit sections you have no evidence for — do not fabricate.
 - Keep all values concise: strings under 120 characters, arrays under 6 items.
+- Write all output in ${language}.
 
 Return ONLY valid JSON matching this shape:
 {
@@ -288,7 +307,10 @@ Return ONLY valid JSON matching this shape:
   }
 
   private async pushToFlownau(brandId: string, content: string | null, customAdditions: string | null = null): Promise<void> {
-    const combined = [content?.trim(), customAdditions?.trim()].filter(Boolean).join('\n\nCustom additions:\n')
+    const combined = [
+      customAdditions?.trim() ? `Custom additions:\n${customAdditions.trim()}` : null,
+      content?.trim() ?? null,
+    ].filter(Boolean).join('\n\n')
     if (!combined) return
     const flownauUrl = this.config.get<string>('FLOWNAU_URL') || 'http://localhost:3003'
     const authSecret = this.config.get<string>('AUTH_SECRET')

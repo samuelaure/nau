@@ -125,7 +125,7 @@ function BrandContextCard({ brandId }: { brandId: string }) {
   const isFreshBrand = !hasContext;
 
   return (
-    <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: '10px', padding: '1.5rem', marginBottom: '2rem' }}>
+    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '10px', padding: '1.5rem', marginBottom: '2rem' }}>
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', gap: '1rem', flexWrap: 'wrap' }}>
@@ -220,7 +220,7 @@ function BrandContextCard({ brandId }: { brandId: string }) {
               width: '100%',
               minHeight: isFreshBrand ? '140px' : '72px',
               padding: '0.625rem',
-              background: 'var(--card-bg)',
+              background: 'var(--bg-card)',
               border: '1px solid var(--border)',
               borderRadius: '6px',
               color: 'var(--text-primary)',
@@ -405,7 +405,7 @@ export const BrandOwnedView = () => {
       {ownedProfiles.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1rem' }}>
           {ownedProfiles.map((profile: any) => (
-            <div key={profile.id} style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: '10px', padding: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div key={profile.id} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '10px', padding: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <div style={{ fontSize: '1rem', fontWeight: 600 }}>@{profile.username}</div>
               <div style={{ fontSize: '0.85rem', color: '#8b949e' }}>{profile.platform || 'instagram'}</div>
               {profile.lastScrapedAt && (

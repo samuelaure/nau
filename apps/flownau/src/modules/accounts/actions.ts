@@ -191,6 +191,33 @@ export async function updateBrand(brandId: string, formData: FormData) {
     },
   })
 
+  if (language) {
+    const nauApiUrl = process.env.NAU_API_URL ?? 'http://9nau-api:3000'
+    const nauthenticityUrl = process.env.NAUTHENTICITY_URL ?? 'http://nauthenticity:3000'
+    const authSecret = process.env.AUTH_SECRET
+    const token = await getValidToken()
+    const brand = await prisma.brand.findUnique({ where: { id: parsedId }, select: { workspaceId: true } })
+
+    await Promise.allSettled([
+      fetch(`${nauApiUrl}/workspaces/${brand?.workspaceId}/brands/${parsedId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ language }),
+      }),
+      authSecret
+        ? import('@nau/auth').then(({ signServiceToken }) =>
+            signServiceToken({ secret: authSecret, iss: 'flownau', aud: 'nauthenticity' }).then((svcToken) =>
+              fetch(`${nauthenticityUrl}/api/v1/_service/brands/${parsedId}/settings`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${svcToken}` },
+                body: JSON.stringify({ language }),
+              }),
+            ),
+          )
+        : Promise.resolve(),
+    ])
+  }
+
   revalidatePath('/dashboard')
 }
 

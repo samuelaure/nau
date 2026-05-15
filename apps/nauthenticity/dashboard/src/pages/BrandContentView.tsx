@@ -95,7 +95,7 @@ export const BrandContentView = () => {
               height: '80px',
               borderRadius: '50%',
               border: '2px solid var(--border)',
-              backgroundColor: 'var(--card-bg)',
+              backgroundColor: 'var(--bg-card)',
               padding: selectedAccount.profileImageUrl ? '0' : '12px',
             }}
           />
@@ -137,7 +137,7 @@ export const BrandContentView = () => {
             style={{
               padding: '0.5rem',
               borderRadius: '4px',
-              background: 'var(--card-bg)',
+              background: 'var(--bg-card)',
               color: 'var(--text-primary)',
               border: '1px solid var(--border)',
             }}
@@ -176,7 +176,7 @@ export const BrandContentView = () => {
               padding: '0.5rem',
               borderRadius: '4px',
               border: '1px solid var(--border)',
-              background: 'var(--card-bg)',
+              background: 'var(--bg-card)',
               color: 'var(--text-primary)',
             }}
             disabled={isLinking}
@@ -226,7 +226,7 @@ export const BrandContentView = () => {
           style={{
             padding: '3rem',
             textAlign: 'center',
-            background: 'var(--card-bg)',
+            background: 'var(--bg-card)',
             borderRadius: '12px',
             border: '1px dashed var(--border)',
             color: '#8b949e',

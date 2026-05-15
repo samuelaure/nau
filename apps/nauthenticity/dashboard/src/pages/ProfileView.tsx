@@ -45,7 +45,7 @@ export const ProfileView = () => {
             style={{ width: '80px', height: '80px', borderRadius: '50%', border: '2px solid var(--border)', objectFit: 'cover' }}
           />
         ) : (
-          <div style={{ width: '80px', height: '80px', borderRadius: '50%', border: '2px solid var(--border)', background: 'var(--card-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', color: 'var(--text-secondary)', flexShrink: 0 }}>
+          <div style={{ width: '80px', height: '80px', borderRadius: '50%', border: '2px solid var(--border)', background: 'var(--bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', color: 'var(--text-secondary)', flexShrink: 0 }}>
             {profile.username[0]?.toUpperCase()}
           </div>
         )}
@@ -61,7 +61,7 @@ export const ProfileView = () => {
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value as typeof sort)}
-          style={{ padding: '0.5rem', borderRadius: '4px', background: 'var(--card-bg)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
+          style={{ padding: '0.5rem', borderRadius: '4px', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
         >
           <option value="recent">Most Recent</option>
           <option value="oldest">Oldest First</option>
