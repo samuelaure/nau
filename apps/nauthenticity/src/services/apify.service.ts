@@ -183,7 +183,7 @@ export const runUniversalInstagramScraper = async (
         {
           mode,
           usernames: [username],
-          limit: mode === 'PROFILE' ? 1 : maxPosts,
+          limit: mode === 'PROFILE' ? 1 : maxPosts + 1,
           sortDirection: 'desc',
           proxyConfiguration: { useApifyProxy: true },
           ...(oldestPostDate ? { oldestPostDate } : {}),
