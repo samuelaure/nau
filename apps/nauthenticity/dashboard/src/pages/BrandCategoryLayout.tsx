@@ -267,7 +267,7 @@ export const BrandCategoryLayout = ({
         >
           <div
             onClick={e => e.stopPropagation()}
-            style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: '14px', padding: '2rem', width: '440px', maxWidth: '90vw', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '14px', padding: '2rem', width: '440px', maxWidth: '90vw', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <AlertTriangle size={20} style={{ color: '#e3b341', flexShrink: 0 }} />
@@ -321,7 +321,7 @@ export const BrandCategoryLayout = ({
         >
           <div
             onClick={e => e.stopPropagation()}
-            style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: '14px', padding: '2rem', width: '480px', maxWidth: '90vw', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '14px', padding: '2rem', width: '480px', maxWidth: '90vw', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}
           >
             {/* Modal header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -435,7 +435,7 @@ const ProfileDetailView = ({ title }: { title: string }) => {
             <img
               src={getProfileImageUrl(account.profileImageUrl, account.platform || 'instagram')}
               alt={account.username}
-              style={{ width: '72px', height: '72px', borderRadius: '50%', border: '2px solid var(--border)', backgroundColor: 'var(--card-bg)', padding: account.profileImageUrl ? '0' : '10px', objectFit: 'cover' }}
+              style={{ width: '72px', height: '72px', borderRadius: '50%', border: '2px solid var(--border)', backgroundColor: 'var(--bg-card)', padding: account.profileImageUrl ? '0' : '10px', objectFit: 'cover' }}
             />
             <div>
               <h2 style={{ margin: 0, fontSize: '1.75rem' }}>@{account.username}</h2>
@@ -447,7 +447,7 @@ const ProfileDetailView = ({ title }: { title: string }) => {
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value as any)}
-              style={{ padding: '0.5rem', borderRadius: '4px', background: 'var(--card-bg)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
+              style={{ padding: '0.5rem', borderRadius: '4px', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
             >
               <option value="recent">Most Recent</option>
               <option value="oldest">Oldest First</option>
@@ -457,7 +457,7 @@ const ProfileDetailView = ({ title }: { title: string }) => {
           </div>
 
           {account.posts?.length === 0 ? (
-            <div style={{ padding: '3rem', textAlign: 'center', color: '#8b949e', background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+            <div style={{ padding: '3rem', textAlign: 'center', color: '#8b949e', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border)' }}>
               No posts captured yet for this profile.
             </div>
           ) : (

@@ -99,7 +99,7 @@ export const BrandSinglePostsView = () => {
         <div
           style={{
             display: 'flex',
-            background: 'var(--card-bg)',
+            background: 'var(--bg-card)',
             border: '1px solid var(--border)',
             borderRadius: '6px',
             padding: '2px',
@@ -143,7 +143,7 @@ export const BrandSinglePostsView = () => {
       {/* Manual Request Form */}
       <div
         style={{
-          background: 'var(--card-bg)',
+          background: 'var(--bg-card)',
           border: '1px solid var(--border)',
           padding: '1.5rem',
           borderRadius: '12px',
@@ -286,7 +286,7 @@ export const BrandSinglePostsView = () => {
                 <div
                   key={target.id}
                   style={{
-                    background: 'var(--card-bg)',
+                    background: 'var(--bg-card)',
                     border: '1px solid var(--border)',
                     padding: '1rem',
                     borderRadius: '8px',

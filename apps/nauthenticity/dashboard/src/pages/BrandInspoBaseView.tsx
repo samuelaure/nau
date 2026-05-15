@@ -70,7 +70,7 @@ const VoicenotesTab = ({ voicenotes, loading }: { voicenotes: any[]; loading: bo
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       {voicenotes.map((v: any) => (
-        <div key={v.id} style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: '10px', padding: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <div key={v.id} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '10px', padding: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           <span style={{ fontSize: '0.75rem', color: '#8b949e' }}>
             {formatDistanceToNow(new Date(v.createdAt), { addSuffix: true })}
           </span>
@@ -101,7 +101,7 @@ const YoutubeTab = ({ videos, loading }: { videos: ReturnType<typeof getYoutubeV
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
       {videos.map((v) => (
-        <div key={v.id} style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden' }}>
+        <div key={v.id} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden' }}>
           <a href={v.url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', position: 'relative', aspectRatio: '16/9', background: '#0d1117' }}>
             <img
               src={`https://img.youtube.com/vi/${v.videoId}/mqdefault.jpg`}
@@ -151,7 +151,7 @@ const BlogTab = ({ posts, loading }: { posts: ReturnType<typeof getBlogPosts> ex
         let domain = '';
         try { domain = new URL(p.url).hostname } catch {}
         return (
-          <div key={p.id} style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: '10px', padding: '1.1rem', display: 'flex', gap: '0.9rem', alignItems: 'flex-start' }}>
+          <div key={p.id} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '10px', padding: '1.1rem', display: 'flex', gap: '0.9rem', alignItems: 'flex-start' }}>
             <img
               src={domain ? `https://${domain}/favicon.ico` : ''}
               alt=""

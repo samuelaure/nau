@@ -48,7 +48,7 @@ export const ProfilesList = () => {
                 {getMediaUrl(profile.profileImageUrl ?? undefined) ? (
                   <img src={getMediaUrl(profile.profileImageUrl ?? undefined)} alt={profile.username} className="avatar" />
                 ) : (
-                  <div className="avatar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--card-bg)', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                  <div className="avatar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-card)', color: 'var(--text-secondary)', fontWeight: 600 }}>
                     {profile.username[0]?.toUpperCase()}
                   </div>
                 )}

@@ -216,7 +216,7 @@ export const PostView = () => {
               gap: '1.5rem',
               marginBottom: '1.5rem',
               padding: '1rem',
-              background: 'var(--card-bg)',
+              background: 'var(--bg-card)',
               borderRadius: '8px',
             }}
           >
@@ -294,7 +294,7 @@ export const PostView = () => {
             ) : (post.transcripts && post.transcripts.length > 0) || transcript ? (
               <div
                 style={{
-                  background: 'var(--card-bg)',
+                  background: 'var(--bg-card)',
                   padding: '1.5rem',
                   borderRadius: '8px',
                   maxHeight: '400px',

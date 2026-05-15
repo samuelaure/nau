@@ -60,7 +60,7 @@ export const SocialProfileCard = ({
     <div
       onClick={handleSelect}
       style={{
-        background: 'var(--card-bg)',
+        background: 'var(--bg-card)',
         border: '1px solid var(--border)',
         borderRadius: '10px',
         padding: '1.5rem',
@@ -103,7 +103,7 @@ export const SocialProfileCard = ({
               width: '76px',
               height: '76px',
               borderRadius: '50%',
-              backgroundColor: 'var(--card-bg)',
+              backgroundColor: 'var(--bg-card)',
               padding: profile.profileImageUrl ? '0' : '12px',
               objectFit: 'cover',
             }}
