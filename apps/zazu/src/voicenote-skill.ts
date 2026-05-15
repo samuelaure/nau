@@ -69,6 +69,7 @@ class VoicenoteSkillImpl implements ZazuSkill {
       }
 
       // Multi-brand selection keyboard
+      ctx.session ??= {}
       ctx.session.pendingVoicenoteId = voicenote.id
       ctx.session.pendingVoicenoteClean = cleanTranscription
       ctx.session.pendingVoicenoteSynthesis = synthesis
