@@ -5,7 +5,7 @@ import { prisma } from '@/modules/shared/prisma'
 import { validateServiceToken, unauthorizedResponse } from '@/modules/shared/nau-auth'
 
 /**
- * GET /api/v1/_service/social-profiles/:profileId/published-posts
+ * GET /api/v1/service/social-profiles/:profileId/published-posts
  * Called by nauthenticity during "Sync Profile" to backfill published posts
  * that may have missed the real-time sync (e.g. due to errors at publish time).
  * Auth: service JWT (iss: nauthenticity, aud: flownau)

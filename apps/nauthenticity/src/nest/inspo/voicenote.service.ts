@@ -25,10 +25,12 @@ export class VoicenoteService implements OnModuleInit {
   ) {}
 
   onModuleInit() {
-    // Flush any concepts that failed to push during a previous lifecycle (e.g. deploy mid-request)
-    this.flushPendingConcepts().catch((err) =>
-      this.logger.error('[VoicenoteService] Startup flush failed', err),
-    )
+    // Delay flush so downstream services (flownau) have time to become ready after a simultaneous deploy
+    setTimeout(() => {
+      this.flushPendingConcepts().catch((err) =>
+        this.logger.error('[VoicenoteService] Startup flush failed', err),
+      )
+    }, 30_000)
   }
 
   async processAudio(audioUrl: string, brandId?: string): Promise<{ rawTranscription: string; cleanTranscription: string; synthesis: string }> {
@@ -143,7 +145,7 @@ Return only valid JSON: { "cleanTranscription": "...", "synthesis": "..." }`,
     try {
       const token = await signServiceToken({ secret: authSecret, iss: 'nauthenticity', aud: 'flownau' })
       await axios.post(
-        `${flownauUrl}/api/v1/_service/ideation`,
+        `${flownauUrl}/api/v1/service/ideation`,
         { brandId, topic, sourceRef: conceptId },
         { headers: { Authorization: `Bearer ${token}` }, timeout: 120_000 },
       )

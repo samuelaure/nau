@@ -207,7 +207,7 @@ export async function updateBrand(brandId: string, formData: FormData) {
       authSecret
         ? import('@nau/auth').then(({ signServiceToken }) =>
             signServiceToken({ secret: authSecret, iss: 'flownau', aud: 'nauthenticity' }).then((svcToken) =>
-              fetch(`${nauthenticityUrl}/api/v1/_service/brands/${parsedId}/settings`, {
+              fetch(`${nauthenticityUrl}/api/v1/service/brands/${parsedId}/settings`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${svcToken}` },
                 body: JSON.stringify({ language }),
