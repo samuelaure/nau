@@ -91,7 +91,22 @@ export class BrandContextService {
   ) {}
 
   async getContext(brandId: string) {
-    return this.prisma.brandContext.findUnique({ where: { brandId } })
+    const record = await this.prisma.brandContext.findUnique({ where: { brandId } })
+    if (!record?.content) return record
+
+    // Migrate legacy records where content was cast from JSON to TEXT verbatim
+    try {
+      const parsed = JSON.parse(record.content)
+      if (parsed && typeof parsed === 'object') {
+        const plain = renderToPlainText(BrandContextSchema.parse(parsed))
+        await this.prisma.brandContext.update({ where: { brandId }, data: { content: plain } })
+        return { ...record, content: plain }
+      }
+    } catch {
+      // already plain text — no action needed
+    }
+
+    return record
   }
 
   async generateContext(brandId: string, sources: GenerateSources): Promise<void> {
