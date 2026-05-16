@@ -67,9 +67,9 @@ export class ContentController {
   @Put('posts/:id')
   updatePost(
     @Param('id') id: string,
-    @Body() body: { caption?: string; transcriptText?: string },
+    @Body() body: { caption?: string; transcriptText?: string; postSynthesis?: string },
   ) {
-    return this.contentService.updatePost(id, body.caption, body.transcriptText)
+    return this.contentService.updatePost(id, body.caption, body.transcriptText, body.postSynthesis)
   }
 
   @Get('search')

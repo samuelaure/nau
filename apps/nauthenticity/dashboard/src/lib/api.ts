@@ -110,6 +110,7 @@ export interface Post {
   newerPostId?: string | null;
   olderPostId?: string | null;
   status?: string;
+  postSynthesis?: string | null;
 }
 
 export interface SocialProfileDetails extends SocialProfile {
@@ -184,9 +185,14 @@ export const getPost = async (id: string) => {
 
 export const updatePost = async (
   id: string,
-  updates: { caption?: string; transcriptText?: string },
+  updates: { caption?: string; transcriptText?: string; postSynthesis?: string },
 ) => {
   const { data } = await api.put(`/posts/${id}`, updates);
+  return data;
+};
+
+export const getPostSourceConcepts = async (postId: string) => {
+  const { data } = await api.get<ProfileSourceConcept[]>(`/posts/${postId}/source-concepts`);
   return data;
 };
 

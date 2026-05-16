@@ -116,7 +116,7 @@ export class ContentService {
     return { ...post, newerPostId: newerPost?.id ?? null, olderPostId: olderPost?.id ?? null }
   }
 
-  async updatePost(id: string, caption?: string, transcriptText?: string) {
+  async updatePost(id: string, caption?: string, transcriptText?: string, postSynthesis?: string) {
     const post = await this.prisma.post.findUnique({ where: { id }, include: { transcripts: true } })
     if (!post) throw new NotFoundException('Post not found')
 
@@ -138,6 +138,9 @@ export class ContentService {
       } else {
         await this.prisma.transcript.create({ data: { postId: id, text: transcriptText, originalText: '' } })
       }
+    }
+    if (postSynthesis !== undefined && postSynthesis !== post.postSynthesis) {
+      await this.prisma.post.update({ where: { id }, data: { postSynthesis } })
     }
     return { success: true }
   }

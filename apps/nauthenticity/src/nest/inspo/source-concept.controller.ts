@@ -50,6 +50,13 @@ export class SourceConceptController {
     return this.sourceConceptService.listForProfile(id)
   }
 
+  // User-facing: source concepts linked to a specific post
+  @Get('posts/:id/source-concepts')
+  @UseGuards(JwtAuthGuard)
+  listForPost(@Param('id') id: string) {
+    return this.sourceConceptService.listForPost(id)
+  }
+
   // User-facing: retroactively generate source concepts for already-synthesized INSPO posts
   @Post('brands/:brandId/source-concepts/retroactive')
   @UseGuards(JwtAuthGuard)

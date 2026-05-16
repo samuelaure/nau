@@ -268,6 +268,22 @@ Each "content" is a paragraph (30–60 words) describing the concept clearly eno
     return concepts
   }
 
+  async listForPost(postId: string) {
+    const sources = await this.prisma.sourceConceptSource.findMany({
+      where: { postId },
+      include: { sourceConcept: true },
+      orderBy: { sourceConcept: { createdAt: 'desc' } },
+    })
+    return sources.map((s) => ({
+      id: s.sourceConcept.id,
+      content: s.sourceConcept.content,
+      sourceType: s.sourceConcept.sourceType,
+      status: s.sourceConcept.status,
+      createdAt: s.sourceConcept.createdAt,
+      link: 'post' as const,
+    }))
+  }
+
   async markConsumed(id: string) {
     const concept = await this.prisma.sourceConcept.findUnique({ where: { id } })
     if (!concept) throw new NotFoundException('SourceConcept not found')
