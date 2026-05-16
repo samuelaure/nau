@@ -443,8 +443,7 @@ export const scrapePostByUrl = async (
 
         const actorRun = await client.actor(config.apify.instagramUniversalActorId).call(
           {
-            mode: 'FEED', // Actor's input processor will detect it's a post URL
-            usernames: [url],
+            postUrls: [url],
             limit: 1,
             proxyConfiguration: { useApifyProxy: true },
           },
