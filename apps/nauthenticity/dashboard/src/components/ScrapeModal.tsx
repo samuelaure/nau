@@ -1,4 +1,5 @@
 import React from 'react'
+import { createPortal } from 'react-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ingestAccount } from '../lib/api'
 import { X, RefreshCw, Loader } from 'lucide-react'
@@ -25,12 +26,12 @@ export const ScrapeModal = ({ username, onClose }: ScrapeModalProps) => {
     mutation.mutate({ username, limit })
   }
 
-  return (
+  return createPortal(
     <div
       style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '1.5rem', width: '320px', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+<div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '1.5rem', width: '320px', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>Scrape @{username}</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#8b949e', cursor: 'pointer', padding: 0, display: 'flex' }}>
@@ -73,6 +74,7 @@ export const ScrapeModal = ({ username, onClose }: ScrapeModalProps) => {
 
         <style>{`@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }`}</style>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
