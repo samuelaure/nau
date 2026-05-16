@@ -336,7 +336,7 @@ async function generateSynthesis(caption: string, creative: Record<string, unkno
       messages: [
         {
           role: 'system',
-          content: 'You are an intelligence analyst. Given social media post content, write a concise 1-2 sentence synthesis describing the main topic, key insights, and content themes. Write in the same language as the content. No preamble.',
+          content: `You are an intelligence analyst. Given social media post content, write a concise 1-2 sentence synthesis describing the main topic, key insights, and content themes. Write all output in ${language}. No preamble.`,
         },
         { role: 'user', content: `Caption: ${caption}\n\nContent: ${contentSample}` },
       ],

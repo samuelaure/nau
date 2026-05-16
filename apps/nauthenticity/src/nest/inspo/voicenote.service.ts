@@ -84,17 +84,40 @@ Return only valid JSON: { "cleanTranscription": "...", "synthesis": "..." }`,
     brandId: string,
     data: { cleanTranscription: string; synthesis: string; sourceRef?: string },
   ) {
-    await this.prisma.brand.upsert({
+    const brand = await this.prisma.brand.upsert({
       where: { id: brandId },
       create: { id: brandId, workspaceId: '' },
       update: {},
+      select: { language: true },
     })
+
+    // Re-synthesize using the brand's language so the SourceConcept is always
+    // in the correct language regardless of what language zazu processed with.
+    const language = brand.language ?? 'Spanish'
+    let synthesis = data.synthesis
+    try {
+      const { client, model } = getClientForFeature('synthesis')
+      const result = await client.chatCompletion({
+        model,
+        temperature: 0.3,
+        messages: [
+          {
+            role: 'system',
+            content: `You receive a content creator's transcription. Write a 2–4 sentence interpretation of the core idea, intent, and key themes as a rich content angle that an ideation LLM can work from. Write all output in ${language}.`,
+          },
+          { role: 'user', content: data.cleanTranscription },
+        ],
+      })
+      synthesis = result.content?.trim() || data.synthesis
+    } catch {
+      // Non-critical — fall back to the synthesis received from zazu
+    }
 
     const voicenote = await this.prisma.voicenote.create({
       data: {
         brandId,
         cleanTranscription: data.cleanTranscription,
-        synthesis: data.synthesis,
+        synthesis,
         sourceRef: data.sourceRef ?? null,
       },
     })
@@ -102,7 +125,7 @@ Return only valid JSON: { "cleanTranscription": "...", "synthesis": "..." }`,
     const concept = await this.prisma.sourceConcept.create({
       data: {
         brandId,
-        content: data.synthesis,
+        content: synthesis,
         sourceType: 'voicenote',
         status: 'pending',
       },

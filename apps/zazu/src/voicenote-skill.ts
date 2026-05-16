@@ -41,7 +41,7 @@ class VoicenoteSkillImpl implements ZazuSkill {
       // Send to nauthenticity for transcription + synthesis
       const nautHeaders = await buildServiceHeaders('nauthenticity')
       const processResp = await axios.post(
-        `${NAUTHENTICITY_URL}/api/v1/service/audio/process`,
+        `${NAUTHENTICITY_URL}/api/v1/_service/audio/process`,
         { audioUrl },
         { headers: nautHeaders, timeout: 60_000 },
       )
@@ -109,7 +109,7 @@ class VoicenoteSkillImpl implements ZazuSkill {
       brandIds.map((brandId) =>
         axios
           .post(
-            `${NAUTHENTICITY_URL}/api/v1/service/brands/${brandId}/voicenotes`,
+            `${NAUTHENTICITY_URL}/api/v1/_service/brands/${brandId}/voicenotes`,
             { cleanTranscription, synthesis, sourceRef: voicenoteId },
             { headers, timeout: 120_000 },
           )
