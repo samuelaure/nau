@@ -42,6 +42,11 @@
     @apply w-full bg-input border border-border text-text-primary px-4 py-3 rounded-xl outline-none transition-all duration-200 text-[15px] placeholder:text-text-secondary/40 shadow-sm;
   }
 
+  textarea {
+    field-sizing: content;
+    overflow: hidden;
+  }
+
   input:focus,
   textarea:focus,
   select:focus {
