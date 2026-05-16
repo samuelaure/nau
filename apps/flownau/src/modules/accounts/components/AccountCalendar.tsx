@@ -29,6 +29,7 @@ import {
   MoreHorizontal,
   Shuffle,
   ScrollText,
+  Pencil,
 } from 'lucide-react'
 import { cn } from '@/modules/shared/utils'
 import Modal from '@/modules/shared/components/Modal'
@@ -134,9 +135,14 @@ function BetweenDropZone({
   const [over, setOver] = useState(false)
   if (!dragState) return null
 
+  const ONE_HOUR = 60 * 60 * 1000
   const midTime = beforeTime && afterTime
     ? new Date((new Date(beforeTime).getTime() + new Date(afterTime).getTime()) / 2).toISOString()
-    : afterTime ?? beforeTime ?? new Date().toISOString()
+    : !beforeTime && afterTime
+      ? new Date(new Date(afterTime).getTime() - ONE_HOUR).toISOString()
+      : beforeTime && !afterTime
+        ? new Date(new Date(beforeTime).getTime() + ONE_HOUR).toISOString()
+        : new Date().toISOString()
 
   return (
     // min-h keeps the zone stable when expanded — avoids layout reflow that causes onDragLeave to fire
@@ -913,17 +919,41 @@ function CompositionModal({
           )}
 
           {/* Scheduled time */}
-          <div className="flex items-start gap-3">
-            <Clock size={15} className="text-text-secondary mt-0.5 shrink-0" />
-            <div>
-              <p className="text-xs text-text-secondary uppercase tracking-wider mb-0.5">
-                {comp.status === 'PUBLISHED' ? 'Published at' : isScheduled ? 'Scheduled for' : 'Not scheduled'}
-              </p>
-              {displayDate && (
-                <p className="text-sm text-white">{fmtDateTime(displayDate)}</p>
-              )}
-            </div>
-          </div>
+          {(() => {
+            const canEdit = !scheduling && display !== 'Published' && display !== 'Error' && comp.status !== 'RENDERING' && comp.status !== 'DRAFT_APPROVED'
+            return canEdit ? (
+              <button
+                onClick={() => setScheduling(true)}
+                className="flex items-start gap-3 group text-left w-full rounded-lg px-3 py-2 -mx-3 hover:bg-white/5 transition-colors"
+              >
+                <Clock size={15} className="text-text-secondary mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-xs text-text-secondary uppercase tracking-wider mb-0.5">
+                    {isScheduled ? 'Scheduled for' : 'Not scheduled'}
+                  </p>
+                  {displayDate && (
+                    <p className="text-sm text-white">{fmtDateTime(displayDate)}</p>
+                  )}
+                  {!displayDate && (
+                    <p className="text-sm text-text-secondary italic">Click to set a date & time</p>
+                  )}
+                </div>
+                <Pencil size={13} className="text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity mt-0.5 shrink-0" />
+              </button>
+            ) : (
+              <div className="flex items-start gap-3">
+                <Clock size={15} className="text-text-secondary mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-xs text-text-secondary uppercase tracking-wider mb-0.5">
+                    {comp.status === 'PUBLISHED' ? 'Published at' : isScheduled ? 'Scheduled for' : 'Not scheduled'}
+                  </p>
+                  {displayDate && (
+                    <p className="text-sm text-white">{fmtDateTime(displayDate)}</p>
+                  )}
+                </div>
+              </div>
+            )
+          })()}
 
           {/* ── REEL layout ─────────────────────────────────────────────────── */}
           {REEL_FAMILY.has(comp.format) && (() => {
@@ -1444,6 +1474,7 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
       const r = data.result as {
         alreadyFull: boolean
         postsNeeded: number
+        pastRescheduled: number
         ideasGenerated: number
         noDigest: boolean
         approvedIdeas: number
@@ -1455,6 +1486,10 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
       if (r.alreadyFull) {
         toast.success('Calendar is already fully scheduled.')
         return
+      }
+
+      if (r.pastRescheduled > 0) {
+        toast.info(`${r.pastRescheduled} past unscheduled post${r.pastRescheduled === 1 ? '' : 's'} moved to new slots.`)
       }
 
       if (r.ideasGenerated > 0) {
@@ -1473,9 +1508,9 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
       if (r.needsApproval > 0) {
         toast.warning(
           r.approvedIdeas === 0
-            ? `${r.postsNeeded} post${r.postsNeeded === 1 ? '' : 's'} to schedule but no ideas are approved yet. Approve some in the Ideas tab to get started.`
-            : `${r.postsNeeded} post${r.postsNeeded === 1 ? '' : 's'} to schedule but only ${r.approvedIdeas} idea${r.approvedIdeas === 1 ? '' : 's'} approved. Approve ${r.needsApproval} more in the Ideas tab.`,
-          { duration: 8000 },
+            ? `New ideas were generated but auto-approve is off. Approve them in the Ideas tab, then hit Fill Calendar again.`
+            : `${r.needsApproval} idea${r.needsApproval === 1 ? '' : 's'} need approval to finish filling the calendar. Approve them in the Ideas tab, then hit Fill Calendar again.`,
+          { duration: 10000 },
         )
       }
 
@@ -1644,7 +1679,7 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
                     {dragState ? (
                       <BetweenDropZone
                         beforeTime={null}
-                        afterTime={`${day.toISOString().slice(0, 10)}T12:00:00.000Z`}
+                        afterTime={`${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}T12:00:00.000Z`}
                         dragState={dragState}
                         onDrop={(t) => handleDrop(dragState.postId, t)}
                       />
