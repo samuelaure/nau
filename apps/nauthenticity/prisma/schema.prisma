@@ -76,6 +76,7 @@ model Post {
   collaborators   Json?
   intelligence    Json?
   postSynthesis   String?  @db.Text
+  status          String   @default("pending")
 
   runId String?
   run   ScrapingRun? @relation(fields: [runId], references: [id])

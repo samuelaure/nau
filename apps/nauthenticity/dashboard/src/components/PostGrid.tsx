@@ -3,6 +3,29 @@ import { Link, useLocation } from 'react-router-dom';
 import { Heart, MessageCircle } from 'lucide-react';
 import { getMediaUrl, type Post } from '../lib/api';
 
+const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  pending:     { label: 'Pending',     color: '#8b949e', bg: 'rgba(139,148,158,0.15)' },
+  downloading: { label: 'Downloading', color: '#58a6ff', bg: 'rgba(88,166,255,0.15)' },
+  optimizing:  { label: 'Optimizing',  color: '#d29922', bg: 'rgba(210,153,34,0.15)' },
+  computing:   { label: 'Computing',   color: '#bc8cff', bg: 'rgba(188,140,255,0.15)' },
+  failed:      { label: 'Failed',      color: '#f85149', bg: 'rgba(248,81,73,0.15)' },
+};
+
+const PostStatusBadge = ({ status }: { status: string }) => {
+  const cfg = STATUS_CONFIG[status];
+  if (!cfg) return null;
+  return (
+    <div style={{
+      position: 'absolute', bottom: 6, right: 6, zIndex: 10,
+      padding: '2px 7px', borderRadius: '100px', fontSize: '0.68rem', fontWeight: 600,
+      color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.color}44`,
+      backdropFilter: 'blur(4px)',
+    }}>
+      {cfg.label}
+    </div>
+  );
+};
+
 interface PostGridItemProps {
   post: Post;
 }
@@ -126,6 +149,10 @@ export const PostGridItem = ({ post }: PostGridItemProps) => {
         >
           No Media
         </div>
+      )}
+
+      {post.status && post.status !== 'ready' && (
+        <PostStatusBadge status={post.status} />
       )}
 
       <div className="post-overlay">

@@ -1,11 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation, Routes, Route, Navigate, NavLink } from 'react-router-dom';
-import { getBrandTargets, addBrandTarget, capturePostByUrl, removeBrandTarget, addInspoUrl, getAccount, getProfileImageUrl, ingestAccount, type Post } from '../lib/api';
-import { Plus, ArrowLeft, X, Trash2, AlertTriangle } from 'lucide-react';
+import { getBrandTargets, addBrandTarget, capturePostByUrl, removeBrandTarget, addInspoUrl, type Post } from '../lib/api';
+import { Plus, X, Trash2, AlertTriangle } from 'lucide-react';
 import { SocialProfileCard } from '../components/SocialProfileCard';
 import { PostGrid } from '../components/PostGrid';
 import { CreateContentButton } from '../components/CreateContentButton';
+import { ProfileDetail } from '../components/ProfileDetail';
 
 interface ExtraTab {
   key: string;
@@ -145,8 +146,10 @@ export const BrandCategoryLayout = ({
       addPostUrlMutation.mutate(value);
     } else {
       let clean = value;
-      if (clean.includes('instagram.com/')) clean = clean.split('instagram.com/')[1].split('/')[0];
+      if (clean.includes('instagram.com/')) clean = clean.split('instagram.com/')[1] ?? clean;
+      clean = clean.split('?')[0].split('#')[0].split('/')[0];
       if (clean.startsWith('@')) clean = clean.slice(1);
+      clean = clean.replace(/[^a-zA-Z0-9._]/g, '');
       addUsernameMutation.mutate(clean);
     }
   };
@@ -243,7 +246,17 @@ export const BrandCategoryLayout = ({
             <ProfilesTab profiles={profileMemberships} onRemove={handleRemove} removing={removing} brandId={brandId!} category={category} />
           )}
         />
-        <Route path="profiles/:username" element={<ProfileDetailView title={title} brandId={brandId!} category={category} />} />
+        <Route path="profiles/:username" element={
+          <ProfileDetail
+            backLabel={`Back to ${title} Profiles`}
+            backPath="../profiles"
+            renderPostActions={category === 'INSPO' ? (post) => (
+              <div style={{ position: 'absolute', bottom: '6px', left: '6px', zIndex: 10 }}>
+                <CreateContentButton brandId={brandId!} itemType="post" itemId={post.id} />
+              </div>
+            ) : undefined}
+          />
+        } />
         <Route
           path="posts"
           element={isLoading ? <div>Loading...</div> : (
@@ -424,119 +437,6 @@ const ProfilesTab = ({ profiles, onRemove, brandId, category }: { profiles: any[
   );
 };
 
-// ── Profile Detail ────────────────────────────────────────────────────────────
-
-const ProfileDetailView = ({ title, brandId, category }: { title: string; brandId: string; category: string }) => {
-  const { username } = useParams<{ username: string }>();
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const [sort, setSort] = useState<'recent' | 'oldest' | 'likes' | 'comments'>('recent');
-  const [scrapeStatus, setScrapeStatus] = useState<'idle' | 'pending' | 'done'>('idle');
-
-  const { data: account, isLoading } = useQuery({
-    queryKey: ['account', username],
-    queryFn: () => getAccount(username!),
-    enabled: !!username,
-  });
-
-  const handleScrape = async (limit: number) => {
-    if (!username || scrapeStatus === 'pending') return;
-    setScrapeStatus('pending');
-    try {
-      await ingestAccount({ username, limit });
-      setScrapeStatus('done');
-      setTimeout(() => {
-        setScrapeStatus('idle');
-        queryClient.invalidateQueries({ queryKey: ['account', username] });
-      }, 3000);
-    } catch {
-      setScrapeStatus('idle');
-    }
-  };
-
-  return (
-    <div className="fade-in">
-      <button
-        onClick={() => navigate('../profiles')}
-        style={{ background: 'none', border: 'none', color: '#58a6ff', cursor: 'pointer', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '6px', padding: 0, fontWeight: 500 }}
-      >
-        <ArrowLeft size={16} /> Back to {title} Profiles
-      </button>
-
-      {isLoading || !account ? (
-        <div style={{ color: '#8b949e' }}>Loading @{username}...</div>
-      ) : (
-        <>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', marginBottom: '2rem' }}>
-            <img
-              src={getProfileImageUrl(account.profileImageUrl, account.platform || 'instagram')}
-              alt={account.username}
-              style={{ width: '72px', height: '72px', borderRadius: '50%', border: '2px solid var(--border)', backgroundColor: 'var(--bg-card)', padding: account.profileImageUrl ? '0' : '10px', objectFit: 'cover' }}
-            />
-            <div style={{ flex: 1 }}>
-              <h2 style={{ margin: 0, fontSize: '1.75rem' }}>@{account.username}</h2>
-              <span style={{ color: '#8b949e', fontSize: '0.9rem' }}>{account.posts?.length ?? 0} posts captured</span>
-            </div>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button
-                onClick={() => handleScrape(30)}
-                disabled={scrapeStatus !== 'idle'}
-                style={{ padding: '0.4rem 0.9rem', borderRadius: '8px', background: 'rgba(63,185,80,0.1)', border: '1px solid rgba(63,185,80,0.3)', color: '#3fb950', cursor: scrapeStatus !== 'idle' ? 'default' : 'pointer', fontSize: '0.82rem', fontWeight: 600, opacity: scrapeStatus !== 'idle' ? 0.6 : 1 }}
-              >
-                {scrapeStatus === 'pending' ? 'Scraping…' : scrapeStatus === 'done' ? 'Queued ✓' : '↻ Quick scrape'}
-              </button>
-              <button
-                onClick={() => handleScrape(200)}
-                disabled={scrapeStatus !== 'idle'}
-                style={{ padding: '0.4rem 0.9rem', borderRadius: '8px', background: 'rgba(88,166,255,0.1)', border: '1px solid rgba(88,166,255,0.3)', color: '#58a6ff', cursor: scrapeStatus !== 'idle' ? 'default' : 'pointer', fontSize: '0.82rem', fontWeight: 600, opacity: scrapeStatus !== 'idle' ? 0.6 : 1 }}
-              >
-                Full scrape (200)
-              </button>
-            </div>
-          </div>
-
-          <div style={{ marginBottom: '1.5rem' }}>
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value as any)}
-              style={{ padding: '0.5rem', borderRadius: '4px', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
-            >
-              <option value="recent">Most Recent</option>
-              <option value="oldest">Oldest First</option>
-              <option value="likes">Most Likes</option>
-              <option value="comments">Most Comments</option>
-            </select>
-          </div>
-
-          {account.posts?.length === 0 ? (
-            <div style={{ padding: '3rem', textAlign: 'center', color: '#8b949e', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border)' }}>
-              No posts captured yet for this profile.
-            </div>
-          ) : category === 'INSPO' ? (
-            <div className="posts-grid">
-              {[...account.posts].sort((a, b) => {
-                if (sort === 'recent') return new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime();
-                if (sort === 'oldest') return new Date(a.postedAt).getTime() - new Date(b.postedAt).getTime();
-                if (sort === 'likes') return b.likes - a.likes;
-                if (sort === 'comments') return b.comments - a.comments;
-                return 0;
-              }).map((post: any) => (
-                <div key={post.id} style={{ position: 'relative' }}>
-                  <PostGrid posts={[post]} sort="recent" />
-                  <div style={{ position: 'absolute', bottom: '6px', left: '6px', zIndex: 10 }}>
-                    <CreateContentButton brandId={brandId} itemType="post" itemId={post.id} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <PostGrid posts={account.posts} sort={sort} />
-          )}
-        </>
-      )}
-    </div>
-  );
-};
 
 // ── Posts Tab ─────────────────────────────────────────────────────────────────
 

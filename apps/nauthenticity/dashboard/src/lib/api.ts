@@ -109,6 +109,7 @@ export interface Post {
   collaborators?: { username: string; profilePicUrl?: string; role?: string }[];
   newerPostId?: string | null;
   olderPostId?: string | null;
+  status?: string;
 }
 
 export interface SocialProfileDetails extends SocialProfile {
