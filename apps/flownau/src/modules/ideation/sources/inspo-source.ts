@@ -32,7 +32,7 @@ export async function fetchPendingSourceConcepts(brandId: string): Promise<Sourc
   }
   try {
     const response = await axios.get<SourceConcept[]>(
-      `${base}/api/v1/service/brands/${encodeURIComponent(brandId)}/source-concepts`,
+      `${base}/api/v1/_service/brands/${encodeURIComponent(brandId)}/source-concepts`,
       { headers: { Authorization: `Bearer ${token}` }, timeout: NAUTHENTICITY_TIMEOUT_MS },
     )
     return response.data ?? []
@@ -52,7 +52,7 @@ export async function generateSourceConcepts(brandId: string): Promise<SourceCon
   if (!base || !token) return []
   try {
     const response = await axios.post<SourceConcept[]>(
-      `${base}/api/v1/service/brands/${encodeURIComponent(brandId)}/source-concepts/generate`,
+      `${base}/api/v1/_service/brands/${encodeURIComponent(brandId)}/source-concepts/generate`,
       {},
       { headers: { Authorization: `Bearer ${token}` }, timeout: 120_000 },
     )
@@ -77,7 +77,7 @@ export async function markSourceConceptConsumed(conceptId: string): Promise<void
   if (!base || !token) return
   try {
     await axios.patch(
-      `${base}/api/v1/service/source-concepts/${encodeURIComponent(conceptId)}/consume`,
+      `${base}/api/v1/_service/source-concepts/${encodeURIComponent(conceptId)}/consume`,
       {},
       { headers: { Authorization: `Bearer ${token}` }, timeout: NAUTHENTICITY_TIMEOUT_MS },
     )
