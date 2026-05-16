@@ -422,16 +422,15 @@ const ProfilesTab = ({ profiles, onRemove, brandId, category }: { profiles: any[
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
       {profiles.map((m: any) => (
-        <div key={m.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <SocialProfileCard
-            profile={m.socialProfile}
-            onSelect={(username) => navigate(`../profiles/${username}`)}
-            onDelete={async () => onRemove(m.id, `@${m.socialProfile?.username ?? 'profile'}`)}
-          />
-          {category === 'INSPO' && m.socialProfile?.id && (
-            <CreateContentButton brandId={brandId} itemType="profile" itemId={m.socialProfile.id} />
-          )}
-        </div>
+        <SocialProfileCard
+          key={m.id}
+          profile={m.socialProfile}
+          onSelect={(username) => navigate(`../profiles/${username}`)}
+          onDelete={async () => onRemove(m.id, `@${m.socialProfile?.username ?? 'profile'}`)}
+          footerAction={category === 'INSPO' && m.socialProfile?.id
+            ? <CreateContentButton brandId={brandId} itemType="profile" itemId={m.socialProfile.id} />
+            : undefined}
+        />
       ))}
     </div>
   );

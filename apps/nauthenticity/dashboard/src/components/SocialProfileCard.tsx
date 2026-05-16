@@ -19,6 +19,7 @@ interface SocialProfileCardProps {
   onDelete?: (id: string) => Promise<void>;
   brandId?: string;
   workspaceId?: string;
+  footerAction?: React.ReactNode;
 }
 
 export const SocialProfileCard = ({
@@ -27,6 +28,7 @@ export const SocialProfileCard = ({
   onDelete,
   brandId,
   workspaceId,
+  footerAction,
 }: SocialProfileCardProps) => {
   const navigate = useNavigate();
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
@@ -204,6 +206,12 @@ export const SocialProfileCard = ({
         >
           View Content
         </button>
+
+        {footerAction && (
+          <div onClick={(e) => e.stopPropagation()}>
+            {footerAction}
+          </div>
+        )}
 
         {onDelete && (
           <button
