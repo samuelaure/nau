@@ -261,6 +261,14 @@ async function fillCalendarForBrand(
     return { alreadyFull: true, postsNeeded: 0, pastRescheduled: 0, ideasGenerated: 0, noDigest: false, approvedIdeas: 0, postsFilled: 0, skippedByBatchRule: 0, needsApproval: 0 }
   }
 
+  // When auto-approve is on, any IDEA_PENDING posts are eligible — approve them now so Tier 2 can use them
+  if (brand.autoApproveIdeas) {
+    await prisma.post.updateMany({
+      where: { brandId, status: 'IDEA_PENDING' },
+      data: { status: 'IDEA_APPROVED' },
+    })
+  }
+
   // Fetch past posts that were scheduled but never published — reschedule these first
   const now = new Date()
   const pastUnpublished = await prisma.post.findMany({
