@@ -135,9 +135,14 @@ function BetweenDropZone({
   const [over, setOver] = useState(false)
   if (!dragState) return null
 
+  const ONE_HOUR = 60 * 60 * 1000
   const midTime = beforeTime && afterTime
     ? new Date((new Date(beforeTime).getTime() + new Date(afterTime).getTime()) / 2).toISOString()
-    : afterTime ?? beforeTime ?? new Date().toISOString()
+    : !beforeTime && afterTime
+      ? new Date(new Date(afterTime).getTime() - ONE_HOUR).toISOString()
+      : beforeTime && !afterTime
+        ? new Date(new Date(beforeTime).getTime() + ONE_HOUR).toISOString()
+        : new Date().toISOString()
 
   return (
     // min-h keeps the zone stable when expanded — avoids layout reflow that causes onDragLeave to fire
