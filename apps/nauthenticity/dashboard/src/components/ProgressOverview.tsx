@@ -29,13 +29,14 @@ export const ProgressOverview = ({ username, postCount }: ProgressOverviewProps)
     queryKey: ['progress', username],
     queryFn: () => getProfileProgress(username),
     refetchInterval: (query) => {
-      const phase = query.state.data?.run?.phase
+      const phase = query.state.data?.summary?.phase
       return phase && phase !== 'finished' ? 3000 : false
     },
     enabled: postCount > 0,
   })
 
-  if (!progress?.run || progress.run.phase === 'finished') return null
+  const phase = progress?.summary?.phase
+  if (!phase || phase === 'finished') return null
 
   const counts: Record<string, number> = {}
   for (const post of progress.posts) {
@@ -49,7 +50,7 @@ export const ProgressOverview = ({ username, postCount }: ProgressOverviewProps)
   return (
     <div style={{ marginBottom: '1.5rem', padding: '0.9rem 1.1rem', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '10px', display: 'flex', flexWrap: 'wrap', gap: '0.75rem 1.5rem', alignItems: 'center' }}>
       <span style={{ fontSize: '0.78rem', color: '#8b949e', textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>
-        Processing · {progress.run.phase}
+        Processing · {phase}
       </span>
       {activeStages.map((stage) => (
         <div key={stage} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
