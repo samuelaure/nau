@@ -1,4 +1,5 @@
 import { getAdminModelClient } from '@/modules/shared/admin-model'
+import { reportFlownauUsage } from '@/modules/shared/report-usage'
 import { z } from 'zod'
 import { prisma } from '@/modules/shared/prisma'
 import { buildPrompt } from '@/modules/prompts/kernel'
@@ -130,6 +131,7 @@ async function runHeadTalkPath(args: {
       timeoutMs: 40_000,
     })
     rawResult = result.data
+    reportFlownauUsage({ operation: 'draft_compose', brandId, usage: result.usage })
   } catch (err) {
     logError('[DraftPipeline] HeadTalk LLM call failed', err)
     throw err
@@ -189,7 +191,8 @@ async function runSlotPath(args: {
 
   logger.info({ brandId, templateId, provider, model }, '[DraftPipeline] Slot LLM call')
 
-  const callAndParse = async (): Promise<Record<string, unknown>> => {
+  type SlotResult = { parsed: Record<string, unknown>; usage: import('@nau/llm-client').LLMUsage }
+  const callAndParse = async (): Promise<SlotResult> => {
     const result = await llm.chatCompletion({
       model,
       temperature: 0.7,
@@ -202,18 +205,22 @@ async function runSlotPath(args: {
     const start = jsonStr.indexOf('{')
     const end = jsonStr.lastIndexOf('}')
     if (start === -1 || end <= start) throw new Error(`No JSON object in response: ${raw.slice(0, 200)}`)
-    return JSON.parse(jsonStr.slice(start, end + 1)) as Record<string, unknown>
+    return { parsed: JSON.parse(jsonStr.slice(start, end + 1)) as Record<string, unknown>, usage: result.usage }
   }
 
   let parsed: Record<string, unknown>
   try {
-    parsed = await callAndParse()
+    const res = await callAndParse()
+    parsed = res.parsed
+    reportFlownauUsage({ operation: 'draft_compose', brandId, usage: res.usage })
   } catch (firstError: unknown) {
     const errorMsg = firstError instanceof Error ? firstError.message : String(firstError)
     logger.warn({ brandId, templateId, error: errorMsg }, '[DraftPipeline] Slot first attempt failed, retrying')
     messages.push({ role: 'user', content: 'Your previous response had invalid JSON. Fix it and return only a valid JSON object. No markdown, no explanation.' })
     try {
-      parsed = await callAndParse()
+      const res = await callAndParse()
+      parsed = res.parsed
+      reportFlownauUsage({ operation: 'draft_compose', brandId, usage: res.usage })
     } catch (secondError: unknown) {
       logError('[DraftPipeline] Slot both attempts failed', secondError)
       throw new Error(`DraftPipeline slot path failed: ${secondError instanceof Error ? secondError.message : String(secondError)}`)

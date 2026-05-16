@@ -597,6 +597,7 @@ async function generateIdeasFromSourceConcepts(
         language: brand.language,
         recentContent,
         userInstructions: brand.ideationCustomPrompt ?? null,
+        brandId,
       })
       const batchId = crypto.randomUUID()
       await Promise.all(output.ideas.map((idea) =>

@@ -1,4 +1,5 @@
 import { getAdminModelClient } from '@/modules/shared/admin-model'
+import { reportFlownauUsage } from '@/modules/shared/report-usage'
 import { z } from 'zod'
 import { buildPrompt } from '@/modules/prompts/kernel'
 
@@ -40,6 +41,9 @@ export interface GenerationRequest {
   recentContent?: string[]
   userInstructions?: string | null
   brandContext?: string | null
+  brandId?: string
+  workspaceId?: string
+  userId?: string
 }
 
 export async function generateContentIdeas(req: GenerationRequest): Promise<IdeationOutputWithTrace> {
@@ -71,6 +75,10 @@ export async function generateContentIdeas(req: GenerationRequest): Promise<Idea
     ],
     timeoutMs: 60_000,
   })
+
+  if (result.usage) {
+    reportFlownauUsage({ operation: 'ideation', brandId: req.brandId, workspaceId: req.workspaceId, userId: req.userId, usage: result.usage })
+  }
 
   const data = result.data as IdeationOutput
   return {

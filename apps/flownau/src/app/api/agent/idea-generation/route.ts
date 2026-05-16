@@ -75,6 +75,7 @@ export async function POST(req: Request) {
       count,
       userInstructions: brand?.ideationCustomPrompt ?? null,
       brandContext,
+      brandId,
     })
 
     const autoApprove = (await prisma.brand.findUnique({ where: { id: brandId }, select: { autoApproveIdeas: true } }))?.autoApproveIdeas ?? false

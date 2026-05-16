@@ -1,4 +1,5 @@
 import { getAdminModelClient } from '@/modules/shared/admin-model'
+import { reportFlownauUsage } from '@/modules/shared/report-usage'
 import { z } from 'zod'
 
 const StrategistOutputSchema = z.object({
@@ -24,6 +25,7 @@ interface StrategistInput {
   reelsPerDay: number
   trialReelsPerDay: number
   daysToPlan: number
+  brandId?: string
 }
 
 /**
@@ -81,6 +83,8 @@ RULES:
       ],
       timeoutMs: 30_000,
     })
+
+    reportFlownauUsage({ operation: 'calendar_planning', brandId: input.brandId, usage: result.usage })
 
     const ordered = (result.data as StrategistOutput).orderedIds
     const allIds = new Set(input.pieces.map((p) => p.id))

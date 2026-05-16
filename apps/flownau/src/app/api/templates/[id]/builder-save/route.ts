@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server'
 import { createLLMClient } from '@nau/llm-client'
 import { getSetting } from '@/modules/shared/settings'
 import { decrypt } from '@/modules/shared/encryption'
+import { reportFlownauUsage } from '@/modules/shared/report-usage'
 
 export async function PUT(req: Request, props: { params: Promise<{ id: string }> }) {
   const user = await getAuthUser()
@@ -35,6 +36,7 @@ export async function PUT(req: Request, props: { params: Promise<{ id: string }>
       ],
     })
 
+    reportFlownauUsage({ operation: 'template_compile', userId: user.id, usage: result.usage })
     const generatedSystemPrompt = result.content || 'No prompt generated'
 
     const updated = await (prisma.template as any).update({

@@ -9,6 +9,8 @@ import {
 } from '@nestjs/common';
 import { ServiceAuthGuard } from '../common/guards/service-auth.guard';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
+import type { AccessTokenPayload } from '@nau/types';
 import { UsageService, CreateUsageEventDto } from './usage.service';
 
 @Controller()
@@ -36,12 +38,14 @@ export class UsageController {
   @Get('admin/usage/summary')
   @UseGuards(JwtAuthGuard)
   async getSummary(
+    @CurrentUser() user: AccessTokenPayload,
     @Query('workspaceId') workspaceId?: string,
     @Query('brandId') brandId?: string,
     @Query('service') service?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
+    await this.usageService.assertAdmin(user.sub);
     return this.usageService.getSummary({
       workspaceId,
       brandId,
