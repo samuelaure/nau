@@ -16,7 +16,7 @@ export const BrandLayout = () => {
       <Route path="comments/*" element={<BrandCommentView />} />
       <Route path="benchmark/*" element={<BrandBenchmarkView />} />
       <Route path="trash" element={<BrandTrashView />} />
-      <Route path="settings" element={<BrandOwnedView />} />
+      <Route path="settings/*" element={<BrandOwnedView />} />
       <Route path="*" element={<Navigate to="content" replace />} />
     </Routes>
   );

@@ -346,6 +346,11 @@ export const getBrandOwnedProfiles = async (brandId: string) => {
   return data;
 };
 
+export const addOwnedProfile = async (brandId: string, username: string) => {
+  const { data } = await api.post(`/brands/${brandId}/owned-profiles`, { username });
+  return data;
+};
+
 // ── Projects ──────────────────────────────────────────────────────────────────
 
 export interface NauProject {
