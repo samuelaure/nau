@@ -1,7 +1,7 @@
 'use client'
 
 import { useTransition, useEffect, useRef, useState } from 'react'
-import { updateBrand, saveBrandContext } from '@/modules/accounts/actions'
+import { updateBrand, saveBrandContext, syncBrandContextFromNauthenticity } from '@/modules/accounts/actions'
 import { Card } from '@/modules/shared/components/ui/Card'
 import { Button } from '@/modules/shared/components/ui/Button'
 import AccountSchedule from './AccountSchedule'
@@ -186,11 +186,12 @@ export default function BrandSettings({ brand, initialSchedule, initialTab }: { 
   const [tab, setTab] = useState<BrandSettingsTab>(initialTab ?? 'general')
   const [isPending, startTransition] = useTransition()
   const [contextJson, setContextJson] = useState(
-    brand.context ? JSON.stringify(brand.context, null, 2) : '',
+    typeof brand.context === 'string' ? brand.context : (brand.context ? JSON.stringify(brand.context, null, 2) : ''),
   )
   const [contextSaving, setContextSaving] = useState(false)
   const [contextSaved, setContextSaved] = useState(false)
   const [contextError, setContextError] = useState<string | null>(null)
+  const [contextSyncing, setContextSyncing] = useState(false)
 
   const tabs: { id: BrandSettingsTab; label: string }[] = [
     { id: 'general', label: 'General' },
@@ -351,10 +352,32 @@ export default function BrandSettings({ brand, initialSchedule, initialTab }: { 
                   className="w-full font-mono text-xs bg-gray-950 border border-border text-white rounded-lg px-3 py-3 resize-y focus:outline-none focus:border-zinc-600 placeholder:text-zinc-700 leading-relaxed"
                 />
                 {contextError && <p className="text-xs text-red-400">{contextError}</p>}
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-2">
                   <button
                     type="button"
-                    disabled={contextSaving}
+                    disabled={contextSyncing || contextSaving}
+                    onClick={async () => {
+                      setContextSyncing(true)
+                      setContextError(null)
+                      setContextSaved(false)
+                      try {
+                        const { content } = await syncBrandContextFromNauthenticity(brand.id)
+                        setContextJson(content)
+                        setContextSaved(true)
+                        setTimeout(() => setContextSaved(false), 3000)
+                      } catch (err: unknown) {
+                        setContextError(err instanceof Error ? err.message : 'Sync failed')
+                      } finally {
+                        setContextSyncing(false)
+                      }
+                    }}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-zinc-700 text-zinc-200 hover:border-zinc-500 hover:bg-zinc-800/50 transition-all disabled:opacity-50"
+                  >
+                    {contextSyncing ? 'Syncing…' : 'Sync from nauthenticity'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={contextSaving || contextSyncing}
                     onClick={async () => {
                       setContextSaving(true)
                       setContextError(null)

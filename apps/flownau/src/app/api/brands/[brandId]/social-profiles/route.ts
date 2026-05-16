@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth'
 import { prisma } from '@/modules/shared/prisma'
 import { checkBrandAccessForRoute } from '@/lib/auth'
+import { validateServiceToken } from '@/modules/shared/nau-auth'
 
 /**
  * GET /api/brands/{brandId}/social-profiles
@@ -36,10 +37,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ brandId:
 export async function POST(req: Request, { params }: { params: Promise<{ brandId: string }> }) {
   try {
     const { brandId } = await params
-    const user = await getAuthUser()
-    if (!user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const denied2 = await checkBrandAccessForRoute(brandId); if (denied2) return denied2
+    // Accept either user session or service JWT (nauthenticity sync)
+    const isServiceCall = await validateServiceToken(req)
+    if (!isServiceCall) {
+      const user = await getAuthUser()
+      if (!user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      const denied2 = await checkBrandAccessForRoute(brandId); if (denied2) return denied2
+    }
 
     const body = await req.json()
     const { username, platform = 'instagram', nauthenticityProfileId, syncedFromNauthenticity = false } = body

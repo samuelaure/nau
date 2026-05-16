@@ -221,18 +221,37 @@ export async function updateBrand(brandId: string, formData: FormData) {
   revalidatePath('/dashboard')
 }
 
-/** Save manually edited brand context JSON. */
+/** Save manually edited brand context (plain text). */
 export async function saveBrandContext(brandId: string, context: string) {
   await checkAuth()
   const parsedId = IdSchema.parse(brandId)
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(context)
-  } catch {
-    throw new Error('Invalid JSON — please check the format and try again.')
-  }
-  await prisma.brand.update({ where: { id: parsedId }, data: { context: parsed as any } })
+  await prisma.brand.update({ where: { id: parsedId }, data: { context } })
   revalidatePath('/dashboard')
+}
+
+/** Pull the latest brand context from nauthenticity and write it to Brand.context. */
+export async function syncBrandContextFromNauthenticity(brandId: string): Promise<{ content: string }> {
+  await checkAuth()
+  const parsedId = IdSchema.parse(brandId)
+  const nauthenticityUrl = process.env.NAUTHENTICITY_URL ?? 'http://nauthenticity:3000'
+  const authSecret = process.env.AUTH_SECRET
+  if (!authSecret) throw new Error('AUTH_SECRET not configured')
+
+  const { signServiceToken } = await import('@nau/auth')
+  const svcToken = await signServiceToken({ secret: authSecret, iss: 'flownau', aud: 'nauthenticity' })
+
+  const res = await fetch(`${nauthenticityUrl}/api/v1/brands/${parsedId}/context`, {
+    headers: { Authorization: `Bearer ${svcToken}` },
+  })
+  if (!res.ok) throw new Error(`nauthenticity returned ${res.status}`)
+
+  const data = await res.json()
+  const content: string | null = data.content ?? null
+  if (!content) throw new Error('No brand context available in nauthenticity yet.')
+
+  await prisma.brand.update({ where: { id: parsedId }, data: { context: content } })
+  revalidatePath('/dashboard')
+  return { content }
 }
 
 
