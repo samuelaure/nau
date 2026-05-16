@@ -177,6 +177,7 @@ function computeIdealTimes(
 export interface SmartFillResult {
   alreadyFull: boolean
   postsNeeded: number
+  pastRescheduled: number
   ideasGenerated: number
   noDigest: boolean
   approvedIdeas: number
@@ -224,7 +225,7 @@ async function fillCalendarForBrand(
 ): Promise<SmartFillResult> {
   const schedule = await prisma.postSchedule.findUnique({ where: { brandId } })
   if (!schedule || !schedule.isActive || schedule.formatChain.length === 0) {
-    return { alreadyFull: true, postsNeeded: 0, ideasGenerated: 0, noDigest: false, approvedIdeas: 0, postsFilled: 0, skippedByBatchRule: 0, needsApproval: 0 }
+    return { alreadyFull: true, postsNeeded: 0, pastRescheduled: 0, ideasGenerated: 0, noDigest: false, approvedIdeas: 0, postsFilled: 0, skippedByBatchRule: 0, needsApproval: 0 }
   }
 
   const horizonDays = brand.coverageHorizonDays
@@ -257,10 +258,22 @@ async function fillCalendarForBrand(
   }
 
   if (postsNeeded === 0) {
-    return { alreadyFull: true, postsNeeded: 0, ideasGenerated: 0, noDigest: false, approvedIdeas: 0, postsFilled: 0, skippedByBatchRule: 0, needsApproval: 0 }
+    return { alreadyFull: true, postsNeeded: 0, pastRescheduled: 0, ideasGenerated: 0, noDigest: false, approvedIdeas: 0, postsFilled: 0, skippedByBatchRule: 0, needsApproval: 0 }
   }
 
-  // Pre-generate ideas if we're short
+  // Fetch past posts that were scheduled but never published — reschedule these first
+  const now = new Date()
+  const pastUnpublished = await prisma.post.findMany({
+    where: {
+      brandId,
+      scheduledAt: { lt: now },
+      status: { notIn: ['PUBLISHED', 'FAILED', 'IDEA_PENDING', 'IDEA_APPROVED'] },
+    },
+    orderBy: { scheduledAt: 'asc' },
+    select: { id: true, generationBatchId: true, format: true },
+  })
+
+  // Pre-generate ideas if we're short (past-unpublished posts count as available)
   let ideasGenerated = 0
   let noDigest = false
   const countAvailable = () => prisma.post.count({
@@ -271,7 +284,7 @@ async function fillCalendarForBrand(
   })
 
   const [available, unscheduledDrafts] = await Promise.all([countAvailable(), countUnscheduledDrafts()])
-  if (available + unscheduledDrafts < postsNeeded) {
+  if (available + unscheduledDrafts + pastUnpublished.length < postsNeeded) {
     const result = await generateIdeasFromSourceConcepts(brandId, brand)
     if (!result.hasConcepts) {
       noDigest = true
@@ -295,6 +308,7 @@ async function fillCalendarForBrand(
   const deck = new TemplateDeck()
   let chainPos = schedule.chainPosition
   let postsFilled = 0
+  let pastRescheduled = 0
   let skippedByBatchRule = 0
   let notifyUserApproveIdeas = false
 
@@ -350,6 +364,20 @@ async function fillCalendarForBrand(
 
         const batchFilter = batchExcludeFilter(recentBatchIds)
         const batchAnd = Object.keys(batchFilter).length > 0 ? [batchFilter] : []
+
+        // Tier 0: reschedule past unpublished post (was scheduled, never published)
+        const pastIdx = pastUnpublished.findIndex((p) => !p.format || p.format === format)
+        if (pastIdx !== -1) {
+          const past = pastUnpublished.splice(pastIdx, 1)[0]!
+          await prisma.post.update({ where: { id: past.id }, data: { scheduledAt: targetTime } })
+          advanceBatchWindow(past.generationBatchId)
+          pastRescheduled++
+          postsFilled++
+          ;(occupiedByDate[localDate] ??= []).push(targetTime.getTime())
+          countByDate[localDate] = (countByDate[localDate] ?? 0) + 1
+          logger.info({ brandId, postId: past.id, targetTime }, '[COVERAGE] Rescheduled past unpublished post')
+          continue
+        }
 
         // Tier 1: unscheduled draft
         const existingDraft = await prisma.post.findFirst({
@@ -469,11 +497,12 @@ async function fillCalendarForBrand(
     ? Math.max(0, postsNeeded - postsFilled - skippedByBatchRule)
     : 0
 
-  logger.info({ brandId, postsNeeded, postsFilled, ideasGenerated, skippedByBatchRule }, '[COVERAGE] Fill complete')
+  logger.info({ brandId, postsNeeded, postsFilled, pastRescheduled, ideasGenerated, skippedByBatchRule }, '[COVERAGE] Fill complete')
 
   return {
     alreadyFull: false,
     postsNeeded,
+    pastRescheduled,
     ideasGenerated,
     noDigest,
     approvedIdeas,

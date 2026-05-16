@@ -1469,6 +1469,7 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
       const r = data.result as {
         alreadyFull: boolean
         postsNeeded: number
+        pastRescheduled: number
         ideasGenerated: number
         noDigest: boolean
         approvedIdeas: number
@@ -1480,6 +1481,10 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
       if (r.alreadyFull) {
         toast.success('Calendar is already fully scheduled.')
         return
+      }
+
+      if (r.pastRescheduled > 0) {
+        toast.info(`${r.pastRescheduled} past unscheduled post${r.pastRescheduled === 1 ? '' : 's'} moved to new slots.`)
       }
 
       if (r.ideasGenerated > 0) {
@@ -1498,9 +1503,9 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
       if (r.needsApproval > 0) {
         toast.warning(
           r.approvedIdeas === 0
-            ? `${r.postsNeeded} post${r.postsNeeded === 1 ? '' : 's'} to schedule but no ideas are approved yet. Approve some in the Ideas tab to get started.`
-            : `${r.postsNeeded} post${r.postsNeeded === 1 ? '' : 's'} to schedule but only ${r.approvedIdeas} idea${r.approvedIdeas === 1 ? '' : 's'} approved. Approve ${r.needsApproval} more in the Ideas tab.`,
-          { duration: 8000 },
+            ? `New ideas were generated but auto-approve is off. Approve them in the Ideas tab, then hit Fill Calendar again.`
+            : `${r.needsApproval} idea${r.needsApproval === 1 ? '' : 's'} need approval to finish filling the calendar. Approve them in the Ideas tab, then hit Fill Calendar again.`,
+          { duration: 10000 },
         )
       }
 
