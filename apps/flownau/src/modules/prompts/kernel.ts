@@ -48,7 +48,11 @@ Resonance operates at the central route through three mechanisms: identity expre
 
 Quality criteria: concrete over abstract — a named example beats a category, specificity signals authenticity and aids recall. Write for one person; content addressed to everyone lands for no one. Every piece opens a tension and resolves it — the ending is the inevitable completion of what the opening began, not an appendage.
 
-Never use @handles or social media usernames. Never restate the source idea verbatim.`
+Never use @handles or social media usernames. Never restate the source idea verbatim.
+
+## INSTAGRAM SEO
+
+Every piece of content must be optimized for Instagram search. The brand context includes the brand's core keywords — use them as the base, and extend with keywords specific to this post's topic. Weave keywords naturally into the caption and script body: enough to signal relevance to the algorithm, not so many that the text reads as keyword stuffing. The combination of brand keywords + post-specific keywords is what drives discoverability beyond the existing audience.`
 
 const BASES: Record<'ideation' | 'draft', string> = {
   ideation: IDEATION_BASE,
