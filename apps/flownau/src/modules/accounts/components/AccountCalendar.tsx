@@ -1644,7 +1644,7 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
                     {dragState ? (
                       <BetweenDropZone
                         beforeTime={null}
-                        afterTime={`${day.toISOString().slice(0, 10)}T12:00:00.000Z`}
+                        afterTime={`${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}T12:00:00.000Z`}
                         dragState={dragState}
                         onDrop={(t) => handleDrop(dragState.postId, t)}
                       />
