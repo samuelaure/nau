@@ -29,6 +29,7 @@ import {
   MoreHorizontal,
   Shuffle,
   ScrollText,
+  Pencil,
 } from 'lucide-react'
 import { cn } from '@/modules/shared/utils'
 import Modal from '@/modules/shared/components/Modal'
@@ -913,17 +914,41 @@ function CompositionModal({
           )}
 
           {/* Scheduled time */}
-          <div className="flex items-start gap-3">
-            <Clock size={15} className="text-text-secondary mt-0.5 shrink-0" />
-            <div>
-              <p className="text-xs text-text-secondary uppercase tracking-wider mb-0.5">
-                {comp.status === 'PUBLISHED' ? 'Published at' : isScheduled ? 'Scheduled for' : 'Not scheduled'}
-              </p>
-              {displayDate && (
-                <p className="text-sm text-white">{fmtDateTime(displayDate)}</p>
-              )}
-            </div>
-          </div>
+          {(() => {
+            const canEdit = !scheduling && display !== 'Published' && display !== 'Error' && comp.status !== 'RENDERING' && comp.status !== 'DRAFT_APPROVED'
+            return canEdit ? (
+              <button
+                onClick={() => setScheduling(true)}
+                className="flex items-start gap-3 group text-left w-full rounded-lg px-3 py-2 -mx-3 hover:bg-white/5 transition-colors"
+              >
+                <Clock size={15} className="text-text-secondary mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-xs text-text-secondary uppercase tracking-wider mb-0.5">
+                    {isScheduled ? 'Scheduled for' : 'Not scheduled'}
+                  </p>
+                  {displayDate && (
+                    <p className="text-sm text-white">{fmtDateTime(displayDate)}</p>
+                  )}
+                  {!displayDate && (
+                    <p className="text-sm text-text-secondary italic">Click to set a date & time</p>
+                  )}
+                </div>
+                <Pencil size={13} className="text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity mt-0.5 shrink-0" />
+              </button>
+            ) : (
+              <div className="flex items-start gap-3">
+                <Clock size={15} className="text-text-secondary mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-xs text-text-secondary uppercase tracking-wider mb-0.5">
+                    {comp.status === 'PUBLISHED' ? 'Published at' : isScheduled ? 'Scheduled for' : 'Not scheduled'}
+                  </p>
+                  {displayDate && (
+                    <p className="text-sm text-white">{fmtDateTime(displayDate)}</p>
+                  )}
+                </div>
+              </div>
+            )
+          })()}
 
           {/* ── REEL layout ─────────────────────────────────────────────────── */}
           {REEL_FAMILY.has(comp.format) && (() => {
