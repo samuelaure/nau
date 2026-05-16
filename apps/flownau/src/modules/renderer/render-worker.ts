@@ -129,13 +129,14 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
     const [allVideos, audioAssets] = await Promise.all([
       prisma.asset.findMany({
         where: { brandId, type: { in: ['video', 'VID'] } },
-        select: { url: true, duration: true, tags: true },
+        select: { id: true, url: true, duration: true, tags: true, lastUsedAt: true },
         take: 50,
       }),
       prisma.asset.findMany({
         where: { brandId, type: { in: ['audio', 'AUD'] } },
-        select: { url: true },
+        select: { id: true, url: true, lastUsedAt: true },
         take: 50,
+        orderBy: { lastUsedAt: 'asc' },
       }),
     ])
 
@@ -145,7 +146,18 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
     const moodMatched = moodKeywords.length > 0
       ? candidatePool.filter((a) => a.tags.some((t) => moodKeywords.includes(t.toLowerCase())))
       : []
-    const videoPool = shuffle(moodMatched.length > 0 ? moodMatched : candidatePool)
+
+    // LRU ordering: assets never used (null) first, then oldest-used first.
+    // Applies within the mood-filtered pool (or full pool if no mood match).
+    const orderedPool = (moodMatched.length > 0 ? moodMatched : candidatePool)
+      .sort((a, b) => {
+        if (!a.lastUsedAt && !b.lastUsedAt) return 0
+        if (!a.lastUsedAt) return -1
+        if (!b.lastUsedAt) return 1
+        return a.lastUsedAt.getTime() - b.lastUsedAt.getTime()
+      })
+
+    const videoPool = orderedPool.slice(0, 5)
 
     brollClips = videoPool.map((a) => {
       const assetFrames = a.duration ? Math.floor(a.duration * REMOTION_FPS) : 0
@@ -154,10 +166,22 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
       return { url: a.url, startFrom, durationInFrames: assetFrames > 0 ? assetFrames : undefined }
     })
 
-    audioUrl = shuffle(audioAssets)[0]?.url
+    const selectedAudio = audioAssets[0]
+    audioUrl = selectedAudio?.url
     freshlyResolved = true
 
-    logger.info({ postId, brandId, moodKeywords, videoPoolSize: videoPool.length, hasAudio: !!audioUrl }, '[RenderWorker] B-roll and audio assets resolved')
+    // Stamp selected assets so LRU ordering rotates them out next time
+    const usedVideoIds = videoPool.map((a) => a.id)
+    const usedAudioIds = selectedAudio ? [selectedAudio.id] : []
+    const usedIds = [...usedVideoIds, ...usedAudioIds]
+    if (usedIds.length > 0) {
+      await prisma.asset.updateMany({
+        where: { id: { in: usedIds } },
+        data: { lastUsedAt: new Date(), usageCount: { increment: 1 } },
+      })
+    }
+
+    logger.info({ postId, brandId, moodKeywords, videoPoolSize: orderedPool.length, selectedClipCount: videoPool.length, hasAudio: !!audioUrl }, '[RenderWorker] B-roll and audio assets resolved')
   }
 
   const selectedClips = brollClips.slice(0, 5)
