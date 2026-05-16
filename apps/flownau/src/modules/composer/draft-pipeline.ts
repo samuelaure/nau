@@ -135,9 +135,16 @@ async function runHeadTalkPath(args: {
     throw err
   }
 
-  const creative = rawResult as HeadTalkCreative
-  const caption = typeof creative.caption === 'string' ? creative.caption : ''
-  const hashtags = Array.isArray(creative.hashtags) ? creative.hashtags : []
+  const raw = rawResult as HeadTalkCreative
+  const creative: HeadTalkCreative = {
+    hook: normalizeParagraphs(raw.hook ?? ''),
+    body: normalizeParagraphs(raw.body ?? ''),
+    cta: normalizeParagraphs(raw.cta ?? ''),
+    caption: normalizeParagraphs(raw.caption ?? ''),
+    hashtags: raw.hashtags ?? [],
+  }
+  const caption = creative.caption
+  const hashtags = creative.hashtags
 
   const postSynthesis = await generateSynthesis(caption, creative as unknown as Record<string, unknown>, language)
 
@@ -219,8 +226,9 @@ async function runSlotPath(args: {
       if (typeof parsed[slotDef.key] === 'string') slots[slotDef.key] = parsed[slotDef.key] as string
     }
   }
+  slots = Object.fromEntries(Object.entries(slots).map(([k, v]) => [k, normalizeParagraphs(v)]))
 
-  const caption = (parsed.caption as string) ?? ''
+  const caption = normalizeParagraphs((parsed.caption as string) ?? '')
   const hashtags = Array.isArray(parsed.hashtags) ? (parsed.hashtags as string[]) : []
   const brollMood = (parsed.brollMood as string) ?? ''
 
@@ -347,6 +355,14 @@ async function generateSynthesis(caption: string, creative: Record<string, unkno
   } catch {
     return ''
   }
+}
+
+function normalizeParagraphs(text: string): string {
+  return text
+    .split(/\n{2,}/)
+    .map((chunk) => chunk.split('\n').map((l) => l.trim()).filter(Boolean).join(' '))
+    .filter(Boolean)
+    .join('\n\n')
 }
 
 function buildUserMessage(
