@@ -36,7 +36,7 @@ export const ProgressOverview = ({ username, postCount }: ProgressOverviewProps)
   })
 
   const phase = progress?.summary?.phase
-  if (!phase || phase === 'finished') return null
+  if (!phase || phase === 'finished' || phase === 'idle') return null
 
   const counts: Record<string, number> = {}
   for (const post of progress.posts) {
