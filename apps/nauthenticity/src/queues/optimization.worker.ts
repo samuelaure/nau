@@ -118,6 +118,10 @@ export const optimizationWorker = new Worker(
                 where: { id: runId },
                 data: { phase: 'visualizing' },
               });
+              await prisma.post.updateMany({
+                where: { runId },
+                data: { status: 'computing' },
+              });
               await computeQueue.add('visualize-batch', { runId, username });
             }
           }

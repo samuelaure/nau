@@ -4,7 +4,8 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { getBrandOwnedProfiles, getAccount, getProfileImageUrl } from '../lib/api';
 import { Database, TrendingUp } from 'lucide-react';
 import { PostGrid } from '../components/PostGrid';
-import { ProfileActionsBar } from '../components/ProfileActionsBar';
+import { ScrapeModal } from '../components/ScrapeModal';
+import { RefreshCw } from 'lucide-react';
 import { SocialProfileCard } from '../components/SocialProfileCard';
 
 export const BrandContentView = () => {
@@ -13,6 +14,7 @@ export const BrandContentView = () => {
   const location = useLocation();
   const selectedUsername = username || null;
   const [sort, setSort] = React.useState<'recent' | 'oldest' | 'likes' | 'comments'>('recent');
+  const [scrapeOpen, setScrapeOpen] = React.useState(false);
 
   const [usernameToLink, setUsernameToLink] = React.useState('');
   const [isLinking, setIsLinking] = React.useState(false);
@@ -108,7 +110,13 @@ export const BrandContentView = () => {
         </div>
 
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <ProfileActionsBar username={selectedUsername} postCount={selectedAccount.posts?.length ?? 0} />
+          <button
+            onClick={() => setScrapeOpen(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.875rem', borderRadius: '4px', background: 'rgba(63,185,80,0.1)', border: '1px solid rgba(63,185,80,0.3)', color: '#3fb950', cursor: 'pointer', fontWeight: 600 }}
+          >
+            <RefreshCw size={15} /> Scrape
+          </button>
+          {scrapeOpen && selectedUsername && <ScrapeModal username={selectedUsername} onClose={() => setScrapeOpen(false)} />}
           <button
             onClick={() => navigate(`/progress?username=${selectedUsername}`)}
             style={{

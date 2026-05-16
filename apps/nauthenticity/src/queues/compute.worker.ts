@@ -110,6 +110,10 @@ async function advanceOrFinish(
       where: { id: runId },
       data: { phase: 'finished', status: 'completed' },
     });
+    await prisma.post.updateMany({
+      where: { runId },
+      data: { status: 'ready' },
+    });
   }
 }
 

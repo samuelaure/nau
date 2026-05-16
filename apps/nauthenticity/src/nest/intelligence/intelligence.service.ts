@@ -11,6 +11,18 @@ import { computeQueue } from '../../queues/compute.queue'
 
 const RECENT_SCRAPE_THRESHOLD_DAYS = 7
 
+function sanitiseUsername(raw: string): string {
+  // Strip Instagram URL prefix
+  let u = raw.trim()
+  if (u.includes('instagram.com/')) u = u.split('instagram.com/')[1] ?? u
+  // Strip query string / fragment / path suffix
+  u = u.split('?')[0].split('#')[0].split('/')[0]
+  // Strip leading @
+  if (u.startsWith('@')) u = u.slice(1)
+  // Keep only valid Instagram username characters
+  return u.replace(/[^a-zA-Z0-9._]/g, '')
+}
+
 export type Category = 'COMMENT' | 'INSPO' | 'BENCHMARK'
 export const CATEGORIES: readonly Category[] = ['COMMENT', 'INSPO', 'BENCHMARK'] as const
 
@@ -120,7 +132,8 @@ export class IntelligenceService {
 
     let absorbedPostCount = 0
     let scrapeQueued = false
-    for (const username of usernames) {
+    for (const raw of usernames) {
+      const username = sanitiseUsername(raw)
       const profile = await upsertSocialProfile({ platform: 'instagram', username })
 
       const existing = await this.prisma.categoryMembership.findFirst({
@@ -150,12 +163,10 @@ export class IntelligenceService {
       })
       absorbedPostCount += absorbedCount
 
-      if (opts.category === 'INSPO') {
-        const staleThreshold = new Date(Date.now() - RECENT_SCRAPE_THRESHOLD_DAYS * 24 * 60 * 60 * 1000)
-        if (!profile.lastScrapedAt || profile.lastScrapedAt < staleThreshold) {
-          const queued = await this.ingestion.tryQueueIngestion(username, 30)
-          if (queued) scrapeQueued = true
-        }
+      const staleThreshold = new Date(Date.now() - RECENT_SCRAPE_THRESHOLD_DAYS * 24 * 60 * 60 * 1000)
+      if (!profile.lastScrapedAt || profile.lastScrapedAt < staleThreshold) {
+        const queued = await this.ingestion.tryQueueIngestion(username, 30)
+        if (queued) scrapeQueued = true
       }
     }
     return { success: true, absorbedPostCount, scrapeQueued }

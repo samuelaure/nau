@@ -101,6 +101,11 @@ export const downloadWorker = new Worker(
             data: { storageUrl: publicUrl },
           });
 
+          await prisma.post.updateMany({
+            where: { id: postId, status: 'pending' },
+            data: { status: 'downloading' },
+          });
+
           wlog.download.done(mediaId, publicUrl);
 
           if (runId) {
@@ -123,6 +128,10 @@ export const downloadWorker = new Worker(
                 await prisma.scrapingRun.update({
                   where: { id: runId },
                   data: { phase: 'optimizing' },
+                });
+                await prisma.post.updateMany({
+                  where: { runId },
+                  data: { status: 'optimizing' },
                 });
 
                 const rawMedia = await prisma.media.findMany({
