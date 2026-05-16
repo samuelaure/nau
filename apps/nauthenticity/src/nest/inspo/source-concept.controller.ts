@@ -43,6 +43,13 @@ export class SourceConceptController {
     return this.sourceConceptService.markConsumed(id)
   }
 
+  // User-facing: all source concepts linked to a social profile (direct + via posts)
+  @Get('social-profiles/:id/source-concepts')
+  @UseGuards(JwtAuthGuard)
+  listForProfile(@Param('id') id: string) {
+    return this.sourceConceptService.listForProfile(id)
+  }
+
   // User-facing: retroactively generate source concepts for already-synthesized INSPO posts
   @Post('brands/:brandId/source-concepts/retroactive')
   @UseGuards(JwtAuthGuard)

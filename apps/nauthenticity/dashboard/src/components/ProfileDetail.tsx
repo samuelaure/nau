@@ -2,22 +2,25 @@ import React from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getAccount, getProfileImageUrl } from '../lib/api'
-import { ArrowLeft, RefreshCw } from 'lucide-react'
+import { ArrowLeft, RefreshCw, Info } from 'lucide-react'
 import { PostGrid } from './PostGrid'
 import { ScrapeModal } from './ScrapeModal'
 import { ProgressOverview } from './ProgressOverview'
+import { ProfileDetailsDrawer } from './ProfileDetailsDrawer'
 
 interface ProfileDetailProps {
   backLabel: string
   backPath: string
   renderPostActions?: (post: any) => React.ReactNode
+  showSourceConcepts?: boolean
 }
 
-export const ProfileDetail = ({ backLabel, backPath, renderPostActions }: ProfileDetailProps) => {
+export const ProfileDetail = ({ backLabel, backPath, renderPostActions, showSourceConcepts = false }: ProfileDetailProps) => {
   const { username } = useParams<{ username: string }>()
   const navigate = useNavigate()
   const [sort, setSort] = React.useState<'recent' | 'oldest' | 'likes' | 'comments'>('recent')
   const [scrapeOpen, setScrapeOpen] = React.useState(false)
+  const [detailsOpen, setDetailsOpen] = React.useState(false)
 
   const { data: account, isLoading } = useQuery({
     queryKey: ['account', username],
@@ -50,12 +53,20 @@ export const ProfileDetail = ({ backLabel, backPath, renderPostActions }: Profil
               <h2 style={{ margin: 0, fontSize: '1.75rem' }}>@{account.username}</h2>
               <span style={{ color: '#8b949e', fontSize: '0.9rem' }}>{account.posts?.length ?? 0} posts captured</span>
             </div>
-            <button
-              onClick={() => setScrapeOpen(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.9rem', borderRadius: '8px', background: 'rgba(63,185,80,0.1)', border: '1px solid rgba(63,185,80,0.3)', color: '#3fb950', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600, flexShrink: 0 }}
-            >
-              <RefreshCw size={14} /> Scrape
-            </button>
+            <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+              <button
+                onClick={() => setDetailsOpen(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.9rem', borderRadius: '8px', background: 'rgba(139,148,158,0.1)', border: '1px solid rgba(139,148,158,0.3)', color: '#8b949e', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}
+              >
+                <Info size={14} /> Details
+              </button>
+              <button
+                onClick={() => setScrapeOpen(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.9rem', borderRadius: '8px', background: 'rgba(63,185,80,0.1)', border: '1px solid rgba(63,185,80,0.3)', color: '#3fb950', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}
+              >
+                <RefreshCw size={14} /> Scrape
+              </button>
+            </div>
           </div>
 
           <ProgressOverview username={account.username} postCount={account.posts?.length ?? 0} />
@@ -100,6 +111,15 @@ export const ProfileDetail = ({ backLabel, backPath, renderPostActions }: Profil
 
       {scrapeOpen && (
         <ScrapeModal username={username} onClose={() => setScrapeOpen(false)} />
+      )}
+
+      {detailsOpen && account && (
+        <ProfileDetailsDrawer
+          socialProfileId={account.id}
+          username={account.username}
+          showSourceConcepts={showSourceConcepts}
+          onClose={() => setDetailsOpen(false)}
+        />
       )}
     </div>
   )

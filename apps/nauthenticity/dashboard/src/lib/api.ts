@@ -444,6 +444,27 @@ export const updateInspoItem = async (id: string, brandId: string, updates: any)
   return data;
 };
 
+export const getProfileSynthesis = async (socialProfileId: string) => {
+  const { data } = await api.get<{ id: string; content: string; postCountAtGeneration: number; generatedAt: string } | null>(
+    `/social-profiles/${socialProfileId}/synthesis`,
+  );
+  return data;
+};
+
+export interface ProfileSourceConcept {
+  id: string;
+  content: string;
+  sourceType: string;
+  status: string;
+  createdAt: string;
+  link: 'profile' | 'post';
+}
+
+export const getProfileSourceConcepts = async (socialProfileId: string) => {
+  const { data } = await api.get<ProfileSourceConcept[]>(`/social-profiles/${socialProfileId}/source-concepts`);
+  return data;
+};
+
 // Maps the dashboard's legacy targetType values to the new CategoryMembership.category enum.
 // 'single_post' has no profile-level analogue — it now routes through the InspoBase / Benchmark
 // post-level endpoints; that page will be refactored separately.

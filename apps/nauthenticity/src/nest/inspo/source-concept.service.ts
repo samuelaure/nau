@@ -235,6 +235,39 @@ Each "content" is a paragraph (30–60 words) describing the concept clearly eno
     return this.generateFromInspoBase(brandId)
   }
 
+  // Returns all source concepts linked to a social profile — either directly via
+  // SourceConceptSource.socialProfileId or via posts that belong to the profile.
+  async listForProfile(socialProfileId: string) {
+    const [directSources, postSources] = await Promise.all([
+      this.prisma.sourceConceptSource.findMany({
+        where: { socialProfileId },
+        include: { sourceConcept: true },
+        orderBy: { sourceConcept: { createdAt: 'desc' } },
+      }),
+      this.prisma.sourceConceptSource.findMany({
+        where: { post: { socialProfileId } },
+        include: { sourceConcept: true },
+        orderBy: { sourceConcept: { createdAt: 'desc' } },
+      }),
+    ])
+
+    const seen = new Set<string>()
+    const concepts: Array<{ id: string; content: string; sourceType: string; status: string; createdAt: Date; link: 'profile' | 'post' }> = []
+    for (const src of [...directSources, ...postSources]) {
+      if (seen.has(src.sourceConcept.id)) continue
+      seen.add(src.sourceConcept.id)
+      concepts.push({
+        id: src.sourceConcept.id,
+        content: src.sourceConcept.content,
+        sourceType: src.sourceConcept.sourceType,
+        status: src.sourceConcept.status,
+        createdAt: src.sourceConcept.createdAt,
+        link: src.socialProfileId ? 'profile' : 'post',
+      })
+    }
+    return concepts
+  }
+
   async markConsumed(id: string) {
     const concept = await this.prisma.sourceConcept.findUnique({ where: { id } })
     if (!concept) throw new NotFoundException('SourceConcept not found')
