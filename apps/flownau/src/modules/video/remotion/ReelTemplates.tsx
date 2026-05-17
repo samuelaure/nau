@@ -138,8 +138,8 @@ export const BROLL_REQUIRED_FRAMES = SCENE_BODY + TRAIL
 // Platform UI (navigation bar, caption/action tray) covers the edges of a reel.
 // All text must stay inside this zone.
 
-const SAFE_ZONE = { top: 220, bottom: 450, left: 100, right: 100 } as const
-const SAFE_W = 1080 - SAFE_ZONE.left - SAFE_ZONE.right   // 880
+const SAFE_ZONE = { top: 220, bottom: 450, left: 160, right: 160 } as const
+const SAFE_W = 1080 - SAFE_ZONE.left - SAFE_ZONE.right   // 760
 const SAFE_H = 1920 - SAFE_ZONE.top  - SAFE_ZONE.bottom  // 1250
 
 // TextZone: centers text on the full 1920px canvas height so text appears
