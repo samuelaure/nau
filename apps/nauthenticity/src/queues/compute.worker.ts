@@ -586,34 +586,12 @@ const handleTranscribeBatch = async (
   }
 };
 
-// Checks whether a profile has accumulated enough new synthesized posts to warrant
-// a soft-update of its ProfileSynthesis. Runs inline (no NestJS DI needed).
-const triggerProfileSynthesisSoftUpdate = async (socialProfileId: string): Promise<void> => {
-  const [existing, profile] = await Promise.all([
-    prisma.profileSynthesis.findUnique({ where: { socialProfileId } }),
-    prisma.socialProfile.findUnique({
-      where: { id: socialProfileId },
-      select: {
-        username: true,
-        synthesisTriggerThreshold: true,
-        _count: { select: { posts: { where: { postSynthesis: { not: null } } } } },
-      },
-    }),
-  ]);
+// Generates ProfileSynthesis for the first time after a profile's first scrape.
+// No-ops if synthesis already exists — subsequent regenerations are manual only.
+const triggerFirstProfileSynthesis = async (socialProfileId: string): Promise<void> => {
+  const existing = await prisma.profileSynthesis.findUnique({ where: { socialProfileId } });
+  if (existing) return;
 
-  if (!profile) return;
-
-  const postCount = profile._count.posts;
-  const threshold = profile.synthesisTriggerThreshold;
-
-  if (!existing) {
-    if (postCount < threshold) return;
-  } else {
-    const newSince = postCount - existing.postCountAtGeneration;
-    if (newSince < threshold) return;
-  }
-
-  // Threshold reached — generate profile synthesis via internal HTTP to keep DI out of worker
   const authSecret = config.authSecret;
   if (!authSecret) return;
 
@@ -644,6 +622,19 @@ const handleSynthesizeBatch = async (
   const { getClientForFeature } = await import('@nau/llm-client');
   const { client, model } = getClientForFeature('synthesis');
 
+  // Cache profile ownership per socialProfileId to avoid repeated queries
+  const profileOwnerCache = new Map<string, string | null>();
+  const getOwnedBrandId = async (socialProfileId: string): Promise<string | null> => {
+    if (profileOwnerCache.has(socialProfileId)) return profileOwnerCache.get(socialProfileId)!;
+    const profile = await prisma.socialProfile.findUnique({
+      where: { id: socialProfileId },
+      select: { ownerId: true },
+    });
+    const ownerId = profile?.ownerId ?? null;
+    profileOwnerCache.set(socialProfileId, ownerId);
+    return ownerId;
+  };
+
   for (let i = 0; i < posts.length; i++) {
     if (i % 20 === 0 && await checkPaused(runId)) {
       wlog.phase('paused', runId, 'synthesis stopped');
@@ -667,20 +658,29 @@ const handleSynthesizeBatch = async (
       transcript && `Transcript: ${transcript}`,
     ].filter(Boolean).join('\n');
 
-    // Check if post is tagged INSPO for any brand
-    const inspoMembership = await prisma.categoryMembership.findFirst({
-      where: { postId: post.id, category: 'INSPO', isActive: true, brandId: { not: null } },
-      select: { brandId: true },
-    });
-    const isInspo = !!inspoMembership;
+    // Collect all brands that need source concepts for this post
+    const [inspoMemberships, ownedBrandId] = await Promise.all([
+      prisma.categoryMembership.findMany({
+        where: { postId: post.id, category: 'INSPO', isActive: true, brandId: { not: null } },
+        select: { brandId: true },
+      }),
+      post.socialProfileId ? getOwnedBrandId(post.socialProfileId) : Promise.resolve(null),
+    ]);
 
-    const brandLanguage = inspoMembership?.brandId
-      ? (await prisma.brand.findUnique({ where: { id: inspoMembership.brandId }, select: { language: true } }))?.language ?? 'Spanish'
+    const sourceBrandIds = new Set<string>();
+    for (const m of inspoMemberships) if (m.brandId) sourceBrandIds.add(m.brandId);
+    if (ownedBrandId) sourceBrandIds.add(ownedBrandId);
+
+    const needsSourceConcepts = sourceBrandIds.size > 0;
+
+    // Determine language from first applicable brand
+    const firstBrandId = sourceBrandIds.values().next().value ?? null;
+    const brandLanguage = firstBrandId
+      ? (await prisma.brand.findUnique({ where: { id: firstBrandId }, select: { language: true } }))?.language ?? 'Spanish'
       : 'Spanish';
 
     try {
-      if (isInspo) {
-        // INSPO path: JSON response with synthesis + sourceConcepts
+      if (needsSourceConcepts) {
         const result = await client.chatCompletion({
           model,
           temperature: 0.4,
@@ -715,25 +715,21 @@ Return only valid JSON: { "synthesis": "...", "sourceConcepts": ["...", "..."] }
 
         await prisma.post.update({ where: { id: post.id }, data: { postSynthesis: synthesis } });
 
-        if (sourceConcepts.length > 0 && inspoMembership.brandId) {
+        if (sourceConcepts.length > 0) {
           await Promise.all(
-            sourceConcepts.map(async (content) => {
-              const concept = await prisma.sourceConcept.create({
-                data: {
-                  brandId: inspoMembership.brandId as string,
-                  content,
-                  sourceType: 'specific_post',
-                  status: 'pending',
-                },
-              });
-              await prisma.sourceConceptSource.create({
-                data: { sourceConceptId: concept.id, postId: post.id },
-              });
-            }),
+            [...sourceBrandIds].flatMap((brandId) =>
+              sourceConcepts.map(async (content) => {
+                const concept = await prisma.sourceConcept.create({
+                  data: { brandId, content, sourceType: 'specific_post', status: 'pending' },
+                });
+                await prisma.sourceConceptSource.create({
+                  data: { sourceConceptId: concept.id, postId: post.id },
+                });
+              }),
+            ),
           );
         }
       } else {
-        // Standard path: plain text synthesis
         const result = await client.chatCompletion({
           model,
           temperature: 0.3,
@@ -751,13 +747,15 @@ Return only valid JSON: { "synthesis": "...", "sourceConcepts": ["...", "..."] }
           data: { postSynthesis: result.content.trim() },
         });
       }
-
-      if (post.socialProfileId) {
-        triggerProfileSynthesisSoftUpdate(post.socialProfileId).catch(() => {});
-      }
     } catch (err) {
       logger.error({ postId: post.id, err }, '[SYNTHESIZE] Failed to synthesize post');
     }
+  }
+
+  // After all posts processed: trigger first-time ProfileSynthesis for each profile in this run
+  const profileIds = [...new Set(posts.map((p) => p.socialProfileId).filter(Boolean))] as string[];
+  for (const socialProfileId of profileIds) {
+    triggerFirstProfileSynthesis(socialProfileId).catch(() => {});
   }
 };
 
