@@ -83,10 +83,11 @@ Rules:
       })
     }
 
+    const synthesisTrace = { systemPrompt, userMessage, model, generatedAt: new Date().toISOString() }
     const synthesis = await this.prisma.profileSynthesis.upsert({
       where: { socialProfileId },
-      create: { socialProfileId, content, postCountAtGeneration },
-      update: { content, postCountAtGeneration, generatedAt: new Date() },
+      create: { socialProfileId, content, postCountAtGeneration, synthesisTrace },
+      update: { content, postCountAtGeneration, synthesisTrace, generatedAt: new Date() },
     })
 
     const apiURL = this.config.get<string>('NAU_API_URL')
@@ -178,10 +179,11 @@ Return JSON: { "synthesis": "...", "concepts": [{ "content": "..." }, ...] }`
         },
       })
     }
+    const synthesisTrace = { systemPrompt, userMessage, model, generatedAt: new Date().toISOString() }
     const synthesis = await this.prisma.profileSynthesis.upsert({
       where: { socialProfileId },
-      create: { socialProfileId, content: parsed.synthesis, postCountAtGeneration: posts.length },
-      update: { content: parsed.synthesis, postCountAtGeneration: posts.length, generatedAt: new Date() },
+      create: { socialProfileId, content: parsed.synthesis, postCountAtGeneration: posts.length, synthesisTrace },
+      update: { content: parsed.synthesis, postCountAtGeneration: posts.length, synthesisTrace, generatedAt: new Date() },
     })
 
     // Save synthesis as the primary source concept, then save derived concepts

@@ -76,6 +76,7 @@ model Post {
   collaborators   Json?
   intelligence    Json?
   postSynthesis   String?  @db.Text
+  synthesisTrace  Json?
   status          String   @default("pending")
 
   runId String?
@@ -283,6 +284,7 @@ model ProfileSynthesis {
   socialProfile        SocialProfile @relation(fields: [socialProfileId], references: [id], onDelete: Cascade)
   content              String        @db.Text
   postCountAtGeneration Int
+  synthesisTrace       Json?
   generatedAt          DateTime      @default(now())
 }
 

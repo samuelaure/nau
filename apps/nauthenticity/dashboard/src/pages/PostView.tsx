@@ -1,9 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useRef } from 'react';
-import { useParams, Link, useLocation } from 'react-router-dom';
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { getPost, updatePost, getPostSourceConcepts, getMediaUrl } from '../lib/api';
-import { ArrowLeft, ArrowRight, MessageCircle, Heart, Eye, Calendar, ChevronDown, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight, MessageCircle, Heart, Eye, Calendar, ChevronDown, ChevronRight, ScrollText } from 'lucide-react';
 import { MediaCarousel } from '../components/MediaCarousel';
+import { PromptsModal } from '../components/PromptsModal';
 
 // ── Inline editable field ─────────────────────────────────────────────────────
 
@@ -110,8 +111,10 @@ const Section = ({ label, tag, children, defaultOpen = true }: { label: string; 
 export const PostView = () => {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
-  const backTo: string = (location.state as any)?.backTo ?? null;
+  const navigate = useNavigate();
+  const backTo: string | null = (location.state as any)?.backTo ?? null;
   const queryClient = useQueryClient();
+  const [showPrompts, setShowPrompts] = useState(false);
 
   const { data: post, isLoading } = useQuery({
     queryKey: ['post', id],
@@ -142,9 +145,12 @@ export const PostView = () => {
     <div className="fade-in" style={{ maxWidth: '1000px', margin: '0 auto' }}>
       {/* Nav bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <Link to={backTo ?? '/workspaces'} style={{ color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <button
+          onClick={() => backTo ? navigate(backTo) : navigate(-1)}
+          style={{ color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: 0, fontSize: '0.9rem' }}
+        >
           <ArrowLeft size={16} /> Back to Posts
-        </Link>
+        </button>
         <div style={{ display: 'flex', gap: '1rem' }}>
           {post.newerPostId && (
             <Link to={`/posts/${post.newerPostId}`} className="nav-arrow" title="Previous Post (Newer)">
@@ -195,7 +201,17 @@ export const PostView = () => {
           )}
 
           {/* Synthesis */}
-          <Section label="Synthesis">
+          <Section
+            label="Synthesis"
+            tag={post.synthesisTrace && (
+              <button
+                onClick={() => setShowPrompts(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: '#6e7681', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+              >
+                <ScrollText size={12} /> Prompts
+              </button>
+            )}
+          >
             <EditableField
               value={post.postSynthesis ?? ''}
               onSave={save('postSynthesis')}
@@ -252,6 +268,14 @@ export const PostView = () => {
           </div>
         </div>
       </div>
+
+      {showPrompts && post.synthesisTrace && (
+        <PromptsModal
+          title={`@${post.username ?? 'post'} · synthesis`}
+          trace={post.synthesisTrace as any}
+          onClose={() => setShowPrompts(false)}
+        />
+      )}
     </div>
   );
 };

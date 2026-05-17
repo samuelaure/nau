@@ -111,6 +111,7 @@ export interface Post {
   olderPostId?: string | null;
   status?: string;
   postSynthesis?: string | null;
+  synthesisTrace?: Record<string, unknown> | null;
 }
 
 export interface SocialProfileDetails extends SocialProfile {
@@ -461,7 +462,7 @@ export const generateProfileIntelligence = async (socialProfileId: string, brand
 };
 
 export const getProfileSynthesis = async (socialProfileId: string) => {
-  const { data } = await api.get<{ id: string; content: string; postCountAtGeneration: number; generatedAt: string } | null>(
+  const { data } = await api.get<{ id: string; content: string; postCountAtGeneration: number; generatedAt: string; synthesisTrace?: Record<string, unknown> | null } | null>(
     `/social-profiles/${socialProfileId}/synthesis`,
   );
   return data;

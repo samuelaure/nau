@@ -689,13 +689,7 @@ const handleSynthesizeBatch = async (
 
     try {
       if (needsSourceConcepts) {
-        const result = await client.chatCompletion({
-          model,
-          temperature: 0.4,
-          messages: [
-            {
-              role: 'system',
-              content: `You extract reusable content intelligence from social media posts. Your output will be used by other content teams as raw inspiration material — not to describe the original post or its author.
+        const systemPrompt = `You extract reusable content intelligence from social media posts. Your output will be used by other content teams as raw inspiration material — not to describe the original post or its author.
 
 Produce two things:
 
@@ -705,8 +699,12 @@ Produce two things:
 
 Write all output in ${brandLanguage}.
 
-Return only valid JSON: { "synthesis": "...", "sourceConcepts": ["...", "..."] }`,
-            },
+Return only valid JSON: { "synthesis": "...", "sourceConcepts": ["...", "..."] }`;
+        const result = await client.chatCompletion({
+          model,
+          temperature: 0.4,
+          messages: [
+            { role: 'system', content: systemPrompt },
             { role: 'user', content: contentBlock },
           ],
           responseFormat: { type: 'json_object' },
@@ -725,7 +723,13 @@ Return only valid JSON: { "synthesis": "...", "sourceConcepts": ["...", "..."] }
           synthesis = result.content.trim();
         }
 
-        await prisma.post.update({ where: { id: post.id }, data: { postSynthesis: synthesis } });
+        await prisma.post.update({
+          where: { id: post.id },
+          data: {
+            postSynthesis: synthesis,
+            synthesisTrace: { systemPrompt, userMessage: contentBlock, model, generatedAt: new Date().toISOString() },
+          },
+        });
 
         if (sourceConcepts.length > 0) {
           await Promise.all(
@@ -742,21 +746,22 @@ Return only valid JSON: { "synthesis": "...", "sourceConcepts": ["...", "..."] }
           );
         }
       } else {
+        const systemPrompt = `You extract the core idea from a social media post in 1-3 sentences. Write the idea itself — not a description of it. Never mention the author, their products, their offers, or their prices. Ignore promotional or sales content. If the post is purely an offer or call to action with no underlying idea, return a single dash: -\n\nWrite all output in ${brandLanguage}.`;
         const result = await client.chatCompletion({
           model,
           temperature: 0.3,
           messages: [
-            {
-              role: 'system',
-              content: `You extract the core idea from a social media post in 1-3 sentences. Write the idea itself — not a description of it. Never mention the author, their products, their offers, or their prices. Ignore promotional or sales content. If the post is purely an offer or call to action with no underlying idea, return a single dash: -\n\nWrite all output in ${brandLanguage}.`,
-            },
+            { role: 'system', content: systemPrompt },
             { role: 'user', content: contentBlock },
           ],
         });
 
         await prisma.post.update({
           where: { id: post.id },
-          data: { postSynthesis: result.content.trim() },
+          data: {
+            postSynthesis: result.content.trim(),
+            synthesisTrace: { systemPrompt, userMessage: contentBlock, model, generatedAt: new Date().toISOString() },
+          },
         });
       }
     } catch (err) {

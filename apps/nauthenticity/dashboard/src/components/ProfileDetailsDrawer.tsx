@@ -1,8 +1,9 @@
 import { createPortal } from 'react-dom'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { X, RefreshCw, Zap, ChevronDown, ChevronRight } from 'lucide-react'
+import { X, RefreshCw, Zap, ChevronDown, ChevronRight, ScrollText } from 'lucide-react'
 import { getProfileSynthesis, getProfileSourceConcepts, generateProfileIntelligence, dispatchSourceConcept } from '../lib/api'
+import { PromptsModal } from './PromptsModal'
 
 interface ProfileDetailsDrawerProps {
   socialProfileId: string
@@ -41,6 +42,7 @@ export const ProfileDetailsDrawer = ({ socialProfileId, username, brandId, showS
   const [synthOpen, setSynthOpen] = useState(true)
   const [profileConceptsOpen, setProfileConceptsOpen] = useState(true)
   const [postConceptsOpen, setPostConceptsOpen] = useState(false)
+  const [showPrompts, setShowPrompts] = useState(false)
 
   const { data: synthesis, isLoading: loadingSynthesis } = useQuery({
     queryKey: ['profile-synthesis', socialProfileId],
@@ -133,9 +135,19 @@ export const ProfileDetailsDrawer = ({ socialProfileId, username, brandId, showS
               ) : (
                 <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: '8px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <p style={{ margin: 0, fontSize: '0.875rem', color: '#c9d1d9', lineHeight: 1.65 }}>{synthesis.content}</p>
-                  <span style={{ fontSize: '0.72rem', color: '#6e7681' }}>
-                    Generated from {synthesis.postCountAtGeneration} posts · {new Date(synthesis.generatedAt).toLocaleDateString()}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.72rem', color: '#6e7681' }}>
+                      Generated from {synthesis.postCountAtGeneration} posts · {new Date(synthesis.generatedAt).toLocaleDateString()}
+                    </span>
+                    {(synthesis as any).synthesisTrace && (
+                      <button
+                        onClick={() => setShowPrompts(true)}
+                        style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: '#6e7681', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                      >
+                        <ScrollText size={11} /> Prompts
+                      </button>
+                    )}
+                  </div>
                 </div>
               )
             )}
@@ -216,6 +228,13 @@ export const ProfileDetailsDrawer = ({ socialProfileId, username, brandId, showS
       </div>
 
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+      {showPrompts && synthesis?.synthesisTrace && (
+        <PromptsModal
+          title={`@${username} · profile synthesis`}
+          trace={(synthesis as any).synthesisTrace}
+          onClose={() => setShowPrompts(false)}
+        />
+      )}
     </>,
     document.body,
   )
