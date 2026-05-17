@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   getProfileProgress,
   getAccounts,
@@ -31,6 +31,7 @@ import {
   Cpu,
   AlertCircle,
   Trash2,
+  ArrowLeft,
 } from 'lucide-react';
 import { AddAccountForm } from '../components/AddAccountForm';
 import React from 'react';
@@ -522,7 +523,9 @@ const PostRow = ({ post }: { post: PostProgress }) => {
 export const ProgressView = () => {
   const { data: accounts } = useQuery({ queryKey: ['accounts'], queryFn: getAccounts });
   const location = useLocation();
+  const navigate = useNavigate();
   const [selected, setSelected] = React.useState<string | null>(null);
+  const fromPath: string | undefined = (location.state as any)?.from;
   const [showQueues, setShowQueues] = React.useState(false);
 
   const { data: queueStatus } = useQuery({
@@ -576,7 +579,15 @@ export const ProgressView = () => {
           marginBottom: '1.5rem',
         }}
       >
-        <h2 style={{ margin: 0 }}>Ingestion Progress</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <button
+            onClick={() => fromPath ? navigate(fromPath) : navigate(-1)}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'none', border: 'none', color: '#58a6ff', cursor: 'pointer', padding: 0, fontSize: '0.875rem', fontWeight: 500 }}
+          >
+            <ArrowLeft size={16} /> Go back
+          </button>
+          <h2 style={{ margin: 0 }}>Ingestion Progress</h2>
+        </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <button

@@ -7,6 +7,7 @@ import {
   Lightbulb,
   MessageSquare,
   BarChart2,
+  Activity,
   LogOut,
   ChevronDown,
   Check,
@@ -213,6 +214,7 @@ export function Sidebar() {
               { label: 'Inspo', to: `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}/inspo`, icon: Lightbulb },
               { label: 'Comments', to: `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}/comments`, icon: MessageSquare },
               { label: 'Benchmark', to: `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}/benchmark`, icon: BarChart2 },
+              { label: 'Progress', to: `/progress`, icon: Activity },
               { label: 'Settings', to: `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}/settings`, icon: Settings },
               { label: 'Trash', to: `/workspaces/${activeWorkspaceId}/brands/${activeBrandId}/trash`, icon: Trash2 },
             ].map(({ label, to, icon: Icon }) => (

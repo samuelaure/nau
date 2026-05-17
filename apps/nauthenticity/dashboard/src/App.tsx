@@ -11,6 +11,7 @@ import { BrandLayout } from './pages/BrandLayout';
 import { ProjectLayout } from './pages/ProjectLayout';
 import { RequireAuth } from './components/RequireAuth';
 import { Sidebar } from './components/Sidebar';
+import { GlobalProgressBar } from './components/GlobalProgressBar';
 import './index.css';
 
 const queryClient = new QueryClient({
@@ -36,6 +37,7 @@ function App() {
                 <div className="app-layout">
                   <Sidebar />
                   <main className="main-content">
+                    <GlobalProgressBar />
                     <Routes>
                       <Route path="/workspaces" element={<WorkspacesList />} />
                       <Route path="/workspaces/:workspaceId/brands" element={<BrandsList />} />
