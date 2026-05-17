@@ -955,6 +955,27 @@ function CompositionModal({
             )
           })()}
 
+          {/* Schedule / Reschedule picker — appears inline right below the date button */}
+          {scheduling && (
+            <div className="flex flex-col gap-2 p-3 bg-white/5 rounded-lg">
+              <p className="text-xs text-text-secondary font-medium">
+                {isScheduled ? 'New date & time' : 'Pick a date & time'}
+              </p>
+              <input
+                type="datetime-local"
+                value={newDatetime}
+                onChange={(e) => setNewDatetime(e.target.value)}
+                className="bg-gray-950 border border-gray-800 text-white rounded px-3 py-2 text-sm"
+              />
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" size="sm" onClick={() => setScheduling(false)}>Cancel</Button>
+                <Button size="sm" disabled={!newDatetime || actioning} onClick={handleSchedule}>
+                  {actioning ? <Loader2 size={13} className="animate-spin" /> : (isScheduled ? 'Reschedule' : 'Schedule')}
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* ── REEL layout ─────────────────────────────────────────────────── */}
           {REEL_FAMILY.has(comp.format) && (() => {
             const hasVideo = !!(comp.videoUrl || comp.renderedVideoUrl)
@@ -1068,26 +1089,6 @@ function CompositionModal({
             <IdeaToggle ideaText={comp.ideaText} />
           )}
 
-          {/* Schedule / Reschedule picker */}
-          {scheduling && (
-            <div className="flex flex-col gap-2 p-3 bg-white/5 rounded-lg">
-              <p className="text-xs text-text-secondary font-medium">
-                {isScheduled ? 'New date & time' : 'Pick a date & time'}
-              </p>
-              <input
-                type="datetime-local"
-                value={newDatetime}
-                onChange={(e) => setNewDatetime(e.target.value)}
-                className="bg-gray-950 border border-gray-800 text-white rounded px-3 py-2 text-sm"
-              />
-              <div className="flex gap-2 justify-end">
-                <Button variant="outline" size="sm" onClick={() => setScheduling(false)}>Cancel</Button>
-                <Button size="sm" disabled={!newDatetime || actioning} onClick={handleSchedule}>
-                  {actioning ? <Loader2 size={13} className="animate-spin" /> : (isScheduled ? 'Reschedule' : 'Schedule')}
-                </Button>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Re-compose panel */}
