@@ -163,8 +163,10 @@ export class IntelligenceService {
       })
       absorbedPostCount += absorbedCount
 
+      // Always scrape on new membership; only skip if re-added and scraped recently.
       const staleThreshold = new Date(Date.now() - RECENT_SCRAPE_THRESHOLD_DAYS * 24 * 60 * 60 * 1000)
-      if (!profile.lastScrapedAt || profile.lastScrapedAt < staleThreshold) {
+      const isNewMembership = !existing
+      if (isNewMembership || !profile.lastScrapedAt || profile.lastScrapedAt < staleThreshold) {
         const queued = await this.ingestion.tryQueueIngestion(username, 30)
         if (queued) scrapeQueued = true
       }
