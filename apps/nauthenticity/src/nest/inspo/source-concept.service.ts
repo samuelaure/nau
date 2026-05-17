@@ -303,32 +303,63 @@ Each "content" is a paragraph (30–60 words) describing the concept clearly eno
     const brand = await this.prisma.brand.findUnique({ where: { id: brandId } })
     if (!brand) throw new NotFoundException('Brand not found')
 
-    // All INSPO post memberships for this brand where post has synthesis
-    const memberships = await this.prisma.categoryMembership.findMany({
+    const brandLanguage = brand.language ?? 'Spanish'
+
+    // Collect posts from post-level INSPO memberships
+    const postMemberships = await this.prisma.categoryMembership.findMany({
       where: { brandId, category: 'INSPO', isActive: true, postId: { not: null } },
-      include: { post: { select: { id: true, caption: true, postSynthesis: true } } },
+      select: { postId: true },
     })
 
-    // Exclude posts already linked to a SourceConceptSource
+    // Collect posts from profile-level INSPO memberships
+    const profileMemberships = await this.prisma.categoryMembership.findMany({
+      where: { brandId, category: 'INSPO', isActive: true, socialProfileId: { not: null } },
+      select: { socialProfileId: true },
+    })
+    const profileIds = profileMemberships.map((m) => m.socialProfileId!).filter(Boolean)
+    const profilePosts = profileIds.length > 0
+      ? await this.prisma.post.findMany({
+          where: { socialProfileId: { in: profileIds }, postSynthesis: { not: null } },
+          select: { id: true, caption: true, postSynthesis: true },
+        })
+      : []
+
+    const postLevelIds = new Set(postMemberships.map((m) => m.postId!))
+    const allPostIds = [...postLevelIds, ...profilePosts.map((p) => p.id)]
+
+    if (allPostIds.length === 0) return { generated: 0 }
+
+    // Exclude posts already linked to a SourceConceptSource for this brand
     const linkedPostIds = await this.prisma.sourceConceptSource
-      .findMany({ where: { postId: { not: null } }, select: { postId: true } })
+      .findMany({
+        where: { postId: { in: allPostIds }, sourceConcept: { brandId } },
+        select: { postId: true },
+      })
       .then((rows) => new Set(rows.map((r) => r.postId)))
 
-    const unprocessed = memberships.filter(
-      (m) => m.post?.postSynthesis && !linkedPostIds.has(m.postId),
-    )
+    // Build the full post list (deduplicated)
+    const postMap = new Map<string, { id: string; caption: string | null; postSynthesis: string | null }>()
+    for (const p of profilePosts) postMap.set(p.id, p)
+
+    if (postLevelIds.size > 0) {
+      const postLevelPosts = await this.prisma.post.findMany({
+        where: { id: { in: [...postLevelIds] }, postSynthesis: { not: null } },
+        select: { id: true, caption: true, postSynthesis: true },
+      })
+      for (const p of postLevelPosts) postMap.set(p.id, p)
+    }
+
+    const unprocessed = [...postMap.values()].filter((p) => !linkedPostIds.has(p.id))
 
     if (unprocessed.length === 0) return { generated: 0 }
 
     const { client, model } = getClientForFeature('synthesis')
     let generated = 0
 
-    // Process in batches of 10 to avoid overwhelming the LLM
     for (let i = 0; i < unprocessed.length; i += 10) {
       const batch = unprocessed.slice(i, i + 10)
       await Promise.all(
-        batch.map(async (m) => {
-          const post = m.post!
+        batch.map(async (post) => {
           const contentBlock = [
             post.postSynthesis && `Synthesis: ${post.postSynthesis}`,
             post.caption && `Caption: ${post.caption}`,
@@ -341,7 +372,12 @@ Each "content" is a paragraph (30–60 words) describing the concept clearly eno
               messages: [
                 {
                   role: 'system',
-                  content: `You are a content strategist. Given a social media post synthesis (and optional caption), extract 1-3 distinct source concepts (each 30-60 words) that could independently drive a separate content ideation batch. Each concept must be self-contained and actionable.
+                  content: `You extract reusable content intelligence from a social media post synthesis. Your output will be used by other content teams as inspiration material — it must be completely detached from the original author.
+
+Extract 1-3 distinct content angles (30-60 words each) that any brand could use as a starting point for their own content. Each concept must be self-contained and independent of the original author or their business. Exclude anything tied to personal branding, offers, pricing, or promotion.
+
+Write all output in ${brandLanguage}.
+
 Return JSON: { "sourceConcepts": ["...", "..."] }`,
                 },
                 { role: 'user', content: contentBlock },

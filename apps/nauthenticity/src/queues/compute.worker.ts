@@ -658,14 +658,22 @@ const handleSynthesizeBatch = async (
       transcript && `Transcript: ${transcript}`,
     ].filter(Boolean).join('\n');
 
-    // Collect all brands that need source concepts for this post
-    const [inspoMemberships, ownedBrandId] = await Promise.all([
+    // Collect all brands that need source concepts for this post.
+    // Memberships can be either post-level (postId) or profile-level (socialProfileId).
+    const [postInspoMemberships, profileInspoMemberships, ownedBrandId] = await Promise.all([
       prisma.categoryMembership.findMany({
         where: { postId: post.id, category: 'INSPO', isActive: true, brandId: { not: null } },
         select: { brandId: true },
       }),
+      post.socialProfileId
+        ? prisma.categoryMembership.findMany({
+            where: { socialProfileId: post.socialProfileId, category: 'INSPO', isActive: true, brandId: { not: null } },
+            select: { brandId: true },
+          })
+        : Promise.resolve([]),
       post.socialProfileId ? getOwnedBrandId(post.socialProfileId) : Promise.resolve(null),
     ]);
+    const inspoMemberships = [...postInspoMemberships, ...profileInspoMemberships];
 
     const sourceBrandIds = new Set<string>();
     for (const m of inspoMemberships) if (m.brandId) sourceBrandIds.add(m.brandId);
