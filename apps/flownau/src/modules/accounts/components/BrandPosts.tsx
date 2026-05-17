@@ -401,6 +401,40 @@ const handleSavePrompt = async (text: string) => {
 
   const selectAll = () => setSelected(new Set(ideas.map(i => i.id)))
 
+  const selectBatch = (batchIdeas: any[]) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      for (const idea of batchIdeas) next.add(idea.id)
+      return next
+    })
+  }
+
+  // Group ideas by generationBatchId, newest batch first
+  const batches: { batchId: string | null; label: string; ideas: any[] }[] = (() => {
+    const map = new Map<string, any[]>()
+    for (const idea of ideas) {
+      const key = idea.generationBatchId ?? '__manual__'
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(idea)
+    }
+    return [...map.entries()]
+      .map(([key, batchIdeas]) => {
+        const newest = batchIdeas.reduce((a, b) =>
+          new Date(a.createdAt) > new Date(b.createdAt) ? a : b,
+        )
+        const date = new Date(newest.createdAt)
+        const label = key === '__manual__'
+          ? 'Individual & Captured'
+          : date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+        return { batchId: key === '__manual__' ? null : key, label, ideas: batchIdeas, _newestMs: date.getTime() }
+      })
+      .sort((a, b) => {
+        if (a.batchId === null) return 1
+        if (b.batchId === null) return -1
+        return b._newestMs - a._newestMs
+      })
+  })()
+
   // ── Actions ─────────────────────────────────────────────────────────────────
 
   const handleDelete = async (id: string) => {
@@ -632,6 +666,15 @@ const handleSavePrompt = async (text: string) => {
           <p className="text-xs text-text-secondary">Captured ideas first, then manual, then automatic.</p>
         </div>
         <div className="flex flex-wrap gap-2 items-center">
+          {ideas.length > 0 && (
+            selected.size === ideas.length
+              ? <button onClick={clearSelection} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-white/10 text-text-secondary hover:text-white hover:bg-white/5 transition-colors">
+                  <Square size={12} /> Clear selection
+                </button>
+              : <button onClick={selectAll} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-white/10 text-text-secondary hover:text-white hover:bg-white/5 transition-colors">
+                  <CheckSquare size={12} /> Select all
+                </button>
+          )}
           <button
             onClick={() => { setPromptDraft(ideationCustomPrompt); setPromptModalOpen(true) }}
             className={cn(
@@ -659,7 +702,6 @@ const handleSavePrompt = async (text: string) => {
       {selected.size > 0 && (
         <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-accent/10 border border-accent/20 text-sm">
           <span className="text-accent font-medium">{selected.size} selected</span>
-          <button onClick={selectAll} className="text-text-secondary hover:text-white text-xs transition-colors">Select all</button>
           <button onClick={clearSelection} className="text-text-secondary hover:text-white text-xs transition-colors">Clear</button>
           <div className="flex-1" />
           <Button
@@ -693,9 +735,24 @@ const handleSavePrompt = async (text: string) => {
         </div>
       )}
 
-      {/* Grid */}
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
-        {ideas.map((idea) => {
+      {/* Ideas grouped by batch */}
+      {batches.map(({ batchId, label, ideas: batchIdeas }) => {
+        const allSelected = batchIdeas.every(i => selected.has(i.id))
+        return (
+          <div key={batchId ?? '__manual__'} className="flex flex-col gap-3">
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] font-semibold text-text-secondary uppercase tracking-wider whitespace-nowrap">{label}</span>
+              <div className="flex-1 h-px bg-white/5" />
+              <span className="text-[11px] text-text-secondary">{batchIdeas.length} idea{batchIdeas.length !== 1 ? 's' : ''}</span>
+              <button
+                onClick={() => allSelected ? batchIdeas.forEach(i => setSelected(prev => { const n = new Set(prev); n.delete(i.id); return n })) : selectBatch(batchIdeas)}
+                className="text-[11px] text-text-secondary hover:text-white transition-colors whitespace-nowrap"
+              >
+                {allSelected ? 'Deselect' : 'Select batch'}
+              </button>
+            </div>
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
+        {batchIdeas.map((idea) => {
           const isUsed = idea.status === 'USED'
           const isPending = idea.status === 'IDEA_PENDING'
           const isSelected = selected.has(idea.id)
@@ -779,7 +836,10 @@ const handleSavePrompt = async (text: string) => {
             </Card>
           )
         })}
-      </div>
+            </div>
+          </div>
+        )
+      })}
 
       {/* ── Idea detail modal ─────────────────────────────────────────────────── */}
       <IdeaModal
