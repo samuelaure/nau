@@ -284,6 +284,10 @@ Each "content" is a paragraph (30–60 words) describing the concept clearly eno
     }))
   }
 
+  async getById(id: string) {
+    return this.prisma.sourceConcept.findUnique({ where: { id } })
+  }
+
   async markConsumed(id: string) {
     const concept = await this.prisma.sourceConcept.findUnique({ where: { id } })
     if (!concept) throw new NotFoundException('SourceConcept not found')

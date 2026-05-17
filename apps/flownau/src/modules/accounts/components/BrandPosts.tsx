@@ -31,6 +31,7 @@ import {
   X,
   Shuffle,
   ScrollText,
+  Lightbulb,
 } from 'lucide-react'
 import Modal from '@/modules/shared/components/Modal'
 import PromptsModal from './PromptsModal'
@@ -329,6 +330,17 @@ export default function BrandPosts({ brandId, workspaceId }: { brandId: string; 
   const [editText, setEditText] = useState('')
   const [savingEdit, setSavingEdit] = useState(false)
   const [deletingIdea, setDeletingIdea] = useState(false)
+  const [sourceConceptCache, setSourceConceptCache] = useState<Record<string, string | null>>({})
+  const [activeSourceConceptId, setActiveSourceConceptId] = useState<string | null>(null)
+
+  const toggleSourceConcept = async (id: string) => {
+    if (activeSourceConceptId === id) { setActiveSourceConceptId(null); return }
+    setActiveSourceConceptId(id)
+    if (id in sourceConceptCache) return
+    const res = await fetch(`/api/source-concepts/${id}`)
+    const data = res.ok ? await res.json() : null
+    setSourceConceptCache(prev => ({ ...prev, [id]: data?.content ?? null }))
+  }
 
   const fetchIdeationPrompt = async () => {
     try {
@@ -738,12 +750,25 @@ const handleSavePrompt = async (text: string) => {
       {/* Ideas grouped by batch */}
       {batches.map(({ batchId, label, ideas: batchIdeas }) => {
         const allSelected = batchIdeas.every(i => selected.has(i.id))
+        const batchSourceRef = batchIdeas[0]?.sourceRef ?? null
+        const isConceptOpen = batchSourceRef && activeSourceConceptId === batchSourceRef
+        const conceptText = batchSourceRef ? sourceConceptCache[batchSourceRef] : undefined
         return (
           <div key={batchId ?? '__manual__'} className="flex flex-col gap-3">
             <div className="flex items-center gap-3">
               <span className="text-[11px] font-semibold text-text-secondary uppercase tracking-wider whitespace-nowrap">{label}</span>
               <div className="flex-1 h-px bg-white/5" />
               <span className="text-[11px] text-text-secondary">{batchIdeas.length} idea{batchIdeas.length !== 1 ? 's' : ''}</span>
+              {batchSourceRef && (
+                <button
+                  onClick={() => toggleSourceConcept(batchSourceRef)}
+                  className={cn('inline-flex items-center gap-1 text-[11px] transition-colors whitespace-nowrap', isConceptOpen ? 'text-accent' : 'text-text-secondary hover:text-white')}
+                  title="View source concept"
+                >
+                  <Lightbulb size={11} />
+                  Source
+                </button>
+              )}
               <button
                 onClick={() => allSelected ? batchIdeas.forEach(i => setSelected(prev => { const n = new Set(prev); n.delete(i.id); return n })) : selectBatch(batchIdeas)}
                 className="text-[11px] text-text-secondary hover:text-white transition-colors whitespace-nowrap"
@@ -751,6 +776,11 @@ const handleSavePrompt = async (text: string) => {
                 {allSelected ? 'Deselect' : 'Select batch'}
               </button>
             </div>
+            {isConceptOpen && (
+              <div className="text-[12px] text-text-secondary bg-white/5 border border-white/10 rounded-lg px-3 py-2 leading-relaxed">
+                {conceptText === undefined ? 'Loading…' : conceptText ?? 'Concept not found.'}
+              </div>
+            )}
             <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
         {batchIdeas.map((idea) => {
           const isUsed = idea.status === 'USED'

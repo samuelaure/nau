@@ -21,6 +21,13 @@ export class SourceConceptController {
     return this.sourceConceptService.listPending(brandId)
   }
 
+  // Service-to-service: fetch a single concept by ID (used by flownau to show source on idea batches)
+  @Get('_service/source-concepts/:id')
+  @UseGuards(ServiceAuthGuard)
+  getOne(@Param('id') id: string) {
+    return this.sourceConceptService.getById(id)
+  }
+
   // Service-to-service: flownau gets concepts — returns pending pool or generates new if empty
   @Get('_service/brands/:brandId/source-concepts')
   @UseGuards(ServiceAuthGuard)
