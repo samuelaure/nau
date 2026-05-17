@@ -250,6 +250,7 @@ export const BrandCategoryLayout = ({
           <ProfileDetail
             backLabel={`Back to ${title} Profiles`}
             backPath="../profiles"
+            brandId={brandId ?? undefined}
             showSourceConcepts={category === 'INSPO'}
             renderPostActions={category === 'INSPO' ? (post) => (
               <div style={{ position: 'absolute', bottom: '6px', left: '6px', zIndex: 10 }}>

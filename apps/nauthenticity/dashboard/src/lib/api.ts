@@ -455,6 +455,11 @@ export const updateInspoItem = async (id: string, brandId: string, updates: any)
   return data;
 };
 
+export const generateProfileIntelligence = async (socialProfileId: string, brandId: string) => {
+  const { data } = await api.post(`/social-profiles/${socialProfileId}/intelligence/generate`, { brandId });
+  return data;
+};
+
 export const getProfileSynthesis = async (socialProfileId: string) => {
   const { data } = await api.get<{ id: string; content: string; postCountAtGeneration: number; generatedAt: string } | null>(
     `/social-profiles/${socialProfileId}/synthesis`,

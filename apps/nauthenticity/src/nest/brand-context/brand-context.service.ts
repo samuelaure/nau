@@ -153,7 +153,7 @@ export class BrandContextService {
       if (!brand) throw new Error(`Brand ${brandId} not found`)
 
       // Load sources in parallel
-      const [ownedPosts, inspoPosts, previousCtx] = await Promise.all([
+      const [ownedPosts, directInspoPosts, inspoProfileMemberships, previousCtx] = await Promise.all([
         sources.ownedProfile
           ? this.prisma.post.findMany({
               where: { socialProfile: { ownerId: brandId } },
@@ -170,14 +170,47 @@ export class BrandContextService {
               take: 20,
             })
           : Promise.resolve([] as Array<{ post: { url: string | null; caption: string | null } | null }>),
+        sources.inspoBase
+          ? this.prisma.categoryMembership.findMany({
+              where: { brandId, category: 'INSPO', postId: null, socialProfileId: { not: null } },
+              select: { socialProfileId: true },
+              orderBy: { createdAt: 'desc' },
+              take: 10,
+            })
+          : Promise.resolve([] as Array<{ socialProfileId: string | null }>),
         sources.previousContext
           ? this.prisma.brandContext.findUnique({ where: { brandId }, select: { content: true } })
           : Promise.resolve(null),
       ])
 
-      const inspoPostsForLLM = inspoPosts
-        .filter((m): m is { post: { url: string | null; caption: string | null } } => !!m.post)
-        .map((m) => ({ url: m.post.url ?? null, caption: m.post.caption ?? null }))
+      // Fetch posts from inspo profile memberships (higher weight — sample more per profile)
+      const profilePostsRaw = inspoProfileMemberships.length > 0
+        ? await this.prisma.post.findMany({
+            where: {
+              socialProfileId: { in: inspoProfileMemberships.map((m) => m.socialProfileId!).filter(Boolean) },
+              caption: { not: null },
+            },
+            select: { url: true, caption: true },
+            orderBy: { postedAt: 'desc' },
+            take: 30,
+          })
+        : []
+
+      const inspoPostsForLLM = [
+        ...directInspoPosts
+          .filter((m): m is { post: { url: string | null; caption: string | null } } => !!m.post)
+          .map((m) => ({ url: m.post.url ?? null, caption: m.post.caption ?? null })),
+        ...profilePostsRaw.map((p) => ({ url: p.url ?? null, caption: p.caption ?? null })),
+      ]
+
+      // deduplicate by url
+      const seen = new Set<string>()
+      const inspoPosts = inspoPostsForLLM.filter((p) => {
+        if (!p.url) return true
+        if (seen.has(p.url)) return false
+        seen.add(p.url)
+        return true
+      }).slice(0, 40)
 
       const brandRecord = await this.prisma.brand.findUnique({ where: { id: brandId }, select: { language: true } })
       const context = await this.callLLM({
@@ -186,7 +219,7 @@ export class BrandContextService {
         manual: sources.manual,
         previousContext: previousCtx?.content ?? null,
         ownedPosts,
-        inspoPosts: inspoPostsForLLM,
+        inspoPosts,
       })
 
       await this.saveContext(brandId, context)

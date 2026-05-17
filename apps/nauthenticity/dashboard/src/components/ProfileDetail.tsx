@@ -11,11 +11,12 @@ import { ProfileDetailsDrawer } from './ProfileDetailsDrawer'
 interface ProfileDetailProps {
   backLabel: string
   backPath: string
+  brandId?: string
   renderPostActions?: (post: any) => React.ReactNode
   showSourceConcepts?: boolean
 }
 
-export const ProfileDetail = ({ backLabel, backPath, renderPostActions, showSourceConcepts = false }: ProfileDetailProps) => {
+export const ProfileDetail = ({ backLabel, backPath, brandId, renderPostActions, showSourceConcepts = false }: ProfileDetailProps) => {
   const { username } = useParams<{ username: string }>()
   const navigate = useNavigate()
   const [sort, setSort] = React.useState<'recent' | 'oldest' | 'likes' | 'comments'>('recent')
@@ -117,6 +118,7 @@ export const ProfileDetail = ({ backLabel, backPath, renderPostActions, showSour
         <ProfileDetailsDrawer
           socialProfileId={account.id}
           username={account.username}
+          brandId={brandId}
           showSourceConcepts={showSourceConcepts}
           onClose={() => setDetailsOpen(false)}
         />

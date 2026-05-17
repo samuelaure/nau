@@ -16,7 +16,6 @@ import type { Response } from 'express'
 import { ContentService } from './content.service'
 import { ProfileSynthesisService } from './profile-synthesis.service'
 import { AnyAuthGuard } from '../auth/any-auth.guard'
-import { ServiceAuthGuard } from '../auth/service-auth.guard'
 
 @Controller()
 @UseGuards(AnyAuthGuard)
@@ -97,9 +96,13 @@ export class ContentController {
   }
 
   @Post('social-profiles/:id/synthesis/generate')
-  @UseGuards(ServiceAuthGuard)
   generateProfileSynthesis(@Param('id') id: string) {
     return this.profileSynthesisService.generateForProfile(id)
+  }
+
+  @Post('social-profiles/:id/intelligence/generate')
+  generateProfileIntelligence(@Param('id') id: string, @Body() body: { brandId: string }) {
+    return this.profileSynthesisService.generateIntelligence(id, body.brandId)
   }
 
   @Patch('social-profiles/:id/synthesis/threshold')
