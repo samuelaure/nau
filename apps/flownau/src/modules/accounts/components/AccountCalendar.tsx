@@ -1558,14 +1558,52 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <div>
-          <h3 className="text-xl font-heading font-semibold">Content Calendar</h3>
-          <p className="text-xs text-text-secondary">
-            Click any composition to view details or take action.
-          </p>
+      <div className="flex flex-col gap-3">
+        {/* Title + week navigation */}
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <h3 className="text-xl font-heading font-semibold">Content Calendar</h3>
+            <p className="text-xs text-text-secondary">
+              Click any composition to view details or take action.
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setWeekStart(startOfWeek(new Date()))}
+              className="text-xs"
+            >
+              Today
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setWeekStart((d) => addDays(d, -7))}
+              className="px-2"
+            >
+              <ChevronLeft size={16} />
+            </Button>
+            <span className="text-xs sm:text-sm text-white text-center whitespace-nowrap">
+              {weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} –{' '}
+              {addDays(weekStart, 6).toLocaleDateString('en-GB', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+              })}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setWeekStart((d) => addDays(d, 7))}
+              className="px-2"
+            >
+              <ChevronRight size={16} />
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+        {/* Action buttons row */}
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => { setDraftCustomPromptDraft(draftCustomPrompt); setDraftCustomPromptModalOpen(true) }}
             className={cn(
@@ -1597,38 +1635,6 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
             {runningCoverage ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
             {runningCoverage ? 'Running…' : 'Fill Calendar'}
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setWeekStart(startOfWeek(new Date()))}
-            className="text-xs"
-          >
-            Today
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setWeekStart((d) => addDays(d, -7))}
-            className="px-2"
-          >
-            <ChevronLeft size={16} />
-          </Button>
-          <span className="text-sm text-white min-w-[160px] text-center">
-            {weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} –{' '}
-            {addDays(weekStart, 6).toLocaleDateString('en-GB', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-            })}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setWeekStart((d) => addDays(d, 7))}
-            className="px-2"
-          >
-            <ChevronRight size={16} />
-          </Button>
         </div>
       </div>
 
@@ -1653,7 +1659,8 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
           Loading...
         </div>
       ) : (
-        <div className="grid grid-cols-7 gap-1 min-h-[480px]">
+        <div className="overflow-x-auto -mx-1 px-1 pb-1">
+        <div className="grid grid-cols-7 gap-1 min-h-[480px] min-w-[560px]">
           {weekDays.map((day) => {
             const isToday = isSameDay(day, today)
             const dayComps = forDay(day)
@@ -1722,6 +1729,7 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
               </div>
             )
           })}
+        </div>
         </div>
       )}
 
