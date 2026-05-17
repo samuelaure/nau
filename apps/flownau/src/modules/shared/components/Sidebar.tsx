@@ -15,6 +15,11 @@ import {
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { BrandSwitcher } from './BrandSwitcher'
 
+interface SidebarProps {
+  open?: boolean
+  onClose?: () => void
+}
+
 type NauWorkspace = { id: string; name: string }
 
 // ─── Workspace selector ───────────────────────────────────────────────────────
@@ -281,7 +286,7 @@ function WorkspaceSelector() {
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
-export default function Sidebar() {
+export default function Sidebar({ open = false, onClose }: SidebarProps) {
   const router = useRouter()
   const pathname = usePathname()
 
@@ -320,18 +325,23 @@ export default function Sidebar() {
 
   return (
     <div
-      className="glass"
-      style={{
-        width: '280px',
-        height: 'calc(100vh - 40px)',
-        margin: '20px',
-        display: 'flex',
-        flexDirection: 'column',
-        padding: '24px',
-        position: 'fixed',
-      }}
+      className={[
+        // Base
+        'fixed z-50 flex flex-col transition-transform duration-300 ease-in-out',
+        // Mobile: full-height flush drawer, rounded right edge
+        'top-0 left-0 h-dvh rounded-r-2xl',
+        // Mobile: glass + border on visible side only
+        'backdrop-blur-xl border-r border-white/[0.08]',
+        'bg-[rgba(26,26,26,0.97)]',
+        // Desktop: restore original floating card look
+        'md:rounded-2xl md:border md:m-5 md:h-[calc(100vh-40px)] md:bg-[rgba(26,26,26,0.8)]',
+        // Slide in/out on mobile; always visible on desktop
+        open ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+      ].join(' ')}
+      style={{ width: '280px', padding: '24px' }}
     >
-      {/* Logo */}
+
+      {/* Logo row — includes close button on mobile */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px' }}>
         <div style={{ padding: '8px', background: 'var(--accent-color)', borderRadius: '8px' }}>
           <Video size={20} color="white" />
@@ -342,10 +352,19 @@ export default function Sidebar() {
             fontSize: '20px',
             fontFamily: 'Outfit',
             textTransform: 'lowercase',
+            flex: 1,
           }}
         >
           flownaŭ
         </span>
+        {/* Close button — mobile only */}
+        <button
+          className="md:hidden p-1.5 rounded-lg text-text-secondary hover:text-white hover:bg-white/5 transition-colors"
+          onClick={onClose}
+          aria-label="Close menu"
+        >
+          <X size={18} />
+        </button>
       </div>
 
       {/* Workspace selector */}
