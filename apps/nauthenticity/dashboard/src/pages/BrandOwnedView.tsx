@@ -386,7 +386,7 @@ export const BrandOwnedView = () => {
 
       <Routes>
         <Route path="profiles" element={<ProfilesTab brandId={brandId} />} />
-        <Route path="profiles/:username" element={<ProfileDetail backLabel="Back to Owned Profiles" backPath="../profiles" />} />
+        <Route path="profiles/:username" element={<ProfileDetail backLabel="Back to Owned Profiles" backPath="../profiles" brandId={brandId} showSourceConcepts />} />
         <Route path="*" element={<Navigate to="profiles" replace />} />
       </Routes>
     </div>
