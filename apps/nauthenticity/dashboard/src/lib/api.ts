@@ -461,11 +461,19 @@ export const generateProfileIntelligence = async (socialProfileId: string, brand
   return data;
 };
 
+export interface ProfileSynthesis {
+  id: string;
+  content: string;
+  postCountAtGeneration: number;
+  generatedAt: string;
+  synthesisTrace?: Record<string, unknown> | null;
+}
+
 export const getProfileSynthesis = async (socialProfileId: string) => {
-  const { data } = await api.get<{ id: string; content: string; postCountAtGeneration: number; generatedAt: string; synthesisTrace?: Record<string, unknown> | null } | null>(
+  const { data } = await api.get<{ synthesis: ProfileSynthesis | null; history: ProfileSynthesis[] }>(
     `/social-profiles/${socialProfileId}/synthesis`,
   );
-  return data;
+  return data.synthesis;
 };
 
 export interface ProfileSourceConcept {
