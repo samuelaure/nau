@@ -42,13 +42,18 @@ export class ProfileSynthesisService {
       .map((p, i) => `${i + 1}. ${p.postSynthesis}`)
       .join('\n')
 
-    const systemPrompt = `You are a content distiller. You receive condensed summaries of posts from a single social media profile. Write a holistic profile synthesis that reads like a direct representation of this creator's voice and worldview — not an analysis of it.
+    const systemPrompt = `You extract reusable content intelligence from a set of post summaries. Your output will be used by other content teams as inspiration — it must be completely detached from the original author.
 
-Capture: the recurring ideas and arguments they make, the specific language and framing they use, their point of view, and what they consistently stand for or against.
+Write a dense paragraph that captures the recurring ideas, arguments, perspectives, and content angles present across the posts. Focus entirely on the IDEAS: what topics are explored, what positions are taken, what tensions are surfaced, what frames and metaphors recur.
 
-Write in continuous prose, in the same register as the content itself. Be concrete and specific — no generic observations. No meta-language like "este perfil aborda" or "el creador habla de".`
+Rules:
+- Never mention the author, their name, their account, or anything that identifies them
+- Exclude all commercial content: offers, pricing, services, products, CTAs, promotions
+- Do not describe the content — express the ideas directly
+- No meta-language ("these posts explore", "the author argues") — state the ideas themselves
+- Write in continuous prose, concrete and specific`
 
-    const userMessage = `## Profile: @${profile.username}\n\n## Post Syntheses (${posts.length} posts)\n${synthesisList}\n\nWrite the profile synthesis.`
+    const userMessage = `## Post Summaries (${posts.length} posts)\n${synthesisList}\n\nWrite the idea synthesis.`
 
     const { client, model } = getClientForFeature('synthesis')
     const result = await client.chatCompletion({
@@ -134,17 +139,19 @@ Write in continuous prose, in the same register as the content itself. Be concre
 
     const language = brand.language ?? 'Spanish'
 
-    const systemPrompt = `You are a content distiller. You receive condensed summaries of up to 30 posts from a single social media profile. Produce two outputs in one JSON response:
+    const systemPrompt = `You extract reusable content intelligence from a set of post summaries. Your output will be used by other content teams as inspiration material — it must be completely detached from the original author.
 
-1. "synthesis" — a holistic profile synthesis that reads like a direct representation of this creator's voice and worldview, not an analysis of it. Capture: the recurring ideas and arguments they make, the specific language and framing they use, their point of view, what they consistently stand for or against. Write in continuous prose, in the same register as the content. No meta-language like "este perfil aborda" or "el creador habla de". Be concrete and specific.
+Produce two outputs:
 
-2. "concepts" — an array of distinct, actionable source concepts (each 30-60 words) derived from the profile's actual ideas. Each concept must be self-contained and rich enough to drive an independent ideation batch. Quality over quantity.
+1. "synthesis" — a dense paragraph capturing the recurring ideas, arguments, perspectives, and content angles present across the posts. Focus entirely on the IDEAS: what topics are explored, what positions are taken, what tensions are surfaced, what frames and metaphors recur. Never mention the author, their name, their identity, or anything that identifies them. Exclude all commercial content: offers, pricing, services, products, CTAs. Do not describe the content — express the ideas directly. No meta-language. Concrete and specific.
 
-Write all text in ${language}.
+2. "concepts" — an array of distinct content angles (30-60 words each) that any brand could use as a starting point for their own content, derived from the ideas above. Each concept must be self-contained and independent of the original author or their business. A good concept poses a clear argument, tension, or perspective that could inspire original content. Exclude anything tied to personal branding, offers, or promotion. Quality over quantity — only include concepts strong enough to independently drive an ideation batch.
+
+Write all output in ${language}.
 
 Return JSON: { "synthesis": "...", "concepts": [{ "content": "..." }, ...] }`
 
-    const userMessage = `## Profile: @${profile.username}\n\n## Post Syntheses (${posts.length} posts)\n${postLines}\n\nGenerate synthesis and source concepts.`
+    const userMessage = `## Post Summaries (${posts.length} posts)\n${postLines}\n\nGenerate idea synthesis and source concepts.`
 
     const { client, model } = getClientForFeature('synthesis')
     const result = await client.chatCompletion({

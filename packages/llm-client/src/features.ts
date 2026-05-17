@@ -49,7 +49,7 @@ const DEFAULT_FEATURE_MODELS: Record<LLMFeature, string> = {
   journal_summary:     'openai/gpt-4o',
   comment_suggestions: 'openai/gpt-4o-mini',
   post_intelligence:   'openai/gpt-4o-mini',
-  synthesis:           'openai/gpt-4o',
+  synthesis:           'openai/gpt-4o-mini',
   benchmark:           'openai/gpt-4o-mini',
   embedding:           'openai/text-embedding-3-small',
   transcription:       'groq/whisper-large-v3-turbo',

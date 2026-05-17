@@ -687,10 +687,13 @@ const handleSynthesizeBatch = async (
           messages: [
             {
               role: 'system',
-              content: `You are a content distiller. Given a social media post, produce two things:
+              content: `You extract reusable content intelligence from social media posts. Your output will be used by other content teams as raw inspiration material — not to describe the original post or its author.
 
-1. "synthesis": an executive summary of the post's actual message — written as a direct, condensed version of what the post says, not a description of it. Use the same voice and perspective as the original. Never write "el post habla de" or "el contenido aborda" — instead, just say what it says. Keep it tight: 1-3 sentences max.
-2. "sourceConcepts": an array of 1-3 distinct content angles (each 30-60 words) that could independently drive a separate ideation batch. Each concept must be self-contained and actionable.
+Produce two things:
+
+1. "synthesis": a tight 1-3 sentence distillation of the core idea or argument in the post. Write the idea itself, not a description of it. Never mention the author, their account, their products, their prices, or any offer. Ignore promotional or sales content entirely — extract only the underlying idea or perspective being expressed.
+
+2. "sourceConcepts": 1-3 distinct content angles (30-60 words each) derived from the post's ideas that any brand could use as a starting point for their own content. Each concept must stand on its own without reference to the original author or their business. Exclude anything tied to personal branding, service offers, pricing, or calls to action. Focus on the argument, the insight, the frame, or the point of view.
 
 Write all output in ${brandLanguage}.
 
@@ -737,7 +740,7 @@ Return only valid JSON: { "synthesis": "...", "sourceConcepts": ["...", "..."] }
           messages: [
             {
               role: 'system',
-              content: `You are a content distiller. Write an executive summary of the post's actual message — a direct, condensed version of what the post says, not a description of it. Use the same voice and perspective as the original. Never write "el post habla de", "el contenido aborda", or any meta-description. Just say what it says. 1-3 sentences max.\n\nWrite all output in ${brandLanguage}.`,
+              content: `You extract the core idea from a social media post in 1-3 sentences. Write the idea itself — not a description of it. Never mention the author, their products, their offers, or their prices. Ignore promotional or sales content. If the post is purely an offer or call to action with no underlying idea, return a single dash: -\n\nWrite all output in ${brandLanguage}.`,
             },
             { role: 'user', content: contentBlock },
           ],
