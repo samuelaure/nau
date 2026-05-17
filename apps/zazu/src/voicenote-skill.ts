@@ -10,6 +10,15 @@ const NAU_API_URL = process.env.NAU_API_URL ?? 'http://api:3000'
 
 type Brand = { id: string; name: string }
 
+function buildSummaryMessage(results: Array<{ brandName: string; ideaCount: number }>): string {
+  const lines = results.map((r) => `\\- ${r.ideaCount} nuevas ideas para *${escapeMarkdown(r.brandName)}*`)
+  return `✅ Captura enviada\\. Se generaron:\n${lines.join('\n')}`
+}
+
+function escapeMarkdown(text: string): string {
+  return text.replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&')
+}
+
 class VoicenoteSkillImpl implements ZazuSkill {
   id = 'voicenote-capture'
   name = 'Voicenote Capture'
@@ -24,7 +33,12 @@ class VoicenoteSkillImpl implements ZazuSkill {
     const user = ctx.dbUser
     const voice = (ctx.message as any).voice
 
-    await ctx.reply('🎙️ Procesando tu nota de voz...')
+    const statusMsg = await ctx.reply('🎙️ Procesando tu nota de voz...')
+    const chatId = statusMsg.chat.id
+    const msgId = statusMsg.message_id
+
+    const editStatus = (text: string) =>
+      ctx.telegram.editMessageText(chatId, msgId, undefined, text, { parse_mode: 'Markdown' }).catch(() => {})
 
     try {
       // Download from Telegram
@@ -58,17 +72,18 @@ class VoicenoteSkillImpl implements ZazuSkill {
       const brands: Brand[] = (wsResp.data as Array<{ brands: Brand[] }>).flatMap((w) => w.brands)
 
       if (brands.length === 0) {
-        await ctx.reply('No tienes marcas configuradas. Crea una marca primero.')
+        await editStatus('No tienes marcas configuradas. Crea una marca primero.')
         return
       }
 
       if (brands.length === 1) {
-        await this.dispatchToBrands(voicenote.id, cleanTranscription, synthesis, [brands[0].id])
-        await ctx.reply(`✅ Captura enviada a *${brands[0].name}*. Las ideas se están generando.`, { parse_mode: 'Markdown' })
+        await editStatus(`⏳ Enviando captura a *${brands[0].name}*\\.\\.\\.`)
+        const results = await this.dispatchToBrands(voicenote.id, cleanTranscription, synthesis, brands)
+        await editStatus(buildSummaryMessage(results))
         return
       }
 
-      // Multi-brand selection keyboard
+      // Multi-brand selection keyboard — processing message stays, keyboard is a new message
       ctx.session ??= {}
       ctx.session.pendingVoicenoteId = voicenote.id
       ctx.session.pendingVoicenoteClean = cleanTranscription
@@ -76,12 +91,14 @@ class VoicenoteSkillImpl implements ZazuSkill {
       ctx.session.pendingVoicenoteBrands = brands
       ctx.session.selectedVoicenoteBrandIds = []
 
+      await editStatus('🎙️ Nota procesada. ¿A qué marca\\(s\\) enviamos esta captura?')
+
       const brandButtons = brands.map((b) => ([{
         text: `☐ ${b.name}`,
         callback_data: `vnote_brand_${b.id}`,
       }]))
 
-      await ctx.reply('¿A qué marca(s) enviamos esta captura?', {
+      await ctx.reply('Selecciona marca(s):', {
         reply_markup: {
           inline_keyboard: [
             ...brandButtons,
@@ -94,7 +111,7 @@ class VoicenoteSkillImpl implements ZazuSkill {
       })
     } catch (err) {
       logger.error({ err }, '[VoicenoteSkill] Error processing voicenote')
-      await ctx.reply('❌ Error al procesar la nota de voz. Intenta de nuevo.')
+      await editStatus('❌ Error al procesar la nota de voz. Intenta de nuevo.')
     }
   }
 
@@ -102,20 +119,25 @@ class VoicenoteSkillImpl implements ZazuSkill {
     voicenoteId: string,
     cleanTranscription: string,
     synthesis: string,
-    brandIds: string[],
-  ): Promise<void> {
+    brands: Brand[],
+  ): Promise<Array<{ brandName: string; ideaCount: number }>> {
     const headers = await buildServiceHeaders('nauthenticity')
-    await Promise.all(
-      brandIds.map((brandId) =>
-        axios
-          .post(
-            `${NAUTHENTICITY_URL}/api/v1/_service/brands/${brandId}/voicenotes`,
+    const results = await Promise.all(
+      brands.map(async (brand) => {
+        try {
+          const res = await axios.post<{ ideaCount: number }>(
+            `${NAUTHENTICITY_URL}/api/v1/_service/brands/${brand.id}/voicenotes`,
             { cleanTranscription, synthesis, sourceRef: voicenoteId },
             { headers, timeout: 120_000 },
           )
-          .catch((err) => logger.error({ err, brandId }, '[VoicenoteSkill] Failed to dispatch to brand')),
-      ),
+          return { brandName: brand.name, ideaCount: res.data?.ideaCount ?? 0 }
+        } catch (err) {
+          logger.error({ err, brandId: brand.id }, '[VoicenoteSkill] Failed to dispatch to brand')
+          return { brandName: brand.name, ideaCount: 0 }
+        }
+      }),
     )
+    return results
   }
 }
 

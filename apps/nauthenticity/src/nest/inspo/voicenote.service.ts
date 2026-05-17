@@ -131,12 +131,12 @@ Return only valid JSON: { "cleanTranscription": "...", "synthesis": "..." }`,
       },
     })
 
-    const pushed = await this.pushConceptToFlownau(brandId, concept.id, concept.content)
-    if (!pushed) {
+    const ideaCount = await this.pushConceptToFlownau(brandId, concept.id, concept.content)
+    if (ideaCount === null) {
       this.logger.warn({ brandId, conceptId: concept.id }, '[VoicenoteService] Push to flownau failed — concept stays pending for recovery flush')
     }
 
-    return { voicenote, concept }
+    return { voicenote, concept, ideaCount: ideaCount ?? 0 }
   }
 
   // Flush all pending voicenote SourceConcepts that were never delivered to flownau.
@@ -151,23 +151,23 @@ Return only valid JSON: { "cleanTranscription": "...", "synthesis": "..." }`,
 
     for (const concept of pending) {
       const pushed = await this.pushConceptToFlownau(concept.brandId, concept.id, concept.content)
-      if (!pushed) {
+      if (pushed === null) {
         this.logger.warn({ conceptId: concept.id, brandId: concept.brandId }, '[VoicenoteService] Flush: push still failing')
       }
     }
   }
 
-  private async pushConceptToFlownau(brandId: string, conceptId: string, topic: string): Promise<boolean> {
+  private async pushConceptToFlownau(brandId: string, conceptId: string, topic: string): Promise<number | null> {
     const flownauUrl = this.config.get<string>('FLOWNAU_URL')
     const authSecret = this.config.get<string>('AUTH_SECRET')
     if (!flownauUrl || !authSecret) {
       this.logger.error('[VoicenoteService] FLOWNAU_URL or AUTH_SECRET not set — cannot push concept')
-      return false
+      return null
     }
 
     try {
       const token = await signServiceToken({ secret: authSecret, iss: 'nauthenticity', aud: 'flownau' })
-      await axios.post(
+      const res = await axios.post<{ ideas: unknown[] }>(
         `${flownauUrl}/api/v1/service/ideation`,
         { brandId, topic, sourceRef: conceptId },
         { headers: { Authorization: `Bearer ${token}` }, timeout: 120_000 },
@@ -177,10 +177,10 @@ Return only valid JSON: { "cleanTranscription": "...", "synthesis": "..." }`,
         data: { status: 'consumed', consumedAt: new Date() },
       })
       this.logger.log({ brandId, conceptId }, '[VoicenoteService] Concept pushed to flownau and ideation triggered')
-      return true
+      return Array.isArray(res.data?.ideas) ? res.data.ideas.length : 0
     } catch (err) {
       this.logger.error({ brandId, conceptId, err }, '[VoicenoteService] Failed to push concept to flownau')
-      return false
+      return null
     }
   }
 }

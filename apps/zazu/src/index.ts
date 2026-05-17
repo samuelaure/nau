@@ -174,11 +174,13 @@ bot.on('callback_query', async (ctx) => {
       ctx.session.pendingVoicenoteBrands = undefined;
       ctx.session.selectedVoicenoteBrandIds = undefined;
 
-      const selectedNames = brands.filter((b) => selected.includes(b.id)).map((b) => b.name).join(', ');
+      const selectedBrands = brands.filter((b) => selected.includes(b.id));
+      const selectedNames = selectedBrands.map((b) => b.name).join(', ');
       await ctx.editMessageText(`⏳ Enviando captura a: ${selectedNames}...`);
 
-      await voicenoteSkill.dispatchToBrands(voicenoteId, cleanTranscription, synthesis, selected);
-      await ctx.editMessageText(`✅ Captura enviada a: *${selectedNames}*. Las ideas se están generando.`, { parse_mode: 'Markdown' });
+      const results = await voicenoteSkill.dispatchToBrands(voicenoteId, cleanTranscription, synthesis, selectedBrands);
+      const summaryLines = results.map((r) => `- ${r.ideaCount} nuevas ideas para ${r.brandName}`).join('\n');
+      await ctx.editMessageText(`✅ Captura enviada. Se generaron:\n${summaryLines}`);
     }
   }
 });
