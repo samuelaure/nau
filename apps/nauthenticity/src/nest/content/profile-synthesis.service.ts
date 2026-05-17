@@ -177,7 +177,14 @@ Return JSON: { "synthesis": "...", "concepts": [{ "content": "..." }, ...] }`
       update: { content: parsed.synthesis, postCountAtGeneration: posts.length, generatedAt: new Date() },
     })
 
-    // Save source concepts linked to this profile
+    // Save synthesis as the primary source concept, then save derived concepts
+    const synthesisConcept = await this.prisma.sourceConcept.create({
+      data: { brandId, content: parsed.synthesis, sourceType: 'synthesis', status: 'pending' },
+    })
+    await this.prisma.sourceConceptSource.create({
+      data: { sourceConceptId: synthesisConcept.id, socialProfileId },
+    })
+
     await Promise.all(
       parsed.concepts.map(async (c) => {
         const concept = await this.prisma.sourceConcept.create({

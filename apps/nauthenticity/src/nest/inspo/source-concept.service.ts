@@ -224,7 +224,7 @@ Each "content" is a paragraph (30–60 words) describing the concept clearly eno
       WHERE "brandId" = ${brandId}
         AND status = 'pending'
         AND "createdAt" >= ${cutoff}
-      ORDER BY RANDOM()
+      ORDER BY CASE WHEN "sourceType" = 'synthesis' THEN 0 ELSE 1 END, RANDOM()
     `
   }
 
