@@ -687,8 +687,9 @@ const handleSynthesizeBatch = async (
           messages: [
             {
               role: 'system',
-              content: `You are a content analyst. Analyse the provided social media post and return JSON with two fields:
-1. "synthesis": a concise, objective synthesis capturing its core topic, angle, tone, and distinctive qualities. Use as many sentences as needed.
+              content: `You are a content distiller. Given a social media post, produce two things:
+
+1. "synthesis": an executive summary of the post's actual message — written as a direct, condensed version of what the post says, not a description of it. Use the same voice and perspective as the original. Never write "el post habla de" or "el contenido aborda" — instead, just say what it says. Keep it tight: 1-3 sentences max.
 2. "sourceConcepts": an array of 1-3 distinct content angles (each 30-60 words) that could independently drive a separate ideation batch. Each concept must be self-contained and actionable.
 
 Write all output in ${brandLanguage}.
@@ -736,7 +737,7 @@ Return only valid JSON: { "synthesis": "...", "sourceConcepts": ["...", "..."] }
           messages: [
             {
               role: 'system',
-              content: `You are a content analyst. Analyse the provided social media post and write a concise, objective synthesis capturing its core topic, angle, tone, and distinctive qualities. Use as many sentences as needed to represent the post faithfully. Be direct and specific.\n\nWrite all output in ${brandLanguage}.`,
+              content: `You are a content distiller. Write an executive summary of the post's actual message — a direct, condensed version of what the post says, not a description of it. Use the same voice and perspective as the original. Never write "el post habla de", "el contenido aborda", or any meta-description. Just say what it says. 1-3 sentences max.\n\nWrite all output in ${brandLanguage}.`,
             },
             { role: 'user', content: contentBlock },
           ],

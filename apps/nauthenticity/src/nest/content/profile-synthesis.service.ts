@@ -42,13 +42,11 @@ export class ProfileSynthesisService {
       .map((p, i) => `${i + 1}. ${p.postSynthesis}`)
       .join('\n')
 
-    const systemPrompt = `You are a brand intelligence analyst. You receive a numbered list of individual post syntheses from a single social media profile. Your task is to write a holistic profile synthesis — a clear, objective portrait of this profile covering:
-- Recurring topics and themes
-- Tone and communication style
-- Content formats and angles used
-- Distinctive qualities and positioning
+    const systemPrompt = `You are a content distiller. You receive condensed summaries of posts from a single social media profile. Write a holistic profile synthesis that reads like a direct representation of this creator's voice and worldview — not an analysis of it.
 
-Write in continuous prose. No fixed length — use as many paragraphs as needed to represent the profile faithfully. Be specific and evidence-based.`
+Capture: the recurring ideas and arguments they make, the specific language and framing they use, their point of view, and what they consistently stand for or against.
+
+Write in continuous prose, in the same register as the content itself. Be concrete and specific — no generic observations. No meta-language like "este perfil aborda" or "el creador habla de".`
 
     const userMessage = `## Profile: @${profile.username}\n\n## Post Syntheses (${posts.length} posts)\n${synthesisList}\n\nWrite the profile synthesis.`
 
@@ -136,11 +134,11 @@ Write in continuous prose. No fixed length — use as many paragraphs as needed 
 
     const language = brand.language ?? 'Spanish'
 
-    const systemPrompt = `You are a brand intelligence analyst. You receive up to 30 post syntheses from a single social media profile. Produce two outputs in one JSON response:
+    const systemPrompt = `You are a content distiller. You receive condensed summaries of up to 30 posts from a single social media profile. Produce two outputs in one JSON response:
 
-1. "synthesis" — a holistic portrait of this profile in continuous prose covering: recurring topics and themes, tone and communication style, content formats used, distinctive qualities and positioning. Be specific and evidence-based. No fixed length.
+1. "synthesis" — a holistic profile synthesis that reads like a direct representation of this creator's voice and worldview, not an analysis of it. Capture: the recurring ideas and arguments they make, the specific language and framing they use, their point of view, what they consistently stand for or against. Write in continuous prose, in the same register as the content. No meta-language like "este perfil aborda" or "el creador habla de". Be concrete and specific.
 
-2. "concepts" — an array of distinct, actionable source concepts (each 30-60 words) derived from the profile's content. Each concept must be self-contained and rich enough to drive an independent ideation batch. Quality over quantity — only capture genuinely distinct angles.
+2. "concepts" — an array of distinct, actionable source concepts (each 30-60 words) derived from the profile's actual ideas. Each concept must be self-contained and rich enough to drive an independent ideation batch. Quality over quantity.
 
 Write all text in ${language}.
 
