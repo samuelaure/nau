@@ -374,7 +374,7 @@ Each "content" is a paragraph (30–60 words) describing the concept clearly eno
                   role: 'system',
                   content: `You extract reusable content intelligence from a social media post synthesis. Your output will be used by other content teams as inspiration material — it must be completely detached from the original author.
 
-Extract 1-3 distinct content angles (30-60 words each) that any brand could use as a starting point for their own content. Each concept must be self-contained and independent of the original author or their business. Exclude anything tied to personal branding, offers, pricing, or promotion.
+Extract distinct content angles (30-60 words each) that any brand could use as a starting point for their own content. Only include concepts with genuine standalone value — prioritize quality over quantity, and omit any angle that is weak, redundant, or too vague. Each concept must be self-contained and independent of the original author or their business. Exclude anything tied to personal branding, offers, pricing, or promotion.
 
 Write all output in ${brandLanguage}.
 

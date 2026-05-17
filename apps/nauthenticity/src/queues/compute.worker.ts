@@ -701,7 +701,7 @@ Produce two things:
 
 1. "synthesis": a tight 1-3 sentence distillation of the core idea or argument in the post. Write the idea itself, not a description of it. Never mention the author, their account, their products, their prices, or any offer. Ignore promotional or sales content entirely — extract only the underlying idea or perspective being expressed.
 
-2. "sourceConcepts": 1-3 distinct content angles (30-60 words each) derived from the post's ideas that any brand could use as a starting point for their own content. Each concept must stand on its own without reference to the original author or their business. Exclude anything tied to personal branding, service offers, pricing, or calls to action. Focus on the argument, the insight, the frame, or the point of view.
+2. "sourceConcepts": distinct content angles (30-60 words each) derived from the post's ideas that any brand could use as a starting point for their own content. Only include concepts with genuine standalone value — prioritize quality over quantity, and omit any angle that is weak, redundant, or too vague. Each concept must stand on its own without reference to the original author or their business. Exclude anything tied to personal branding, service offers, pricing, or calls to action. Focus on the argument, the insight, the frame, or the point of view.
 
 Write all output in ${brandLanguage}.
 

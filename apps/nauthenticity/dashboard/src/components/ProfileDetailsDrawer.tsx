@@ -1,6 +1,7 @@
 import { createPortal } from 'react-dom'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { X, RefreshCw, Zap } from 'lucide-react'
+import { X, RefreshCw, Zap, ChevronDown, ChevronRight } from 'lucide-react'
 import { getProfileSynthesis, getProfileSourceConcepts, generateProfileIntelligence, dispatchSourceConcept } from '../lib/api'
 
 interface ProfileDetailsDrawerProps {
@@ -11,6 +12,25 @@ interface ProfileDetailsDrawerProps {
   onClose: () => void
 }
 
+const SectionHeader = ({ label, count, open, onToggle }: { label: string; count?: number; open: boolean; onToggle: () => void }) => (
+  <button
+    onClick={onToggle}
+    style={{
+      display: 'flex', alignItems: 'center', gap: '0.4rem', width: '100%',
+      background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left',
+      marginBottom: open ? '0.75rem' : 0,
+    }}
+  >
+    {open ? <ChevronDown size={13} color="#6e7681" /> : <ChevronRight size={13} color="#6e7681" />}
+    <span style={{ fontSize: '0.8rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#8b949e' }}>
+      {label}
+    </span>
+    {count !== undefined && (
+      <span style={{ fontSize: '0.7rem', color: '#6e7681', marginLeft: '0.25rem' }}>({count})</span>
+    )}
+  </button>
+)
+
 const STATUS_COLORS: Record<string, string> = {
   pending:  '#d29922',
   consumed: '#3fb950',
@@ -18,6 +38,9 @@ const STATUS_COLORS: Record<string, string> = {
 
 export const ProfileDetailsDrawer = ({ socialProfileId, username, brandId, showSourceConcepts, onClose }: ProfileDetailsDrawerProps) => {
   const queryClient = useQueryClient()
+  const [synthOpen, setSynthOpen] = useState(true)
+  const [profileConceptsOpen, setProfileConceptsOpen] = useState(true)
+  const [postConceptsOpen, setPostConceptsOpen] = useState(false)
 
   const { data: synthesis, isLoading: loadingSynthesis } = useQuery({
     queryKey: ['profile-synthesis', socialProfileId],
@@ -99,73 +122,96 @@ export const ProfileDetailsDrawer = ({ socialProfileId, username, brandId, showS
 
           {/* Synthesis */}
           <section>
-            <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.8rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#8b949e' }}>
-              Profile Synthesis
-            </h3>
-            {loadingSynthesis ? (
-              <p style={{ color: '#8b949e', fontSize: '0.875rem' }}>Loading…</p>
-            ) : !synthesis ? (
-              <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--border)', borderRadius: '8px', color: '#8b949e', fontSize: '0.875rem' }}>
-                No synthesis yet. Click "Refresh Intelligence" to generate one.
-              </div>
-            ) : (
-              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: '8px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <p style={{ margin: 0, fontSize: '0.875rem', color: '#c9d1d9', lineHeight: 1.65 }}>{synthesis.content}</p>
-                <span style={{ fontSize: '0.72rem', color: '#6e7681' }}>
-                  Generated from {synthesis.postCountAtGeneration} posts · {new Date(synthesis.generatedAt).toLocaleDateString()}
-                </span>
-              </div>
+            <SectionHeader label="Profile Synthesis" open={synthOpen} onToggle={() => setSynthOpen(o => !o)} />
+            {synthOpen && (
+              loadingSynthesis ? (
+                <p style={{ color: '#8b949e', fontSize: '0.875rem' }}>Loading…</p>
+              ) : !synthesis ? (
+                <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--border)', borderRadius: '8px', color: '#8b949e', fontSize: '0.875rem' }}>
+                  No synthesis yet. Click "Refresh Intelligence" to generate one.
+                </div>
+              ) : (
+                <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: '8px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <p style={{ margin: 0, fontSize: '0.875rem', color: '#c9d1d9', lineHeight: 1.65 }}>{synthesis.content}</p>
+                  <span style={{ fontSize: '0.72rem', color: '#6e7681' }}>
+                    Generated from {synthesis.postCountAtGeneration} posts · {new Date(synthesis.generatedAt).toLocaleDateString()}
+                  </span>
+                </div>
+              )
             )}
           </section>
 
           {/* Source Concepts — InspoBase only */}
-          {showSourceConcepts && (
-            <section>
-              <h3 style={{ margin: '0 0 0.75rem', fontSize: '0.8rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#8b949e' }}>
-                Source Concepts
-              </h3>
-              {loadingConcepts ? (
-                <p style={{ color: '#8b949e', fontSize: '0.875rem' }}>Loading…</p>
-              ) : !concepts || concepts.length === 0 ? (
-                <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--border)', borderRadius: '8px', color: '#8b949e', fontSize: '0.875rem' }}>
-                  No source concepts yet. Click "Refresh Intelligence" to generate them.
+          {showSourceConcepts && (() => {
+            const profileConcepts = concepts?.filter(c => c.link === 'profile') ?? []
+            const postConcepts = concepts?.filter(c => c.link === 'post') ?? []
+
+            const ConceptCard = ({ c }: { c: typeof profileConcepts[0] }) => (
+              <div key={c.id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: '8px', padding: '0.85rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: '#c9d1d9', lineHeight: 1.6 }}>{c.content}</p>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '1px 7px', borderRadius: '100px', color: STATUS_COLORS[c.status] ?? '#8b949e', background: 'rgba(0,0,0,0.2)', border: `1px solid ${STATUS_COLORS[c.status] ?? '#8b949e'}44` }}>
+                    {c.status}
+                  </span>
+                  <span style={{ fontSize: '0.68rem', color: '#6e7681', marginLeft: 'auto' }}>
+                    {new Date(c.createdAt).toLocaleDateString()}
+                  </span>
                 </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                  {concepts.map((c) => (
-                    <div key={c.id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: '8px', padding: '0.85rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                      <p style={{ margin: 0, fontSize: '0.85rem', color: '#c9d1d9', lineHeight: 1.6 }}>{c.content}</p>
-                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '1px 7px', borderRadius: '100px', background: c.link === 'profile' ? 'rgba(188,140,255,0.15)' : 'rgba(88,166,255,0.15)', color: c.link === 'profile' ? '#bc8cff' : '#58a6ff', border: `1px solid ${c.link === 'profile' ? '#bc8cff44' : '#58a6ff44'}` }}>
-                          {c.link === 'profile' ? 'profile' : 'post'}
-                        </span>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '1px 7px', borderRadius: '100px', color: STATUS_COLORS[c.status] ?? '#8b949e', background: 'rgba(0,0,0,0.2)', border: `1px solid ${STATUS_COLORS[c.status] ?? '#8b949e'}44` }}>
-                          {c.status}
-                        </span>
-                        <span style={{ fontSize: '0.68rem', color: '#6e7681', marginLeft: 'auto' }}>
-                          {new Date(c.createdAt).toLocaleDateString()}
-                        </span>
+                {brandId && (
+                  <button
+                    onClick={() => dispatch.mutate({ itemType: c.link === 'profile' ? 'profile' : 'post', itemId: c.id })}
+                    disabled={dispatch.isPending}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '0.35rem', alignSelf: 'flex-start',
+                      padding: '0.3rem 0.7rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600,
+                      background: 'rgba(63,185,80,0.1)', border: '1px solid rgba(63,185,80,0.3)',
+                      color: '#3fb950', cursor: 'pointer',
+                    }}
+                  >
+                    <Zap size={11} /> Create Content
+                  </button>
+                )}
+              </div>
+            )
+
+            return (
+              <>
+                <section>
+                  <SectionHeader label="Profile Source Concepts" count={profileConcepts.length} open={profileConceptsOpen} onToggle={() => setProfileConceptsOpen(o => !o)} />
+                  {profileConceptsOpen && (
+                    loadingConcepts ? (
+                      <p style={{ color: '#8b949e', fontSize: '0.875rem' }}>Loading…</p>
+                    ) : profileConcepts.length === 0 ? (
+                      <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--border)', borderRadius: '8px', color: '#8b949e', fontSize: '0.875rem' }}>
+                        No profile-level concepts yet. Click "Refresh Intelligence" to generate them.
                       </div>
-                      {brandId && (
-                        <button
-                          onClick={() => dispatch.mutate({ itemType: c.link === 'profile' ? 'profile' : 'post', itemId: c.id })}
-                          disabled={dispatch.isPending}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: '0.35rem', alignSelf: 'flex-start',
-                            padding: '0.3rem 0.7rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600,
-                            background: 'rgba(63,185,80,0.1)', border: '1px solid rgba(63,185,80,0.3)',
-                            color: '#3fb950', cursor: 'pointer',
-                          }}
-                        >
-                          <Zap size={11} /> Create Content
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-          )}
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                        {profileConcepts.map(c => <ConceptCard key={c.id} c={c} />)}
+                      </div>
+                    )
+                  )}
+                </section>
+
+                <section>
+                  <SectionHeader label="Post Source Concepts" count={postConcepts.length} open={postConceptsOpen} onToggle={() => setPostConceptsOpen(o => !o)} />
+                  {postConceptsOpen && (
+                    loadingConcepts ? (
+                      <p style={{ color: '#8b949e', fontSize: '0.875rem' }}>Loading…</p>
+                    ) : postConcepts.length === 0 ? (
+                      <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--border)', borderRadius: '8px', color: '#8b949e', fontSize: '0.875rem' }}>
+                        No post-level concepts yet.
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                        {postConcepts.map(c => <ConceptCard key={c.id} c={c} />)}
+                      </div>
+                    )
+                  )}
+                </section>
+              </>
+            )
+          })()}
         </div>
       </div>
 
