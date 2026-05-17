@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { useCurrentFrame, interpolate, OffthreadVideo, Sequence, Audio, delayRender, continueRender } from 'remotion'
+import { useCurrentFrame, interpolate, OffthreadVideo, Loop, Sequence, Audio, delayRender, continueRender } from 'remotion'
 import { loadFont as loadAnton } from '@remotion/google-fonts/Anton'
 import { loadFont as loadBebasNeue } from '@remotion/google-fonts/BebasNeue'
 import { loadFont as loadOswald } from '@remotion/google-fonts/Oswald'
@@ -204,26 +204,21 @@ function TextZone({ children, align = 'center' }: { children: React.ReactNode; a
 // ── Shared primitives ──────────────────────────────────────────────────────────
 
 function BrollBackground({ clip, overlayOpacity }: { clip?: BrollClip; overlayOpacity: number }) {
-  const frame = useCurrentFrame()
   if (!clip?.url) {
     return <div style={{ position: 'absolute', inset: 0, background: '#111' }} />
   }
-  // OffthreadVideo at composition frame F shows source video frame (startFrom + F).
-  // To loop a clip of length clipFrames: we need source frame = base + (F % clipFrames).
-  // Since Remotion adds F: startFrom + F = base + (F%clipFrames) → startFrom = base + (F%clipFrames) - F
-  // For F < clipFrames this equals base (normal playback). For F ≥ clipFrames it loops.
-  // startFrom goes negative when F > clipFrames, but startFrom+F is always a valid frame.
-  const base = clip.startFrom ?? 0
+  const startFrom = clip.startFrom ?? 0
   const clipFrames = clip.durationInFrames
-  const startFrom = clipFrames ? base + (frame % clipFrames) - frame : base
   return (
     <>
-      <OffthreadVideo
-        src={clip.url}
-        startFrom={startFrom}
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-        muted
-      />
+      <Loop durationInFrames={clipFrames || 9999}>
+        <OffthreadVideo
+          src={clip.url}
+          startFrom={startFrom}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+          muted
+        />
+      </Loop>
       <div style={{ position: 'absolute', inset: 0, background: `rgba(0,0,0,${overlayOpacity})` }} />
     </>
   )
