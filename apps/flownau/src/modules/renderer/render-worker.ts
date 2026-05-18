@@ -22,7 +22,11 @@ function ensureOutputDir(): void {
   if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true })
 }
 
-async function applyAutoApprovePost(postId: string, brandId: string, templateId: string | null): Promise<void> {
+async function applyAutoApprovePost(
+  postId: string,
+  brandId: string,
+  templateId: string | null,
+): Promise<void> {
   if (!templateId) return
   const config = await prisma.brandTemplateConfig.findUnique({
     where: { brandId_templateId: { brandId, templateId } },
@@ -38,7 +42,9 @@ function cleanupFile(filePath: string): void {
   try {
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
   } catch (err) {
-    logger.warn(`[RenderWorker] Failed to clean up temp file ${filePath}: ${err instanceof Error ? err.message : String(err)}`)
+    logger.warn(
+      `[RenderWorker] Failed to clean up temp file ${filePath}: ${err instanceof Error ? err.message : String(err)}`,
+    )
   }
 }
 
@@ -46,7 +52,9 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
   const { postId } = job.data
   const startTime = Date.now()
 
-  logger.info(`[RenderWorker] Processing job ${job.id} for post ${postId} (attempt ${job.attemptsMade + 1})`)
+  logger.info(
+    `[RenderWorker] Processing job ${job.id} for post ${postId} (attempt ${job.attemptsMade + 1})`,
+  )
 
   const post = await prisma.post.findUnique({
     where: { id: postId },
@@ -57,7 +65,12 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
 
   const renderJob = await prisma.renderJob.upsert({
     where: { postId },
-    update: { status: 'rendering', attempts: job.attemptsMade + 1, startedAt: new Date(), error: null },
+    update: {
+      status: 'rendering',
+      attempts: job.attemptsMade + 1,
+      startedAt: new Date(),
+      error: null,
+    },
     create: {
       postId,
       status: 'rendering',
@@ -75,7 +88,14 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
     const renderTimeMs = Date.now() - startTime
     await prisma.renderJob.update({
       where: { id: renderJob.id },
-      data: { status: 'done', progress: 100, outputUrl: post.userUploadedMediaUrl, outputType: 'video', completedAt: new Date(), renderTimeMs },
+      data: {
+        status: 'done',
+        progress: 100,
+        outputUrl: post.userUploadedMediaUrl,
+        outputType: 'video',
+        completedAt: new Date(),
+        renderTimeMs,
+      },
     })
     await prisma.post.update({
       where: { id: postId },
@@ -94,7 +114,9 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
   // Determine which Remotion composition to use
   const templateRemotionId = post.template?.remotionId ?? ''
   if (!isVideo || !SLOT_REEL_IDS.has(templateRemotionId)) {
-    throw new Error(`Post ${postId} has unsupported format/template: ${format}/${templateRemotionId}`)
+    throw new Error(
+      `Post ${postId} has unsupported format/template: ${format}/${templateRemotionId}`,
+    )
   }
   const remotionCompId = templateRemotionId
 
@@ -104,13 +126,25 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
     // Creative is missing or was composed with the legacy scene-composer.
     // Reset so the user can recompose via the calendar modal.
     await prisma.post.update({ where: { id: postId }, data: { status: 'DRAFT_PENDING' } })
-    await prisma.renderJob.update({ where: { id: renderJob.id }, data: { status: 'failed', error: 'No slot creative — please recompose this post', completedAt: new Date() } })
-    logger.warn({ postId, templateRemotionId }, '[RenderWorker] No slot creative — reset to DRAFT_PENDING')
+    await prisma.renderJob.update({
+      where: { id: renderJob.id },
+      data: {
+        status: 'failed',
+        error: 'No slot creative — please recompose this post',
+        completedAt: new Date(),
+      },
+    })
+    logger.warn(
+      { postId, templateRemotionId },
+      '[RenderWorker] No slot creative — reset to DRAFT_PENDING',
+    )
     return
   }
 
   type RenderSnapshot = { brollClips: Array<{ url: string; startFrom: number }>; audioUrl?: string }
-  const savedSnapshot = (creative as Record<string, unknown>).renderSnapshot as RenderSnapshot | undefined
+  const savedSnapshot = (creative as Record<string, unknown>).renderSnapshot as
+    | RenderSnapshot
+    | undefined
 
   let brollClips: Array<{ url: string; startFrom: number }>
   let audioUrl: string | undefined
@@ -124,40 +158,49 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
     const brollMood = Array.isArray(creative.brollMood)
       ? (creative.brollMood as string[]).join(', ')
       : String(creative.brollMood ?? '')
-    const moodKeywords = brollMood.split(/[,\s]+/).map((s) => s.trim().toLowerCase()).filter(Boolean)
+    const moodKeywords = brollMood
+      .split(/[,\s]+/)
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean)
 
     const [allVideos, audioAssets] = await Promise.all([
       prisma.asset.findMany({
         where: { brandId, type: { in: ['video', 'VID'] } },
         select: { id: true, url: true, duration: true, tags: true, lastUsedAt: true },
         take: 50,
+        orderBy: { lastUsedAt: { sort: 'asc', nulls: 'first' } },
       }),
       prisma.asset.findMany({
         where: { brandId, type: { in: ['audio', 'AUD'] } },
         select: { id: true, url: true, lastUsedAt: true },
         take: 50,
-        orderBy: { lastUsedAt: 'asc' },
+        orderBy: { lastUsedAt: { sort: 'asc', nulls: 'first' } },
       }),
     ])
 
-    const longEnough = allVideos.filter((a) => !a.duration || Math.floor(a.duration * REMOTION_FPS) >= BROLL_REQUIRED_FRAMES)
+    const longEnough = allVideos.filter(
+      (a) => !a.duration || Math.floor(a.duration * REMOTION_FPS) >= BROLL_REQUIRED_FRAMES,
+    )
     const candidatePool = longEnough.length > 0 ? longEnough : allVideos
 
-    const moodMatched = moodKeywords.length > 0
-      ? candidatePool.filter((a) => a.tags.some((t) => moodKeywords.includes(t.toLowerCase())))
-      : []
+    const moodMatched =
+      moodKeywords.length > 0
+        ? candidatePool.filter((a) => a.tags.some((t) => moodKeywords.includes(t.toLowerCase())))
+        : []
 
     // LRU ordering: assets never used (null) first, then oldest-used first.
     // Applies within the mood-filtered pool (or full pool if no mood match).
-    const orderedPool = (moodMatched.length > 0 ? moodMatched : candidatePool)
-      .sort((a, b) => {
-        if (!a.lastUsedAt && !b.lastUsedAt) return 0
-        if (!a.lastUsedAt) return -1
-        if (!b.lastUsedAt) return 1
-        return a.lastUsedAt.getTime() - b.lastUsedAt.getTime()
-      })
+    const orderedPool = (moodMatched.length > 0 ? moodMatched : candidatePool).sort((a, b) => {
+      if (!a.lastUsedAt && !b.lastUsedAt) return 0
+      if (!a.lastUsedAt) return -1
+      if (!b.lastUsedAt) return 1
+      return a.lastUsedAt.getTime() - b.lastUsedAt.getTime()
+    })
 
-    const videoPool = orderedPool.slice(0, 5)
+    // Shuffle within the LRU candidate window (top 10 least-recently-used)
+    // to prevent always selecting the exact same top-5 assets on every render.
+    const LRU_WINDOW = 10
+    const videoPool = shuffle(orderedPool.slice(0, LRU_WINDOW)).slice(0, 5)
 
     brollClips = videoPool.map((a) => {
       const assetFrames = a.duration ? Math.floor(a.duration * REMOTION_FPS) : 0
@@ -166,7 +209,9 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
       return { url: a.url, startFrom, durationInFrames: assetFrames > 0 ? assetFrames : undefined }
     })
 
-    const selectedAudio = audioAssets[0]
+    // Same shuffle approach for audio: pick from top-3 LRU candidates
+    const audioPool = shuffle(audioAssets.slice(0, 3))
+    const selectedAudio = audioPool[0]
     audioUrl = selectedAudio?.url
     freshlyResolved = true
 
@@ -181,7 +226,17 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
       })
     }
 
-    logger.info({ postId, brandId, moodKeywords, videoPoolSize: orderedPool.length, selectedClipCount: videoPool.length, hasAudio: !!audioUrl }, '[RenderWorker] B-roll and audio assets resolved')
+    logger.info(
+      {
+        postId,
+        brandId,
+        moodKeywords,
+        videoPoolSize: orderedPool.length,
+        selectedClipCount: videoPool.length,
+        hasAudio: !!audioUrl,
+      },
+      '[RenderWorker] B-roll and audio assets resolved',
+    )
   }
 
   const selectedClips = brollClips.slice(0, 5)
@@ -189,7 +244,12 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
   if (freshlyResolved) {
     await prisma.post.update({
       where: { id: postId },
-      data: { creative: { ...(creative as object), renderSnapshot: { brollClips: selectedClips, audioUrl } } },
+      data: {
+        creative: {
+          ...(creative as object),
+          renderSnapshot: { brollClips: selectedClips, audioUrl },
+        },
+      },
     })
   }
   const brandIdentity = (post.brand?.brandIdentity ?? {}) as BrandIdentity
@@ -242,10 +302,10 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
       chromiumOptions: { gl: 'swangle' },
       // faststart + yuv420p: required for streaming playback and Instagram compatibility
       ffmpegOverride: ({ type, args }) =>
-        type === 'stitcher'
-          ? [...args, '-pix_fmt', 'yuv420p', '-movflags', '+faststart']
-          : args,
-      onProgress: ({ progress }) => { job.updateProgress(35 + Math.round(progress * 45)).catch(() => {}) },
+        type === 'stitcher' ? [...args, '-pix_fmt', 'yuv420p', '-movflags', '+faststart'] : args,
+      onProgress: ({ progress }) => {
+        job.updateProgress(35 + Math.round(progress * 45)).catch(() => {})
+      },
     })
 
     await job.updateProgress(80)
@@ -253,14 +313,18 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
     await prisma.renderJob.update({ where: { id: renderJob.id }, data: { status: 'uploading' } })
 
     const videoR2Key = flownau.renderOutput(brandId, postId)
-    const videoPublicUrl = await storage.upload(videoR2Key, fs.createReadStream(outputPath), { mimeType: 'video/mp4' })
+    const videoPublicUrl = await storage.upload(videoR2Key, fs.createReadStream(outputPath), {
+      mimeType: 'video/mp4',
+    })
     cleanupFile(outputPath)
 
     await job.updateProgress(90)
 
     // Extract cover frame from the resolved scenes
     let coverUrl: string | null = null
-    const scenes = inputProps.scenes as Array<{ startFrame: number; durationInFrames: number }> | undefined
+    const scenes = inputProps.scenes as
+      | Array<{ startFrame: number; durationInFrames: number }>
+      | undefined
     const coverCreative = post.creative as { coverSceneIndex?: number } | null
     const coverIdx = coverCreative?.coverSceneIndex ?? 0
 
@@ -284,7 +348,9 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
         chromiumOptions: { gl: 'swangle' },
       })
       const coverR2Key = flownau.renderCover(brandId, postId)
-      coverUrl = await storage.upload(coverR2Key, fs.createReadStream(coverPath), { mimeType: 'image/jpeg' })
+      coverUrl = await storage.upload(coverR2Key, fs.createReadStream(coverPath), {
+        mimeType: 'image/jpeg',
+      })
       cleanupFile(coverPath)
     } catch (coverErr) {
       logError('[RenderWorker] Cover extraction failed, proceeding without cover', coverErr)
@@ -295,7 +361,13 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
     const renderTimeMs = Date.now() - startTime
     await prisma.renderJob.update({
       where: { id: renderJob.id },
-      data: { status: 'done', progress: 100, outputUrl: videoPublicUrl, completedAt: new Date(), renderTimeMs },
+      data: {
+        status: 'done',
+        progress: 100,
+        outputUrl: videoPublicUrl,
+        completedAt: new Date(),
+        renderTimeMs,
+      },
     })
     await prisma.post.update({
       where: { id: postId },
@@ -321,13 +393,22 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
     await job.updateProgress(80)
 
     const imageR2Key = flownau.renderStill(brandId, postId)
-    const imagePublicUrl = await storage.upload(imageR2Key, fs.createReadStream(outputPath), { mimeType: 'image/png' })
+    const imagePublicUrl = await storage.upload(imageR2Key, fs.createReadStream(outputPath), {
+      mimeType: 'image/png',
+    })
     cleanupFile(outputPath)
 
     const renderTimeMs = Date.now() - startTime
     await prisma.renderJob.update({
       where: { id: renderJob.id },
-      data: { status: 'done', progress: 100, outputUrl: imagePublicUrl, outputType: 'image', completedAt: new Date(), renderTimeMs },
+      data: {
+        status: 'done',
+        progress: 100,
+        outputUrl: imagePublicUrl,
+        outputType: 'image',
+        completedAt: new Date(),
+        renderTimeMs,
+      },
     })
     await prisma.post.update({
       where: { id: postId },
@@ -349,7 +430,10 @@ function handleFailedJob(job: Job<RenderJobData> | undefined, error: Error): voi
 
   if (job.attemptsMade >= (job.opts.attempts ?? 3) - 1) {
     prisma.renderJob
-      .update({ where: { postId }, data: { status: 'failed', error: error.message, completedAt: new Date() } })
+      .update({
+        where: { postId },
+        data: { status: 'failed', error: error.message, completedAt: new Date() },
+      })
       .then(() => prisma.post.update({ where: { id: postId }, data: { status: 'DRAFT_PENDING' } }))
       .catch((dbErr) => logError('[RenderWorker] Failed to update failed status in DB', dbErr))
   }
@@ -362,9 +446,15 @@ export function startRenderWorker(): Worker<RenderJobData> {
     limiter: { max: 5, duration: 60_000 },
   })
 
-  worker.on('completed', (job) => { logger.info(`[RenderWorker] Job ${job.id} completed successfully`) })
-  worker.on('failed', (job, error) => { handleFailedJob(job, error) })
-  worker.on('error', (error) => { logError('[RenderWorker] Worker error', error) })
+  worker.on('completed', (job) => {
+    logger.info(`[RenderWorker] Job ${job.id} completed successfully`)
+  })
+  worker.on('failed', (job, error) => {
+    handleFailedJob(job, error)
+  })
+  worker.on('error', (error) => {
+    logError('[RenderWorker] Worker error', error)
+  })
 
   logger.info('[RenderWorker] Render worker started, listening for jobs...')
   return worker
