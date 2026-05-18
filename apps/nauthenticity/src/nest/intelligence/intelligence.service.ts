@@ -482,6 +482,50 @@ export class IntelligenceService {
     return { type: 'blog' as const, id: post.id, status: post.status }
   }
 
+  async retryYoutubeVideo(id: string) {
+    const video = await this.prisma.youtubeVideo.findUnique({ where: { id } })
+    if (!video) throw new NotFoundException('YoutubeVideo not found')
+    await this.prisma.youtubeVideo.update({
+      where: { id },
+      data: { status: 'pending', failureReason: null },
+    })
+    await computeQueue.add('youtube-ingest', { youtubeVideoId: id })
+    return { id, status: 'pending' }
+  }
+
+  async retryBlogPost(id: string) {
+    const post = await this.prisma.blogPost.findUnique({ where: { id } })
+    if (!post) throw new NotFoundException('BlogPost not found')
+    await this.prisma.blogPost.update({
+      where: { id },
+      data: { status: 'pending', failureReason: null },
+    })
+    await computeQueue.add('blog-ingest', { blogPostId: id })
+    return { id, status: 'pending' }
+  }
+
+  async getYoutubeVideo(id: string) {
+    const video = await this.prisma.youtubeVideo.findUnique({ where: { id } })
+    if (!video) throw new NotFoundException('YoutubeVideo not found')
+    const conceptSources = await this.prisma.sourceConceptSource.findMany({
+      where: { youtubeVideoId: id },
+      include: { sourceConcept: true },
+    })
+    const concepts = conceptSources.map((s) => s.sourceConcept).filter(Boolean)
+    return { video, concepts }
+  }
+
+  async getBlogPost(id: string) {
+    const post = await this.prisma.blogPost.findUnique({ where: { id } })
+    if (!post) throw new NotFoundException('BlogPost not found')
+    const conceptSources = await this.prisma.sourceConceptSource.findMany({
+      where: { blogPostId: id },
+      include: { sourceConcept: true },
+    })
+    const concepts = conceptSources.map((s) => s.sourceConcept).filter(Boolean)
+    return { post, concepts }
+  }
+
   async getYoutubeVideos(brandId: string) {
     const memberships = await this.prisma.categoryMembership.findMany({
       where: { brandId, category: 'INSPO', isActive: true, youtubeVideoId: { not: null } },

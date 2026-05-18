@@ -2,6 +2,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { LandingPage } from './pages/LandingPage';
 import { PostView } from './pages/PostView';
+import { YoutubeVideoView } from './pages/YoutubeVideoView';
+import { VoicenoteView } from './pages/VoicenoteView';
 import { ProgressView } from './pages/ProgressView';
 import { AuthCallback } from './pages/AuthCallback';
 import { WorkspaceSettings } from './pages/WorkspaceSettings';
@@ -53,6 +55,8 @@ function App() {
                       <Route path="/accounts/*" element={<Navigate to="/workspaces" replace />} />
                       <Route path="/profiles/*" element={<Navigate to="/workspaces" replace />} />
                       <Route path="/posts/:id" element={<PostView />} />
+                      <Route path="/youtube-videos/:id" element={<YoutubeVideoView />} />
+                      <Route path="/voicenotes/:id" element={<VoicenoteView />} />
                       <Route path="/progress" element={<ProgressView />} />
                       <Route path="/workspace-settings" element={<WorkspaceSettings />} />
                     </Routes>

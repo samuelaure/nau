@@ -1,9 +1,10 @@
 import { createPortal } from 'react-dom'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { X, RefreshCw, Zap, ChevronDown, ChevronRight, ScrollText } from 'lucide-react'
-import { getProfileSynthesis, getProfileSourceConcepts, generateProfileIntelligence, dispatchSourceConcept } from '../lib/api'
+import { X, RefreshCw, ChevronDown, ChevronRight, ScrollText } from 'lucide-react'
+import { getProfileSynthesis, getProfileSourceConcepts, generateProfileIntelligence } from '../lib/api'
 import { PromptsModal } from './PromptsModal'
+import { DispatchConceptButton } from './DispatchConceptButton'
 
 interface ProfileDetailsDrawerProps {
   socialProfileId: string
@@ -64,12 +65,6 @@ export const ProfileDetailsDrawer = ({ socialProfileId, username, brandId, showS
         queryClient.invalidateQueries({ queryKey: ['profile-source-concepts', socialProfileId] })
       }, 3000)
     },
-  })
-
-  const dispatch = useMutation({
-    mutationFn: ({ itemType, itemId }: { itemType: 'post' | 'profile' | 'voicenote' | 'youtube' | 'blog'; itemId: string }) =>
-      dispatchSourceConcept(brandId!, itemType, itemId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['profile-source-concepts', socialProfileId] }),
   })
 
   return createPortal(
@@ -170,18 +165,11 @@ export const ProfileDetailsDrawer = ({ socialProfileId, username, brandId, showS
                   </span>
                 </div>
                 {brandId && (
-                  <button
-                    onClick={() => dispatch.mutate({ itemType: c.link === 'profile' ? 'profile' : 'post', itemId: c.id })}
-                    disabled={dispatch.isPending}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '0.35rem', alignSelf: 'flex-start',
-                      padding: '0.3rem 0.7rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600,
-                      background: 'rgba(63,185,80,0.1)', border: '1px solid rgba(63,185,80,0.3)',
-                      color: '#3fb950', cursor: 'pointer',
-                    }}
-                  >
-                    <Zap size={11} /> Create Content
-                  </button>
+                  <DispatchConceptButton
+                    conceptId={c.id}
+                    status={c.status}
+                    invalidateKeys={[['profile-source-concepts', socialProfileId]]}
+                  />
                 )}
               </div>
             )

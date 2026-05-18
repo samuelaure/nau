@@ -1,11 +1,10 @@
-import { useQuery } from '@tanstack/react-query';
-import { useParams } from 'react-router-dom';
-import { getVoicenotes, getYoutubeVideos, getBlogPosts } from '../lib/api';
-import { Sparkles, Youtube, FileText } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useParams, Link, useLocation } from 'react-router-dom';
+import { getVoicenotes, getYoutubeVideos, getBlogPosts, retryYoutubeVideo, retryBlogPost } from '../lib/api';
+import { Sparkles, Youtube, FileText, ExternalLink, RefreshCw, Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { BrandCategoryLayout } from './BrandCategoryLayout';
 import { StatusBadge } from '../components/StatusBadge';
-import { CreateContentButton } from '../components/CreateContentButton';
 
 export const BrandInspoBaseView = () => {
   const { brandId } = useParams<{ brandId: string }>();
@@ -40,7 +39,7 @@ export const BrandInspoBaseView = () => {
         {
           key: 'voicenotes',
           label: `Voicenotes${!loadingVoicenotes ? ` (${voicenotes?.length ?? 0})` : ''}`,
-          content: <VoicenotesTab voicenotes={voicenotes ?? []} loading={loadingVoicenotes} brandId={brandId!} />,
+          content: <VoicenotesTab voicenotes={voicenotes ?? []} loading={loadingVoicenotes} />,
         },
         {
           key: 'youtube',
@@ -58,7 +57,9 @@ export const BrandInspoBaseView = () => {
 };
 
 
-const VoicenotesTab = ({ voicenotes, loading, brandId }: { voicenotes: any[]; loading: boolean; brandId: string }) => {
+const VoicenotesTab = ({ voicenotes, loading }: { voicenotes: any[]; loading: boolean }) => {
+  const location = useLocation();
+
   if (loading) return <div style={{ color: '#8b949e' }}>Loading voicenotes...</div>;
 
   if (voicenotes.length === 0) {
@@ -70,29 +71,43 @@ const VoicenotesTab = ({ voicenotes, loading, brandId }: { voicenotes: any[]; lo
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      {voicenotes.map((v: any) => (
-        <div key={v.id} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '10px', padding: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '0.75rem', color: '#8b949e' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+      {voicenotes.map((v: any) => {
+        const preview = v.cleanTranscription.length > 200
+          ? v.cleanTranscription.slice(0, 200).trimEnd() + '…'
+          : v.cleanTranscription;
+        return (
+          <Link
+            key={v.id}
+            to={`/voicenotes/${v.id}`}
+            state={{ backTo: location.pathname + location.search }}
+            style={{
+              background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '10px',
+              padding: '1.1rem 1.2rem', display: 'flex', flexDirection: 'column', gap: '0.5rem',
+              textDecoration: 'none', color: 'inherit', transition: 'border-color 0.15s',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#58a6ff66')}
+            onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
+          >
+            <span style={{ fontSize: '0.72rem', color: '#8b949e' }}>
               {formatDistanceToNow(new Date(v.createdAt), { addSuffix: true })}
             </span>
-            <CreateContentButton brandId={brandId} itemType="voicenote" itemId={v.id} />
-          </div>
-          <p style={{ margin: 0, fontSize: '0.9rem', color: '#c9d1d9', lineHeight: '1.6' }}>{v.cleanTranscription}</p>
-          {v.synthesis && (
-            <div style={{ paddingTop: '0.75rem', borderTop: '1px solid var(--border)' }}>
-              <span style={{ fontSize: '0.75rem', color: '#8b949e', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Synthesis</span>
-              <p style={{ margin: '0.4rem 0 0 0', fontSize: '0.85rem', color: '#f0f6fc', fontStyle: 'italic', lineHeight: '1.5' }}>{v.synthesis}</p>
-            </div>
-          )}
-        </div>
-      ))}
+            <p style={{ margin: 0, fontSize: '0.88rem', color: '#c9d1d9', lineHeight: 1.55 }}>{preview}</p>
+          </Link>
+        );
+      })}
     </div>
   );
 };
 
-const YoutubeTab = ({ videos, loading, brandId }: { videos: ReturnType<typeof getYoutubeVideos> extends Promise<infer T> ? T : never; loading: boolean; brandId: string }) => {
+const YoutubeTab = ({ videos, loading, brandId }: { videos: any[]; loading: boolean; brandId: string }) => {
+  const location = useLocation();
+  const qc = useQueryClient();
+  const retry = useMutation({
+    mutationFn: (id: string) => retryYoutubeVideo(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['inspo-youtube', brandId] }),
+  });
+
   if (loading) return <div style={{ color: '#8b949e' }}>Loading YouTube videos...</div>;
 
   if (videos.length === 0) {
@@ -106,17 +121,43 @@ const YoutubeTab = ({ videos, loading, brandId }: { videos: ReturnType<typeof ge
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
       {videos.map((v) => (
-        <div key={v.id} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden' }}>
-          <a href={v.url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', position: 'relative', aspectRatio: '16/9', background: '#0d1117' }}>
+        <Link
+          key={v.id}
+          to={`/youtube-videos/${v.id}`}
+          state={{ backTo: location.pathname + location.search }}
+          style={{
+            background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '10px',
+            overflow: 'hidden', textDecoration: 'none', color: 'inherit', display: 'block',
+            transition: 'border-color 0.15s',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#58a6ff66')}
+          onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
+        >
+          <div style={{ position: 'relative', aspectRatio: '16/9', background: '#0d1117' }}>
             <img
               src={`https://img.youtube.com/vi/${v.videoId}/mqdefault.jpg`}
               alt={v.title ?? 'YouTube video'}
               style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
             />
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.3)' }}>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.25)' }}>
               <Youtube size={36} style={{ color: '#ff0000', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.8))' }} />
             </div>
-          </a>
+            <a
+              href={v.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              title="Open on YouTube"
+              style={{
+                position: 'absolute', top: '6px', right: '6px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: '26px', height: '26px', borderRadius: '6px',
+                background: 'rgba(0,0,0,0.65)', color: '#fff', textDecoration: 'none',
+              }}
+            >
+              <ExternalLink size={13} />
+            </a>
+          </div>
           <div style={{ padding: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem' }}>
               <p style={{ margin: 0, fontSize: '0.88rem', fontWeight: 600, color: '#f0f6fc', lineHeight: 1.4 }}>
@@ -132,15 +173,36 @@ const YoutubeTab = ({ videos, loading, brandId }: { videos: ReturnType<typeof ge
                 {v.failureReason === 'duration_limit_exceeded' ? 'Video exceeds 60-minute limit' : v.failureReason}
               </span>
             )}
-            {v.status === 'done' && <CreateContentButton brandId={brandId} itemType="youtube" itemId={v.id} />}
+            {v.status === 'failed' && (
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); retry.mutate(v.id); }}
+                disabled={retry.isPending}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '0.35rem', alignSelf: 'flex-start',
+                  padding: '0.3rem 0.65rem', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 600,
+                  background: 'rgba(88,166,255,0.1)', border: '1px solid rgba(88,166,255,0.3)',
+                  color: '#58a6ff', cursor: 'pointer',
+                }}
+              >
+                {retry.isPending ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <RefreshCw size={11} />}
+                Retry
+              </button>
+            )}
           </div>
-        </div>
+        </Link>
       ))}
     </div>
   );
 };
 
-const BlogTab = ({ posts, loading, brandId }: { posts: ReturnType<typeof getBlogPosts> extends Promise<infer T> ? T : never; loading: boolean; brandId: string }) => {
+const BlogTab = ({ posts, loading, brandId }: { posts: any[]; loading: boolean; brandId: string }) => {
+  const location = useLocation();
+  const qc = useQueryClient();
+  const retry = useMutation({
+    mutationFn: (id: string) => retryBlogPost(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['inspo-blog', brandId] }),
+  });
+
   if (loading) return <div style={{ color: '#8b949e' }}>Loading blog posts...</div>;
 
   if (posts.length === 0) {
@@ -157,7 +219,18 @@ const BlogTab = ({ posts, loading, brandId }: { posts: ReturnType<typeof getBlog
         let domain = '';
         try { domain = new URL(p.url).hostname } catch {}
         return (
-          <div key={p.id} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '10px', padding: '1.1rem', display: 'flex', gap: '0.9rem', alignItems: 'flex-start' }}>
+          <Link
+            key={p.id}
+            to={`/blog-posts/${p.id}`}
+            state={{ backTo: location.pathname + location.search }}
+            style={{
+              background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '10px',
+              padding: '1.1rem', display: 'flex', gap: '0.9rem', alignItems: 'flex-start',
+              textDecoration: 'none', color: 'inherit', transition: 'border-color 0.15s',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#58a6ff66')}
+            onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
+          >
             <img
               src={domain ? `https://${domain}/favicon.ico` : ''}
               alt=""
@@ -168,9 +241,9 @@ const BlogTab = ({ posts, loading, brandId }: { posts: ReturnType<typeof getBlog
             />
             <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem' }}>
-                <a href={p.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.9rem', fontWeight: 600, color: '#58a6ff', textDecoration: 'none', lineHeight: 1.4 }}>
+                <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#f0f6fc', lineHeight: 1.4 }}>
                   {p.title ?? domain}
-                </a>
+                </span>
                 <StatusBadge status={p.status} />
               </div>
               {p.author && <span style={{ fontSize: '0.75rem', color: '#8b949e' }}>{p.author}</span>}
@@ -178,10 +251,34 @@ const BlogTab = ({ posts, loading, brandId }: { posts: ReturnType<typeof getBlog
               {p.failureReason && (
                 <span style={{ fontSize: '0.72rem', color: '#f85149' }}>{p.failureReason}</span>
               )}
-              {p.status === 'done' && <CreateContentButton brandId={brandId} itemType="blog" itemId={p.id} />}
+              {p.status === 'failed' && (
+                <button
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); retry.mutate(p.id); }}
+                  disabled={retry.isPending}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '0.35rem', alignSelf: 'flex-start',
+                    padding: '0.3rem 0.65rem', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 600,
+                    background: 'rgba(88,166,255,0.1)', border: '1px solid rgba(88,166,255,0.3)',
+                    color: '#58a6ff', cursor: 'pointer',
+                  }}
+                >
+                  {retry.isPending ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <RefreshCw size={11} />}
+                  Retry
+                </button>
+              )}
             </div>
+            <a
+              href={p.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              title="Open original post"
+              style={{ color: '#8b949e', flexShrink: 0, marginTop: '2px', display: 'flex' }}
+            >
+              <ExternalLink size={14} />
+            </a>
             <FileText size={16} style={{ color: '#8b949e', flexShrink: 0, marginTop: '2px' }} />
-          </div>
+          </Link>
         )
       })}
     </div>

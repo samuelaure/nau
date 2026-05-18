@@ -413,17 +413,21 @@ Return JSON: { "sourceConcepts": ["...", "..."] }`,
 
   // ── Dispatch a concept from a specific InspoBase item to flownau ideation ──
 
-  async dispatchFromItem(
+  async dispatchByConceptId(conceptId: string): Promise<{ dispatched: boolean; conceptId: string }> {
+    const concept = await this.prisma.sourceConcept.findUnique({ where: { id: conceptId } })
+    if (!concept) throw new NotFoundException('SourceConcept not found')
+    if (concept.status === 'consumed') return { dispatched: false, conceptId }
+    return this.dispatchConcept(concept.brandId, concept.id, concept.content)
+  }
+
+  private async dispatchConcept(
     brandId: string,
-    itemType: 'post' | 'profile' | 'voicenote' | 'youtube' | 'blog',
-    itemId: string,
+    conceptId: string,
+    content: string,
   ): Promise<{ dispatched: boolean; conceptId: string }> {
     const flownauUrl = this.config.get<string>('FLOWNAU_URL')
     const authSecret = this.config.get<string>('AUTH_SECRET')
     if (!flownauUrl || !authSecret) throw new Error('FLOWNAU_URL or AUTH_SECRET not configured')
-
-    const concept = await this.resolveOrCreateConcept(brandId, itemType, itemId)
-    if (!concept) throw new NotFoundException(`No source concept available for this ${itemType}`)
 
     const { signServiceToken } = await import('@nau/auth')
     const axios = (await import('axios')).default
@@ -431,16 +435,26 @@ Return JSON: { "sourceConcepts": ["...", "..."] }`,
 
     await axios.post(
       `${flownauUrl}/api/v1/_service/ideation`,
-      { brandId, topic: concept.content, sourceRef: concept.id },
+      { brandId, topic: content, sourceRef: conceptId },
       { headers: { Authorization: `Bearer ${token}` }, timeout: 120_000 },
     )
 
     await this.prisma.sourceConcept.update({
-      where: { id: concept.id },
+      where: { id: conceptId },
       data: { status: 'consumed', consumedAt: new Date() },
     })
 
-    return { dispatched: true, conceptId: concept.id }
+    return { dispatched: true, conceptId }
+  }
+
+  async dispatchFromItem(
+    brandId: string,
+    itemType: 'post' | 'profile' | 'voicenote' | 'youtube' | 'blog',
+    itemId: string,
+  ): Promise<{ dispatched: boolean; conceptId: string }> {
+    const concept = await this.resolveOrCreateConcept(brandId, itemType, itemId)
+    if (!concept) throw new NotFoundException(`No source concept available for this ${itemType}`)
+    return this.dispatchConcept(brandId, concept.id, concept.content)
   }
 
   private async resolveOrCreateConcept(
@@ -470,24 +484,29 @@ Return JSON: { "sourceConcepts": ["...", "..."] }`,
       const concept = await this.prisma.sourceConcept.create({
         data: { brandId, content: v.synthesis, sourceType: 'voicenote', status: 'pending' },
       })
+      await this.prisma.sourceConceptSource.create({ data: { sourceConceptId: concept.id, voicenoteId: itemId } })
       return concept
     }
 
     if (itemType === 'youtube') {
       const video = await this.prisma.youtubeVideo.findUnique({ where: { id: itemId }, select: { synthesis: true } })
       if (!video?.synthesis) return null
-      return this.prisma.sourceConcept.create({
+      const concept = await this.prisma.sourceConcept.create({
         data: { brandId, content: video.synthesis, sourceType: 'inspo_base', status: 'pending' },
       })
+      await this.prisma.sourceConceptSource.create({ data: { sourceConceptId: concept.id, youtubeVideoId: itemId } })
+      return concept
     }
 
     if (itemType === 'blog') {
       const post = await this.prisma.blogPost.findUnique({ where: { id: itemId }, select: { synthesis: true, title: true } })
       const content = post?.synthesis ?? post?.title
       if (!content) return null
-      return this.prisma.sourceConcept.create({
+      const concept = await this.prisma.sourceConcept.create({
         data: { brandId, content, sourceType: 'inspo_base', status: 'pending' },
       })
+      await this.prisma.sourceConceptSource.create({ data: { sourceConceptId: concept.id, blogPostId: itemId } })
+      return concept
     }
 
     // profile — only use an existing concept, never generate on the fly
@@ -515,13 +534,29 @@ Return JSON: { "sourceConcepts": ["...", "..."] }`,
       return src?.sourceConcept ?? null
     }
     if (itemType === 'voicenote') {
-      const voicenote = await this.prisma.voicenote.findUnique({ where: { id: itemId }, select: { brandId: true, synthesis: true } })
-      if (!voicenote) return null
-      return this.prisma.sourceConcept.findFirst({
-        where: { brandId: voicenote.brandId, sourceType: 'voicenote', status: 'pending', content: voicenote.synthesis },
+      const src = await this.prisma.sourceConceptSource.findFirst({
+        where: { voicenoteId: itemId, sourceConcept: { status: 'pending' } },
+        include: { sourceConcept: true },
+        orderBy: { sourceConcept: { createdAt: 'asc' } },
       })
+      return src?.sourceConcept ?? null
     }
-    // youtube and blog don't link via SourceConceptSource — always create fresh
+    if (itemType === 'youtube') {
+      const src = await this.prisma.sourceConceptSource.findFirst({
+        where: { youtubeVideoId: itemId, sourceConcept: { status: 'pending' } },
+        include: { sourceConcept: true },
+        orderBy: { sourceConcept: { createdAt: 'asc' } },
+      })
+      return src?.sourceConcept ?? null
+    }
+    if (itemType === 'blog') {
+      const src = await this.prisma.sourceConceptSource.findFirst({
+        where: { blogPostId: itemId, sourceConcept: { status: 'pending' } },
+        include: { sourceConcept: true },
+        orderBy: { sourceConcept: { createdAt: 'asc' } },
+      })
+      return src?.sourceConcept ?? null
+    }
     return null
   }
 }

@@ -81,4 +81,13 @@ export class SourceConceptController {
   ) {
     return this.sourceConceptService.dispatchFromItem(brandId, body.itemType, body.itemId)
   }
+
+  // User-facing: dispatch an already-resolved SourceConcept by its own id.
+  // Used by detail views where the concept is already loaded.
+  @Post('source-concepts/:conceptId/dispatch')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  dispatchById(@Param('conceptId') conceptId: string) {
+    return this.sourceConceptService.dispatchByConceptId(conceptId)
+  }
 }

@@ -13,6 +13,12 @@ export class VoicenoteController {
     return this.voicenoteService.listForBrand(brandId)
   }
 
+  @Get('voicenotes/:id')
+  @UseGuards(JwtAuthGuard)
+  getOne(@Param('id') id: string) {
+    return this.voicenoteService.getOne(id)
+  }
+
   @Post('_service/audio/process')
   @UseGuards(ServiceAuthGuard)
   async processAudio(@Body() body: { audioUrl: string; brandId?: string }) {
