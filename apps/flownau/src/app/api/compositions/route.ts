@@ -14,7 +14,8 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Missing brandId' }, { status: 400 })
     }
 
-    const denied = await checkBrandAccessForRoute(brandId); if (denied) return denied
+    const denied = await checkBrandAccessForRoute(brandId)
+    if (denied) return denied
 
     const isCalendar = searchParams.get('calendar') === '1'
     const isPool = searchParams.get('pool') === '1'
@@ -22,11 +23,19 @@ export async function GET(req: Request) {
 
     // Statuses that represent actionable content (past the idea stage)
     const CONTENT_STATUSES = [
-      'DRAFT_PENDING', 'DRAFT_APPROVED',
-      'RENDERING', 'RENDERED_PENDING', 'RENDERED_APPROVED',
-      'PUBLISHING', 'PUBLISHED', 'FAILED',
+      'DRAFT_PENDING',
+      'DRAFT_APPROVED',
+      'RENDERING',
+      'RENDERED_PENDING',
+      'RENDERED_APPROVED',
+      'PUBLISHING',
+      'PUBLISHED',
+      'FAILED',
       // legacy values kept for backwards compat
-      'DRAFT', 'APPROVED', 'SCHEDULED', 'RENDERED',
+      'DRAFT',
+      'APPROVED',
+      'SCHEDULED',
+      'RENDERED',
     ]
 
     const whereClause = isCalendar

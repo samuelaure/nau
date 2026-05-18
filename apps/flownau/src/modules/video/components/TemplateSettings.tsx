@@ -133,11 +133,7 @@ export default function TemplateSettings({
           </div>
           <div className="form-group">
             <label className="form-label">Template Scope</label>
-            <select
-              name="brandId"
-              defaultValue={template.brandId || ''}
-              className="input-field"
-            >
+            <select name="brandId" defaultValue={template.brandId || ''} className="input-field">
               <option value="">Global Template (Available to all)</option>
               {accounts?.map((acc) => (
                 <option key={acc.id} value={acc.id}>

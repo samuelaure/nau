@@ -7,7 +7,19 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
-  const { assetId, r2Key, cdnUrl, ext, type, contextAccountId, templateId, originalFilename, mimeType, hash, size } = body as {
+  const {
+    assetId,
+    r2Key,
+    cdnUrl,
+    ext,
+    type,
+    contextAccountId,
+    templateId,
+    originalFilename,
+    mimeType,
+    hash,
+    size,
+  } = body as {
     assetId: string
     r2Key: string
     cdnUrl: string
@@ -46,9 +58,22 @@ export async function POST(req: NextRequest) {
   })
 
   const assetFolder =
-    type === 'VID' ? ('videos' as const) : type === 'AUD' ? ('audios' as const) : ('images' as const)
+    type === 'VID'
+      ? ('videos' as const)
+      : type === 'AUD'
+        ? ('audios' as const)
+        : ('images' as const)
 
-  await enqueueOptimization({ assetId, cdnUrl, type, mimeType, ext, contextAccountId, templateId, assetFolder })
+  await enqueueOptimization({
+    assetId,
+    cdnUrl,
+    type,
+    mimeType,
+    ext,
+    contextAccountId,
+    templateId,
+    assetFolder,
+  })
 
   logger.info({ assetId, type }, 'Asset confirmed — optimization enqueued')
 

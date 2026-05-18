@@ -66,16 +66,36 @@ export async function publishComposition(post: PostForPublish): Promise<PublishR
   switch (post.format) {
     case 'reel':
     case 'head_talk':
-      result = await publishReel({ accessToken: validToken, igUserId, videoUrl: post.videoUrl, caption, coverUrl: post.coverUrl ?? undefined })
+      result = await publishReel({
+        accessToken: validToken,
+        igUserId,
+        videoUrl: post.videoUrl,
+        caption,
+        coverUrl: post.coverUrl ?? undefined,
+      })
       break
     case 'trial_head_talk':
     case 'trial_reel': {
-      const trialResult = await publishTrialReel({ accessToken: validToken, igUserId, videoUrl: post.videoUrl, caption })
+      const trialResult = await publishTrialReel({
+        accessToken: validToken,
+        igUserId,
+        videoUrl: post.videoUrl,
+        caption,
+      })
       // 2207081 = account doesn't meet trial reel follower requirement — non-transient, fall back to regular reel
       if (!trialResult.success && trialResult.igErrorSubcode === 2207081) {
-        logger.warn({ postId: post.id }, '[PublishOrchestrator] Trial reel not eligible (follower count) — falling back to regular reel')
+        logger.warn(
+          { postId: post.id },
+          '[PublishOrchestrator] Trial reel not eligible (follower count) — falling back to regular reel',
+        )
         await prisma.post.update({ where: { id: post.id }, data: { format: 'reel' } })
-        result = await publishReel({ accessToken: validToken, igUserId, videoUrl: post.videoUrl, caption, coverUrl: post.coverUrl ?? undefined })
+        result = await publishReel({
+          accessToken: validToken,
+          igUserId,
+          videoUrl: post.videoUrl,
+          caption,
+          coverUrl: post.coverUrl ?? undefined,
+        })
       } else {
         result = trialResult
       }
@@ -87,7 +107,12 @@ export async function publishComposition(post: PostForPublish): Promise<PublishR
       break
     }
     case 'single_image':
-      result = await publishPhoto({ accessToken: validToken, igUserId, imageUrl: post.videoUrl, caption })
+      result = await publishPhoto({
+        accessToken: validToken,
+        igUserId,
+        imageUrl: post.videoUrl,
+        caption,
+      })
       break
     default:
       result = { success: false, error: `Unknown format: ${post.format}` }
@@ -103,7 +128,9 @@ export async function publishComposition(post: PostForPublish): Promise<PublishR
         publishedAt: new Date(),
       },
     })
-    logger.info(`[PublishOrchestrator] Published ${post.id} → ${result.permalink ?? result.externalId}`)
+    logger.info(
+      `[PublishOrchestrator] Published ${post.id} → ${result.permalink ?? result.externalId}`,
+    )
     await onPostPublished(post.id, post.brandId)
   }
 

@@ -7,9 +7,13 @@ import { logError, logger } from '@/modules/shared/logger'
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const post = await prisma.post.findUnique({ where: { id }, select: { id: true, brandId: true, status: true } })
+    const post = await prisma.post.findUnique({
+      where: { id },
+      select: { id: true, brandId: true, status: true },
+    })
     if (!post) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-    const denied = await checkBrandAccessForRoute(post.brandId); if (denied) return denied
+    const denied = await checkBrandAccessForRoute(post.brandId)
+    if (denied) return denied
 
     // Already out of the render pipeline — treat as success (idempotent)
     if (post.status !== 'RENDERING' && post.status !== 'DRAFT_APPROVED') {
@@ -26,7 +30,10 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
     // Reset post to DRAFT_APPROVED so user can re-render
     await prisma.post.update({ where: { id }, data: { status: 'DRAFT_PENDING' } })
-    await prisma.renderJob.updateMany({ where: { postId: id, status: { in: ['queued', 'rendering', 'uploading'] } }, data: { status: 'failed', error: 'Cancelled by user' } })
+    await prisma.renderJob.updateMany({
+      where: { postId: id, status: { in: ['queued', 'rendering', 'uploading'] } },
+      data: { status: 'failed', error: 'Cancelled by user' },
+    })
 
     logger.info({ postId: id }, '[CancelRender] Render cancelled by user')
     return NextResponse.json({ ok: true })

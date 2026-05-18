@@ -36,11 +36,18 @@ async function main() {
     const ideaId = IDEAS[i]
     if (!ideaId) continue
     const idea = await prisma.post.findUnique({ where: { id: ideaId }, select: { ideaText: true } })
-    if (!idea) { console.log(`  Idea ${ideaId} not found`); continue }
+    if (!idea) {
+      console.log(`  Idea ${ideaId} not found`)
+      continue
+    }
 
     console.log(`  Composing ${template.name} (${template.remotionId})...`)
     try {
-      const result = await runDraftPipeline({ ideaText: idea.ideaText ?? '', brandId, templateId: template.id })
+      const result = await runDraftPipeline({
+        ideaText: idea.ideaText ?? '',
+        brandId,
+        templateId: template.id,
+      })
       const post = await prisma.post.update({
         where: { id: ideaId },
         data: {
@@ -63,7 +70,11 @@ async function main() {
     const htIdea = `La conexión entre padres e hijos se fortalece cuando los niños aprenden en libertad y confianza.`
     console.log(`\n  Composing head talk: ${htTemplate.name}...`)
     try {
-      const result = await runDraftPipeline({ ideaText: htIdea, brandId, templateId: htTemplate.id })
+      const result = await runDraftPipeline({
+        ideaText: htIdea,
+        brandId,
+        templateId: htTemplate.id,
+      })
       const htPost = await prisma.post.create({
         data: {
           brandId,
@@ -90,9 +101,13 @@ async function main() {
       await triggerRenderForPost(postId)
       console.log(`  Render enqueued: ${postId}`)
     } catch (err) {
-      console.error(`  Render enqueue failed for ${postId}: ${err instanceof Error ? err.message : err}`)
+      console.error(
+        `  Render enqueue failed for ${postId}: ${err instanceof Error ? err.message : err}`,
+      )
     }
   }
 }
 
-main().catch(console.error).finally(() => prisma.$disconnect())
+main()
+  .catch(console.error)
+  .finally(() => prisma.$disconnect())

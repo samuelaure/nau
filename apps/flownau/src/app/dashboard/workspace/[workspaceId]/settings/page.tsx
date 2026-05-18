@@ -5,7 +5,18 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { Loader2, Users, Building2, UserPlus, Trash2, Copy, RefreshCw, Clock, Bell, BellOff } from 'lucide-react'
+import {
+  Loader2,
+  Users,
+  Building2,
+  UserPlus,
+  Trash2,
+  Copy,
+  RefreshCw,
+  Clock,
+  Bell,
+  BellOff,
+} from 'lucide-react'
 import { Card } from '@/modules/shared/components/ui/Card'
 import { Input } from '@/modules/shared/components/ui/Input'
 import { Button } from '@/modules/shared/components/ui/Button'
@@ -64,7 +75,10 @@ export default function WorkspaceSettingsPage() {
         ])
         const workspaces: { id: string; name: string }[] = wsRes.ok ? await wsRes.json() : []
         const ws = workspaces.find((w) => w.id === workspaceId)
-        if (ws) { setName(ws.name); setOriginalName(ws.name) }
+        if (ws) {
+          setName(ws.name)
+          setOriginalName(ws.name)
+        }
 
         if (membersRes.ok) {
           const data = await membersRes.json()
@@ -83,7 +97,7 @@ export default function WorkspaceSettingsPage() {
       }
     }
     load()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId])
 
   // Derive current role after members load
@@ -94,7 +108,11 @@ export default function WorkspaceSettingsPage() {
     }
   }, [members, currentUserId])
 
-  const canManage = currentRole === 'OWNER' || currentRole === 'ADMIN' || currentRole === 'owner' || currentRole === 'admin'
+  const canManage =
+    currentRole === 'OWNER' ||
+    currentRole === 'ADMIN' ||
+    currentRole === 'owner' ||
+    currentRole === 'admin'
 
   const handleSave = async () => {
     if (!name.trim() || name.trim() === originalName) return
@@ -147,7 +165,9 @@ export default function WorkspaceSettingsPage() {
   const handleRemove = async (member: Member) => {
     setRemovingId(member.id)
     try {
-      const res = await fetch(`/api/workspaces/${workspaceId}/members/${member.user.id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/workspaces/${workspaceId}/members/${member.user.id}`, {
+        method: 'DELETE',
+      })
       if (!res.ok) throw new Error()
       setMembers((prev) => prev.filter((m) => m.id !== member.id))
       toast.success('Member removed.')
@@ -162,17 +182,22 @@ export default function WorkspaceSettingsPage() {
     const enabled = member.notificationSettings?.flownau !== false
     setTogglingNotifId(member.user.id)
     try {
-      const res = await fetch(`/api/workspaces/${workspaceId}/members/${member.user.id}/notifications`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ app: 'flownau', enabled: !enabled }),
-      })
+      const res = await fetch(
+        `/api/workspaces/${workspaceId}/members/${member.user.id}/notifications`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ app: 'flownau', enabled: !enabled }),
+        },
+      )
       if (!res.ok) throw new Error()
-      setMembers((prev) => prev.map((m) =>
-        m.id === member.id
-          ? { ...m, notificationSettings: { ...m.notificationSettings, flownau: !enabled } }
-          : m
-      ))
+      setMembers((prev) =>
+        prev.map((m) =>
+          m.id === member.id
+            ? { ...m, notificationSettings: { ...m.notificationSettings, flownau: !enabled } }
+            : m,
+        ),
+      )
       toast.success(!enabled ? 'Notifications enabled' : 'Notifications disabled')
     } catch {
       toast.error('Failed to update notification settings')
@@ -190,10 +215,18 @@ export default function WorkspaceSettingsPage() {
   const handleRegenerateInvite = async (invite: PendingInvite) => {
     setRegeneratingId(invite.id)
     try {
-      const res = await fetch(`/api/workspaces/${workspaceId}/invites/${invite.id}`, { method: 'POST' })
+      const res = await fetch(`/api/workspaces/${workspaceId}/invites/${invite.id}`, {
+        method: 'POST',
+      })
       if (!res.ok) throw new Error()
       const updated = await res.json()
-      setPendingInvites((prev) => prev.map((i) => i.id === invite.id ? { ...i, token: updated.token, expiresAt: updated.expiresAt, expired: false } : i))
+      setPendingInvites((prev) =>
+        prev.map((i) =>
+          i.id === invite.id
+            ? { ...i, token: updated.token, expiresAt: updated.expiresAt, expired: false }
+            : i,
+        ),
+      )
       toast.success('Invite link regenerated.')
     } catch {
       toast.error('Failed to regenerate invite.')
@@ -205,7 +238,9 @@ export default function WorkspaceSettingsPage() {
   const handleCancelInvite = async (invite: PendingInvite) => {
     setCancellingId(invite.id)
     try {
-      const res = await fetch(`/api/workspaces/${workspaceId}/invites/${invite.id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/workspaces/${workspaceId}/invites/${invite.id}`, {
+        method: 'DELETE',
+      })
       if (!res.ok) throw new Error()
       setPendingInvites((prev) => prev.filter((i) => i.id !== invite.id))
       toast.success('Invite cancelled.')
@@ -228,7 +263,9 @@ export default function WorkspaceSettingsPage() {
     <div className="animate-fade-in max-w-2xl">
       <header className="mb-10">
         <h1 className="text-3xl font-heading font-semibold mb-2">Workspace Settings</h1>
-        <p className="text-text-secondary text-sm">Manage this workspace&apos;s name and members.</p>
+        <p className="text-text-secondary text-sm">
+          Manage this workspace&apos;s name and members.
+        </p>
       </header>
 
       {/* Name */}
@@ -242,10 +279,16 @@ export default function WorkspaceSettingsPage() {
             label="Workspace name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleSave() }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSave()
+            }}
           />
           <div className="flex justify-end">
-            <Button onClick={handleSave} disabled={saving || !name.trim() || name.trim() === originalName} className="gap-2">
+            <Button
+              onClick={handleSave}
+              disabled={saving || !name.trim() || name.trim() === originalName}
+              className="gap-2"
+            >
               {saving && <Loader2 size={14} className="animate-spin" />}
               Save
             </Button>
@@ -277,31 +320,47 @@ export default function WorkspaceSettingsPage() {
                   <span className="text-xs capitalize bg-gray-800 text-text-secondary px-2 py-0.5 rounded-full">
                     {m.role.toLowerCase()}
                   </span>
-                  {(canManage || m.user.id === currentUserId) && (() => {
-                    const notifEnabled = m.notificationSettings?.flownau !== false
-                    return (
+                  {(canManage || m.user.id === currentUserId) &&
+                    (() => {
+                      const notifEnabled = m.notificationSettings?.flownau !== false
+                      return (
+                        <button
+                          onClick={() => handleToggleNotification(m)}
+                          disabled={togglingNotifId === m.user.id}
+                          className={`transition-colors disabled:opacity-50 ${notifEnabled ? 'text-primary hover:text-text-secondary' : 'text-text-secondary hover:text-primary'}`}
+                          title={
+                            notifEnabled
+                              ? 'Disable flownaŭ notifications'
+                              : 'Enable flownaŭ notifications'
+                          }
+                        >
+                          {togglingNotifId === m.user.id ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : notifEnabled ? (
+                            <Bell size={14} />
+                          ) : (
+                            <BellOff size={14} />
+                          )}
+                        </button>
+                      )
+                    })()}
+                  {canManage &&
+                    m.user.id !== currentUserId &&
+                    m.role !== 'OWNER' &&
+                    m.role !== 'owner' && (
                       <button
-                        onClick={() => handleToggleNotification(m)}
-                        disabled={togglingNotifId === m.user.id}
-                        className={`transition-colors disabled:opacity-50 ${notifEnabled ? 'text-primary hover:text-text-secondary' : 'text-text-secondary hover:text-primary'}`}
-                        title={notifEnabled ? 'Disable flownaŭ notifications' : 'Enable flownaŭ notifications'}
+                        onClick={() => handleRemove(m)}
+                        disabled={removingId === m.id}
+                        className="text-text-secondary hover:text-red-400 transition-colors disabled:opacity-50"
+                        aria-label="Remove member"
                       >
-                        {togglingNotifId === m.user.id
-                          ? <Loader2 size={14} className="animate-spin" />
-                          : notifEnabled ? <Bell size={14} /> : <BellOff size={14} />}
+                        {removingId === m.id ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <Trash2 size={14} />
+                        )}
                       </button>
-                    )
-                  })()}
-                  {canManage && m.user.id !== currentUserId && m.role !== 'OWNER' && m.role !== 'owner' && (
-                    <button
-                      onClick={() => handleRemove(m)}
-                      disabled={removingId === m.id}
-                      className="text-text-secondary hover:text-red-400 transition-colors disabled:opacity-50"
-                      aria-label="Remove member"
-                    >
-                      {removingId === m.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                    </button>
-                  )}
+                    )}
                 </div>
               </li>
             ))}
@@ -314,7 +373,9 @@ export default function WorkspaceSettingsPage() {
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <Clock size={11} className={inv.expired ? 'text-red-400' : 'text-amber-400'} />
                     <span className={`text-xs ${inv.expired ? 'text-red-400' : 'text-amber-400'}`}>
-                      {inv.expired ? 'Expired' : `Expires ${new Date(inv.expiresAt).toLocaleDateString('en-GB')}`}
+                      {inv.expired
+                        ? 'Expired'
+                        : `Expires ${new Date(inv.expiresAt).toLocaleDateString('en-GB')}`}
                     </span>
                   </div>
                 </div>
@@ -337,7 +398,11 @@ export default function WorkspaceSettingsPage() {
                         className="text-text-secondary hover:text-white transition-colors disabled:opacity-50"
                         title="Regenerate invite link"
                       >
-                        {regeneratingId === inv.id ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                        {regeneratingId === inv.id ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <RefreshCw size={14} />
+                        )}
                       </button>
                       <button
                         onClick={() => handleCancelInvite(inv)}
@@ -345,7 +410,11 @@ export default function WorkspaceSettingsPage() {
                         className="text-text-secondary hover:text-red-400 transition-colors disabled:opacity-50"
                         title="Cancel invite"
                       >
-                        {cancellingId === inv.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                        {cancellingId === inv.id ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <Trash2 size={14} />
+                        )}
                       </button>
                     </>
                   )}
@@ -366,7 +435,9 @@ export default function WorkspaceSettingsPage() {
                   placeholder="Email address"
                   value={addEmail}
                   onChange={(e) => setAddEmail(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleAddMember() }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleAddMember()
+                  }}
                 />
               </div>
               <select
@@ -375,10 +446,16 @@ export default function WorkspaceSettingsPage() {
                 className="bg-surface border border-border rounded-lg px-3 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-primary"
               >
                 {ROLES.map((r) => (
-                  <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
+                  <option key={r} value={r}>
+                    {r.charAt(0).toUpperCase() + r.slice(1)}
+                  </option>
                 ))}
               </select>
-              <Button onClick={handleAddMember} disabled={adding || !addEmail.trim()} className="gap-2 shrink-0">
+              <Button
+                onClick={handleAddMember}
+                disabled={adding || !addEmail.trim()}
+                className="gap-2 shrink-0"
+              >
                 {adding ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
                 Invite
               </Button>

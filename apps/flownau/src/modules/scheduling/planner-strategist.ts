@@ -84,7 +84,11 @@ RULES:
       timeoutMs: 30_000,
     })
 
-    reportFlownauUsage({ operation: 'calendar_planning', brandId: input.brandId, usage: result.usage })
+    reportFlownauUsage({
+      operation: 'calendar_planning',
+      brandId: input.brandId,
+      usage: result.usage,
+    })
 
     const ordered = (result.data as StrategistOutput).orderedIds
     const allIds = new Set(input.pieces.map((p) => p.id))

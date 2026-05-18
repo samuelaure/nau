@@ -5,7 +5,10 @@ import { prisma } from '@/modules/shared/prisma'
 import { logger } from '@/lib/logger'
 import { enqueueOptimization } from '@/modules/asset/optimization-queue'
 
-export async function POST(_req: NextRequest, { params }: { params: Promise<{ assetId: string }> }) {
+export async function POST(
+  _req: NextRequest,
+  { params }: { params: Promise<{ assetId: string }> },
+) {
   const { assetId } = await params
 
   const asset = await prisma.asset.findUnique({ where: { id: assetId } })
@@ -20,7 +23,11 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ as
   const type = asset.type as 'VID' | 'AUD' | 'IMG'
   const ext = asset.systemFilename.split('.').pop() || ''
   const assetFolder =
-    type === 'VID' ? ('videos' as const) : type === 'AUD' ? ('audios' as const) : ('images' as const)
+    type === 'VID'
+      ? ('videos' as const)
+      : type === 'AUD'
+        ? ('audios' as const)
+        : ('images' as const)
 
   await enqueueOptimization({
     assetId,

@@ -2,16 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import {
-  Video,
-  Settings,
-  LogOut,
-  ChevronDown,
-  Plus,
-  Check,
-  Loader2,
-  X,
-} from 'lucide-react'
+import { Video, Settings, LogOut, ChevronDown, Plus, Check, Loader2, X } from 'lucide-react'
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { BrandSwitcher } from './BrandSwitcher'
 
@@ -140,8 +131,12 @@ function WorkspaceSelector() {
               textAlign: 'left',
               fontWeight: 400,
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.05)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent'
+            }}
           >
             All Workspaces
           </button>
@@ -340,7 +335,6 @@ export default function Sidebar({ open = false, onClose }: SidebarProps) {
       ].join(' ')}
       style={{ width: '280px', padding: '24px' }}
     >
-
       {/* Logo row — includes close button on mobile */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px' }}>
         <div style={{ padding: '8px', background: 'var(--accent-color)', borderRadius: '8px' }}>

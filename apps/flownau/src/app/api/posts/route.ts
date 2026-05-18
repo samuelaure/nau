@@ -5,8 +5,8 @@ import { logError } from '@/modules/shared/logger'
 
 // Stage filters mapped to status values
 const STAGE_FILTERS: Record<string, string[]> = {
-  idea:      ['IDEA_PENDING', 'IDEA_APPROVED'],
-  draft:     ['DRAFT_PENDING', 'DRAFT_APPROVED'],
+  idea: ['IDEA_PENDING', 'IDEA_APPROVED'],
+  draft: ['DRAFT_PENDING', 'DRAFT_APPROVED'],
   scheduled: ['SCHEDULED'],
   rendering: ['RENDERING', 'RENDERED_PENDING', 'RENDERED_APPROVED'],
   published: ['PUBLISHED'],
@@ -20,7 +20,8 @@ export async function GET(req: Request) {
     const status = searchParams.get('status')
 
     if (!brandId) return NextResponse.json({ error: 'Missing brandId' }, { status: 400 })
-    const denied = await checkBrandAccessForRoute(brandId); if (denied) return denied
+    const denied = await checkBrandAccessForRoute(brandId)
+    if (denied) return denied
 
     const statusFilter = status
       ? [status]
@@ -55,7 +56,8 @@ export async function POST(req: Request) {
     if (!brandId || !ideaText?.trim()) {
       return NextResponse.json({ error: 'brandId and ideaText are required' }, { status: 400 })
     }
-    const denied2 = await checkBrandAccessForRoute(brandId); if (denied2) return denied2
+    const denied2 = await checkBrandAccessForRoute(brandId)
+    if (denied2) return denied2
 
     const brand = await prisma.brand.findUnique({
       where: { id: brandId },

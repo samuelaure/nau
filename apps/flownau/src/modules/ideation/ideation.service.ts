@@ -46,7 +46,9 @@ export interface GenerationRequest {
   userId?: string
 }
 
-export async function generateContentIdeas(req: GenerationRequest): Promise<IdeationOutputWithTrace> {
+export async function generateContentIdeas(
+  req: GenerationRequest,
+): Promise<IdeationOutputWithTrace> {
   if (!req.topic?.trim()) {
     throw new Error('Topic is required for idea generation.')
   }
@@ -77,7 +79,13 @@ export async function generateContentIdeas(req: GenerationRequest): Promise<Idea
   })
 
   if (result.usage) {
-    reportFlownauUsage({ operation: 'ideation', brandId: req.brandId, workspaceId: req.workspaceId, userId: req.userId, usage: result.usage })
+    reportFlownauUsage({
+      operation: 'ideation',
+      brandId: req.brandId,
+      workspaceId: req.workspaceId,
+      userId: req.userId,
+      usage: result.usage,
+    })
   }
 
   const data = result.data as IdeationOutput
@@ -95,15 +103,18 @@ export async function generateContentIdeas(req: GenerationRequest): Promise<Idea
 }
 
 function buildUserMessage(req: GenerationRequest): string {
-  const countInstruction = req.count != null
-    ? `Generate exactly ${req.count} ideas`
-    : `Generate as many ideas as genuinely capture distinct angles — be moderate, quality over quantity`
+  const countInstruction =
+    req.count != null
+      ? `Generate exactly ${req.count} ideas`
+      : `Generate as many ideas as genuinely capture distinct angles — be moderate, quality over quantity`
 
   let msg = `${countInstruction} about:\n\n${req.topic}`
 
   if (req.recentContent && req.recentContent.length > 0) {
     msg += `\n\nRECENT PUBLISHED CONTENT — do not repeat these topics:\n`
-    req.recentContent.forEach((c) => { msg += `- ${c}\n` })
+    req.recentContent.forEach((c) => {
+      msg += `- ${c}\n`
+    })
   }
 
   return msg

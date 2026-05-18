@@ -11,18 +11,14 @@ import { logError } from '@/modules/shared/logger'
 export async function POST(req: Request) {
   try {
     const json = await req.json()
-    const {
-      brandId,
-      topic: topicFromBody,
-      count: countOverride,
-      source = 'manual',
-    } = json
+    const { brandId, topic: topicFromBody, count: countOverride, source = 'manual' } = json
 
     if (!brandId) {
       return NextResponse.json({ error: 'Missing brandId' }, { status: 400 })
     }
 
-    const denied = await checkBrandAccessForRoute(brandId); if (denied) return denied
+    const denied = await checkBrandAccessForRoute(brandId)
+    if (denied) return denied
 
     const brand = await prisma.brand.findUnique({
       where: { id: brandId },
@@ -40,12 +36,16 @@ export async function POST(req: Request) {
     if (source === 'capture') {
       // Service-delivered capture (voicenote, specific capture) — topic and sourceRef come from body
       if (!topic) {
-        return NextResponse.json({ error: 'Topic is required for capture source.' }, { status: 400 })
+        return NextResponse.json(
+          { error: 'Topic is required for capture source.' },
+          { status: 400 },
+        )
       }
       priority = 1
       sourceRef = json.sourceRef ?? null
     } else if (source === 'automatic') {
-      const { fetchPendingSourceConcepts, generateSourceConcepts } = await import('@/modules/ideation/sources/inspo-source')
+      const { fetchPendingSourceConcepts, generateSourceConcepts } =
+        await import('@/modules/ideation/sources/inspo-source')
       let concepts = await fetchPendingSourceConcepts(brandId)
       if (concepts.length === 0) concepts = await generateSourceConcepts(brandId)
 
@@ -67,7 +67,9 @@ export async function POST(req: Request) {
     }
 
     // Recent content for diversity (manual skip for speed; cron handles this for automatic)
-    const brandContext = renderBrandContextBlock({ name: brand?.name ?? null, context: brand?.context ?? null }) || null
+    const brandContext =
+      renderBrandContextBlock({ name: brand?.name ?? null, context: brand?.context ?? null }) ||
+      null
 
     const output = await generateContentIdeas({
       topic,
@@ -78,7 +80,13 @@ export async function POST(req: Request) {
       brandId,
     })
 
-    const autoApprove = (await prisma.brand.findUnique({ where: { id: brandId }, select: { autoApproveIdeas: true } }))?.autoApproveIdeas ?? false
+    const autoApprove =
+      (
+        await prisma.brand.findUnique({
+          where: { id: brandId },
+          select: { autoApproveIdeas: true },
+        })
+      )?.autoApproveIdeas ?? false
     const batchId = crypto.randomUUID()
 
     const ops = output.ideas.map((idea) =>

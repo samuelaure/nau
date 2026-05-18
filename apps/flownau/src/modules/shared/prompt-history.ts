@@ -29,6 +29,8 @@ export async function recordPromptChange(
     ...(active
       ? [prisma.promptHistory.update({ where: { id: active.id }, data: { replacedAt: now } })]
       : []),
-    prisma.promptHistory.create({ data: { entityType, entityId, field, content, activeSince: now } }),
+    prisma.promptHistory.create({
+      data: { entityType, entityId, field, content, activeSince: now },
+    }),
   ])
 }

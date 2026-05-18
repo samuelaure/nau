@@ -65,7 +65,11 @@ export async function ingestExternalIdea(params: ExternalIdeaInput) {
   }
 
   // AI-linked ideas always require human review regardless of source or autoApprove settings
-  const status = aiLinked ? 'IDEA_PENDING' : source === 'captured' ? 'IDEA_APPROVED' : 'IDEA_PENDING'
+  const status = aiLinked
+    ? 'IDEA_PENDING'
+    : source === 'captured'
+      ? 'IDEA_APPROVED'
+      : 'IDEA_PENDING'
 
   const provenance = await resolveProvenance(brandId)
 

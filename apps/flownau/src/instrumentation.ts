@@ -6,9 +6,11 @@ export async function register() {
     // Any asset stuck in 'processing' means the previous container died mid-job.
     // Reset them to 'pending' so they show as retriable in the UI.
     const { prisma } = await import('@/modules/shared/prisma')
-    await prisma.asset.updateMany({
-      where: { optimizationStatus: 'processing' },
-      data: { optimizationStatus: 'failed' },
-    }).catch(() => {})
+    await prisma.asset
+      .updateMany({
+        where: { optimizationStatus: 'processing' },
+        data: { optimizationStatus: 'failed' },
+      })
+      .catch(() => {})
   }
 }

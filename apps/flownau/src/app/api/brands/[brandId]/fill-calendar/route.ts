@@ -8,7 +8,8 @@ import { logError } from '@/modules/shared/logger'
 export async function POST(req: NextRequest, { params }: { params: Promise<{ brandId: string }> }) {
   const { brandId } = await params
   try {
-    const denied = await checkBrandAccessForRoute(brandId); if (denied) return denied
+    const denied = await checkBrandAccessForRoute(brandId)
+    if (denied) return denied
     const result = await smartFillCalendar(brandId)
     return NextResponse.json({ result })
   } catch (error) {

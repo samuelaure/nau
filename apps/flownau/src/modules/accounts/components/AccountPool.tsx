@@ -173,7 +173,10 @@ export default function AccountPool({
       formData.append('file', file)
       formData.append('compositionId', id)
       formData.append('brandId', brandId)
-      const res = await fetch('/api/compositions/upload-recording', { method: 'POST', body: formData })
+      const res = await fetch('/api/compositions/upload-recording', {
+        method: 'POST',
+        body: formData,
+      })
       if (!res.ok) throw new Error((await res.json()).error || 'Upload failed')
       toast.success('Recording uploaded', { id: toastId })
       fetchCompositions()
@@ -216,7 +219,9 @@ export default function AccountPool({
         <div className="text-center py-16 text-text-secondary border border-dashed border-gray-800 rounded-lg">
           <Layers className="w-8 h-8 mx-auto mb-3 opacity-30" />
           <p className="text-sm">No drafts in the pool yet.</p>
-          <p className="text-xs mt-1 opacity-60">Approve ideas from Ideas to generate drafts here.</p>
+          <p className="text-xs mt-1 opacity-60">
+            Approve ideas from Ideas to generate drafts here.
+          </p>
         </div>
       )}
 
@@ -268,15 +273,15 @@ export default function AccountPool({
                   </span>
                 )}
                 {scenes.length > 0 && (
-                  <span>{scenes.length} scene{scenes.length !== 1 ? 's' : ''}</span>
+                  <span>
+                    {scenes.length} scene{scenes.length !== 1 ? 's' : ''}
+                  </span>
                 )}
               </div>
 
               {/* Caption preview */}
               {comp.caption && (
-                <p className="text-[11px] text-gray-500 line-clamp-2 mb-3 italic">
-                  {comp.caption}
-                </p>
+                <p className="text-[11px] text-gray-500 line-clamp-2 mb-3 italic">{comp.caption}</p>
               )}
 
               {/* Actions */}
@@ -296,7 +301,11 @@ export default function AccountPool({
                     onClick={() => handleApprove(comp.id)}
                     className="bg-accent hover:bg-accent/80 px-3 flex items-center gap-1.5 text-sm"
                   >
-                    {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+                    {busy ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="w-3 h-3" />
+                    )}
                     Approve
                   </Button>
                 )}
@@ -307,7 +316,11 @@ export default function AccountPool({
                     onClick={() => handleCompose(comp)}
                     className="bg-purple-700 hover:bg-purple-600 px-3 flex items-center gap-1.5 text-sm"
                   >
-                    {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+                    {busy ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Wand2 className="w-3 h-3" />
+                    )}
                     Compose
                   </Button>
                 )}
@@ -315,7 +328,9 @@ export default function AccountPool({
                 {isHeadTalk && ['APPROVED', 'DRAFT_APPROVED'].includes(comp.status) && (
                   <>
                     <input
-                      ref={(el) => { uploadRefs.current[comp.id] = el }}
+                      ref={(el) => {
+                        uploadRefs.current[comp.id] = el
+                      }}
                       type="file"
                       accept="video/*"
                       className="hidden"
@@ -330,7 +345,11 @@ export default function AccountPool({
                       onClick={() => uploadRefs.current[comp.id]?.click()}
                       className="bg-blue-700 hover:bg-blue-600 px-3 flex items-center gap-1.5 text-xs"
                     >
-                      {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+                      {busy ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Upload className="w-3 h-3" />
+                      )}
                       Upload
                     </Button>
                     <Button

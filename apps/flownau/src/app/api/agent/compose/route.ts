@@ -14,7 +14,15 @@ const ComposeRequestSchema = z.object({
   prompt: z.string().min(3),
   brandId: z.string(),
   format: z
-    .enum(['reel', 'trial_reel', 'head_talk', 'trial_head_talk', 'carousel', 'static_post', 'story'])
+    .enum([
+      'reel',
+      'trial_reel',
+      'head_talk',
+      'trial_head_talk',
+      'carousel',
+      'static_post',
+      'story',
+    ])
     .default('reel'),
   postId: z.string().optional(),
   templateId: z.string().optional(),
@@ -33,7 +41,14 @@ export async function POST(req: Request) {
       )
     }
 
-    const { prompt, brandId, format: requestedFormat, postId, templateId, recomposeInstructions } = parsed.data
+    const {
+      prompt,
+      brandId,
+      format: requestedFormat,
+      postId,
+      templateId,
+      recomposeInstructions,
+    } = parsed.data
 
     const rateLimit = await checkRateLimit({
       key: `rate:compose:${brandId}`,
@@ -76,10 +91,12 @@ export async function POST(req: Request) {
     }
 
     const autoApproveDraft =
-      (await prisma.brandTemplateConfig.findUnique({
-        where: { brandId_templateId: { brandId, templateId: resolvedTemplateId } },
-        select: { autoApproveDraft: true },
-      }))?.autoApproveDraft ?? false
+      (
+        await prisma.brandTemplateConfig.findUnique({
+          where: { brandId_templateId: { brandId, templateId: resolvedTemplateId } },
+          select: { autoApproveDraft: true },
+        })
+      )?.autoApproveDraft ?? false
 
     const draftStatus = autoApproveDraft ? 'DRAFT_APPROVED' : 'DRAFT_PENDING'
 
@@ -88,9 +105,15 @@ export async function POST(req: Request) {
 
     let currentDraft: { creative: Record<string, unknown>; caption: string } | null = null
     if (postId) {
-      const existing = await prisma.post.findUnique({ where: { id: postId }, select: { creative: true, caption: true } })
+      const existing = await prisma.post.findUnique({
+        where: { id: postId },
+        select: { creative: true, caption: true },
+      })
       if (existing?.creative) {
-        currentDraft = { creative: existing.creative as Record<string, unknown>, caption: existing.caption ?? '' }
+        currentDraft = {
+          creative: existing.creative as Record<string, unknown>,
+          caption: existing.caption ?? '',
+        }
       }
     }
 
@@ -107,7 +130,10 @@ export async function POST(req: Request) {
 
     let updatedPost
     if (postId) {
-      const existingTrace = await prisma.post.findUnique({ where: { id: postId }, select: { llmTrace: true } })
+      const existingTrace = await prisma.post.findUnique({
+        where: { id: postId },
+        select: { llmTrace: true },
+      })
       updatedPost = await prisma.post.update({
         where: { id: postId },
         data: {
@@ -118,7 +144,10 @@ export async function POST(req: Request) {
           status: draftStatus,
           templateId: resolvedTemplateId,
           postSynthesis: result.postSynthesis || null,
-          llmTrace: { ...(existingTrace?.llmTrace as object ?? {}), draftTrace: result.trace } as unknown as Prisma.InputJsonValue,
+          llmTrace: {
+            ...((existingTrace?.llmTrace as object) ?? {}),
+            draftTrace: result.trace,
+          } as unknown as Prisma.InputJsonValue,
         },
       })
     } else {

@@ -24,7 +24,9 @@ export async function publishTrialReel(params: TrialReelPublishParams): Promise<
       trial_params: JSON.stringify({ graduation_strategy: graduationStrategy }),
     }
 
-    logger.info(`[PublishTrialReel] Creating trial reel container (strategy: ${graduationStrategy})`)
+    logger.info(
+      `[PublishTrialReel] Creating trial reel container (strategy: ${graduationStrategy})`,
+    )
     const containerRes = await axios.post(`${IG_BASE_URL}/${igUserId}/media`, containerPayload)
     const containerId: string = containerRes.data.id
 
@@ -49,9 +51,12 @@ export async function publishTrialReel(params: TrialReelPublishParams): Promise<
     logError('[PublishTrialReel] Failed', err)
     if (apiError) logger.error({ apiError }, '[PublishTrialReel] Instagram API error body')
     const igSubcode: number | undefined = apiError?.error?.error_subcode
-    const msg = axios.isAxiosError(err) && apiError?.error?.message
-      ? apiError.error.message
-      : err instanceof Error ? err.message : String(err)
+    const msg =
+      axios.isAxiosError(err) && apiError?.error?.message
+        ? apiError.error.message
+        : err instanceof Error
+          ? err.message
+          : String(err)
     return { success: false, error: msg, igErrorSubcode: igSubcode }
   }
 }

@@ -50,7 +50,6 @@ export const RemotionVideo: React.FC = () => {
         height={1920}
         defaultProps={defaultReelProps}
       />
-
     </>
   )
 }

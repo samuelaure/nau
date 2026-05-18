@@ -53,9 +53,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ postId: post.id, status: 'pending_approval' })
     }
 
-    const selectedTemplate = await selectTemplateForIdea({ brandId: input.brandId, format: input.format })
+    const selectedTemplate = await selectTemplateForIdea({
+      brandId: input.brandId,
+      format: input.format,
+    })
     if (!selectedTemplate) {
-      return NextResponse.json({ error: 'No enabled template found for this format' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'No enabled template found for this format' },
+        { status: 400 },
+      )
     }
 
     const draftResult = await runDraftPipeline({

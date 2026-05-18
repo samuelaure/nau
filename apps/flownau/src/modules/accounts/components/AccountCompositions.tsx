@@ -88,7 +88,9 @@ export default function AccountCompositions({ brandId }: { brandId: string }) {
       const profileData = await profileRes.json()
       // Filter to post-render statuses only — pool handles DRAFT/APPROVED
       const rendered = (compData.compositions ?? []).filter((c: Composition) =>
-        ['RENDERING', 'RENDERED', 'SCHEDULED', 'PUBLISHING', 'PUBLISHED', 'FAILED'].includes(c.status),
+        ['RENDERING', 'RENDERED', 'SCHEDULED', 'PUBLISHING', 'PUBLISHED', 'FAILED'].includes(
+          c.status,
+        ),
       )
       setCompositions(rendered)
       setSocialProfiles(profileData.profiles ?? [])
@@ -105,7 +107,9 @@ export default function AccountCompositions({ brandId }: { brandId: string }) {
 
   // Poll every 5 s while any composition is actively rendering, stop when done.
   useEffect(() => {
-    const isRendering = compositions.some((c) => c.status === 'RENDERING' || c.status === 'PUBLISHING')
+    const isRendering = compositions.some(
+      (c) => c.status === 'RENDERING' || c.status === 'PUBLISHING',
+    )
     if (!isRendering) return
     const id = setInterval(fetchCompositions, 5000)
     return () => clearInterval(id)
@@ -180,9 +184,7 @@ export default function AccountCompositions({ brandId }: { brandId: string }) {
     <div className="flex flex-col gap-6">
       <div>
         <h3 className="text-xl font-heading font-semibold">Compositions</h3>
-        <p className="text-xs text-text-secondary mt-0.5">
-          Rendered and published content.
-        </p>
+        <p className="text-xs text-text-secondary mt-0.5">Rendered and published content.</p>
       </div>
 
       {compositions.length === 0 && (
@@ -292,7 +294,13 @@ export default function AccountCompositions({ brandId }: { brandId: string }) {
       </div>
 
       {/* Publish Modal */}
-      <Modal isOpen={publishModalOpen} onClose={() => { setPublishModalOpen(false); setPublishingId(null) }}>
+      <Modal
+        isOpen={publishModalOpen}
+        onClose={() => {
+          setPublishModalOpen(false)
+          setPublishingId(null)
+        }}
+      >
         <div className="text-center mb-8">
           <div className="w-20 h-20 bg-accent/10 rounded-3xl flex items-center justify-center mx-auto mb-6 text-accent">
             <Send size={36} />
@@ -334,7 +342,10 @@ export default function AccountCompositions({ brandId }: { brandId: string }) {
         <div className="flex gap-3">
           <Button
             variant="outline"
-            onClick={() => { setPublishModalOpen(false); setPublishingId(null) }}
+            onClick={() => {
+              setPublishModalOpen(false)
+              setPublishingId(null)
+            }}
             disabled={publishInProgress}
             className="flex-1"
           >
@@ -353,7 +364,8 @@ export default function AccountCompositions({ brandId }: { brandId: string }) {
             ) : (
               <>
                 <Send className="w-4 h-4 mr-2" />
-                Publish to {selectedProfiles.length} {selectedProfiles.length === 1 ? 'profile' : 'profiles'}
+                Publish to {selectedProfiles.length}{' '}
+                {selectedProfiles.length === 1 ? 'profile' : 'profiles'}
               </>
             )}
           </Button>

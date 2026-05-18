@@ -8,7 +8,10 @@ const CONCURRENCY = parseInt(process.env.OPTIMIZATION_CONCURRENCY || '1', 10)
 
 async function processOptimizationJob(job: Job<OptimizationJobData>): Promise<void> {
   const { assetId } = job.data
-  logger.info({ assetId, jobId: job.id, attempt: job.attemptsMade + 1 }, '[OptimizationWorker] Processing job')
+  logger.info(
+    { assetId, jobId: job.id, attempt: job.attemptsMade + 1 },
+    '[OptimizationWorker] Processing job',
+  )
   await optimizeAsset(job.data)
 }
 
@@ -32,8 +35,12 @@ export function startOptimizationWorker(): Worker<OptimizationJobData> {
   worker.on('completed', (job) => {
     logger.info({ jobId: job.id, assetId: job.data.assetId }, '[OptimizationWorker] Job completed')
   })
-  worker.on('failed', (job, error) => { handleFailedJob(job, error) })
-  worker.on('error', (error) => { logError('[OptimizationWorker] Worker error', error) })
+  worker.on('failed', (job, error) => {
+    handleFailedJob(job, error)
+  })
+  worker.on('error', (error) => {
+    logError('[OptimizationWorker] Worker error', error)
+  })
 
   logger.info({ concurrency: CONCURRENCY }, '[OptimizationWorker] Started, listening for jobs...')
   return worker

@@ -16,14 +16,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     if (!post) return NextResponse.json({ error: 'Post not found' }, { status: 404 })
 
-    const denied = await checkBrandAccessForRoute(post.brandId); if (denied) return denied
+    const denied = await checkBrandAccessForRoute(post.brandId)
+    if (denied) return denied
 
     await prisma.post.update({
       where: { id },
       data: { status: 'PUBLISHED', publishedAt: new Date() },
     })
 
-    logger.info({ postId: id, format: post.format }, '[MARK_POSTED] Post manually marked as published')
+    logger.info(
+      { postId: id, format: post.format },
+      '[MARK_POSTED] Post manually marked as published',
+    )
     await onPostPublished(id, post.brandId)
 
     return NextResponse.json({ success: true })

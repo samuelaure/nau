@@ -16,7 +16,9 @@ export default function TelegramLinkCard({ linked }: { linked: boolean }) {
           <span className="text-2xl">✅</span>
           <div>
             <h3 className="text-lg font-heading font-semibold">Telegram Connected</h3>
-            <p className="text-sm text-text-secondary mt-1">Your naŭ account is linked. You'll receive approval notifications via Zazŭ bot.</p>
+            <p className="text-sm text-text-secondary mt-1">
+              Your naŭ account is linked. You'll receive approval notifications via Zazŭ bot.
+            </p>
           </div>
         </div>
       </Card>
@@ -42,7 +44,8 @@ export default function TelegramLinkCard({ linked }: { linked: boolean }) {
         <div className="flex-1">
           <h3 className="text-lg font-heading font-semibold">Connect Telegram</h3>
           <p className="text-sm text-text-secondary mt-1 mb-4">
-            Link your Telegram account to receive approval notifications and send voice note ideas via Zazŭ bot.
+            Link your Telegram account to receive approval notifications and send voice note ideas
+            via Zazŭ bot.
           </p>
           {deepLink ? (
             <div className="flex flex-col gap-3">

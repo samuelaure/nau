@@ -35,14 +35,23 @@ export async function GET(request: Request) {
       try {
         const templateLookupFormat = format === 'trial_reel' ? 'reel' : format
         const templateConfig = await prisma.brandTemplateConfig.findFirst({
-          where: { brandId: post.brandId, enabled: true, template: { format: templateLookupFormat } },
+          where: {
+            brandId: post.brandId,
+            enabled: true,
+            template: { format: templateLookupFormat },
+          },
           select: { autoApproveDraft: true, template: { select: { id: true } } },
           orderBy: { updatedAt: 'desc' },
         })
 
         if (!templateConfig?.template.id) {
           logger.warn({ postId: post.id, format }, '[Composer] No template found — skipping')
-          results.push({ postId: post.id, brandId: post.brandId, status: 'skipped', error: 'No template found' })
+          results.push({
+            postId: post.id,
+            brandId: post.brandId,
+            status: 'skipped',
+            error: 'No template found',
+          })
           continue
         }
 

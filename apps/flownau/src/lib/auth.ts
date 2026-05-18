@@ -13,7 +13,9 @@ const ACCOUNTS_URL = process.env.NEXT_PUBLIC_ACCOUNTS_URL ?? 'https://accounts.9
 const FLOWNAU_URL = process.env.NEXT_PUBLIC_FLOWNAU_URL ?? 'https://flownau.9nau.com'
 
 const ADMIN_USER_IDS = (process.env.PLATFORM_ADMIN_USER_IDS ?? '')
-  .split(',').map(s => s.trim()).filter(Boolean)
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean)
 
 export function isAdminUser(userId: string): boolean {
   return ADMIN_USER_IDS.includes(userId)

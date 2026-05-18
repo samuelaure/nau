@@ -79,7 +79,12 @@ const TIMEZONES = [
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function AccountSchedule({ brandId, initialSchedule, initialAutoApproveIdeas, initialCoverageHorizonDays }: AccountScheduleProps) {
+export default function AccountSchedule({
+  brandId,
+  initialSchedule,
+  initialAutoApproveIdeas,
+  initialCoverageHorizonDays,
+}: AccountScheduleProps) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -94,7 +99,9 @@ export default function AccountSchedule({ brandId, initialSchedule, initialAutoA
       .then((data) => {
         const templateFormats = new Set<string>(
           (data.templates ?? [])
-            .filter((t: { brandConfigs?: Array<{ enabled: boolean }> }) => t.brandConfigs?.[0]?.enabled)
+            .filter(
+              (t: { brandConfigs?: Array<{ enabled: boolean }> }) => t.brandConfigs?.[0]?.enabled,
+            )
             .map((t: { format: string }) => t.format),
         )
         const formats: string[] = []
@@ -182,7 +189,14 @@ export default function AccountSchedule({ brandId, initialSchedule, initialAutoA
         fetch(`/api/brands/${brandId}/schedule`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ formatChain: chain, dailyFrequency, windowStart, windowEnd, timezone, isActive }),
+          body: JSON.stringify({
+            formatChain: chain,
+            dailyFrequency,
+            windowStart,
+            windowEnd,
+            timezone,
+            isActive,
+          }),
         }),
         fetch(`/api/brands/${brandId}`, {
           method: 'PATCH',
@@ -224,7 +238,9 @@ export default function AccountSchedule({ brandId, initialSchedule, initialAutoA
       <Card className="p-6 flex items-center justify-between">
         <div>
           <p className="font-medium text-white">Posting Schedule</p>
-          <p className="text-sm text-text-secondary mt-0.5">Enable to auto-fill your content calendar</p>
+          <p className="text-sm text-text-secondary mt-0.5">
+            Enable to auto-fill your content calendar
+          </p>
         </div>
         <label className="relative inline-flex items-center cursor-pointer">
           <input

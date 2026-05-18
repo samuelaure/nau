@@ -24,7 +24,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     if (!post) return NextResponse.json({ error: 'Post not found' }, { status: 404 })
 
-    const denied = await checkBrandAccessForRoute(post.brandId); if (denied) return denied
+    const denied = await checkBrandAccessForRoute(post.brandId)
+    if (denied) return denied
 
     if (!UPLOADABLE_FORMATS.has(post.format ?? '')) {
       return NextResponse.json(

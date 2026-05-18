@@ -10,7 +10,7 @@ export async function PATCH(
   { params }: { params: Promise<{ workspaceId: string }> },
 ) {
   const { workspaceId } = await params
-  const token = await getValidToken() ?? ''
+  const token = (await getValidToken()) ?? ''
   const body = await req.json()
   const res = await fetch(`${NAU_API_URL}/workspaces/${workspaceId}`, {
     method: 'PATCH',

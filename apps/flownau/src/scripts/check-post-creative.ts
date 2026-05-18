@@ -13,7 +13,10 @@ async function main() {
       select: { id: true, format: true, status: true, templateId: true, creative: true },
     })
     const template = post?.templateId
-      ? await prisma.template.findUnique({ where: { id: post.templateId }, select: { name: true, remotionId: true, slotSchema: true } })
+      ? await prisma.template.findUnique({
+          where: { id: post.templateId },
+          select: { name: true, remotionId: true, slotSchema: true },
+        })
       : null
     console.log(`\nPost ${postId.slice(-8)}:`)
     console.log(`  format: ${post?.format}`)
@@ -22,8 +25,12 @@ async function main() {
     const creative = post?.creative as any
     console.log(`  creative keys: ${creative ? Object.keys(creative).join(', ') : 'null'}`)
     console.log(`  creative.slots: ${JSON.stringify(creative?.slots)}`)
-    console.log(`  creative.scenes: ${creative?.scenes ? `${creative.scenes.length} scenes` : 'none'}`)
+    console.log(
+      `  creative.scenes: ${creative?.scenes ? `${creative.scenes.length} scenes` : 'none'}`,
+    )
   }
 }
 
-main().catch(console.error).finally(() => prisma.$disconnect())
+main()
+  .catch(console.error)
+  .finally(() => prisma.$disconnect())

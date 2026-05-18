@@ -10,9 +10,9 @@ async function main() {
   const post = await prisma.post.findUnique({
     where: { id: postId },
     include: { template: { select: { name: true, remotionId: true } } },
-    })
+  })
   console.log('Post template:', post?.template?.name, 'remotionId:', post?.template?.remotionId)
-  console.log('Creative type:', Object.keys(post?.creative as any ?? {}).join(', '))
+  console.log('Creative type:', Object.keys((post?.creative as any) ?? {}).join(', '))
 
   // Remove existing BullMQ job
   const existing = await renderQueue.getJob(jobId)
@@ -25,7 +25,14 @@ async function main() {
   // Reset DB
   await prisma.renderJob.upsert({
     where: { postId },
-    update: { status: 'queued', progress: 0, error: null, startedAt: null, completedAt: null, attempts: 0 },
+    update: {
+      status: 'queued',
+      progress: 0,
+      error: null,
+      startedAt: null,
+      completedAt: null,
+      attempts: 0,
+    },
     create: { postId, status: 'queued', progress: 0 },
   })
   await prisma.post.update({ where: { id: postId }, data: { status: 'RENDERING' } })
@@ -35,7 +42,9 @@ async function main() {
   console.log(`✓ Re-enqueued ${postId}`)
 }
 
-main().catch(console.error).finally(async () => {
-  await renderQueue.close()
-  await prisma.$disconnect()
-})
+main()
+  .catch(console.error)
+  .finally(async () => {
+    await renderQueue.close()
+    await prisma.$disconnect()
+  })

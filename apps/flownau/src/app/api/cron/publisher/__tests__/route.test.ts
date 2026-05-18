@@ -9,7 +9,6 @@ vi.mock('@/modules/shared/prisma', () => ({
       findMany: vi.fn(),
       update: vi.fn(),
     },
-
   },
 }))
 

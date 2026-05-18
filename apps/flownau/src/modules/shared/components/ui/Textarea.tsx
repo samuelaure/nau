@@ -9,7 +9,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
 
     const setRef = React.useCallback(
       (el: HTMLTextAreaElement | null) => {
-        (innerRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = el
+        ;(innerRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = el
         if (typeof ref === 'function') ref(el)
         else if (ref) (ref as React.MutableRefObject<HTMLTextAreaElement | null>).current = el
       },
@@ -25,7 +25,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
 
     React.useLayoutEffect(() => {
       resize()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [props.value, props.defaultValue])
 
     const handleChange = React.useCallback(

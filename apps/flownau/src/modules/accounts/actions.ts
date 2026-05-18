@@ -17,7 +17,10 @@ import { z } from 'zod'
 import { getValidToken } from '@/lib/auth'
 
 const SocialProfileSchema = z.object({
-  username: z.string().min(1, 'Username is required').transform((val) => val.replace(/^@/, '')),
+  username: z
+    .string()
+    .min(1, 'Username is required')
+    .transform((val) => val.replace(/^@/, '')),
   accessToken: z.string().min(1, 'Access Token is required'),
   platformId: z.string().min(1, 'Platform ID is required'),
 })
@@ -166,10 +169,17 @@ export async function updateBrand(brandId: string, formData: FormData) {
   const secondaryColor = (formData.get('bi_secondaryColor') as string | null)?.trim() || undefined
   const titleFont = (formData.get('bi_titleFont') as string | null)?.trim() || undefined
   const bodyFont = (formData.get('bi_bodyFont') as string | null)?.trim() || undefined
-  const overlayOpacity = formData.get('bi_overlayOpacity') ? parseFloat(formData.get('bi_overlayOpacity') as string) : undefined
-  const maxTextSize = formData.get('bi_maxTextSize') ? parseInt(formData.get('bi_maxTextSize') as string, 10) : undefined
+  const overlayOpacity = formData.get('bi_overlayOpacity')
+    ? parseFloat(formData.get('bi_overlayOpacity') as string)
+    : undefined
+  const maxTextSize = formData.get('bi_maxTextSize')
+    ? parseInt(formData.get('bi_maxTextSize') as string, 10)
+    : undefined
 
-  const existing = await prisma.brand.findUnique({ where: { id: parsedId }, select: { brandIdentity: true } })
+  const existing = await prisma.brand.findUnique({
+    where: { id: parsedId },
+    select: { brandIdentity: true },
+  })
   const existingIdentity = (existing?.brandIdentity as Record<string, unknown>) ?? {}
 
   const brandIdentity: Record<string, unknown> = {
@@ -196,7 +206,10 @@ export async function updateBrand(brandId: string, formData: FormData) {
     const nauthenticityUrl = process.env.NAUTHENTICITY_URL ?? 'http://nauthenticity:3000'
     const authSecret = process.env.AUTH_SECRET
     const token = await getValidToken()
-    const brand = await prisma.brand.findUnique({ where: { id: parsedId }, select: { workspaceId: true } })
+    const brand = await prisma.brand.findUnique({
+      where: { id: parsedId },
+      select: { workspaceId: true },
+    })
 
     await Promise.allSettled([
       fetch(`${nauApiUrl}/workspaces/${brand?.workspaceId}/brands/${parsedId}`, {
@@ -206,12 +219,16 @@ export async function updateBrand(brandId: string, formData: FormData) {
       }),
       authSecret
         ? import('@nau/auth').then(({ signServiceToken }) =>
-            signServiceToken({ secret: authSecret, iss: 'flownau', aud: 'nauthenticity' }).then((svcToken) =>
-              fetch(`${nauthenticityUrl}/api/v1/_service/brands/${parsedId}/settings`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${svcToken}` },
-                body: JSON.stringify({ language }),
-              }),
+            signServiceToken({ secret: authSecret, iss: 'flownau', aud: 'nauthenticity' }).then(
+              (svcToken) =>
+                fetch(`${nauthenticityUrl}/api/v1/_service/brands/${parsedId}/settings`, {
+                  method: 'PATCH',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${svcToken}`,
+                  },
+                  body: JSON.stringify({ language }),
+                }),
             ),
           )
         : Promise.resolve(),
@@ -230,7 +247,9 @@ export async function saveBrandContext(brandId: string, context: string) {
 }
 
 /** Pull the latest brand context from nauthenticity and write it to Brand.context. */
-export async function syncBrandContextFromNauthenticity(brandId: string): Promise<{ content: string }> {
+export async function syncBrandContextFromNauthenticity(
+  brandId: string,
+): Promise<{ content: string }> {
   await checkAuth()
   const parsedId = IdSchema.parse(brandId)
   const nauthenticityUrl = process.env.NAUTHENTICITY_URL ?? 'http://nauthenticity:3000'
@@ -238,7 +257,11 @@ export async function syncBrandContextFromNauthenticity(brandId: string): Promis
   if (!authSecret) throw new Error('AUTH_SECRET not configured')
 
   const { signServiceToken } = await import('@nau/auth')
-  const svcToken = await signServiceToken({ secret: authSecret, iss: 'flownau', aud: 'nauthenticity' })
+  const svcToken = await signServiceToken({
+    secret: authSecret,
+    iss: 'flownau',
+    aud: 'nauthenticity',
+  })
 
   const res = await fetch(`${nauthenticityUrl}/api/v1/brands/${parsedId}/context`, {
     headers: { Authorization: `Bearer ${svcToken}` },
@@ -254,7 +277,6 @@ export async function syncBrandContextFromNauthenticity(brandId: string): Promis
   return { content }
 }
 
-
 /** Move a brand to another workspace (updates both 9naŭ API and local record). */
 export async function moveBrandToWorkspace(brandId: string, targetWorkspaceId: string) {
   await checkAuth()
@@ -268,14 +290,11 @@ export async function moveBrandToWorkspace(brandId: string, targetWorkspaceId: s
   if (!brand) throw new Error('Brand not found')
 
   if (token) {
-    const res = await fetch(
-      `${nauApiUrl}/workspaces/${brand.workspaceId}/brands/${parsedId}`,
-      {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ workspaceId: parsedWsId }),
-      },
-    )
+    const res = await fetch(`${nauApiUrl}/workspaces/${brand.workspaceId}/brands/${parsedId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ workspaceId: parsedWsId }),
+    })
     if (!res.ok) console.error(`Failed to move brand in 9naŭ-api: ${await res.text()}`)
   }
 

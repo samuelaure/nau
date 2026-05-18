@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     templateId?: string
   }
 
-  if (!filename || !mimeType || !brandId && !templateId) {
+  if (!filename || !mimeType || (!brandId && !templateId)) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
@@ -48,17 +48,25 @@ export async function POST(req: NextRequest) {
       },
     })
     if (duplicate) {
-      const message = duplicate.optimizationStatus === 'purged'
-        ? `This file was previously uploaded and split into segments. Re-uploading is not allowed.`
-        : `This file already exists as "${duplicate.systemFilename}"`
-      return NextResponse.json({ error: 'DUPLICATE', existing: duplicate, message }, { status: 409 })
+      const message =
+        duplicate.optimizationStatus === 'purged'
+          ? `This file was previously uploaded and split into segments. Re-uploading is not allowed.`
+          : `This file already exists as "${duplicate.systemFilename}"`
+      return NextResponse.json(
+        { error: 'DUPLICATE', existing: duplicate, message },
+        { status: 409 },
+      )
     }
   }
 
   const assetId = createId()
   const ext = filename.split('.').pop() || ''
   const assetFolder =
-    type === 'VID' ? ('videos' as const) : type === 'AUD' ? ('audios' as const) : ('images' as const)
+    type === 'VID'
+      ? ('videos' as const)
+      : type === 'AUD'
+        ? ('audios' as const)
+        : ('images' as const)
   const r2Key = contextAccountId
     ? flownau.accountAsset(contextAccountId, assetFolder, assetId, ext)
     : flownau.templateAsset(templateId || 'global', assetId, ext)

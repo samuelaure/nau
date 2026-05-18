@@ -22,7 +22,14 @@ async function main() {
     // Reset RenderJob DB record
     await prisma.renderJob.upsert({
       where: { postId },
-      update: { status: 'queued', progress: 0, error: null, startedAt: null, completedAt: null, attempts: 0 },
+      update: {
+        status: 'queued',
+        progress: 0,
+        error: null,
+        startedAt: null,
+        completedAt: null,
+        attempts: 0,
+      },
       create: { postId, status: 'queued', progress: 0 },
     })
 
@@ -33,7 +40,9 @@ async function main() {
   console.log('\n✅ All render jobs re-queued. Render worker should pick them up.')
 }
 
-main().catch(console.error).finally(async () => {
-  await renderQueue.close()
-  await prisma.$disconnect()
-})
+main()
+  .catch(console.error)
+  .finally(async () => {
+    await renderQueue.close()
+    await prisma.$disconnect()
+  })

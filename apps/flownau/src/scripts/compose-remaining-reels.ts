@@ -6,8 +6,12 @@ const brandId = 'cmogyjn5a0006gcv46nis4o0l'
 const TEMPLATES = ['ReelT2', 'ReelT3', 'ReelT4']
 
 async function main() {
-  const brand = await prisma.brand.findUniqueOrThrow({ where: { id: brandId }, select: { id: true, ideationCustomPrompt: true } })
-  const ideaText = brand.ideationCustomPrompt ?? 'Share valuable insights about our brand and services'
+  const brand = await prisma.brand.findUniqueOrThrow({
+    where: { id: brandId },
+    select: { id: true, ideationCustomPrompt: true },
+  })
+  const ideaText =
+    brand.ideationCustomPrompt ?? 'Share valuable insights about our brand and services'
 
   for (const remotionId of TEMPLATES) {
     const template = await prisma.template.findFirstOrThrow({
@@ -42,7 +46,9 @@ async function main() {
   console.log('\n✅ All 3 reels composed and queued for rendering')
 }
 
-main().catch(console.error).finally(async () => {
-  await renderQueue.close()
-  await prisma.$disconnect()
-})
+main()
+  .catch(console.error)
+  .finally(async () => {
+    await renderQueue.close()
+    await prisma.$disconnect()
+  })

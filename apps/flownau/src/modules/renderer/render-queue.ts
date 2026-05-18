@@ -49,7 +49,9 @@ export async function addRenderJob(postId: string, priority?: number): Promise<s
  * nothing — the user uploads media manually. Otherwise it flips the post to
  * RENDERING and enqueues a render job.
  */
-export async function triggerRenderForPost(postId: string): Promise<{ enqueued: boolean; reason?: string }> {
+export async function triggerRenderForPost(
+  postId: string,
+): Promise<{ enqueued: boolean; reason?: string }> {
   const post = await prisma.post.findUnique({
     where: { id: postId },
     select: { id: true, status: true, format: true, userUploadedMediaUrl: true },
@@ -72,7 +74,11 @@ export async function getRenderJobStatus(postId: string): Promise<{
   failedReason?: string
 }> {
   // Job IDs now include a timestamp suffix — find the latest job for this post
-  const jobs = await renderQueue.getJobs(['active', 'waiting', 'delayed', 'failed', 'completed'], 0, 200)
+  const jobs = await renderQueue.getJobs(
+    ['active', 'waiting', 'delayed', 'failed', 'completed'],
+    0,
+    200,
+  )
   const job = jobs
     .filter((j) => j.id?.startsWith(`render-${postId}-`))
     .sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0))[0]

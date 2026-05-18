@@ -12,7 +12,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const nauthenticityUrl = process.env.NAUTHENTICITY_URL ?? 'http://nauthenticity:3000'
   const authSecret = process.env.AUTH_SECRET ?? ''
 
-  const svcToken = await signServiceToken({ secret: authSecret, iss: 'flownau', aud: 'nauthenticity' })
+  const svcToken = await signServiceToken({
+    secret: authSecret,
+    iss: 'flownau',
+    aud: 'nauthenticity',
+  })
   const res = await fetch(`${nauthenticityUrl}/api/v1/_service/source-concepts/${id}`, {
     headers: { Authorization: `Bearer ${svcToken}` },
   })

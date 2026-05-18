@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import axios from 'axios'
-import { fetchPendingSourceConcepts, generateSourceConcepts, markSourceConceptConsumed } from '../inspo-source'
+import {
+  fetchPendingSourceConcepts,
+  generateSourceConcepts,
+  markSourceConceptConsumed,
+} from '../inspo-source'
 import { logger } from '@/modules/shared/logger'
 
 vi.mock('axios')
@@ -15,7 +19,14 @@ vi.mock('@nau/auth', () => ({
 const brandId = 'brand-test-123'
 const mockUrl = 'http://nauthenticity-test'
 const mockConcepts = [
-  { id: 'c1', brandId, content: 'A rich angle about storytelling', sourceType: 'inspo_base', status: 'pending', createdAt: new Date().toISOString() },
+  {
+    id: 'c1',
+    brandId,
+    content: 'A rich angle about storytelling',
+    sourceType: 'inspo_base',
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+  },
 ]
 
 beforeEach(() => {
@@ -29,7 +40,9 @@ describe('fetchPendingSourceConcepts()', () => {
     vi.stubEnv('NAUTHENTICITY_URL', '')
     const result = await fetchPendingSourceConcepts(brandId)
     expect(result).toEqual([])
-    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('NAUTHENTICITY_URL or AUTH_SECRET not configured'))
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('NAUTHENTICITY_URL or AUTH_SECRET not configured'),
+    )
   })
 
   it('returns concepts on success', async () => {
@@ -38,7 +51,9 @@ describe('fetchPendingSourceConcepts()', () => {
     expect(result).toEqual(mockConcepts)
     expect(axios.get).toHaveBeenCalledWith(
       expect.stringContaining(`/brands/${brandId}/source-concepts`),
-      expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer mock-service-token' }) }),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer mock-service-token' }),
+      }),
     )
   })
 

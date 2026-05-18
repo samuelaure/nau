@@ -19,7 +19,7 @@ export async function PATCH(req: Request) {
   const user = await getAuthUser()
   if (!user || !isAdminUser(user.id)) return adminUnauthorized()
 
-  const body = await req.json() as Record<string, string>
+  const body = (await req.json()) as Record<string, string>
   const allowedKeys = new Set(Object.values(ADMIN_MODEL_SETTING_KEYS))
 
   const updates = Object.entries(body).filter(([k]) => allowedKeys.has(k))

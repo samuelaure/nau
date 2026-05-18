@@ -17,7 +17,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       },
     })
     if (!post) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-    const denied = await checkBrandAccessForRoute(post.brandId); if (denied) return denied
+    const denied = await checkBrandAccessForRoute(post.brandId)
+    if (denied) return denied
     return NextResponse.json({ post })
   } catch (error) {
     logError('GET /api/posts/[id]', error)
@@ -32,7 +33,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     const post = await prisma.post.findUnique({ where: { id } })
     if (!post) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-    const denied2 = await checkBrandAccessForRoute(post.brandId); if (denied2) return denied2
+    const denied2 = await checkBrandAccessForRoute(post.brandId)
+    if (denied2) return denied2
 
     const {
       status,
@@ -79,7 +81,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         ...(hashtags !== undefined && { hashtags }),
         ...(sceneTypes !== undefined && { sceneTypes }),
         ...(topicHash !== undefined && { topicHash }),
-        ...(scheduledAt !== undefined && { scheduledAt: scheduledAt ? new Date(scheduledAt) : null }),
+        ...(scheduledAt !== undefined && {
+          scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
+        }),
         ...(videoUrl !== undefined && { videoUrl }),
         ...(coverUrl !== undefined && { coverUrl }),
         ...(externalPostId !== undefined && { externalPostId }),
@@ -87,7 +91,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         ...(publishAttempts !== undefined && { publishAttempts }),
         ...(lastPublishError !== undefined && { lastPublishError }),
         ...(userPostedManually !== undefined && { userPostedManually }),
-        ...(publishedAt !== undefined && { publishedAt: publishedAt ? new Date(publishedAt) : null }),
+        ...(publishedAt !== undefined && {
+          publishedAt: publishedAt ? new Date(publishedAt) : null,
+        }),
         ...(userUploadedMediaUrl !== undefined && { userUploadedMediaUrl }),
       },
     })
@@ -112,7 +118,8 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     const { id } = await params
     const post = await prisma.post.findUnique({ where: { id } })
     if (!post) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-    const denied3 = await checkBrandAccessForRoute(post.brandId); if (denied3) return denied3
+    const denied3 = await checkBrandAccessForRoute(post.brandId)
+    if (denied3) return denied3
 
     await prisma.post.delete({ where: { id } })
 
@@ -130,9 +137,9 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       const key = keyFromCdnUrl(url)
       if (key) r2Keys.add(key)
     }
-    storage.deleteMany([...r2Keys]).catch((err) =>
-      logError('DELETE /api/posts/[id] R2 cleanup', err),
-    )
+    storage
+      .deleteMany([...r2Keys])
+      .catch((err) => logError('DELETE /api/posts/[id] R2 cleanup', err))
 
     return NextResponse.json({ success: true })
   } catch (error) {

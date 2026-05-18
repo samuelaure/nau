@@ -11,9 +11,12 @@ async function resolveNauUserIds(workspaceId: string): Promise<string[]> {
   if (!secret) return []
   try {
     const token = await signServiceToken({ iss: 'flownau', aud: '9nau-api', secret })
-    const res = await fetch(`${API_URL()}/workspaces/_service/${workspaceId}/notification-target?app=flownau`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    const res = await fetch(
+      `${API_URL()}/workspaces/_service/${workspaceId}/notification-target?app=flownau`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    )
     if (!res.ok) return []
     const body = (await res.json()) as { nauUserIds: string[] }
     return body.nauUserIds ?? []
@@ -22,7 +25,11 @@ async function resolveNauUserIds(workspaceId: string): Promise<string[]> {
   }
 }
 
-async function sendZazuNotification(nauUserId: string, type: string, payload: Record<string, unknown>): Promise<void> {
+async function sendZazuNotification(
+  nauUserId: string,
+  type: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
   const secret = process.env.AUTH_SECRET
   if (!secret) return
   const token = await signServiceToken({ iss: 'flownau', aud: 'zazu', secret })
@@ -33,13 +40,23 @@ async function sendZazuNotification(nauUserId: string, type: string, payload: Re
   })
 }
 
-async function notifyAllMembers(workspaceId: string, type: string, payload: Record<string, unknown>): Promise<void> {
+async function notifyAllMembers(
+  workspaceId: string,
+  type: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
   const userIds = await resolveNauUserIds(workspaceId)
   if (!userIds.length) {
     logger.warn({ workspaceId }, '[ApprovalNotif] Could not resolve any nauUserIds')
     return
   }
-  await Promise.all(userIds.map(id => sendZazuNotification(id, type, payload).catch(err => logError('[ApprovalNotif] Failed to send notification', err))))
+  await Promise.all(
+    userIds.map((id) =>
+      sendZazuNotification(id, type, payload).catch((err) =>
+        logError('[ApprovalNotif] Failed to send notification', err),
+      ),
+    ),
+  )
 }
 
 function calendarUrl(workspaceId: string, brandId: string): string {
@@ -185,5 +202,12 @@ export async function notifyNextInLine(brandId: string): Promise<void> {
 }
 
 function formatTime(date: Date): string {
-  return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' }) + ' UTC'
+  return (
+    date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: 'UTC',
+    }) + ' UTC'
+  )
 }

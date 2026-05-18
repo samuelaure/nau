@@ -8,9 +8,9 @@ import { getSetting } from '@/modules/shared/settings'
  * Admin sets these via the Admin Settings page.
  */
 export const ADMIN_MODEL_SETTING_KEYS: Record<AdminModelFeature, string> = {
-  ideation:    'model_ideation',
-  drafting:    'model_drafting',
-  planning:    'model_planning',
+  ideation: 'model_ideation',
+  drafting: 'model_drafting',
+  planning: 'model_planning',
 }
 
 export type AdminModelFeature = 'ideation' | 'drafting' | 'planning'

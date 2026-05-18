@@ -33,7 +33,9 @@ export async function GET(req: NextRequest) {
       try {
         const decoded = JSON.parse(Buffer.from(stateParam, 'base64url').toString())
         brandIdFromState = decoded.brandId ?? null
-      } catch { /* legacy plain state — ignore */ }
+      } catch {
+        /* legacy plain state — ignore */
+      }
     }
 
     if (error || !code) {
@@ -84,7 +86,9 @@ export async function GET(req: NextRequest) {
     }
 
     // 4. Resolve workspaceId from the JWT claims (set by 9naŭ SSO).
-    const workspaceId = (user as unknown as Record<string, unknown>).activeWorkspaceId as string | undefined
+    const workspaceId = (user as unknown as Record<string, unknown>).activeWorkspaceId as
+      | string
+      | undefined
 
     if (!workspaceId) {
       return NextResponse.redirect(new URL('/dashboard?error=no_workspace', req.url))

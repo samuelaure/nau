@@ -50,7 +50,10 @@ const STATUS_STYLE: Record<string, string> = {
 }
 
 /** Slot labels per scene type */
-const SLOT_META: Record<string, Array<{ key: string; label: string; maxLen: number; multiline?: boolean }>> = {
+const SLOT_META: Record<
+  string,
+  Array<{ key: string; label: string; maxLen: number; multiline?: boolean }>
+> = {
   'hook-text': [{ key: 'hook', label: 'Hook', maxLen: 80, multiline: true }],
   'text-over-media': [{ key: 'text', label: 'Text', maxLen: 150, multiline: true }],
   'quote-card': [
@@ -127,9 +130,7 @@ export default function DraftEditor({ composition, backUrl }: Props) {
 
   const updateSlot = (sceneIdx: number, key: string, value: string) => {
     setScenes((prev) =>
-      prev.map((s, i) =>
-        i === sceneIdx ? { ...s, slots: { ...s.slots, [key]: value } } : s,
-      ),
+      prev.map((s, i) => (i === sceneIdx ? { ...s, slots: { ...s.slots, [key]: value } } : s)),
     )
   }
 
@@ -229,7 +230,9 @@ export default function DraftEditor({ composition, backUrl }: Props) {
             )}
           </div>
           {composition.idea?.ideaText && (
-            <p className="text-sm text-text-secondary leading-relaxed">{composition.idea.ideaText}</p>
+            <p className="text-sm text-text-secondary leading-relaxed">
+              {composition.idea.ideaText}
+            </p>
           )}
         </div>
 
@@ -333,7 +336,9 @@ export default function DraftEditor({ composition, backUrl }: Props) {
                     <div className="flex flex-col gap-2">
                       {(scene.slots?.items ?? []).map((item: string, itemIdx: number) => (
                         <div key={itemIdx} className="flex items-center gap-2">
-                          <span className="text-[10px] text-gray-600 w-4 shrink-0">{itemIdx + 1}.</span>
+                          <span className="text-[10px] text-gray-600 w-4 shrink-0">
+                            {itemIdx + 1}.
+                          </span>
                           <input
                             value={item}
                             onChange={(e) => updateListItem(idx, itemIdx, e.target.value)}
@@ -355,7 +360,9 @@ export default function DraftEditor({ composition, backUrl }: Props) {
       <Card className="p-4 border-gray-800">
         <div className="flex items-center gap-2 mb-3">
           <AlignLeft size={13} className="text-text-secondary" />
-          <h3 className="text-xs font-semibold uppercase tracking-widest text-text-secondary">Caption</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-text-secondary">
+            Caption
+          </h3>
           <span className="text-[10px] text-gray-600 ml-auto">{caption.length}/2200</span>
         </div>
         <textarea
@@ -371,7 +378,9 @@ export default function DraftEditor({ composition, backUrl }: Props) {
       <Card className="p-4 border-gray-800">
         <div className="flex items-center gap-2 mb-3">
           <Hash size={13} className="text-text-secondary" />
-          <h3 className="text-xs font-semibold uppercase tracking-widest text-text-secondary">Hashtags</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-text-secondary">
+            Hashtags
+          </h3>
         </div>
         <input
           value={hashtagsRaw}
@@ -384,7 +393,10 @@ export default function DraftEditor({ composition, backUrl }: Props) {
             .split(/[\s,#]+/)
             .filter(Boolean)
             .map((tag, i) => (
-              <span key={i} className="text-[11px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded-full">
+              <span
+                key={i}
+                className="text-[11px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded-full"
+              >
                 #{tag}
               </span>
             ))}
@@ -408,7 +420,11 @@ export default function DraftEditor({ composition, backUrl }: Props) {
             disabled={actioning || saving}
             className="bg-accent hover:bg-accent/80 gap-1.5"
           >
-            {actioning ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+            {actioning ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+              <CheckCircle2 className="w-3 h-3" />
+            )}
             Save & Approve
           </Button>
         )}

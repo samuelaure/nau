@@ -19,7 +19,9 @@ async function resolveFramework(brandId: string, overrideId?: string | null) {
 
 async function resolvePrinciples(brandId: string, overrideId?: string | null) {
   if (overrideId) return prisma.contentCreationPrinciples.findUnique({ where: { id: overrideId } })
-  const def = await prisma.contentCreationPrinciples.findFirst({ where: { brandId, isDefault: true } })
+  const def = await prisma.contentCreationPrinciples.findFirst({
+    where: { brandId, isDefault: true },
+  })
   if (def) return def
   return prisma.contentCreationPrinciples.findFirst({ where: { brandId } })
 }

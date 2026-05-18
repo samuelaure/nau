@@ -38,11 +38,7 @@ export async function GET(req: Request) {
 
     const templates = await prisma.template.findMany({
       where: {
-        OR: [
-          { brandId },
-          { brandId: { in: siblingIds }, scope: 'workspace' },
-          { scope: 'system' },
-        ],
+        OR: [{ brandId }, { brandId: { in: siblingIds }, scope: 'workspace' }, { scope: 'system' }],
       },
       include: {
         brandConfigs: { where: { brandId } },
@@ -60,7 +56,16 @@ export async function GET(req: Request) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json()
-    const { brandId, templateId, autoApproveDraft, autoApprovePost, enabled, customName, customPrompt, slotOverrides } = body
+    const {
+      brandId,
+      templateId,
+      autoApproveDraft,
+      autoApprovePost,
+      enabled,
+      customName,
+      customPrompt,
+      slotOverrides,
+    } = body
 
     if (!brandId || !templateId) {
       return NextResponse.json({ error: 'Missing brandId or templateId' }, { status: 400 })

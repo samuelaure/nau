@@ -2,7 +2,9 @@ import path from 'path'
 import { readFileSync } from 'fs'
 import type { NextConfig } from 'next'
 
-const { version } = JSON.parse(readFileSync(path.join(__dirname, 'package.json'), 'utf-8')) as { version: string }
+const { version } = JSON.parse(readFileSync(path.join(__dirname, 'package.json'), 'utf-8')) as {
+  version: string
+}
 
 const securityHeaders = [
   { key: 'X-DNS-Prefetch-Control', value: 'on' },

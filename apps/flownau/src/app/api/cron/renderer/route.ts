@@ -46,7 +46,10 @@ export async function GET(request: Request) {
         await prisma.renderJob.deleteMany({ where: { postId: post.id } })
 
         const reason = jobState ?? 'no_job'
-        logger.warn({ postId: post.id, jobState: reason }, '[Renderer Cron] Reset stale RENDERING post')
+        logger.warn(
+          { postId: post.id, jobState: reason },
+          '[Renderer Cron] Reset stale RENDERING post',
+        )
         resetResults.push({ postId: post.id, reason })
       } catch (err) {
         logError(`[Renderer Cron] Failed to reset stale post ${post.id}`, err)
@@ -69,7 +72,10 @@ export async function GET(request: Request) {
         continue
       }
 
-      if (post.renderJob && ['queued', 'rendering', 'uploading', 'done'].includes(post.renderJob.status)) {
+      if (
+        post.renderJob &&
+        ['queued', 'rendering', 'uploading', 'done'].includes(post.renderJob.status)
+      ) {
         enqueueResults.push({ postId: post.id, status: 'already_queued' })
         continue
       }

@@ -57,7 +57,8 @@ export function BrandSwitcher() {
   const activeTab = searchParams.get('tab') ?? 'calendar'
 
   // Whether we're on the workspace main page (vs e.g. /settings sub-route)
-  const isOnWorkspacePage = !!activeWorkspaceId && pathname === `/dashboard/workspace/${activeWorkspaceId}`
+  const isOnWorkspacePage =
+    !!activeWorkspaceId && pathname === `/dashboard/workspace/${activeWorkspaceId}`
 
   useEffect(() => {
     fetch('/api/workspaces')
@@ -81,8 +82,10 @@ export function BrandSwitcher() {
       const brand = await addBrand(fd)
       setWorkspaces((ws) =>
         ws.map((w) =>
-          w.id === activeWorkspaceId ? { ...w, brands: [...w.brands, { id: brand.id, name: newName.trim() }] } : w
-        )
+          w.id === activeWorkspaceId
+            ? { ...w, brands: [...w.brands, { id: brand.id, name: newName.trim() }] }
+            : w,
+        ),
       )
       setCreating(false)
       setNewName('')
@@ -146,21 +149,34 @@ export function BrandSwitcher() {
 
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', padding: '4px 0' }}>
               {creating ? (
-                <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div
+                  style={{
+                    padding: '8px 12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px',
+                  }}
+                >
                   <input
                     autoFocus
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') handleCreate()
-                      if (e.key === 'Escape') { setCreating(false); setNewName('') }
+                      if (e.key === 'Escape') {
+                        setCreating(false)
+                        setNewName('')
+                      }
                     }}
                     placeholder="Brand name"
                     className="w-full text-sm text-white placeholder-gray-500 bg-white/5 border border-white/15 rounded-md px-2.5 py-1.5 outline-none"
                   />
                   <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
                     <button
-                      onClick={() => { setCreating(false); setNewName('') }}
+                      onClick={() => {
+                        setCreating(false)
+                        setNewName('')
+                      }}
                       className="p-1 rounded text-text-secondary hover:bg-white/5 border border-white/10"
                     >
                       <X size={12} />
@@ -169,7 +185,11 @@ export function BrandSwitcher() {
                       onClick={handleCreate}
                       disabled={saving || !newName.trim()}
                       className="px-2.5 py-1 rounded text-xs text-white font-medium disabled:opacity-50"
-                      style={{ background: 'var(--accent-color)', border: 'none', cursor: saving ? 'not-allowed' : 'pointer' }}
+                      style={{
+                        background: 'var(--accent-color)',
+                        border: 'none',
+                        cursor: saving ? 'not-allowed' : 'pointer',
+                      }}
                     >
                       {saving ? <Loader2 size={11} className="animate-spin" /> : 'Create'}
                     </button>
@@ -179,7 +199,13 @@ export function BrandSwitcher() {
                 <button
                   onClick={() => setCreating(true)}
                   className="flex items-center gap-2 w-full px-4 py-2.5 text-sm hover:bg-white/5 transition-colors"
-                  style={{ color: 'var(--accent-color)', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                  style={{
+                    color: 'var(--accent-color)',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
                 >
                   <Plus size={13} />
                   Create a new Brand

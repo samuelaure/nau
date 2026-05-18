@@ -10,7 +10,7 @@ export async function DELETE(
   { params }: { params: Promise<{ workspaceId: string; userId: string }> },
 ) {
   const { workspaceId, userId } = await params
-  const token = await getValidToken() ?? ''
+  const token = (await getValidToken()) ?? ''
   const res = await fetch(`${NAU_API_URL}/workspaces/${workspaceId}/members/${userId}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },

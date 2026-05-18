@@ -37,7 +37,11 @@ export async function compressPublishedPost(postId: string): Promise<void> {
   })
   if (!post) return
 
-  const isVideoFormat = post.format === 'reel' || post.format === 'trial_reel' || post.format === 'head_talk' || post.format === 'trial_head_talk'
+  const isVideoFormat =
+    post.format === 'reel' ||
+    post.format === 'trial_reel' ||
+    post.format === 'head_talk' ||
+    post.format === 'trial_head_talk'
   if (!isVideoFormat || !post.videoUrl) return
 
   const tmpIn = path.join(os.tmpdir(), `flownau_archive_in_${postId}.mp4`)
@@ -56,7 +60,10 @@ export async function compressPublishedPost(postId: string): Promise<void> {
     if (!r2Key) throw new Error(`Cannot derive R2 key from videoUrl: ${post.videoUrl}`)
 
     await storage.upload(r2Key, fs.createReadStream(tmpOut), { mimeType: 'video/mp4' })
-    logger.info({ postId, sizeBefore, sizeAfter, saving: `${saving}%` }, '[PostCompress] Video compressed and re-uploaded')
+    logger.info(
+      { postId, sizeBefore, sizeAfter, saving: `${saving}%` },
+      '[PostCompress] Video compressed and re-uploaded',
+    )
   } catch (err) {
     logError('[PostCompress] Video compression failed', err)
   } finally {

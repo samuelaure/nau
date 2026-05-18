@@ -40,7 +40,11 @@ interface UploadSnapshot {
 }
 
 let _upload: UploadSnapshot = {
-  uploading: false, progress: '', currentFileIndex: 0, totalFiles: 0, uploadPercentage: 0,
+  uploading: false,
+  progress: '',
+  currentFileIndex: 0,
+  totalFiles: 0,
+  uploadPercentage: 0,
 }
 const _listeners = new Set<() => void>()
 
@@ -73,7 +77,9 @@ export default function AssetsManager({
     const sync = () => setUploadSnap({ ..._upload })
     _listeners.add(sync)
     sync()
-    return () => { _listeners.delete(sync) }
+    return () => {
+      _listeners.delete(sync)
+    }
   }, [])
 
   // Live asset state — poll while any asset is pending/processing
@@ -87,7 +93,10 @@ export default function AssetsManager({
   useEffect(() => {
     if (ownerType !== 'brand') return
     if (!needsPoll) {
-      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+      if (pollRef.current) {
+        clearInterval(pollRef.current)
+        pollRef.current = null
+      }
       return
     }
     if (pollRef.current) return
@@ -97,7 +106,12 @@ export default function AssetsManager({
         setAssets(res.data.assets)
       } catch {}
     }, 3000)
-    return () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null } }
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current)
+        pollRef.current = null
+      }
+    }
   }, [needsPoll, ownerId, ownerType])
 
   const [currentPath, setCurrentPath] = useState<string[]>([])
@@ -112,7 +126,11 @@ export default function AssetsManager({
     try {
       const res = await axios.post(`/api/protected/upload/retry-all?brandId=${ownerId}`)
       const { queued } = res.data
-      setAssets((prev) => prev.map((a) => a.optimizationStatus !== 'done' ? { ...a, optimizationStatus: 'pending' } : a))
+      setAssets((prev) =>
+        prev.map((a) =>
+          a.optimizationStatus !== 'done' ? { ...a, optimizationStatus: 'pending' } : a,
+        ),
+      )
       toast.success(`${queued} asset${queued !== 1 ? 's' : ''} queued for optimization`)
     } catch {
       toast.error('Failed to queue optimization')
@@ -152,21 +170,40 @@ export default function AssetsManager({
     async (acceptedFiles: File[]) => {
       if (!acceptedFiles?.length) return
 
-      setUpload({ uploading: true, totalFiles: acceptedFiles.length, currentFileIndex: 0, uploadPercentage: 0, progress: '' })
+      setUpload({
+        uploading: true,
+        totalFiles: acceptedFiles.length,
+        currentFileIndex: 0,
+        uploadPercentage: 0,
+        progress: '',
+      })
       toast.loading(`Uploading 1 of ${acceptedFiles.length}…`, { id: TOAST_ID, duration: Infinity })
 
       try {
         for (let i = 0; i < acceptedFiles.length; i++) {
           const file = acceptedFiles[i]
           setUpload({ currentFileIndex: i, uploadPercentage: 0, progress: `Hashing ${file.name}…` })
-          toast.loading(`Uploading ${i + 1} of ${acceptedFiles.length} — hashing…`, { id: TOAST_ID, duration: Infinity })
+          toast.loading(`Uploading ${i + 1} of ${acceptedFiles.length} — hashing…`, {
+            id: TOAST_ID,
+            duration: Infinity,
+          })
 
           const buffer = await file.arrayBuffer()
           const hashBuffer = await crypto.subtle.digest('SHA-256', buffer)
-          const hash = Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, '0')).join('')
+          const hash = Array.from(new Uint8Array(hashBuffer))
+            .map((b) => b.toString(16).padStart(2, '0'))
+            .join('')
 
           // Step 1: get a presigned URL (lightweight JSON request — no file bytes through server)
-          let presignData: { assetId: string; uploadUrl: string; cdnUrl: string; r2Key: string; ext: string; type: string; contextAccountId: string | null }
+          let presignData: {
+            assetId: string
+            uploadUrl: string
+            cdnUrl: string
+            r2Key: string
+            ext: string
+            type: string
+            contextAccountId: string | null
+          }
           try {
             const presignRes = await axios.post('/api/protected/upload/presign', {
               filename: file.name,
@@ -228,7 +265,13 @@ export default function AssetsManager({
         console.error('Upload failed', error)
         toast.error(`Upload failed: ${(error as Error).message}`, { id: TOAST_ID })
       } finally {
-        setUpload({ uploading: false, progress: '', uploadPercentage: 0, currentFileIndex: 0, totalFiles: 0 })
+        setUpload({
+          uploading: false,
+          progress: '',
+          uploadPercentage: 0,
+          currentFileIndex: 0,
+          totalFiles: 0,
+        })
       }
     },
     [ownerId, ownerType],
@@ -337,7 +380,11 @@ export default function AssetsManager({
               disabled={optimizingAll}
               className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold bg-accent/10 hover:bg-accent/20 text-accent border border-accent/20 transition-all disabled:opacity-50"
             >
-              {optimizingAll ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
+              {optimizingAll ? (
+                <Loader2 size={13} className="animate-spin" />
+              ) : (
+                <RotateCcw size={13} />
+              )}
               Optimize all ({pendingCount})
             </button>
           )}
@@ -468,7 +515,11 @@ export default function AssetsManager({
               try {
                 await axios.post(`/api/protected/upload/retry/${asset.id}`)
                 toast.success('Re-queued for optimization')
-                setAssets(prev => prev.map(a => a.id === asset.id ? { ...a, optimizationStatus: 'pending' } : a))
+                setAssets((prev) =>
+                  prev.map((a) =>
+                    a.id === asset.id ? { ...a, optimizationStatus: 'pending' } : a,
+                  ),
+                )
               } catch {
                 toast.error('Failed to retry')
               }
@@ -490,7 +541,6 @@ export default function AssetsManager({
           </div>
         </div>
       )}
-
     </div>
   )
 }
@@ -519,7 +569,12 @@ function OptimizationBadge({ status, onRetry }: { status: string; onRetry: () =>
           <Clock size={10} /> Queued
         </span>
         <button
-          onClick={async (e) => { e.stopPropagation(); setRetrying(true); await onRetry(); setRetrying(false) }}
+          onClick={async (e) => {
+            e.stopPropagation()
+            setRetrying(true)
+            await onRetry()
+            setRetrying(false)
+          }}
           disabled={retrying}
           className="flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-widest text-zinc-400 hover:text-white transition-colors disabled:opacity-40"
         >
@@ -536,7 +591,12 @@ function OptimizationBadge({ status, onRetry }: { status: string; onRetry: () =>
           <AlertTriangle size={10} /> Failed
         </span>
         <button
-          onClick={async (e) => { e.stopPropagation(); setRetrying(true); await onRetry(); setRetrying(false) }}
+          onClick={async (e) => {
+            e.stopPropagation()
+            setRetrying(true)
+            await onRetry()
+            setRetrying(false)
+          }}
           disabled={retrying}
           className="flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-widest text-zinc-400 hover:text-white transition-colors disabled:opacity-40"
         >

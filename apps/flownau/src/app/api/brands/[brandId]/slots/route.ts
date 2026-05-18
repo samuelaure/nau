@@ -11,7 +11,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ bran
   try {
     const user = await getAuthUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    const denied = await checkBrandAccessForRoute(brandId); if (denied) return denied
+    const denied = await checkBrandAccessForRoute(brandId)
+    if (denied) return denied
 
     const url = new URL(req.url)
     const from = url.searchParams.get('from')

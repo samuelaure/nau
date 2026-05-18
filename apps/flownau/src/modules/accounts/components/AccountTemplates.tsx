@@ -3,9 +3,21 @@
 import { useState, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import {
-  Loader2, X, Film, Mic, Play, Pencil, Copy,
-  LayoutGrid, ImageIcon, Clock, Layers, Volume2, VolumeX,
-  ToggleLeft, ToggleRight,
+  Loader2,
+  X,
+  Film,
+  Mic,
+  Play,
+  Pencil,
+  Copy,
+  LayoutGrid,
+  ImageIcon,
+  Clock,
+  Layers,
+  Volume2,
+  VolumeX,
+  ToggleLeft,
+  ToggleRight,
 } from 'lucide-react'
 import { cn } from '@/modules/shared/utils'
 import { PromptHistoryPanel } from './PromptHistoryPanel'
@@ -28,12 +40,20 @@ const FORMAT_COLOR: Record<string, string> = {
   static_post: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/20',
 }
 
-type SlotDef = { key: string; label: string; intention: string; minWords?: number; maxWords: number; style?: string }
+type SlotDef = {
+  key: string
+  label: string
+  intention: string
+  minWords?: number
+  maxWords: number
+  style?: string
+}
 
 const CAPTION_SLOT: SlotDef = {
   key: 'caption',
   label: 'Caption',
-  intention: 'Instagram caption for when this video is published. 2-3 sentences, engaging, no hashtags.',
+  intention:
+    'Instagram caption for when this video is published. 2-3 sentences, engaging, no hashtags.',
   maxWords: 60,
 }
 
@@ -93,7 +113,10 @@ function PreviewMedia({
       }}
       onMouseLeave={() => {
         setHovering(false)
-        if (videoRef.current) { videoRef.current.pause(); videoRef.current.currentTime = 0 }
+        if (videoRef.current) {
+          videoRef.current.pause()
+          videoRef.current.currentTime = 0
+        }
       }}
     >
       {/* Static thumbnail — shown when not hovering */}
@@ -101,7 +124,10 @@ function PreviewMedia({
         <img
           src={previewThumbnailUrl}
           alt=""
-          className={cn('absolute inset-0 w-full h-full object-cover transition-opacity duration-200', hovering ? 'opacity-0' : 'opacity-100')}
+          className={cn(
+            'absolute inset-0 w-full h-full object-cover transition-opacity duration-200',
+            hovering ? 'opacity-0' : 'opacity-100',
+          )}
         />
       )}
       {/* Video — loaded lazily, shown on hover */}
@@ -114,7 +140,10 @@ function PreviewMedia({
           loop
           playsInline
           preload="none"
-          className={cn('w-full h-full object-cover transition-opacity duration-200', hovering ? 'opacity-100' : 'opacity-0')}
+          className={cn(
+            'w-full h-full object-cover transition-opacity duration-200',
+            hovering ? 'opacity-100' : 'opacity-0',
+          )}
         />
       )}
       {/* Fallback icon when only previewUrl (no thumbnail) and not hovering */}
@@ -139,14 +168,21 @@ function SlotOverrideRow({
 }: {
   slot: SlotDef
   override: { intention?: string; minWords?: number; maxWords?: number } | undefined
-  onChange: (key: string, patch: { intention?: string; minWords?: number; maxWords?: number } | null) => void
+  onChange: (
+    key: string,
+    patch: { intention?: string; minWords?: number; maxWords?: number } | null,
+  ) => void
   onRestore: (key: string) => void
 }) {
   const [editing, setEditing] = useState(false)
   const [localIntention, setLocalIntention] = useState(override?.intention ?? slot.intention)
   const [localMin, setLocalMin] = useState<number>(override?.minWords ?? slot.minWords ?? 0)
   const [localMax, setLocalMax] = useState<number>(override?.maxWords ?? slot.maxWords)
-  const hasOverride = !!override && (override.intention !== undefined || override.minWords !== undefined || override.maxWords !== undefined)
+  const hasOverride =
+    !!override &&
+    (override.intention !== undefined ||
+      override.minWords !== undefined ||
+      override.maxWords !== undefined)
 
   const effectiveIntention = override?.intention ?? slot.intention
   const effectiveMax = override?.maxWords ?? slot.maxWords
@@ -156,7 +192,12 @@ function SlotOverrideRow({
       <div
         role="button"
         tabIndex={0}
-        onClick={() => { setLocalIntention(override?.intention ?? slot.intention); setLocalMin(override?.minWords ?? slot.minWords ?? 0); setLocalMax(override?.maxWords ?? slot.maxWords); setEditing(true) }}
+        onClick={() => {
+          setLocalIntention(override?.intention ?? slot.intention)
+          setLocalMin(override?.minWords ?? slot.minWords ?? 0)
+          setLocalMax(override?.maxWords ?? slot.maxWords)
+          setEditing(true)
+        }}
         onKeyDown={(e) => e.key === 'Enter' && setEditing(true)}
         className="bg-gray-900 border border-gray-800 rounded-lg p-3 space-y-1 cursor-text hover:border-gray-700 transition-colors group"
       >
@@ -165,13 +206,21 @@ function SlotOverrideRow({
           <div className="flex items-center gap-2">
             {hasOverride && (
               <button
-                onClick={(e) => { e.stopPropagation(); onRestore(slot.key) }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onRestore(slot.key)
+                }}
                 className="text-[10px] text-amber-400 hover:text-amber-300 transition-colors"
               >
                 restore default
               </button>
             )}
-            <span className={cn('text-[10px] shrink-0', hasOverride ? 'text-accent' : 'text-gray-600')}>max {effectiveMax}w{hasOverride ? ' ·' : ''}{hasOverride ? ' custom' : ''}</span>
+            <span
+              className={cn('text-[10px] shrink-0', hasOverride ? 'text-accent' : 'text-gray-600')}
+            >
+              max {effectiveMax}w{hasOverride ? ' ·' : ''}
+              {hasOverride ? ' custom' : ''}
+            </span>
           </div>
         </div>
         <p className="text-[11px] text-text-secondary leading-relaxed">{effectiveIntention}</p>
@@ -277,10 +326,17 @@ function TemplateModal({
     return null
   })()
 
-  const htSections = (contentSchema?.sections as Array<{ key: string; label: string; intention: string; maxWords: number }> | undefined) ?? null
+  const htSections =
+    (contentSchema?.sections as
+      | Array<{ key: string; label: string; intention: string; maxWords: number }>
+      | undefined) ?? null
   const sections = slotSchema ?? htSections
 
-  const update = async (patch: { enabled?: boolean; autoApproveDraft?: boolean; autoApprovePost?: boolean }) => {
+  const update = async (patch: {
+    enabled?: boolean
+    autoApproveDraft?: boolean
+    autoApprovePost?: boolean
+  }) => {
     setSaving(true)
     try {
       const res = await fetch('/api/account-templates', {
@@ -354,7 +410,7 @@ function TemplateModal({
         body: JSON.stringify({ brandId, templateId: template.id }),
       })
       if (!res.ok) throw new Error()
-      const { template: newTemplate } = await res.json() as { template: Template }
+      const { template: newTemplate } = (await res.json()) as { template: Template }
       await onRefresh()
       onDuplicated(newTemplate)
     } catch {
@@ -364,9 +420,16 @@ function TemplateModal({
     }
   }
 
-  const handleSlotChange = (key: string, patch: { intention?: string; minWords?: number; maxWords?: number } | null) => {
+  const handleSlotChange = (
+    key: string,
+    patch: { intention?: string; minWords?: number; maxWords?: number } | null,
+  ) => {
     const next = { ...slotOverrides }
-    if (patch === null) { delete next[key] } else { next[key] = { ...next[key], ...patch } }
+    if (patch === null) {
+      delete next[key]
+    } else {
+      next[key] = { ...next[key], ...patch }
+    }
     setSlotOverrides(next)
     saveCustomizations(next)
   }
@@ -420,7 +483,12 @@ function TemplateModal({
           {/* Header */}
           <div className="flex items-start justify-between gap-3 p-5 border-b border-gray-800 sticky top-0 bg-gray-950 z-10">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className={cn('p-1.5 rounded-md border', FORMAT_COLOR[template.format] ?? 'bg-white/5 text-white/50 border-gray-800')}>
+              <div
+                className={cn(
+                  'p-1.5 rounded-md border',
+                  FORMAT_COLOR[template.format] ?? 'bg-white/5 text-white/50 border-gray-800',
+                )}
+              >
                 <FormatIcon size={14} />
               </div>
               <div className="min-w-0">
@@ -430,27 +498,55 @@ function TemplateModal({
                       autoFocus
                       value={customName}
                       onChange={(e) => setCustomName(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') saveCustomName(); if (e.key === 'Escape') setEditingName(false) }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') saveCustomName()
+                        if (e.key === 'Escape') setEditingName(false)
+                      }}
                       placeholder={template.name}
                       className="text-sm font-semibold bg-gray-800 border border-gray-600 rounded px-2 py-0.5 text-white focus:outline-none focus:border-gray-400 w-40"
                     />
-                    <button onClick={saveCustomName} disabled={savingName} className="text-[11px] text-green-400 hover:text-green-300 disabled:opacity-50">
+                    <button
+                      onClick={saveCustomName}
+                      disabled={savingName}
+                      className="text-[11px] text-green-400 hover:text-green-300 disabled:opacity-50"
+                    >
                       {savingName ? '…' : 'Save'}
                     </button>
-                    <button onClick={() => { setCustomName(config?.customName ?? ''); setEditingName(false) }} className="text-[11px] text-gray-500 hover:text-gray-300">
+                    <button
+                      onClick={() => {
+                        setCustomName(config?.customName ?? '')
+                        setEditingName(false)
+                      }}
+                      className="text-[11px] text-gray-500 hover:text-gray-300"
+                    >
                       Cancel
                     </button>
                   </div>
                 ) : (
-                  <button onClick={() => setEditingName(true)} className="group flex items-center gap-1 text-left">
+                  <button
+                    onClick={() => setEditingName(true)}
+                    className="group flex items-center gap-1 text-left"
+                  >
                     <h2 className="font-semibold text-sm leading-tight group-hover:text-white/80 transition-colors">
                       {customName || template.name}
                     </h2>
-                    {customName && <span className="text-[10px] text-gray-600 group-hover:text-gray-500">(custom)</span>}
-                    <Pencil size={11} className="text-gray-700 group-hover:text-gray-400 transition-colors shrink-0" />
+                    {customName && (
+                      <span className="text-[10px] text-gray-600 group-hover:text-gray-500">
+                        (custom)
+                      </span>
+                    )}
+                    <Pencil
+                      size={11}
+                      className="text-gray-700 group-hover:text-gray-400 transition-colors shrink-0"
+                    />
                   </button>
                 )}
-                <span className={cn('text-[10px] px-1.5 py-0.5 rounded border mt-0.5 inline-block', FORMAT_COLOR[template.format] ?? 'bg-white/5 text-white/40 border-gray-800')}>
+                <span
+                  className={cn(
+                    'text-[10px] px-1.5 py-0.5 rounded border mt-0.5 inline-block',
+                    FORMAT_COLOR[template.format] ?? 'bg-white/5 text-white/40 border-gray-800',
+                  )}
+                >
                   {template.format.replace('_', ' ')}
                 </span>
               </div>
@@ -464,7 +560,10 @@ function TemplateModal({
               >
                 {duplicating ? <Loader2 size={15} className="animate-spin" /> : <Copy size={15} />}
               </button>
-              <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+              <button
+                onClick={onClose}
+                className="text-gray-500 hover:text-white transition-colors"
+              >
                 <X size={16} />
               </button>
             </div>
@@ -487,18 +586,21 @@ function TemplateModal({
               {sections && sections.length > 0 && (
                 <div className="flex items-center gap-1.5 text-xs text-text-secondary bg-gray-900 rounded px-2.5 py-1.5 border border-gray-800">
                   <Layers size={11} />
-                  {sections.length} {slotSchema ? 'text slot' : 'section'}{sections.length !== 1 ? 's' : ''}
+                  {sections.length} {slotSchema ? 'text slot' : 'section'}
+                  {sections.length !== 1 ? 's' : ''}
                 </div>
               )}
             </div>
 
             {/* Slot / section overrides — editable for both reels (slotSchema) and head talks (contentSchema sections) */}
-            {(slotSchema && slotSchema.length > 0 || htSections && htSections.length > 0) && (
+            {((slotSchema && slotSchema.length > 0) || (htSections && htSections.length > 0)) && (
               <div className="space-y-2">
                 <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">
                   {slotSchema ? 'What the AI fills in' : 'Script sections'}
                 </p>
-                <p className="text-[11px] text-gray-600">Click a section to customize its instructions for this brand.</p>
+                <p className="text-[11px] text-gray-600">
+                  Click a section to customize its instructions for this brand.
+                </p>
                 <div className="space-y-2">
                   {(slotSchema ?? htSections!).map((s) => (
                     <SlotOverrideRow
@@ -515,8 +617,12 @@ function TemplateModal({
 
             {/* Caption customization — available for all templates */}
             <div className="space-y-2">
-              <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">Caption</p>
-              <p className="text-[11px] text-gray-600">Customize how the AI writes the Instagram caption for this brand.</p>
+              <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">
+                Caption
+              </p>
+              <p className="text-[11px] text-gray-600">
+                Customize how the AI writes the Instagram caption for this brand.
+              </p>
               <SlotOverrideRow
                 slot={CAPTION_SLOT}
                 override={slotOverrides['caption']}
@@ -527,12 +633,19 @@ function TemplateModal({
 
             {/* Custom prompt */}
             <div className="space-y-2">
-              <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">Custom prompt</p>
-              <p className="text-[11px] text-gray-600">Extra instructions the AI must follow when drafting for this brand with this template. Highest priority — overrides everything else.</p>
+              <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">
+                Custom prompt
+              </p>
+              <p className="text-[11px] text-gray-600">
+                Extra instructions the AI must follow when drafting for this brand with this
+                template. Highest priority — overrides everything else.
+              </p>
               <textarea
                 value={customPrompt}
                 onChange={(e) => setCustomPrompt(e.target.value)}
-                placeholder={"How should the AI write when using this template for this brand?\n\n• Hook rule: e.g. 'Always open with a bold, specific claim — no questions'\n• Format constraint: e.g. 'Keep sentences under 12 words; no bullet lists'\n• Tone note: e.g. 'Dry and direct — no hype, no exclamation marks'\n• Brand-specific detail: e.g. 'Reference our founding year 2019 when relevant'\n• Hard restriction: e.g. 'Never mention competitors by name'"}
+                placeholder={
+                  "How should the AI write when using this template for this brand?\n\n• Hook rule: e.g. 'Always open with a bold, specific claim — no questions'\n• Format constraint: e.g. 'Keep sentences under 12 words; no bullet lists'\n• Tone note: e.g. 'Dry and direct — no hype, no exclamation marks'\n• Brand-specific detail: e.g. 'Reference our founding year 2019 when relevant'\n• Hard restriction: e.g. 'Never mention competitors by name'"
+                }
                 className="w-full text-sm bg-gray-900 border border-gray-800 text-white rounded-lg px-3 py-2 resize-y min-h-[140px] focus:outline-none focus:border-gray-600 placeholder:text-gray-600 leading-relaxed"
               />
               <div className="flex justify-end">
@@ -556,12 +669,16 @@ function TemplateModal({
 
             {/* Settings */}
             <div className="space-y-2">
-              <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">Settings</p>
+              <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">
+                Settings
+              </p>
               <div className="flex flex-col gap-2">
                 <label className="flex items-center justify-between bg-gray-900 border border-gray-800 rounded-lg px-3 py-2.5 cursor-pointer">
                   <div>
                     <p className="text-sm font-medium">Enabled</p>
-                    <p className="text-xs text-text-secondary mt-0.5">Include when generating content for this brand</p>
+                    <p className="text-xs text-text-secondary mt-0.5">
+                      Include when generating content for this brand
+                    </p>
                   </div>
                   <input
                     type="checkbox"
@@ -574,7 +691,9 @@ function TemplateModal({
                 <label className="flex items-center justify-between bg-gray-900 border border-gray-800 rounded-lg px-3 py-2.5 cursor-pointer">
                   <div>
                     <p className="text-sm font-medium">Auto-approve draft</p>
-                    <p className="text-xs text-text-secondary mt-0.5">Automatically approve the generated draft and queue it for rendering</p>
+                    <p className="text-xs text-text-secondary mt-0.5">
+                      Automatically approve the generated draft and queue it for rendering
+                    </p>
                   </div>
                   <input
                     type="checkbox"
@@ -587,7 +706,10 @@ function TemplateModal({
                 <label className="flex items-center justify-between bg-gray-900 border border-gray-800 rounded-lg px-3 py-2.5 cursor-pointer">
                   <div>
                     <p className="text-sm font-medium">Auto-approve post</p>
-                    <p className="text-xs text-text-secondary mt-0.5">Automatically approve the rendered video for publishing when its scheduled time arrives</p>
+                    <p className="text-xs text-text-secondary mt-0.5">
+                      Automatically approve the rendered video for publishing when its scheduled
+                      time arrives
+                    </p>
                   </div>
                   <input
                     type="checkbox"
@@ -599,7 +721,6 @@ function TemplateModal({
                 </label>
               </div>
             </div>
-
           </div>
         </div>
       </div>
@@ -644,7 +765,9 @@ function TemplateCard({
       className="group text-left w-full bg-gray-900 border border-gray-800 rounded-xl overflow-hidden hover:border-gray-700 transition-all flex flex-col cursor-pointer"
     >
       {/* Preview */}
-      <div className={cn('w-full relative bg-gray-950', isPortrait ? 'aspect-[9/16]' : 'aspect-[4/3]')}>
+      <div
+        className={cn('w-full relative bg-gray-950', isPortrait ? 'aspect-[9/16]' : 'aspect-[4/3]')}
+      >
         <PreviewMedia
           previewUrl={template.previewUrl}
           previewThumbnailUrl={template.previewThumbnailUrl}
@@ -662,9 +785,13 @@ function TemplateCard({
               : 'bg-gray-900/80 border-gray-700 text-gray-400 hover:bg-gray-800/80',
           )}
         >
-          {toggling
-            ? <Loader2 size={9} className="animate-spin" />
-            : isEnabled ? <ToggleRight size={11} /> : <ToggleLeft size={11} />}
+          {toggling ? (
+            <Loader2 size={9} className="animate-spin" />
+          ) : isEnabled ? (
+            <ToggleRight size={11} />
+          ) : (
+            <ToggleLeft size={11} />
+          )}
           {isEnabled ? 'On' : 'Off'}
         </button>
       </div>
@@ -672,20 +799,33 @@ function TemplateCard({
       {/* Info */}
       <div className="p-3 flex flex-col gap-1.5 flex-1">
         <div className="flex items-start justify-between gap-1.5">
-          <p className="text-xs font-semibold leading-snug line-clamp-2 group-hover:text-white transition-colors flex-1">{config?.customName || template.name}</p>
+          <p className="text-xs font-semibold leading-snug line-clamp-2 group-hover:text-white transition-colors flex-1">
+            {config?.customName || template.name}
+          </p>
           <div className="flex items-center gap-1 shrink-0">
-            {(config?.customPrompt || (config?.slotOverrides && Object.keys(config.slotOverrides).length > 0)) && (
-              <span className="text-[9px] px-1 py-0.5 rounded border bg-amber-500/10 text-amber-400 border-amber-500/20" title="Custom prompt set">
+            {(config?.customPrompt ||
+              (config?.slotOverrides && Object.keys(config.slotOverrides).length > 0)) && (
+              <span
+                className="text-[9px] px-1 py-0.5 rounded border bg-amber-500/10 text-amber-400 border-amber-500/20"
+                title="Custom prompt set"
+              >
                 custom
               </span>
             )}
-            <span className={cn('text-[9px] px-1 py-0.5 rounded border', FORMAT_COLOR[template.format] ?? 'bg-gray-800 text-gray-400 border-gray-700')}>
+            <span
+              className={cn(
+                'text-[9px] px-1 py-0.5 rounded border',
+                FORMAT_COLOR[template.format] ?? 'bg-gray-800 text-gray-400 border-gray-700',
+              )}
+            >
               {template.format.replace('_', ' ')}
             </span>
           </div>
         </div>
         {template.description && (
-          <p className="text-[11px] text-text-secondary leading-snug line-clamp-2">{template.description}</p>
+          <p className="text-[11px] text-text-secondary leading-snug line-clamp-2">
+            {template.description}
+          </p>
         )}
       </div>
     </div>
@@ -722,7 +862,9 @@ export default function AccountTemplates({ brandId }: { brandId: string }) {
     }
   }
 
-  useEffect(() => { fetchTemplates() }, [brandId])
+  useEffect(() => {
+    fetchTemplates()
+  }, [brandId])
 
   const toggleTemplate = async (templateId: string, enabled: boolean) => {
     await fetch('/api/account-templates', {
@@ -732,7 +874,7 @@ export default function AccountTemplates({ brandId }: { brandId: string }) {
     })
     await fetchTemplates()
     // Keep selected in sync
-    setSelected((prev) => prev?.id === templateId ? { ...prev } : prev)
+    setSelected((prev) => (prev?.id === templateId ? { ...prev } : prev))
   }
 
   if (loading) return <p className="text-text-secondary text-sm">Loading…</p>
@@ -740,16 +882,33 @@ export default function AccountTemplates({ brandId }: { brandId: string }) {
   const enabled = templates.filter((t) => t.brandConfigs?.[0]?.enabled)
   const disabled = templates.filter((t) => !t.brandConfigs?.[0]?.enabled)
 
-  const visibleTemplates = activeTab === 'enabled' ? enabled : activeTab === 'disabled' ? disabled : templates
+  const visibleTemplates =
+    activeTab === 'enabled' ? enabled : activeTab === 'disabled' ? disabled : templates
 
-  const reelTemplates = visibleTemplates.filter((t) => t.format === 'reel' || t.format === 'trial_reel')
-  const headTalkTemplates = visibleTemplates.filter((t) => t.format === 'head_talk' || t.format === 'trial_head_talk')
-  const otherTemplates = visibleTemplates.filter((t) => t.format !== 'reel' && t.format !== 'trial_reel' && t.format !== 'head_talk' && t.format !== 'trial_head_talk')
+  const reelTemplates = visibleTemplates.filter(
+    (t) => t.format === 'reel' || t.format === 'trial_reel',
+  )
+  const headTalkTemplates = visibleTemplates.filter(
+    (t) => t.format === 'head_talk' || t.format === 'trial_head_talk',
+  )
+  const otherTemplates = visibleTemplates.filter(
+    (t) =>
+      t.format !== 'reel' &&
+      t.format !== 'trial_reel' &&
+      t.format !== 'head_talk' &&
+      t.format !== 'trial_head_talk',
+  )
 
   const groups = [
     { label: 'Reels', items: reelTemplates, cols: 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4' },
-    { label: 'Head Talk', items: headTalkTemplates, cols: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' },
-    ...(otherTemplates.length > 0 ? [{ label: 'Other', items: otherTemplates, cols: 'grid-cols-2 sm:grid-cols-3' }] : []),
+    {
+      label: 'Head Talk',
+      items: headTalkTemplates,
+      cols: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+    },
+    ...(otherTemplates.length > 0
+      ? [{ label: 'Other', items: otherTemplates, cols: 'grid-cols-2 sm:grid-cols-3' }]
+      : []),
   ].filter((g) => g.items.length > 0)
 
   return (
@@ -764,7 +923,12 @@ export default function AccountTemplates({ brandId }: { brandId: string }) {
       {/* Tabs */}
       <div className="flex items-center gap-1 border-b border-gray-800">
         {TABS.map((tab) => {
-          const count = tab.id === 'enabled' ? enabled.length : tab.id === 'disabled' ? disabled.length : templates.length
+          const count =
+            tab.id === 'enabled'
+              ? enabled.length
+              : tab.id === 'disabled'
+                ? disabled.length
+                : templates.length
           return (
             <button
               key={tab.id}
@@ -777,7 +941,12 @@ export default function AccountTemplates({ brandId }: { brandId: string }) {
               )}
             >
               {tab.label}
-              <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full', activeTab === tab.id ? 'bg-accent/20 text-accent' : 'bg-gray-800 text-gray-500')}>
+              <span
+                className={cn(
+                  'text-[10px] px-1.5 py-0.5 rounded-full',
+                  activeTab === tab.id ? 'bg-accent/20 text-accent' : 'bg-gray-800 text-gray-500',
+                )}
+              >
                 {count}
               </span>
             </button>
@@ -789,13 +958,17 @@ export default function AccountTemplates({ brandId }: { brandId: string }) {
         <p className="text-text-secondary text-sm">No templates available yet.</p>
       ) : visibleTemplates.length === 0 ? (
         <p className="text-text-secondary text-sm py-4">
-          {activeTab === 'enabled' ? 'No templates enabled yet. Enable some from the Gallery tab.' : 'All templates are enabled.'}
+          {activeTab === 'enabled'
+            ? 'No templates enabled yet. Enable some from the Gallery tab.'
+            : 'All templates are enabled.'}
         </p>
       ) : (
         <div className="space-y-8">
           {groups.map((group) => (
             <div key={group.label} className="space-y-3">
-              <h3 className="text-xs font-medium text-text-secondary uppercase tracking-wide">{group.label}</h3>
+              <h3 className="text-xs font-medium text-text-secondary uppercase tracking-wide">
+                {group.label}
+              </h3>
               <div className={cn('grid gap-3', group.cols)}>
                 {group.items.map((t) => (
                   <TemplateCard
@@ -819,7 +992,7 @@ export default function AccountTemplates({ brandId }: { brandId: string }) {
           onClose={() => setSelected(null)}
           onRefresh={() => {
             fetchTemplates()
-            setSelected((prev) => prev ? { ...prev } : null)
+            setSelected((prev) => (prev ? { ...prev } : null))
           }}
           onDuplicated={(newTemplate) => setSelected(newTemplate)}
         />

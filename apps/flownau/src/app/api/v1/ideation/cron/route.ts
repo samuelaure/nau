@@ -3,7 +3,10 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { generateContentIdeas } from '@/modules/ideation/ideation.service'
-import { fetchPendingSourceConcepts, markSourceConceptConsumed } from '@/modules/ideation/sources/inspo-source'
+import {
+  fetchPendingSourceConcepts,
+  markSourceConceptConsumed,
+} from '@/modules/ideation/sources/inspo-source'
 import { prisma } from '@/modules/shared/prisma'
 import { validateServiceToken, unauthorizedResponse } from '@/modules/shared/nau-auth'
 import { signServiceToken } from '@nau/auth'
@@ -56,7 +59,10 @@ export async function POST(request: NextRequest) {
     // Persist as Post records
     if (account) {
       try {
-        const brand2 = await prisma.brand.findUnique({ where: { id: brandId }, select: { autoApproveIdeas: true } })
+        const brand2 = await prisma.brand.findUnique({
+          where: { id: brandId },
+          select: { autoApproveIdeas: true },
+        })
         const autoApprove = brand2?.autoApproveIdeas ?? false
         const batchId = crypto.randomUUID()
         await prisma.post.createMany({

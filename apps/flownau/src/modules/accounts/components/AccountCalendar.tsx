@@ -43,7 +43,13 @@ type DisplayStatus = 'Draft' | 'Ready' | 'Published' | 'Error'
 function getDisplayStatus(dbStatus: string): DisplayStatus {
   if (dbStatus === 'PUBLISHED') return 'Published'
   if (dbStatus === 'FAILED') return 'Error'
-  if (dbStatus === 'RENDERED_PENDING' || dbStatus === 'RENDERED_APPROVED' || dbStatus === 'RENDERED' || dbStatus === 'PUBLISHING') return 'Ready'
+  if (
+    dbStatus === 'RENDERED_PENDING' ||
+    dbStatus === 'RENDERED_APPROVED' ||
+    dbStatus === 'RENDERED' ||
+    dbStatus === 'PUBLISHING'
+  )
+    return 'Ready'
   // IDEA, DRAFT, SCHEDULED, RENDERING → still "in progress" from user POV
   return 'Draft'
 }
@@ -136,20 +142,30 @@ function BetweenDropZone({
   if (!dragState) return null
 
   const ONE_HOUR = 60 * 60 * 1000
-  const midTime = beforeTime && afterTime
-    ? new Date((new Date(beforeTime).getTime() + new Date(afterTime).getTime()) / 2).toISOString()
-    : !beforeTime && afterTime
-      ? new Date(new Date(afterTime).getTime() - ONE_HOUR).toISOString()
-      : beforeTime && !afterTime
-        ? new Date(new Date(beforeTime).getTime() + ONE_HOUR).toISOString()
-        : new Date().toISOString()
+  const midTime =
+    beforeTime && afterTime
+      ? new Date((new Date(beforeTime).getTime() + new Date(afterTime).getTime()) / 2).toISOString()
+      : !beforeTime && afterTime
+        ? new Date(new Date(afterTime).getTime() - ONE_HOUR).toISOString()
+        : beforeTime && !afterTime
+          ? new Date(new Date(beforeTime).getTime() + ONE_HOUR).toISOString()
+          : new Date().toISOString()
 
   return (
     // min-h keeps the zone stable when expanded — avoids layout reflow that causes onDragLeave to fire
     <div
-      onDragOver={(e) => { e.preventDefault(); if (!over) setOver(true) }}
-      onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver(false) }}
-      onDrop={(e) => { e.preventDefault(); setOver(false); onDrop(midTime) }}
+      onDragOver={(e) => {
+        e.preventDefault()
+        if (!over) setOver(true)
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver(false)
+      }}
+      onDrop={(e) => {
+        e.preventDefault()
+        setOver(false)
+        onDrop(midTime)
+      }}
       className={cn(
         'w-full rounded transition-colors flex items-center justify-center',
         over
@@ -157,7 +173,11 @@ function BetweenDropZone({
           : 'min-h-[6px] bg-white/5 hover:bg-white/10',
       )}
     >
-      {over && <span className="text-[9px] text-accent pointer-events-none">Drop here · {fmtTime(midTime)}</span>}
+      {over && (
+        <span className="text-[9px] text-accent pointer-events-none">
+          Drop here · {fmtTime(midTime)}
+        </span>
+      )}
     </div>
   )
 }
@@ -216,16 +236,24 @@ function isSameDay(a: Date, b: Date): boolean {
 }
 
 function fmtTime(iso: string) {
-  return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })
+  return new Date(iso).toLocaleTimeString('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
 }
 
 function fmtDateTime(iso: string) {
   const d = new Date(iso)
-  const date = d.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })
+  const date = d.toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
   const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })
   return `${date} ${time}`
 }
-
 
 // ─── Format-specific creative content ────────────────────────────────────────
 
@@ -291,7 +319,9 @@ function HeadTalkContent({
             placeholder="Write your teleprompter script here..."
           />
           <div className="flex gap-2 justify-end">
-            <Button variant="outline" size="sm" onClick={() => setEditing(false)}>Cancel</Button>
+            <Button variant="outline" size="sm" onClick={() => setEditing(false)}>
+              Cancel
+            </Button>
             <Button size="sm" disabled={saving || actioning} onClick={save}>
               {saving ? <Loader2 size={12} className="animate-spin" /> : 'Save'}
             </Button>
@@ -301,19 +331,27 @@ function HeadTalkContent({
         <p
           onClick={() => setEditing(true)}
           className="text-sm text-white leading-relaxed whitespace-pre-wrap cursor-text rounded px-3 py-2.5 bg-white/5 border border-transparent hover:border-white/10 transition-colors"
-        >{draft}</p>
+        >
+          {draft}
+        </p>
       ) : (
         <p
           onClick={() => setEditing(true)}
           className="text-sm text-text-secondary italic cursor-text rounded px-3 py-2.5 bg-white/5 border border-transparent hover:border-white/10 transition-colors"
-        >No script yet. Click to write.</p>
+        >
+          No script yet. Click to write.
+        </p>
       )}
     </div>
   )
 }
 
 type SceneSlots = Record<string, unknown>
-interface SceneDef { type: string; slots?: SceneSlots; mood?: string }
+interface SceneDef {
+  type: string
+  slots?: SceneSlots
+  mood?: string
+}
 
 function ReelContent({
   comp,
@@ -324,7 +362,11 @@ function ReelContent({
   actioning: boolean
   onSaved: () => void
 }) {
-  const creative = comp.creative as { scenes?: SceneDef[]; slots?: Record<string, string>; brollMood?: string } | null
+  const creative = comp.creative as {
+    scenes?: SceneDef[]
+    slots?: Record<string, string>
+    brollMood?: string
+  } | null
   const slots = creative?.slots
 
   // ── Slot-based reel (current templates) ──────────────────────────────────
@@ -371,10 +413,21 @@ function ReelContent({
               </div>
             ))}
             {creative?.brollMood && (
-              <p className="text-[11px] text-text-secondary italic">B-roll mood: {creative.brollMood}</p>
+              <p className="text-[11px] text-text-secondary italic">
+                B-roll mood: {creative.brollMood}
+              </p>
             )}
             <div className="flex gap-2 justify-end">
-              <Button variant="outline" size="sm" onClick={() => { setSlotDrafts(slots); setEditing(false) }}>Cancel</Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSlotDrafts(slots)
+                  setEditing(false)
+                }}
+              >
+                Cancel
+              </Button>
               <Button size="sm" disabled={saving || actioning} onClick={save}>
                 {saving ? <Loader2 size={12} className="animate-spin" /> : 'Save'}
               </Button>
@@ -383,13 +436,18 @@ function ReelContent({
         ) : (
           <div onClick={() => setEditing(true)} className="flex flex-col gap-2 cursor-text">
             {Object.entries(slotDrafts).map(([key, val]) => (
-              <div key={key} className="rounded-lg bg-white/5 border border-transparent hover:border-white/10 transition-colors px-3 py-2.5 flex flex-col gap-0.5">
+              <div
+                key={key}
+                className="rounded-lg bg-white/5 border border-transparent hover:border-white/10 transition-colors px-3 py-2.5 flex flex-col gap-0.5"
+              >
                 <p className="text-[10px] font-mono text-accent uppercase tracking-wide">{key}</p>
                 <p className="text-sm text-white leading-relaxed whitespace-pre-wrap">{val}</p>
               </div>
             ))}
             {creative?.brollMood && (
-              <p className="text-[11px] text-text-secondary italic">B-roll mood: {creative.brollMood}</p>
+              <p className="text-[11px] text-text-secondary italic">
+                B-roll mood: {creative.brollMood}
+              </p>
             )}
           </div>
         )}
@@ -405,12 +463,19 @@ function ReelContent({
 
   return (
     <div className="flex flex-col gap-3 pt-3">
-      <p className="text-xs text-text-secondary uppercase tracking-wider">Scenes ({scenes.length})</p>
+      <p className="text-xs text-text-secondary uppercase tracking-wider">
+        Scenes ({scenes.length})
+      </p>
       {scenes.map((scene, i) => {
         const sceneSlots = scene.slots ?? {}
-        const slotEntries = Object.entries(sceneSlots).filter(([, v]) => v !== null && v !== undefined && v !== '')
+        const slotEntries = Object.entries(sceneSlots).filter(
+          ([, v]) => v !== null && v !== undefined && v !== '',
+        )
         return (
-          <div key={i} className="rounded-lg bg-white/5 border border-white/10 px-3 py-2.5 flex flex-col gap-1">
+          <div
+            key={i}
+            className="rounded-lg bg-white/5 border border-white/10 px-3 py-2.5 flex flex-col gap-1"
+          >
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-mono bg-accent/10 text-accent px-1.5 py-0.5 rounded">
                 {scene.type}
@@ -423,7 +488,11 @@ function ReelContent({
               slotEntries.map(([key, val]) => (
                 <p key={key} className="text-sm text-white leading-relaxed">
                   {Array.isArray(val)
-                    ? (val as string[]).map((item, j) => <span key={j} className="block">• {item}</span>)
+                    ? (val as string[]).map((item, j) => (
+                        <span key={j} className="block">
+                          • {item}
+                        </span>
+                      ))
                     : String(val)}
                 </p>
               ))
@@ -437,7 +506,15 @@ function ReelContent({
   )
 }
 
-function FormatContent({ comp, actioning, onSaved }: { comp: Composition; actioning: boolean; onSaved: () => void }) {
+function FormatContent({
+  comp,
+  actioning,
+  onSaved,
+}: {
+  comp: Composition
+  actioning: boolean
+  onSaved: () => void
+}) {
   if (HEAD_TALK_FAMILY.has(comp.format)) {
     return <HeadTalkContent comp={comp} actioning={actioning} onSaved={onSaved} />
   }
@@ -458,11 +535,16 @@ function IdeaToggle({ ideaText }: { ideaText: string }) {
         className="w-full flex items-center justify-between px-4 py-3 text-xs text-text-secondary hover:text-white hover:bg-white/5 transition-colors rounded-xl"
       >
         <span className="uppercase tracking-wider font-medium">Original idea</span>
-        <ChevronDown size={14} className={cn('transition-transform duration-200', open && 'rotate-180')} />
+        <ChevronDown
+          size={14}
+          className={cn('transition-transform duration-200', open && 'rotate-180')}
+        />
       </button>
       {open && (
         <div className="px-4 pb-4 border-t border-white/10">
-          <p className="text-sm text-white/70 leading-relaxed whitespace-pre-wrap pt-3">{ideaText}</p>
+          <p className="text-sm text-white/70 leading-relaxed whitespace-pre-wrap pt-3">
+            {ideaText}
+          </p>
         </div>
       )}
     </div>
@@ -497,7 +579,7 @@ function CompositionModal({
         setComp({ ...data.post, renderedVideoUrl: data.post.renderJob?.outputUrl ?? null })
       })
       .catch(() => {})
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialComp.id])
 
   const [actioning, setActioning] = useState(false)
@@ -517,7 +599,8 @@ function CompositionModal({
   const display = getDisplayStatus(comp.status)
   const tag = getSecondaryTag(comp.format, display, comp.status)
   const isScheduled = !!comp.scheduledAt
-  const displayDate = comp.status === 'PUBLISHED' ? (comp.publishedAt ?? comp.scheduledAt) : comp.scheduledAt
+  const displayDate =
+    comp.status === 'PUBLISHED' ? (comp.publishedAt ?? comp.scheduledAt) : comp.scheduledAt
 
   const handleSchedule = async () => {
     if (!newDatetime) return
@@ -719,7 +802,13 @@ function CompositionModal({
     }
     setActioning(true)
     try {
-      const body: Record<string, unknown> = { prompt: ideaText, brandId, format: comp.format, postId: comp.id, templateId: comp.templateId }
+      const body: Record<string, unknown> = {
+        prompt: ideaText,
+        brandId,
+        format: comp.format,
+        postId: comp.id,
+        templateId: comp.templateId,
+      }
       if (instructions?.trim()) body.recomposeInstructions = instructions.trim()
       const res = await fetch('/api/agent/compose', {
         method: 'POST',
@@ -744,10 +833,14 @@ function CompositionModal({
 
   const handleToggleTrial = async () => {
     const isCurrentlyTrial = comp.format === 'trial_reel' || comp.format === 'trial_head_talk'
-    const newFormat = comp.format === 'reel' ? 'trial_reel'
-      : comp.format === 'trial_reel' ? 'reel'
-      : comp.format === 'head_talk' ? 'trial_head_talk'
-      : 'head_talk'
+    const newFormat =
+      comp.format === 'reel'
+        ? 'trial_reel'
+        : comp.format === 'trial_reel'
+          ? 'reel'
+          : comp.format === 'head_talk'
+            ? 'trial_head_talk'
+            : 'head_talk'
     setActioning(true)
     try {
       const res = await fetch(`/api/posts/${comp.id}`, {
@@ -810,30 +903,94 @@ function CompositionModal({
     return () => document.removeEventListener('mousedown', handle)
   }, [moreOpen])
 
-  type MenuItem = { key: string; label: string; icon: ReactNode; onClick: () => void; className?: string }
+  type MenuItem = {
+    key: string
+    label: string
+    icon: ReactNode
+    onClick: () => void
+    className?: string
+  }
   const moreItems: MenuItem[] = []
-  if (!scheduling && display !== 'Published' && display !== 'Error' && comp.status !== 'RENDERING' && comp.status !== 'DRAFT_APPROVED') {
-    moreItems.push({ key: 'schedule', label: isScheduled ? 'Reschedule' : 'Schedule', icon: isScheduled ? <Clock size={13} /> : <CalendarPlus size={13} />, onClick: () => setScheduling(true) })
+  if (
+    !scheduling &&
+    display !== 'Published' &&
+    display !== 'Error' &&
+    comp.status !== 'RENDERING' &&
+    comp.status !== 'DRAFT_APPROVED'
+  ) {
+    moreItems.push({
+      key: 'schedule',
+      label: isScheduled ? 'Reschedule' : 'Schedule',
+      icon: isScheduled ? <Clock size={13} /> : <CalendarPlus size={13} />,
+      onClick: () => setScheduling(true),
+    })
   }
   if (isScheduled && !scheduling && display !== 'Published') {
-    moreItems.push({ key: 'unschedule', label: 'Unschedule', icon: <CalendarX size={13} />, onClick: handleUnschedule })
+    moreItems.push({
+      key: 'unschedule',
+      label: 'Unschedule',
+      icon: <CalendarX size={13} />,
+      onClick: handleUnschedule,
+    })
   }
   if (comp.status === 'DRAFT_PENDING') {
-    moreItems.push({ key: 'ai-recompose', label: 'Re-compose', icon: <RefreshCw size={13} />, onClick: () => { setRecomposeOpen(true); setMoreOpen(false) } })
-    moreItems.push({ key: 'reformat', label: 'Re-format', icon: <Shuffle size={13} />, onClick: () => { onClose(); onReformat(comp) } })
+    moreItems.push({
+      key: 'ai-recompose',
+      label: 'Re-compose',
+      icon: <RefreshCw size={13} />,
+      onClick: () => {
+        setRecomposeOpen(true)
+        setMoreOpen(false)
+      },
+    })
+    moreItems.push({
+      key: 'reformat',
+      label: 'Re-format',
+      icon: <Shuffle size={13} />,
+      onClick: () => {
+        onClose()
+        onReformat(comp)
+      },
+    })
   }
   if (display === 'Ready') {
-    moreItems.push({ key: 'rerender', label: 'Re-render', icon: <RefreshCw size={13} />, onClick: handleRerender })
-    moreItems.push({ key: 'recompose', label: 'Use different assets', icon: <Shuffle size={13} />, onClick: handleRecompose })
+    moreItems.push({
+      key: 'rerender',
+      label: 'Re-render',
+      icon: <RefreshCw size={13} />,
+      onClick: handleRerender,
+    })
+    moreItems.push({
+      key: 'recompose',
+      label: 'Use different assets',
+      icon: <Shuffle size={13} />,
+      onClick: handleRecompose,
+    })
   }
   if (tag === 'Record' || tag === 'Replicate') {
-    moreItems.push({ key: 'mark-posted', label: 'Mark as published', icon: <Send size={13} />, onClick: handleMarkPosted })
+    moreItems.push({
+      key: 'mark-posted',
+      label: 'Mark as published',
+      icon: <Send size={13} />,
+      onClick: handleMarkPosted,
+    })
   }
   if (tag === 'Approve' && !!(comp.videoUrl || comp.renderedVideoUrl)) {
-    moreItems.push({ key: 'post-now', label: 'Post now', icon: <Send size={13} />, onClick: handlePostNow, className: 'text-green-300 hover:text-green-200' })
+    moreItems.push({
+      key: 'post-now',
+      label: 'Post now',
+      icon: <Send size={13} />,
+      onClick: handlePostNow,
+      className: 'text-green-300 hover:text-green-200',
+    })
   }
   if (comp.llmTrace && Object.keys(comp.llmTrace).length > 0) {
-    moreItems.push({ key: 'prompts', label: 'Used prompts', icon: <ScrollText size={13} />, onClick: () => onShowPrompts(comp) })
+    moreItems.push({
+      key: 'prompts',
+      label: 'Used prompts',
+      icon: <ScrollText size={13} />,
+      onClick: () => onShowPrompts(comp),
+    })
   }
 
   return (
@@ -854,40 +1011,59 @@ function CompositionModal({
             <div>
               <p className="font-semibold">{FORMAT_LABEL[comp.format] ?? comp.format}</p>
               <p className="text-xs text-text-secondary">
-                {comp.template?.name && <span className="text-white/60">{comp.template.name} · </span>}
+                {comp.template?.name && (
+                  <span className="text-white/60">{comp.template.name} · </span>
+                )}
                 Created {new Date(comp.createdAt).toLocaleDateString('en-GB')}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1.5">
-              <span className={cn(
-                'flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border',
-                (comp.status === 'RENDERING' || comp.status === 'DRAFT_APPROVED')
-                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
-                  : 'bg-gray-800/50 border-gray-700/50 text-gray-300',
-              )}>
-                {(comp.status === 'RENDERING' || comp.status === 'DRAFT_APPROVED') ? (
+              <span
+                className={cn(
+                  'flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border',
+                  comp.status === 'RENDERING' || comp.status === 'DRAFT_APPROVED'
+                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                    : 'bg-gray-800/50 border-gray-700/50 text-gray-300',
+                )}
+              >
+                {comp.status === 'RENDERING' || comp.status === 'DRAFT_APPROVED' ? (
                   <Loader2 size={10} className="animate-spin" />
                 ) : (
                   <span className={cn('w-1.5 h-1.5 rounded-full', DISPLAY_DOT[display])} />
                 )}
-                {comp.status === 'RENDERING' ? 'Rendering' : comp.status === 'DRAFT_APPROVED' ? 'Queued' : display}
+                {comp.status === 'RENDERING'
+                  ? 'Rendering'
+                  : comp.status === 'DRAFT_APPROVED'
+                    ? 'Queued'
+                    : display}
               </span>
               {tag && (
-                <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full border', TAG_COLOR[tag])}>
+                <span
+                  className={cn(
+                    'text-xs font-semibold px-2 py-0.5 rounded-full border',
+                    TAG_COLOR[tag],
+                  )}
+                >
                   {tag}
                 </span>
               )}
             </div>
             <button
-              onClick={() => { navigator.clipboard.writeText(comp.id); toast.success('Post ID copied') }}
+              onClick={() => {
+                navigator.clipboard.writeText(comp.id)
+                toast.success('Post ID copied')
+              }}
               className="text-text-secondary hover:text-white transition-colors"
               title={comp.id}
             >
               <Copy size={15} />
             </button>
-            <button onClick={onClose} className="text-text-secondary hover:text-white transition-colors">
+            <button
+              onClick={onClose}
+              className="text-text-secondary hover:text-white transition-colors"
+            >
               <X size={18} />
             </button>
           </div>
@@ -900,27 +1076,40 @@ function CompositionModal({
             <div className="flex items-center justify-between px-4 py-2.5 rounded-lg bg-white/5 border border-white/10">
               <div>
                 <p className="text-sm font-medium text-white">Trial</p>
-                <p className="text-xs text-text-secondary">Post as Instagram Trial — shown to non-followers first</p>
+                <p className="text-xs text-text-secondary">
+                  Post as Instagram Trial — shown to non-followers first
+                </p>
               </div>
               <button
                 onClick={handleToggleTrial}
                 disabled={actioning}
                 className={cn(
                   'relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-40',
-                  (comp.format === 'trial_reel' || comp.format === 'trial_head_talk') ? 'bg-accent' : 'bg-white/20',
+                  comp.format === 'trial_reel' || comp.format === 'trial_head_talk'
+                    ? 'bg-accent'
+                    : 'bg-white/20',
                 )}
               >
-                <span className={cn(
-                  'absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200',
-                  (comp.format === 'trial_reel' || comp.format === 'trial_head_talk') ? 'translate-x-5' : 'translate-x-0',
-                )} />
+                <span
+                  className={cn(
+                    'absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200',
+                    comp.format === 'trial_reel' || comp.format === 'trial_head_talk'
+                      ? 'translate-x-5'
+                      : 'translate-x-0',
+                  )}
+                />
               </button>
             </div>
           )}
 
           {/* Scheduled time */}
           {(() => {
-            const canEdit = !scheduling && display !== 'Published' && display !== 'Error' && comp.status !== 'RENDERING' && comp.status !== 'DRAFT_APPROVED'
+            const canEdit =
+              !scheduling &&
+              display !== 'Published' &&
+              display !== 'Error' &&
+              comp.status !== 'RENDERING' &&
+              comp.status !== 'DRAFT_APPROVED'
             return canEdit ? (
               <button
                 onClick={() => setScheduling(true)}
@@ -931,25 +1120,28 @@ function CompositionModal({
                   <p className="text-xs text-text-secondary uppercase tracking-wider mb-0.5">
                     {isScheduled ? 'Scheduled for' : 'Not scheduled'}
                   </p>
-                  {displayDate && (
-                    <p className="text-sm text-white">{fmtDateTime(displayDate)}</p>
-                  )}
+                  {displayDate && <p className="text-sm text-white">{fmtDateTime(displayDate)}</p>}
                   {!displayDate && (
                     <p className="text-sm text-text-secondary italic">Click to set a date & time</p>
                   )}
                 </div>
-                <Pencil size={13} className="text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity mt-0.5 shrink-0" />
+                <Pencil
+                  size={13}
+                  className="text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity mt-0.5 shrink-0"
+                />
               </button>
             ) : (
               <div className="flex items-start gap-3">
                 <Clock size={15} className="text-text-secondary mt-0.5 shrink-0" />
                 <div>
                   <p className="text-xs text-text-secondary uppercase tracking-wider mb-0.5">
-                    {comp.status === 'PUBLISHED' ? 'Published at' : isScheduled ? 'Scheduled for' : 'Not scheduled'}
+                    {comp.status === 'PUBLISHED'
+                      ? 'Published at'
+                      : isScheduled
+                        ? 'Scheduled for'
+                        : 'Not scheduled'}
                   </p>
-                  {displayDate && (
-                    <p className="text-sm text-white">{fmtDateTime(displayDate)}</p>
-                  )}
+                  {displayDate && <p className="text-sm text-white">{fmtDateTime(displayDate)}</p>}
                 </div>
               </div>
             )
@@ -968,89 +1160,122 @@ function CompositionModal({
                 className="bg-gray-950 border border-gray-800 text-white rounded px-3 py-2 text-sm"
               />
               <div className="flex gap-2 justify-end">
-                <Button variant="outline" size="sm" onClick={() => setScheduling(false)}>Cancel</Button>
+                <Button variant="outline" size="sm" onClick={() => setScheduling(false)}>
+                  Cancel
+                </Button>
                 <Button size="sm" disabled={!newDatetime || actioning} onClick={handleSchedule}>
-                  {actioning ? <Loader2 size={13} className="animate-spin" /> : (isScheduled ? 'Reschedule' : 'Schedule')}
+                  {actioning ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : isScheduled ? (
+                    'Reschedule'
+                  ) : (
+                    'Schedule'
+                  )}
                 </Button>
               </div>
             </div>
           )}
 
           {/* ── REEL layout ─────────────────────────────────────────────────── */}
-          {REEL_FAMILY.has(comp.format) && (() => {
-            const hasVideo = !!(comp.videoUrl || comp.renderedVideoUrl)
-            return (
-              <>
-                {hasVideo ? (
-                  <>
-                    {/* Video player */}
+          {REEL_FAMILY.has(comp.format) &&
+            (() => {
+              const hasVideo = !!(comp.videoUrl || comp.renderedVideoUrl)
+              return (
+                <>
+                  {hasVideo ? (
+                    <>
+                      {/* Video player */}
+                      <video
+                        src={comp.videoUrl || comp.renderedVideoUrl || ''}
+                        poster={comp.coverUrl ?? undefined}
+                        controls
+                        className="w-full rounded-xl bg-black"
+                        style={{ maxHeight: '20rem' }}
+                      />
+                      {/* Slot texts — collapsible once video exists */}
+                      <div className="border border-white/10 rounded-xl">
+                        <button
+                          onClick={() => setContentOpen((v) => !v)}
+                          className="w-full flex items-center justify-between px-4 py-3 text-xs text-text-secondary hover:text-white hover:bg-white/5 transition-colors rounded-xl"
+                        >
+                          <span className="uppercase tracking-wider font-medium">Content</span>
+                          <ChevronDown
+                            size={14}
+                            className={cn(
+                              'transition-transform duration-200',
+                              contentOpen && 'rotate-180',
+                            )}
+                          />
+                        </button>
+                        {contentOpen && (
+                          <div className="px-4 pb-4 border-t border-white/10">
+                            <ReelContent comp={comp} actioning={actioning} onSaved={onRefresh} />
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    /* No video yet — show slot texts open for review */
+                    <ReelContent comp={comp} actioning={actioning} onSaved={onRefresh} />
+                  )}
+                </>
+              )
+            })()}
+
+          {/* ── HEAD TALK layout ─────────────────────────────────────────────── */}
+          {HEAD_TALK_FAMILY.has(comp.format) &&
+            (() => {
+              const hasVideo = !!(
+                comp.videoUrl ||
+                comp.renderedVideoUrl ||
+                comp.userUploadedMediaUrl
+              )
+              return (
+                <>
+                  {!hasVideo && (
+                    <HeadTalkContent comp={comp} actioning={actioning} onSaved={onRefresh} />
+                  )}
+                  {hasVideo && (
                     <video
-                      src={comp.videoUrl || comp.renderedVideoUrl || ''}
+                      src={
+                        comp.videoUrl || comp.renderedVideoUrl || comp.userUploadedMediaUrl || ''
+                      }
                       poster={comp.coverUrl ?? undefined}
                       controls
                       className="w-full rounded-xl bg-black"
                       style={{ maxHeight: '20rem' }}
                     />
-                    {/* Slot texts — collapsible once video exists */}
-                    <div className="border border-white/10 rounded-xl">
+                  )}
+                  {hasVideo && (
+                    <div className="border border-white/10 rounded-xl overflow-hidden">
                       <button
                         onClick={() => setContentOpen((v) => !v)}
-                        className="w-full flex items-center justify-between px-4 py-3 text-xs text-text-secondary hover:text-white hover:bg-white/5 transition-colors rounded-xl"
+                        className="w-full flex items-center justify-between px-4 py-3 text-xs text-text-secondary hover:text-white hover:bg-white/5 transition-colors"
                       >
-                        <span className="uppercase tracking-wider font-medium">Content</span>
-                        <ChevronDown size={14} className={cn('transition-transform duration-200', contentOpen && 'rotate-180')} />
+                        <span className="uppercase tracking-wider font-medium">Script</span>
+                        <ChevronDown
+                          size={14}
+                          className={cn(
+                            'transition-transform duration-200',
+                            contentOpen && 'rotate-180',
+                          )}
+                        />
                       </button>
                       {contentOpen && (
-                        <div className="px-4 pb-4 border-t border-white/10">
-                          <ReelContent comp={comp} actioning={actioning} onSaved={onRefresh} />
+                        <div className="px-4 pb-4 border-t border-white/5">
+                          <HeadTalkContent
+                            comp={comp}
+                            actioning={actioning}
+                            onSaved={onRefresh}
+                            hideLabel
+                          />
                         </div>
                       )}
                     </div>
-                  </>
-                ) : (
-                  /* No video yet — show slot texts open for review */
-                  <ReelContent comp={comp} actioning={actioning} onSaved={onRefresh} />
-                )}
-              </>
-            )
-          })()}
-
-          {/* ── HEAD TALK layout ─────────────────────────────────────────────── */}
-          {HEAD_TALK_FAMILY.has(comp.format) && (() => {
-            const hasVideo = !!(comp.videoUrl || comp.renderedVideoUrl || comp.userUploadedMediaUrl)
-            return (
-              <>
-                {!hasVideo && (
-                  <HeadTalkContent comp={comp} actioning={actioning} onSaved={onRefresh} />
-                )}
-                {hasVideo && (
-                  <video
-                    src={comp.videoUrl || comp.renderedVideoUrl || comp.userUploadedMediaUrl || ''}
-                    poster={comp.coverUrl ?? undefined}
-                    controls
-                    className="w-full rounded-xl bg-black"
-                    style={{ maxHeight: '20rem' }}
-                  />
-                )}
-                {hasVideo && (
-                  <div className="border border-white/10 rounded-xl overflow-hidden">
-                    <button
-                      onClick={() => setContentOpen((v) => !v)}
-                      className="w-full flex items-center justify-between px-4 py-3 text-xs text-text-secondary hover:text-white hover:bg-white/5 transition-colors"
-                    >
-                      <span className="uppercase tracking-wider font-medium">Script</span>
-                      <ChevronDown size={14} className={cn('transition-transform duration-200', contentOpen && 'rotate-180')} />
-                    </button>
-                    {contentOpen && (
-                      <div className="px-4 pb-4 border-t border-white/5">
-                        <HeadTalkContent comp={comp} actioning={actioning} onSaved={onRefresh} hideLabel />
-                      </div>
-                    )}
-                  </div>
-                )}
-              </>
-            )
-          })()}
+                  )}
+                </>
+              )
+            })()}
 
           {/* Caption — always last */}
           <div className="flex flex-col gap-2">
@@ -1065,7 +1290,9 @@ function CompositionModal({
                   className="bg-gray-950 border border-gray-800 text-white rounded px-3 py-2 text-sm resize-none w-full focus:outline-none focus:border-accent/50"
                 />
                 <div className="flex gap-2 justify-end">
-                  <Button variant="outline" size="sm" onClick={() => setEditingCaption(false)}>Cancel</Button>
+                  <Button variant="outline" size="sm" onClick={() => setEditingCaption(false)}>
+                    Cancel
+                  </Button>
                   <Button size="sm" disabled={actioning} onClick={handleSaveCaption}>
                     {actioning ? <Loader2 size={12} className="animate-spin" /> : 'Save'}
                   </Button>
@@ -1075,26 +1302,32 @@ function CompositionModal({
               <p
                 onClick={() => setEditingCaption(true)}
                 className="text-sm text-white leading-relaxed whitespace-pre-wrap cursor-text rounded px-3 py-2.5 bg-white/5 border border-transparent hover:border-white/10 transition-colors"
-              >{captionDraft}</p>
+              >
+                {captionDraft}
+              </p>
             ) : (
               <p
                 onClick={() => setEditingCaption(true)}
                 className="text-sm text-text-secondary italic cursor-text rounded px-3 py-2.5 bg-white/5 border border-transparent hover:border-white/10 transition-colors"
-              >No caption yet. Click to write.</p>
+              >
+                No caption yet. Click to write.
+              </p>
             )}
           </div>
 
           {/* Original idea — collapsible */}
-          {comp.ideaText && (
-            <IdeaToggle ideaText={comp.ideaText} />
-          )}
-
+          {comp.ideaText && <IdeaToggle ideaText={comp.ideaText} />}
         </div>
 
         {/* Re-compose panel */}
         {recomposeOpen && (
           <div className="px-6 py-4 border-t border-white/5 flex flex-col gap-3">
-            <p className="text-xs text-text-secondary">What should change? <span className="text-white/40">(optional — leave blank for a completely fresh take)</span></p>
+            <p className="text-xs text-text-secondary">
+              What should change?{' '}
+              <span className="text-white/40">
+                (optional — leave blank for a completely fresh take)
+              </span>
+            </p>
             <textarea
               value={recomposeInstructions}
               onChange={(e) => setRecomposeInstructions(e.target.value)}
@@ -1103,9 +1336,26 @@ function CompositionModal({
               className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/30 resize-none focus:outline-none focus:border-white/25"
             />
             <div className="flex items-center gap-2 justify-end">
-              <button onClick={() => { setRecomposeOpen(false); setRecomposeInstructions('') }} className="text-xs text-text-secondary hover:text-white transition-colors">Cancel</button>
-              <Button size="sm" onClick={() => handleAIRecompose(recomposeInstructions)} disabled={actioning} className="gap-1.5">
-                {actioning ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+              <button
+                onClick={() => {
+                  setRecomposeOpen(false)
+                  setRecomposeInstructions('')
+                }}
+                className="text-xs text-text-secondary hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <Button
+                size="sm"
+                onClick={() => handleAIRecompose(recomposeInstructions)}
+                disabled={actioning}
+                className="gap-1.5"
+              >
+                {actioning ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <RefreshCw size={13} />
+                )}
                 Compose
               </Button>
             </div>
@@ -1125,7 +1375,10 @@ function CompositionModal({
               >
                 {actioning ? <Loader2 size={12} className="animate-spin" /> : 'Yes, delete'}
               </button>
-              <button onClick={() => setConfirmDelete(false)} className="text-xs text-text-secondary hover:text-white">
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="text-xs text-text-secondary hover:text-white"
+              >
                 Cancel
               </button>
             </div>
@@ -1142,10 +1395,15 @@ function CompositionModal({
 
           {/* Right: primary action(s) + more dropdown */}
           <div className="flex items-center gap-2">
-
             {/* Queued / rendering → cancel is the only sensible action */}
             {(comp.status === 'RENDERING' || comp.status === 'DRAFT_APPROVED') && (
-              <Button variant="outline" size="sm" onClick={handleCancelRender} disabled={actioning} className="gap-1.5 border-amber-500/30 text-amber-300 hover:bg-amber-500/10">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCancelRender}
+                disabled={actioning}
+                className="gap-1.5 border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
+              >
                 {actioning ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />}
                 {comp.status === 'DRAFT_APPROVED' ? 'Remove from queue' : 'Cancel render'}
               </Button>
@@ -1153,8 +1411,17 @@ function CompositionModal({
 
             {/* Error → retry */}
             {display === 'Error' && (
-              <Button size="sm" onClick={handleConfirmRetry} disabled={actioning} className="gap-1.5">
-                {actioning ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+              <Button
+                size="sm"
+                onClick={handleConfirmRetry}
+                disabled={actioning}
+                className="gap-1.5"
+              >
+                {actioning ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <RefreshCw size={13} />
+                )}
                 Retry
               </Button>
             )}
@@ -1175,36 +1442,64 @@ function CompositionModal({
                     fd.append('file', file)
                     fd.append('compositionId', comp.id)
                     fd.append('brandId', brandId)
-                    const res = await fetch('/api/compositions/upload-recording', { method: 'POST', body: fd })
-                    if (res.ok) { toast.success('Media uploaded.'); onRefresh(); onClose() }
-                    else toast.error('Upload failed')
+                    const res = await fetch('/api/compositions/upload-recording', {
+                      method: 'POST',
+                      body: fd,
+                    })
+                    if (res.ok) {
+                      toast.success('Media uploaded.')
+                      onRefresh()
+                      onClose()
+                    } else toast.error('Upload failed')
                   }}
                 />
               </label>
             )}
 
             {/* Draft → approve to start rendering */}
-            {comp.status === 'DRAFT_PENDING' && (
-              !(REEL_FAMILY.has(comp.format)) ||
-              !!(comp.creative as Record<string, unknown> | null)?.slots
-            ) && (
-              <Button size="sm" onClick={handleApproveDraft} disabled={actioning} className="gap-1.5 bg-accent hover:bg-accent/80">
-                {actioning ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
-                Approve draft
-              </Button>
-            )}
+            {comp.status === 'DRAFT_PENDING' &&
+              (!REEL_FAMILY.has(comp.format) ||
+                !!(comp.creative as Record<string, unknown> | null)?.slots) && (
+                <Button
+                  size="sm"
+                  onClick={handleApproveDraft}
+                  disabled={actioning}
+                  className="gap-1.5 bg-accent hover:bg-accent/80"
+                >
+                  {actioning ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : (
+                    <CheckCircle2 size={13} />
+                  )}
+                  Approve draft
+                </Button>
+              )}
 
             {/* Ready but not approved → needs posting approval */}
             {tag === 'Approve' && (
-              <Button size="sm" onClick={handleApproveRender} disabled={actioning} className="gap-1.5 bg-orange-600 hover:bg-orange-500">
-                {actioning ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
+              <Button
+                size="sm"
+                onClick={handleApproveRender}
+                disabled={actioning}
+                className="gap-1.5 bg-orange-600 hover:bg-orange-500"
+              >
+                {actioning ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <CheckCircle2 size={13} />
+                )}
                 Approve
               </Button>
             )}
 
             {/* Approved and has video → publish immediately */}
             {tag === 'Approved' && !!(comp.videoUrl || comp.renderedVideoUrl) && (
-              <Button size="sm" onClick={handlePostNow} disabled={actioning} className="gap-1.5 bg-green-600 hover:bg-green-500 text-white">
+              <Button
+                size="sm"
+                onClick={handlePostNow}
+                disabled={actioning}
+                className="gap-1.5 bg-green-600 hover:bg-green-500 text-white"
+              >
                 {actioning ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
                 Post now
               </Button>
@@ -1227,7 +1522,10 @@ function CompositionModal({
                     {moreItems.map((item) => (
                       <button
                         key={item.key}
-                        onClick={() => { setMoreOpen(false); item.onClick() }}
+                        onClick={() => {
+                          setMoreOpen(false)
+                          item.onClick()
+                        }}
                         disabled={actioning}
                         className={cn(
                           'w-full flex items-center gap-2.5 px-4 py-2 text-sm text-text-primary hover:bg-white/5 transition-colors disabled:opacity-50',
@@ -1272,7 +1570,12 @@ function CompositionChip({
 
   // Prioritize cover image, fallback to rendered video if available (browser can try to grab first frame), or uploaded media.
   // Actually, we shouldn't use video files as standard <img> src, but if coverUrl exists, we use it.
-  const thumb = comp.coverUrl || (comp.renderedVideoUrl?.endsWith('.mp4') ? null : comp.renderedVideoUrl) || (comp.userUploadedMediaUrl?.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? comp.userUploadedMediaUrl : null)
+  const thumb =
+    comp.coverUrl ||
+    (comp.renderedVideoUrl?.endsWith('.mp4') ? null : comp.renderedVideoUrl) ||
+    (comp.userUploadedMediaUrl?.match(/\.(jpeg|jpg|gif|png|webp)$/i)
+      ? comp.userUploadedMediaUrl
+      : null)
 
   const isVideoThumb = !thumb && (comp.renderedVideoUrl || comp.userUploadedMediaUrl)
 
@@ -1291,10 +1594,17 @@ function CompositionChip({
       <div className="flex items-start justify-between w-full">
         <div className="flex items-center gap-1">
           <FormatIcon size={10} className="shrink-0" />
-          <span className="font-bold truncate leading-none pt-0.5">{FORMAT_LABEL[comp.format] ?? comp.format}</span>
+          <span className="font-bold truncate leading-none pt-0.5">
+            {FORMAT_LABEL[comp.format] ?? comp.format}
+          </span>
         </div>
         {tag && (
-          <span className={cn('text-[8px] font-bold px-1 py-0.5 rounded border leading-none', TAG_COLOR[tag])}>
+          <span
+            className={cn(
+              'text-[8px] font-bold px-1 py-0.5 rounded border leading-none',
+              TAG_COLOR[tag],
+            )}
+          >
             {tag}
           </span>
         )}
@@ -1305,7 +1615,12 @@ function CompositionChip({
           {thumb ? (
             <img src={thumb} alt="Thumbnail" className="w-full h-full object-cover opacity-90" />
           ) : isVideoThumb ? (
-            <video src={comp.renderedVideoUrl || comp.userUploadedMediaUrl || ''} className="w-full h-full object-cover opacity-90" muted playsInline />
+            <video
+              src={comp.renderedVideoUrl || comp.userUploadedMediaUrl || ''}
+              className="w-full h-full object-cover opacity-90"
+              muted
+              playsInline
+            />
           ) : null}
         </div>
       )}
@@ -1318,16 +1633,32 @@ function CompositionChip({
 
       <div className="flex items-center justify-between w-full mt-auto pt-0.5">
         <span className="text-[9px] opacity-70 font-medium">
-          {(() => { const d = comp.status === 'PUBLISHED' ? (comp.publishedAt ?? comp.scheduledAt) : comp.scheduledAt; return d ? fmtTime(d) : 'Unscheduled' })()}
+          {(() => {
+            const d =
+              comp.status === 'PUBLISHED'
+                ? (comp.publishedAt ?? comp.scheduledAt)
+                : comp.scheduledAt
+            return d ? fmtTime(d) : 'Unscheduled'
+          })()}
         </span>
         <div className="flex items-center gap-1">
-          {(comp.status === 'RENDERING' || comp.status === 'DRAFT_APPROVED') ? (
+          {comp.status === 'RENDERING' || comp.status === 'DRAFT_APPROVED' ? (
             <Loader2 size={9} className="shrink-0 animate-spin text-amber-400" />
           ) : (
             <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', DISPLAY_DOT[display])} />
           )}
-          <span className={cn('text-[9px] opacity-70', (comp.status === 'RENDERING' || comp.status === 'DRAFT_APPROVED') && 'text-amber-400 opacity-100')}>
-            {comp.status === 'RENDERING' ? 'Rendering' : comp.status === 'DRAFT_APPROVED' ? 'Queued' : display}
+          <span
+            className={cn(
+              'text-[9px] opacity-70',
+              (comp.status === 'RENDERING' || comp.status === 'DRAFT_APPROVED') &&
+                'text-amber-400 opacity-100',
+            )}
+          >
+            {comp.status === 'RENDERING'
+              ? 'Rendering'
+              : comp.status === 'DRAFT_APPROVED'
+                ? 'Queued'
+                : display}
           </span>
         </div>
       </div>
@@ -1337,7 +1668,13 @@ function CompositionChip({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function AccountCalendar({ brandId, workspaceId }: { brandId: string; workspaceId?: string }) {
+export default function AccountCalendar({
+  brandId,
+  workspaceId,
+}: {
+  brandId: string
+  workspaceId?: string
+}) {
   const [compositions, setCompositions] = useState<Composition[]>([])
   const [dragState, setDragState] = useState<DragState | null>(null)
   const [loading, setLoading] = useState(true)
@@ -1364,7 +1701,9 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
       const compData = await compRes.json()
       const comps = compData.compositions || []
       setCompositions(comps)
-      setSelected(prev => prev ? (comps.find((c: Composition) => c.id === prev.id) ?? prev) : null)
+      setSelected((prev) =>
+        prev ? (comps.find((c: Composition) => c.id === prev.id) ?? prev) : null,
+      )
     } catch {
       toast.error('Failed to load calendar')
     } finally {
@@ -1380,7 +1719,7 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
       let finalTemplateId = reformatTemplateId
       let finalFormat = reformatFormat
       if (reformatMode === 'format' && finalFormat) {
-        const candidates = availableTemplates.filter(t => t.format === finalFormat)
+        const candidates = availableTemplates.filter((t) => t.format === finalFormat)
         const picked = candidates[Math.floor(Math.random() * candidates.length)]
         finalTemplateId = picked?.id ?? ''
       }
@@ -1388,7 +1727,13 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
       const res = await fetch('/api/agent/compose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brandId, prompt: reformatComp.ideaText ?? '', postId: reformatComp.id, format: finalFormat || undefined, templateId: finalTemplateId || undefined }),
+        body: JSON.stringify({
+          brandId,
+          prompt: reformatComp.ideaText ?? '',
+          postId: reformatComp.id,
+          format: finalFormat || undefined,
+          templateId: finalTemplateId || undefined,
+        }),
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
@@ -1415,7 +1760,11 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
       .catch(() => {})
     fetch(`/api/account-templates?brandId=${brandId}`)
       .then((r) => r.json())
-      .then((data) => setAvailableTemplates((data.templates || []).filter((t: any) => t.brandConfigs?.[0]?.enabled !== false)))
+      .then((data) =>
+        setAvailableTemplates(
+          (data.templates || []).filter((t: any) => t.brandConfigs?.[0]?.enabled !== false),
+        ),
+      )
       .catch(() => {})
   }, [brandId])
 
@@ -1438,7 +1787,6 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
     }
   }
 
-
   // Poll every 5 s while any composition is actively rendering, stop when done.
   useEffect(() => {
     const isRendering = compositions.some(
@@ -1458,8 +1806,15 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
 
   const forDay = (day: Date) =>
     compositions
-      .filter((c) => { const d = calendarDate(c); return d && isSameDay(new Date(d), day) })
-      .sort((a, b) => { const da = calendarDate(a)!; const db = calendarDate(b)!; return da < db ? -1 : 1 })
+      .filter((c) => {
+        const d = calendarDate(c)
+        return d && isSameDay(new Date(d), day)
+      })
+      .sort((a, b) => {
+        const da = calendarDate(a)!
+        const db = calendarDate(b)!
+        return da < db ? -1 : 1
+      })
 
   const unscheduled = compositions.filter((c) => !calendarDate(c))
 
@@ -1490,13 +1845,19 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
       }
 
       if (r.pastRescheduled > 0) {
-        toast.info(`${r.pastRescheduled} past unscheduled post${r.pastRescheduled === 1 ? '' : 's'} moved to new slots.`)
+        toast.info(
+          `${r.pastRescheduled} past unscheduled post${r.pastRescheduled === 1 ? '' : 's'} moved to new slots.`,
+        )
       }
 
       if (r.ideasGenerated > 0) {
-        toast.info(`Generated ${r.ideasGenerated} new idea${r.ideasGenerated === 1 ? '' : 's'} to fill the queue.`)
+        toast.info(
+          `Generated ${r.ideasGenerated} new idea${r.ideasGenerated === 1 ? '' : 's'} to fill the queue.`,
+        )
       } else if (r.noDigest && r.approvedIdeas < r.postsNeeded) {
-        toast.warning('Could not auto-generate ideas — no InspoBase digest available. Add topics manually in the Ideas tab.')
+        toast.warning(
+          'Could not auto-generate ideas — no InspoBase digest available. Add topics manually in the Ideas tab.',
+        )
       }
 
       if (r.skippedByBatchRule > 0) {
@@ -1524,7 +1885,9 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
           { duration: 8000 },
         )
       } else {
-        toast.success(`Calendar filled — ${r.postsFilled} post${r.postsFilled === 1 ? '' : 's'} scheduled.`)
+        toast.success(
+          `Calendar filled — ${r.postsFilled} post${r.postsFilled === 1 ? '' : 's'} scheduled.`,
+        )
       }
 
       await fetchCompositions()
@@ -1539,9 +1902,7 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
   const handleDrop = async (postId: string, scheduledAt: string) => {
     setDragState(null)
 
-    setCompositions((prev) =>
-      prev.map((c) => c.id === postId ? { ...c, scheduledAt } : c),
-    )
+    setCompositions((prev) => prev.map((c) => (c.id === postId ? { ...c, scheduledAt } : c)))
 
     try {
       await fetch(`/api/posts/${postId}`, {
@@ -1606,7 +1967,10 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
         {/* Action buttons row */}
         <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={() => { setDraftCustomPromptDraft(draftCustomPrompt); setDraftCustomPromptModalOpen(true) }}
+            onClick={() => {
+              setDraftCustomPromptDraft(draftCustomPrompt)
+              setDraftCustomPromptModalOpen(true)
+            }}
             className={cn(
               'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
               draftCustomPrompt
@@ -1633,7 +1997,11 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
             disabled={runningCoverage}
             className="text-xs gap-1.5"
           >
-            {runningCoverage ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+            {runningCoverage ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <CheckCircle2 size={12} />
+            )}
             {runningCoverage ? 'Running…' : 'Fill Calendar'}
           </Button>
         </div>
@@ -1661,76 +2029,83 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
         </div>
       ) : (
         <div className="overflow-x-auto -mx-1 px-1 pb-1">
-        <div className="grid grid-cols-7 gap-1 min-h-[480px] min-w-[560px]">
-          {weekDays.map((day) => {
-            const isToday = isSameDay(day, today)
-            const dayComps = forDay(day)
-            return (
-              <div
-                key={day.toISOString()}
-                className={cn(
-                  'flex flex-col gap-1 rounded-lg p-2 border',
-                  isToday ? 'border-accent/50 bg-accent/5' : 'border-white/5 bg-white/2',
-                )}
-              >
-                <div className="text-center mb-1">
-                  <p className="text-[10px] text-text-secondary uppercase tracking-widest">
-                    {DAY_LABELS[day.getDay()]}
-                  </p>
-                  <p className={cn('text-sm font-bold', isToday ? 'text-accent' : 'text-white')}>
-                    {day.getDate()}
-                  </p>
-                </div>
-
-                {dayComps.length === 0 ? (
-                  <div className="flex-1 flex items-center justify-center">
-                    {dragState ? (
-                      <BetweenDropZone
-                        beforeTime={null}
-                        afterTime={`${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}T12:00:00.000Z`}
-                        dragState={dragState}
-                        onDrop={(t) => handleDrop(dragState.postId, t)}
-                      />
-                    ) : (
-                      <span className="text-[10px] text-gray-700">—</span>
-                    )}
+          <div className="grid grid-cols-7 gap-1 min-h-[480px] min-w-[560px]">
+            {weekDays.map((day) => {
+              const isToday = isSameDay(day, today)
+              const dayComps = forDay(day)
+              return (
+                <div
+                  key={day.toISOString()}
+                  className={cn(
+                    'flex flex-col gap-1 rounded-lg p-2 border',
+                    isToday ? 'border-accent/50 bg-accent/5' : 'border-white/5 bg-white/2',
+                  )}
+                >
+                  <div className="text-center mb-1">
+                    <p className="text-[10px] text-text-secondary uppercase tracking-widest">
+                      {DAY_LABELS[day.getDay()]}
+                    </p>
+                    <p className={cn('text-sm font-bold', isToday ? 'text-accent' : 'text-white')}>
+                      {day.getDate()}
+                    </p>
                   </div>
-                ) : (
-                  <div className="flex flex-col gap-1">
-                    {dayComps.map((comp, idx) => {
-                      const time = (calendarDate(comp) ?? comp.scheduledAt)!
-                      return (
-                        <div key={comp.id}>
-                          <BetweenDropZone
-                            beforeTime={idx > 0 ? (calendarDate(dayComps[idx - 1]!) ?? dayComps[idx - 1]!.scheduledAt) : null}
-                            afterTime={time}
-                            dragState={dragState}
-                            onDrop={(t) => handleDrop(dragState!.postId, t)}
-                          />
-                          <CompositionChip
-                            comp={comp}
-                            onClick={() => setSelected(comp)}
-                            dragState={dragState}
-                            onDragStart={() => setDragState({ postId: comp.id, format: comp.format })}
-                            onDragEnd={() => setDragState(null)}
-                          />
-                          {idx === dayComps.length - 1 && (
+
+                  {dayComps.length === 0 ? (
+                    <div className="flex-1 flex items-center justify-center">
+                      {dragState ? (
+                        <BetweenDropZone
+                          beforeTime={null}
+                          afterTime={`${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}T12:00:00.000Z`}
+                          dragState={dragState}
+                          onDrop={(t) => handleDrop(dragState.postId, t)}
+                        />
+                      ) : (
+                        <span className="text-[10px] text-gray-700">—</span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-1">
+                      {dayComps.map((comp, idx) => {
+                        const time = (calendarDate(comp) ?? comp.scheduledAt)!
+                        return (
+                          <div key={comp.id}>
                             <BetweenDropZone
-                              beforeTime={time}
-                              afterTime={null}
+                              beforeTime={
+                                idx > 0
+                                  ? (calendarDate(dayComps[idx - 1]!) ??
+                                    dayComps[idx - 1]!.scheduledAt)
+                                  : null
+                              }
+                              afterTime={time}
                               dragState={dragState}
                               onDrop={(t) => handleDrop(dragState!.postId, t)}
                             />
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
+                            <CompositionChip
+                              comp={comp}
+                              onClick={() => setSelected(comp)}
+                              dragState={dragState}
+                              onDragStart={() =>
+                                setDragState({ postId: comp.id, format: comp.format })
+                              }
+                              onDragEnd={() => setDragState(null)}
+                            />
+                            {idx === dayComps.length - 1 && (
+                              <BetweenDropZone
+                                beforeTime={time}
+                                afterTime={null}
+                                dragState={dragState}
+                                onDrop={(t) => handleDrop(dragState!.postId, t)}
+                              />
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 
@@ -1748,8 +2123,14 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
               const FormatIcon = FORMAT_ICON[comp.format] ?? Film
               const display = getDisplayStatus(comp.status)
               const tag = getSecondaryTag(comp.format, display, comp.status)
-              const formatColor = FORMAT_COLOR[comp.format] ?? 'bg-gray-800/50 border-gray-700/50 text-gray-200'
-              const thumb = comp.coverUrl || (comp.renderedVideoUrl?.endsWith('.mp4') ? null : comp.renderedVideoUrl) || (comp.userUploadedMediaUrl?.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? comp.userUploadedMediaUrl : null)
+              const formatColor =
+                FORMAT_COLOR[comp.format] ?? 'bg-gray-800/50 border-gray-700/50 text-gray-200'
+              const thumb =
+                comp.coverUrl ||
+                (comp.renderedVideoUrl?.endsWith('.mp4') ? null : comp.renderedVideoUrl) ||
+                (comp.userUploadedMediaUrl?.match(/\.(jpeg|jpg|gif|png|webp)$/i)
+                  ? comp.userUploadedMediaUrl
+                  : null)
               const isVideoThumb = !thumb && (comp.renderedVideoUrl || comp.userUploadedMediaUrl)
               const isDragging = dragState?.postId === comp.id
 
@@ -1769,10 +2150,17 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
                   <div className="flex items-start justify-between w-full">
                     <div className="flex items-center gap-1.5">
                       <FormatIcon size={12} className="shrink-0" />
-                      <span className="font-bold truncate leading-none pt-0.5">{FORMAT_LABEL[comp.format] ?? comp.format}</span>
+                      <span className="font-bold truncate leading-none pt-0.5">
+                        {FORMAT_LABEL[comp.format] ?? comp.format}
+                      </span>
                     </div>
                     {tag && (
-                      <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded border leading-none', TAG_COLOR[tag])}>
+                      <span
+                        className={cn(
+                          'text-[9px] font-bold px-1.5 py-0.5 rounded border leading-none',
+                          TAG_COLOR[tag],
+                        )}
+                      >
                         {tag}
                       </span>
                     )}
@@ -1781,9 +2169,18 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
                   {(thumb || isVideoThumb) && (
                     <div className="w-full h-16 rounded overflow-hidden bg-black/20 flex-shrink-0 relative">
                       {thumb ? (
-                        <img src={thumb} alt="Thumbnail" className="w-full h-full object-cover opacity-90" />
+                        <img
+                          src={thumb}
+                          alt="Thumbnail"
+                          className="w-full h-full object-cover opacity-90"
+                        />
                       ) : isVideoThumb ? (
-                        <video src={comp.renderedVideoUrl || comp.userUploadedMediaUrl || ''} className="w-full h-full object-cover opacity-90" muted playsInline />
+                        <video
+                          src={comp.renderedVideoUrl || comp.userUploadedMediaUrl || ''}
+                          className="w-full h-full object-cover opacity-90"
+                          muted
+                          playsInline
+                        />
                       ) : null}
                     </div>
                   )}
@@ -1797,13 +2194,25 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
                   <div className="flex items-center justify-between w-full mt-auto pt-1">
                     <span className="text-[10px] opacity-70 font-medium">Unscheduled</span>
                     <div className="flex items-center gap-1.5">
-                      {(comp.status === 'RENDERING' || comp.status === 'DRAFT_APPROVED') ? (
+                      {comp.status === 'RENDERING' || comp.status === 'DRAFT_APPROVED' ? (
                         <Loader2 size={9} className="shrink-0 animate-spin text-amber-400" />
                       ) : (
-                        <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', DISPLAY_DOT[display])} />
+                        <span
+                          className={cn('w-1.5 h-1.5 rounded-full shrink-0', DISPLAY_DOT[display])}
+                        />
                       )}
-                      <span className={cn('text-[10px] opacity-70', (comp.status === 'RENDERING' || comp.status === 'DRAFT_APPROVED') && 'text-amber-400 opacity-100')}>
-                        {comp.status === 'RENDERING' ? 'Rendering' : comp.status === 'DRAFT_APPROVED' ? 'Queued' : display}
+                      <span
+                        className={cn(
+                          'text-[10px] opacity-70',
+                          (comp.status === 'RENDERING' || comp.status === 'DRAFT_APPROVED') &&
+                            'text-amber-400 opacity-100',
+                        )}
+                      >
+                        {comp.status === 'RENDERING'
+                          ? 'Rendering'
+                          : comp.status === 'DRAFT_APPROVED'
+                            ? 'Queued'
+                            : display}
                       </span>
                     </div>
                   </div>
@@ -1815,14 +2224,18 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
       )}
 
       {/* Composer prompt modal */}
-      <Modal isOpen={draftCustomPromptModalOpen} onClose={() => setDraftCustomPromptModalOpen(false)}>
+      <Modal
+        isOpen={draftCustomPromptModalOpen}
+        onClose={() => setDraftCustomPromptModalOpen(false)}
+      >
         <div className="text-center mb-6">
           <div className="w-16 h-16 bg-amber-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4 text-amber-400">
             <SlidersHorizontal size={28} />
           </div>
           <h2 className="text-2xl font-heading font-bold mb-2">Composer Prompt</h2>
           <p className="text-text-secondary text-sm max-w-[320px] mx-auto">
-            Injected into every draft composition with the highest priority — overrides template and system prompts.
+            Injected into every draft composition with the highest priority — overrides template and
+            system prompts.
           </p>
         </div>
         <textarea
@@ -1833,10 +2246,19 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
           className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-text-secondary resize-none focus:outline-none focus:border-amber-500/50 mb-6"
         />
         <div className="flex gap-3">
-          <Button variant="outline" onClick={() => setDraftCustomPromptModalOpen(false)} disabled={savingComposerPrompt} className="flex-1">
+          <Button
+            variant="outline"
+            onClick={() => setDraftCustomPromptModalOpen(false)}
+            disabled={savingComposerPrompt}
+            className="flex-1"
+          >
             Cancel
           </Button>
-          <Button onClick={handleSaveComposerPrompt} disabled={savingComposerPrompt} className="flex-1 bg-amber-600 hover:bg-amber-500 text-white">
+          <Button
+            onClick={handleSaveComposerPrompt}
+            disabled={savingComposerPrompt}
+            className="flex-1 bg-amber-600 hover:bg-amber-500 text-white"
+          >
             {savingComposerPrompt ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
           </Button>
         </div>
@@ -1849,13 +2271,21 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
           brandId={brandId}
           onClose={() => setSelected(null)}
           onRefresh={fetchCompositions}
-          onReformat={(comp) => { setReformatComp(comp); setReformatMode('format'); setReformatFormat(''); setReformatTemplateId('') }}
+          onReformat={(comp) => {
+            setReformatComp(comp)
+            setReformatMode('format')
+            setReformatFormat('')
+            setReformatTemplateId('')
+          }}
           onShowPrompts={(comp) => setPromptsComp(comp)}
         />
       )}
 
       {promptsComp?.llmTrace && (
-        <PromptsModal llmTrace={promptsComp.llmTrace as LlmTrace} onClose={() => setPromptsComp(null)} />
+        <PromptsModal
+          llmTrace={promptsComp.llmTrace as LlmTrace}
+          onClose={() => setPromptsComp(null)}
+        />
       )}
 
       {/* Re-format modal */}
@@ -1872,11 +2302,20 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
               </div>
             )}
             <div className="flex bg-gray-900 p-1 rounded-lg border border-gray-800">
-              {(['format', 'template'] as const).map(mode => (
+              {(['format', 'template'] as const).map((mode) => (
                 <button
                   key={mode}
-                  onClick={() => { setReformatMode(mode); setReformatFormat(''); setReformatTemplateId('') }}
-                  className={cn('flex-1 py-1.5 text-xs font-bold rounded-md transition-all', reformatMode === mode ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white')}
+                  onClick={() => {
+                    setReformatMode(mode)
+                    setReformatFormat('')
+                    setReformatTemplateId('')
+                  }}
+                  className={cn(
+                    'flex-1 py-1.5 text-xs font-bold rounded-md transition-all',
+                    reformatMode === mode
+                      ? 'bg-gray-800 text-white'
+                      : 'text-gray-400 hover:text-white',
+                  )}
                 >
                   {mode === 'format' ? 'By Format' : 'Specific Template'}
                 </button>
@@ -1884,21 +2323,30 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
             </div>
             {reformatMode === 'format' ? (
               <div>
-                <label className="text-xs text-gray-400 block mb-2">Choose a format — a template will be picked at random</label>
+                <label className="text-xs text-gray-400 block mb-2">
+                  Choose a format — a template will be picked at random
+                </label>
                 <div className="flex flex-wrap gap-2">
-                  {[...new Set(availableTemplates.map(t => t.format).filter(Boolean))].map(fmt => {
-                    const Icon = FORMAT_ICON[fmt]
-                    return (
-                      <button
-                        key={fmt}
-                        onClick={() => setReformatFormat(fmt === reformatFormat ? '' : fmt)}
-                        className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all', reformatFormat === fmt ? 'bg-accent border-accent text-white' : 'border-white/10 text-gray-400 hover:border-white/30 hover:text-white')}
-                      >
-                        {Icon && <Icon size={12} />}
-                        {FORMAT_LABEL[fmt] ?? fmt}
-                      </button>
-                    )
-                  })}
+                  {[...new Set(availableTemplates.map((t) => t.format).filter(Boolean))].map(
+                    (fmt) => {
+                      const Icon = FORMAT_ICON[fmt]
+                      return (
+                        <button
+                          key={fmt}
+                          onClick={() => setReformatFormat(fmt === reformatFormat ? '' : fmt)}
+                          className={cn(
+                            'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all',
+                            reformatFormat === fmt
+                              ? 'bg-accent border-accent text-white'
+                              : 'border-white/10 text-gray-400 hover:border-white/30 hover:text-white',
+                          )}
+                        >
+                          {Icon && <Icon size={12} />}
+                          {FORMAT_LABEL[fmt] ?? fmt}
+                        </button>
+                      )
+                    },
+                  )}
                 </div>
               </div>
             ) : (
@@ -1907,22 +2355,45 @@ export default function AccountCalendar({ brandId, workspaceId }: { brandId: str
                 <select
                   className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-sm"
                   value={reformatTemplateId}
-                  onChange={e => setReformatTemplateId(e.target.value)}
+                  onChange={(e) => setReformatTemplateId(e.target.value)}
                   disabled={reformatting}
                 >
                   <option value="">Select a template…</option>
-                  {availableTemplates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  {availableTemplates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
                 </select>
               </div>
             )}
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" disabled={reformatting} onClick={() => setReformatComp(null)}>Cancel</Button>
               <Button
-                disabled={reformatting || (reformatMode === 'format' ? !reformatFormat : !reformatTemplateId)}
+                variant="outline"
+                disabled={reformatting}
+                onClick={() => setReformatComp(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={
+                  reformatting ||
+                  (reformatMode === 'format' ? !reformatFormat : !reformatTemplateId)
+                }
                 onClick={handleReformat}
                 className="bg-accent text-white"
               >
-                {reformatting ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Re-formatting…</> : <><Shuffle className="w-4 h-4 mr-2" />Re-format</>}
+                {reformatting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    Re-formatting…
+                  </>
+                ) : (
+                  <>
+                    <Shuffle className="w-4 h-4 mr-2" />
+                    Re-format
+                  </>
+                )}
               </Button>
             </div>
           </div>

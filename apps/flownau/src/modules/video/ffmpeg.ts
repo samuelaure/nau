@@ -178,7 +178,11 @@ export function generateThumbnail(inputPath: string, outputPath: string): Promis
  * outputPattern must be a printf-style path e.g. "/tmp/seg_%03d.mp4".
  * Returns the number of segments produced.
  */
-export function splitVideo(inputPath: string, outputPattern: string, segmentSecs: number): Promise<number> {
+export function splitVideo(
+  inputPath: string,
+  outputPattern: string,
+  segmentSecs: number,
+): Promise<number> {
   return new Promise((resolve, reject) => {
     let segmentCount = 0
     ffmpeg(inputPath)
@@ -193,7 +197,10 @@ export function splitVideo(inputPath: string, outputPattern: string, segmentSecs
         // segment muxer emits a new timemark each time a segment is closed
         if (p.timemark) segmentCount++
       })
-      .on('error', (err) => { logger.error({ err }, 'Video split error'); reject(err) })
+      .on('error', (err) => {
+        logger.error({ err }, 'Video split error')
+        reject(err)
+      })
       .on('end', () => {
         logger.info({ segmentCount }, 'Video split finished')
         resolve(segmentCount)

@@ -85,4 +85,3 @@ export async function markSourceConceptConsumed(conceptId: string): Promise<void
     logError(`[InspoSource] Failed to mark concept ${conceptId} consumed`, err)
   }
 }
-

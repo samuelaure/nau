@@ -15,7 +15,7 @@ async function isTelegramLinked(token: string): Promise<boolean> {
       cache: 'no-store',
     })
     if (!res.ok) return true
-    const user = await res.json() as { telegramId?: string | null }
+    const user = (await res.json()) as { telegramId?: string | null }
     return !!user.telegramId
   } catch {
     return true

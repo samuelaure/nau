@@ -10,7 +10,7 @@ export async function GET(
   { params }: { params: Promise<{ workspaceId: string }> },
 ) {
   const { workspaceId } = await params
-  const token = await getValidToken() ?? ''
+  const token = (await getValidToken()) ?? ''
   const res = await fetch(`${NAU_API_URL}/workspaces/${workspaceId}/members`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
@@ -24,7 +24,7 @@ export async function POST(
   { params }: { params: Promise<{ workspaceId: string }> },
 ) {
   const { workspaceId } = await params
-  const token = await getValidToken() ?? ''
+  const token = (await getValidToken()) ?? ''
   const body = await req.json()
   const res = await fetch(`${NAU_API_URL}/workspaces/${workspaceId}/members`, {
     method: 'POST',

@@ -14,7 +14,10 @@ export default function AddBrandButton({ workspaceId }: { workspaceId: string })
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  const handleClose = () => { setIsOpen(false); setError(null) }
+  const handleClose = () => {
+    setIsOpen(false)
+    setError(null)
+  }
 
   const handleSubmit = (formData: FormData) => {
     setError(null)
@@ -49,7 +52,13 @@ export default function AddBrandButton({ workspaceId }: { workspaceId: string })
         </div>
 
         <form action={handleSubmit} className="flex flex-col gap-6">
-          <Input name="brandName" label="Brand Name" placeholder="e.g. Andi Universo" required className="py-4" />
+          <Input
+            name="brandName"
+            label="Brand Name"
+            placeholder="e.g. Andi Universo"
+            required
+            className="py-4"
+          />
 
           {error && (
             <div className="p-4 bg-error/10 text-error border border-error/20 rounded-2xl text-sm text-center font-medium">
@@ -57,8 +66,16 @@ export default function AddBrandButton({ workspaceId }: { workspaceId: string })
             </div>
           )}
 
-          <Button type="submit" disabled={isPending} className="mt-2 w-full py-4 rounded-2xl text-lg">
-            {isPending ? <Loader2 className="animate-spin mr-2" size={22} /> : <Plus size={20} className="mr-2" />}
+          <Button
+            type="submit"
+            disabled={isPending}
+            className="mt-2 w-full py-4 rounded-2xl text-lg"
+          >
+            {isPending ? (
+              <Loader2 className="animate-spin mr-2" size={22} />
+            ) : (
+              <Plus size={20} className="mr-2" />
+            )}
             {isPending ? 'Creating…' : 'Create Brand'}
           </Button>
         </form>

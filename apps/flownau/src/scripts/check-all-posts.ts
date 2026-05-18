@@ -22,7 +22,13 @@ async function main() {
     select: { id: true, type: true, tags: true, url: true },
   })
   console.log(`\nBrand video assets: ${assets.length}`)
-  assets.forEach(a => console.log(`  ${a.id.slice(-8)} type:${a.type} tags:[${a.tags.join(',')}] url:${a.url.slice(0, 60)}`))
+  assets.forEach((a) =>
+    console.log(
+      `  ${a.id.slice(-8)} type:${a.type} tags:[${a.tags.join(',')}] url:${a.url.slice(0, 60)}`,
+    ),
+  )
 }
 
-main().catch(console.error).finally(() => prisma.$disconnect())
+main()
+  .catch(console.error)
+  .finally(() => prisma.$disconnect())

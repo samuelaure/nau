@@ -57,9 +57,20 @@ async function syncToNauthenticity(postId: string, brandId: string): Promise<voi
   const nauthenticityProfileId = post.brand.socialProfiles[0]?.nauthenticityProfileId
   if (!nauthenticityProfileId) return
 
-  const media: Array<{ type: string; url: string; thumbnailUrl?: string | null; duration?: null; index: number }> = []
+  const media: Array<{
+    type: string
+    url: string
+    thumbnailUrl?: string | null
+    duration?: null
+    index: number
+  }> = []
   if (post.videoUrl) {
-    media.push({ type: post.format ?? 'video', url: post.videoUrl, thumbnailUrl: post.coverUrl ?? null, index: 0 })
+    media.push({
+      type: post.format ?? 'video',
+      url: post.videoUrl,
+      thumbnailUrl: post.coverUrl ?? null,
+      index: 0,
+    })
   }
 
   const token = await signServiceToken({ secret: authSecret, iss: 'flownau', aud: 'nauthenticity' })
@@ -81,7 +92,10 @@ async function syncToNauthenticity(postId: string, brandId: string): Promise<voi
 
   if (!res.ok) {
     const text = await res.text().catch(() => '')
-    logger.error({ postId, status: res.status, body: text }, '[POST_PUBLISHED] Nauthenticity sync HTTP error')
+    logger.error(
+      { postId, status: res.status, body: text },
+      '[POST_PUBLISHED] Nauthenticity sync HTTP error',
+    )
   } else {
     logger.info({ postId, nauthenticityProfileId }, '[POST_PUBLISHED] Synced post to nauthenticity')
   }

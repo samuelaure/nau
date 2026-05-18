@@ -13,7 +13,11 @@ async function main() {
   console.log(`Found ${posts.length} reel posts`)
 
   for (const post of posts) {
-    const creative = post.creative as { caption?: string; hashtags?: string[]; slots?: Record<string, string> } | null
+    const creative = post.creative as {
+      caption?: string
+      hashtags?: string[]
+      slots?: Record<string, string>
+    } | null
 
     // Backfill top-level caption/hashtags if missing
     if (!post.caption && creative?.caption) {
@@ -34,7 +38,14 @@ async function main() {
 
     await prisma.renderJob.upsert({
       where: { postId: post.id },
-      update: { status: 'queued', progress: 0, error: null, startedAt: null, completedAt: null, attempts: 0 },
+      update: {
+        status: 'queued',
+        progress: 0,
+        error: null,
+        startedAt: null,
+        completedAt: null,
+        attempts: 0,
+      },
       create: { postId: post.id, status: 'queued', progress: 0 },
     })
     await prisma.post.update({ where: { id: post.id }, data: { status: 'RENDERING' } })
@@ -45,7 +56,9 @@ async function main() {
   console.log('\n✅ All reel posts re-queued with new timing')
 }
 
-main().catch(console.error).finally(async () => {
-  await renderQueue.close()
-  await prisma.$disconnect()
-})
+main()
+  .catch(console.error)
+  .finally(async () => {
+    await renderQueue.close()
+    await prisma.$disconnect()
+  })

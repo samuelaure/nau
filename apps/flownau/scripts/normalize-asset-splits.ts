@@ -11,7 +11,12 @@
 import { PrismaClient } from '../src/generated/prisma'
 import { storage } from '../src/modules/shared/r2'
 import { flownau } from 'nau-storage'
-import { splitVideo, getDuration, generateThumbnail, getTempPath } from '../src/modules/video/ffmpeg'
+import {
+  splitVideo,
+  getDuration,
+  generateThumbnail,
+  getTempPath,
+} from '../src/modules/video/ffmpeg'
 import fs from 'fs/promises'
 import { createReadStream, createWriteStream } from 'fs'
 import https from 'https'
@@ -28,13 +33,15 @@ function downloadToTemp(url: string, destPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const proto = url.startsWith('https') ? https : http
     const file = createWriteStream(destPath)
-    proto.get(url, (res) => {
-      res.pipe(file)
-      file.on('finish', () => file.close(() => resolve()))
-    }).on('error', (err) => {
-      fs.unlink(destPath).catch(() => {})
-      reject(err)
-    })
+    proto
+      .get(url, (res) => {
+        res.pipe(file)
+        file.on('finish', () => file.close(() => resolve()))
+      })
+      .on('error', (err) => {
+        fs.unlink(destPath).catch(() => {})
+        reject(err)
+      })
   })
 }
 
@@ -51,7 +58,7 @@ async function processAsset(asset: {
   console.log(`\n[${assetId}] Downloading from ${url}`)
   await downloadToTemp(url, inputPath)
 
-  const duration = await getDuration(inputPath) ?? asset.duration ?? 0
+  const duration = (await getDuration(inputPath)) ?? asset.duration ?? 0
   if (duration <= MAX_SEGMENT_SECS) {
     console.log(`[${assetId}] Duration ${duration.toFixed(1)}s ≤ ${MAX_SEGMENT_SECS}s — skipping`)
     await fs.unlink(inputPath).catch(() => {})
@@ -59,7 +66,9 @@ async function processAsset(asset: {
   }
 
   const segCount = Math.ceil(duration / MAX_SEGMENT_SECS)
-  console.log(`[${assetId}] Duration ${duration.toFixed(1)}s → splitting into ${segCount} segments (dry=${DRY_RUN})`)
+  console.log(
+    `[${assetId}] Duration ${duration.toFixed(1)}s → splitting into ${segCount} segments (dry=${DRY_RUN})`,
+  )
 
   if (DRY_RUN) {
     await fs.unlink(inputPath).catch(() => {})
@@ -68,7 +77,7 @@ async function processAsset(asset: {
 
   // Determine context for R2 key construction
   const assetFolder = 'videos' as const
-  const contextAccountId = brandId  // accountAsset takes brandId as contextAccountId
+  const contextAccountId = brandId // accountAsset takes brandId as contextAccountId
 
   const segmentPattern = getTempPath(`split_${assetId}_%03d.mp4`)
   const segmentDir = path.dirname(segmentPattern)
@@ -80,7 +89,12 @@ async function processAsset(asset: {
   const segmentPaths: string[] = []
   for (let i = 0; ; i++) {
     const p = path.join(segmentDir, segmentBase.replace('%03d', String(i).padStart(3, '0')))
-    try { await fs.access(p); segmentPaths.push(p) } catch { break }
+    try {
+      await fs.access(p)
+      segmentPaths.push(p)
+    } catch {
+      break
+    }
   }
 
   console.log(`[${assetId}] ${segmentPaths.length} segment files produced`)
@@ -93,10 +107,17 @@ async function processAsset(asset: {
       : flownau.templateAsset(templateId || 'global', segId, 'mp4')
 
     const segStats = await fs.stat(segPath)
-    const segUrl = await storage.upload(r2Key, createReadStream(segPath), { mimeType: 'video/mp4', size: segStats.size })
+    const segUrl = await storage.upload(r2Key, createReadStream(segPath), {
+      mimeType: 'video/mp4',
+      size: segStats.size,
+    })
 
     let segDuration: number | undefined
-    try { segDuration = await getDuration(segPath) } catch { /* non-critical */ }
+    try {
+      segDuration = await getDuration(segPath)
+    } catch {
+      /* non-critical */
+    }
 
     let thumbUrl: string | null = null
     const thumbPath = getTempPath(`thumb_${segId}.jpg`)
@@ -106,8 +127,13 @@ async function processAsset(asset: {
         ? flownau.accountThumbnail(contextAccountId, segId)
         : flownau.templateThumbnail(templateId || 'global', segId)
       const thumbStats = await fs.stat(thumbPath)
-      thumbUrl = await storage.upload(thumbKey, createReadStream(thumbPath), { mimeType: 'image/jpeg', size: thumbStats.size })
-    } catch { /* non-critical */ } finally {
+      thumbUrl = await storage.upload(thumbKey, createReadStream(thumbPath), {
+        mimeType: 'image/jpeg',
+        size: thumbStats.size,
+      })
+    } catch {
+      /* non-critical */
+    } finally {
       await fs.unlink(thumbPath).catch(() => {})
     }
 
@@ -147,11 +173,11 @@ async function main() {
   const assets = await prisma.asset.findMany({
     where: {
       type: 'VID',
-      optimizationStatus: 'done',  // skip already-split, pending, failed
-      splitFromId: null,           // skip segments themselves
+      optimizationStatus: 'done', // skip already-split, pending, failed
+      splitFromId: null, // skip segments themselves
       OR: [
         { duration: { gt: MAX_SEGMENT_SECS } },
-        { duration: null },  // duration unknown — will probe during download
+        { duration: null }, // duration unknown — will probe during download
       ],
     },
     select: { id: true, url: true, brandId: true, templateId: true, duration: true },

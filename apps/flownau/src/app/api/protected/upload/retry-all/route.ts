@@ -25,7 +25,11 @@ export async function POST(req: NextRequest) {
     const type = asset.type as 'VID' | 'AUD' | 'IMG'
     const ext = asset.systemFilename.split('.').pop() || ''
     const assetFolder =
-      type === 'VID' ? ('videos' as const) : type === 'AUD' ? ('audios' as const) : ('images' as const)
+      type === 'VID'
+        ? ('videos' as const)
+        : type === 'AUD'
+          ? ('audios' as const)
+          : ('images' as const)
 
     await enqueueOptimization({
       assetId: asset.id,

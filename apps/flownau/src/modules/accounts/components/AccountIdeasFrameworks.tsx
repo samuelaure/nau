@@ -98,11 +98,16 @@ export default function AccountIdeasFrameworks({ brandId }: { brandId: string })
         <div>
           <h3 className="text-xl font-heading font-semibold">Ideas Strategy Frameworks</h3>
           <p className="text-sm text-text-secondary mt-1">
-            Frameworks instruct the AI how to generate content ideas during brainstorming. Select one
-            from the Ideas tab when generating.
+            Frameworks instruct the AI how to generate content ideas during brainstorming. Select
+            one from the Ideas tab when generating.
           </p>
         </div>
-        <Button size="sm" variant="outline" onClick={startCreate} className="flex items-center gap-1.5 shrink-0">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={startCreate}
+          className="flex items-center gap-1.5 shrink-0"
+        >
           <Plus size={14} />
           New Framework
         </Button>
@@ -208,7 +213,11 @@ export default function AccountIdeasFrameworks({ brandId }: { brandId: string })
                   disabled={deletingId === fw.id}
                   className="border-red-900 text-red-500 hover:bg-red-950"
                 >
-                  {deletingId === fw.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                  {deletingId === fw.id ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : (
+                    <Trash2 size={13} />
+                  )}
                 </Button>
               </div>
             </Card>

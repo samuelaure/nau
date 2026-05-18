@@ -9,7 +9,18 @@ import { signServiceToken } from '@nau/auth'
 
 // ─── Template deck: shuffle-drain per format ──────────────────────────────────
 
-type TemplateDeckEntry = { templateId: string; autoApproveDraft: boolean; template: { id: string; format: string; systemPrompt: string | null; contentSchema: unknown; slotSchema: unknown; remotionId: string } }
+type TemplateDeckEntry = {
+  templateId: string
+  autoApproveDraft: boolean
+  template: {
+    id: string
+    format: string
+    systemPrompt: string | null
+    contentSchema: unknown
+    slotSchema: unknown
+    remotionId: string
+  }
+}
 
 class TemplateDeck {
   private decks = new Map<string, TemplateDeckEntry[]>()
@@ -24,7 +35,16 @@ class TemplateDeck {
         select: {
           templateId: true,
           autoApproveDraft: true,
-          template: { select: { id: true, format: true, systemPrompt: true, contentSchema: true, slotSchema: true, remotionId: true } },
+          template: {
+            select: {
+              id: true,
+              format: true,
+              systemPrompt: true,
+              contentSchema: true,
+              slotSchema: true,
+              remotionId: true,
+            },
+          },
         },
       })
       this.originals.set(key, configs)
@@ -48,23 +68,33 @@ async function notifyViaZazu(brandId: string, markdown: string): Promise<void> {
   const secret = process.env.AUTH_SECRET
   if (!secret) return
   try {
-    const brand = await prisma.brand.findUnique({ where: { id: brandId }, select: { workspaceId: true } })
+    const brand = await prisma.brand.findUnique({
+      where: { id: brandId },
+      select: { workspaceId: true },
+    })
     if (!brand) return
     const apiUrl = process.env.NAU_API_URL || 'http://api:3000'
     const serviceToken = await signServiceToken({ iss: 'flownau', aud: '9nau-api', secret })
-    const targetRes = await fetch(`${apiUrl}/workspaces/_service/${brand.workspaceId}/notification-target?app=flownau`, {
-      headers: { Authorization: `Bearer ${serviceToken}` },
-    })
+    const targetRes = await fetch(
+      `${apiUrl}/workspaces/_service/${brand.workspaceId}/notification-target?app=flownau`,
+      {
+        headers: { Authorization: `Bearer ${serviceToken}` },
+      },
+    )
     if (!targetRes.ok) return
     const { nauUserIds } = (await targetRes.json()) as { nauUserIds: string[] }
     const notifyToken = await signServiceToken({ iss: 'flownau', aud: 'zazu', secret })
-    await Promise.all((nauUserIds ?? []).map(nauUserId =>
-      fetch(`${zazuUrl}/api/internal/notify`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${notifyToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nauUserId, type: 'calendar_fill_blocked', brandId, markdown }),
-      }).catch(() => { /* non-critical */ })
-    ))
+    await Promise.all(
+      (nauUserIds ?? []).map((nauUserId) =>
+        fetch(`${zazuUrl}/api/internal/notify`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${notifyToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nauUserId, type: 'calendar_fill_blocked', brandId, markdown }),
+        }).catch(() => {
+          /* non-critical */
+        }),
+      ),
+    )
   } catch {
     logger.warn({ brandId }, '[COVERAGE] Failed to send Zazŭ notification')
   }
@@ -79,10 +109,7 @@ function batchExcludeFilter(recentBatchIds: (string | null)[]) {
   const excluded = recentBatchIds.filter((b): b is string => b !== null)
   if (excluded.length === 0) return {}
   return {
-    OR: [
-      { generationBatchId: null },
-      { generationBatchId: { notIn: excluded } },
-    ],
+    OR: [{ generationBatchId: null }, { generationBatchId: { notIn: excluded } }],
   }
 }
 
@@ -119,7 +146,10 @@ function startOfTodayInTimezone(timezone: string): Date {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
-    }).format(now).split('-').map(Number)
+    })
+      .format(now)
+      .split('-')
+      .map(Number)
     return new Date(Date.UTC(year, month - 1, day))
   } catch {
     const now = new Date()
@@ -195,7 +225,12 @@ export interface CoverageResult {
 export async function runCoverageChecks(brandId: string): Promise<CoverageResult> {
   const brand = await prisma.brand.findUnique({
     where: { id: brandId },
-    select: { coverageHorizonDays: true, autoApproveIdeas: true, language: true, ideationCustomPrompt: true },
+    select: {
+      coverageHorizonDays: true,
+      autoApproveIdeas: true,
+      language: true,
+      ideationCustomPrompt: true,
+    },
   })
   if (!brand) throw new Error(`Brand ${brandId} not found`)
 
@@ -209,7 +244,12 @@ export async function runCoverageChecks(brandId: string): Promise<CoverageResult
 export async function smartFillCalendar(brandId: string): Promise<SmartFillResult> {
   const brand = await prisma.brand.findUnique({
     where: { id: brandId },
-    select: { coverageHorizonDays: true, autoApproveIdeas: true, language: true, ideationCustomPrompt: true },
+    select: {
+      coverageHorizonDays: true,
+      autoApproveIdeas: true,
+      language: true,
+      ideationCustomPrompt: true,
+    },
   })
   if (!brand) throw new Error(`Brand ${brandId} not found`)
 
@@ -220,12 +260,27 @@ export async function smartFillCalendar(brandId: string): Promise<SmartFillResul
 
 async function fillCalendarForBrand(
   brandId: string,
-  brand: { coverageHorizonDays: number; autoApproveIdeas: boolean; language: string; ideationCustomPrompt?: string | null },
+  brand: {
+    coverageHorizonDays: number
+    autoApproveIdeas: boolean
+    language: string
+    ideationCustomPrompt?: string | null
+  },
   source: 'manual' | 'automatic',
 ): Promise<SmartFillResult> {
   const schedule = await prisma.postSchedule.findUnique({ where: { brandId } })
   if (!schedule || !schedule.isActive || schedule.formatChain.length === 0) {
-    return { alreadyFull: true, postsNeeded: 0, pastRescheduled: 0, ideasGenerated: 0, noDigest: false, approvedIdeas: 0, postsFilled: 0, skippedByBatchRule: 0, needsApproval: 0 }
+    return {
+      alreadyFull: true,
+      postsNeeded: 0,
+      pastRescheduled: 0,
+      ideasGenerated: 0,
+      noDigest: false,
+      approvedIdeas: 0,
+      postsFilled: 0,
+      skippedByBatchRule: 0,
+      needsApproval: 0,
+    }
   }
 
   const horizonDays = brand.coverageHorizonDays
@@ -258,7 +313,17 @@ async function fillCalendarForBrand(
   }
 
   if (postsNeeded === 0) {
-    return { alreadyFull: true, postsNeeded: 0, pastRescheduled: 0, ideasGenerated: 0, noDigest: false, approvedIdeas: 0, postsFilled: 0, skippedByBatchRule: 0, needsApproval: 0 }
+    return {
+      alreadyFull: true,
+      postsNeeded: 0,
+      pastRescheduled: 0,
+      ideasGenerated: 0,
+      noDigest: false,
+      approvedIdeas: 0,
+      postsFilled: 0,
+      skippedByBatchRule: 0,
+      needsApproval: 0,
+    }
   }
 
   // When auto-approve is on, any IDEA_PENDING posts are eligible — approve them now so Tier 2 can use them
@@ -284,14 +349,19 @@ async function fillCalendarForBrand(
   // Pre-generate ideas if we're short (past-unpublished posts count as available)
   let ideasGenerated = 0
   let noDigest = false
-  const countAvailable = () => prisma.post.count({
-    where: { brandId, status: { in: ['IDEA_PENDING', 'IDEA_APPROVED'] } },
-  })
-  const countUnscheduledDrafts = () => prisma.post.count({
-    where: { brandId, status: { in: ['DRAFT_PENDING', 'DRAFT_APPROVED'] }, scheduledAt: null },
-  })
+  const countAvailable = () =>
+    prisma.post.count({
+      where: { brandId, status: { in: ['IDEA_PENDING', 'IDEA_APPROVED'] } },
+    })
+  const countUnscheduledDrafts = () =>
+    prisma.post.count({
+      where: { brandId, status: { in: ['DRAFT_PENDING', 'DRAFT_APPROVED'] }, scheduledAt: null },
+    })
 
-  const [available, unscheduledDrafts] = await Promise.all([countAvailable(), countUnscheduledDrafts()])
+  const [available, unscheduledDrafts] = await Promise.all([
+    countAvailable(),
+    countUnscheduledDrafts(),
+  ])
   if (available + unscheduledDrafts + pastUnpublished.length < postsNeeded) {
     const result = await generateIdeasFromSourceConcepts(brandId, brand)
     if (!result.hasConcepts) {
@@ -323,7 +393,11 @@ async function fillCalendarForBrand(
   // Initialise batch-rule window from last 2 scheduled posts before the horizon
   const recentBatchIds: (string | null)[] = []
   const priorPosts = await prisma.post.findMany({
-    where: { brandId, scheduledAt: { lt: todayLocal }, status: { notIn: ['IDEA_PENDING', 'IDEA_APPROVED'] } },
+    where: {
+      brandId,
+      scheduledAt: { lt: todayLocal },
+      status: { notIn: ['IDEA_PENDING', 'IDEA_APPROVED'] },
+    },
     orderBy: { scheduledAt: 'desc' },
     take: BATCH_GAP,
     select: { generationBatchId: true },
@@ -362,9 +436,9 @@ async function fillCalendarForBrand(
 
       const TOLERANCE_MS = 4 * 60 * 1000
       const occupied = occupiedByDate[localDate] ?? []
-      const freeTimes = idealTimes.filter((t) =>
-        !occupied.some((o) => Math.abs(o - t.getTime()) <= TOLERANCE_MS),
-      ).slice(0, toFill)
+      const freeTimes = idealTimes
+        .filter((t) => !occupied.some((o) => Math.abs(o - t.getTime()) <= TOLERANCE_MS))
+        .slice(0, toFill)
 
       for (const targetTime of freeTimes) {
         const format = schedule.formatChain[chainPos % schedule.formatChain.length]!
@@ -383,7 +457,10 @@ async function fillCalendarForBrand(
           postsFilled++
           ;(occupiedByDate[localDate] ??= []).push(targetTime.getTime())
           countByDate[localDate] = (countByDate[localDate] ?? 0) + 1
-          logger.info({ brandId, postId: past.id, targetTime }, '[COVERAGE] Rescheduled past unpublished post')
+          logger.info(
+            { brandId, postId: past.id, targetTime },
+            '[COVERAGE] Rescheduled past unpublished post',
+          )
           continue
         }
 
@@ -407,7 +484,10 @@ async function fillCalendarForBrand(
           postsFilled++
           ;(occupiedByDate[localDate] ??= []).push(targetTime.getTime())
           countByDate[localDate] = (countByDate[localDate] ?? 0) + 1
-          logger.info({ brandId, postId: existingDraft.id, targetTime }, '[COVERAGE] Scheduled existing draft')
+          logger.info(
+            { brandId, postId: existingDraft.id, targetTime },
+            '[COVERAGE] Scheduled existing draft',
+          )
           continue
         }
 
@@ -444,8 +524,13 @@ async function fillCalendarForBrand(
             noDigest = true
             skippedByBatchRule++
             if (source === 'automatic') {
-              const name = (await prisma.brand.findUnique({ where: { id: brandId }, select: { name: true } }))?.name ?? brandId
-              await notifyViaZazu(brandId, `⚠️ *Calendar fill blocked* — _${name}_\n\nAll approved ideas are from the same batch. Could not generate new ideas: no InspoBase digest available.\n\n${skippedByBatchRule} post(s) left unfilled.`)
+              const name =
+                (await prisma.brand.findUnique({ where: { id: brandId }, select: { name: true } }))
+                  ?.name ?? brandId
+              await notifyViaZazu(
+                brandId,
+                `⚠️ *Calendar fill blocked* — _${name}_\n\nAll approved ideas are from the same batch. Could not generate new ideas: no InspoBase digest available.\n\n${skippedByBatchRule} post(s) left unfilled.`,
+              )
             }
             continue
           }
@@ -453,8 +538,13 @@ async function fillCalendarForBrand(
             notifyUserApproveIdeas = true
             skippedByBatchRule++
             if (source === 'automatic') {
-              const name = (await prisma.brand.findUnique({ where: { id: brandId }, select: { name: true } }))?.name ?? brandId
-              await notifyViaZazu(brandId, `⚠️ *Calendar fill blocked* — _${name}_\n\nNew ideas were generated to satisfy the batch rule, but auto-approve is off.\n\nPlease approve ideas in the Ideas tab to continue filling the calendar.`)
+              const name =
+                (await prisma.brand.findUnique({ where: { id: brandId }, select: { name: true } }))
+                  ?.name ?? brandId
+              await notifyViaZazu(
+                brandId,
+                `⚠️ *Calendar fill blocked* — _${name}_\n\nNew ideas were generated to satisfy the batch rule, but auto-approve is off.\n\nPlease approve ideas in the Ideas tab to continue filling the calendar.`,
+              )
             }
             continue
           }
@@ -468,7 +558,13 @@ async function fillCalendarForBrand(
             orderBy: { createdAt: 'asc' },
           })
           if (retryCandidate) {
-            const filled = await composeAndSchedule(brandId, retryCandidate, format, targetTime, deck)
+            const filled = await composeAndSchedule(
+              brandId,
+              retryCandidate,
+              format,
+              targetTime,
+              deck,
+            )
             if (filled) {
               advanceBatchWindow(retryCandidate.generationBatchId)
               postsFilled++
@@ -505,7 +601,10 @@ async function fillCalendarForBrand(
     ? Math.max(0, postsNeeded - postsFilled - skippedByBatchRule)
     : 0
 
-  logger.info({ brandId, postsNeeded, postsFilled, pastRescheduled, ideasGenerated, skippedByBatchRule }, '[COVERAGE] Fill complete')
+  logger.info(
+    { brandId, postsNeeded, postsFilled, pastRescheduled, ideasGenerated, skippedByBatchRule },
+    '[COVERAGE] Fill complete',
+  )
 
   return {
     alreadyFull: false,
@@ -531,7 +630,10 @@ async function composeAndSchedule(
 ): Promise<boolean> {
   const templateConfig = await deck.pick(brandId, format)
   if (!templateConfig) {
-    logger.warn({ brandId, postId: candidate.id, format }, '[COVERAGE] No template for format — skipping')
+    logger.warn(
+      { brandId, postId: candidate.id, format },
+      '[COVERAGE] No template for format — skipping',
+    )
     return false
   }
   try {
@@ -553,7 +655,10 @@ async function composeAndSchedule(
         templateId: draftResult.templateId,
         status: draftStatus,
         scheduledAt: targetTime,
-        llmTrace: { ...(candidate.llmTrace as object ?? {}), draftTrace: draftResult.trace } as unknown as Prisma.InputJsonValue,
+        llmTrace: {
+          ...((candidate.llmTrace as object) ?? {}),
+          draftTrace: draftResult.trace,
+        } as unknown as Prisma.InputJsonValue,
       },
     })
     if (draftStatus === 'DRAFT_APPROVED') {
@@ -561,7 +666,10 @@ async function composeAndSchedule(
         logger.error({ postId: candidate.id, err }, '[COVERAGE] triggerRenderForPost failed'),
       )
     }
-    logger.info({ brandId, postId: candidate.id, format, draftStatus, targetTime }, '[COVERAGE] Post composed and scheduled')
+    logger.info(
+      { brandId, postId: candidate.id, format, draftStatus, targetTime },
+      '[COVERAGE] Post composed and scheduled',
+    )
     return true
   } catch (err) {
     logger.error({ brandId, postId: candidate.id, err }, '[COVERAGE] Auto-compose failed')
@@ -585,7 +693,11 @@ async function generateIdeasFromSourceConcepts(
     if (concepts.length === 0) return { hasConcepts: false }
 
     const recentPosts = await prisma.post.findMany({
-      where: { brandId, createdAt: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) }, caption: { not: null } },
+      where: {
+        brandId,
+        createdAt: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
+        caption: { not: null },
+      },
       select: { caption: true },
       take: 30,
     })
@@ -600,23 +712,28 @@ async function generateIdeasFromSourceConcepts(
         brandId,
       })
       const batchId = crypto.randomUUID()
-      await Promise.all(output.ideas.map((idea) =>
-        prisma.post.create({
-          data: {
-            brandId,
-            ideaText: idea.concept,
-            angle: idea.angle,
-            status: brand.autoApproveIdeas ? 'IDEA_APPROVED' : 'IDEA_PENDING',
-            source: 'automatic',
-            priority: 3,
-            sourceRef: concept.id,
-            generationBatchId: batchId,
-            llmTrace: { ideaTrace: output.trace } as unknown as Prisma.InputJsonValue,
-          },
-        }),
-      ))
+      await Promise.all(
+        output.ideas.map((idea) =>
+          prisma.post.create({
+            data: {
+              brandId,
+              ideaText: idea.concept,
+              angle: idea.angle,
+              status: brand.autoApproveIdeas ? 'IDEA_APPROVED' : 'IDEA_PENDING',
+              source: 'automatic',
+              priority: 3,
+              sourceRef: concept.id,
+              generationBatchId: batchId,
+              llmTrace: { ideaTrace: output.trace } as unknown as Prisma.InputJsonValue,
+            },
+          }),
+        ),
+      )
       await markSourceConceptConsumed(concept.id)
-      logger.info({ brandId, conceptId: concept.id, count: output.ideas.length }, '[COVERAGE] Ideas generated from source concept')
+      logger.info(
+        { brandId, conceptId: concept.id, count: output.ideas.length },
+        '[COVERAGE] Ideas generated from source concept',
+      )
     }
     return { hasConcepts: true }
   } catch (err) {

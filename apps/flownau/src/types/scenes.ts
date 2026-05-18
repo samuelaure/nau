@@ -224,7 +224,10 @@ export const SCENE_CATALOG: SceneCatalogEntry[] = [
     minDurationSec: 2.5,
     maxDurationSec: 6,
     slotDescription: 'quote: string (max 200 chars), attribution?: string (max 50 chars)',
-    slotTemplate: { quote: 'Powerful quote here (max 200 chars)', attribution: 'Source or speaker (optional, max 50 chars)' },
+    slotTemplate: {
+      quote: 'Powerful quote here (max 200 chars)',
+      attribution: 'Source or speaker (optional, max 50 chars)',
+    },
   },
   {
     type: 'list-reveal',
@@ -234,8 +237,12 @@ export const SCENE_CATALOG: SceneCatalogEntry[] = [
     defaultDurationSec: 4,
     minDurationSec: 3,
     maxDurationSec: 8,
-    slotDescription: 'title?: string (max 60 chars), items: string[] (2-5 items, max 80 chars each)',
-    slotTemplate: { title: 'Optional list title (max 60 chars)', items: ['Item one (max 80 chars)', 'Item two', 'Item three'] },
+    slotDescription:
+      'title?: string (max 60 chars), items: string[] (2-5 items, max 80 chars each)',
+    slotTemplate: {
+      title: 'Optional list title (max 60 chars)',
+      items: ['Item one (max 80 chars)', 'Item two', 'Item three'],
+    },
   },
   {
     type: 'media-only',
@@ -280,7 +287,10 @@ export const SCENE_CATALOG: SceneCatalogEntry[] = [
     minDurationSec: 0,
     maxDurationSec: 0,
     slotDescription: 'title: string (max 80 chars), subtitle?: string (max 120 chars)',
-    slotTemplate: { title: 'Carousel title (max 80 chars)', subtitle: 'Optional subtitle or teaser (max 120 chars)' },
+    slotTemplate: {
+      title: 'Carousel title (max 80 chars)',
+      subtitle: 'Optional subtitle or teaser (max 120 chars)',
+    },
   },
   {
     type: 'content-slide',
@@ -291,7 +301,10 @@ export const SCENE_CATALOG: SceneCatalogEntry[] = [
     minDurationSec: 0,
     maxDurationSec: 0,
     slotDescription: 'heading: string (max 80 chars), body: string (max 300 chars)',
-    slotTemplate: { heading: 'Slide heading (max 80 chars)', body: 'Slide body content (max 300 chars)' },
+    slotTemplate: {
+      heading: 'Slide heading (max 80 chars)',
+      body: 'Slide body content (max 300 chars)',
+    },
   },
   {
     type: 'quote-slide',
@@ -302,7 +315,10 @@ export const SCENE_CATALOG: SceneCatalogEntry[] = [
     minDurationSec: 0,
     maxDurationSec: 0,
     slotDescription: 'quote: string (max 200 chars), attribution?: string (max 50 chars)',
-    slotTemplate: { quote: 'Impactful quote here (max 200 chars)', attribution: 'Optional source (max 50 chars)' },
+    slotTemplate: {
+      quote: 'Impactful quote here (max 200 chars)',
+      attribution: 'Optional source (max 50 chars)',
+    },
   },
   {
     type: 'list-slide',
@@ -312,8 +328,12 @@ export const SCENE_CATALOG: SceneCatalogEntry[] = [
     defaultDurationSec: 0,
     minDurationSec: 0,
     maxDurationSec: 0,
-    slotDescription: 'title?: string (max 60 chars), items: string[] (2-5 items, max 80 chars each)',
-    slotTemplate: { title: 'Optional title (max 60 chars)', items: ['Point one (max 80 chars)', 'Point two', 'Point three'] },
+    slotDescription:
+      'title?: string (max 60 chars), items: string[] (2-5 items, max 80 chars each)',
+    slotTemplate: {
+      title: 'Optional title (max 60 chars)',
+      items: ['Point one (max 80 chars)', 'Point two', 'Point three'],
+    },
   },
   {
     type: 'cta-slide',

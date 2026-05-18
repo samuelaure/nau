@@ -29,18 +29,23 @@ const TABS = [
 
 type Tab = (typeof TABS)[number]['id']
 
-
 export default async function WorkspaceOverviewPage({
   params,
   searchParams,
 }: {
   params: Promise<{ workspaceId: string }>
-  searchParams: Promise<{ brandId?: string; tab?: string; returnTab?: string; settingsTab?: string }>
+  searchParams: Promise<{
+    brandId?: string
+    tab?: string
+    returnTab?: string
+    settingsTab?: string
+  }>
 }) {
   const { workspaceId } = await params
   const { brandId, tab: tabParam, returnTab, settingsTab } = await searchParams
   const activeTab: Tab = (TABS.find((t) => t.id === tabParam)?.id ?? 'calendar') as Tab
-  const safeReturnTab = (TABS.find((t) => t.id === returnTab && t.id !== 'settings')?.id ?? 'calendar') as Tab
+  const safeReturnTab = (TABS.find((t) => t.id === returnTab && t.id !== 'settings')?.id ??
+    'calendar') as Tab
 
   const nauApiUrl = process.env.NAU_API_URL || 'http://9nau-api:3000'
   const serviceToken = await signServiceToken({
@@ -58,7 +63,9 @@ export default async function WorkspaceOverviewPage({
     if (workspaceResp.ok) {
       workspace = (await workspaceResp.json()) as { name: string; brands: NauBrand[] }
     } else {
-      console.error(`[WORKSPACES] Failed to fetch workspace ${workspaceId}: ${workspaceResp.status}`)
+      console.error(
+        `[WORKSPACES] Failed to fetch workspace ${workspaceId}: ${workspaceResp.status}`,
+      )
     }
   } catch (err) {
     console.error(`[WORKSPACES] Network error fetching workspace ${workspaceId}:`, err)
@@ -68,8 +75,12 @@ export default async function WorkspaceOverviewPage({
     return (
       <div className="flex flex-col items-center justify-center pt-20 animate-fade-in">
         <h2 className="text-2xl font-bold mb-4">Workspace Unavailable</h2>
-        <p className="text-text-secondary mb-8">Could not load this workspace. The API may be unreachable.</p>
-        <a href="/dashboard" className="btn-primary px-6 py-2">Back to Dashboard</a>
+        <p className="text-text-secondary mb-8">
+          Could not load this workspace. The API may be unreachable.
+        </p>
+        <a href="/dashboard" className="btn-primary px-6 py-2">
+          Back to Dashboard
+        </a>
       </div>
     )
   }
@@ -80,14 +91,21 @@ export default async function WorkspaceOverviewPage({
   if (brandId) {
     const nauBrand = brands.find((b) => b.id === brandId)
     if (!nauBrand) {
-      console.error(`[WORKSPACES] Brand ${brandId} not found in workspace ${workspaceId}. brands=[${brands.map(b => b.id).join(', ')}]`)
+      console.error(
+        `[WORKSPACES] Brand ${brandId} not found in workspace ${workspaceId}. brands=[${brands.map((b) => b.id).join(', ')}]`,
+      )
       notFound()
     }
 
     // Upsert local Brand record so it always exists before rendering
     const localBrand = await prisma.brand.upsert({
       where: { id: brandId },
-      create: { id: brandId, workspaceId, name: nauBrand.name, language: (nauBrand as any).language ?? 'Spanish' },
+      create: {
+        id: brandId,
+        workspaceId,
+        name: nauBrand.name,
+        language: (nauBrand as any).language ?? 'Spanish',
+      },
       update: { name: nauBrand.name, language: (nauBrand as any).language ?? undefined },
     })
 
@@ -96,17 +114,17 @@ export default async function WorkspaceOverviewPage({
       orderBy: { createdAt: 'desc' },
     })
 
-    const postSchedule = activeTab === 'settings'
-      ? await prisma.postSchedule.findUnique({ where: { brandId } })
-      : null
+    const postSchedule =
+      activeTab === 'settings' ? await prisma.postSchedule.findUnique({ where: { brandId } }) : null
 
-    const assets = activeTab === 'assets'
-      ? await prisma.asset.findMany({
-          where: { brandId },
-          orderBy: { createdAt: 'desc' },
-          take: 48,
-        })
-      : []
+    const assets =
+      activeTab === 'assets'
+        ? await prisma.asset.findMany({
+            where: { brandId },
+            orderBy: { createdAt: 'desc' },
+            take: 48,
+          })
+        : []
 
     // Uploaded assets land at flownau/accounts/{brandId}/assets/{type}/{id}.ext
     // Use that prefix as the root so the viewer strips it and shows type folders.
@@ -117,7 +135,10 @@ export default async function WorkspaceOverviewPage({
         {/* Breadcrumb + Brand Settings button */}
         <header className="mb-8 flex items-center justify-between gap-4">
           <p className="text-text-secondary text-sm">
-            <Link href={`/dashboard/workspace/${workspaceId}`} className="hover:text-white transition-colors">
+            <Link
+              href={`/dashboard/workspace/${workspaceId}`}
+              className="hover:text-white transition-colors"
+            >
               {workspace.name}
             </Link>
             {' / '}
@@ -143,7 +164,9 @@ export default async function WorkspaceOverviewPage({
 
         {/* Tab content */}
         <div className="min-h-[400px]">
-          {activeTab === 'calendar' && <AccountCalendar brandId={brandId} workspaceId={workspaceId} />}
+          {activeTab === 'calendar' && (
+            <AccountCalendar brandId={brandId} workspaceId={workspaceId} />
+          )}
           {activeTab === 'ideas' && <BrandPosts brandId={brandId} workspaceId={workspaceId} />}
           {activeTab === 'templates' && <AccountTemplates brandId={brandId} />}
           {activeTab === 'profiles' && (
@@ -162,7 +185,12 @@ export default async function WorkspaceOverviewPage({
             />
           )}
           {activeTab === 'assets' && (
-            <AssetsManager ownerId={brandId} ownerType="brand" assets={assets} basePath={basePath} />
+            <AssetsManager
+              ownerId={brandId}
+              ownerType="brand"
+              assets={assets}
+              basePath={basePath}
+            />
           )}
           {activeTab === 'settings' && (
             <BrandSettings
@@ -176,14 +204,18 @@ export default async function WorkspaceOverviewPage({
                 context: localBrand.context,
               }}
               initialTab={settingsTab as 'general' | 'schedule' | undefined}
-              initialSchedule={postSchedule ? {
-                formatChain: postSchedule.formatChain,
-                dailyFrequency: postSchedule.dailyFrequency,
-                windowStart: postSchedule.windowStart,
-                windowEnd: postSchedule.windowEnd,
-                timezone: postSchedule.timezone,
-                isActive: postSchedule.isActive,
-              } : null}
+              initialSchedule={
+                postSchedule
+                  ? {
+                      formatChain: postSchedule.formatChain,
+                      dailyFrequency: postSchedule.dailyFrequency,
+                      windowStart: postSchedule.windowStart,
+                      windowEnd: postSchedule.windowEnd,
+                      timezone: postSchedule.timezone,
+                      isActive: postSchedule.isActive,
+                    }
+                  : null
+              }
             />
           )}
         </div>
@@ -210,7 +242,9 @@ export default async function WorkspaceOverviewPage({
                 <Tag size={22} className="text-accent" />
               </div>
               <div className="min-w-0">
-                <h3 className="text-lg font-semibold truncate group-hover:text-accent transition-colors">{brand.name}</h3>
+                <h3 className="text-lg font-semibold truncate group-hover:text-accent transition-colors">
+                  {brand.name}
+                </h3>
                 <p className="text-xs text-text-secondary mt-0.5">View brand</p>
               </div>
             </Card>

@@ -20,11 +20,19 @@ export async function POST(req: Request) {
 
     const brand = await prisma.brand.findUnique({
       where: { id: brandId },
-      select: { language: true, ideationCustomPrompt: true, name: true, context: true, autoApproveIdeas: true },
+      select: {
+        language: true,
+        ideationCustomPrompt: true,
+        name: true,
+        context: true,
+        autoApproveIdeas: true,
+      },
     })
 
     const language = brand?.language ?? 'Spanish'
-    const brandContext = renderBrandContextBlock({ name: brand?.name ?? null, context: brand?.context ?? null }) || null
+    const brandContext =
+      renderBrandContextBlock({ name: brand?.name ?? null, context: brand?.context ?? null }) ||
+      null
 
     const output = await generateContentIdeas({
       topic,

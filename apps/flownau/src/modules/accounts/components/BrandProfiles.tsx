@@ -95,7 +95,11 @@ export default function BrandProfiles({
                 <div className="w-12 h-12 rounded-full p-[2px] bg-[linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)] shrink-0 overflow-hidden">
                   <div className="w-full h-full rounded-full bg-panel flex items-center justify-center overflow-hidden">
                     {profile.profileImage ? (
-                      <img src={profile.profileImage} alt={profile.username ?? ''} className="w-full h-full object-cover" />
+                      <img
+                        src={profile.profileImage}
+                        alt={profile.username ?? ''}
+                        className="w-full h-full object-cover"
+                      />
                     ) : (
                       <Instagram size={22} />
                     )}
@@ -121,14 +125,25 @@ export default function BrandProfiles({
 
               <div className="flex gap-2">
                 <div className="flex-1 p-2.5 bg-white/5 rounded-lg text-center">
-                  <p className="text-[10px] text-text-secondary uppercase tracking-wider mb-0.5">Token</p>
-                  <p className={cn('text-xs font-semibold', tokenOk ? 'text-success' : 'text-red-400')}>
+                  <p className="text-[10px] text-text-secondary uppercase tracking-wider mb-0.5">
+                    Token
+                  </p>
+                  <p
+                    className={cn(
+                      'text-xs font-semibold',
+                      tokenOk ? 'text-success' : 'text-red-400',
+                    )}
+                  >
                     {daysLeft !== null ? `${daysLeft}d` : 'No expiry'}
                   </p>
                 </div>
                 <div className="flex-1 p-2.5 bg-white/5 rounded-lg text-center">
-                  <p className="text-[10px] text-text-secondary uppercase tracking-wider mb-0.5">Added</p>
-                  <p className="text-xs font-semibold">{new Date(profile.createdAt).toLocaleDateString('en-US')}</p>
+                  <p className="text-[10px] text-text-secondary uppercase tracking-wider mb-0.5">
+                    Added
+                  </p>
+                  <p className="text-xs font-semibold">
+                    {new Date(profile.createdAt).toLocaleDateString('en-US')}
+                  </p>
                 </div>
               </div>
 
@@ -140,7 +155,11 @@ export default function BrandProfiles({
                   disabled={deletingId === profile.id}
                   onClick={() => handleDelete(profile.id)}
                 >
-                  {deletingId === profile.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                  {deletingId === profile.id ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : (
+                    <Trash2 size={13} />
+                  )}
                 </Button>
               </div>
             </Card>
@@ -151,7 +170,9 @@ export default function BrandProfiles({
           <Card className="col-span-full py-16 text-center border-dashed bg-transparent flex flex-col items-center">
             <Instagram size={40} className="text-text-secondary mb-3 opacity-30" />
             <p className="font-semibold mb-1">No social profiles yet</p>
-            <p className="text-text-secondary text-sm mb-5">Add an Instagram Business account to enable publishing.</p>
+            <p className="text-text-secondary text-sm mb-5">
+              Add an Instagram Business account to enable publishing.
+            </p>
             <Button onClick={() => setIsAddOpen(true)}>
               <Plus size={16} className="mr-2" />
               Add Profile
@@ -160,7 +181,13 @@ export default function BrandProfiles({
         )}
       </div>
 
-      <Modal isOpen={isAddOpen} onClose={() => { setIsAddOpen(false); setError(null) }}>
+      <Modal
+        isOpen={isAddOpen}
+        onClose={() => {
+          setIsAddOpen(false)
+          setError(null)
+        }}
+      >
         <div className="text-center mb-8">
           <div className="w-20 h-20 bg-[#E1306C]/10 rounded-3xl flex items-center justify-center mx-auto mb-6 text-[#E1306C]">
             <Instagram size={36} />
@@ -172,11 +199,29 @@ export default function BrandProfiles({
         </div>
 
         <form action={handleAdd} className="flex flex-col gap-5">
-          <Input name="username" label="Instagram Username" placeholder="@username" required className="py-4" />
-          <Input name="platformId" label="User ID (Platform ID)" placeholder="1784140…" required className="py-4" />
+          <Input
+            name="username"
+            label="Instagram Username"
+            placeholder="@username"
+            required
+            className="py-4"
+          />
+          <Input
+            name="platformId"
+            label="User ID (Platform ID)"
+            placeholder="1784140…"
+            required
+            className="py-4"
+          />
           <div className="w-full">
             <label className="form-label">Access Token</label>
-            <input name="accessToken" type="password" className="input-field py-4" placeholder="EAAB…" required />
+            <input
+              name="accessToken"
+              type="password"
+              className="input-field py-4"
+              placeholder="EAAB…"
+              required
+            />
           </div>
 
           {error && (
@@ -185,8 +230,16 @@ export default function BrandProfiles({
             </div>
           )}
 
-          <Button type="submit" disabled={isPending} className="mt-2 w-full py-4 rounded-2xl text-lg">
-            {isPending ? <Loader2 className="animate-spin mr-2" size={20} /> : <Plus size={18} className="mr-2" />}
+          <Button
+            type="submit"
+            disabled={isPending}
+            className="mt-2 w-full py-4 rounded-2xl text-lg"
+          >
+            {isPending ? (
+              <Loader2 className="animate-spin mr-2" size={20} />
+            ) : (
+              <Plus size={18} className="mr-2" />
+            )}
             {isPending ? 'Connecting…' : 'Connect Profile'}
           </Button>
         </form>

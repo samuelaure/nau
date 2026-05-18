@@ -10,10 +10,7 @@ import { logger } from '@/lib/logger'
  * POST /api/compositions/{id}/publish
  * Publish a composition to selected social profiles
  */
-export async function POST(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const user = await getAuthUser()
@@ -25,10 +22,7 @@ export async function POST(
     const { profileIds } = body
 
     if (!profileIds || !Array.isArray(profileIds) || profileIds.length === 0) {
-      return NextResponse.json(
-        { error: 'At least one profile ID is required' },
-        { status: 400 },
-      )
+      return NextResponse.json({ error: 'At least one profile ID is required' }, { status: 400 })
     }
 
     const composition = await prisma.post.findUnique({
@@ -40,7 +34,8 @@ export async function POST(
       return NextResponse.json({ error: 'Post not found' }, { status: 404 })
     }
 
-    const denied = await checkBrandAccessForRoute(composition.brandId); if (denied) return denied
+    const denied = await checkBrandAccessForRoute(composition.brandId)
+    if (denied) return denied
 
     // Verify all profiles belong to this brand
     const profiles = await prisma.socialProfile.findMany({

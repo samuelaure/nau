@@ -1,7 +1,11 @@
 'use client'
 
 import { useTransition, useEffect, useRef, useState } from 'react'
-import { updateBrand, saveBrandContext, syncBrandContextFromNauthenticity } from '@/modules/accounts/actions'
+import {
+  updateBrand,
+  saveBrandContext,
+  syncBrandContextFromNauthenticity,
+} from '@/modules/accounts/actions'
 import { Card } from '@/modules/shared/components/ui/Card'
 import { Button } from '@/modules/shared/components/ui/Button'
 import AccountSchedule from './AccountSchedule'
@@ -36,48 +40,48 @@ interface BrandIdentity {
 }
 
 const FONT_OPTIONS = [
-  { description: 'system default',           value: 'sans-serif'            },
+  { description: 'system default', value: 'sans-serif' },
   // Bold display
-  { description: 'bold display',             value: 'Anton'                 },
-  { description: 'condensed impact',         value: 'Bebas Neue'            },
-  { description: 'condensed editorial',      value: 'Oswald'                },
-  { description: 'heavy, asian-friendly',    value: 'Black Han Sans'        },
-  { description: 'condensed sport',          value: 'Barlow Condensed'      },
-  { description: 'tall bold display',        value: 'Teko'                  },
-  { description: 'retro bold',               value: 'Righteous'             },
-  { description: 'heavy grotesque',          value: 'Archivo Black'         },
+  { description: 'bold display', value: 'Anton' },
+  { description: 'condensed impact', value: 'Bebas Neue' },
+  { description: 'condensed editorial', value: 'Oswald' },
+  { description: 'heavy, asian-friendly', value: 'Black Han Sans' },
+  { description: 'condensed sport', value: 'Barlow Condensed' },
+  { description: 'tall bold display', value: 'Teko' },
+  { description: 'retro bold', value: 'Righteous' },
+  { description: 'heavy grotesque', value: 'Archivo Black' },
   // Modern sans-serif
-  { description: 'clean neutral',            value: 'Inter'                 },
-  { description: 'geometric bold',           value: 'Montserrat'            },
-  { description: 'rounded modern',           value: 'Poppins'               },
-  { description: 'low-contrast readable',    value: 'DM Sans'               },
-  { description: 'soft rounded',             value: 'Nunito'                },
-  { description: 'elegant thin',             value: 'Raleway'               },
-  { description: 'humanist balanced',        value: 'Lato'                  },
-  { description: 'universal readable',       value: 'Roboto'                },
-  { description: 'open grotesque',           value: 'Work Sans'             },
-  { description: 'wide modern',              value: 'Manrope'               },
-  { description: 'minimalist clean',         value: 'Urbanist'              },
-  { description: 'contemporary geometric',   value: 'Outfit'                },
-  { description: 'friendly modern',          value: 'Figtree'               },
-  { description: 'tech editorial',           value: 'Space Grotesk'         },
-  { description: 'clean circular',           value: 'Sora'                  },
-  { description: 'condensed versatile',      value: 'Barlow'                },
-  { description: 'sharp modern',             value: 'Kanit'                 },
+  { description: 'clean neutral', value: 'Inter' },
+  { description: 'geometric bold', value: 'Montserrat' },
+  { description: 'rounded modern', value: 'Poppins' },
+  { description: 'low-contrast readable', value: 'DM Sans' },
+  { description: 'soft rounded', value: 'Nunito' },
+  { description: 'elegant thin', value: 'Raleway' },
+  { description: 'humanist balanced', value: 'Lato' },
+  { description: 'universal readable', value: 'Roboto' },
+  { description: 'open grotesque', value: 'Work Sans' },
+  { description: 'wide modern', value: 'Manrope' },
+  { description: 'minimalist clean', value: 'Urbanist' },
+  { description: 'contemporary geometric', value: 'Outfit' },
+  { description: 'friendly modern', value: 'Figtree' },
+  { description: 'tech editorial', value: 'Space Grotesk' },
+  { description: 'clean circular', value: 'Sora' },
+  { description: 'condensed versatile', value: 'Barlow' },
+  { description: 'sharp modern', value: 'Kanit' },
   // Serif
-  { description: 'editorial serif',          value: 'Playfair Display'      },
-  { description: 'warm readable serif',      value: 'Lora'                  },
-  { description: 'sturdy news serif',        value: 'Merriweather'          },
-  { description: 'elegant high contrast',    value: 'Cormorant'             },
-  { description: 'classic book serif',       value: 'Libre Baskerville'     },
-  { description: 'vintage editorial',        value: 'Crimson Text'          },
-  { description: 'roman decorative',         value: 'Cinzel'                },
+  { description: 'editorial serif', value: 'Playfair Display' },
+  { description: 'warm readable serif', value: 'Lora' },
+  { description: 'sturdy news serif', value: 'Merriweather' },
+  { description: 'elegant high contrast', value: 'Cormorant' },
+  { description: 'classic book serif', value: 'Libre Baskerville' },
+  { description: 'vintage editorial', value: 'Crimson Text' },
+  { description: 'roman decorative', value: 'Cinzel' },
   // Handwriting / script
-  { description: 'flowing script',           value: 'Dancing Script'        },
-  { description: 'thin signature',           value: 'Sacramento'            },
-  { description: 'casual script',            value: 'Satisfy'               },
-  { description: 'playful retro',            value: 'Pacifico'              },
-  { description: 'natural handwritten',      value: 'Caveat'                },
+  { description: 'flowing script', value: 'Dancing Script' },
+  { description: 'thin signature', value: 'Sacramento' },
+  { description: 'casual script', value: 'Satisfy' },
+  { description: 'playful retro', value: 'Pacifico' },
+  { description: 'natural handwritten', value: 'Caveat' },
 ]
 
 // Google Fonts URL for all custom fonts in the list
@@ -139,7 +143,13 @@ function FontPicker({ name, defaultValue }: { name: string; defaultValue: string
           {selected.value === 'sans-serif' ? '— System default —' : selected.value}
         </span>
         <span className="text-xs text-text-secondary shrink-0 ml-1">{selected.description}</span>
-        <svg className="w-3.5 h-3.5 text-text-secondary shrink-0 ml-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <svg
+          className="w-3.5 h-3.5 text-text-secondary shrink-0 ml-auto"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
       </button>
@@ -151,7 +161,10 @@ function FontPicker({ name, defaultValue }: { name: string; defaultValue: string
             <button
               key={f.value}
               type="button"
-              onClick={() => { setValue(f.value); setOpen(false) }}
+              onClick={() => {
+                setValue(f.value)
+                setOpen(false)
+              }}
               className={cn(
                 'w-full flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-white/5 transition-colors text-left',
                 value === f.value && 'bg-white/10',
@@ -182,11 +195,23 @@ type Brand = {
   context?: unknown
 }
 
-export default function BrandSettings({ brand, initialSchedule, initialTab }: { brand: Brand; initialSchedule: PostSchedule | null; initialTab?: BrandSettingsTab }) {
+export default function BrandSettings({
+  brand,
+  initialSchedule,
+  initialTab,
+}: {
+  brand: Brand
+  initialSchedule: PostSchedule | null
+  initialTab?: BrandSettingsTab
+}) {
   const [tab, setTab] = useState<BrandSettingsTab>(initialTab ?? 'general')
   const [isPending, startTransition] = useTransition()
   const [contextJson, setContextJson] = useState(
-    typeof brand.context === 'string' ? brand.context : (brand.context ? JSON.stringify(brand.context, null, 2) : ''),
+    typeof brand.context === 'string'
+      ? brand.context
+      : brand.context
+        ? JSON.stringify(brand.context, null, 2)
+        : '',
   )
   const [contextSaving, setContextSaving] = useState(false)
   const [contextSaved, setContextSaved] = useState(false)
@@ -249,7 +274,9 @@ export default function BrandSettings({ brand, initialSchedule, initialTab }: { 
 
             <div className="w-full border-t border-white/5 pt-6 flex flex-col gap-4">
               <h4 className="form-label font-semibold text-white">Brand Identity</h4>
-              <p className="text-xs text-text-secondary -mt-2">Colors and fonts used in Remotion video templates.</p>
+              <p className="text-xs text-text-secondary -mt-2">
+                Colors and fonts used in Remotion video templates.
+              </p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="form-label mb-1 block text-xs">Primary Color</label>
@@ -289,11 +316,17 @@ export default function BrandSettings({ brand, initialSchedule, initialTab }: { 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="form-label mb-1 block text-xs">Title Font</label>
-                  <FontPicker name="bi_titleFont" defaultValue={brand.brandIdentity?.titleFont ?? 'sans-serif'} />
+                  <FontPicker
+                    name="bi_titleFont"
+                    defaultValue={brand.brandIdentity?.titleFont ?? 'sans-serif'}
+                  />
                 </div>
                 <div>
                   <label className="form-label mb-1 block text-xs">Body Font</label>
-                  <FontPicker name="bi_bodyFont" defaultValue={brand.brandIdentity?.bodyFont ?? 'sans-serif'} />
+                  <FontPicker
+                    name="bi_bodyFont"
+                    defaultValue={brand.brandIdentity?.bodyFont ?? 'sans-serif'}
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -334,21 +367,29 @@ export default function BrandSettings({ brand, initialSchedule, initialTab }: { 
               <div>
                 <h4 className="form-label font-semibold text-white">Brand context</h4>
                 <p className="text-xs text-text-secondary mt-0.5">
-                  AI-generated brand profile from nauthenticity — used in every content generation step as context. Sync to pull the latest from nauthenticity, or edit directly.
+                  AI-generated brand profile from nauthenticity — used in every content generation
+                  step as context. Sync to pull the latest from nauthenticity, or edit directly.
                 </p>
               </div>
 
               {/* Context editor */}
               <div className="flex flex-col gap-2">
                 <label className="text-xs text-text-secondary">
-                  Context JSON — edit directly if needed. Syncing from nauthenticity overwrites this.
+                  Context JSON — edit directly if needed. Syncing from nauthenticity overwrites
+                  this.
                 </label>
                 <textarea
                   value={contextJson}
-                  onChange={(e) => { setContextJson(e.target.value); setContextSaved(false); setContextError(null) }}
+                  onChange={(e) => {
+                    setContextJson(e.target.value)
+                    setContextSaved(false)
+                    setContextError(null)
+                  }}
                   rows={14}
                   spellCheck={false}
-                  placeholder={"{\n  \"identity\": { \"oneLiner\": \"…\" },\n  \"voice\": { \"descriptors\": [\"…\"] }\n}"}
+                  placeholder={
+                    '{\n  "identity": { "oneLiner": "…" },\n  "voice": { "descriptors": ["…"] }\n}'
+                  }
                   className="w-full font-mono text-xs bg-gray-950 border border-border text-white rounded-lg px-3 py-3 resize-y focus:outline-none focus:border-zinc-600 placeholder:text-zinc-700 leading-relaxed"
                 />
                 {contextError && <p className="text-xs text-red-400">{contextError}</p>}
@@ -394,7 +435,15 @@ export default function BrandSettings({ brand, initialSchedule, initialTab }: { 
                     }}
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-zinc-700 text-zinc-200 hover:border-zinc-500 hover:bg-zinc-800/50 transition-all disabled:opacity-50"
                   >
-                    {contextSaving ? 'Saving…' : contextSaved ? <><Check size={14} /> Saved</> : 'Save context'}
+                    {contextSaving ? (
+                      'Saving…'
+                    ) : contextSaved ? (
+                      <>
+                        <Check size={14} /> Saved
+                      </>
+                    ) : (
+                      'Save context'
+                    )}
                   </button>
                 </div>
               </div>
@@ -409,7 +458,14 @@ export default function BrandSettings({ brand, initialSchedule, initialTab }: { 
         </Card>
       )}
 
-      {tab === 'schedule' && <AccountSchedule brandId={brand.id} initialSchedule={initialSchedule} initialAutoApproveIdeas={brand.autoApproveIdeas} initialCoverageHorizonDays={brand.coverageHorizonDays} />}
+      {tab === 'schedule' && (
+        <AccountSchedule
+          brandId={brand.id}
+          initialSchedule={initialSchedule}
+          initialAutoApproveIdeas={brand.autoApproveIdeas}
+          initialCoverageHorizonDays={brand.coverageHorizonDays}
+        />
+      )}
     </div>
   )
 }

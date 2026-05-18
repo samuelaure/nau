@@ -12,6 +12,7 @@ When a brand owner adds a social profile in nauthenticity and marks it as "publi
 ### flownau
 
 **SocialProfile** model:
+
 - `accessToken: String?` — Made optional to support "soft" profiles awaiting OAuth
 - `syncedFromNauthenticity: Boolean` — Track if synced from nauthenticity
 - `nauthenticityProfileId: String?` — Reference to source nauthenticity profile
@@ -19,6 +20,7 @@ When a brand owner adds a social profile in nauthenticity and marks it as "publi
 ### nauthenticity
 
 **SocialProfileTarget** model:
+
 - `isPublishingProfile: Boolean` — Mark as owned/publishing (vs. monitored)
 - `syncedToFlownauAt: DateTime?` — Track successful sync to flownau
 
@@ -28,12 +30,13 @@ When a brand owner adds a social profile in nauthenticity and marks it as "publi
 
 **POST /api/brands/{brandId}/social-profiles**
 Create a new social profile (soft add).
+
 ```json
 {
   "username": "brand_account",
   "platform": "instagram",
-  "nauthenticityProfileId": "abc123",          // optional, from nauthenticity
-  "syncedFromNauthenticity": true              // optional
+  "nauthenticityProfileId": "abc123", // optional, from nauthenticity
+  "syncedFromNauthenticity": true // optional
 }
 ```
 
@@ -46,6 +49,7 @@ List all social profiles for a brand.
 
 **PUT /social-profile-targets/{targetId}/publishing**
 Toggle `isPublishingProfile` and sync to flownau.
+
 ```json
 {
   "isPublishingProfile": true
@@ -101,6 +105,7 @@ Response: `{ syncedCount: number }`
 ### Token Optional by Design
 
 The `accessToken` field is nullable to allow:
+
 - **Soft adds**: Profile discovery without immediate OAuth burden
 - **Cross-app linking**: nauthenticity → flownau sync creates placeholder
 - **Deferred authorization**: User authorizes later when ready to publish

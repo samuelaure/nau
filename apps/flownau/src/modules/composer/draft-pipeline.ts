@@ -8,11 +8,12 @@ import { logError, logger } from '@/modules/shared/logger'
 import type { LlmTrace } from '@/modules/ideation/ideation.service'
 import type { SlotDef } from '../../../prisma/seeds/templates'
 
-
 const HEAD_TALK_FORMATS = new Set(['head_talk', 'trial_head_talk'])
 
 const HeadTalkSchema = z.object({
-  hook: z.string().describe('Opening hook — max 2 sentences. Wins attention in the first 2 seconds.'),
+  hook: z
+    .string()
+    .describe('Opening hook — max 2 sentences. Wins attention in the first 2 seconds.'),
   body: z.string().describe('Main content body — max 150 words. Short paragraphs, one idea each.'),
   cta: z.string().describe('Call to action — max 2 sentences. Closes the loop the hook opened.'),
   caption: z.string().describe('Social media caption for when the video is published.'),
@@ -42,7 +43,8 @@ export interface DraftPipelineResult {
 }
 
 export async function runDraftPipeline(input: DraftPipelineInput): Promise<DraftPipelineResult> {
-  const { ideaText, brandId, templateId, recentContext, currentDraft, recomposeInstructions } = input
+  const { ideaText, brandId, templateId, recentContext, currentDraft, recomposeInstructions } =
+    input
 
   logger.info({ brandId, templateId }, '[DraftPipeline] Starting composition')
 
@@ -66,9 +68,13 @@ export async function runDraftPipeline(input: DraftPipelineInput): Promise<Draft
   const format = template.format ?? 'reel'
   const language = brand?.language ?? 'Spanish'
 
-  const brandContextStr = renderBrandContextBlock({ name: brand?.name ?? null, context: brand?.context ?? null }) || null
+  const brandContextStr =
+    renderBrandContextBlock({ name: brand?.name ?? null, context: brand?.context ?? null }) || null
 
-  const slotOverrides = (brandTemplateConfig?.slotOverrides ?? null) as Record<string, { intention?: string; minWords?: number; maxWords?: number }> | null
+  const slotOverrides = (brandTemplateConfig?.slotOverrides ?? null) as Record<
+    string,
+    { intention?: string; minWords?: number; maxWords?: number }
+  > | null
   const captionOverride = slotOverrides?.['caption'] ?? null
   const mergedTemplate = slotOverrides
     ? {
@@ -94,9 +100,28 @@ export async function runDraftPipeline(input: DraftPipelineInput): Promise<Draft
   logger.info({ brandId, templateId, format }, '[DraftPipeline] Prompt assembled')
 
   if (HEAD_TALK_FORMATS.has(format)) {
-    return runHeadTalkPath({ brandId, templateId, format, systemPrompt, userMessage, ideaText, layers, language })
+    return runHeadTalkPath({
+      brandId,
+      templateId,
+      format,
+      systemPrompt,
+      userMessage,
+      ideaText,
+      layers,
+      language,
+    })
   }
-  return runSlotPath({ brandId, templateId, format, systemPrompt, userMessage, template: mergedTemplate, ideaText, layers, language })
+  return runSlotPath({
+    brandId,
+    templateId,
+    format,
+    systemPrompt,
+    userMessage,
+    template: mergedTemplate,
+    ideaText,
+    layers,
+    language,
+  })
 }
 
 // ─── Head-talk path (structured output via parseCompletion) ───────────────────
@@ -148,7 +173,11 @@ async function runHeadTalkPath(args: {
   const caption = creative.caption
   const hashtags = creative.hashtags
 
-  const postSynthesis = await generateSynthesis(caption, creative as unknown as Record<string, unknown>, language)
+  const postSynthesis = await generateSynthesis(
+    caption,
+    creative as unknown as Record<string, unknown>,
+    language,
+  )
 
   logger.info({ brandId, templateId }, '[DraftPipeline] HeadTalk composition complete')
 
@@ -159,7 +188,14 @@ async function runHeadTalkPath(args: {
     templateId,
     format,
     postSynthesis,
-    trace: { provider, model, registryId, systemPrompt, userMessage, generatedAt: new Date().toISOString() },
+    trace: {
+      provider,
+      model,
+      registryId,
+      systemPrompt,
+      userMessage,
+      generatedAt: new Date().toISOString(),
+    },
   }
 }
 
@@ -201,11 +237,18 @@ async function runSlotPath(args: {
       maxTokens: 4096,
     })
     const raw = result.content?.trim() ?? ''
-    const jsonStr = raw.replace(/```json?\n?/g, '').replace(/```/g, '').trim()
+    const jsonStr = raw
+      .replace(/```json?\n?/g, '')
+      .replace(/```/g, '')
+      .trim()
     const start = jsonStr.indexOf('{')
     const end = jsonStr.lastIndexOf('}')
-    if (start === -1 || end <= start) throw new Error(`No JSON object in response: ${raw.slice(0, 200)}`)
-    return { parsed: JSON.parse(jsonStr.slice(start, end + 1)) as Record<string, unknown>, usage: result.usage }
+    if (start === -1 || end <= start)
+      throw new Error(`No JSON object in response: ${raw.slice(0, 200)}`)
+    return {
+      parsed: JSON.parse(jsonStr.slice(start, end + 1)) as Record<string, unknown>,
+      usage: result.usage,
+    }
   }
 
   let parsed: Record<string, unknown>
@@ -215,22 +258,32 @@ async function runSlotPath(args: {
     reportFlownauUsage({ operation: 'draft_compose', brandId, usage: res.usage })
   } catch (firstError: unknown) {
     const errorMsg = firstError instanceof Error ? firstError.message : String(firstError)
-    logger.warn({ brandId, templateId, error: errorMsg }, '[DraftPipeline] Slot first attempt failed, retrying')
-    messages.push({ role: 'user', content: 'Your previous response had invalid JSON. Fix it and return only a valid JSON object. No markdown, no explanation.' })
+    logger.warn(
+      { brandId, templateId, error: errorMsg },
+      '[DraftPipeline] Slot first attempt failed, retrying',
+    )
+    messages.push({
+      role: 'user',
+      content:
+        'Your previous response had invalid JSON. Fix it and return only a valid JSON object. No markdown, no explanation.',
+    })
     try {
       const res = await callAndParse()
       parsed = res.parsed
       reportFlownauUsage({ operation: 'draft_compose', brandId, usage: res.usage })
     } catch (secondError: unknown) {
       logError('[DraftPipeline] Slot both attempts failed', secondError)
-      throw new Error(`DraftPipeline slot path failed: ${secondError instanceof Error ? secondError.message : String(secondError)}`)
+      throw new Error(
+        `DraftPipeline slot path failed: ${secondError instanceof Error ? secondError.message : String(secondError)}`,
+      )
     }
   }
 
   let slots = (parsed.slots as Record<string, string> | undefined) ?? {}
   if (Object.keys(slots).length === 0) {
     for (const slotDef of slotDefs) {
-      if (typeof parsed[slotDef.key] === 'string') slots[slotDef.key] = parsed[slotDef.key] as string
+      if (typeof parsed[slotDef.key] === 'string')
+        slots[slotDef.key] = parsed[slotDef.key] as string
     }
   }
   slots = Object.fromEntries(Object.entries(slots).map(([k, v]) => [k, normalizeParagraphs(v)]))
@@ -241,7 +294,10 @@ async function runSlotPath(args: {
 
   const postSynthesis = await generateSynthesis(caption, { slots }, language)
 
-  logger.info({ brandId, templateId, slotKeys: Object.keys(slots), brollMood }, '[DraftPipeline] Slot composition complete')
+  logger.info(
+    { brandId, templateId, slotKeys: Object.keys(slots), brollMood },
+    '[DraftPipeline] Slot composition complete',
+  )
 
   return {
     creative: { slots, caption, hashtags, brollMood },
@@ -251,18 +307,28 @@ async function runSlotPath(args: {
     templateId,
     format,
     postSynthesis,
-    trace: { provider, model, registryId, systemPrompt, userMessage, generatedAt: new Date().toISOString() },
+    trace: {
+      provider,
+      model,
+      registryId,
+      systemPrompt,
+      userMessage,
+      generatedAt: new Date().toISOString(),
+    },
   }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function buildCaptionInstruction(override: { intention?: string; minWords?: number; maxWords?: number } | null): string {
+function buildCaptionInstruction(
+  override: { intention?: string; minWords?: number; maxWords?: number } | null,
+): string {
   if (!override) return '• caption — Instagram caption (max 300 chars, 2-3 sentences, no hashtags)'
   const intention = override.intention ?? 'Instagram caption (2-3 sentences, no hashtags)'
-  const wordRange = override.minWords != null
-    ? `min ${override.minWords}, max ${override.maxWords ?? 60} words`
-    : `max ${override.maxWords ?? 60} words`
+  const wordRange =
+    override.minWords != null
+      ? `min ${override.minWords}, max ${override.maxWords ?? 60} words`
+      : `max ${override.maxWords ?? 60} words`
   return `• caption — ${intention} (${wordRange})`
 }
 
@@ -277,7 +343,10 @@ function buildTemplateSchemaBlock(
 
     const slotBlock = slotDefs
       .map((s) => {
-        const wordRange = s.minWords != null ? `min ${s.minWords} words, max ${s.maxWords} words` : `max ${s.maxWords} words`
+        const wordRange =
+          s.minWords != null
+            ? `min ${s.minWords} words, max ${s.maxWords} words`
+            : `max ${s.maxWords} words`
         return `• "${s.key}" (${s.label}) — ${wordRange}\n  Intention: ${s.intention}`
       })
       .join('\n\n')
@@ -312,7 +381,9 @@ function mergeContentSchemaOverrides(
   if (!Array.isArray(cs.sections)) return contentSchema
   return {
     ...cs,
-    sections: (cs.sections as Array<{ key: string; intention: string; minWords?: number; maxWords: number }>).map((s) => {
+    sections: (
+      cs.sections as Array<{ key: string; intention: string; minWords?: number; maxWords: number }>
+    ).map((s) => {
       const ov = overrides[s.key]
       if (!ov) return s
       return {
@@ -333,16 +404,28 @@ function mergeSlotOverrides(
   return slotSchema.map((slot: SlotDef) => {
     const ov = overrides[slot.key]
     if (!ov) return slot
-    return { ...slot, ...(ov.intention !== undefined && { intention: ov.intention }), ...(ov.minWords !== undefined && { minWords: ov.minWords }), ...(ov.maxWords !== undefined && { maxWords: ov.maxWords }) }
+    return {
+      ...slot,
+      ...(ov.intention !== undefined && { intention: ov.intention }),
+      ...(ov.minWords !== undefined && { minWords: ov.minWords }),
+      ...(ov.maxWords !== undefined && { maxWords: ov.maxWords }),
+    }
   })
 }
 
-async function generateSynthesis(caption: string, creative: Record<string, unknown>, language: string): Promise<string> {
+async function generateSynthesis(
+  caption: string,
+  creative: Record<string, unknown>,
+  language: string,
+): Promise<string> {
   const { client: llm, model } = await getAdminModelClient('drafting')
   const slots = (creative as { slots?: Record<string, string> }).slots
   const contentSample = slots
     ? Object.values(slots).join(' ').slice(0, 600)
-    : Object.values(creative).filter((v) => typeof v === 'string').join(' ').slice(0, 600)
+    : Object.values(creative)
+        .filter((v) => typeof v === 'string')
+        .join(' ')
+        .slice(0, 600)
 
   try {
     const result = await llm.chatCompletion({
@@ -367,7 +450,13 @@ async function generateSynthesis(caption: string, creative: Record<string, unkno
 function normalizeParagraphs(text: string): string {
   return text
     .split(/\n{2,}/)
-    .map((chunk) => chunk.split('\n').map((l) => l.trim()).filter(Boolean).join(' '))
+    .map((chunk) =>
+      chunk
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .join(' '),
+    )
     .filter(Boolean)
     .join('\n\n')
 }
@@ -382,9 +471,12 @@ function buildUserMessage(
   if (recentContext) msg += `\n\n${recentContext}`
   if (currentDraft) {
     const slots = (currentDraft.creative as { slots?: Record<string, string> }).slots
-    const draftSummary = slots && Object.keys(slots).length > 0
-      ? Object.entries(slots).map(([k, v]) => `[${k}]: ${v}`).join('\n')
-      : currentDraft.caption
+    const draftSummary =
+      slots && Object.keys(slots).length > 0
+        ? Object.entries(slots)
+            .map(([k, v]) => `[${k}]: ${v}`)
+            .join('\n')
+        : currentDraft.caption
     msg += `\n\n--- RECOMPOSE REQUEST ---\nThe user wants a fresh recompose. Below is what was already generated — do NOT repeat the same structure, phrasing, or angle:\n\n${draftSummary}`
     if (currentDraft.caption) msg += `\n\nCaption: ${currentDraft.caption}`
     const instruction = recomposeInstructions?.trim()

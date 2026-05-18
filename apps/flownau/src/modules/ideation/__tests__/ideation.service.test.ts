@@ -4,7 +4,12 @@ const { mockParseCompletion } = vi.hoisted(() => ({ mockParseCompletion: vi.fn()
 
 vi.mock('@/modules/shared/admin-model', () => ({
   getAdminModelClient: vi.fn(() =>
-    Promise.resolve({ client: { parseCompletion: mockParseCompletion }, model: 'gpt-4o', registryId: 'gpt-4o', provider: 'openai' }),
+    Promise.resolve({
+      client: { parseCompletion: mockParseCompletion },
+      model: 'gpt-4o',
+      registryId: 'gpt-4o',
+      provider: 'openai',
+    }),
   ),
 }))
 
@@ -12,8 +17,14 @@ import { generateContentIdeas } from '../ideation.service'
 
 const validIdeationOutput = {
   ideas: [
-    { concept: 'You are not bad at consistency — you just have a system built for someone else. Most productivity frameworks were designed for office workers, not creators. Your brain is not broken; the template is.' },
-    { concept: 'The brands that grow fastest right now are not posting more — they are posting with a point of view. One clear perspective beats ten generic updates every time. This is not a content volume problem.' },
+    {
+      concept:
+        'You are not bad at consistency — you just have a system built for someone else. Most productivity frameworks were designed for office workers, not creators. Your brain is not broken; the template is.',
+    },
+    {
+      concept:
+        'The brands that grow fastest right now are not posting more — they are posting with a point of view. One clear perspective beats ten generic updates every time. This is not a content volume problem.',
+    },
   ],
   briefSummary: 'Generated 2 ideas on brand positioning and creative systems.',
 }

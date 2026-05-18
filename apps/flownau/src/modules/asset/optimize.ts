@@ -26,13 +26,15 @@ function downloadToTemp(url: string, destPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const proto = url.startsWith('https') ? https : http
     const file = createWriteStream(destPath)
-    proto.get(url, (res) => {
-      res.pipe(file)
-      file.on('finish', () => file.close(() => resolve()))
-    }).on('error', (err) => {
-      fs.unlink(destPath).catch(() => {})
-      reject(err)
-    })
+    proto
+      .get(url, (res) => {
+        res.pipe(file)
+        file.on('finish', () => file.close(() => resolve()))
+      })
+      .on('error', (err) => {
+        fs.unlink(destPath).catch(() => {})
+        reject(err)
+      })
   })
 }
 
@@ -47,7 +49,8 @@ interface SplitContext {
 }
 
 export async function splitAndStoreSegments(ctx: SplitContext): Promise<void> {
-  const { assetId, compressedPath, duration, contextAccountId, templateId, assetFolder, brandId } = ctx
+  const { assetId, compressedPath, duration, contextAccountId, templateId, assetFolder, brandId } =
+    ctx
   const segmentPattern = getTempPath(`split_${assetId}_%03d.mp4`)
   const segmentDir = path.dirname(segmentPattern)
   const segmentBase = path.basename(segmentPattern)
@@ -60,7 +63,12 @@ export async function splitAndStoreSegments(ctx: SplitContext): Promise<void> {
   const segmentPaths: string[] = []
   for (let i = 0; ; i++) {
     const p = path.join(segmentDir, segmentBase.replace('%03d', String(i).padStart(3, '0')))
-    try { await fs.access(p); segmentPaths.push(p) } catch { break }
+    try {
+      await fs.access(p)
+      segmentPaths.push(p)
+    } catch {
+      break
+    }
   }
 
   logger.info({ assetId, segments: segmentPaths.length }, '[split] Uploading segments')
@@ -73,10 +81,17 @@ export async function splitAndStoreSegments(ctx: SplitContext): Promise<void> {
       : flownau.templateAsset(templateId || 'global', segId, 'mp4')
 
     const segStats = await fs.stat(segPath)
-    const segUrl = await storage.upload(r2Key, createReadStream(segPath), { mimeType: 'video/mp4', size: segStats.size })
+    const segUrl = await storage.upload(r2Key, createReadStream(segPath), {
+      mimeType: 'video/mp4',
+      size: segStats.size,
+    })
 
     let segDuration: number | undefined
-    try { segDuration = await getDuration(segPath) } catch { /* non-critical */ }
+    try {
+      segDuration = await getDuration(segPath)
+    } catch {
+      /* non-critical */
+    }
 
     let thumbUrl: string | null = null
     const thumbPath = getTempPath(`thumb_${segId}.jpg`)
@@ -86,8 +101,13 @@ export async function splitAndStoreSegments(ctx: SplitContext): Promise<void> {
         ? flownau.accountThumbnail(contextAccountId, segId)
         : flownau.templateThumbnail(templateId || 'global', segId)
       const thumbStats = await fs.stat(thumbPath)
-      thumbUrl = await storage.upload(thumbKey, createReadStream(thumbPath), { mimeType: 'image/jpeg', size: thumbStats.size })
-    } catch { /* thumbnail is non-critical */ } finally {
+      thumbUrl = await storage.upload(thumbKey, createReadStream(thumbPath), {
+        mimeType: 'image/jpeg',
+        size: thumbStats.size,
+      })
+    } catch {
+      /* thumbnail is non-critical */
+    } finally {
       await fs.unlink(thumbPath).catch(() => {})
     }
 
@@ -118,14 +138,19 @@ export async function splitAndStoreSegments(ctx: SplitContext): Promise<void> {
 
   // Purge the parent's R2 files — segments are the canonical assets now.
   // The DB row is kept with optimizationStatus='purged' so the hash blocks re-uploads.
-  const parent = await prisma.asset.findUnique({ where: { id: assetId }, select: { r2Key: true, thumbnailUrl: true } })
+  const parent = await prisma.asset.findUnique({
+    where: { id: assetId },
+    select: { r2Key: true, thumbnailUrl: true },
+  })
   if (parent) {
     const keysToDelete = [parent.r2Key]
     if (parent.thumbnailUrl) {
       const thumbKey = keyFromCdnUrl(parent.thumbnailUrl)
       if (thumbKey && thumbKey !== parent.r2Key) keysToDelete.push(thumbKey)
     }
-    await storage.deleteMany(keysToDelete).catch((err) => logger.warn({ assetId, err }, '[split] Failed to purge parent R2 files'))
+    await storage
+      .deleteMany(keysToDelete)
+      .catch((err) => logger.warn({ assetId, err }, '[split] Failed to purge parent R2 files'))
   }
 
   await prisma.asset.update({
@@ -133,7 +158,10 @@ export async function splitAndStoreSegments(ctx: SplitContext): Promise<void> {
     data: { optimizationStatus: 'purged', r2Key: '', url: '', thumbnailUrl: null },
   })
 
-  logger.info({ assetId, segments: segmentPaths.length }, '[split] Asset split complete — parent purged')
+  logger.info(
+    { assetId, segments: segmentPaths.length },
+    '[split] Asset split complete — parent purged',
+  )
 }
 
 export async function optimizeAsset(args: OptimizationJobData): Promise<void> {
@@ -167,7 +195,11 @@ export async function optimizeAsset(args: OptimizationJobData): Promise<void> {
         finalMime = mimeType
       }
       thumbPath = getTempPath(`thumb_${assetId}.jpg`)
-      try { await generateThumbnail(outputPath, thumbPath) } catch { thumbPath = null }
+      try {
+        await generateThumbnail(outputPath, thumbPath)
+      } catch {
+        thumbPath = null
+      }
     } else if (type === 'AUD') {
       finalExt = 'm4a'
       finalMime = 'audio/mp4'
@@ -199,7 +231,10 @@ export async function optimizeAsset(args: OptimizationJobData): Promise<void> {
       : flownau.templateAsset(templateId || 'global', assetId, finalExt)
 
     const optimizedStats = await fs.stat(outputPath)
-    logger.info({ assetId, r2Key: optimizedR2Key, size: optimizedStats.size }, 'Uploading optimized asset')
+    logger.info(
+      { assetId, r2Key: optimizedR2Key, size: optimizedStats.size },
+      'Uploading optimized asset',
+    )
 
     const optimizedUrl = await storage.upload(optimizedR2Key, createReadStream(outputPath), {
       mimeType: finalMime,
@@ -220,12 +255,19 @@ export async function optimizeAsset(args: OptimizationJobData): Promise<void> {
 
     let duration: number | undefined
     if (type === 'VID' || type === 'AUD') {
-      try { duration = await getDuration(outputPath) } catch { /* non-critical */ }
+      try {
+        duration = await getDuration(outputPath)
+      } catch {
+        /* non-critical */
+      }
     }
 
     // Split long videos into ≤27s segments instead of storing them as-is.
     if (type === 'VID' && duration !== undefined && duration > MAX_SEGMENT_SECS) {
-      const asset = await prisma.asset.findUnique({ where: { id: assetId }, select: { brandId: true } })
+      const asset = await prisma.asset.findUnique({
+        where: { id: assetId },
+        select: { brandId: true },
+      })
       await splitAndStoreSegments({
         assetId,
         compressedPath: outputPath,
@@ -236,7 +278,10 @@ export async function optimizeAsset(args: OptimizationJobData): Promise<void> {
         brandId: asset?.brandId ?? null,
       })
       // Original asset is marked 'split' by splitAndStoreSegments — skip the normal update.
-      logger.info({ assetId, duration }, '[OptimizeAsset] Video split into segments — skipping normal asset update')
+      logger.info(
+        { assetId, duration },
+        '[OptimizeAsset] Video split into segments — skipping normal asset update',
+      )
       return
     }
 
@@ -257,7 +302,9 @@ export async function optimizeAsset(args: OptimizationJobData): Promise<void> {
     logger.info({ assetId }, 'Asset optimization complete')
   } catch (err) {
     logger.error({ assetId, err }, 'Asset optimization failed')
-    await prisma.asset.update({ where: { id: assetId }, data: { optimizationStatus: 'failed' } }).catch(() => {})
+    await prisma.asset
+      .update({ where: { id: assetId }, data: { optimizationStatus: 'failed' } })
+      .catch(() => {})
   } finally {
     await fs.unlink(inputPath).catch(() => {})
   }

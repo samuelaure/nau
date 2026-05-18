@@ -14,7 +14,8 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Missing brandId' }, { status: 400 })
     }
 
-    const denied = await checkBrandAccessForRoute(brandId); if (denied) return denied
+    const denied = await checkBrandAccessForRoute(brandId)
+    if (denied) return denied
 
     const ideas = await prisma.post.findMany({
       where: { brandId, status: { in: ['IDEA_PENDING', 'IDEA_APPROVED'] } },
@@ -37,7 +38,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing brandId or ideaText' }, { status: 400 })
     }
 
-    const denied2 = await checkBrandAccessForRoute(brandId); if (denied2) return denied2
+    const denied2 = await checkBrandAccessForRoute(brandId)
+    if (denied2) return denied2
 
     let priority = 3
     if (source === 'captured') priority = 1

@@ -17,7 +17,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ brandId:
     const user = await getAuthUser()
     if (!user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const denied = await checkBrandAccessForRoute(brandId); if (denied) return denied
+    const denied = await checkBrandAccessForRoute(brandId)
+    if (denied) return denied
 
     const profiles = await prisma.socialProfile.findMany({
       where: { brandId },
@@ -44,7 +45,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ brandId
     if (!isServiceCall) {
       const user = await getAuthUser()
       if (!user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      const denied2 = await checkBrandAccessForRoute(brandId); if (denied2) return denied2
+      const denied2 = await checkBrandAccessForRoute(brandId)
+      if (denied2) return denied2
     }
 
     const body = await req.json()
@@ -85,12 +87,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ brandId
       // Backfill platformId / nauthenticityProfileId / image on existing rows when newly known.
       const patch: Record<string, unknown> = {}
       if (platformId && !existing.platformId) patch.platformId = platformId
-      if (nauthenticityProfileId && !existing.nauthenticityProfileId) patch.nauthenticityProfileId = nauthenticityProfileId
+      if (nauthenticityProfileId && !existing.nauthenticityProfileId)
+        patch.nauthenticityProfileId = nauthenticityProfileId
       if (profileImage && !existing.profileImage) patch.profileImage = profileImage
-      if (syncedFromNauthenticity && !existing.syncedFromNauthenticity) patch.syncedFromNauthenticity = true
-      const profile = Object.keys(patch).length > 0
-        ? await prisma.socialProfile.update({ where: { id: existing.id }, data: patch })
-        : existing
+      if (syncedFromNauthenticity && !existing.syncedFromNauthenticity)
+        patch.syncedFromNauthenticity = true
+      const profile =
+        Object.keys(patch).length > 0
+          ? await prisma.socialProfile.update({ where: { id: existing.id }, data: patch })
+          : existing
       return NextResponse.json({ profile, deduped: true }, { status: 200 })
     }
 
@@ -119,11 +124,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ brandId
       const authSecret = process.env.AUTH_SECRET
       signServiceToken({ secret: authSecret, iss: 'flownau', aud: 'nauthenticity' })
         .then((token) =>
-          fetch(`${process.env.NAUTHENTICITY_URL || 'http://localhost:3007'}/api/v1/social-profiles/sync`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ username, platform, platformId, brandId, workspaceId: brand.workspaceId }),
-          }),
+          fetch(
+            `${process.env.NAUTHENTICITY_URL || 'http://localhost:3007'}/api/v1/social-profiles/sync`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({
+                username,
+                platform,
+                platformId,
+                brandId,
+                workspaceId: brand.workspaceId,
+              }),
+            },
+          ),
         )
         .catch((err) => console.warn('[SyncToNauthenticity] Failed:', err))
     }

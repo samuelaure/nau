@@ -18,10 +18,18 @@ const BrandPatchSchema = z.object({
 export async function GET(req: NextRequest, { params }: { params: Promise<{ brandId: string }> }) {
   const { brandId } = await params
   try {
-    const denied = await checkBrandAccessForRoute(brandId); if (denied) return denied
+    const denied = await checkBrandAccessForRoute(brandId)
+    if (denied) return denied
     const brand = await prisma.brand.findUnique({
       where: { id: brandId },
-      select: { id: true, ideationCustomPrompt: true, draftCustomPrompt: true, language: true, autoApproveIdeas: true, coverageHorizonDays: true },
+      select: {
+        id: true,
+        ideationCustomPrompt: true,
+        draftCustomPrompt: true,
+        language: true,
+        autoApproveIdeas: true,
+        coverageHorizonDays: true,
+      },
     })
     if (!brand) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     return NextResponse.json({ brand })
@@ -31,12 +39,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ bran
   }
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ brandId: string }> }) {
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ brandId: string }> },
+) {
   const { brandId } = await params
   try {
     const user = await getAuthUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    const denied2 = await checkBrandAccessForRoute(brandId); if (denied2) return denied2
+    const denied2 = await checkBrandAccessForRoute(brandId)
+    if (denied2) return denied2
 
     const body = await req.json()
     const parsed = BrandPatchSchema.safeParse(body)
@@ -50,7 +62,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ br
     })
 
     if (parsed.data.ideationCustomPrompt !== undefined) {
-      await recordPromptChange('brand', brandId, 'ideationCustomPrompt', parsed.data.ideationCustomPrompt)
+      await recordPromptChange(
+        'brand',
+        brandId,
+        'ideationCustomPrompt',
+        parsed.data.ideationCustomPrompt,
+      )
     }
     if (parsed.data.draftCustomPrompt !== undefined) {
       await recordPromptChange('brand', brandId, 'draftCustomPrompt', parsed.data.draftCustomPrompt)

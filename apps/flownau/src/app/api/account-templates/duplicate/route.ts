@@ -3,14 +3,16 @@ import { prisma } from '@/modules/shared/prisma'
 
 export async function POST(req: Request) {
   try {
-    const { brandId, templateId } = await req.json() as { brandId?: string; templateId?: string }
+    const { brandId, templateId } = (await req.json()) as { brandId?: string; templateId?: string }
     if (!brandId || !templateId) {
       return NextResponse.json({ error: 'Missing brandId or templateId' }, { status: 400 })
     }
 
     const [template, config] = await Promise.all([
       prisma.template.findUnique({ where: { id: templateId } }),
-      prisma.brandTemplateConfig.findUnique({ where: { brandId_templateId: { brandId, templateId } } }),
+      prisma.brandTemplateConfig.findUnique({
+        where: { brandId_templateId: { brandId, templateId } },
+      }),
     ])
     if (!template) return NextResponse.json({ error: 'Template not found' }, { status: 404 })
 

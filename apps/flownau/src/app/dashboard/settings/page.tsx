@@ -25,7 +25,7 @@ async function getTelegramLinked(token: string): Promise<boolean> {
     cache: 'no-store',
   })
   if (!res.ok) return false
-  const user = await res.json() as { telegramId?: string | null }
+  const user = (await res.json()) as { telegramId?: string | null }
   return !!user.telegramId
 }
 
@@ -59,7 +59,9 @@ export default async function SettingsPage() {
         )}
       </div>
 
-      <p className="text-xs text-text-secondary mt-8">flownaŭ v{process.env.NEXT_PUBLIC_APP_VERSION}</p>
+      <p className="text-xs text-text-secondary mt-8">
+        flownaŭ v{process.env.NEXT_PUBLIC_APP_VERSION}
+      </p>
     </div>
   )
 }

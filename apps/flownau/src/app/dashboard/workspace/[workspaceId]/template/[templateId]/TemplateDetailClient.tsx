@@ -134,9 +134,13 @@ export default function TemplateDetailClient({ template, backUrl }: Props) {
             <span>{template._count?.posts ?? 0} posts generated</span>
             <span className="flex items-center gap-1">
               {scope === 'workspace' ? (
-                <><Globe size={10} /> Workspace-shared</>
+                <>
+                  <Globe size={10} /> Workspace-shared
+                </>
               ) : (
-                <><Lock size={10} /> Brand-only</>
+                <>
+                  <Lock size={10} /> Brand-only
+                </>
               )}
             </span>
           </div>
@@ -148,7 +152,11 @@ export default function TemplateDetailClient({ template, backUrl }: Props) {
             disabled={deleting || saving}
             className="border-gray-700 px-3"
           >
-            {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4 text-red-500" />}
+            {deleting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Trash2 className="w-4 h-4 text-red-500" />
+            )}
           </Button>
           <Button
             onClick={handleSave}
@@ -167,28 +175,51 @@ export default function TemplateDetailClient({ template, backUrl }: Props) {
           Settings
         </h2>
 
-        {field('Name', <input value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />)}
+        {field(
+          'Name',
+          <input value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />,
+        )}
 
         {field(
           'Description',
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className={`${inputClass} resize-none`} placeholder="Short description shown in the template gallery" />,
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={2}
+            className={`${inputClass} resize-none`}
+            placeholder="Short description shown in the template gallery"
+          />,
         )}
 
         {field(
           'Preview video URL',
-          <input value={previewUrl} onChange={(e) => setPreviewUrl(e.target.value)} className={inputClass} placeholder="https://cdn.example.com/templates/preview.mp4" />,
+          <input
+            value={previewUrl}
+            onChange={(e) => setPreviewUrl(e.target.value)}
+            className={inputClass}
+            placeholder="https://cdn.example.com/templates/preview.mp4"
+          />,
           'MP4 video shown in the template gallery and detail modal.',
         )}
 
         {field(
           'Preview thumbnail URL',
-          <input value={previewThumbnailUrl} onChange={(e) => setPreviewThumbnailUrl(e.target.value)} className={inputClass} placeholder="https://cdn.example.com/templates/preview.jpg" />,
+          <input
+            value={previewThumbnailUrl}
+            onChange={(e) => setPreviewThumbnailUrl(e.target.value)}
+            className={inputClass}
+            placeholder="https://cdn.example.com/templates/preview.jpg"
+          />,
           'Static image shown before the video plays. Used as poster frame.',
         )}
 
         {field(
           'Remotion ID',
-          <input value={remotionId} onChange={(e) => setRemotionId(e.target.value)} className={inputClass} />,
+          <input
+            value={remotionId}
+            onChange={(e) => setRemotionId(e.target.value)}
+            className={inputClass}
+          />,
           'Matches the Remotion composition identifier used by the render service.',
         )}
 
@@ -223,7 +254,9 @@ export default function TemplateDetailClient({ template, backUrl }: Props) {
               />
             </button>
             <span className="text-sm text-gray-300">
-              {scope === 'workspace' ? 'Shared with all brands in this workspace' : 'Only this brand'}
+              {scope === 'workspace'
+                ? 'Shared with all brands in this workspace'
+                : 'Only this brand'}
             </span>
           </div>,
         )}
@@ -236,7 +269,8 @@ export default function TemplateDetailClient({ template, backUrl }: Props) {
             Narrative Guidance
           </h2>
           <p className="text-[11px] text-gray-600 mt-1">
-            Injected into the AI Creative Director as "Template Narrative Guidance". Shapes how scenes are structured and written.
+            Injected into the AI Creative Director as "Template Narrative Guidance". Shapes how
+            scenes are structured and written.
           </p>
         </div>
         <textarea
@@ -261,20 +295,22 @@ export default function TemplateDetailClient({ template, backUrl }: Props) {
             Content Schema
           </h2>
           <p className="text-[11px] text-gray-600 mt-1">
-            JSON object injected as "Template Content Schema — slot specs per scene". Tells the AI exactly what to write in each slot.
+            JSON object injected as "Template Content Schema — slot specs per scene". Tells the AI
+            exactly what to write in each slot.
           </p>
         </div>
         <textarea
           value={contentSchemaRaw}
-          onChange={(e) => { setContentSchemaRaw(e.target.value); setSchemaError('') }}
+          onChange={(e) => {
+            setContentSchemaRaw(e.target.value)
+            setSchemaError('')
+          }}
           rows={14}
           className={`${inputClass} resize-none font-mono text-xs`}
           placeholder='{ "format": "reel", "structure": [...] }'
           spellCheck={false}
         />
-        {schemaError && (
-          <p className="text-xs text-red-400">{schemaError}</p>
-        )}
+        {schemaError && <p className="text-xs text-red-400">{schemaError}</p>}
       </Card>
 
       <div className="flex justify-end pb-8">

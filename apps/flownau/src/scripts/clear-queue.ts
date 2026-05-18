@@ -5,4 +5,6 @@ async function main() {
   console.log('✅ Render queue cleared.')
 }
 
-main().catch(console.error).finally(() => renderQueue.close())
+main()
+  .catch(console.error)
+  .finally(() => renderQueue.close())

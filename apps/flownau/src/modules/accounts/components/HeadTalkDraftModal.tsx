@@ -52,7 +52,7 @@ export default function HeadTalkDraftModal({
 }: HeadTalkDraftModalProps) {
   const creative = parseCreative(post.creative)
   const caption = post.caption ?? creative?.caption ?? ''
-  const hashtags = post.hashtags?.length ? post.hashtags : creative?.hashtags ?? []
+  const hashtags = post.hashtags?.length ? post.hashtags : (creative?.hashtags ?? [])
 
   const [tab, setTab] = useState<'script' | 'caption'>('script')
   const [uploading, setUploading] = useState(false)
@@ -62,7 +62,9 @@ export default function HeadTalkDraftModal({
 
   // Close on Escape
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
@@ -106,35 +108,40 @@ export default function HeadTalkDraftModal({
   }
 
   const isPublished = post.status === 'PUBLISHED'
-  const hasVideo = post.status === 'RENDERED_PENDING' || post.status === 'SCHEDULED' || post.status === 'PUBLISHED'
+  const hasVideo =
+    post.status === 'RENDERED_PENDING' || post.status === 'SCHEDULED' || post.status === 'PUBLISHED'
 
   const modal = (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
 
       {/* Panel */}
       <div className="relative z-10 w-full max-w-2xl max-h-[90vh] flex flex-col bg-gray-950 border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
-
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
           <div className="flex items-center gap-3">
             <Mic size={16} className="text-accent" />
             <span className="font-semibold text-white">Head Talk Draft</span>
-            <span className={cn(
-              'text-xs px-2 py-0.5 rounded-full font-medium',
-              isPublished ? 'bg-gray-700 text-gray-400' :
-              hasVideo ? 'bg-purple-900/60 text-purple-300' :
-              post.status === 'DRAFT_APPROVED' ? 'bg-green-900/60 text-green-400' :
-              'bg-orange-900/60 text-orange-400'
-            )}>
+            <span
+              className={cn(
+                'text-xs px-2 py-0.5 rounded-full font-medium',
+                isPublished
+                  ? 'bg-gray-700 text-gray-400'
+                  : hasVideo
+                    ? 'bg-purple-900/60 text-purple-300'
+                    : post.status === 'DRAFT_APPROVED'
+                      ? 'bg-green-900/60 text-green-400'
+                      : 'bg-orange-900/60 text-orange-400',
+              )}
+            >
               {post.status.replace(/_/g, ' ')}
             </span>
           </div>
-          <button onClick={onClose} className="text-text-secondary hover:text-white transition-colors">
+          <button
+            onClick={onClose}
+            className="text-text-secondary hover:text-white transition-colors"
+          >
             <X size={18} />
           </button>
         </div>
@@ -160,7 +167,17 @@ export default function HeadTalkDraftModal({
                   : 'text-text-secondary border-transparent hover:text-white',
               )}
             >
-              {t === 'script' ? <span className="flex items-center gap-1.5"><AlignLeft size={13} />Script</span> : <span className="flex items-center gap-1.5"><Hash size={13} />Caption</span>}
+              {t === 'script' ? (
+                <span className="flex items-center gap-1.5">
+                  <AlignLeft size={13} />
+                  Script
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5">
+                  <Hash size={13} />
+                  Caption
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -171,19 +188,27 @@ export default function HeadTalkDraftModal({
             <div className="flex flex-col gap-6">
               {/* Hook */}
               <div>
-                <p className="text-xs font-semibold text-accent uppercase tracking-widest mb-2">Hook</p>
+                <p className="text-xs font-semibold text-accent uppercase tracking-widest mb-2">
+                  Hook
+                </p>
                 <p className="text-white leading-relaxed text-base font-medium">{creative.hook}</p>
               </div>
 
               {/* Body */}
               <div>
-                <p className="text-xs font-semibold text-text-secondary uppercase tracking-widest mb-2">Body</p>
-                <div className="text-white/85 leading-relaxed text-base whitespace-pre-line">{creative.body}</div>
+                <p className="text-xs font-semibold text-text-secondary uppercase tracking-widest mb-2">
+                  Body
+                </p>
+                <div className="text-white/85 leading-relaxed text-base whitespace-pre-line">
+                  {creative.body}
+                </div>
               </div>
 
               {/* CTA */}
               <div>
-                <p className="text-xs font-semibold text-accent/70 uppercase tracking-widest mb-2">Call to Action</p>
+                <p className="text-xs font-semibold text-accent/70 uppercase tracking-widest mb-2">
+                  Call to Action
+                </p>
                 <p className="text-white/85 leading-relaxed text-base">{creative.cta}</p>
               </div>
             </div>
@@ -194,15 +219,24 @@ export default function HeadTalkDraftModal({
           {tab === 'caption' && (
             <div className="flex flex-col gap-4">
               <div>
-                <p className="text-xs font-semibold text-text-secondary uppercase tracking-widest mb-2">Caption</p>
-                <p className="text-white/85 leading-relaxed text-sm whitespace-pre-line">{caption || '—'}</p>
+                <p className="text-xs font-semibold text-text-secondary uppercase tracking-widest mb-2">
+                  Caption
+                </p>
+                <p className="text-white/85 leading-relaxed text-sm whitespace-pre-line">
+                  {caption || '—'}
+                </p>
               </div>
               {hashtags.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-text-secondary uppercase tracking-widest mb-2">Hashtags</p>
+                  <p className="text-xs font-semibold text-text-secondary uppercase tracking-widest mb-2">
+                    Hashtags
+                  </p>
                   <div className="flex flex-wrap gap-2">
                     {hashtags.map((h) => (
-                      <span key={h} className="text-xs bg-white/5 border border-white/10 rounded-full px-3 py-1 text-text-secondary">
+                      <span
+                        key={h}
+                        className="text-xs bg-white/5 border border-white/10 rounded-full px-3 py-1 text-text-secondary"
+                      >
                         #{h}
                       </span>
                     ))}
@@ -216,10 +250,12 @@ export default function HeadTalkDraftModal({
         {/* Actions */}
         {!isPublished && (
           <div className="border-t border-white/5 px-6 py-4 flex flex-col gap-3">
-
             {/* Upload drop zone */}
             <div
-              onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+              onDragOver={(e) => {
+                e.preventDefault()
+                setDragOver(true)
+              }}
               onDragLeave={() => setDragOver(false)}
               onDrop={(e) => {
                 e.preventDefault()
@@ -242,32 +278,35 @@ export default function HeadTalkDraftModal({
                 <Upload size={20} className="text-text-secondary" />
               )}
               <p className="text-sm text-text-secondary">
-                {uploading ? 'Uploading…' : hasVideo ? 'Video uploaded — click to replace' : 'Drop video here or click to upload'}
+                {uploading
+                  ? 'Uploading…'
+                  : hasVideo
+                    ? 'Video uploaded — click to replace'
+                    : 'Drop video here or click to upload'}
               </p>
               <input
                 ref={fileInputRef}
                 type="file"
                 accept="video/*"
                 className="hidden"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadVideo(f) }}
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (f) uploadVideo(f)
+                }}
               />
             </div>
 
             {/* Footer buttons */}
             <div className="flex items-center justify-between gap-3">
-              <Button
-                variant="ghost"
-                onClick={onClose}
-                className="text-text-secondary"
-              >
+              <Button variant="ghost" onClick={onClose} className="text-text-secondary">
                 Close
               </Button>
-              <Button
-                onClick={markPosted}
-                disabled={marking}
-                variant="outline"
-              >
-                {marking ? <Loader2 size={14} className="animate-spin mr-1.5" /> : <CheckCircle2 size={14} className="mr-1.5" />}
+              <Button onClick={markPosted} disabled={marking} variant="outline">
+                {marking ? (
+                  <Loader2 size={14} className="animate-spin mr-1.5" />
+                ) : (
+                  <CheckCircle2 size={14} className="mr-1.5" />
+                )}
                 Mark as Posted
               </Button>
             </div>
@@ -276,7 +315,9 @@ export default function HeadTalkDraftModal({
 
         {isPublished && (
           <div className="border-t border-white/5 px-6 py-4 flex justify-end">
-            <Button variant="ghost" onClick={onClose} className="text-text-secondary">Close</Button>
+            <Button variant="ghost" onClick={onClose} className="text-text-secondary">
+              Close
+            </Button>
           </div>
         )}
       </div>

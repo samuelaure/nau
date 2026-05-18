@@ -13,6 +13,9 @@ export async function getBrandDNA(brandId: string): Promise<string> {
 
   if (!brand) return 'No brand identity configured.'
 
-  const block = renderBrandContextBlock({ name: brand.name ?? null, context: brand.context ?? null }).trim()
+  const block = renderBrandContextBlock({
+    name: brand.name ?? null,
+    context: brand.context ?? null,
+  }).trim()
   return block || 'No brand identity configured.'
 }

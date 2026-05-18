@@ -10,7 +10,7 @@ export async function POST(
   { params }: { params: Promise<{ workspaceId: string; inviteId: string }> },
 ) {
   const { workspaceId, inviteId } = await params
-  const token = await getValidToken() ?? ''
+  const token = (await getValidToken()) ?? ''
   const res = await fetch(
     `${NAU_API_URL}/workspaces/${workspaceId}/invites/${inviteId}/regenerate`,
     { method: 'POST', headers: { Authorization: `Bearer ${token}` } },
@@ -24,11 +24,11 @@ export async function DELETE(
   { params }: { params: Promise<{ workspaceId: string; inviteId: string }> },
 ) {
   const { workspaceId, inviteId } = await params
-  const token = await getValidToken() ?? ''
-  const res = await fetch(
-    `${NAU_API_URL}/workspaces/${workspaceId}/invites/${inviteId}`,
-    { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
-  )
+  const token = (await getValidToken()) ?? ''
+  const res = await fetch(`${NAU_API_URL}/workspaces/${workspaceId}/invites/${inviteId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  })
   if (res.status === 204) return new NextResponse(null, { status: 204 })
   const data = await res.json().catch(() => ({}))
   return NextResponse.json(data, { status: res.status })

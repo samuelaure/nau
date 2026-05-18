@@ -60,7 +60,9 @@ async function runPublisher() {
   }
 
   if (duePosts.length > 0) {
-    logger.info(`[Cron:Publisher] ${published} published, ${failed} failed of ${duePosts.length} due`)
+    logger.info(
+      `[Cron:Publisher] ${published} published, ${failed} failed of ${duePosts.length} due`,
+    )
   }
 }
 
@@ -91,7 +93,11 @@ async function runRenderer() {
 
   for (const post of drafts) {
     if (USER_MANAGED_FORMATS.has(post.format ?? '') && !post.userUploadedMediaUrl) continue
-    if (post.renderJob && ['queued', 'rendering', 'uploading', 'done'].includes(post.renderJob.status)) continue
+    if (
+      post.renderJob &&
+      ['queued', 'rendering', 'uploading', 'done'].includes(post.renderJob.status)
+    )
+      continue
     try {
       await addRenderJob(post.id)
       await prisma.post.update({ where: { id: post.id }, data: { status: 'RENDERING' } })
@@ -101,8 +107,6 @@ async function runRenderer() {
     }
   }
 }
-
-
 
 async function runTokenRefresh() {
   const lockKey = 'cron:token-refresh:lock'
@@ -125,9 +129,7 @@ function safe(name: string, fn: () => Promise<void>) {
 
 async function runApprovalNotifications() {
   const brands = await prisma.brand.findMany({ select: { id: true } })
-  await Promise.allSettled(
-    brands.flatMap((b) => [notifyTodayDigest(b.id), notifyNextInLine(b.id)]),
-  )
+  await Promise.allSettled(brands.flatMap((b) => [notifyTodayDigest(b.id), notifyNextInLine(b.id)]))
 }
 
 export async function startInternalCron() {

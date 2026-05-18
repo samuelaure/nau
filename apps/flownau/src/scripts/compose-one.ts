@@ -17,16 +17,34 @@ async function main() {
   }
 
   const [idea, template] = await Promise.all([
-    prisma.post.findUnique({ where: { id: ideaId }, select: { id: true, ideaText: true, status: true } }),
-    prisma.template.findFirst({ where: { name: templateName }, select: { id: true, name: true, remotionId: true } }),
+    prisma.post.findUnique({
+      where: { id: ideaId },
+      select: { id: true, ideaText: true, status: true },
+    }),
+    prisma.template.findFirst({
+      where: { name: templateName },
+      select: { id: true, name: true, remotionId: true },
+    }),
   ])
 
-  if (!idea) { console.error('Idea not found'); process.exit(1) }
-  if (!template) { console.error('Template not found'); process.exit(1) }
+  if (!idea) {
+    console.error('Idea not found')
+    process.exit(1)
+  }
+  if (!template) {
+    console.error('Template not found')
+    process.exit(1)
+  }
 
-  console.log(`Composing ${template.name} (${template.remotionId}) for idea: ${idea.ideaText.slice(0, 80)}`)
+  console.log(
+    `Composing ${template.name} (${template.remotionId}) for idea: ${idea.ideaText.slice(0, 80)}`,
+  )
 
-  const result = await runDraftPipeline({ ideaText: idea.ideaText ?? '', brandId, templateId: template.id })
+  const result = await runDraftPipeline({
+    ideaText: idea.ideaText ?? '',
+    brandId,
+    templateId: template.id,
+  })
   console.log('Creative:', JSON.stringify(result.creative).slice(0, 200))
   console.log('Caption:', result.caption.slice(0, 100))
 
@@ -47,7 +65,9 @@ async function main() {
   console.log('Render enqueued:', JSON.stringify(enqueueResult))
 }
 
-main().catch(console.error).finally(async () => {
-  await renderQueue.close()
-  await prisma.$disconnect()
-})
+main()
+  .catch(console.error)
+  .finally(async () => {
+    await renderQueue.close()
+    await prisma.$disconnect()
+  })

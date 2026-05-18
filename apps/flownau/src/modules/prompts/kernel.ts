@@ -62,10 +62,14 @@ const BASES: Record<'ideation' | 'draft', string> = {
 // ─── Builder ──────────────────────────────────────────────────────────────────
 
 const SECTION_DESCRIPTIONS: Partial<Record<PromptLayer, string>> = {
-  brand_context: '`<brand_context>` — the brand identity: voice, audience, point of view. Write as this brand.',
-  custom_prompt: '`<custom_prompt>` — standing brand-level instructions: angles, priorities, tone. Apply throughout.',
-  template_schema: '`<template_schema>` — the output structure to fill. Slot constraints are binding.',
-  template_custom_prompt: '`<template_custom_prompt>` — template-specific instructions for this brand. Takes precedence over `<custom_prompt>` for decisions within this format.',
+  brand_context:
+    '`<brand_context>` — the brand identity: voice, audience, point of view. Write as this brand.',
+  custom_prompt:
+    '`<custom_prompt>` — standing brand-level instructions: angles, priorities, tone. Apply throughout.',
+  template_schema:
+    '`<template_schema>` — the output structure to fill. Slot constraints are binding.',
+  template_custom_prompt:
+    '`<template_custom_prompt>` — template-specific instructions for this brand. Takes precedence over `<custom_prompt>` for decisions within this format.',
   selected_idea: '`<selected_idea>` — the specific idea to develop into content.',
 }
 
@@ -122,7 +126,9 @@ export function buildPrompt(input: KernelInput): KernelOutput {
     parts.push(section('selected_idea', input.selectedIdea.trim()))
   }
 
-  parts.push(`## OUTPUT FORMATTING\n\nShort-form content is consumed vertically and fast. Avoid too long paragraphs and Separate every paragraph with a blank line (\\n\\n between paragraphs).`)
+  parts.push(
+    `## OUTPUT FORMATTING\n\nShort-form content is consumed vertically and fast. Avoid too long paragraphs and Separate every paragraph with a blank line (\\n\\n between paragraphs).`,
+  )
 
   if (input.language?.trim()) {
     parts.push(`Write all output in ${input.language.trim()}.`)

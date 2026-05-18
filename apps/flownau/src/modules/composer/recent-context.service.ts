@@ -1,6 +1,9 @@
 import { prisma } from '@/modules/shared/prisma'
 
-export async function getRecentDraftContext(brandId: string, windowDays = 30): Promise<string | null> {
+export async function getRecentDraftContext(
+  brandId: string,
+  windowDays = 30,
+): Promise<string | null> {
   const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000)
   const posts = await prisma.post.findMany({
     where: { brandId, createdAt: { gte: since }, caption: { not: null } },

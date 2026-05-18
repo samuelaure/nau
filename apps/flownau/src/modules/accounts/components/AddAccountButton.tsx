@@ -110,8 +110,16 @@ export default function AddAccountButton({
                 </div>
               )}
 
-              <Button type="submit" disabled={isPending} className="mt-2 w-full py-4 rounded-2xl text-lg">
-                {isPending ? <Loader2 className="animate-spin mr-2" size={24} /> : <Plus size={20} className="mr-2" />}
+              <Button
+                type="submit"
+                disabled={isPending}
+                className="mt-2 w-full py-4 rounded-2xl text-lg"
+              >
+                {isPending ? (
+                  <Loader2 className="animate-spin mr-2" size={24} />
+                ) : (
+                  <Plus size={20} className="mr-2" />
+                )}
                 {isPending ? 'Creating...' : 'Create Brand'}
               </Button>
             </form>
@@ -122,15 +130,29 @@ export default function AddAccountButton({
               <div className="w-20 h-20 bg-[#E1306C]/10 rounded-3xl flex items-center justify-center mx-auto mb-6 text-[#E1306C] -rotate-3 transition-transform hover:rotate-0 duration-300">
                 <Instagram size={36} />
               </div>
-              <h2 className="text-3xl font-heading font-bold mb-3 tracking-tight">Add Social Profile</h2>
+              <h2 className="text-3xl font-heading font-bold mb-3 tracking-tight">
+                Add Social Profile
+              </h2>
               <p className="text-text-secondary text-base max-w-[280px] mx-auto">
                 Connect an Instagram Business account to enable publishing.
               </p>
             </div>
 
             <form action={handleSocialProfileSubmit} className="flex flex-col gap-6">
-              <Input name="username" label="Instagram Username" placeholder="@username" required className="py-4" />
-              <Input name="platformId" label="User ID (Platform ID)" placeholder="1784140..." required className="py-4" />
+              <Input
+                name="username"
+                label="Instagram Username"
+                placeholder="@username"
+                required
+                className="py-4"
+              />
+              <Input
+                name="platformId"
+                label="User ID (Platform ID)"
+                placeholder="1784140..."
+                required
+                className="py-4"
+              />
 
               <div className="w-full relative">
                 <label className="form-label">Access Token</label>
@@ -191,8 +213,16 @@ export default function AddAccountButton({
                 </div>
               )}
 
-              <Button type="submit" disabled={isPending} className="mt-4 w-full py-4 rounded-2xl text-lg">
-                {isPending ? <Loader2 className="animate-spin mr-2" size={24} /> : <Plus size={20} className="mr-2" />}
+              <Button
+                type="submit"
+                disabled={isPending}
+                className="mt-4 w-full py-4 rounded-2xl text-lg"
+              >
+                {isPending ? (
+                  <Loader2 className="animate-spin mr-2" size={24} />
+                ) : (
+                  <Plus size={20} className="mr-2" />
+                )}
                 {isPending ? 'Connecting...' : 'Connect Profile'}
               </Button>
             </form>

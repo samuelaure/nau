@@ -74,7 +74,9 @@ export async function pollContainerStatus(containerId: string, accessToken: stri
     // human-readable error descriptions like "video processing failed" or an error code.
     const statusDetail: string | undefined = statusRes.data.status
 
-    logger.info(`[PublishReel] Container ${containerId} poll ${i + 1}: ${statusCode}${statusDetail ? ` (${statusDetail})` : ''}`)
+    logger.info(
+      `[PublishReel] Container ${containerId} poll ${i + 1}: ${statusCode}${statusDetail ? ` (${statusDetail})` : ''}`,
+    )
 
     if (statusCode === 'FINISHED') return
     if (statusCode === 'ERROR') {

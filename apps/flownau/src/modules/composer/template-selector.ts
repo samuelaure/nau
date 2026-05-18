@@ -68,8 +68,10 @@ export async function selectTemplateForIdea(params: {
     if ((format === 'reel' || format === 'trial_reel') && configFormat === 'reel') return true
     if ((format === 'reel' || format === 'trial_reel') && t.sceneType === 'reel') return true
     // trial_head_talk uses the same templates as head_talk.
-    if ((format === 'head_talk' || format === 'trial_head_talk') && configFormat === 'head_talk') return true
-    if ((format === 'head_talk' || format === 'trial_head_talk') && t.sceneType === 'head_talk') return true
+    if ((format === 'head_talk' || format === 'trial_head_talk') && configFormat === 'head_talk')
+      return true
+    if ((format === 'head_talk' || format === 'trial_head_talk') && t.sceneType === 'head_talk')
+      return true
     // If a template declares no format, treat it as universal.
     return !configFormat && !t.sceneType
   }

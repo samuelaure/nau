@@ -21,7 +21,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ bra
   try {
     const user = await getAuthUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    const denied = await checkBrandAccessForRoute(brandId); if (denied) return denied
+    const denied = await checkBrandAccessForRoute(brandId)
+    if (denied) return denied
 
     const schedule = await prisma.postSchedule.findUnique({ where: { brandId } })
     return NextResponse.json({ schedule })
@@ -36,7 +37,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ bran
   try {
     const user = await getAuthUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    const denied2 = await checkBrandAccessForRoute(brandId); if (denied2) return denied2
+    const denied2 = await checkBrandAccessForRoute(brandId)
+    if (denied2) return denied2
 
     const body = await req.json()
     const parsed = ScheduleUpsertSchema.safeParse(body)

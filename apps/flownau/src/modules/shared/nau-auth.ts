@@ -31,10 +31,10 @@ export async function validateServiceToken(request: Request): Promise<boolean> {
  * Standard 401 response for unauthorized cross-service requests.
  */
 export function unauthorizedResponse(): Response {
-  return new Response(
-    JSON.stringify({ error: 'Unauthorized: missing or invalid service token' }),
-    { status: 401, headers: { 'Content-Type': 'application/json' } },
-  )
+  return new Response(JSON.stringify({ error: 'Unauthorized: missing or invalid service token' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  })
 }
 
 /**

@@ -21,7 +21,9 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     } else {
       document.body.style.overflow = ''
     }
-    return () => { document.body.style.overflow = '' }
+    return () => {
+      document.body.style.overflow = ''
+    }
   }, [sidebarOpen])
 
   return (

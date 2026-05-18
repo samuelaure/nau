@@ -56,7 +56,7 @@ export async function generateTelegramLinkToken(): Promise<{ deepLink?: string; 
     cache: 'no-store',
   })
   if (!res.ok) return { error: 'Failed to generate link token' }
-  const { token: linkToken } = await res.json() as { token: string }
+  const { token: linkToken } = (await res.json()) as { token: string }
 
   const accountsUrl = process.env.NEXT_PUBLIC_ACCOUNTS_URL ?? 'https://accounts.9nau.com'
   return { deepLink: `${accountsUrl}/telegram/link?token=${linkToken}` }

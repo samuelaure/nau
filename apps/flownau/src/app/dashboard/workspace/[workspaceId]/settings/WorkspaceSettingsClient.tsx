@@ -247,7 +247,11 @@ export default function WorkspaceSettingsClient({
                 <option value="member">Member</option>
                 <option value="admin">Admin</option>
               </select>
-              <Button onClick={handleInvite} disabled={inviting || !inviteEmail.trim()} className="shrink-0">
+              <Button
+                onClick={handleInvite}
+                disabled={inviting || !inviteEmail.trim()}
+                className="shrink-0"
+              >
                 {inviting ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (

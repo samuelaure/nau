@@ -18,9 +18,17 @@ interface Props {
 }
 
 function formatRange(activeSince: string, replacedAt: string | null): string {
-  const from = new Date(activeSince).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+  const from = new Date(activeSince).toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
   if (!replacedAt) return `Active since ${from}`
-  const to = new Date(replacedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+  const to = new Date(replacedAt).toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
   return `${from} → ${to}`
 }
 
@@ -33,7 +41,9 @@ export function PromptHistoryPanel({ entityType, entityId, field, onRestore }: P
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/prompt-history?entityType=${entityType}&entityId=${encodeURIComponent(entityId)}&field=${field}`)
+      const res = await fetch(
+        `/api/prompt-history?entityType=${entityType}&entityId=${encodeURIComponent(entityId)}&field=${field}`,
+      )
       const { entries } = await res.json()
       setEntries(entries ?? [])
     } finally {
@@ -43,7 +53,7 @@ export function PromptHistoryPanel({ entityType, entityId, field, onRestore }: P
 
   const toggle = () => {
     if (!open) load()
-    setOpen(v => !v)
+    setOpen((v) => !v)
   }
 
   if (!entityId) return null
@@ -65,19 +75,28 @@ export function PromptHistoryPanel({ entityType, entityId, field, onRestore }: P
           {loading ? (
             <p className="text-xs text-gray-600 px-3 py-2">Loading…</p>
           ) : entries.length === 0 ? (
-            <p className="text-xs text-gray-600 px-3 py-2">No history yet — changes will appear here after saving.</p>
+            <p className="text-xs text-gray-600 px-3 py-2">
+              No history yet — changes will appear here after saving.
+            </p>
           ) : (
             <ul className="divide-y divide-gray-800">
               {entries.map((entry) => {
                 const isExpanded = expanded === entry.id
-                const preview = entry.content.length > 120 ? entry.content.slice(0, 120) + '…' : entry.content
+                const preview =
+                  entry.content.length > 120 ? entry.content.slice(0, 120) + '…' : entry.content
                 const isCurrent = !entry.replacedAt
                 return (
                   <li key={entry.id} className="px-3 py-2 text-xs bg-gray-950">
                     <div className="flex items-center justify-between gap-2">
-                      <span className={`${isCurrent ? 'text-green-500' : 'text-gray-500'} shrink-0`}>
+                      <span
+                        className={`${isCurrent ? 'text-green-500' : 'text-gray-500'} shrink-0`}
+                      >
                         {formatRange(entry.activeSince, entry.replacedAt)}
-                        {isCurrent && <span className="ml-1.5 bg-green-900/40 text-green-400 px-1.5 py-0.5 rounded text-[10px]">current</span>}
+                        {isCurrent && (
+                          <span className="ml-1.5 bg-green-900/40 text-green-400 px-1.5 py-0.5 rounded text-[10px]">
+                            current
+                          </span>
+                        )}
                       </span>
                       {!isCurrent && (
                         <button
