@@ -5,6 +5,7 @@ import { getAuthUser } from '@/lib/auth'
 import { prisma } from '@/modules/shared/prisma'
 import { checkBrandAccessForRoute } from '@/lib/auth'
 import { validateServiceToken } from '@/modules/shared/nau-auth'
+import { signServiceToken } from '@nau/auth'
 
 /**
  * GET /api/brands/{brandId}/social-profiles
@@ -47,62 +48,84 @@ export async function POST(req: Request, { params }: { params: Promise<{ brandId
     }
 
     const body = await req.json()
-    const { username, platform = 'instagram', nauthenticityProfileId, syncedFromNauthenticity = false } = body
+    const {
+      username,
+      platform = 'instagram',
+      platformId,
+      profileImage,
+      nauthenticityProfileId,
+      syncedFromNauthenticity = false,
+    } = body as {
+      username?: string
+      platform?: string
+      platformId?: string | null
+      profileImage?: string | null
+      nauthenticityProfileId?: string | null
+      syncedFromNauthenticity?: boolean
+    }
 
     if (!username) {
       return NextResponse.json({ error: 'Username is required' }, { status: 400 })
     }
 
-    // Check if profile already exists
+    // Dedup: prefer stable platformId, fall back to (brandId, username, platform).
     const existing = await prisma.socialProfile.findFirst({
-      where: { brandId, username, platform },
+      where: {
+        brandId,
+        platform,
+        OR: [
+          ...(platformId ? [{ platformId }] : []),
+          ...(nauthenticityProfileId ? [{ nauthenticityProfileId }] : []),
+          { username },
+        ],
+      },
     })
 
     if (existing) {
-      return NextResponse.json(
-        { error: 'Profile already exists for this brand', profile: existing },
-        { status: 409 },
-      )
+      // Backfill platformId / nauthenticityProfileId / image on existing rows when newly known.
+      const patch: Record<string, unknown> = {}
+      if (platformId && !existing.platformId) patch.platformId = platformId
+      if (nauthenticityProfileId && !existing.nauthenticityProfileId) patch.nauthenticityProfileId = nauthenticityProfileId
+      if (profileImage && !existing.profileImage) patch.profileImage = profileImage
+      if (syncedFromNauthenticity && !existing.syncedFromNauthenticity) patch.syncedFromNauthenticity = true
+      const profile = Object.keys(patch).length > 0
+        ? await prisma.socialProfile.update({ where: { id: existing.id }, data: patch })
+        : existing
+      return NextResponse.json({ profile, deduped: true }, { status: 200 })
     }
 
-    // Get workspace for this brand
     const brand = await prisma.brand.findUnique({ where: { id: brandId } })
     if (!brand?.workspaceId) {
       return NextResponse.json({ error: 'Brand not found or invalid workspace' }, { status: 404 })
     }
 
-    // Create soft profile (no tokens yet)
     const profile = await prisma.socialProfile.create({
       data: {
         brandId,
         workspaceId: brand.workspaceId,
         username,
         platform,
+        platformId: platformId ?? null,
+        profileImage: profileImage ?? null,
         syncedFromNauthenticity,
         nauthenticityProfileId: nauthenticityProfileId || null,
-        // accessToken is null — will be filled after OAuth
         accessToken: null,
       },
     })
 
-    // Sync to nauthenticity asynchronously (don't block response)
-    if (!syncedFromNauthenticity) {
-      fetch(`${process.env.NAUTHENTICITY_URL || 'http://localhost:3007'}/api/v1/social-profiles/sync`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Nau-Service-Key': process.env.NAU_SERVICE_KEY || '',
-        },
-        body: JSON.stringify({
-          username,
-          platform: 'instagram',
-          brandId,
-          workspaceId: brand.workspaceId,
-        }),
-      }).catch((err) => {
-        // Silently fail — sync is nice-to-have
-        console.warn('[SyncToNauthenticity] Failed:', err)
-      })
+    // When a flownau user manually adds a profile, sync it to nauthenticity.
+    // Skip if it came FROM nauthenticity (avoid loopback).
+    if (!syncedFromNauthenticity && process.env.AUTH_SECRET) {
+      const authSecret = process.env.AUTH_SECRET
+      signServiceToken({ secret: authSecret, iss: 'flownau', aud: 'nauthenticity' })
+        .then((token) =>
+          fetch(`${process.env.NAUTHENTICITY_URL || 'http://localhost:3007'}/api/v1/social-profiles/sync`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ username, platform, platformId, brandId, workspaceId: brand.workspaceId }),
+          }),
+        )
+        .catch((err) => console.warn('[SyncToNauthenticity] Failed:', err))
     }
 
     return NextResponse.json({ profile }, { status: 201 })

@@ -388,49 +388,6 @@ export async function syncSocialProfile(id: string) {
 /** @deprecated Use syncSocialProfile */
 export const syncAccountProfile = syncSocialProfile
 
-/**
- * Manually sync a social profile to nauthenticity
- * Useful for profiles created before auto-sync was implemented
- */
-export async function syncProfileToNauthenticity(profileId: string) {
-  await checkAuth()
-
-  const profile = await prisma.socialProfile.findUnique({
-    where: { id: profileId },
-    include: { brand: true },
-  })
-
-  if (!profile || !profile.username) {
-    throw new Error('Profile not found or has no username')
-  }
-
-  const nauthenticityUrl = process.env.NAUTHENTICITY_URL || 'http://localhost:3007'
-  const serviceKey = process.env.NAU_SERVICE_KEY || ''
-
-  const response = await fetch(`${nauthenticityUrl}/api/v1/social-profiles/sync`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Nau-Service-Key': serviceKey,
-    },
-    body: JSON.stringify({
-      username: profile.username,
-      platform: profile.platform || 'instagram',
-      profileImageUrl: profile.profileImage,
-      brandId: profile.brandId,
-      workspaceId: profile.workspaceId,
-    }),
-  })
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}))
-    throw new Error(error.message || 'Failed to sync to nauthenticity')
-  }
-
-  revalidatePath('/dashboard')
-  return { success: true, message: 'Profile synced to nauthenticity' }
-}
-
 // ── Asset upload actions ───────────────────────────────────────────────────────
 
 export async function prepareUpload(

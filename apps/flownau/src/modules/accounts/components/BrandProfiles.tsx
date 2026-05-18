@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Instagram, Plus, Trash2, RefreshCw, Loader2, ExternalLink } from 'lucide-react'
+import { Instagram, Plus, Trash2, Loader2, ExternalLink } from 'lucide-react'
 import { Card } from '@/modules/shared/components/ui/Card'
 import { Button } from '@/modules/shared/components/ui/Button'
 import { Input } from '@/modules/shared/components/ui/Input'
 import Modal from '@/modules/shared/components/Modal'
-import { addSocialProfile, deleteSocialProfile, syncSocialProfile, syncProfileToNauthenticity } from '@/modules/accounts/actions'
+import { addSocialProfile, deleteSocialProfile } from '@/modules/accounts/actions'
 import { toast } from 'sonner'
 import { cn } from '@/modules/shared/utils'
 import { useRouter } from 'next/navigation'
@@ -34,7 +34,6 @@ export default function BrandProfiles({
   const [profiles, setProfiles] = useState<SocialProfile[]>(initialProfiles)
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
-  const [syncingId, setSyncingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -64,22 +63,6 @@ export default function BrandProfiles({
       toast.error('Failed to delete profile')
     } finally {
       setDeletingId(null)
-    }
-  }
-
-  const handleSyncAll = async (id: string) => {
-    setSyncingId(id)
-    try {
-      // First sync from Instagram to refresh data
-      await syncSocialProfile(id)
-      // Then sync to nauthenticity
-      await syncProfileToNauthenticity(id)
-      toast.success('Profile synced from Instagram and nauthenticity')
-      router.refresh()
-    } catch (error: any) {
-      toast.error(error.message || 'Sync failed')
-    } finally {
-      setSyncingId(null)
     }
   }
 
@@ -153,18 +136,7 @@ export default function BrandProfiles({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="flex-1 gap-1.5"
-                  disabled={syncingId === profile.id}
-                  onClick={() => handleSyncAll(profile.id)}
-                  title="Refresh from Instagram and sync to nauthenticity"
-                >
-                  {syncingId === profile.id ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
-                  Sync All
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-red-400 border-red-400/20 hover:bg-red-400/10 gap-1.5"
+                  className="ml-auto text-red-400 border-red-400/20 hover:bg-red-400/10 gap-1.5"
                   disabled={deletingId === profile.id}
                   onClick={() => handleDelete(profile.id)}
                 >
