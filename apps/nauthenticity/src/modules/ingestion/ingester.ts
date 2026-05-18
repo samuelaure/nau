@@ -122,6 +122,10 @@ export const ingestProfile = async (
           contextUsername: username,
         });
       }
+
+      // Push platformId/username/image to flownau (no-op for non-owned profiles).
+      const { pushProfileMetadataToFlownau } = await import('../sync/flownau-client');
+      pushProfileMetadataToFlownau(account.id).catch(() => {});
     }
 
     // Finalize the run after finished
