@@ -2,7 +2,7 @@
 set -e
 
 DATE=$(date +%Y-%m-%d)
-BUCKET=":s3:${R2_BUCKET_NAME}"
+BUCKET=":s3:${R2_BUCKET_NAME}/backups"
 RCLONE_FLAGS="--s3-provider=Cloudflare --s3-access-key-id=${R2_ACCESS_KEY_ID} --s3-secret-access-key=${R2_SECRET_ACCESS_KEY} --s3-endpoint=${R2_ENDPOINT} --s3-no-check-bucket --log-level ERROR"
 
 echo "[backup] Starting nau platform backup — ${DATE}"
