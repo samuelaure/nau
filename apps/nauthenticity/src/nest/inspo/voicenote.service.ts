@@ -80,6 +80,17 @@ Return only valid JSON: { "cleanTranscription": "...", "synthesis": "..." }`,
     })
   }
 
+  async getOne(id: string) {
+    const voicenote = await this.prisma.voicenote.findUnique({ where: { id } })
+    if (!voicenote) return null
+    const conceptSources = await this.prisma.sourceConceptSource.findMany({
+      where: { voicenoteId: id },
+      include: { sourceConcept: true },
+    })
+    const concepts = conceptSources.map((s) => s.sourceConcept).filter(Boolean)
+    return { voicenote, concepts }
+  }
+
   async createFromCapture(
     brandId: string,
     data: { cleanTranscription: string; synthesis: string; sourceRef?: string },
@@ -129,6 +140,9 @@ Return only valid JSON: { "cleanTranscription": "...", "synthesis": "..." }`,
         sourceType: 'voicenote',
         status: 'pending',
       },
+    })
+    await this.prisma.sourceConceptSource.create({
+      data: { sourceConceptId: concept.id, voicenoteId: voicenote.id },
     })
 
     const ideaCount = await this.pushConceptToFlownau(brandId, concept.id, concept.content)

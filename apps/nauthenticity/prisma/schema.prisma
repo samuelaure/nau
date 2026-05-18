@@ -260,18 +260,27 @@ model SourceConcept {
   @@index([brandId, status])
 }
 
-// Links a SourceConcept back to the specific post(s) or profile it was derived from.
+// Links a SourceConcept back to the specific InspoBase item it was derived from.
 model SourceConceptSource {
-  id              String        @id @default(uuid())
+  id              String         @id @default(uuid())
   sourceConceptId String
-  sourceConcept   SourceConcept @relation(fields: [sourceConceptId], references: [id], onDelete: Cascade)
+  sourceConcept   SourceConcept  @relation(fields: [sourceConceptId], references: [id], onDelete: Cascade)
   postId          String?
-  post            Post?         @relation(fields: [postId], references: [id], onDelete: SetNull)
+  post            Post?          @relation(fields: [postId], references: [id], onDelete: SetNull)
   socialProfileId String?
   socialProfile   SocialProfile? @relation(fields: [socialProfileId], references: [id], onDelete: SetNull)
+  voicenoteId     String?
+  voicenote       Voicenote?     @relation(fields: [voicenoteId], references: [id], onDelete: SetNull)
+  youtubeVideoId  String?
+  youtubeVideo    YoutubeVideo?  @relation(fields: [youtubeVideoId], references: [id], onDelete: SetNull)
+  blogPostId      String?
+  blogPost        BlogPost?      @relation(fields: [blogPostId], references: [id], onDelete: SetNull)
 
   @@index([sourceConceptId])
   @@index([postId])
+  @@index([voicenoteId])
+  @@index([youtubeVideoId])
+  @@index([blogPostId])
   @@index([socialProfileId])
 }
 
@@ -313,6 +322,8 @@ model Voicenote {
   synthesis        String    @db.Text
   sourceRef        String?   // zazu-bot Voicenote.id
   createdAt        DateTime  @default(now())
+
+  sourceConceptSources SourceConceptSource[]
 
   @@index([brandId])
 }
@@ -425,8 +436,9 @@ model YoutubeVideo {
   failureReason   String?
   createdAt       DateTime @default(now())
 
-  categoryMemberships CategoryMembership[]
-  trashItems          TrashItem[]
+  categoryMemberships  CategoryMembership[]
+  trashItems           TrashItem[]
+  sourceConceptSources SourceConceptSource[]
 
   @@unique([brandId, videoId])
   @@index([brandId, status])
@@ -449,8 +461,9 @@ model BlogPost {
   failureReason String?
   createdAt     DateTime  @default(now())
 
-  categoryMemberships CategoryMembership[]
-  trashItems          TrashItem[]
+  categoryMemberships  CategoryMembership[]
+  trashItems           TrashItem[]
+  sourceConceptSources SourceConceptSource[]
 
   @@unique([brandId, url])
   @@index([brandId, status])

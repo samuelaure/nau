@@ -12,6 +12,7 @@ import { computeQueue } from './compute.queue';
 import { optimizationQueue } from './optimization.queue';
 import { createStorage, nauthenticity } from 'nau-storage';
 import { optimizeImage } from '../utils/media';
+import { pushProfileMetadataToFlownau } from '../modules/sync/flownau-client';
 
 const storage = config.env.R2_ENDPOINT && config.env.R2_ACCESS_KEY_ID && config.env.R2_SECRET_ACCESS_KEY && config.env.R2_BUCKET_NAME && config.env.R2_PUBLIC_URL
   ? createStorage({
@@ -201,6 +202,15 @@ export const downloadWorker = new Worker(
               where: { platform: 'instagram', username },
               data: { profileImageUrl: publicUrl },
             });
+
+            // Push image to flownau for owned profiles (no-op for non-owned).
+            const sp = await prisma.socialProfile.findFirst({
+              where: { platform: 'instagram', username },
+              select: { id: true },
+            });
+            if (sp) {
+              pushProfileMetadataToFlownau(sp.id).catch(() => {});
+            }
 
             const allAccountPosts = await prisma.post.findMany({ where: { username: contextUsername } });
             for (const p of allAccountPosts.filter((p) => p.collaborators !== null)) {

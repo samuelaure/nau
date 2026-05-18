@@ -191,6 +191,26 @@ export class IntelligenceController {
     return this.intelligenceService.getBlogPosts(brandId)
   }
 
+  @Get('youtube-videos/:id')
+  getYoutubeVideo(@Param('id') id: string) {
+    return this.intelligenceService.getYoutubeVideo(id)
+  }
+
+  @Post('youtube-videos/:id/retry')
+  retryYoutubeVideo(@Param('id') id: string) {
+    return this.intelligenceService.retryYoutubeVideo(id)
+  }
+
+  @Get('blog-posts/:id')
+  getBlogPost(@Param('id') id: string) {
+    return this.intelligenceService.getBlogPost(id)
+  }
+
+  @Post('blog-posts/:id/retry')
+  retryBlogPost(@Param('id') id: string) {
+    return this.intelligenceService.retryBlogPost(id)
+  }
+
   // -------------------------------------------------------------------------
   // Reactive comment generation and feedback
   // -------------------------------------------------------------------------

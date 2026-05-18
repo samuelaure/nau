@@ -619,3 +619,80 @@ export const dispatchSourceConcept = async (
   const { data } = await api.post(`/brands/${brandId}/source-concepts/dispatch`, { itemType, itemId });
   return data;
 };
+
+export const dispatchConceptById = async (conceptId: string) => {
+  const { data } = await api.post(`/source-concepts/${conceptId}/dispatch`);
+  return data as { dispatched: boolean; conceptId: string };
+};
+
+export interface YoutubeVideoDetail {
+  video: {
+    id: string;
+    brandId: string;
+    url: string;
+    videoId: string;
+    title: string | null;
+    channelName: string | null;
+    durationSeconds: number | null;
+    transcript: string | null;
+    synthesis: string | null;
+    status: string;
+    failureReason: string | null;
+    createdAt: string;
+  };
+  concepts: Array<{ id: string; content: string; status: string; sourceType: string; createdAt: string }>;
+}
+
+export const getYoutubeVideo = async (id: string) => {
+  const { data } = await api.get<YoutubeVideoDetail>(`/youtube-videos/${id}`);
+  return data;
+};
+
+export const retryYoutubeVideo = async (id: string) => {
+  const { data } = await api.post(`/youtube-videos/${id}/retry`);
+  return data as { id: string; status: string };
+};
+
+export interface BlogPostDetail {
+  post: {
+    id: string;
+    brandId: string;
+    url: string;
+    title: string | null;
+    author: string | null;
+    publishedAt: string | null;
+    rawText: string | null;
+    synthesis: string | null;
+    status: string;
+    failureReason: string | null;
+    createdAt: string;
+  };
+  concepts: Array<{ id: string; content: string; status: string; sourceType: string; createdAt: string }>;
+}
+
+export const getBlogPost = async (id: string) => {
+  const { data } = await api.get<BlogPostDetail>(`/blog-posts/${id}`);
+  return data;
+};
+
+export const retryBlogPost = async (id: string) => {
+  const { data } = await api.post(`/blog-posts/${id}/retry`);
+  return data as { id: string; status: string };
+};
+
+export interface VoicenoteDetail {
+  voicenote: {
+    id: string;
+    brandId: string;
+    cleanTranscription: string;
+    synthesis: string;
+    sourceRef: string | null;
+    createdAt: string;
+  };
+  concepts: Array<{ id: string; content: string; status: string; sourceType: string; createdAt: string }>;
+}
+
+export const getVoicenote = async (id: string) => {
+  const { data } = await api.get<VoicenoteDetail>(`/voicenotes/${id}`);
+  return data;
+};
