@@ -29,11 +29,11 @@ COPY prisma.config.js ./
 # pino + pg: Turbopack externalises these with fingerprinted IDs (pkg-HASH) derived from
 #   the build-time pnpm virtual-store path. We install the real packages then create
 #   symlinks named pkg-HASH -> pkg by extracting the hashes from the built SSR chunks.
-RUN npm install prisma@^7.3.0 @prisma/client@^7.3.0 @swc/helpers@^0.5.5 @next/env --no-save && \
+RUN npm install prisma@^7.8.0 @prisma/client@^7.8.0 @swc/helpers@^0.5.5 @next/env --no-save && \
     node_modules/.bin/prisma generate --schema=prisma/schema.prisma && \
     mkdir -p apps/flownau/.next/node_modules && \
     cd apps/flownau/.next/node_modules && \
-    npm install pino@^10.3.1 pino-pretty@^13.1.3 pg pg-connection-string pg-types "@prisma/adapter-pg@^7.3.0" bullmq ioredis axios nau-storage node-cron "@aws-sdk/client-s3" "@aws-sdk/s3-request-presigner" "@aws-sdk/lib-storage" --no-save && \
+    npm install pino@^10.3.1 pino-pretty@^13.1.3 pg pg-connection-string pg-types "@prisma/adapter-pg@^7.8.0" bullmq ioredis axios nau-storage node-cron "@aws-sdk/client-s3" "@aws-sdk/s3-request-presigner" "@aws-sdk/lib-storage" --no-save && \
     for pkg in pg pino bullmq ioredis axios nau-storage node-cron; do \
         for h in $(grep -rh "\"${pkg}-[0-9a-f]" ../server/chunks/ 2>/dev/null | grep -o "\"${pkg}-[0-9a-f]\{16\}\"" | tr -d '"' | sort -u); do \
             ln -sfn "$pkg" "$h" 2>/dev/null || true; \
