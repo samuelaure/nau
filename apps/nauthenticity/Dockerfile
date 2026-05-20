@@ -39,6 +39,9 @@ FROM node:20-slim AS runner
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     openssl \
+    python3 \
+    python3-pip \
+    && pip3 install --break-system-packages yt-dlp \
     && rm -rf /var/lib/apt/lists/*
 
 RUN corepack enable && corepack prepare pnpm@10.14.0 --activate

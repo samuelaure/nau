@@ -1,8 +1,7 @@
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import { execSync } from 'child_process'
-import ytdl from '@distube/ytdl-core'
+import { execSync, spawnSync } from 'child_process'
 import { YoutubeTranscript } from 'youtube-transcript'
 import { transcribeAudio } from './transcription.service'
 import { logger } from '../utils/logger'
@@ -30,13 +29,24 @@ export async function fetchYoutubeMetadata(
   videoId: string,
 ): Promise<{ title: string | null; channelName: string | null; durationSeconds: number | null }> {
   try {
-    const info = await ytdl.getBasicInfo(`https://www.youtube.com/watch?v=${videoId}`)
-    const details = info.videoDetails
-    const durationSeconds = details.lengthSeconds ? parseInt(details.lengthSeconds, 10) : null
+    const result = spawnSync(
+      'yt-dlp',
+      ['--dump-json', '--no-playlist', '--', videoId],
+      { encoding: 'utf8', timeout: 30_000 },
+    )
+    if (result.status !== 0) {
+      throw new Error(result.stderr || 'yt-dlp metadata fetch failed')
+    }
+    const info = JSON.parse(result.stdout) as {
+      title?: string
+      uploader?: string
+      channel?: string
+      duration?: number
+    }
     return {
-      title: details.title ?? null,
-      channelName: details.author?.name ?? null,
-      durationSeconds,
+      title: info.title ?? null,
+      channelName: info.channel ?? info.uploader ?? null,
+      durationSeconds: info.duration ?? null,
     }
   } catch (err) {
     logger.warn({ videoId, err }, 'failed to fetch YouTube metadata')
@@ -61,27 +71,33 @@ export async function downloadAudioAndTranscribe(
   const audioPath = path.join(tmpDir, `yt-${videoId}-${Date.now()}.mp3`)
 
   try {
-    await new Promise<void>((resolve, reject) => {
-      const stream = ytdl(`https://www.youtube.com/watch?v=${videoId}`, {
-        quality: 'lowestaudio',
-        filter: 'audioonly',
-      })
-      const file = fs.createWriteStream(audioPath)
-      stream.pipe(file)
-      file.on('finish', resolve)
-      file.on('error', reject)
-      stream.on('error', reject)
-    })
+    // yt-dlp downloads and converts to mp3 in one step (no ytdl stream needed)
+    const result = spawnSync(
+      'yt-dlp',
+      [
+        '--no-playlist',
+        '-x',
+        '--audio-format', 'mp3',
+        '--audio-quality', '9',
+        '-o', audioPath,
+        '--',
+        videoId,
+      ],
+      { timeout: 300_000 },
+    )
+    if (result.status !== 0) {
+      throw new Error(result.stderr?.toString() || 'yt-dlp audio download failed')
+    }
 
     const fileSizeBytes = fs.statSync(audioPath).size
     const fileSizeMB = fileSizeBytes / (1024 * 1024)
 
     if (fileSizeMB <= 25) {
-      const result = await transcribeAudio(audioPath)
-      return result.text
+      const transcription = await transcribeAudio(audioPath)
+      return transcription.text
     }
 
-    // Split into N chunks each under 25MB
+    // Split into N chunks each under 25 MB
     const N = Math.ceil(fileSizeMB / 25)
     const chunkDuration = Math.ceil(durationSeconds / N)
     const chunkPaths: string[] = []
@@ -95,7 +111,9 @@ export async function downloadAudioAndTranscribe(
       chunkPaths.push(chunkPath)
     }
 
-    const transcripts = await Promise.all(chunkPaths.map((p) => transcribeAudio(p).then((r) => r.text)))
+    const transcripts = await Promise.all(
+      chunkPaths.map((p) => transcribeAudio(p).then((r) => r.text)),
+    )
 
     for (const p of chunkPaths) {
       fs.rmSync(p, { force: true })
