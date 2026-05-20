@@ -865,10 +865,59 @@ const handleYoutubeIngest = async (job: Job): Promise<void> => {
       ],
     });
 
+    const synthesis = result.content.trim();
+
     await prisma.youtubeVideo.update({
       where: { id: youtubeVideoId },
-      data: { transcript, synthesis: result.content.trim(), status: 'ready' },
+      data: { transcript, synthesis, status: 'ready' },
     });
+
+    // Extract source concepts from the transcript so they appear in the brand's concept pool
+    try {
+      const conceptResult = await client.chatCompletion({
+        model,
+        temperature: 0.4,
+        messages: [
+          {
+            role: 'system',
+            content: `You extract reusable content intelligence from YouTube video transcripts. Your output will be used by other content teams as raw inspiration material.
+
+Produce distinct content angles (30-60 words each) derived from the video's ideas that any brand could use as a starting point for their own content. Only include concepts with genuine standalone value — prioritize quality over quantity, and omit any angle that is weak, redundant, or too vague. Each concept must stand on its own without reference to the original author or their business. Exclude anything tied to personal branding, service offers, pricing, or calls to action. Focus on arguments, insights, frames, or points of view.
+
+Write all output in ${brandLanguage}.
+
+Return only valid JSON: { "sourceConcepts": ["...", "..."] }`,
+          },
+          { role: 'user', content: transcript },
+        ],
+        responseFormat: { type: 'json_object' },
+      });
+
+      let sourceConcepts: string[] = [];
+      try {
+        const parsed = JSON.parse(conceptResult.content) as { sourceConcepts?: unknown[] };
+        sourceConcepts = Array.isArray(parsed.sourceConcepts)
+          ? parsed.sourceConcepts.filter((c): c is string => typeof c === 'string')
+          : [];
+      } catch {
+        // malformed JSON — skip concepts
+      }
+
+      if (sourceConcepts.length > 0) {
+        await Promise.all(
+          sourceConcepts.map(async (content) => {
+            const concept = await prisma.sourceConcept.create({
+              data: { brandId: video.brandId, content, sourceType: 'specific_post', status: 'pending' },
+            });
+            await prisma.sourceConceptSource.create({
+              data: { sourceConceptId: concept.id, youtubeVideoId },
+            });
+          }),
+        );
+      }
+    } catch (conceptErr) {
+      logger.warn({ youtubeVideoId, conceptErr }, '[YoutubeIngest] source concept extraction failed — synthesis was saved');
+    }
   } catch (err) {
     if (err instanceof DurationLimitExceededError) {
       await prisma.youtubeVideo.update({
