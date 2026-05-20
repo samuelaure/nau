@@ -17,6 +17,15 @@ const YOUTUBE_PATTERNS = [
   /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([A-Za-z0-9_-]{11})/,
 ]
 
+// Common yt-dlp flags that bypass YouTube bot detection:
+// - ios player client: uses Apple's iOS app API — not subject to JS-based bot checks
+// - js-runtimes node: register the container's Node.js so yt-dlp can use it if needed
+const YTDLP_BYPASS_ARGS = [
+  '--extractor-args', 'youtube:player_client=ios',
+  '--js-runtimes', 'node',
+  '--no-warnings',
+]
+
 export function extractVideoId(url: string): string | null {
   for (const pattern of YOUTUBE_PATTERNS) {
     const match = url.match(pattern)
@@ -31,7 +40,7 @@ export async function fetchYoutubeMetadata(
   try {
     const result = spawnSync(
       'yt-dlp',
-      ['--dump-json', '--no-playlist', '--', videoId],
+      [...YTDLP_BYPASS_ARGS, '--dump-json', '--no-playlist', '--', videoId],
       { encoding: 'utf8', timeout: 30_000 },
     )
     if (result.status !== 0) {
@@ -71,10 +80,10 @@ export async function downloadAudioAndTranscribe(
   const audioPath = path.join(tmpDir, `yt-${videoId}-${Date.now()}.mp3`)
 
   try {
-    // yt-dlp downloads and converts to mp3 in one step (no ytdl stream needed)
     const result = spawnSync(
       'yt-dlp',
       [
+        ...YTDLP_BYPASS_ARGS,
         '--no-playlist',
         '-x',
         '--audio-format', 'mp3',
