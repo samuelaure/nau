@@ -583,6 +583,7 @@ function CompositionModal({
   }, [initialComp.id])
 
   const [actioning, setActioning] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null)
   const [scheduling, setScheduling] = useState(false)
   const [newDatetime, setNewDatetime] = useState(
     initialComp.scheduledAt ? initialComp.scheduledAt.slice(0, 16) : '',
@@ -1428,29 +1429,84 @@ function CompositionModal({
 
             {/* Record / Replicate: upload is the blocker action */}
             {(tag === 'Record' || tag === 'Replicate') && !comp.userUploadedMediaUrl && (
-              <label className="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border border-amber-400/30 text-amber-300 hover:bg-amber-400/10 transition-colors">
-                <AlertCircle size={13} />
-                {tag === 'Record' ? 'Upload recording' : 'Upload media'}
+              <label
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+                  actioning
+                    ? 'cursor-not-allowed border-amber-400/20 text-amber-300/50'
+                    : 'cursor-pointer border-amber-400/30 text-amber-300 hover:bg-amber-400/10'
+                }`}
+              >
+                {actioning ? (
+                  <>
+                    <Loader2 size={13} className="animate-spin" />
+                    {uploadProgress !== null ? `${uploadProgress}%` : 'Uploading…'}
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle size={13} />
+                    {tag === 'Record' ? 'Upload recording' : 'Upload media'}
+                  </>
+                )}
                 <input
                   type="file"
                   accept="video/*,image/*"
                   className="hidden"
+                  disabled={actioning}
                   onChange={async (e) => {
                     const file = e.target.files?.[0]
                     if (!file) return
-                    const fd = new FormData()
-                    fd.append('file', file)
-                    fd.append('compositionId', comp.id)
-                    fd.append('brandId', brandId)
-                    const res = await fetch('/api/compositions/upload-recording', {
-                      method: 'POST',
-                      body: fd,
-                    })
-                    if (res.ok) {
-                      toast.success('Media uploaded.')
+                    setActioning(true)
+                    setUploadProgress(0)
+                    try {
+                      // 1. Get presigned URL (bypasses nginx body limit)
+                      const presignRes = await fetch(`/api/posts/${comp.id}/recording/presign`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ mimeType: file.type || 'video/mp4' }),
+                      })
+                      if (!presignRes.ok) throw new Error('Failed to get upload URL')
+                      const { uploadUrl, cdnUrl } = (await presignRes.json()) as {
+                        uploadUrl: string
+                        cdnUrl: string
+                      }
+
+                      // 2. Upload directly to R2 with progress tracking
+                      await new Promise<void>((resolve, reject) => {
+                        const xhr = new XMLHttpRequest()
+                        xhr.open('PUT', uploadUrl)
+                        xhr.setRequestHeader('Content-Type', file.type || 'video/mp4')
+                        xhr.upload.onprogress = (ev) => {
+                          if (ev.lengthComputable) {
+                            setUploadProgress(Math.round((ev.loaded / ev.total) * 100))
+                          }
+                        }
+                        xhr.onload = () =>
+                          xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`R2 upload failed: ${xhr.status}`))
+                        xhr.onerror = () => reject(new Error('Network error during upload'))
+                        xhr.send(file)
+                      })
+
+                      // 3. Confirm with the server — update post record
+                      const patchRes = await fetch(`/api/posts/${comp.id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          videoUrl: cdnUrl,
+                          userUploadedMediaUrl: cdnUrl,
+                          status: 'RENDERED_APPROVED',
+                        }),
+                      })
+                      if (!patchRes.ok) throw new Error('Failed to save upload')
+
+                      toast.success('Recording uploaded — queued for publishing.')
                       onRefresh()
                       onClose()
-                    } else toast.error('Upload failed')
+                    } catch (err) {
+                      toast.error(err instanceof Error ? err.message : 'Upload failed')
+                    } finally {
+                      setActioning(false)
+                      setUploadProgress(null)
+                    }
                   }}
                 />
               </label>

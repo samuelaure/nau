@@ -57,11 +57,11 @@ export async function POST(req: NextRequest) {
       data: {
         userUploadedMediaUrl: mediaUrl,
         videoUrl: mediaUrl,
-        status: 'RENDERED_PENDING',
+        status: 'RENDERED_APPROVED',
       },
     })
 
-    return NextResponse.json({ videoUrl: mediaUrl, status: 'RENDERED_PENDING' }, { status: 200 })
+    return NextResponse.json({ videoUrl: mediaUrl, status: 'RENDERED_APPROVED' }, { status: 200 })
   } catch (error) {
     logError('UPLOAD_RECORDING_ERROR', error)
     const message = error instanceof Error ? error.message : 'Upload failed'

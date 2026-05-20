@@ -51,7 +51,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       data: {
         videoUrl,
         userUploadedMediaUrl: videoUrl,
-        status: 'RENDERED_PENDING',
+        status: 'RENDERED_APPROVED',
       },
     })
 
