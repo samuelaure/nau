@@ -586,7 +586,7 @@ const handleTranscribeBatch = async (
   }
 };
 
-// Generates ProfileSynthesis for the first time after a profile's first scrape.
+// Generates ProfileSynthesis + source concepts for the first time after a profile's first scrape.
 // No-ops if synthesis already exists — subsequent regenerations are manual only.
 const triggerFirstProfileSynthesis = async (socialProfileId: string): Promise<void> => {
   const existing = await prisma.profileSynthesis.findUnique({ where: { socialProfileId } });
@@ -595,12 +595,20 @@ const triggerFirstProfileSynthesis = async (socialProfileId: string): Promise<vo
   const authSecret = config.authSecret;
   if (!authSecret) return;
 
+  // Need a brandId to generate source concepts; use the first INSPO membership for this profile.
+  const membership = await prisma.categoryMembership.findFirst({
+    where: { socialProfileId, category: 'INSPO', isActive: true },
+    select: { brandId: true },
+  });
+  if (!membership) return;
+
   const { signServiceToken } = await import('@nau/auth');
   const token = await signServiceToken({ secret: authSecret, iss: 'nauthenticity-worker', aud: 'nauthenticity' });
   const port = config.port ?? 3000;
-  await fetch(`http://localhost:${port}/api/v1/social-profiles/${socialProfileId}/synthesis/generate`, {
+  await fetch(`http://localhost:${port}/api/v1/social-profiles/${socialProfileId}/intelligence/generate`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ brandId: membership.brandId }),
   }).catch(() => {});
 };
 
