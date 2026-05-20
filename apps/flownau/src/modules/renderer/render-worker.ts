@@ -315,6 +315,7 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
     const videoR2Key = flownau.renderOutput(brandId, postId)
     const videoPublicUrl = await storage.upload(videoR2Key, fs.createReadStream(outputPath), {
       mimeType: 'video/mp4',
+      cacheControl: 'no-store',
     })
     cleanupFile(outputPath)
 
@@ -350,6 +351,7 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
       const coverR2Key = flownau.renderCover(brandId, postId)
       coverUrl = await storage.upload(coverR2Key, fs.createReadStream(coverPath), {
         mimeType: 'image/jpeg',
+        cacheControl: 'no-store',
       })
       cleanupFile(coverPath)
     } catch (coverErr) {
@@ -395,6 +397,7 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
     const imageR2Key = flownau.renderStill(brandId, postId)
     const imagePublicUrl = await storage.upload(imageR2Key, fs.createReadStream(outputPath), {
       mimeType: 'image/png',
+      cacheControl: 'no-store',
     })
     cleanupFile(outputPath)
 

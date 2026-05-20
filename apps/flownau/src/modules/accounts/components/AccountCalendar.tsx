@@ -1574,7 +1574,7 @@ function CompositionModal({
                   <MoreHorizontal size={15} />
                 </Button>
                 {moreOpen && (
-                  <div className="absolute bottom-full right-0 mb-2 bg-panel border border-white/10 rounded-xl shadow-2xl py-1 min-w-44 z-50">
+                  <div className="absolute bottom-full right-0 mb-2 bg-panel border border-white/10 rounded-xl shadow-2xl py-1 min-w-52 z-50">
                     {moreItems.map((item) => (
                       <button
                         key={item.key}
