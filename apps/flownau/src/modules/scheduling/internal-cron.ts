@@ -70,19 +70,36 @@ async function runRenderer() {
   const staleThreshold = new Date(Date.now() - RENDER_TIMEOUT_MS)
   const renderingPosts = await prisma.post.findMany({
     where: { status: 'RENDERING', updatedAt: { lt: staleThreshold } },
-    select: { id: true, format: true },
+    select: { id: true, format: true, videoUrl: true },
   })
 
-  for (const post of renderingPosts) {
-    try {
-      const job = await renderQueue.getJob(`render-${post.id}`)
-      const jobState = job ? await job.getState() : null
-      if (jobState && ['active', 'waiting', 'delayed'].includes(jobState)) continue
-      await prisma.post.update({ where: { id: post.id }, data: { status: 'DRAFT_PENDING' } })
-      await prisma.renderJob.deleteMany({ where: { postId: post.id } })
-      logger.warn({ postId: post.id }, '[Cron:Renderer] Reset stale RENDERING post')
-    } catch (err) {
-      logError(`[Cron:Renderer] Failed to reset stale post ${post.id}`, err)
+  if (renderingPosts.length > 0) {
+    // Load active BullMQ jobs once — job IDs use prefix render-<postId>-<ts>
+    const activeJobs = await renderQueue.getJobs(['active', 'waiting', 'delayed'])
+    const activePostIds = new Set(
+      activeJobs.map((j) => j.id?.split('-')[1]).filter(Boolean),
+    )
+
+    for (const post of renderingPosts) {
+      try {
+        if (activePostIds.has(post.id)) continue
+
+        // Render completed (videoUrl exists) but status write was killed — recover to approval
+        if (post.videoUrl) {
+          await prisma.post.update({ where: { id: post.id }, data: { status: 'RENDERED_PENDING' } })
+          await prisma.renderJob.updateMany({
+            where: { postId: post.id, status: { in: ['queued', 'rendering', 'uploading'] } },
+            data: { status: 'done', completedAt: new Date() },
+          })
+          logger.warn({ postId: post.id }, '[Cron:Renderer] Recovered completed-but-stuck render to RENDERED_PENDING')
+        } else {
+          await prisma.post.update({ where: { id: post.id }, data: { status: 'DRAFT_PENDING' } })
+          await prisma.renderJob.deleteMany({ where: { postId: post.id } })
+          logger.warn({ postId: post.id }, '[Cron:Renderer] Reset stale RENDERING post to DRAFT_PENDING')
+        }
+      } catch (err) {
+        logError(`[Cron:Renderer] Failed to reset stale post ${post.id}`, err)
+      }
     }
   }
 
@@ -133,6 +150,9 @@ async function runApprovalNotifications() {
 }
 
 export async function startInternalCron() {
+  // Recover any posts stuck in RENDERING from a previous deploy/crash
+  setTimeout(() => runRenderer().catch((err) => logError('[InternalCron] Startup renderer recovery failed', err)), 10_000)
+
   const { default: cron } = await import('node-cron')
 
   // Publisher — every 5 minutes
