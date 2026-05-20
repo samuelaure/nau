@@ -15,7 +15,8 @@ export async function upsertSocialProfile(opts: {
   externalId?: string | null;
   extraUpdate?: Record<string, unknown>;
 }) {
-  const { platform, username, externalId, extraUpdate = {} } = opts;
+  const { platform, externalId, extraUpdate = {} } = opts;
+  const username = opts.username.toLowerCase();
 
   if (externalId) {
     const byExternalId = await prisma.socialProfile.findFirst({

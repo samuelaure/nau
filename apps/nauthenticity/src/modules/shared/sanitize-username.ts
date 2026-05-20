@@ -10,5 +10,5 @@ export function sanitiseUsername(raw: string): string {
   if (u.includes('instagram.com/')) u = u.split('instagram.com/')[1] ?? u
   u = u.split('?')[0].split('#')[0].split('/')[0]
   if (u.startsWith('@')) u = u.slice(1)
-  return u.replace(/[^a-zA-Z0-9._]/g, '')
+  return u.replace(/[^a-zA-Z0-9._]/g, '').toLowerCase()
 }
