@@ -228,12 +228,38 @@ export interface CreateBlockDto {
   type: string
   parentId?: string | null
   properties: Record<string, unknown>
+  workspaceId?: string
+  userId?: string
 }
 
 export interface UpdateBlockDto {
   type?: string
   parentId?: string | null
   properties?: Record<string, unknown>
+}
+
+// ── Tag ───────────────────────────────────────────────────────────────────────
+
+export interface Tag {
+  id: string
+  workspaceId: string
+  name: string
+  color: string | null
+  parentId: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateTagDto {
+  name: string
+  parentId?: string | null
+  color?: string
+}
+
+export interface UpdateTagDto {
+  name?: string
+  parentId?: string | null
+  color?: string | null
 }
 
 // ── Schedule ──────────────────────────────────────────────────────────────────

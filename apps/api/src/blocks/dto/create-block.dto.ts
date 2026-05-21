@@ -1,11 +1,6 @@
 import { IsNotEmpty, IsString, IsObject, IsOptional } from 'class-validator';
 import { CreateBlockDto as ICreateBlockDto } from '@nau/types';
 
-/**
- * Data Transfer Object for creating a new Block.
- * Implements the shared interface from @9nau/types for consistency.
- * Uses class-validator decorators for automatic request body validation.
- */
 export class CreateBlockDto implements ICreateBlockDto {
   @IsString()
   @IsNotEmpty()
@@ -17,4 +12,12 @@ export class CreateBlockDto implements ICreateBlockDto {
 
   @IsObject()
   properties!: Record<string, unknown>;
+
+  @IsString()
+  @IsOptional()
+  workspaceId?: string;
+
+  @IsString()
+  @IsOptional()
+  userId?: string;
 }
