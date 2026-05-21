@@ -40,6 +40,7 @@
   "dependencies": {
     "@react-native-community/datetimepicker": "7.7.0",
     "expo": "~50.0.6",
+    "expo-asset": "~9.0.2",
     "expo-av": "~13.10.6",
     "expo-clipboard": "~5.0.1",
     "expo-crypto": "~13.0.2",
