@@ -41,6 +41,7 @@
     "expo": "~50.0.6",
     "expo-av": "~13.10.6",
     "expo-clipboard": "~5.0.1",
+    "expo-crypto": "~13.0.2",
     "expo-file-system": "~16.0.9",
     "expo-linking": "~6.2.2",
     "expo-share-intent": "^1.9.0",
