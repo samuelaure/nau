@@ -1,4 +1,5 @@
 import { executeSql, runSql } from './core';
+import { DEFAULT_WORKSPACE_ID, DEFAULT_USER_ID } from '@/constants';
 
 interface Migration {
   version: number;
@@ -156,6 +157,16 @@ const migrations: Migration[] = [
       if (!existingColumns.includes('workspaceId')) {
         await runSql('ALTER TABLE posts ADD COLUMN workspaceId TEXT');
       }
+
+      // Seed default workspace/user into settings if not already set
+      await runSql(
+        `INSERT OR IGNORE INTO settings (key, value) VALUES ('nau_workspace_id', ?)`,
+        [DEFAULT_WORKSPACE_ID],
+      );
+      await runSql(
+        `INSERT OR IGNORE INTO settings (key, value) VALUES ('nau_user_id', ?)`,
+        [DEFAULT_USER_ID],
+      );
     },
   },
 ];

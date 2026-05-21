@@ -23,6 +23,10 @@ export const API_CONFIG = {
   serviceKey: 'secret_key_for_dev',
 };
 
+// Temporary until Phase 9 real auth. Hard-coded to Samuel's Personal Workspace.
+export const DEFAULT_WORKSPACE_ID = 'cmoq2tqx3000101n6usl2vxbx';
+export const DEFAULT_USER_ID = 'cmoq2tqwz000001n6fnjqjzcw';
+
 export const R2_CONFIG = {
   publicUrl: 'https://media.9nau.com',
 };
