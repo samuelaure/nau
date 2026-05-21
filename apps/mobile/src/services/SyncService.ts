@@ -2,6 +2,7 @@ import axios from 'axios';
 import { API_CONFIG } from '@/constants';
 import { executeSql, runSql } from '../db';
 import { Post } from '@/repositories/PostRepository';
+import { getSetting } from '@/repositories/SettingsRepository';
 
 export interface SyncBlock {
   uuid: string;
@@ -22,9 +23,6 @@ class SyncService {
     },
   });
 
-  /**
-   * Pushes local changes to the API
-   */
   async pushLocalChanges(): Promise<number> {
     // 1. Fetch posts that were updated locally after they were last synced from API
     // Or just all posts where local_updated_at > api_updated_at (or api_updated_at is NULL)
@@ -33,6 +31,11 @@ class SyncService {
     );
 
     if (localChanges.length === 0) return 0;
+
+    const [userId, workspaceId] = await Promise.all([
+      getSetting('nau_user_id'),
+      getSetting('nau_workspace_id'),
+    ]);
 
     console.log(`[SyncService] Pushing ${localChanges.length} local changes to API...`);
 
@@ -62,7 +65,7 @@ class SyncService {
     }));
 
     try {
-      const response = await this.client.post('/sync/push', { blocks });
+      const response = await this.client.post('/sync/push', { blocks, userId, workspaceId });
       const results = response.data;
       
       // Update api_updated_at for successfully synced blocks
@@ -81,21 +84,18 @@ class SyncService {
     }
   }
 
-  /**
-   * Pulls changes from the API
-   */
   async pullRemoteChanges(): Promise<number> {
-    // 1. Get the latest api_updated_at from our local DB
-    const latestSync = await executeSql<{ max_api: string }>(
-      'SELECT MAX(api_updated_at) as max_api FROM posts'
-    );
+    const [latestSync, workspaceId] = await Promise.all([
+      executeSql<{ max_api: string }>('SELECT MAX(api_updated_at) as max_api FROM posts'),
+      getSetting('nau_workspace_id'),
+    ]);
     const lastSyncedAt = latestSync[0]?.max_api || new Date(0).toISOString();
 
     console.log(`[SyncService] Pulling changes since ${lastSyncedAt}...`);
 
     try {
       const response = await this.client.get('/sync/pull', {
-        params: { lastSyncedAt },
+        params: { lastSyncedAt, ...(workspaceId ? { workspaceId } : {}) },
       });
       
       const { blocks, serverTime } = response.data;

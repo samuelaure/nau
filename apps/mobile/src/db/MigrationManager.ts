@@ -147,6 +147,17 @@ const migrations: Migration[] = [
       }
     },
   },
+  {
+    version: 6,
+    up: async () => {
+      const tableInfo = await executeSql<{ name: string }>('PRAGMA table_info(posts)');
+      const existingColumns = tableInfo.map((col) => col.name);
+
+      if (!existingColumns.includes('workspaceId')) {
+        await runSql('ALTER TABLE posts ADD COLUMN workspaceId TEXT');
+      }
+    },
+  },
 ];
 
 export const applyMigrations = async () => {
