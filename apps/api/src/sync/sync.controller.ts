@@ -8,12 +8,25 @@ export class SyncController {
   constructor(private readonly syncService: SyncService) {}
 
   @Post('push')
-  async push(@Body() body: { blocks: Record<string, unknown>[] }) {
-    return this.syncService.push(body.blocks);
+  async push(
+    @Body()
+    body: {
+      blocks: Record<string, unknown>[];
+      userId?: string;
+      workspaceId?: string;
+    },
+  ) {
+    return this.syncService.push(body.blocks, body.userId, body.workspaceId);
   }
 
   @Get('pull')
-  async pull(@Query('lastSyncedAt') lastSyncedAt: string) {
-    return this.syncService.pull(lastSyncedAt || new Date(0).toISOString());
+  async pull(
+    @Query('lastSyncedAt') lastSyncedAt: string,
+    @Query('workspaceId') workspaceId?: string,
+  ) {
+    return this.syncService.pull(
+      lastSyncedAt || new Date(0).toISOString(),
+      workspaceId,
+    );
   }
 }

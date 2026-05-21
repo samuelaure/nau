@@ -12,7 +12,11 @@ export class SyncService {
     private readonly flownauService: FlownauIntegrationService,
   ) {}
 
-  async push(blocks: Record<string, unknown>[]) {
+  async push(
+    blocks: Record<string, unknown>[],
+    userId?: string,
+    workspaceId?: string,
+  ) {
     this.logger.log(`Sync PUSH: processing ${blocks.length} blocks`);
     const results = [];
 
@@ -25,6 +29,8 @@ export class SyncService {
         deletedAt,
         source,
         sourceRef,
+        workspaceId: blockWorkspaceId,
+        userId: blockUserId,
       } = blockData as {
         uuid: string;
         type: string;
@@ -33,7 +39,12 @@ export class SyncService {
         deletedAt?: string | null;
         source?: string;
         sourceRef?: string;
+        workspaceId?: string;
+        userId?: string;
       };
+
+      const resolvedWorkspaceId = blockWorkspaceId ?? workspaceId;
+      const resolvedUserId = blockUserId ?? userId;
 
       try {
         const upserted = await this.prisma.block.upsert({
@@ -44,6 +55,8 @@ export class SyncService {
             deletedAt: deletedAt ? new Date(deletedAt) : null,
             source,
             sourceRef,
+            ...(resolvedWorkspaceId && { workspaceId: resolvedWorkspaceId }),
+            ...(resolvedUserId && { userId: resolvedUserId }),
           },
           create: {
             uuid,
@@ -53,11 +66,12 @@ export class SyncService {
             deletedAt: deletedAt ? new Date(deletedAt) : null,
             source,
             sourceRef,
+            workspaceId: resolvedWorkspaceId ?? null,
+            userId: resolvedUserId ?? null,
           },
         });
         results.push({ uuid: upserted.uuid, status: 'synced' });
 
-        // Forward manually-synced content_idea blocks to Flownau
         if (type === 'content_idea') {
           const brandId = (properties as Record<string, unknown>).brandId as string | undefined;
           const text = (properties as Record<string, unknown>).text as string | undefined;
@@ -99,19 +113,28 @@ export class SyncService {
       }
     }
 
+    if (userId && workspaceId) {
+      await this.prisma.syncCursor.upsert({
+        where: { userId_workspaceId: { userId, workspaceId } },
+        update: { lastSyncedAt: new Date() },
+        create: { userId, workspaceId, lastSyncedAt: new Date() },
+      });
+    }
+
     return results;
   }
 
-  async pull(lastSyncedAt: string) {
+  async pull(lastSyncedAt: string, workspaceId?: string) {
     const since = new Date(lastSyncedAt);
     this.logger.log(`Sync PULL: fetching changes since ${since.toISOString()}`);
 
+    const where: Prisma.BlockWhereInput = {
+      updatedAt: { gt: since },
+      ...(workspaceId ? { workspaceId } : {}),
+    };
+
     const blocks = await this.prisma.block.findMany({
-      where: {
-        updatedAt: {
-          gt: since,
-        },
-      },
+      where,
       include: {
         schedule: true,
         events: {

@@ -12,7 +12,7 @@ import {
   ScrollView,
   FlatList,
 } from 'react-native';
-import { X, Globe, Database, Trash2, RefreshCcw, Clock, FileText, Bug } from 'lucide-react-native';
+import { X, Globe, Database, Trash2, RefreshCcw, Clock, FileText, Bug, ChevronDown } from 'lucide-react-native';
 import { getSetting, setSetting } from '@/repositories/SettingsRepository';
 import { getStandbyPosts, resetSyncForManualRetry } from '@/repositories/PostRepository';
 import { SYNC_POLLING_INTERVAL, COLORS } from '@/constants';
@@ -21,6 +21,7 @@ import { syncManager } from '@/services/SyncManager';
 import { MediaCacheService } from '@/services/MediaCacheService';
 import { BackupService } from '@/services/BackupService';
 import { logger } from '@/services/LogService';
+import { workspacesService, NauWorkspace } from '@/services/WorkspacesService';
 
 interface SettingsModalProps {
   visible: boolean;
@@ -31,6 +32,9 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
   const [apifyToken, setApifyToken] = useState('');
   const [frequencyChain, setFrequencyChain] = useState('');
   const [nauUserId, setNauUserId] = useState('');
+  const [nauWorkspaceId, setNauWorkspaceId] = useState('');
+  const [workspaces, setWorkspaces] = useState<NauWorkspace[]>([]);
+  const [showWorkspacePicker, setShowWorkspacePicker] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [isRecovering, setIsRecovering] = useState(false);
   const [isBackingUp, setIsBackingUp] = useState(false);
@@ -52,9 +56,16 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
       getSetting('apify_api_token').then((val) => setApifyToken(val || ''));
       getSetting('frequency_chain').then((val) => setFrequencyChain(val || DEFAULT_FREQUENCY_CHAIN.join(', ')));
       getSetting('nau_user_id').then((val) => setNauUserId(val || ''));
+      getSetting('nau_workspace_id').then((val) => setNauWorkspaceId(val || ''));
       loadStandbyCount();
     }
   }, [visible]);
+
+  const handleLoadWorkspaces = async () => {
+    const list = await workspacesService.fetchWorkspaces();
+    setWorkspaces(list);
+    setShowWorkspacePicker(true);
+  };
 
   useEffect(() => {
     if (showLogs) {
@@ -69,6 +80,7 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
     await setSetting('apify_api_token', apifyToken);
     await setSetting('frequency_chain', frequencyChain);
     await setSetting('nau_user_id', nauUserId);
+    if (nauWorkspaceId) await setSetting('nau_workspace_id', nauWorkspaceId);
     onClose();
   };
 
@@ -215,6 +227,39 @@ export const SettingsModal = ({ visible, onClose }: SettingsModalProps) => {
                 </View>
                 <Text style={styles.helpText}>
                   Required to load your brands in Special Functions. Find it in 9naŭ → Profile.
+                </Text>
+
+                {/* Workspace */}
+                <View style={styles.sectionDivider} />
+                <Text style={styles.label}>Active Workspace</Text>
+                <TouchableOpacity style={styles.inputContainer} onPress={handleLoadWorkspaces}>
+                  <Database size={18} color={COLORS.textSecondary} style={styles.inputIcon} />
+                  <Text style={[styles.input, { paddingVertical: 14, color: nauWorkspaceId ? '#111827' : '#9ca3af' }]} numberOfLines={1}>
+                    {workspaces.find(w => w.id === nauWorkspaceId)?.name || (nauWorkspaceId ? nauWorkspaceId : 'Select workspace...')}
+                  </Text>
+                  <ChevronDown size={16} color={COLORS.textSecondary} />
+                </TouchableOpacity>
+                {showWorkspacePicker && workspaces.length > 0 && (
+                  <View style={styles.pickerList}>
+                    {workspaces.map(ws => (
+                      <TouchableOpacity
+                        key={ws.id}
+                        style={[styles.pickerItem, ws.id === nauWorkspaceId && styles.pickerItemActive]}
+                        onPress={() => { setNauWorkspaceId(ws.id); setShowWorkspacePicker(false); }}
+                      >
+                        <Text style={[styles.pickerItemText, ws.id === nauWorkspaceId && styles.pickerItemTextActive]}>
+                          {ws.name}
+                        </Text>
+                        <Text style={styles.pickerItemRole}>{ws.role}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+                {showWorkspacePicker && workspaces.length === 0 && (
+                  <Text style={styles.helpText}>No workspaces found. Make sure your naŭ User ID is set.</Text>
+                )}
+                <Text style={styles.helpText}>
+                  All new captures will be synced to this workspace.
                 </Text>
 
                 {/* API Settings */}
@@ -528,5 +573,36 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '800',
+  },
+  pickerList: {
+    backgroundColor: '#fff',
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: -4,
+    overflow: 'hidden',
+  },
+  pickerItem: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  pickerItemActive: {
+    backgroundColor: '#f5f3ff',
+  },
+  pickerItemText: {
+    color: '#111827',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  pickerItemTextActive: {
+    color: COLORS.primary,
+    fontWeight: '700',
+  },
+  pickerItemRole: {
+    color: '#9ca3af',
+    fontSize: 12,
   },
 });

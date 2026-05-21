@@ -8,4 +8,8 @@ export class FindBlocksQueryDto {
   @IsOptional()
   @IsString()
   status?: string;
+
+  @IsOptional()
+  @IsString()
+  workspaceId?: string;
 }

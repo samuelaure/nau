@@ -10,7 +10,7 @@ export class BlocksService {
   constructor(private prisma: PrismaService) {}
 
   async create(createBlockDto: CreateBlockDto) {
-    const { parentId, type, properties } = createBlockDto;
+    const { parentId, type, properties, workspaceId, userId } = createBlockDto;
 
     let sortOrder = 1;
 
@@ -29,8 +29,7 @@ export class BlocksService {
     if (
       lastSibling &&
       lastSibling.properties !== null &&
-      typeof (lastSibling.properties as Prisma.JsonObject).sortOrder ===
-        'number'
+      typeof (lastSibling.properties as Prisma.JsonObject).sortOrder === 'number'
     ) {
       sortOrder =
         ((lastSibling.properties as Prisma.JsonObject).sortOrder as number) + 1;
@@ -42,25 +41,23 @@ export class BlocksService {
         ...((properties as Prisma.JsonObject) || {}),
         sortOrder,
       },
-      ...(parentId && {
-        parent: {
-          connect: {
-            id: parentId,
-          },
-        },
-      }),
+      ...(parentId && { parent: { connect: { id: parentId } } }),
+      ...(workspaceId && { workspace: { connect: { id: workspaceId } } }),
+      userId: userId ?? null,
     };
 
-    return this.prisma.block.create({
-      data,
-    });
+    return this.prisma.block.create({ data });
   }
 
   async findAll(query: FindBlocksQueryDto) {
-    const { type, status } = query;
+    const { type, status, workspaceId } = query;
     const where: Prisma.BlockWhereInput = {
       deletedAt: null,
     };
+
+    if (workspaceId) {
+      where.workspaceId = workspaceId;
+    }
 
     if (type) {
       where.type = type;
@@ -78,9 +75,7 @@ export class BlocksService {
       };
     }
 
-    const blocks = await this.prisma.block.findMany({
-      where,
-    });
+    const blocks = await this.prisma.block.findMany({ where });
 
     return blocks.sort((a, b) => {
       const dateA = (a.properties as Prisma.JsonObject)?.date as string;
@@ -128,10 +123,7 @@ export class BlocksService {
           : { connect: { id: parentId } };
     }
 
-    return this.prisma.block.update({
-      where: { id },
-      data,
-    });
+    return this.prisma.block.update({ where: { id }, data });
   }
 
   async findOne(id: string) {
@@ -154,9 +146,7 @@ export class BlocksService {
     return this.prisma.block.findMany({
       where: {
         deletedAt: null,
-        schedule: {
-          isNot: null,
-        },
+        schedule: { isNot: null },
       },
       include: { schedule: true },
     });
@@ -170,6 +160,21 @@ export class BlocksService {
     return this.prisma.block.update({
       where: { id },
       data: { deletedAt: new Date() },
+    });
+  }
+
+  async addTag(blockId: string, tagId: string) {
+    const block = await this.prisma.block.findUnique({ where: { id: blockId } });
+    if (!block) throw new NotFoundException(`Block ${blockId} not found`);
+
+    return this.prisma.blockTag.create({
+      data: { blockId, tagId },
+    });
+  }
+
+  async removeTag(blockId: string, tagId: string) {
+    return this.prisma.blockTag.delete({
+      where: { blockId_tagId: { blockId, tagId } },
     });
   }
 }

@@ -21,6 +21,7 @@ import { ProjectsModule } from './projects/projects.module';
 import { SocialProfilesModule } from './social-profiles/social-profiles.module';
 import { PromptsModule } from './prompts/prompts.module';
 import { UsageModule } from './usage/usage.module';
+import { TagsModule } from './tags/tags.module';
 import { ScheduleModule as NestScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
@@ -54,6 +55,7 @@ import { APP_GUARD } from '@nestjs/core';
     SocialProfilesModule,
     PromptsModule,
     UsageModule,
+    TagsModule,
   ],
   controllers: [AppController],
   providers: [
