@@ -18,7 +18,8 @@
   },
   "pnpm": {
     "overrides": {
-      "multer": "^2.0.0"
+      "multer": "^2.0.0",
+      "mobile>@types/react": "~18.2.45"
     }
   },
   "devDependencies": {
