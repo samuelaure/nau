@@ -604,6 +604,12 @@ importers:
       '@react-native-community/datetimepicker':
         specifier: 7.7.0
         version: 7.7.0
+      '@react-native/assets-registry':
+        specifier: 0.73.1
+        version: 0.73.1
+      babel-preset-fbjs:
+        specifier: ^3.4.0
+        version: 3.4.0(@babel/core@7.29.0)
       expo:
         specifier: ~50.0.6
         version: 50.0.21(@babel/core@7.29.0)(@react-native/babel-preset@0.73.21(@babel/core@7.29.0)(@babel/preset-env@7.29.2(@babel/core@7.29.0)))(react-native@0.73.6(@babel/core@7.29.0)(@babel/preset-env@7.29.2(@babel/core@7.29.0))(react@18.2.0))(react@18.2.0)

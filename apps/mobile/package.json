@@ -39,6 +39,8 @@
   },
   "dependencies": {
     "@react-native-community/datetimepicker": "7.7.0",
+    "@react-native/assets-registry": "0.73.1",
+    "babel-preset-fbjs": "^3.4.0",
     "expo": "~50.0.6",
     "expo-asset": "~9.0.2",
     "expo-av": "~13.10.6",
