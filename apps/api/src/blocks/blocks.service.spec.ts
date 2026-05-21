@@ -23,6 +23,8 @@ describe('BlocksService', () => {
     deletedAt: null,
     source: null,
     sourceRef: null,
+    workspaceId: null,
+    userId: null,
   };
 
   beforeEach(async () => {
@@ -63,6 +65,7 @@ describe('BlocksService', () => {
         data: {
           type: 'note',
           properties: { text: 'New note', sortOrder: 1 },
+          userId: null,
         },
       });
       expect(result.properties).toEqual({ text: 'New note', sortOrder: 1 });
@@ -93,6 +96,7 @@ describe('BlocksService', () => {
         data: {
           type: 'note',
           properties: { text: 'New note', sortOrder: 6 },
+          userId: null,
         },
       });
       expect(result.properties).toEqual({ text: 'New note', sortOrder: 6 });
