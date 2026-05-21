@@ -75,6 +75,8 @@ model Workspace {
   brands       Brand[]
   projects     Project[]
   inviteTokens InviteToken[]
+  tags         Tag[]
+  blocks       Block[]
 }
 
 model WorkspaceMember {
@@ -221,27 +223,35 @@ model Prompt {
 // ── Second Brain ──────────────────────────────────────────────────────────────
 
 model Block {
-  id         String     @id @default(cuid())
-  type       String
-  properties Json       @default("{}")
+  id          String   @id @default(cuid())
+  type        String
+  properties  Json     @default("{}")
 
-  parentId   String?
-  parent     Block?     @relation("BlockChildren", fields: [parentId], references: [id], onDelete: Cascade)
-  children   Block[]    @relation("BlockChildren")
+  workspaceId String?
+  userId      String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  parentId    String?
+  parent      Block?     @relation("BlockChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children    Block[]    @relation("BlockChildren")
 
   relationsFrom Relation[] @relation("FromBlock")
   relationsTo   Relation[] @relation("ToBlock")
 
-  schedule   Schedule?
-  events     Event[]
+  schedule    Schedule?
+  events      Event[]
+  tags        BlockTag[]
 
-  uuid       String   @unique @default(uuid())
-  updatedAt  DateTime @updatedAt
-  createdAt  DateTime @default(now())
-  deletedAt  DateTime?
+  uuid        String   @unique @default(uuid())
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  deletedAt   DateTime?
 
-  source     String?
-  sourceRef  String?
+  source      String?
+  sourceRef   String?
+
+  @@index([workspaceId])
+  @@index([userId])
 }
 
 model Relation {
@@ -284,9 +294,41 @@ model Event {
 
 model SyncCursor {
   id           String   @id @default(cuid())
-  userId       String   @unique
+  userId       String
+  workspaceId  String
   lastSyncedAt DateTime
   updatedAt    DateTime @updatedAt
+
+  @@unique([userId, workspaceId])
+}
+
+// ── Tags ──────────────────────────────────────────────────────────────────────
+
+model Tag {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  color       String?
+  parentId    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  parent      Tag?       @relation("TagChildren", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Tag[]      @relation("TagChildren")
+  blocks      BlockTag[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+}
+
+model BlockTag {
+  blockId String
+  tagId   String
+  block   Block  @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  tag     Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([blockId, tagId])
 }
 
 
