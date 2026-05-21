@@ -15,6 +15,7 @@
     "clean": "expo-cli cache:clear && rimraf node_modules",
     "build:local": "npm run prebuild && cd android && gradlew assembleRelease",
     "build:preview": "eas build -p android --profile preview",
+    "postinstall": "node scripts/patch-expo-modules.js",
     "test": "jest --passWithNoTests",
     "test:ci": "jest --coverage --ci --passWithNoTests"
   },

@@ -12,7 +12,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#3b0764"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.nau.ig"
@@ -42,6 +44,11 @@
           }
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "3700daab-1bec-4946-8412-a18758f1435d"
+      }
+    }
   }
 }
