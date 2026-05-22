@@ -587,9 +587,13 @@ const handleTranscribeBatch = async (
 };
 
 // Generates ProfileSynthesis + source concepts for the first time after a profile's first scrape.
-// No-ops if synthesis already exists — subsequent regenerations are manual only.
+// No-ops if a synthesis SourceConcept already exists for this profile (guards against re-runs).
+// Intentionally does NOT check ProfileSynthesis — old profiles have ProfileSynthesis but no
+// source concepts because the intelligence endpoint didn't exist when they were first scraped.
 const triggerFirstProfileSynthesis = async (socialProfileId: string): Promise<void> => {
-  const existing = await prisma.profileSynthesis.findUnique({ where: { socialProfileId } });
+  const existing = await prisma.sourceConcept.findFirst({
+    where: { sourceType: 'synthesis', sources: { some: { socialProfileId, postId: null } } },
+  });
   if (existing) return;
 
   const authSecret = config.authSecret;
