@@ -205,7 +205,9 @@ Each "content" is a paragraph (30–60 words) describing the concept clearly eno
     return created
   }
 
-  // Returns pending concepts that are within the brand's freshness window, in random order.
+  // Returns pending concepts using tiered exhaustion: Tier 1 (synthesis) → Tier 2 (profile-level)
+  // → Tier 3 (post-level). Within each tier selection is random. A tier must be fully consumed
+  // before the next tier is exposed.
   async listPending(brandId: string) {
     const brand = await this.prisma.brand.findUnique({
       where: { id: brandId },
@@ -218,13 +220,44 @@ Each "content" is a paragraph (30–60 words) describing the concept clearly eno
     if (unit === 'WEEKS') cutoff.setDate(cutoff.getDate() - period * 7)
     else cutoff.setMonth(cutoff.getMonth() - period)
 
-    return this.prisma.$queryRaw<Array<{ id: string; brandId: string; content: string; sourceType: string; status: string; createdAt: Date; consumedAt: Date | null }>>`
+    type Row = { id: string; brandId: string; content: string; sourceType: string; status: string; createdAt: Date; consumedAt: Date | null }
+
+    // Tier 1: Profile syntheses
+    const tier1 = await this.prisma.$queryRaw<Row[]>`
       SELECT id, "brandId", content, "sourceType", status, "createdAt", "consumedAt"
       FROM "SourceConcept"
       WHERE "brandId" = ${brandId}
         AND status = 'pending'
+        AND "sourceType" = 'synthesis'
         AND "createdAt" >= ${cutoff}
-      ORDER BY CASE WHEN "sourceType" = 'synthesis' THEN 0 ELSE 1 END, RANDOM()
+      ORDER BY RANDOM()
+    `
+    if (tier1.length > 0) return tier1
+
+    // Tier 2: Profile-level source concepts (linked to a profile, not a post)
+    const tier2 = await this.prisma.$queryRaw<Row[]>`
+      SELECT sc.id, sc."brandId", sc.content, sc."sourceType", sc.status, sc."createdAt", sc."consumedAt"
+      FROM "SourceConcept" sc
+      JOIN "SourceConceptSource" scs ON scs."sourceConceptId" = sc.id
+      WHERE sc."brandId" = ${brandId}
+        AND sc.status = 'pending'
+        AND sc."createdAt" >= ${cutoff}
+        AND scs."socialProfileId" IS NOT NULL
+        AND scs."postId" IS NULL
+      ORDER BY RANDOM()
+    `
+    if (tier2.length > 0) return tier2
+
+    // Tier 3: Post-level source concepts
+    return this.prisma.$queryRaw<Row[]>`
+      SELECT sc.id, sc."brandId", sc.content, sc."sourceType", sc.status, sc."createdAt", sc."consumedAt"
+      FROM "SourceConcept" sc
+      JOIN "SourceConceptSource" scs ON scs."sourceConceptId" = sc.id
+      WHERE sc."brandId" = ${brandId}
+        AND sc.status = 'pending'
+        AND sc."createdAt" >= ${cutoff}
+        AND scs."postId" IS NOT NULL
+      ORDER BY RANDOM()
     `
   }
 
@@ -434,7 +467,7 @@ Return JSON: { "sourceConcepts": ["...", "..."] }`,
     const token = await signServiceToken({ secret: authSecret, iss: 'nauthenticity', aud: 'flownau' })
 
     await axios.post(
-      `${flownauUrl}/api/v1/_service/ideation`,
+      `${flownauUrl}/api/v1/service/ideation`,
       { brandId, topic: content, sourceRef: conceptId },
       { headers: { Authorization: `Bearer ${token}` }, timeout: 120_000 },
     )
