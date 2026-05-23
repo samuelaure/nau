@@ -45,9 +45,15 @@ export class TriageService {
     sourceBlockId?: string,
     brandId?: string | null,
     workspaceId?: string,
+    journalOnly?: boolean,
   ) {
 
     try {
+      // ── Journal-only fast path ──────────────────────────────────────────────
+      if (journalOnly) {
+        return await this.processJournalOnly(text, sourceBlockId);
+      }
+
       // 1. Fetch context — projects + brand DNA
       const recentBlocks = await this.blocksService.findAll({});
 
@@ -248,6 +254,61 @@ OUTPUT: Return valid JSON matching the schema.`,
     }
 
     return createdBlocks;
+  }
+
+  /**
+   * Journal-only fast path. Extracts a reflective journal entry from raw text
+   * using a simplified LLM prompt, then saves it as a journal_entry block.
+   * No brand context. No content_idea segments. No flownau dispatch.
+   */
+  private async processJournalOnly(text: string, sourceBlockId?: string) {
+    const JournalOnlySchema = z.object({
+      journalEntry: z.string().describe('A reflective, first-person journal entry distilled from the raw voice capture. Preserve the personal tone and emotional context.'),
+    });
+
+    let journalText = text; // fallback: raw text as-is
+
+    try {
+      const { client: llm, model } = getClientForFeature('triage');
+      const result = await llm.parseCompletion({
+        model,
+        temperature: 0.2,
+        schema: JournalOnlySchema as any,
+        schemaName: 'JournalOnlyEntry',
+        messages: [
+          {
+            role: 'system',
+            content: `You receive a raw voice transcription from a personal voice capture. 
+Your ONLY task: distill it into a clear, reflective, first-person journal entry. 
+Preserve the personal tone, thoughts, and emotional context. 
+Remove filler words and repetition but keep the full meaning.
+Do NOT generate tasks, content ideas, or any structured output — only a journal entry paragraph.
+Write in the same language as the input.`,
+          },
+          { role: 'user', content: text },
+        ],
+      });
+      journalText = (result.data as any)?.journalEntry ?? text;
+    } catch (err) {
+      this.logger.error('LLM failed for journal-only path, using raw text', err);
+    }
+
+    const journalBlock = await this.blocksService.create({
+      type: 'journal_entry',
+      properties: {
+        summary: journalText,
+        date: new Date().toISOString(),
+        sourceBlockId,
+        source: 'zazu_voicenote',
+      },
+    });
+
+    return {
+      success: true,
+      summary: 'Entrada de diario guardada.',
+      blocks: [journalBlock],
+      rawResult: { segments: [], journalSummary: journalText },
+    };
   }
 
   /**

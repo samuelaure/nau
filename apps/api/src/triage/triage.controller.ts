@@ -8,6 +8,7 @@ export class TriageDto {
   sourceBlockId?: string;
   brandId?: string | null;
   workspaceId?: string;
+  journalOnly?: boolean;
 }
 
 @UseGuards(ServiceAuthGuard)
@@ -23,6 +24,7 @@ export class TriageController {
       body.sourceBlockId,
       body.brandId,
       body.workspaceId,
+      body.journalOnly,
     );
     return result;
   }

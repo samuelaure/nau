@@ -32,6 +32,7 @@ export type LLMFeature =
   | 'benchmark'            // benchmark comment generation (nauthenticity)
   | 'embedding'            // vector embeddings (nauthenticity)
   | 'transcription'        // audio transcription (zazu-bot)
+  | 'voicenote_split'      // journal vs content intent splitting (zazu-bot)
 
 /**
  * Default feature → model registry ID mapping.
@@ -53,6 +54,7 @@ const DEFAULT_FEATURE_MODELS: Record<LLMFeature, string> = {
   benchmark:           'openai/gpt-4o-mini',
   embedding:           'openai/text-embedding-3-small',
   transcription:       'groq/whisper-large-v3-turbo',
+  voicenote_split:     'openai/gpt-4o-mini',
 }
 
 /** Convert a feature name to its env-var override key. */
