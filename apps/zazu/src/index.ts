@@ -29,6 +29,8 @@ import { triageSkill } from './triage-skill';
 import { summarySkill } from './summary-skill';
 import { voicenoteSkill, buildBrandKeyboard, buildWorkspaceKeyboard } from './voicenote-skill';
 import type { Brand, Workspace } from './voicenote-skill';
+import { youtubeDigestSkill } from './youtube-skill';
+skillManager.register(youtubeDigestSkill);
 skillManager.register(voicenoteSkill);
 skillManager.register(triageSkill);
 skillManager.register(summarySkill);

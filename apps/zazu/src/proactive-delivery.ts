@@ -90,6 +90,79 @@ export class ProactiveDeliverySystem {
       }
     });
 
+    // ── Make.com callback: YouTube digest result ──────────────────────────────
+    //
+    // Called by Make.com after it finishes processing a YouTube video.
+    // Payload shape:
+    //   Success: { telegramId, youtubeUrl, success: true,  output: <any JSON> }
+    //   Failure: { telegramId, youtubeUrl, success: false, error?: string }
+    //
+    // Auth: standard service JWT via requireServiceAuth (x-service-key / Authorization header).
+    // NOTE: Make.com must include the Authorization header with a valid service JWT.
+
+    this.app.post('/api/internal/make-callback', requireServiceAuth, async (req, res) => {
+      const body = req.body as {
+        telegramId?: string;
+        youtubeUrl?: string;
+        success?: boolean;
+        output?: unknown;
+        error?: string;
+      };
+
+      const { telegramId, youtubeUrl, success, output, error } = body;
+
+      if (!telegramId) return res.status(400).json({ error: 'Missing telegramId' });
+
+      logger.info({ telegramId, youtubeUrl, success }, '[MakeCallback] Received YouTube digest callback');
+
+      try {
+        const user = await prisma.user.findFirst({
+          where: { telegramId: BigInt(telegramId) },
+          select: { id: true },
+        });
+
+        if (!user) {
+          logger.warn({ telegramId }, '[MakeCallback] No Zazŭ user found for telegramId');
+          return res.status(404).json({ error: 'User not found' });
+        }
+
+        // ── Format the message ──────────────────────────────────────────────
+        let messageText: string;
+
+        if (success && output !== undefined && output !== null) {
+          messageText = formatYouTubeDigestOutput(youtubeUrl ?? '', output);
+        } else {
+          const reason = error ?? 'no_transcription';
+          messageText =
+            `❌ *No se pudo digerir el video.*\n\n` +
+            (youtubeUrl ? `🔗 ${youtubeUrl}\n\n` : '') +
+            `_Motivo: ${reason}_`;
+        }
+
+        // ── Send Telegram message ───────────────────────────────────────────
+        await this.bot.telegram.sendMessage(telegramId, messageText, { parse_mode: 'Markdown' });
+
+        // ── Persist to message history ──────────────────────────────────────
+        await prisma.message.create({
+          data: {
+            userId: user.id,
+            role: Role.ASSISTANT,
+            content: messageText,
+            metadata: {
+              source: 'make_youtube_callback',
+              youtubeUrl: youtubeUrl ?? null,
+              success: success ?? false,
+            },
+          },
+        });
+
+        return res.status(200).json({ ok: true });
+      } catch (err: any) {
+        logger.error({ err, telegramId }, '[MakeCallback] Failed to process YouTube callback');
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
     // ── Admin: direct message ─────────────────────────────────────────────────
 
     this.app.post('/api/internal/admin/message', requireServiceAuth, async (req, res) => {
@@ -459,3 +532,61 @@ export class ProactiveDeliverySystem {
     this.flushQueue();
   }
 }
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Formats the Make.com YouTube digest output into a Telegram-friendly Markdown string.
+ *
+ * Tries to render well-known fields:
+ *   - title       → bold header
+ *   - summary     → paragraph
+ *   - keyPoints   → bullet list
+ *
+ * Falls back to a fenced JSON block for any other output shape, so the user
+ * always receives something readable regardless of what Make.com returns.
+ */
+function formatYouTubeDigestOutput(youtubeUrl: string, output: unknown): string {
+  const lines: string[] = [];
+  lines.push(`🎬 *Resumen del video*`);
+  if (youtubeUrl) lines.push(`🔗 ${youtubeUrl}`);
+  lines.push('');
+
+  if (output && typeof output === 'object' && !Array.isArray(output)) {
+    const o = output as Record<string, unknown>;
+
+    if (typeof o['title'] === 'string') {
+      lines.push(`*${o['title']}*`);
+      lines.push('');
+    }
+
+    if (typeof o['summary'] === 'string') {
+      lines.push(o['summary']);
+      lines.push('');
+    }
+
+    const keyPoints = o['keyPoints'] ?? o['key_points'] ?? o['points'];
+    if (Array.isArray(keyPoints) && keyPoints.length > 0) {
+      lines.push('*Puntos clave:*');
+      for (const point of keyPoints) {
+        lines.push(`• ${String(point)}`);
+      }
+      lines.push('');
+    }
+
+    // If none of the known fields were present, fall back to JSON
+    if (!o['title'] && !o['summary'] && !keyPoints) {
+      lines.push('```');
+      lines.push(JSON.stringify(output, null, 2));
+      lines.push('```');
+    }
+  } else {
+    // Scalar or array output — display as-is
+    lines.push('```');
+    lines.push(JSON.stringify(output, null, 2));
+    lines.push('```');
+  }
+
+  return lines.join('\n');
+}
+
