@@ -1,46 +1,25 @@
 import { ZazuSkill, ZazuContext } from '@zazu/skills-core'
 import { logger } from './lib/logger'
-import { buildServiceHeaders } from './lib/service-auth'
 
-const NAU_API_URL = process.env.NAU_API_URL ?? 'http://api:3000'
 const MAKE_YOUTUBE_WEBHOOK_URL = process.env.MAKE_YOUTUBE_WEBHOOK_URL ?? ''
 
-// ── Feature gate ──────────────────────────────────────────────────────────────
-
-const HARDCODED_ALLOWED_EMAIL = 'andiclinaz@gmail.com'
 
 /**
  * Checks whether the user is allowed to use the YouTube digest feature.
  *
- * Permission ladder (easy to promote when ready):
- *  1. User has `youtube_digest` feature row in DB (UserFeature table) — covers future rollout to all users.
- *  2. User's linked naŭ account email is the hardcoded allowlist entry — current one-user phase.
+ * Access is controlled via the `UserFeature` table (featureId = 'youtube_digest').
+ * The `Feature` + `UserFeature` rows are seeded directly in the production DB.
  *
- * To promote to "all users": flip the `youtube_digest` Feature seed to be granted globally,
- * or remove this gate entirely from `canHandle`.
+ * Promotion ladder:
+ *  - Current: single user has the UserFeature row seeded manually
+ *  - Next:    seed UserFeature for more users, or expose an admin UI
+ *  - Future:  remove this gate entirely and let all users access it
  */
-async function hasYouTubeDigestAccess(ctx: ZazuContext): Promise<boolean> {
-  // Phase 1: DB feature flag (UserFeature table)
+function hasYouTubeDigestAccess(ctx: ZazuContext): boolean {
   const activeFeatureIds: string[] = ctx.dbUser?.features?.map((f: any) => f.featureId) ?? []
-  if (activeFeatureIds.includes('youtube_digest')) return true
-
-  // Phase 2: Hardcoded email check via naŭ API
-  const nauUserId = ctx.dbUser?.nauUserId
-  if (!nauUserId) return false
-
-  try {
-    const headers = await buildServiceHeaders('9nau-api')
-    const res = await fetch(`${NAU_API_URL}/auth/lookup?email=${encodeURIComponent(HARDCODED_ALLOWED_EMAIL)}`, {
-      headers,
-    })
-    if (!res.ok) return false
-    const user = await res.json() as { id?: string }
-    return user?.id === nauUserId
-  } catch (err) {
-    logger.warn({ err }, '[YouTubeSkill] Failed to check email against naŭ API')
-    return false
-  }
+  return activeFeatureIds.includes('youtube_digest')
 }
+
 
 // ── YouTube URL detection ──────────────────────────────────────────────────────
 
