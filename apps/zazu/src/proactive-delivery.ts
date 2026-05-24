@@ -142,18 +142,21 @@ export class ProactiveDeliverySystem {
         // ── Format the message ──────────────────────────────────────────────
         let messageText: string;
 
-        if (success && output !== undefined && output !== null) {
+        const isSuccess = success && output !== undefined && output !== null;
+        if (isSuccess) {
           messageText = formatYouTubeDigestOutput(youtubeUrl ?? '', output);
         } else {
           const reason = error ?? 'no_transcription';
+          // Plain text — no Markdown to avoid entity errors from underscores in reason codes
           messageText =
-            `❌ *No se pudo digerir el video.*\n\n` +
+            `❌ No se pudo digerir el video.\n\n` +
             (youtubeUrl ? `🔗 ${youtubeUrl}\n\n` : '') +
-            `_Motivo: ${reason}_`;
+            `Motivo: ${reason}`;
         }
 
         // ── Send Telegram message ───────────────────────────────────────────
-        await this.bot.telegram.sendMessage(telegramId, messageText, { parse_mode: 'Markdown' });
+        const sendOptions = isSuccess ? { parse_mode: 'Markdown' as const } : {};
+        await this.bot.telegram.sendMessage(telegramId, messageText, sendOptions);
 
         // ── Persist to message history ──────────────────────────────────────
         await prisma.message.create({
