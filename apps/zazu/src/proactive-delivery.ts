@@ -568,7 +568,9 @@ function formatYouTubeDigestOutput(youtubeUrl: string, output: unknown): string 
   if (youtubeUrl) lines.push(`🔗 ${youtubeUrl}`);
   lines.push('');
 
-  if (output && typeof output === 'object' && !Array.isArray(output)) {
+  if (typeof output === 'string') {
+    lines.push(output);
+  } else if (output && typeof output === 'object' && !Array.isArray(output)) {
     const o = output as Record<string, unknown>;
 
     if (typeof o['title'] === 'string') {
