@@ -131,17 +131,19 @@ jobs:
       - uses: appleboy/ssh-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ZAZU_ENV_FILE: ${{ secrets.ZAZU_ENV_FILE }}
         with:
           host: ${{ secrets.DEPLOY_SSH_HOST }}
           username: root
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          envs: GITHUB_TOKEN
+          envs: GITHUB_TOKEN,ZAZU_ENV_FILE
           script: |
             echo "$GITHUB_TOKEN" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            echo "${{ secrets.ZAZU_ENV_FILE }}" > ~/apps/zazu/.env
+            printf '%s' "$ZAZU_ENV_FILE" > ~/apps/zazu/.env
             cd ~/apps/zazu
             docker compose pull
             docker compose up -d zazu-postgres
             docker compose run --rm --no-deps zazu npx prisma migrate deploy
             docker compose up -d
             docker image prune -f || true
+
