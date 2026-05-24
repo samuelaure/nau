@@ -97,10 +97,23 @@ export class ProactiveDeliverySystem {
     //   Success: { telegramId, youtubeUrl, success: true,  output: <any JSON> }
     //   Failure: { telegramId, youtubeUrl, success: false, error?: string }
     //
-    // Auth: standard service JWT via requireServiceAuth (x-service-key / Authorization header).
-    // NOTE: Make.com must include the Authorization header with a valid service JWT.
+    // Auth: static secret via `x-callback-secret` header.
+    // Make.com HTTP Request module sends this header with the value of
+    // MAKE_CALLBACK_SECRET env var. This avoids the JWT rotation problem.
 
-    this.app.post('/api/internal/make-callback', requireServiceAuth, async (req, res) => {
+    this.app.post('/api/internal/make-callback', async (req, res) => {
+      const incomingSecret = req.headers['x-callback-secret'];
+      const expectedSecret = process.env['MAKE_CALLBACK_SECRET'];
+
+      if (!expectedSecret) {
+        logger.error('[MakeCallback] MAKE_CALLBACK_SECRET is not configured');
+        return res.status(503).json({ error: 'Callback secret not configured' });
+      }
+      if (!incomingSecret || incomingSecret !== expectedSecret) {
+        logger.warn({ incomingSecret }, '[MakeCallback] Invalid or missing x-callback-secret');
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
       const body = req.body as {
         telegramId?: string;
         youtubeUrl?: string;
