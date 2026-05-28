@@ -146,6 +146,62 @@ export class ProactiveDeliverySystem {
       }
     });
 
+    // ── nau-web: contact form (9nau.com → admin Telegram) ────────────────────
+    //
+    // Called by the nau-web Express server when a visitor submits the contact
+    // form on 9nau.com. Auth uses a static shared secret in `x-nau-web-secret`.
+    //
+    // Payload shape:
+    //   { name: string, email: string, service?: string, message: string }
+
+    this.app.post('/api/public/nau-web/contact', async (req, res) => {
+      const incomingSecret = req.headers['x-nau-web-secret'];
+      const expectedSecret = process.env['NAU_WEB_WEBHOOK_SECRET'];
+
+      if (!expectedSecret) {
+        logger.error('[NauWebContact] NAU_WEB_WEBHOOK_SECRET is not configured');
+        return res.status(503).json({ error: 'Contact endpoint not configured' });
+      }
+      if (!incomingSecret || incomingSecret !== expectedSecret) {
+        logger.warn({ incomingSecret: '***' }, '[NauWebContact] Invalid or missing x-nau-web-secret');
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      if (!ADMIN_TELEGRAM_ID) {
+        logger.error('[NauWebContact] ADMIN_TELEGRAM_ID is not configured');
+        return res.status(503).json({ error: 'Admin not configured' });
+      }
+
+      const { name, email, service, message } = req.body as {
+        name?: string;
+        email?: string;
+        service?: string;
+        message?: string;
+      };
+
+      if (!name || !email || !message) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+
+      logger.info({ name, email, service }, '[NauWebContact] Received contact form submission');
+
+      const telegramMessage =
+        `📩 *Nuevo contacto — 9nau.com*\n\n` +
+        `👤 *Nombre:* ${name.trim()}\n` +
+        `📧 *Email:* ${email.trim()}\n` +
+        (service ? `🛠 *Servicio:* ${service}\n` : '') +
+        `\n💬 *Mensaje:*\n${message.trim()}`;
+
+      try {
+        await this.bot.telegram.sendMessage(ADMIN_TELEGRAM_ID, telegramMessage, { parse_mode: 'Markdown' });
+        return res.status(200).json({ ok: true });
+      } catch (err: any) {
+        logger.error({ err }, '[NauWebContact] Failed to send Telegram message');
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+
+
     // ── Make.com callback: YouTube digest result ──────────────────────────────
     //
     // Called by Make.com after it finishes processing a YouTube video.
