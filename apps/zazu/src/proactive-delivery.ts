@@ -90,6 +90,62 @@ export class ProactiveDeliverySystem {
       }
     });
 
+    // ── nispiras: app feedback (nispiras Android → admin Telegram) ─────────────
+    //
+    // Called by the nispiras Android app when a user submits a suggestion or
+    // feedback. Auth uses a static shared secret in `x-nispiras-secret`.
+    //
+    // Payload shape:
+    //   { message: string, appVersion?: string, device?: string }
+
+    this.app.post('/api/public/nispiras/feedback', async (req, res) => {
+      const incomingSecret = req.headers['x-nispiras-secret'];
+      const expectedSecret = process.env['NISPIRAS_WEBHOOK_SECRET'];
+
+      if (!expectedSecret) {
+        logger.error('[NispirasFeedback] NISPIRAS_WEBHOOK_SECRET is not configured');
+        return res.status(503).json({ error: 'Feedback endpoint not configured' });
+      }
+      if (!incomingSecret || incomingSecret !== expectedSecret) {
+        logger.warn({ incomingSecret: '***' }, '[NispirasFeedback] Invalid or missing x-nispiras-secret');
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      if (!ADMIN_TELEGRAM_ID) {
+        logger.error('[NispirasFeedback] ADMIN_TELEGRAM_ID is not configured');
+        return res.status(503).json({ error: 'Admin not configured' });
+      }
+
+      const { message, appVersion, device } = req.body as {
+        message?: string;
+        appVersion?: string;
+        device?: string;
+      };
+
+      if (!message || message.trim().length === 0) {
+        return res.status(400).json({ error: 'Missing message' });
+      }
+
+      logger.info({ appVersion, device }, '[NispirasFeedback] Received feedback');
+
+      const metaLine = [
+        appVersion ? `v${appVersion}` : null,
+        device ?? null,
+      ].filter(Boolean).join(' · ');
+
+      const telegramMessage =
+        `💬 *nispiras feedback*\n\n` +
+        `${message.trim()}\n\n` +
+        (metaLine ? `_${metaLine}_` : '');
+
+      try {
+        await this.bot.telegram.sendMessage(ADMIN_TELEGRAM_ID, telegramMessage, { parse_mode: 'Markdown' });
+        return res.status(200).json({ ok: true });
+      } catch (err: any) {
+        logger.error({ err }, '[NispirasFeedback] Failed to send Telegram message');
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
     // ── Make.com callback: YouTube digest result ──────────────────────────────
     //
     // Called by Make.com after it finishes processing a YouTube video.
