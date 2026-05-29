@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { toast } from 'sonner'
 import {
   Loader2,
@@ -18,9 +18,12 @@ import {
   VolumeX,
   ToggleLeft,
   ToggleRight,
+  Sliders,
 } from 'lucide-react'
 import { cn } from '@/modules/shared/utils'
 import { PromptHistoryPanel } from './PromptHistoryPanel'
+import { ReelSceneBuilder } from './ReelSceneBuilder'
+import type { SceneDef } from '@/types/template-scenes'
 
 const FORMAT_ICON: Record<string, React.ElementType> = {
   reel: Film,
@@ -68,6 +71,7 @@ type Template = {
   previewThumbnailUrl?: string | null
   slotSchema?: SlotDef[] | null
   contentSchema?: Record<string, unknown> | null
+  scenes?: SceneDef[] | null
   brandConfigs?: Array<{
     id: string
     enabled: boolean
@@ -315,6 +319,15 @@ function TemplateModal({
   const FormatIcon = FORMAT_ICON[template.format] ?? Film
   const slotSchema = template.slotSchema as SlotDef[] | null
   const contentSchema = template.contentSchema as Record<string, unknown> | null
+  const scenes = (template.scenes ?? null) as SceneDef[] | null
+  const isReelFormat = template.format === 'reel' || template.format === 'trial_reel'
+  const isDynamicReel = isReelFormat && scenes && scenes.length > 0
+
+  // Tab: 'settings' always shown; 'builder' shown for block-based reels
+  const [activeTab, setActiveTab] = useState<'settings' | 'builder'>(
+    isDynamicReel ? 'builder' : 'settings',
+  )
+  const [savingScenes, setSavingScenes] = useState(false)
 
   const durationLabel = (() => {
     const dur = contentSchema?.targetDurationSeconds as string | undefined
@@ -441,6 +454,24 @@ function TemplateModal({
     saveCustomizations(next)
   }
 
+  const saveScenes = async (newScenes: SceneDef[]) => {
+    setSavingScenes(true)
+    try {
+      const res = await fetch(`/api/templates/${template.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scenes: newScenes }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success('Template saved')
+      onRefresh()
+    } catch {
+      toast.error('Failed to save template')
+    } finally {
+      setSavingScenes(false)
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
@@ -479,7 +510,7 @@ function TemplateModal({
         </div>
 
         {/* Right: info + settings */}
-        <div className="flex-1 min-w-0 overflow-y-auto">
+        <div className="flex-1 min-w-0 overflow-y-auto flex flex-col">
           {/* Header */}
           <div className="flex items-start justify-between gap-3 p-5 border-b border-gray-800 sticky top-0 bg-gray-950 z-10">
             <div className="flex items-center gap-2.5 min-w-0">
@@ -569,164 +600,198 @@ function TemplateModal({
             </div>
           </div>
 
-          <div className="p-5 space-y-5">
-            {/* Description */}
-            {template.description && (
-              <p className="text-sm text-text-secondary leading-relaxed">{template.description}</p>
-            )}
-
-            {/* Stats */}
-            <div className="flex flex-wrap gap-2">
-              {durationLabel && (
-                <div className="flex items-center gap-1.5 text-xs text-text-secondary bg-gray-900 rounded px-2.5 py-1.5 border border-gray-800">
-                  <Clock size={11} />
-                  {durationLabel}
-                </div>
-              )}
-              {sections && sections.length > 0 && (
-                <div className="flex items-center gap-1.5 text-xs text-text-secondary bg-gray-900 rounded px-2.5 py-1.5 border border-gray-800">
-                  <Layers size={11} />
-                  {sections.length} {slotSchema ? 'text slot' : 'section'}
-                  {sections.length !== 1 ? 's' : ''}
-                </div>
-              )}
-            </div>
-
-            {/* Slot / section overrides — editable for both reels (slotSchema) and head talks (contentSchema sections) */}
-            {((slotSchema && slotSchema.length > 0) || (htSections && htSections.length > 0)) && (
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">
-                  {slotSchema ? 'What the AI fills in' : 'Script sections'}
-                </p>
-                <p className="text-[11px] text-gray-600">
-                  Click a section to customize its instructions for this brand.
-                </p>
-                <div className="space-y-2">
-                  {(slotSchema ?? htSections!).map((s) => (
-                    <SlotOverrideRow
-                      key={s.key}
-                      slot={s}
-                      override={slotOverrides[s.key]}
-                      onChange={handleSlotChange}
-                      onRestore={handleSlotRestore}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Caption customization — available for all templates */}
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">
-                Caption
-              </p>
-              <p className="text-[11px] text-gray-600">
-                Customize how the AI writes the Instagram caption for this brand.
-              </p>
-              <SlotOverrideRow
-                slot={CAPTION_SLOT}
-                override={slotOverrides['caption']}
-                onChange={handleSlotChange}
-                onRestore={handleSlotRestore}
-              />
-            </div>
-
-            {/* Custom prompt */}
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">
-                Custom prompt
-              </p>
-              <p className="text-[11px] text-gray-600">
-                Extra instructions the AI must follow when drafting for this brand with this
-                template. Highest priority — overrides everything else.
-              </p>
-              <textarea
-                value={customPrompt}
-                onChange={(e) => setCustomPrompt(e.target.value)}
-                placeholder={
-                  "How should the AI write when using this template for this brand?\n\n• Hook rule: e.g. 'Always open with a bold, specific claim — no questions'\n• Format constraint: e.g. 'Keep sentences under 12 words; no bullet lists'\n• Tone note: e.g. 'Dry and direct — no hype, no exclamation marks'\n• Brand-specific detail: e.g. 'Reference our founding year 2019 when relevant'\n• Hard restriction: e.g. 'Never mention competitors by name'"
-                }
-                className="w-full text-sm bg-gray-900 border border-gray-800 text-white rounded-lg px-3 py-2 resize-y min-h-[140px] focus:outline-none focus:border-gray-600 placeholder:text-gray-600 leading-relaxed"
-              />
-              <div className="flex justify-end">
+          {/* Tabs — only shown for block-based reels */}
+          {isDynamicReel && (
+            <div className="flex border-b border-gray-800 px-5">
+              {(['builder', 'settings'] as const).map((tab) => (
                 <button
-                  onClick={() => saveCustomizations(undefined, customPrompt)}
-                  disabled={savingPrompt}
-                  className="text-xs bg-white text-black rounded px-3 py-1.5 hover:bg-zinc-200 disabled:opacity-50 transition-colors"
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-2 -mb-px text-xs font-medium border-b-2 transition-colors capitalize',
+                    activeTab === tab
+                      ? 'border-accent text-white'
+                      : 'border-transparent text-gray-500 hover:text-white',
+                  )}
                 >
-                  {savingPrompt ? 'Saving…' : 'Save prompt'}
+                  {tab === 'builder' ? <Sliders size={11} /> : <Layers size={11} />}
+                  {tab}
                 </button>
-              </div>
-              {config?.id && (
-                <PromptHistoryPanel
-                  entityType="brand_account_template"
-                  entityId={config.id}
-                  field="customPrompt"
-                  onRestore={(content) => setCustomPrompt(content)}
-                />
-              )}
+              ))}
             </div>
+          )}
 
-            {/* Settings */}
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">
-                Settings
-              </p>
-              <div className="flex flex-col gap-2">
-                <label className="flex items-center justify-between bg-gray-900 border border-gray-800 rounded-lg px-3 py-2.5 cursor-pointer">
-                  <div>
-                    <p className="text-sm font-medium">Enabled</p>
-                    <p className="text-xs text-text-secondary mt-0.5">
-                      Include when generating content for this brand
+          {/* Tab content */}
+          <div className="p-5 flex-1 overflow-y-auto">
+            {/* Builder tab — block-based reel */}
+            {activeTab === 'builder' && isDynamicReel && (
+              <ReelSceneBuilder
+                scenes={scenes!}
+                brandId={brandId}
+                onSave={saveScenes}
+                saving={savingScenes}
+              />
+            )}
+
+            {/* Settings tab (or legacy/head_talk defaults) */}
+            {(activeTab === 'settings' || !isDynamicReel) && (
+              <div className="space-y-5">
+                {/* Description */}
+                {template.description && (
+                  <p className="text-sm text-text-secondary leading-relaxed">{template.description}</p>
+                )}
+
+                {/* Stats */}
+                <div className="flex flex-wrap gap-2">
+                  {durationLabel && (
+                    <div className="flex items-center gap-1.5 text-xs text-text-secondary bg-gray-900 rounded px-2.5 py-1.5 border border-gray-800">
+                      <Clock size={11} />
+                      {durationLabel}
+                    </div>
+                  )}
+                  {sections && sections.length > 0 && (
+                    <div className="flex items-center gap-1.5 text-xs text-text-secondary bg-gray-900 rounded px-2.5 py-1.5 border border-gray-800">
+                      <Layers size={11} />
+                      {sections.length} {slotSchema ? 'text slot' : 'section'}
+                      {sections.length !== 1 ? 's' : ''}
+                    </div>
+                  )}
+                </div>
+
+                {/* Slot / section overrides */}
+                {((slotSchema && slotSchema.length > 0) || (htSections && htSections.length > 0)) && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">
+                      {slotSchema ? 'What the AI fills in' : 'Script sections'}
                     </p>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={isEnabled}
-                    disabled={saving}
-                    onChange={(e) => update({ enabled: e.target.checked })}
-                    className="w-4 h-4 accent-accent shrink-0"
-                  />
-                </label>
-                <label className="flex items-center justify-between bg-gray-900 border border-gray-800 rounded-lg px-3 py-2.5 cursor-pointer">
-                  <div>
-                    <p className="text-sm font-medium">Auto-approve draft</p>
-                    <p className="text-xs text-text-secondary mt-0.5">
-                      Automatically approve the generated draft and queue it for rendering
+                    <p className="text-[11px] text-gray-600">
+                      Click a section to customize its instructions for this brand.
                     </p>
+                    <div className="space-y-2">
+                      {(slotSchema ?? htSections!).map((s) => (
+                        <SlotOverrideRow
+                          key={s.key}
+                          slot={s}
+                          override={slotOverrides[s.key]}
+                          onChange={handleSlotChange}
+                          onRestore={handleSlotRestore}
+                        />
+                      ))}
+                    </div>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={autoApproveDraft}
-                    disabled={saving}
-                    onChange={(e) => update({ autoApproveDraft: e.target.checked })}
-                    className="w-4 h-4 accent-accent shrink-0"
+                )}
+
+                {/* Caption customization */}
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">Caption</p>
+                  <p className="text-[11px] text-gray-600">
+                    Customize how the AI writes the Instagram caption for this brand.
+                  </p>
+                  <SlotOverrideRow
+                    slot={CAPTION_SLOT}
+                    override={slotOverrides['caption']}
+                    onChange={handleSlotChange}
+                    onRestore={handleSlotRestore}
                   />
-                </label>
-                <label className="flex items-center justify-between bg-gray-900 border border-gray-800 rounded-lg px-3 py-2.5 cursor-pointer">
-                  <div>
-                    <p className="text-sm font-medium">Auto-approve post</p>
-                    <p className="text-xs text-text-secondary mt-0.5">
-                      Automatically approve the rendered video for publishing when its scheduled
-                      time arrives
-                    </p>
+                </div>
+
+                {/* Custom prompt */}
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">
+                    Custom prompt
+                  </p>
+                  <p className="text-[11px] text-gray-600">
+                    Extra instructions the AI must follow when drafting for this brand with this
+                    template. Highest priority — overrides everything else.
+                  </p>
+                  <textarea
+                    value={customPrompt}
+                    onChange={(e) => setCustomPrompt(e.target.value)}
+                    placeholder={
+                      "How should the AI write when using this template for this brand?\n\n• Hook rule: e.g. 'Always open with a bold, specific claim — no questions'\n• Format constraint: e.g. 'Keep sentences under 12 words; no bullet lists'\n• Tone note: e.g. 'Dry and direct — no hype, no exclamation marks'\n• Brand-specific detail: e.g. 'Reference our founding year 2019 when relevant'\n• Hard restriction: e.g. 'Never mention competitors by name'"
+                    }
+                    className="w-full text-sm bg-gray-900 border border-gray-800 text-white rounded-lg px-3 py-2 resize-y min-h-[140px] focus:outline-none focus:border-gray-600 placeholder:text-gray-600 leading-relaxed"
+                  />
+                  <div className="flex justify-end">
+                    <button
+                      onClick={() => saveCustomizations(undefined, customPrompt)}
+                      disabled={savingPrompt}
+                      className="text-xs bg-white text-black rounded px-3 py-1.5 hover:bg-zinc-200 disabled:opacity-50 transition-colors"
+                    >
+                      {savingPrompt ? 'Saving…' : 'Save prompt'}
+                    </button>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={autoApprovePost}
-                    disabled={saving}
-                    onChange={(e) => update({ autoApprovePost: e.target.checked })}
-                    className="w-4 h-4 accent-accent shrink-0"
-                  />
-                </label>
+                  {config?.id && (
+                    <PromptHistoryPanel
+                      entityType="brand_account_template"
+                      entityId={config.id}
+                      field="customPrompt"
+                      onRestore={(content) => setCustomPrompt(content)}
+                    />
+                  )}
+                </div>
+
+                {/* Settings */}
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">Settings</p>
+                  <div className="flex flex-col gap-2">
+                    <label className="flex items-center justify-between bg-gray-900 border border-gray-800 rounded-lg px-3 py-2.5 cursor-pointer">
+                      <div>
+                        <p className="text-sm font-medium">Enabled</p>
+                        <p className="text-xs text-text-secondary mt-0.5">
+                          Include when generating content for this brand
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={isEnabled}
+                        disabled={saving}
+                        onChange={(e) => update({ enabled: e.target.checked })}
+                        className="w-4 h-4 accent-accent shrink-0"
+                      />
+                    </label>
+                    <label className="flex items-center justify-between bg-gray-900 border border-gray-800 rounded-lg px-3 py-2.5 cursor-pointer">
+                      <div>
+                        <p className="text-sm font-medium">Auto-approve draft</p>
+                        <p className="text-xs text-text-secondary mt-0.5">
+                          Automatically approve the generated draft and queue it for rendering
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={autoApproveDraft}
+                        disabled={saving}
+                        onChange={(e) => update({ autoApproveDraft: e.target.checked })}
+                        className="w-4 h-4 accent-accent shrink-0"
+                      />
+                    </label>
+                    <label className="flex items-center justify-between bg-gray-900 border border-gray-800 rounded-lg px-3 py-2.5 cursor-pointer">
+                      <div>
+                        <p className="text-sm font-medium">Auto-approve post</p>
+                        <p className="text-xs text-text-secondary mt-0.5">
+                          Automatically approve the rendered video for publishing when its scheduled
+                          time arrives
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={autoApprovePost}
+                        disabled={saving}
+                        onChange={(e) => update({ autoApprovePost: e.target.checked })}
+                        className="w-4 h-4 accent-accent shrink-0"
+                      />
+                    </label>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
     </div>
   )
 }
+
 
 // ─── Template card ────────────────────────────────────────────────────────────
 

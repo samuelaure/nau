@@ -11,8 +11,13 @@ import { redisConnection, type RenderJobData } from './render-queue'
 import type { BrandIdentity } from '@/modules/video/remotion/ReelTemplates'
 import { BROLL_REQUIRED_FRAMES, REMOTION_FPS } from '@/modules/video/remotion/ReelTemplates'
 import { shuffle } from '@/modules/video/utils/assets'
+import type { ResolvedSceneDef } from '@/types/template-scenes'
 
+// Legacy slot-based reel IDs
 const SLOT_REEL_IDS = new Set(['ReelT1', 'ReelT2', 'ReelT3', 'ReelT4'])
+// Block-based dynamic reel
+const DYNAMIC_REEL_ID = 'DynamicReel'
+const VIDEO_REEL_IDS = new Set([...SLOT_REEL_IDS, DYNAMIC_REEL_ID])
 
 const CONCURRENCY = parseInt(process.env.RENDER_CONCURRENCY || '1', 10)
 const OUTPUT_DIR = path.join(process.cwd(), 'out')
@@ -46,6 +51,202 @@ function cleanupFile(filePath: string): void {
       `[RenderWorker] Failed to clean up temp file ${filePath}: ${err instanceof Error ? err.message : String(err)}`,
     )
   }
+}
+
+// ── resolveDynamicReelScenes ───────────────────────────────────────────────────
+// For each scene: if backgroundVideoAssetId is set, fetch that exact asset URL.
+// Otherwise, apply the same LRU random selection as the legacy path.
+
+async function resolveDynamicReelScenes(
+  creative: Record<string, unknown> | null,
+  brandId: string,
+  postId: string,
+  renderJobId: string,
+): Promise<ResolvedSceneDef[] | null> {
+  if (!creative?.scenes || !Array.isArray(creative.scenes)) {
+    await prisma.post.update({ where: { id: postId }, data: { status: 'DRAFT_PENDING' } })
+    await prisma.renderJob.update({
+      where: { id: renderJobId },
+      data: { status: 'failed', error: 'No scenes creative — please recompose this post', completedAt: new Date() },
+    })
+    logger.warn({ postId }, '[RenderWorker] DynamicReel: no scenes — reset to DRAFT_PENDING')
+    return null
+  }
+
+  const rawScenes = creative.scenes as ResolvedSceneDef[]
+
+  // Collect IDs of scenes that need random LRU selection (no pinned video)
+  const needsRandom = rawScenes.filter((s) => !s.backgroundVideoAssetId)
+
+  // Pre-fetch random video pool once for all unset scenes
+  let randomVideoPool: Array<{ id: string; url: string; duration: number | null; lastUsedAt: Date | null }> = []
+  if (needsRandom.length > 0) {
+    const allVideos = await prisma.asset.findMany({
+      where: { brandId, type: { in: ['video', 'VID'] } },
+      select: { id: true, url: true, duration: true, lastUsedAt: true },
+      take: 50,
+      orderBy: { lastUsedAt: { sort: 'asc', nulls: 'first' } },
+    })
+    const LRU_WINDOW = Math.min(allVideos.length, 10)
+    randomVideoPool = shuffle(allVideos.slice(0, LRU_WINDOW))
+  }
+
+  let randomPoolIdx = 0
+  const usedVideoIds: string[] = []
+  const resolved: ResolvedSceneDef[] = []
+
+  for (const scene of rawScenes) {
+    if (scene.backgroundVideoAssetId) {
+      // Pinned video — fetch the exact asset
+      const asset = await prisma.asset.findUnique({
+        where: { id: scene.backgroundVideoAssetId },
+        select: { url: true, duration: true },
+      })
+      resolved.push({
+        ...scene,
+        resolvedBackgroundVideoUrl: asset?.url ?? null,
+        resolvedBrollStartFrom: 0,
+        backgroundVideoDurationSecs: asset?.duration ?? scene.backgroundVideoDurationSecs ?? null,
+      })
+    } else {
+      // Random LRU selection
+      const pick = randomVideoPool[randomPoolIdx % Math.max(1, randomVideoPool.length)]
+      randomPoolIdx++
+      if (pick) usedVideoIds.push(pick.id)
+      const assetFrames = pick?.duration ? Math.floor(pick.duration * REMOTION_FPS) : 0
+      const maxStart = Math.max(0, assetFrames - BROLL_REQUIRED_FRAMES)
+      const startFrom = maxStart > 0 ? Math.floor(Math.random() * maxStart) : 0
+      resolved.push({
+        ...scene,
+        resolvedBackgroundVideoUrl: pick?.url ?? null,
+        resolvedBrollStartFrom: startFrom,
+      })
+    }
+  }
+
+  // Stamp used assets for LRU rotation
+  if (usedVideoIds.length > 0) {
+    await prisma.asset.updateMany({
+      where: { id: { in: usedVideoIds } },
+      data: { lastUsedAt: new Date(), usageCount: { increment: 1 } },
+    })
+  }
+
+  logger.info({ postId, sceneCount: resolved.length }, '[RenderWorker] DynamicReel scenes resolved')
+  return resolved
+}
+
+// ── renderReelVideo ────────────────────────────────────────────────────────────
+// Shared bundle + render + R2 upload pipeline used by both slot-based and
+// dynamic reel paths.
+
+async function renderReelVideo({
+  job,
+  postId,
+  brandId,
+  templateId,
+  renderJobId,
+  remotionCompId,
+  inputProps,
+  startTime,
+}: {
+  job: Job<RenderJobData>
+  postId: string
+  brandId: string
+  templateId: string | null
+  renderJobId: string
+  remotionCompId: string
+  inputProps: Record<string, unknown>
+  startTime: number
+}): Promise<void> {
+  ensureOutputDir()
+
+  logger.info('[RenderWorker] Bundling Remotion composition...')
+  const bundleLocation = await bundle(ENTRY_POINT, () => {}, {
+    webpackOverride: (config) => ({
+      ...config,
+      resolve: {
+        ...config.resolve,
+        alias: { ...config.resolve?.alias, '@': path.resolve(process.cwd(), 'src') },
+      },
+    }),
+  })
+  await job.updateProgress(35)
+
+  const comps = await getCompositions(bundleLocation, { inputProps })
+  const remotionComp = comps.find((c) => c.id === remotionCompId)
+  if (!remotionComp) throw new Error(`Remotion composition '${remotionCompId}' not found in bundle`)
+
+  const outputPath = path.join(OUTPUT_DIR, `render-${postId}.mp4`)
+  logger.info(`[RenderWorker] Rendering video (${remotionComp.durationInFrames} frames)...`)
+  await renderMedia({
+    composition: remotionComp,
+    serveUrl: bundleLocation,
+    outputLocation: outputPath,
+    inputProps,
+    codec: 'h264',
+    crf: 26,
+    x264Preset: 'slow',
+    audioBitrate: '128k',
+    concurrency: CONCURRENCY,
+    jpegQuality: 85,
+    chromiumOptions: { gl: 'swangle' },
+    ffmpegOverride: ({ type, args }) =>
+      type === 'stitcher' ? [...args, '-pix_fmt', 'yuv420p', '-movflags', '+faststart'] : args,
+    onProgress: ({ progress }) => {
+      job.updateProgress(35 + Math.round(progress * 45)).catch(() => {})
+    },
+  })
+
+  await job.updateProgress(80)
+  logger.info('[RenderWorker] Uploading video to R2...')
+  await prisma.renderJob.update({ where: { id: renderJobId }, data: { status: 'uploading' } })
+
+  const videoR2Key = flownau.renderOutput(brandId, postId)
+  const videoPublicUrl = await storage.upload(videoR2Key, fs.createReadStream(outputPath), {
+    mimeType: 'video/mp4',
+    cacheControl: 'no-store',
+  })
+  cleanupFile(outputPath)
+  await job.updateProgress(90)
+
+  // Extract cover frame — use midpoint of first scene
+  let coverUrl: string | null = null
+  const coverFrame = Math.min(Math.floor(remotionComp.durationInFrames / 2), remotionComp.durationInFrames - 1)
+  const coverPath = path.join(OUTPUT_DIR, `cover-${postId}.jpg`)
+  try {
+    await renderStill({
+      composition: remotionComp,
+      serveUrl: bundleLocation,
+      output: coverPath,
+      inputProps,
+      frame: coverFrame,
+      imageFormat: 'jpeg',
+      jpegQuality: 85,
+      chromiumOptions: { gl: 'swangle' },
+    })
+    const coverR2Key = flownau.renderCover(brandId, postId)
+    coverUrl = await storage.upload(coverR2Key, fs.createReadStream(coverPath), {
+      mimeType: 'image/jpeg',
+      cacheControl: 'no-store',
+    })
+    cleanupFile(coverPath)
+  } catch (coverErr) {
+    logError('[RenderWorker] Cover extraction failed, proceeding without cover', coverErr)
+  }
+
+  await job.updateProgress(95)
+  const renderTimeMs = Date.now() - startTime
+  await prisma.renderJob.update({
+    where: { id: renderJobId },
+    data: { status: 'done', progress: 100, outputUrl: videoPublicUrl, completedAt: new Date(), renderTimeMs },
+  })
+  await prisma.post.update({
+    where: { id: postId },
+    data: { videoUrl: videoPublicUrl, coverUrl, status: 'RENDERED_PENDING' },
+  })
+  await applyAutoApprovePost(postId, brandId, templateId)
+  logger.info(`[RenderWorker] Video render complete: ${postId} (${renderTimeMs}ms)`)
 }
 
 async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
@@ -113,15 +314,49 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
 
   // Determine which Remotion composition to use
   const templateRemotionId = post.template?.remotionId ?? ''
-  if (!isVideo || !SLOT_REEL_IDS.has(templateRemotionId)) {
+  if (!isVideo || !VIDEO_REEL_IDS.has(templateRemotionId)) {
     throw new Error(
       `Post ${postId} has unsupported format/template: ${format}/${templateRemotionId}`,
     )
   }
   const remotionCompId = templateRemotionId
+  const isDynamicReel = remotionCompId === DYNAMIC_REEL_ID
 
   // ── Build Remotion inputProps ─────────────────────────────────────────────────
   const creative = post.creative as Record<string, unknown> | null
+
+  // ── Dynamic reel path ──────────────────────────────────────────────────────
+  if (isDynamicReel) {
+    const resolvedScenes = await resolveDynamicReelScenes(
+      creative,
+      post.brandId,
+      postId,
+      renderJob.id,
+    )
+    if (!resolvedScenes) return // error already written to DB
+
+    const brandIdentity = (post.brand?.brandIdentity ?? {}) as BrandIdentity
+    const inputProps: Record<string, unknown> = {
+      scenes: resolvedScenes,
+      audioUrl: (creative as any)?.audioUrl ?? undefined,
+      brand: brandIdentity,
+    }
+
+    await job.updateProgress(20)
+    await renderReelVideo({
+      job,
+      postId,
+      brandId: post.brandId,
+      templateId: post.templateId,
+      renderJobId: renderJob.id,
+      remotionCompId,
+      inputProps,
+      startTime,
+    })
+    return
+  }
+
+  // ── Legacy slot-based path ─────────────────────────────────────────────────
   if (!creative?.slots) {
     // Creative is missing or was composed with the legacy scene-composer.
     // Reset so the user can recompose via the calendar modal.
@@ -264,166 +499,19 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
   }
 
   await job.updateProgress(20)
-
-  ensureOutputDir()
-
-  logger.info(`[RenderWorker] Bundling Remotion composition...`)
-  const bundleLocation = await bundle(ENTRY_POINT, () => {}, {
-    webpackOverride: (config) => ({
-      ...config,
-      resolve: {
-        ...config.resolve,
-        alias: { ...config.resolve?.alias, '@': path.resolve(process.cwd(), 'src') },
-      },
-    }),
+  await renderReelVideo({
+    job,
+    postId,
+    brandId,
+    templateId: post.templateId,
+    renderJobId: renderJob.id,
+    remotionCompId,
+    inputProps,
+    startTime,
   })
-  await job.updateProgress(35)
-
-  const comps = await getCompositions(bundleLocation, { inputProps })
-  const remotionComp = comps.find((c) => c.id === remotionCompId)
-  if (!remotionComp) throw new Error(`Remotion composition '${remotionCompId}' not found in bundle`)
-
-  if (isVideo) {
-    const outputPath = path.join(OUTPUT_DIR, `render-${postId}.mp4`)
-
-    logger.info(`[RenderWorker] Rendering video (${remotionComp.durationInFrames} frames)...`)
-    await renderMedia({
-      composition: remotionComp,
-      serveUrl: bundleLocation,
-      outputLocation: outputPath,
-      inputProps,
-      codec: 'h264',
-      crf: 26,
-      x264Preset: 'slow',
-      audioBitrate: '128k',
-      concurrency: CONCURRENCY,
-      jpegQuality: 85,
-      // swangle = ANGLE on SwiftShader: CPU-based GL, avoids GPU compositor memory in Docker
-      chromiumOptions: { gl: 'swangle' },
-      // faststart + yuv420p: required for streaming playback and Instagram compatibility
-      ffmpegOverride: ({ type, args }) =>
-        type === 'stitcher' ? [...args, '-pix_fmt', 'yuv420p', '-movflags', '+faststart'] : args,
-      onProgress: ({ progress }) => {
-        job.updateProgress(35 + Math.round(progress * 45)).catch(() => {})
-      },
-    })
-
-    await job.updateProgress(80)
-    logger.info(`[RenderWorker] Uploading video to R2...`)
-    await prisma.renderJob.update({ where: { id: renderJob.id }, data: { status: 'uploading' } })
-
-    const videoR2Key = flownau.renderOutput(brandId, postId)
-    const videoPublicUrl = await storage.upload(videoR2Key, fs.createReadStream(outputPath), {
-      mimeType: 'video/mp4',
-      cacheControl: 'no-store',
-    })
-    cleanupFile(outputPath)
-
-    await job.updateProgress(90)
-
-    // Extract cover frame from the resolved scenes
-    let coverUrl: string | null = null
-    const scenes = inputProps.scenes as
-      | Array<{ startFrame: number; durationInFrames: number }>
-      | undefined
-    const coverCreative = post.creative as { coverSceneIndex?: number } | null
-    const coverIdx = coverCreative?.coverSceneIndex ?? 0
-
-    let coverFrame = 0
-    if (scenes && coverIdx < scenes.length) {
-      const s = scenes[coverIdx]
-      coverFrame = s.startFrame + Math.floor(s.durationInFrames / 2)
-    }
-    coverFrame = Math.min(coverFrame, remotionComp.durationInFrames - 1)
-
-    const coverPath = path.join(OUTPUT_DIR, `cover-${postId}.jpg`)
-    try {
-      await renderStill({
-        composition: remotionComp,
-        serveUrl: bundleLocation,
-        output: coverPath,
-        inputProps,
-        frame: coverFrame,
-        imageFormat: 'jpeg',
-        jpegQuality: 85,
-        chromiumOptions: { gl: 'swangle' },
-      })
-      const coverR2Key = flownau.renderCover(brandId, postId)
-      coverUrl = await storage.upload(coverR2Key, fs.createReadStream(coverPath), {
-        mimeType: 'image/jpeg',
-        cacheControl: 'no-store',
-      })
-      cleanupFile(coverPath)
-    } catch (coverErr) {
-      logError('[RenderWorker] Cover extraction failed, proceeding without cover', coverErr)
-    }
-
-    await job.updateProgress(95)
-
-    const renderTimeMs = Date.now() - startTime
-    await prisma.renderJob.update({
-      where: { id: renderJob.id },
-      data: {
-        status: 'done',
-        progress: 100,
-        outputUrl: videoPublicUrl,
-        completedAt: new Date(),
-        renderTimeMs,
-      },
-    })
-    await prisma.post.update({
-      where: { id: postId },
-      data: { videoUrl: videoPublicUrl, coverUrl, status: 'RENDERED_PENDING' },
-    })
-    await applyAutoApprovePost(postId, post.brandId, post.templateId)
-
-    logger.info(`[RenderWorker] Video render complete: ${postId} (${renderTimeMs}ms)`)
-  } else {
-    const outputPath = path.join(OUTPUT_DIR, `render-${postId}.png`)
-
-    logger.info(`[RenderWorker] Rendering still image...`)
-    await renderStill({
-      composition: remotionComp,
-      serveUrl: bundleLocation,
-      output: outputPath,
-      inputProps,
-      frame: 0,
-      imageFormat: 'png',
-      chromiumOptions: { gl: 'swangle' },
-    })
-
-    await job.updateProgress(80)
-
-    const imageR2Key = flownau.renderStill(brandId, postId)
-    const imagePublicUrl = await storage.upload(imageR2Key, fs.createReadStream(outputPath), {
-      mimeType: 'image/png',
-      cacheControl: 'no-store',
-    })
-    cleanupFile(outputPath)
-
-    const renderTimeMs = Date.now() - startTime
-    await prisma.renderJob.update({
-      where: { id: renderJob.id },
-      data: {
-        status: 'done',
-        progress: 100,
-        outputUrl: imagePublicUrl,
-        outputType: 'image',
-        completedAt: new Date(),
-        renderTimeMs,
-      },
-    })
-    await prisma.post.update({
-      where: { id: postId },
-      data: { videoUrl: imagePublicUrl, status: 'RENDERED_PENDING' },
-    })
-    await applyAutoApprovePost(postId, post.brandId, post.templateId)
-
-    logger.info(`[RenderWorker] Still render complete: ${postId} (${renderTimeMs}ms)`)
-  }
-
   await job.updateProgress(100)
 }
+
 
 function handleFailedJob(job: Job<RenderJobData> | undefined, error: Error): void {
   if (!job) return

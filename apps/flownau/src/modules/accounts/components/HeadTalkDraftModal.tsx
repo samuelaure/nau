@@ -8,9 +8,7 @@ import { toast } from 'sonner'
 import { cn } from '@/modules/shared/utils'
 
 interface HeadTalkCreative {
-  hook: string
-  body: string
-  cta: string
+  script: string
   caption: string
   hashtags: string[]
 }
@@ -34,15 +32,14 @@ interface HeadTalkDraftModalProps {
 function parseCreative(creative: unknown): HeadTalkCreative | null {
   if (!creative || typeof creative !== 'object') return null
   const c = creative as Record<string, unknown>
-  if (typeof c.hook !== 'string') return null
+  if (typeof c.script !== 'string') return null
   return {
-    hook: c.hook as string,
-    body: typeof c.body === 'string' ? c.body : '',
-    cta: typeof c.cta === 'string' ? c.cta : '',
+    script: c.script,
     caption: typeof c.caption === 'string' ? c.caption : '',
     hashtags: Array.isArray(c.hashtags) ? (c.hashtags as string[]) : [],
   }
 }
+
 
 export default function HeadTalkDraftModal({
   post,
@@ -185,36 +182,18 @@ export default function HeadTalkDraftModal({
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
           {tab === 'script' && creative ? (
-            <div className="flex flex-col gap-6">
-              {/* Hook */}
-              <div>
-                <p className="text-xs font-semibold text-accent uppercase tracking-widest mb-2">
-                  Hook
-                </p>
-                <p className="text-white leading-relaxed text-base font-medium">{creative.hook}</p>
-              </div>
-
-              {/* Body */}
-              <div>
-                <p className="text-xs font-semibold text-text-secondary uppercase tracking-widest mb-2">
-                  Body
-                </p>
-                <div className="text-white/85 leading-relaxed text-base whitespace-pre-line">
-                  {creative.body}
-                </div>
-              </div>
-
-              {/* CTA */}
-              <div>
-                <p className="text-xs font-semibold text-accent/70 uppercase tracking-widest mb-2">
-                  Call to Action
-                </p>
-                <p className="text-white/85 leading-relaxed text-base">{creative.cta}</p>
+            <div>
+              <p className="text-xs font-semibold text-text-secondary uppercase tracking-widest mb-3">
+                Script
+              </p>
+              <div className="text-white/85 leading-relaxed text-base whitespace-pre-line">
+                {creative.script}
               </div>
             </div>
           ) : tab === 'script' && !creative ? (
             <p className="text-text-secondary text-sm">No script generated yet.</p>
           ) : null}
+
 
           {tab === 'caption' && (
             <div className="flex flex-col gap-4">

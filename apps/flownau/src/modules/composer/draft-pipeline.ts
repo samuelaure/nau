@@ -7,15 +7,17 @@ import { renderBrandContextBlock } from '@/modules/prompts/brand-context'
 import { logError, logger } from '@/modules/shared/logger'
 import type { LlmTrace } from '@/modules/ideation/ideation.service'
 import type { SlotDef } from '../../../prisma/seeds/templates'
+import type { SceneDef, TextDef } from '@/types/template-scenes'
 
 const HEAD_TALK_FORMATS = new Set(['head_talk', 'trial_head_talk'])
 
+// ── HeadTalk — simplified 2-field schema ─────────────────────────────────────
 const HeadTalkSchema = z.object({
-  hook: z
+  script: z
     .string()
-    .describe('Opening hook — max 2 sentences. Wins attention in the first 2 seconds.'),
-  body: z.string().describe('Main content body — max 150 words. Short paragraphs, one idea each.'),
-  cta: z.string().describe('Call to action — max 2 sentences. Closes the loop the hook opened.'),
+    .describe(
+      'Full spoken script — hook, body and call-to-action in one continuous flow. Short paragraphs, one idea each.',
+    ),
   caption: z.string().describe('Social media caption for when the video is published.'),
   hashtags: z.array(z.string()).describe('8-12 relevant hashtags without # prefix.'),
 })
@@ -48,10 +50,9 @@ export async function runDraftPipeline(input: DraftPipelineInput): Promise<Draft
 
   logger.info({ brandId, templateId }, '[DraftPipeline] Starting composition')
 
-  const [template, brand, brandTemplateConfig] = await Promise.all([
+  const [templateRaw, brand, brandTemplateConfig] = await Promise.all([
     prisma.template.findUnique({
       where: { id: templateId },
-      select: { format: true, slotSchema: true, schemaJson: true, contentSchema: true },
     }),
     prisma.brand.findUnique({
       where: { id: brandId },
@@ -63,7 +64,8 @@ export async function runDraftPipeline(input: DraftPipelineInput): Promise<Draft
     }),
   ])
 
-  if (!template) throw new Error(`Template ${templateId} not found`)
+  if (!templateRaw) throw new Error(`Template ${templateId} not found`)
+  const template = templateRaw
 
   const format = template.format ?? 'reel'
   const language = brand?.language ?? 'Spanish'
@@ -111,6 +113,24 @@ export async function runDraftPipeline(input: DraftPipelineInput): Promise<Draft
       language,
     })
   }
+
+  // Block-based dynamic reel path
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const templateScenes = (template as any).scenes
+  if (templateScenes && Array.isArray(templateScenes) && templateScenes.length > 0) {
+    return runDynamicReelPath({
+      brandId,
+      templateId,
+      format,
+      systemPrompt,
+      userMessage,
+      scenes: templateScenes as SceneDef[],
+      ideaText,
+      layers,
+      language,
+    })
+  }
+
   return runSlotPath({
     brandId,
     templateId,
@@ -164,9 +184,7 @@ async function runHeadTalkPath(args: {
 
   const raw = rawResult as HeadTalkCreative
   const creative: HeadTalkCreative = {
-    hook: normalizeParagraphs(raw.hook ?? ''),
-    body: normalizeParagraphs(raw.body ?? ''),
-    cta: normalizeParagraphs(raw.cta ?? ''),
+    script: normalizeParagraphs(raw.script ?? ''),
     caption: normalizeParagraphs(raw.caption ?? ''),
     hashtags: raw.hashtags ?? [],
   }
@@ -183,6 +201,156 @@ async function runHeadTalkPath(args: {
 
   return {
     creative: creative as unknown as Record<string, unknown>,
+    caption,
+    hashtags,
+    templateId,
+    format,
+    postSynthesis,
+    trace: {
+      provider,
+      model,
+      registryId,
+      systemPrompt,
+      userMessage,
+      generatedAt: new Date().toISOString(),
+    },
+  }
+}
+
+// ─── Dynamic reel path (block-based templates) ────────────────────────────────
+
+async function runDynamicReelPath(args: {
+  brandId: string
+  templateId: string
+  format: string
+  systemPrompt: string
+  userMessage: string
+  scenes: SceneDef[]
+  ideaText: string
+  layers: Record<string, string>
+  language: string
+}): Promise<DraftPipelineResult> {
+  const { brandId, templateId, format, scenes, layers, language } = args
+  let { systemPrompt, userMessage } = args
+
+  const { client: llm, model, registryId, provider } = await getAdminModelClient('drafting')
+
+  // Build a flat key→instruction map for all prompt-mode texts
+  // Key format: scene_{sceneIdx}_text_{textIdx}
+  const promptSlots: Array<{ key: string; sceneIdx: number; textIdx: number; text: TextDef }> = []
+  for (let si = 0; si < scenes.length; si++) {
+    for (let ti = 0; ti < scenes[si].texts.length; ti++) {
+      const text = scenes[si].texts[ti]
+      if (text.mode === 'prompt') {
+        promptSlots.push({ key: `scene_${si}_text_${ti}`, sceneIdx: si, textIdx: ti, text })
+      }
+    }
+  }
+
+  if (promptSlots.length === 0) {
+    // All texts are manual — no LLM call needed, pass through verbatim
+    const resolvedScenes = scenes.map((scene) => ({
+      ...scene,
+      texts: scene.texts.map((t) => ({ ...t, resolvedContent: t.content })),
+    }))
+    const caption = ''
+    const hashtags: string[] = []
+    const postSynthesis = await generateSynthesis(caption, { scenes: resolvedScenes }, language)
+    return {
+      creative: { scenes: resolvedScenes, caption, hashtags },
+      caption,
+      hashtags,
+      templateId,
+      format,
+      postSynthesis,
+      trace: {
+        provider: 'none',
+        model: 'none',
+        registryId: 'none',
+        systemPrompt,
+        userMessage,
+        generatedAt: new Date().toISOString(),
+      },
+    }
+  }
+
+  // Build the slot schema block for the AI
+  const slotInstructions = promptSlots
+    .map((s) => {
+      const wordRange =
+        s.text.minWords != null
+          ? `min ${s.text.minWords} words, max ${s.text.maxWords ?? 60} words`
+          : `max ${s.text.maxWords ?? 60} words`
+      return `• "${s.key}" — ${wordRange}\n  Instructions: ${s.text.content}`
+    })
+    .join('\n\n')
+
+  const schemaBlock = `SCENE TEXT SLOTS TO FILL:\n${slotInstructions}\n\nAlso write:\n• caption — Instagram caption (max 300 chars, 2-3 sentences, no hashtags)\n• hashtags — 5–10 relevant hashtags (without # prefix)\n\nRespond ONLY with valid JSON. Never mention @handles.`
+
+  systemPrompt = `${systemPrompt}\n\n${schemaBlock}`
+
+  const messages: Array<{ role: 'system' | 'user'; content: string }> = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userMessage },
+  ]
+
+  logger.info({ brandId, templateId, provider, model, promptSlotCount: promptSlots.length }, '[DraftPipeline] DynamicReel LLM call')
+
+  type ParseResult = { parsed: Record<string, unknown>; usage: import('@nau/llm-client').LLMUsage }
+  const callAndParse = async (): Promise<ParseResult> => {
+    const result = await llm.chatCompletion({
+      model,
+      temperature: 0.7,
+      messages,
+      timeoutMs: provider === 'openai' ? 60_000 : 45_000,
+      maxTokens: 4096,
+    })
+    const raw = result.content?.trim() ?? ''
+    const jsonStr = raw.replace(/```json?\n?/g, '').replace(/```/g, '').trim()
+    const start = jsonStr.indexOf('{')
+    const end = jsonStr.lastIndexOf('}')
+    if (start === -1 || end <= start) throw new Error(`No JSON object in response: ${raw.slice(0, 200)}`)
+    return { parsed: JSON.parse(jsonStr.slice(start, end + 1)) as Record<string, unknown>, usage: result.usage }
+  }
+
+  let parsed: Record<string, unknown>
+  try {
+    const res = await callAndParse()
+    parsed = res.parsed
+    reportFlownauUsage({ operation: 'draft_compose', brandId, usage: res.usage })
+  } catch (firstError) {
+    logger.warn({ brandId, templateId }, '[DraftPipeline] DynamicReel first attempt failed, retrying')
+    messages.push({ role: 'user', content: 'Your previous response had invalid JSON. Fix it and return only a valid JSON object. No markdown, no explanation.' })
+    try {
+      const res = await callAndParse()
+      parsed = res.parsed
+      reportFlownauUsage({ operation: 'draft_compose', brandId, usage: res.usage })
+    } catch (secondError) {
+      logError('[DraftPipeline] DynamicReel both attempts failed', secondError)
+      throw new Error(`DraftPipeline DynamicReel path failed: ${secondError instanceof Error ? secondError.message : String(secondError)}`)
+    }
+  }
+
+  // Map AI output back to scenes, merging manual texts verbatim
+  const resolvedScenes = scenes.map((scene, si) => ({
+    ...scene,
+    texts: scene.texts.map((t, ti) => {
+      if (t.mode === 'manual') return { ...t, resolvedContent: t.content }
+      const key = `scene_${si}_text_${ti}`
+      const aiContent = normalizeParagraphs((parsed[key] as string) ?? t.content)
+      return { ...t, resolvedContent: aiContent }
+    }),
+  }))
+
+  const caption = normalizeParagraphs((parsed.caption as string) ?? '')
+  const hashtags = Array.isArray(parsed.hashtags) ? (parsed.hashtags as string[]) : []
+
+  const postSynthesis = await generateSynthesis(caption, { scenes: resolvedScenes }, language)
+
+  logger.info({ brandId, templateId, sceneCount: resolvedScenes.length }, '[DraftPipeline] DynamicReel composition complete')
+
+  return {
+    creative: { scenes: resolvedScenes, caption, hashtags },
     caption,
     hashtags,
     templateId,

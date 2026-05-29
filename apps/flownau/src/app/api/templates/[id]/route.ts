@@ -53,6 +53,26 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   }
 }
 
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const resolvedParams = await params
+    const body = await req.json()
+    const updateData: Record<string, unknown> = {}
+    if (body.scenes !== undefined) updateData.scenes = body.scenes
+    if (body.description !== undefined) updateData.description = body.description
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
+    }
+    const template = await prisma.template.update({
+      where: { id: resolvedParams.id },
+      data: updateData,
+    })
+    return NextResponse.json({ template }, { status: 200 })
+  } catch {
+    return NextResponse.json({ error: 'Failed to patch template' }, { status: 500 })
+  }
+}
+
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const resolvedParams = await params
