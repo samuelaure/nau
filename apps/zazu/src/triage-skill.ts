@@ -23,7 +23,7 @@ async function fetchUserBrands(nauUserId: string): Promise<NauBrand[]> {
 
 async function callTriageApi(text: string, userId: string, brandId: string | null) {
   const headers = await buildServiceHeaders('9nau-api');
-  const res = await fetch(`${NAU_API_URL}/_service/triage`, {
+  const res = await fetch(`${NAU_API_URL}/triage`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ text, userId, brandId }),

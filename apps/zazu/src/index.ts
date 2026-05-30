@@ -145,6 +145,12 @@ bot.on('callback_query', async (ctx) => {
         return;
       }
 
+      if (ctx.session?.voicenoteProcessPromise) {
+        await ctx.editMessageText('⏳ Procesando audio y transcribiendo...');
+        await ctx.session.voicenoteProcessPromise;
+      }
+      if (ctx.session?.voicenoteProcessError) return;
+
       const workspaces: Array<{ id: string; name: string }> = ctx.session?.pendingVoicenoteWorkspaces ?? [];
       const brands: Array<{ id: string; name: string }> = ctx.session?.pendingVoicenoteBrands ?? [];
       const cleanTranscription: string = ctx.session?.pendingVoicenoteClean ?? '';
@@ -174,14 +180,12 @@ bot.on('callback_query', async (ctx) => {
             ctx.session.selectedVoicenoteBrandIds = brands.map((b) => b.id);
             await handleBothDispatch(ctx);
           } else {
-            await ctx.editMessageText('💡 ¿A qué marca(s) enviamos la idea de contenido?');
-            await ctx.reply('Selecciona marca(s):', {
+            await ctx.editMessageText('💡 ¿A qué marca(s) enviamos la idea de contenido?', {
               reply_markup: buildBrandKeyboard(brands, []),
             });
           }
         } else {
-          await ctx.editMessageText('📓 ¿A qué espacio de trabajo va la entrada de diario?');
-          await ctx.reply('Selecciona espacio(s):', {
+          await ctx.editMessageText('📓 ¿A qué espacio de trabajo va la entrada de diario?', {
             reply_markup: buildWorkspaceKeyboard(workspaces, []),
           });
         }
@@ -199,8 +203,7 @@ bot.on('callback_query', async (ctx) => {
           await ctx.editMessageText('⏳ Guardando entrada de diario...');
           await dispatchJournalAndFinish(ctx, workspaces[0].id);
         } else {
-          await ctx.editMessageText('📓 ¿A qué espacio de trabajo va esta entrada?');
-          await ctx.reply('Selecciona espacio(s):', {
+          await ctx.editMessageText('📓 ¿A qué espacio de trabajo va esta entrada?', {
             reply_markup: buildWorkspaceKeyboard(workspaces, []),
           });
         }
@@ -215,14 +218,13 @@ bot.on('callback_query', async (ctx) => {
         }
         if (brands.length === 1) {
           // Auto-select and dispatch immediately
-          await ctx.editMessageText(`⏳ Enviando captura a *${brands[0].name}*\\.\\.\\.`);
+          await ctx.editMessageText(`⏳ Enviando nota de voz a *${brands[0].name}*...`, { parse_mode: 'Markdown' });
           const results = await voicenoteSkill.dispatchToBrands(voicenoteId, cleanTranscription, ctx.session.pendingVoicenoteSynthesis, brands);
           clearVoicenoteSession(ctx);
           const summaryLines = results.map((r) => `- ${r.ideaCount} nuevas ideas para ${r.brandName}`).join('\n');
-          await ctx.editMessageText(`✅ Captura enviada. Se generaron:\n${summaryLines}`);
+          await ctx.editMessageText(`✅ Nota de voz enviada. Se generaron:\n${summaryLines}`);
         } else {
-          await ctx.editMessageText('💡 ¿A qué marca(s) enviamos esta captura?');
-          await ctx.reply('Selecciona marca(s):', {
+          await ctx.editMessageText('💡 ¿A qué marca(s) enviamos esta nota de voz?', {
             reply_markup: buildBrandKeyboard(brands, []),
           });
         }
@@ -260,8 +262,7 @@ bot.on('callback_query', async (ctx) => {
           ctx.session.selectedVoicenoteBrandIds = brands.map((b) => b.id);
           await handleBothDispatch(ctx);
         } else {
-          await ctx.editMessageText('💡 ¿A qué marca(s) enviamos la idea de contenido?');
-          await ctx.reply('Selecciona marca(s):', {
+          await ctx.editMessageText('💡 ¿A qué marca(s) enviamos la idea de contenido?', {
             reply_markup: buildBrandKeyboard(brands, []),
           });
         }
@@ -313,11 +314,11 @@ bot.on('callback_query', async (ctx) => {
         const synthesis: string = ctx.session?.pendingVoicenoteSynthesis;
         const selectedBrands = brands.filter((b) => selected.includes(b.id));
         const selectedNames = selectedBrands.map((b) => b.name).join(', ');
-        await ctx.editMessageText(`⏳ Enviando captura a: ${selectedNames}...`);
+        await ctx.editMessageText(`⏳ Enviando nota de voz a: ${selectedNames}...`);
         const results = await voicenoteSkill.dispatchToBrands(voicenoteId, cleanTranscription, synthesis, selectedBrands);
         clearVoicenoteSession(ctx);
         const summaryLines = results.map((r) => `- ${r.ideaCount} nuevas ideas para ${r.brandName}`).join('\n');
-        await ctx.editMessageText(`✅ Captura enviada. Se generaron:\n${summaryLines}`);
+        await ctx.editMessageText(`✅ Nota de voz enviada. Se generaron:\n${summaryLines}`);
       }
     }
   }
@@ -417,7 +418,7 @@ async function handleBothDispatch(ctx: ZazuContext) {
   const summaryLines = contentResultData.map((r) => `- ${r.ideaCount} ideas para ${r.brandName}`).join('\n');
   const journalLine = workspaceId ? '📓 Entrada de diario guardada.' : '';
   const contentLine = summaryLines ? `💡 Ideas de contenido:\n${summaryLines}` : '';
-  await ctx.editMessageText(`✅ Captura procesada.\n${[journalLine, contentLine].filter(Boolean).join('\n')}`);
+  await ctx.editMessageText(`✅ Nota de voz procesada.\n${[journalLine, contentLine].filter(Boolean).join('\n')}`);
 }
 
 async function launchBot(retries = 5): Promise<void> {
