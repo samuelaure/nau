@@ -30,7 +30,7 @@ type VoicenoteSplit = z.infer<typeof VoicenoteSplitSchema>
 // ── Summary builders ──────────────────────────────────────────────────────────
 function buildSummaryMessage(results: Array<{ brandName: string; ideaCount: number }>): string {
   const lines = results.map((r) => `\\- ${r.ideaCount} nuevas ideas para *${escapeMarkdown(r.brandName)}*`)
-  return `✅ Captura enviada\\. Se generaron:\\n${lines.join('\n')}`
+  return `✅ Nota de voz enviada\\. Se generaron:\\n${lines.join('\n')}`
 }
 
 function escapeMarkdown(text: string): string {
@@ -82,74 +82,79 @@ class VoicenoteSkillImpl implements ZazuSkill {
     const user = ctx.dbUser
     const voice = (ctx.message as any).voice
 
-    const statusMsg = await ctx.reply('🎙️ Procesando tu nota de voz...')
+    ctx.session ??= {}
+    ctx.session.selectedVoicenoteBrandIds = []
+    ctx.session.selectedVoicenoteWorkspaceIds = []
+    ctx.session.selectedVoicenoteIntents = []
+    ctx.session.pendingVoicenoteId = undefined
+    ctx.session.pendingVoicenoteClean = undefined
+    ctx.session.pendingVoicenoteSynthesis = undefined
+    ctx.session.pendingVoicenoteBrands = []
+    ctx.session.pendingVoicenoteWorkspaces = []
+    ctx.session.voicenoteProcessError = undefined
+
+    const statusMsg = await ctx.reply('¿Qué contiene esta nota de voz?', {
+      parse_mode: 'MarkdownV2',
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '☐ 📓 Diario (Journal)', callback_data: 'vnote_triage_journal' }],
+          [{ text: '☐ 💡 Idea de Contenido', callback_data: 'vnote_triage_content' }],
+          [{ text: '▶️ Confirmar', callback_data: 'vnote_triage_confirm' }],
+        ],
+      },
+    })
     const chatId = statusMsg.chat.id
     const msgId = statusMsg.message_id
+    
+    ctx.session.voicenoteMessageId = msgId
+    ctx.session.voicenoteChatId = chatId
 
-    const editStatus = (text: string) =>
-      ctx.telegram.editMessageText(chatId, msgId, undefined, text, { parse_mode: 'Markdown' }).catch(() => {})
+    ctx.session.voicenoteProcessPromise = (async () => {
+      try {
+        const file = await ctx.telegram.getFile(voice.file_id)
+        const telegramFileUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${file.file_path}`
+        const audioResp = await axios.get(telegramFileUrl, { responseType: 'arraybuffer', timeout: 30_000 })
+        const audioBuffer = Buffer.from(audioResp.data)
 
-    try {
-      // Download from Telegram
-      const file = await ctx.telegram.getFile(voice.file_id)
-      const telegramFileUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${file.file_path}`
-      const audioResp = await axios.get(telegramFileUrl, { responseType: 'arraybuffer', timeout: 30_000 })
-      const audioBuffer = Buffer.from(audioResp.data)
+        const storage = getStorage()
+        const storageKey = `zazu/voicenotes/${user.telegramId}/${crypto.randomUUID()}.ogg`
+        const audioUrl = await storage.upload(storageKey, audioBuffer, { mimeType: 'audio/ogg' })
 
-      // Upload to nau_storage under zazu folder
-      const storage = getStorage()
-      const storageKey = `zazu/voicenotes/${user.telegramId}/${crypto.randomUUID()}.ogg`
-      const audioUrl = await storage.upload(storageKey, audioBuffer, { mimeType: 'audio/ogg' })
+        const nautHeaders = await buildServiceHeaders('nauthenticity')
+        const processResp = await axios.post(
+          `${NAUTHENTICITY_URL}/api/v1/_service/audio/process`,
+          { audioUrl },
+          { headers: nautHeaders, timeout: 60_000 },
+        )
+        const { rawTranscription, cleanTranscription, synthesis } = processResp.data
 
-      // Send to nauthenticity for transcription + synthesis
-      const nautHeaders = await buildServiceHeaders('nauthenticity')
-      const processResp = await axios.post(
-        `${NAUTHENTICITY_URL}/api/v1/_service/audio/process`,
-        { audioUrl },
-        { headers: nautHeaders, timeout: 60_000 },
-      )
-      const { rawTranscription, cleanTranscription, synthesis } = processResp.data
+        const voicenote = await prisma.voicenote.create({
+          data: { userId: user.id, audioStorageUrl: audioUrl, rawTranscription, cleanTranscription, synthesis },
+        })
 
-      // Store in zazu DB
-      const voicenote = await prisma.voicenote.create({
-        data: { userId: user.id, audioStorageUrl: audioUrl, rawTranscription, cleanTranscription, synthesis },
-      })
+        const apiHeaders = await buildServiceHeaders('9nau-api')
+        const wsResp = await axios.get(`${NAU_API_URL}/_service/workspaces?userId=${user.nauUserId}`, { headers: apiHeaders })
+        const wsData = wsResp.data as Array<{ id: string; name: string; brands: Brand[] }>
+        const workspaces: Workspace[] = wsData.map((w) => ({ id: w.id, name: w.name }))
+        const brands: Brand[] = wsData.flatMap((w) => w.brands)
 
-      // Fetch workspaces and brands in parallel
-      const apiHeaders = await buildServiceHeaders('9nau-api')
-      const wsResp = await axios.get(`${NAU_API_URL}/_service/workspaces?userId=${user.nauUserId}`, { headers: apiHeaders })
-      const wsData = wsResp.data as Array<{ id: string; name: string; brands: Brand[] }>
-      const workspaces: Workspace[] = wsData.map((w) => ({ id: w.id, name: w.name }))
-      const brands: Brand[] = wsData.flatMap((w) => w.brands)
-
-      // Store all context in session for the callback state machine
-      ctx.session ??= {}
-      ctx.session.pendingVoicenoteId = voicenote.id
-      ctx.session.pendingVoicenoteClean = cleanTranscription
-      ctx.session.pendingVoicenoteSynthesis = synthesis
-      ctx.session.pendingVoicenoteBrands = brands
-      ctx.session.pendingVoicenoteWorkspaces = workspaces
-      ctx.session.selectedVoicenoteBrandIds = []
-      ctx.session.selectedVoicenoteWorkspaceIds = []
-      ctx.session.selectedVoicenoteIntents = []
-
-      await editStatus('🎙️ Nota procesada\\. ¿Cómo clasificamos esta captura?')
-
-      // Show the triage intent keyboard
-      await ctx.reply('Selecciona el tipo\\(s\\):', {
-        parse_mode: 'MarkdownV2',
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: '☐ 📓 Diario (Journal)', callback_data: 'vnote_triage_journal' }],
-            [{ text: '☐ 💡 Idea de Contenido', callback_data: 'vnote_triage_content' }],
-            [{ text: '▶️ Confirmar', callback_data: 'vnote_triage_confirm' }],
-          ],
-        },
-      })
-    } catch (err) {
-      logger.error({ err }, '[VoicenoteSkill] Error processing voicenote')
-      await editStatus('❌ Error al procesar la nota de voz. Intenta de nuevo.')
-    }
+        ctx.session.pendingVoicenoteId = voicenote.id
+        ctx.session.pendingVoicenoteClean = cleanTranscription
+        ctx.session.pendingVoicenoteSynthesis = synthesis
+        ctx.session.pendingVoicenoteBrands = brands
+        ctx.session.pendingVoicenoteWorkspaces = workspaces
+      } catch (err) {
+        logger.error({ err }, '[VoicenoteSkill] Error processing voicenote in background')
+        ctx.session.voicenoteProcessError = true
+        await ctx.telegram.editMessageText(
+          chatId,
+          msgId,
+          undefined,
+          '❌ Error al procesar la nota de voz. Intenta de nuevo.',
+          { parse_mode: 'Markdown' }
+        ).catch(() => {})
+      }
+    })()
   }
 
   /**
@@ -191,7 +196,7 @@ class VoicenoteSkillImpl implements ZazuSkill {
   ): Promise<void> {
     const headers = await buildServiceHeaders('9nau-api')
     await axios.post(
-      `${NAU_API_URL}/_service/triage`,
+      `${NAU_API_URL}/triage`,
       {
         text: cleanTranscription,
         userId: nauUserId,
