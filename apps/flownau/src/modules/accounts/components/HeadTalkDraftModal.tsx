@@ -32,9 +32,18 @@ interface HeadTalkDraftModalProps {
 function parseCreative(creative: unknown): HeadTalkCreative | null {
   if (!creative || typeof creative !== 'object') return null
   const c = creative as Record<string, unknown>
-  if (typeof c.script !== 'string') return null
+  
+  let script = ''
+  if (typeof c.script === 'string') {
+    script = c.script
+  } else if (typeof c.hook === 'string') {
+    script = `${c.hook}\n\n${typeof c.body === 'string' ? c.body : ''}\n\n${typeof c.cta === 'string' ? c.cta : ''}`.trim()
+  } else {
+    return null
+  }
+
   return {
-    script: c.script,
+    script,
     caption: typeof c.caption === 'string' ? c.caption : '',
     hashtags: Array.isArray(c.hashtags) ? (c.hashtags as string[]) : [],
   }
