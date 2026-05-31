@@ -5,6 +5,7 @@ import { Block, CreateBlockDto, UpdateBlockDto } from '@9nau/types'
 type FindBlocksParams = {
   type?: string
   status?: string
+  workspaceId?: string
 }
 
 export const useGetBlocks = (params: FindBlocksParams) => {
@@ -16,6 +17,9 @@ export const useGetBlocks = (params: FindBlocksParams) => {
       // Handle 'not:trash' case
       if (params.status && !params.status.startsWith('not:')) {
         searchParams.append('status', params.status)
+      }
+      if (params.workspaceId) {
+        searchParams.append('workspaceId', params.workspaceId)
       }
       return apiClient.get(`/blocks?${searchParams.toString()}`)
     },

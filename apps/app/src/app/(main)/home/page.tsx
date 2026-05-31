@@ -14,15 +14,20 @@ import { useUiStore } from '@/lib/state/ui-store'
 import { NoteGrid } from '@/components/notes/NoteGrid'
 
 export default function HomePage() {
+  const activeWorkspaceId = useUiStore((s) => s.activeWorkspaceId)
   const activeView = useUiStore((s) => s.activeView)
   const setAllBlocks = useDashboardStore((s) => s.actions.setAllBlocks)
 
   const queryParams = useMemo(() => {
-    if (activeView === 'home') {
-      return {}
+    const params: any = {}
+    if (activeView !== 'home') {
+      params.status = activeView
     }
-    return { status: activeView }
-  }, [activeView])
+    if (activeWorkspaceId) {
+      params.workspaceId = activeWorkspaceId
+    }
+    return params
+  }, [activeView, activeWorkspaceId])
 
   const { data: blocks, isLoading, isError } = useGetBlocks(queryParams)
 
