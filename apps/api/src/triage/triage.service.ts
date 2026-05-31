@@ -194,6 +194,7 @@ OUTPUT: Return valid JSON matching the schema.`,
         reasoning: segment.reasoning,
         source: 'triage_engine',
         status: 'todo',
+        date: new Date().toISOString(),
       };
 
       if (segment.category === 'action' && segment.metadata) {
@@ -261,7 +262,8 @@ OUTPUT: Return valid JSON matching the schema.`,
         properties: {
           summary: result.journalSummary,
           date: new Date().toISOString(),
-          sourceBlockId
+          sourceBlockId,
+          status: 'published'
         },
         workspaceId
       });
@@ -315,6 +317,7 @@ Write in the same language as the input.`,
         date: new Date().toISOString(),
         sourceBlockId,
         source: 'zazu_voicenote',
+        status: 'published',
       },
       workspaceId,
     });
