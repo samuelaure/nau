@@ -587,6 +587,7 @@ export class ProactiveDeliverySystem {
 
       const tidStr = user.telegramId.toString();
       const shouldForward = user.forwardNotificationsToAdmin;
+      const isSelfAdmin = !!(ADMIN_TELEGRAM_ID && tidStr === ADMIN_TELEGRAM_ID);
 
       const journalItems = items.filter(i => (i.payloadJson as any).type === 'journal_summary');
       const MARKDOWN_TYPES = new Set(['content_brief', 'calendar_fill_blocked', 'approval_digest_today', 'approval_digest_tomorrow', 'approval_next_in_line']);
@@ -600,14 +601,14 @@ export class ProactiveDeliverySystem {
         const payload = item.payloadJson as { summaryData: string; periodTitle: string };
         const text = `📊 *${payload.periodTitle}*\n\n${payload.summaryData}`;
         await this.bot.telegram.sendMessage(tidStr, text, { parse_mode: 'Markdown' });
-        if (shouldForward) await this.forwardToAdmin(`👤 *${user.displayName ?? user.firstName ?? tidStr}*\n\n${text}`);
+        if (shouldForward && !isSelfAdmin) await this.forwardToAdmin(`👤 *${user.displayName ?? user.firstName ?? tidStr}*\n\n${text}`);
         await prisma.notificationQueue.update({ where: { id: item.id }, data: { status: 'SENT', sentAt: new Date() } });
       }
 
       for (const item of briefItems) {
         const payload = item.payloadJson as { markdown: string; brandName: string };
         await this.bot.telegram.sendMessage(tidStr, payload.markdown, { parse_mode: 'Markdown' });
-        if (shouldForward) await this.forwardToAdmin(`👤 *${user.displayName ?? user.firstName ?? tidStr}*\n\n${payload.markdown}`);
+        if (shouldForward && !isSelfAdmin) await this.forwardToAdmin(`👤 *${user.displayName ?? user.firstName ?? tidStr}*\n\n${payload.markdown}`);
         await prisma.notificationQueue.update({ where: { id: item.id }, data: { status: 'SENT', sentAt: new Date() } });
       }
 
@@ -641,7 +642,7 @@ export class ProactiveDeliverySystem {
             reply_markup: { inline_keyboard },
           });
 
-          if (shouldForward) await this.forwardToAdmin(`👤 *${user.displayName ?? user.firstName ?? tidStr}*\n\n${headerMsg}`);
+          if (shouldForward && !isSelfAdmin) await this.forwardToAdmin(`👤 *${user.displayName ?? user.firstName ?? tidStr}*\n\n${headerMsg}`);
 
           await prisma.notificationQueue.update({ where: { id: item.id }, data: { status: 'SENT', sentAt: new Date() } });
         }
