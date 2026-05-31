@@ -30,7 +30,7 @@ type VoicenoteSplit = z.infer<typeof VoicenoteSplitSchema>
 // ── Summary builders ──────────────────────────────────────────────────────────
 function buildSummaryMessage(results: Array<{ brandName: string; ideaCount: number }>): string {
   const lines = results.map((r) => `\\- ${r.ideaCount} nuevas ideas para *${escapeMarkdown(r.brandName)}*`)
-  return `✅ Nota de voz enviada\\. Se generaron:\\n${lines.join('\n')}`
+  return `✅ Nota de voz procesada\\. Se generaron:\\n${lines.join('\n')}`
 }
 
 function escapeMarkdown(text: string): string {
@@ -93,6 +93,15 @@ class VoicenoteSkillImpl implements ZazuSkill {
     ctx.session.pendingVoicenoteWorkspaces = []
     ctx.session.voicenoteProcessError = undefined
 
+    const apiHeaders = await buildServiceHeaders('9nau-api')
+    const wsResp = await axios.get(`${NAU_API_URL}/_service/workspaces?userId=${user.nauUserId}`, { headers: apiHeaders })
+    const wsData = wsResp.data as Array<{ id: string; name: string; brands: Brand[] }>
+    const workspaces: Workspace[] = wsData.map((w) => ({ id: w.id, name: w.name }))
+    const brands: Brand[] = wsData.flatMap((w) => w.brands)
+
+    ctx.session.pendingVoicenoteBrands = brands
+    ctx.session.pendingVoicenoteWorkspaces = workspaces
+
     const statusMsg = await ctx.reply('¿Qué contiene esta nota de voz?', {
       parse_mode: 'MarkdownV2',
       reply_markup: {
@@ -132,17 +141,9 @@ class VoicenoteSkillImpl implements ZazuSkill {
           data: { userId: user.id, audioStorageUrl: audioUrl, rawTranscription, cleanTranscription, synthesis },
         })
 
-        const apiHeaders = await buildServiceHeaders('9nau-api')
-        const wsResp = await axios.get(`${NAU_API_URL}/_service/workspaces?userId=${user.nauUserId}`, { headers: apiHeaders })
-        const wsData = wsResp.data as Array<{ id: string; name: string; brands: Brand[] }>
-        const workspaces: Workspace[] = wsData.map((w) => ({ id: w.id, name: w.name }))
-        const brands: Brand[] = wsData.flatMap((w) => w.brands)
-
         ctx.session.pendingVoicenoteId = voicenote.id
         ctx.session.pendingVoicenoteClean = cleanTranscription
         ctx.session.pendingVoicenoteSynthesis = synthesis
-        ctx.session.pendingVoicenoteBrands = brands
-        ctx.session.pendingVoicenoteWorkspaces = workspaces
       } catch (err) {
         logger.error({ err }, '[VoicenoteSkill] Error processing voicenote in background')
         ctx.session.voicenoteProcessError = true

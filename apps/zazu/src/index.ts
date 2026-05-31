@@ -120,6 +120,11 @@ bot.on('callback_query', async (ctx) => {
 
     // ── Step 1: Intent selection (Journal / Content) ──────────────────────────
     if (data === 'vnote_triage_journal' || data === 'vnote_triage_content') {
+      if (ctx.session?.pendingVoicenoteSplitJournal || (ctx.session?.selectedVoicenoteWorkspaceIds ?? []).length > 0) {
+        await ctx.answerCbQuery('Esta etapa ya fue confirmada.');
+        return;
+      }
+      
       const intent = data === 'vnote_triage_journal' ? 'journal' : 'content';
       let intents: string[] = ctx.session?.selectedVoicenoteIntents ?? [];
       intents = intents.includes(intent)
@@ -145,33 +150,19 @@ bot.on('callback_query', async (ctx) => {
         return;
       }
 
-      if (ctx.session?.voicenoteProcessPromise) {
-        await ctx.editMessageText('⏳ Procesando audio y transcribiendo...');
-        await ctx.session.voicenoteProcessPromise;
+      if (ctx.session?.voicenoteProcessError) {
+        await ctx.answerCbQuery('❌ Error procesando la nota. Intenta de nuevo.');
+        return;
       }
-      if (ctx.session?.voicenoteProcessError) return;
 
       const workspaces: Array<{ id: string; name: string }> = ctx.session?.pendingVoicenoteWorkspaces ?? [];
       const brands: Array<{ id: string; name: string }> = ctx.session?.pendingVoicenoteBrands ?? [];
-      const cleanTranscription: string = ctx.session?.pendingVoicenoteClean ?? '';
-      const voicenoteId: string = ctx.session?.pendingVoicenoteId ?? '';
       const isJournal = intents.includes('journal');
       const isContent = intents.includes('content');
       const isBoth = isJournal && isContent;
 
       // ── BOTH: Run LLM split first, then chain the selection steps
       if (isBoth) {
-        await ctx.editMessageText('⏳ Separando ideas y reflexiones...');
-        try {
-          const split = await voicenoteSkill.splitIntent(cleanTranscription);
-          ctx.session.pendingVoicenoteSplitJournal = split.journal_entry ?? cleanTranscription;
-          ctx.session.pendingVoicenoteSplitContent = split.content_idea ?? cleanTranscription;
-        } catch (err) {
-          logger.error({ err }, '[VoicenoteSkill] split-intent LLM failed, falling back to full text');
-          ctx.session.pendingVoicenoteSplitJournal = cleanTranscription;
-          ctx.session.pendingVoicenoteSplitContent = cleanTranscription;
-        }
-
         // Next: workspace selection (or auto-select if only one)
         if (workspaces.length <= 1) {
           ctx.session.selectedVoicenoteWorkspaceIds = workspaces.map((w) => w.id);
@@ -200,7 +191,6 @@ bot.on('callback_query', async (ctx) => {
         }
         if (workspaces.length === 1) {
           // Auto-select and dispatch immediately
-          await ctx.editMessageText('⏳ Guardando entrada de diario...');
           await dispatchJournalAndFinish(ctx, workspaces[0].id);
         } else {
           await ctx.editMessageText('📓 ¿A qué espacio de trabajo va esta entrada?', {
@@ -218,11 +208,15 @@ bot.on('callback_query', async (ctx) => {
         }
         if (brands.length === 1) {
           // Auto-select and dispatch immediately
+          if (await awaitVoicenoteProcessingAndHandleError(ctx)) return;
+
+          const voicenoteId: string = ctx.session?.pendingVoicenoteId;
+          const cleanTranscription: string = ctx.session?.pendingVoicenoteClean;
           await ctx.editMessageText(`⏳ Enviando nota de voz a *${brands[0].name}*...`, { parse_mode: 'Markdown' });
           const results = await voicenoteSkill.dispatchToBrands(voicenoteId, cleanTranscription, ctx.session.pendingVoicenoteSynthesis, brands);
           clearVoicenoteSession(ctx);
           const summaryLines = results.map((r) => `- ${r.ideaCount} nuevas ideas para ${r.brandName}`).join('\n');
-          await ctx.editMessageText(`✅ Nota de voz enviada. Se generaron:\n${summaryLines}`);
+          await ctx.editMessageText(`✅ Nota de voz procesada. Se generaron:\n${summaryLines}`);
         } else {
           await ctx.editMessageText('💡 ¿A qué marca(s) enviamos esta nota de voz?', {
             reply_markup: buildBrandKeyboard(brands, []),
@@ -268,7 +262,6 @@ bot.on('callback_query', async (ctx) => {
         }
       } else {
         // Journal-only path: dispatch to first selected workspace
-        await ctx.editMessageText('⏳ Guardando entrada de diario...');
         await dispatchJournalAndFinish(ctx, selectedWs[0]);
       }
       return;
@@ -309,6 +302,8 @@ bot.on('callback_query', async (ctx) => {
         await handleBothDispatch(ctx);
       } else {
         // Content-only path dispatch
+        if (await awaitVoicenoteProcessingAndHandleError(ctx)) return;
+
         const voicenoteId: string = ctx.session?.pendingVoicenoteId;
         const cleanTranscription: string = ctx.session?.pendingVoicenoteClean;
         const synthesis: string = ctx.session?.pendingVoicenoteSynthesis;
@@ -318,7 +313,7 @@ bot.on('callback_query', async (ctx) => {
         const results = await voicenoteSkill.dispatchToBrands(voicenoteId, cleanTranscription, synthesis, selectedBrands);
         clearVoicenoteSession(ctx);
         const summaryLines = results.map((r) => `- ${r.ideaCount} nuevas ideas para ${r.brandName}`).join('\n');
-        await ctx.editMessageText(`✅ Nota de voz enviada. Se generaron:\n${summaryLines}`);
+        await ctx.editMessageText(`✅ Nota de voz procesada. Se generaron:\n${summaryLines}`);
       }
     }
   }
@@ -356,13 +351,17 @@ bot.on('message', async (ctx) => {
 
 // ── Helper: dispatch journal-only path and display success ───────────────────
 async function dispatchJournalAndFinish(ctx: ZazuContext, workspaceId: string) {
+  if (await awaitVoicenoteProcessingAndHandleError(ctx)) return;
+
   const voicenoteId: string = ctx.session?.pendingVoicenoteId ?? '';
   const cleanTranscription: string = ctx.session?.pendingVoicenoteClean ?? '';
   const nauUserId: string = ctx.dbUser?.nauUserId ?? '';
+  
+  await ctx.editMessageText('⏳ Guardando entrada de diario...');
   try {
     await voicenoteSkill.dispatchToJournal(voicenoteId, cleanTranscription, workspaceId, nauUserId);
     clearVoicenoteSession(ctx);
-    await ctx.editMessageText('✅ Entrada de diario guardada.');
+    await ctx.editMessageText('✅ Nota de voz procesada. Entrada de diario guardada.');
   } catch (err) {
     logger.error({ err }, '[VoicenoteSkill] Failed to dispatch journal entry');
     await ctx.editMessageText('❌ Error al guardar la entrada de diario. Intenta de nuevo.');
@@ -382,16 +381,44 @@ function clearVoicenoteSession(ctx: ZazuContext) {
   ctx.session.selectedVoicenoteIntents = undefined;
   ctx.session.pendingVoicenoteSplitJournal = undefined;
   ctx.session.pendingVoicenoteSplitContent = undefined;
+  ctx.session.voicenoteProcessPromise = undefined;
+  ctx.session.voicenoteProcessError = undefined;
+  ctx.session.voicenoteMessageId = undefined;
+  ctx.session.voicenoteChatId = undefined;
+}
+
+async function awaitVoicenoteProcessingAndHandleError(ctx: ZazuContext): Promise<boolean> {
+  if (ctx.session?.voicenoteProcessPromise && !ctx.session?.pendingVoicenoteId) {
+    await ctx.editMessageText('⏳ Procesando nota de voz...');
+    await ctx.session.voicenoteProcessPromise;
+  }
+  if (ctx.session?.voicenoteProcessError) {
+    await ctx.editMessageText('❌ Error procesando la nota. Intenta de nuevo.');
+    return true; // indicates error
+  }
+  return false;
 }
 
 // ── Helper: dispatch both journal and content for the "Both" path ─────────────
 async function handleBothDispatch(ctx: ZazuContext) {
+  if (await awaitVoicenoteProcessingAndHandleError(ctx)) return;
+
   const voicenoteId: string = ctx.session?.pendingVoicenoteId ?? '';
+  const cleanTranscription: string = ctx.session?.pendingVoicenoteClean ?? '';
   const synthesis: string = ctx.session?.pendingVoicenoteSynthesis ?? '';
   const nauUserId: string = ctx.dbUser?.nauUserId ?? '';
 
-  const journalText: string = ctx.session?.pendingVoicenoteSplitJournal ?? ctx.session?.pendingVoicenoteClean ?? '';
-  const contentText: string = ctx.session?.pendingVoicenoteSplitContent ?? ctx.session?.pendingVoicenoteClean ?? '';
+  let journalText: string = cleanTranscription;
+  let contentText: string = cleanTranscription;
+
+  await ctx.editMessageText('⏳ Separando ideas y reflexiones...');
+  try {
+    const split = await voicenoteSkill.splitIntent(cleanTranscription);
+    journalText = split.journal_entry ?? cleanTranscription;
+    contentText = split.content_idea ?? cleanTranscription;
+  } catch (err) {
+    logger.error({ err }, '[VoicenoteSkill] split-intent LLM failed, falling back to full text');
+  }
 
   const selectedWsIds: string[] = ctx.session?.selectedVoicenoteWorkspaceIds ?? [];
   const selectedBrandIds: string[] = ctx.session?.selectedVoicenoteBrandIds ?? [];
