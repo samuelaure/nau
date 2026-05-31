@@ -19,13 +19,16 @@ const handleResponse = async (response: Response) => {
 
 export const apiClient = {
   get: async <T>(path: string): Promise<T> => {
-    const response = await fetch(`${getApiBaseUrl()}${path}`)
+    const response = await fetch(`${getApiBaseUrl()}${path}`, {
+      credentials: 'include',
+    })
     return handleResponse(response)
   },
   post: async <T>(path: string, body: unknown): Promise<T> => {
     const response = await fetch(`${getApiBaseUrl()}${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(body),
     })
     return handleResponse(response)
@@ -34,6 +37,7 @@ export const apiClient = {
     const response = await fetch(`${getApiBaseUrl()}${path}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(body),
     })
     return handleResponse(response)
@@ -41,6 +45,7 @@ export const apiClient = {
   delete: async <T>(path: string): Promise<T> => {
     const response = await fetch(`${getApiBaseUrl()}${path}`, {
       method: 'DELETE',
+      credentials: 'include',
     })
     return handleResponse(response)
   },
