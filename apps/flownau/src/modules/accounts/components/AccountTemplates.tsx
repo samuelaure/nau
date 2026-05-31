@@ -23,6 +23,7 @@ import {
 import { cn } from '@/modules/shared/utils'
 import { PromptHistoryPanel } from './PromptHistoryPanel'
 import { ReelSceneBuilder } from './ReelSceneBuilder'
+import AddTemplateButton from '@/modules/video/components/AddTemplateButton'
 import type { SceneDef } from '@/types/template-scenes'
 
 const FORMAT_ICON: Record<string, React.ElementType> = {
@@ -978,11 +979,14 @@ export default function AccountTemplates({ brandId }: { brandId: string }) {
 
   return (
     <div className="animate-fade-in space-y-5">
-      <div>
-        <h2 className="text-xl font-heading font-semibold">Templates</h2>
-        <p className="text-text-secondary text-sm mt-1">
-          Enable templates for this brand and configure how each is used.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-heading font-semibold">Templates</h2>
+          <p className="text-text-secondary text-sm mt-1">
+            Enable templates for this brand and configure how each is used.
+          </p>
+        </div>
+        <AddTemplateButton defaultAccountId={brandId} />
       </div>
 
       {/* Tabs */}
