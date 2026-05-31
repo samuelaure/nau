@@ -141,7 +141,7 @@ bot.on('callback_query', async (ctx) => {
         inline_keyboard: [
           [{ text: intents.includes('journal') ? '✅ 📓 Diario (Journal)' : '☐ 📓 Diario (Journal)', callback_data: 'vnote_triage_journal' }],
           [{ text: intents.includes('content') ? '✅ 💡 Idea de Contenido' : '☐ 💡 Idea de Contenido', callback_data: 'vnote_triage_content' }],
-          [{ text: intents.includes('actions') ? '✅ ✅ Tareas (Actions)' : '☐ ✅ Tareas (Actions)', callback_data: 'vnote_triage_actions' }],
+          [{ text: intents.includes('actions') ? '✅ 🎯 Tareas (Actions)' : '☐ 🎯 Tareas (Actions)', callback_data: 'vnote_triage_actions' }],
           [{ text: '▶️ Confirmar', callback_data: 'vnote_triage_confirm' }],
         ],
       });
