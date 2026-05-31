@@ -51,7 +51,20 @@ export class TriageService {
     try {
       // ── Journal-only fast path ──────────────────────────────────────────────
       if (journalOnly) {
-        return await this.processJournalOnly(text, sourceBlockId);
+        let resolvedWorkspaceId = workspaceId;
+        if (!resolvedWorkspaceId) {
+          const user = await this.prisma.user.findFirst({
+            where: {
+              OR: [
+                { id: userId },
+                { telegramId: userId },
+              ],
+            },
+            include: { workspaces: { take: 1 } },
+          });
+          resolvedWorkspaceId = user?.workspaces?.[0]?.workspaceId;
+        }
+        return await this.processJournalOnly(text, sourceBlockId, resolvedWorkspaceId);
       }
 
       // 1. Fetch context — projects + brand DNA
@@ -150,7 +163,7 @@ OUTPUT: Return valid JSON matching the schema.`,
       const parsed = result.data;
 
       // 6. Save blocks — pass through explicit brandId and aiRouting flag
-      const createdBlocks = await this.saveTriagedBlocks(parsed, sourceBlockId, brandId, aiRoutingEnabled);
+      const createdBlocks = await this.saveTriagedBlocks(parsed, sourceBlockId, brandId, aiRoutingEnabled, resolvedWorkspaceId);
 
       return {
         success: true,
@@ -169,6 +182,7 @@ OUTPUT: Return valid JSON matching the schema.`,
     sourceBlockId?: string,
     explicitBrandId?: string | null,
     aiRoutingEnabled = false,
+    workspaceId?: string,
   ) {
     const createdBlocks = [];
 
@@ -205,7 +219,7 @@ OUTPUT: Return valid JSON matching the schema.`,
         properties.flownauSyncStatus = 'pending';
       }
 
-      const block = await this.blocksService.create({ type, properties });
+      const block = await this.blocksService.create({ type, properties, workspaceId });
 
       // Forward content_idea blocks with a resolved brand to flownaŭ
       if (segment.category === 'content_idea' && properties.brandId) {
@@ -248,7 +262,8 @@ OUTPUT: Return valid JSON matching the schema.`,
           summary: result.journalSummary,
           date: new Date().toISOString(),
           sourceBlockId
-        }
+        },
+        workspaceId
       });
       createdBlocks.push(journalBlock);
     }
@@ -261,7 +276,7 @@ OUTPUT: Return valid JSON matching the schema.`,
    * using a simplified LLM prompt, then saves it as a journal_entry block.
    * No brand context. No content_idea segments. No flownau dispatch.
    */
-  private async processJournalOnly(text: string, sourceBlockId?: string) {
+  private async processJournalOnly(text: string, sourceBlockId?: string, workspaceId?: string) {
     const JournalOnlySchema = z.object({
       journalEntry: z.string().describe('A reflective, first-person journal entry distilled from the raw voice capture. Preserve the personal tone and emotional context.'),
     });
@@ -301,6 +316,7 @@ Write in the same language as the input.`,
         sourceBlockId,
         source: 'zazu_voicenote',
       },
+      workspaceId,
     });
 
     return {
