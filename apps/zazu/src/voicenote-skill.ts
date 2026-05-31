@@ -5,7 +5,10 @@ import prisma from '@zazu/db'
 import { logger } from './lib/logger'
 import { buildServiceHeaders } from './lib/service-auth'
 import { getStorage } from './lib/storage'
-import { getClientForFeature } from '@nau/llm-client'
+import { getClientForFeature, getFeatureFallbackChain } from '@nau/llm-client'
+import fs from 'fs'
+import os from 'os'
+import path from 'path'
 
 const NAUTHENTICITY_URL = process.env.NAUTHENTICITY_URL ?? 'http://nauthenticity:3000'
 const NAU_API_URL = process.env.NAU_API_URL ?? 'http://api:3000'
@@ -13,24 +16,12 @@ const NAU_API_URL = process.env.NAU_API_URL ?? 'http://api:3000'
 type Brand = { id: string; name: string }
 type Workspace = { id: string; name: string }
 
-// ── LLM schema for intent splitting ───────────────────────────────────────────
-const VoicenoteSplitSchema = z.object({
-  journal_entry: z
-    .string()
-    .nullable()
-    .describe('Text applicable to a personal journal entry — thoughts, feelings, reflections. Null if none.'),
-  content_idea: z
-    .string()
-    .nullable()
-    .describe('Text applicable as a brand content idea or hook. Null if none.'),
-})
 
-type VoicenoteSplit = z.infer<typeof VoicenoteSplitSchema>
 
 // ── Summary builders ──────────────────────────────────────────────────────────
 function buildSummaryMessage(results: Array<{ brandName: string; ideaCount: number }>): string {
   const lines = results.map((r) => `\\- ${r.ideaCount} nuevas ideas para *${escapeMarkdown(r.brandName)}*`)
-  return `✅ Nota de voz enviada\\. Se generaron:\\n${lines.join('\n')}`
+  return `✅ Nota de voz procesada\\. Se generaron:\\n${lines.join('\n')}`
 }
 
 function escapeMarkdown(text: string): string {
@@ -88,10 +79,19 @@ class VoicenoteSkillImpl implements ZazuSkill {
     ctx.session.selectedVoicenoteIntents = []
     ctx.session.pendingVoicenoteId = undefined
     ctx.session.pendingVoicenoteClean = undefined
-    ctx.session.pendingVoicenoteSynthesis = undefined
+    ctx.session.pendingVoicenoteSummary = undefined
     ctx.session.pendingVoicenoteBrands = []
     ctx.session.pendingVoicenoteWorkspaces = []
     ctx.session.voicenoteProcessError = undefined
+
+    const apiHeaders = await buildServiceHeaders('9nau-api')
+    const wsResp = await axios.get(`${NAU_API_URL}/_service/workspaces?userId=${user.nauUserId}`, { headers: apiHeaders })
+    const wsData = wsResp.data as Array<{ id: string; name: string; brands: Brand[] }>
+    const workspaces: Workspace[] = wsData.map((w) => ({ id: w.id, name: w.name }))
+    const brands: Brand[] = wsData.flatMap((w) => w.brands)
+
+    ctx.session.pendingVoicenoteBrands = brands
+    ctx.session.pendingVoicenoteWorkspaces = workspaces
 
     const statusMsg = await ctx.reply('¿Qué contiene esta nota de voz?', {
       parse_mode: 'MarkdownV2',
@@ -120,29 +120,55 @@ class VoicenoteSkillImpl implements ZazuSkill {
         const storageKey = `zazu/voicenotes/${user.telegramId}/${crypto.randomUUID()}.ogg`
         const audioUrl = await storage.upload(storageKey, audioBuffer, { mimeType: 'audio/ogg' })
 
-        const nautHeaders = await buildServiceHeaders('nauthenticity')
-        const processResp = await axios.post(
-          `${NAUTHENTICITY_URL}/api/v1/_service/audio/process`,
-          { audioUrl },
-          { headers: nautHeaders, timeout: 60_000 },
-        )
-        const { rawTranscription, cleanTranscription, synthesis } = processResp.data
+        // Save buffer to tmp file
+        const tmpPath = path.join(os.tmpdir(), `nau-voice-${crypto.randomUUID()}.ogg`)
+        fs.writeFileSync(tmpPath, audioBuffer)
+
+        let rawTranscription = ''
+        try {
+          const chain = getFeatureFallbackChain('transcription')
+          let lastError: unknown
+          for (const { client, model } of chain) {
+            try {
+              const result = await client.transcribe({ model, file: fs.createReadStream(tmpPath) })
+              rawTranscription = result.text
+              break
+            } catch (err) {
+              lastError = err
+            }
+          }
+          if (!rawTranscription) throw lastError
+        } finally {
+          fs.rmSync(tmpPath, { force: true })
+        }
+
+        const { client, model } = getClientForFeature('synthesis')
+        const result = await client.chatCompletion({
+          model,
+          temperature: 0.3,
+          messages: [
+            {
+              role: 'system',
+              content: `You receive a raw voice transcription. Return JSON with two fields:
+- "cleanTranscription": the transcription cleaned of filler words, repeated phrases, and disfluencies, with proper punctuation. Keep all meaning intact.
+- "summary": a brief 1-2 sentence summary of the core content.
+
+Return only valid JSON: { "cleanTranscription": "...", "summary": "..." }`,
+            },
+            { role: 'user', content: rawTranscription },
+          ],
+          responseFormat: { type: 'json_object' },
+        })
+        const parsed = z.object({ cleanTranscription: z.string(), summary: z.string() }).parse(JSON.parse(result.content as string))
+        const { cleanTranscription, summary } = parsed
 
         const voicenote = await prisma.voicenote.create({
-          data: { userId: user.id, audioStorageUrl: audioUrl, rawTranscription, cleanTranscription, synthesis },
+          data: { userId: user.id, audioStorageUrl: audioUrl, rawTranscription, cleanTranscription, summary },
         })
-
-        const apiHeaders = await buildServiceHeaders('9nau-api')
-        const wsResp = await axios.get(`${NAU_API_URL}/_service/workspaces?userId=${user.nauUserId}`, { headers: apiHeaders })
-        const wsData = wsResp.data as Array<{ id: string; name: string; brands: Brand[] }>
-        const workspaces: Workspace[] = wsData.map((w) => ({ id: w.id, name: w.name }))
-        const brands: Brand[] = wsData.flatMap((w) => w.brands)
 
         ctx.session.pendingVoicenoteId = voicenote.id
         ctx.session.pendingVoicenoteClean = cleanTranscription
-        ctx.session.pendingVoicenoteSynthesis = synthesis
-        ctx.session.pendingVoicenoteBrands = brands
-        ctx.session.pendingVoicenoteWorkspaces = workspaces
+        ctx.session.pendingVoicenoteSummary = summary
       } catch (err) {
         logger.error({ err }, '[VoicenoteSkill] Error processing voicenote in background')
         ctx.session.voicenoteProcessError = true
@@ -163,7 +189,6 @@ class VoicenoteSkillImpl implements ZazuSkill {
   async dispatchToBrands(
     voicenoteId: string,
     cleanTranscription: string,
-    synthesis: string,
     brands: Brand[],
   ): Promise<Array<{ brandName: string; ideaCount: number }>> {
     const headers = await buildServiceHeaders('nauthenticity')
@@ -172,7 +197,7 @@ class VoicenoteSkillImpl implements ZazuSkill {
         try {
           const res = await axios.post<{ ideaCount: number }>(
             `${NAUTHENTICITY_URL}/api/v1/_service/brands/${brand.id}/voicenotes`,
-            { cleanTranscription, synthesis, sourceRef: voicenoteId },
+            { cleanTranscription, sourceRef: voicenoteId },
             { headers, timeout: 120_000 },
           )
           return { brandName: brand.name, ideaCount: res.data?.ideaCount ?? 0 }
@@ -208,25 +233,64 @@ class VoicenoteSkillImpl implements ZazuSkill {
     )
   }
 
+  async dispatchToActions(
+    voicenoteId: string,
+    actionText: string,
+    workspaceId: string,
+    nauUserId: string,
+  ): Promise<any> {
+    const headers = await buildServiceHeaders('9nau-api')
+    const res = await axios.post(
+      `${NAU_API_URL}/triage`,
+      {
+        text: actionText,
+        userId: nauUserId,
+        sourceBlockId: voicenoteId,
+        workspaceId,
+        journalOnly: false,
+      },
+      { headers, timeout: 60_000 },
+    )
+    return res.data
+  }
+
   /**
-   * Calls the LLM to split a transcription into journal vs content idea text.
+   * Calls the LLM to split a transcription into selected intents.
    * Uses the voicenote_split feature (gpt-4o-mini).
    */
-  async splitIntent(cleanTranscription: string): Promise<VoicenoteSplit> {
+  async splitIntent(cleanTranscription: string, intents: string[]): Promise<any> {
     const { client, model } = getClientForFeature('voicenote_split')
+    
+    // Dynamically build schema and prompt based on selected intents
+    const shape: any = {}
+    const rules: string[] = []
+    
+    if (intents.includes('journal')) {
+      shape.journal_entry = z.string().nullable().describe('Personal thoughts, feelings, plans, reflections, life observations. Null if none.')
+      rules.push('- "journal_entry": personal thoughts, feelings, reflections. Return null if nothing personal.')
+    }
+    if (intents.includes('content')) {
+      shape.content_idea = z.string().nullable().describe('Ideas for social media content, hooks, topics, angles for a brand or creator. Null if none.')
+      rules.push('- "content_idea": ideas for social media content, hooks, topics, angles. Return null if no content ideas.')
+    }
+    if (intents.includes('actions')) {
+      shape.action_items = z.string().nullable().describe('Actionable tasks, errands, or project steps. Null if none.')
+      rules.push('- "action_items": concrete tasks, errands, or project steps. Return null if no actionable items.')
+    }
+
+    const DynamicSchema = z.object(shape)
+
     const result = await client.parseCompletion({
       model,
       temperature: 0.1,
-      schema: VoicenoteSplitSchema as any,
+      schema: DynamicSchema as any,
       schemaName: 'VoicenoteSplit',
       messages: [
         {
           role: 'system',
-          content: `You receive a voice transcription that contains both personal reflections AND content ideas.
-Your task: separate them into two distinct outputs.
+          content: `You receive a voice transcription. Your task is to extract relevant parts into the following fields:
 
-- "journal_entry": personal thoughts, feelings, plans, reflections, life observations. Return null if there is nothing personal.
-- "content_idea": ideas for social media content, hooks, topics, angles for a brand or creator. Return null if there are no content ideas.
+${rules.join('\n')}
 
 Rules:
 - Keep the full meaning of each part. Do not summarize or shorten unless necessary.
@@ -236,7 +300,7 @@ Rules:
         { role: 'user', content: cleanTranscription },
       ],
     })
-    return result.data as VoicenoteSplit
+    return result.data
   }
 }
 

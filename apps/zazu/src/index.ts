@@ -119,8 +119,18 @@ bot.on('callback_query', async (ctx) => {
     await ctx.answerCbQuery();
 
     // ── Step 1: Intent selection (Journal / Content) ──────────────────────────
-    if (data === 'vnote_triage_journal' || data === 'vnote_triage_content') {
-      const intent = data === 'vnote_triage_journal' ? 'journal' : 'content';
+    if (data === 'vnote_triage_journal' || data === 'vnote_triage_content' || data === 'vnote_triage_actions') {
+      if (ctx.session?.pendingVoicenoteSplitJournal || (ctx.session?.selectedVoicenoteWorkspaceIds ?? []).length > 0) {
+        await ctx.answerCbQuery('Esta etapa ya fue confirmada.');
+        return;
+      }
+      
+      const intentMap: Record<string, string> = {
+        'vnote_triage_journal': 'journal',
+        'vnote_triage_content': 'content',
+        'vnote_triage_actions': 'actions',
+      };
+      const intent = intentMap[data];
       let intents: string[] = ctx.session?.selectedVoicenoteIntents ?? [];
       intents = intents.includes(intent)
         ? intents.filter((i) => i !== intent)
@@ -131,108 +141,28 @@ bot.on('callback_query', async (ctx) => {
         inline_keyboard: [
           [{ text: intents.includes('journal') ? '✅ 📓 Diario (Journal)' : '☐ 📓 Diario (Journal)', callback_data: 'vnote_triage_journal' }],
           [{ text: intents.includes('content') ? '✅ 💡 Idea de Contenido' : '☐ 💡 Idea de Contenido', callback_data: 'vnote_triage_content' }],
+          [{ text: intents.includes('actions') ? '✅ ✅ Tareas (Actions)' : '☐ ✅ Tareas (Actions)', callback_data: 'vnote_triage_actions' }],
           [{ text: '▶️ Confirmar', callback_data: 'vnote_triage_confirm' }],
         ],
       });
       return;
     }
 
-    // ── Step 1 confirm: Route based on selected intents ───────────────────────
+    // ── Generic Confirm Routing ───────────────────────────────────────
     if (data === 'vnote_triage_confirm') {
       const intents: string[] = ctx.session?.selectedVoicenoteIntents ?? [];
       if (intents.length === 0) {
         await ctx.answerCbQuery('Selecciona al menos una opción.');
         return;
       }
-
-      if (ctx.session?.voicenoteProcessPromise) {
-        await ctx.editMessageText('⏳ Procesando audio y transcribiendo...');
-        await ctx.session.voicenoteProcessPromise;
-      }
-      if (ctx.session?.voicenoteProcessError) return;
-
-      const workspaces: Array<{ id: string; name: string }> = ctx.session?.pendingVoicenoteWorkspaces ?? [];
-      const brands: Array<{ id: string; name: string }> = ctx.session?.pendingVoicenoteBrands ?? [];
-      const cleanTranscription: string = ctx.session?.pendingVoicenoteClean ?? '';
-      const voicenoteId: string = ctx.session?.pendingVoicenoteId ?? '';
-      const isJournal = intents.includes('journal');
-      const isContent = intents.includes('content');
-      const isBoth = isJournal && isContent;
-
-      // ── BOTH: Run LLM split first, then chain the selection steps
-      if (isBoth) {
-        await ctx.editMessageText('⏳ Separando ideas y reflexiones...');
-        try {
-          const split = await voicenoteSkill.splitIntent(cleanTranscription);
-          ctx.session.pendingVoicenoteSplitJournal = split.journal_entry ?? cleanTranscription;
-          ctx.session.pendingVoicenoteSplitContent = split.content_idea ?? cleanTranscription;
-        } catch (err) {
-          logger.error({ err }, '[VoicenoteSkill] split-intent LLM failed, falling back to full text');
-          ctx.session.pendingVoicenoteSplitJournal = cleanTranscription;
-          ctx.session.pendingVoicenoteSplitContent = cleanTranscription;
-        }
-
-        // Next: workspace selection (or auto-select if only one)
-        if (workspaces.length <= 1) {
-          ctx.session.selectedVoicenoteWorkspaceIds = workspaces.map((w) => w.id);
-          // Jump straight to brand selection
-          if (brands.length <= 1) {
-            ctx.session.selectedVoicenoteBrandIds = brands.map((b) => b.id);
-            await handleBothDispatch(ctx);
-          } else {
-            await ctx.editMessageText('💡 ¿A qué marca(s) enviamos la idea de contenido?', {
-              reply_markup: buildBrandKeyboard(brands, []),
-            });
-          }
-        } else {
-          await ctx.editMessageText('📓 ¿A qué espacio de trabajo va la entrada de diario?', {
-            reply_markup: buildWorkspaceKeyboard(workspaces, []),
-          });
-        }
+      if (ctx.session?.voicenoteProcessError) {
+        await ctx.answerCbQuery('❌ Error procesando la nota. Intenta de nuevo.');
         return;
       }
-
-      // ── JOURNAL only ──────────────────────────────────────────────────────
-      if (isJournal) {
-        if (workspaces.length === 0) {
-          await ctx.editMessageText('⚠️ No tienes espacios de trabajo configurados.');
-          return;
-        }
-        if (workspaces.length === 1) {
-          // Auto-select and dispatch immediately
-          await ctx.editMessageText('⏳ Guardando entrada de diario...');
-          await dispatchJournalAndFinish(ctx, workspaces[0].id);
-        } else {
-          await ctx.editMessageText('📓 ¿A qué espacio de trabajo va esta entrada?', {
-            reply_markup: buildWorkspaceKeyboard(workspaces, []),
-          });
-        }
-        return;
-      }
-
-      // ── CONTENT only ──────────────────────────────────────────────────────
-      if (isContent) {
-        if (brands.length === 0) {
-          await ctx.editMessageText('⚠️ No tienes marcas configuradas. Crea una marca primero.');
-          return;
-        }
-        if (brands.length === 1) {
-          // Auto-select and dispatch immediately
-          await ctx.editMessageText(`⏳ Enviando nota de voz a *${brands[0].name}*...`, { parse_mode: 'Markdown' });
-          const results = await voicenoteSkill.dispatchToBrands(voicenoteId, cleanTranscription, ctx.session.pendingVoicenoteSynthesis, brands);
-          clearVoicenoteSession(ctx);
-          const summaryLines = results.map((r) => `- ${r.ideaCount} nuevas ideas para ${r.brandName}`).join('\n');
-          await ctx.editMessageText(`✅ Nota de voz enviada. Se generaron:\n${summaryLines}`);
-        } else {
-          await ctx.editMessageText('💡 ¿A qué marca(s) enviamos esta nota de voz?', {
-            reply_markup: buildBrandKeyboard(brands, []),
-          });
-        }
-        return;
-      }
+      await handleTriageState(ctx);
+      return;
     }
 
-    // ── Step 2a: Workspace multi-select ───────────────────────────────────────
     if (data.startsWith('vnote_ws_') && data !== 'vnote_ws_confirm') {
       const workspaceId = data.replace('vnote_ws_', '');
       const workspaces: Array<{ id: string; name: string }> = ctx.session?.pendingVoicenoteWorkspaces ?? [];
@@ -251,42 +181,21 @@ bot.on('callback_query', async (ctx) => {
         await ctx.answerCbQuery('Selecciona al menos un espacio de trabajo.');
         return;
       }
-
-      const intents: string[] = ctx.session?.selectedVoicenoteIntents ?? [];
-      const isBoth = intents.includes('journal') && intents.includes('content');
-      const brands: Array<{ id: string; name: string }> = ctx.session?.pendingVoicenoteBrands ?? [];
-
-      if (isBoth) {
-        // Workspace confirmed for Both path → now show brand selection
-        if (brands.length <= 1) {
-          ctx.session.selectedVoicenoteBrandIds = brands.map((b) => b.id);
-          await handleBothDispatch(ctx);
-        } else {
-          await ctx.editMessageText('💡 ¿A qué marca(s) enviamos la idea de contenido?', {
-            reply_markup: buildBrandKeyboard(brands, []),
-          });
-        }
-      } else {
-        // Journal-only path: dispatch to first selected workspace
-        await ctx.editMessageText('⏳ Guardando entrada de diario...');
-        await dispatchJournalAndFinish(ctx, selectedWs[0]);
-      }
+      await handleTriageState(ctx);
       return;
     }
 
-    // ── Step 2b: Brand multi-select ───────────────────────────────────────────
-    const brands: Array<{ id: string; name: string }> = ctx.session?.pendingVoicenoteBrands ?? [];
-    let selected: string[] = ctx.session?.selectedVoicenoteBrandIds ?? [];
-
     if (data === 'vnote_all') {
-      selected = brands.map((b) => b.id);
-      ctx.session.selectedVoicenoteBrandIds = selected;
-      await ctx.editMessageReplyMarkup(buildBrandKeyboard(brands, selected));
+      const brands: Array<{ id: string; name: string }> = ctx.session?.pendingVoicenoteBrands ?? [];
+      ctx.session.selectedVoicenoteBrandIds = brands.map((b) => b.id);
+      await ctx.editMessageReplyMarkup(buildBrandKeyboard(brands, ctx.session.selectedVoicenoteBrandIds));
       return;
     }
 
     if (data.startsWith('vnote_brand_')) {
       const brandId = data.replace('vnote_brand_', '');
+      const brands: Array<{ id: string; name: string }> = ctx.session?.pendingVoicenoteBrands ?? [];
+      let selected: string[] = ctx.session?.selectedVoicenoteBrandIds ?? [];
       selected = selected.includes(brandId)
         ? selected.filter((id) => id !== brandId)
         : [...selected, brandId];
@@ -296,30 +205,13 @@ bot.on('callback_query', async (ctx) => {
     }
 
     if (data === 'vnote_confirm') {
+      const selected: string[] = ctx.session?.selectedVoicenoteBrandIds ?? [];
       if (selected.length === 0) {
         await ctx.answerCbQuery('Selecciona al menos una marca.');
         return;
       }
-
-      const intents: string[] = ctx.session?.selectedVoicenoteIntents ?? [];
-      const isBoth = intents.includes('journal') && intents.includes('content');
-
-      if (isBoth) {
-        // Brand confirmed for Both path → dispatch both
-        await handleBothDispatch(ctx);
-      } else {
-        // Content-only path dispatch
-        const voicenoteId: string = ctx.session?.pendingVoicenoteId;
-        const cleanTranscription: string = ctx.session?.pendingVoicenoteClean;
-        const synthesis: string = ctx.session?.pendingVoicenoteSynthesis;
-        const selectedBrands = brands.filter((b) => selected.includes(b.id));
-        const selectedNames = selectedBrands.map((b) => b.name).join(', ');
-        await ctx.editMessageText(`⏳ Enviando nota de voz a: ${selectedNames}...`);
-        const results = await voicenoteSkill.dispatchToBrands(voicenoteId, cleanTranscription, synthesis, selectedBrands);
-        clearVoicenoteSession(ctx);
-        const summaryLines = results.map((r) => `- ${r.ideaCount} nuevas ideas para ${r.brandName}`).join('\n');
-        await ctx.editMessageText(`✅ Nota de voz enviada. Se generaron:\n${summaryLines}`);
-      }
+      await handleTriageState(ctx);
+      return;
     }
   }
 });
@@ -354,19 +246,48 @@ bot.on('message', async (ctx) => {
   return ctx.reply('Entendido. ¿Necesitas algo más?');
 });
 
-// ── Helper: dispatch journal-only path and display success ───────────────────
-async function dispatchJournalAndFinish(ctx: ZazuContext, workspaceId: string) {
-  const voicenoteId: string = ctx.session?.pendingVoicenoteId ?? '';
-  const cleanTranscription: string = ctx.session?.pendingVoicenoteClean ?? '';
-  const nauUserId: string = ctx.dbUser?.nauUserId ?? '';
-  try {
-    await voicenoteSkill.dispatchToJournal(voicenoteId, cleanTranscription, workspaceId, nauUserId);
-    clearVoicenoteSession(ctx);
-    await ctx.editMessageText('✅ Entrada de diario guardada.');
-  } catch (err) {
-    logger.error({ err }, '[VoicenoteSkill] Failed to dispatch journal entry');
-    await ctx.editMessageText('❌ Error al guardar la entrada de diario. Intenta de nuevo.');
+async function handleTriageState(ctx: ZazuContext) {
+  const intents: string[] = ctx.session?.selectedVoicenoteIntents ?? [];
+  const workspaces: Array<{ id: string; name: string }> = ctx.session?.pendingVoicenoteWorkspaces ?? [];
+  const brands: Array<{ id: string; name: string }> = ctx.session?.pendingVoicenoteBrands ?? [];
+  
+  const needsWorkspace = intents.includes('journal') || intents.includes('actions');
+  const needsBrand = intents.includes('content');
+
+  // 1. Resolve Workspace
+  if (needsWorkspace && !ctx.session?.selectedVoicenoteWorkspaceIds) {
+    if (workspaces.length === 0) {
+      await ctx.editMessageText('⚠️ No tienes espacios de trabajo configurados.');
+      return;
+    }
+    if (workspaces.length === 1) {
+      ctx.session.selectedVoicenoteWorkspaceIds = [workspaces[0].id];
+    } else {
+      await ctx.editMessageText('📓 ¿A qué espacio de trabajo va esto?', {
+        reply_markup: buildWorkspaceKeyboard(workspaces, []),
+      });
+      return;
+    }
   }
+
+  // 2. Resolve Brand
+  if (needsBrand && !ctx.session?.selectedVoicenoteBrandIds) {
+    if (brands.length === 0) {
+      await ctx.editMessageText('⚠️ No tienes marcas configuradas. Crea una marca primero.');
+      return;
+    }
+    if (brands.length === 1) {
+      ctx.session.selectedVoicenoteBrandIds = [brands[0].id];
+    } else {
+      await ctx.editMessageText('💡 ¿A qué marca(s) enviamos el contenido?', {
+        reply_markup: buildBrandKeyboard(brands, []),
+      });
+      return;
+    }
+  }
+
+  // 3. Dispatch
+  await handleFinalDispatch(ctx);
 }
 
 // ── Helper: clear all voicenote-related session keys ────────────────────────
@@ -374,7 +295,7 @@ function clearVoicenoteSession(ctx: ZazuContext) {
   if (!ctx.session) return;
   ctx.session.pendingVoicenoteId = undefined;
   ctx.session.pendingVoicenoteClean = undefined;
-  ctx.session.pendingVoicenoteSynthesis = undefined;
+  ctx.session.pendingVoicenoteSummary = undefined;
   ctx.session.pendingVoicenoteBrands = undefined;
   ctx.session.pendingVoicenoteWorkspaces = undefined;
   ctx.session.selectedVoicenoteBrandIds = undefined;
@@ -382,31 +303,66 @@ function clearVoicenoteSession(ctx: ZazuContext) {
   ctx.session.selectedVoicenoteIntents = undefined;
   ctx.session.pendingVoicenoteSplitJournal = undefined;
   ctx.session.pendingVoicenoteSplitContent = undefined;
+  ctx.session.voicenoteProcessPromise = undefined;
+  ctx.session.voicenoteProcessError = undefined;
+  ctx.session.voicenoteMessageId = undefined;
+  ctx.session.voicenoteChatId = undefined;
 }
 
-// ── Helper: dispatch both journal and content for the "Both" path ─────────────
-async function handleBothDispatch(ctx: ZazuContext) {
+async function awaitVoicenoteProcessingAndHandleError(ctx: ZazuContext): Promise<boolean> {
+  if (ctx.session?.voicenoteProcessPromise && !ctx.session?.pendingVoicenoteId) {
+    await ctx.editMessageText('⏳ Procesando nota de voz...');
+    await ctx.session.voicenoteProcessPromise;
+  }
+  if (ctx.session?.voicenoteProcessError) {
+    await ctx.editMessageText('❌ Error procesando la nota. Intenta de nuevo.');
+    return true; // indicates error
+  }
+  return false;
+}
+
+async function handleFinalDispatch(ctx: ZazuContext) {
+  if (await awaitVoicenoteProcessingAndHandleError(ctx)) return;
+
+  const intents: string[] = ctx.session?.selectedVoicenoteIntents ?? [];
   const voicenoteId: string = ctx.session?.pendingVoicenoteId ?? '';
-  const synthesis: string = ctx.session?.pendingVoicenoteSynthesis ?? '';
+  const cleanTranscription: string = ctx.session?.pendingVoicenoteClean ?? '';
+  const summaryText: string = ctx.session?.pendingVoicenoteSummary ?? '';
   const nauUserId: string = ctx.dbUser?.nauUserId ?? '';
 
-  const journalText: string = ctx.session?.pendingVoicenoteSplitJournal ?? ctx.session?.pendingVoicenoteClean ?? '';
-  const contentText: string = ctx.session?.pendingVoicenoteSplitContent ?? ctx.session?.pendingVoicenoteClean ?? '';
+  let journalText: string = cleanTranscription;
+  let contentText: string = cleanTranscription;
+  let actionText: string = cleanTranscription;
+
+  if (intents.length > 1) {
+    await ctx.editMessageText('⏳ Separando intenciones...');
+    try {
+      const split = await voicenoteSkill.splitIntent(cleanTranscription, intents);
+      journalText = split.journal_entry ?? cleanTranscription;
+      contentText = split.content_idea ?? cleanTranscription;
+      actionText = split.action_items ?? cleanTranscription;
+    } catch (err) {
+      logger.error({ err }, '[VoicenoteSkill] split-intent LLM failed, falling back to full text');
+    }
+  }
 
   const selectedWsIds: string[] = ctx.session?.selectedVoicenoteWorkspaceIds ?? [];
   const selectedBrandIds: string[] = ctx.session?.selectedVoicenoteBrandIds ?? [];
   const brands: Brand[] = (ctx.session?.pendingVoicenoteBrands ?? []).filter((b: Brand) => selectedBrandIds.includes(b.id));
   const workspaceId = selectedWsIds[0];
 
-  await ctx.editMessageText('⏳ Guardando diario y enviando ideas de contenido...');
+  await ctx.editMessageText('⏳ Despachando a la plataforma...');
 
-  const [, contentResults] = await Promise.allSettled([
-    workspaceId
+  const [, contentResults, actionResults] = await Promise.allSettled([
+    intents.includes('journal') && workspaceId
       ? voicenoteSkill.dispatchToJournal(voicenoteId, journalText, workspaceId, nauUserId)
       : Promise.resolve(),
-    brands.length > 0
-      ? voicenoteSkill.dispatchToBrands(voicenoteId, contentText, synthesis, brands)
+    intents.includes('content') && brands.length > 0
+      ? voicenoteSkill.dispatchToBrands(voicenoteId, contentText, brands)
       : Promise.resolve([]),
+    intents.includes('actions') && workspaceId
+      ? voicenoteSkill.dispatchToActions(voicenoteId, actionText, workspaceId, nauUserId)
+      : Promise.resolve({ blocks: [] }),
   ]);
 
   clearVoicenoteSession(ctx);
@@ -415,10 +371,21 @@ async function handleBothDispatch(ctx: ZazuContext) {
     ? contentResults.value as Array<{ brandName: string; ideaCount: number }>
     : [];
 
-  const summaryLines = contentResultData.map((r) => `- ${r.ideaCount} ideas para ${r.brandName}`).join('\n');
-  const journalLine = workspaceId ? '📓 Entrada de diario guardada.' : '';
-  const contentLine = summaryLines ? `💡 Ideas de contenido:\n${summaryLines}` : '';
-  await ctx.editMessageText(`✅ Nota de voz procesada.\n${[journalLine, contentLine].filter(Boolean).join('\n')}`);
+  const actionsResultData = actionResults.status === 'fulfilled' && actionResults.value && (actionResults.value as any).blocks
+    ? ((actionResults.value as any).blocks.length as number)
+    : 0;
+
+  const contentLines = contentResultData.map((r) => `- ${r.ideaCount} ideas para ${r.brandName}`).join('\n');
+  const journalLine = intents.includes('journal') ? '📓 Entrada de diario guardada.' : '';
+  const contentLine = contentLines ? `💡 Ideas de contenido:\n${contentLines}` : '';
+  const actionLine = intents.includes('actions') ? `✅ Tareas: ${actionsResultData} bloques creados.` : '';
+  
+  const formattedSummary = summaryText ? `\n📝 *Resumen:* ${summaryText}\n` : '';
+
+  await ctx.editMessageText(
+    `✅ Nota de voz procesada.\n${formattedSummary}\n${[journalLine, contentLine, actionLine].filter(Boolean).join('\n')}`,
+    { parse_mode: 'Markdown' }
+  );
 }
 
 async function launchBot(retries = 5): Promise<void> {

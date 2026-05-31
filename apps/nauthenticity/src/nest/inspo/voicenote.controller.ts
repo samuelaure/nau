@@ -29,7 +29,7 @@ export class VoicenoteController {
   @UseGuards(ServiceAuthGuard)
   async createFromCapture(
     @Param('brandId') brandId: string,
-    @Body() body: { cleanTranscription: string; synthesis: string; sourceRef?: string },
+    @Body() body: { cleanTranscription: string; sourceRef?: string },
   ) {
     return this.voicenoteService.createFromCapture(brandId, body)
   }
