@@ -120,6 +120,12 @@ bot.on('callback_query', async (ctx) => {
 
     // ── Step 1: Intent selection (Journal / Content) ──────────────────────────
     if (data === 'vnote_triage_journal' || data === 'vnote_triage_content' || data === 'vnote_triage_actions') {
+      // Guard: session may be undefined after a bot restart
+      if (!ctx.session) {
+        await ctx.answerCbQuery('⚠️ La sesión expiró. Envía la nota de voz de nuevo.');
+        await ctx.editMessageText('⚠️ Sesión expirada. Por favor envía la nota de voz de nuevo.');
+        return;
+      }
       if (ctx.session?.pendingVoicenoteSplitJournal || (ctx.session?.selectedVoicenoteWorkspaceIds ?? []).length > 0) {
         await ctx.answerCbQuery('Esta etapa ya fue confirmada.');
         return;
@@ -150,6 +156,11 @@ bot.on('callback_query', async (ctx) => {
 
     // ── Generic Confirm Routing ───────────────────────────────────────
     if (data === 'vnote_triage_confirm') {
+      if (!ctx.session) {
+        await ctx.answerCbQuery('⚠️ La sesión expiró. Envía la nota de voz de nuevo.');
+        await ctx.editMessageText('⚠️ Sesión expirada. Por favor envía la nota de voz de nuevo.');
+        return;
+      }
       const intents: string[] = ctx.session?.selectedVoicenoteIntents ?? [];
       if (intents.length === 0) {
         await ctx.answerCbQuery('Selecciona al menos una opción.');
@@ -164,6 +175,10 @@ bot.on('callback_query', async (ctx) => {
     }
 
     if (data.startsWith('vnote_ws_') && data !== 'vnote_ws_confirm') {
+      if (!ctx.session) {
+        await ctx.answerCbQuery('⚠️ La sesión expiró. Envía la nota de voz de nuevo.');
+        return;
+      }
       const workspaceId = data.replace('vnote_ws_', '');
       const workspaces: Array<{ id: string; name: string }> = ctx.session?.pendingVoicenoteWorkspaces ?? [];
       let selected: string[] = ctx.session?.selectedVoicenoteWorkspaceIds ?? [];
@@ -186,6 +201,10 @@ bot.on('callback_query', async (ctx) => {
     }
 
     if (data === 'vnote_all') {
+      if (!ctx.session) {
+        await ctx.answerCbQuery('⚠️ La sesión expiró. Envía la nota de voz de nuevo.');
+        return;
+      }
       const brands: Array<{ id: string; name: string }> = ctx.session?.pendingVoicenoteBrands ?? [];
       ctx.session.selectedVoicenoteBrandIds = brands.map((b) => b.id);
       await ctx.editMessageReplyMarkup(buildBrandKeyboard(brands, ctx.session.selectedVoicenoteBrandIds));
@@ -193,6 +212,10 @@ bot.on('callback_query', async (ctx) => {
     }
 
     if (data.startsWith('vnote_brand_')) {
+      if (!ctx.session) {
+        await ctx.answerCbQuery('⚠️ La sesión expiró. Envía la nota de voz de nuevo.');
+        return;
+      }
       const brandId = data.replace('vnote_brand_', '');
       const brands: Array<{ id: string; name: string }> = ctx.session?.pendingVoicenoteBrands ?? [];
       let selected: string[] = ctx.session?.selectedVoicenoteBrandIds ?? [];

@@ -99,6 +99,7 @@ class VoicenoteSkillImpl implements ZazuSkill {
         inline_keyboard: [
           [{ text: '☐ 📓 Diario (Journal)', callback_data: 'vnote_triage_journal' }],
           [{ text: '☐ 💡 Idea de Contenido', callback_data: 'vnote_triage_content' }],
+          [{ text: '☐ 🎯 Tareas (Actions)', callback_data: 'vnote_triage_actions' }],
           [{ text: '▶️ Confirmar', callback_data: 'vnote_triage_confirm' }],
         ],
       },
