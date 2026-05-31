@@ -98,8 +98,8 @@ class VoicenoteSkillImpl implements ZazuSkill {
       reply_markup: {
         inline_keyboard: [
           [{ text: '☐ 📓 Diario (Journal)', callback_data: 'vnote_triage_journal' }],
-          [{ text: '☐ 💡 Idea de Contenido', callback_data: 'vnote_triage_content' }],
           [{ text: '☐ 🎯 Tareas (Actions)', callback_data: 'vnote_triage_actions' }],
+          [{ text: '☐ 💡 Idea de Contenido', callback_data: 'vnote_triage_content' }],
           [{ text: '▶️ Confirmar', callback_data: 'vnote_triage_confirm' }],
         ],
       },
@@ -151,8 +151,8 @@ class VoicenoteSkillImpl implements ZazuSkill {
             {
               role: 'system',
               content: `You receive a raw voice transcription. Return JSON with two fields:
-- "cleanTranscription": the transcription cleaned of filler words, repeated phrases, and disfluencies, with proper punctuation. Keep all meaning intact.
-- "summary": a brief 1-2 sentence summary of the core content.
+- "cleanTranscription": the transcription cleaned of filler words, repeated phrases, and disfluencies, with proper punctuation. Keep all meaning intact. Write in the same language as the input.
+- "summary": a condensed re-narration of the voice note in the same language, person (first-person if the speaker uses it), and perspective as the original. Do NOT interpret, explain, or add context. Just faithfully compress the content into 2-4 sentences that capture all key points. Imagine the speaker re-reading a shorter version of what they said.
 
 Return only valid JSON: { "cleanTranscription": "...", "summary": "..." }`,
             },

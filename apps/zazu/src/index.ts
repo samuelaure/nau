@@ -146,8 +146,8 @@ bot.on('callback_query', async (ctx) => {
       await ctx.editMessageReplyMarkup({
         inline_keyboard: [
           [{ text: intents.includes('journal') ? '✅ 📓 Diario (Journal)' : '☐ 📓 Diario (Journal)', callback_data: 'vnote_triage_journal' }],
-          [{ text: intents.includes('content') ? '✅ 💡 Idea de Contenido' : '☐ 💡 Idea de Contenido', callback_data: 'vnote_triage_content' }],
           [{ text: intents.includes('actions') ? '✅ 🎯 Tareas (Actions)' : '☐ 🎯 Tareas (Actions)', callback_data: 'vnote_triage_actions' }],
+          [{ text: intents.includes('content') ? '✅ 💡 Idea de Contenido' : '☐ 💡 Idea de Contenido', callback_data: 'vnote_triage_content' }],
           [{ text: '▶️ Confirmar', callback_data: 'vnote_triage_confirm' }],
         ],
       });
@@ -277,30 +277,35 @@ async function handleTriageState(ctx: ZazuContext) {
   const needsWorkspace = intents.includes('journal') || intents.includes('actions');
   const needsBrand = intents.includes('content');
 
-  // 1. Resolve Workspace
-  if (needsWorkspace && !ctx.session?.selectedVoicenoteWorkspaceIds) {
+  // 1. Resolve Workspace (if not yet selected)
+  if (needsWorkspace && (ctx.session?.selectedVoicenoteWorkspaceIds ?? []).length === 0) {
     if (workspaces.length === 0) {
       await ctx.editMessageText('⚠️ No tienes espacios de trabajo configurados.');
       return;
     }
     if (workspaces.length === 1) {
-      ctx.session.selectedVoicenoteWorkspaceIds = [workspaces[0].id];
+      ctx.session!.selectedVoicenoteWorkspaceIds = [workspaces[0].id];
     } else {
-      await ctx.editMessageText('📓 ¿A qué espacio de trabajo va esto?', {
+      const wsLabel = intents.includes('journal') && intents.includes('actions')
+        ? '📓🎯 ¿A qué espacio de trabajo va esto?'
+        : intents.includes('journal')
+          ? '📓 ¿A qué espacio de trabajo va el diario?'
+          : '🎯 ¿A qué espacio de trabajo van las tareas?';
+      await ctx.editMessageText(wsLabel, {
         reply_markup: buildWorkspaceKeyboard(workspaces, []),
       });
       return;
     }
   }
 
-  // 2. Resolve Brand
-  if (needsBrand && !ctx.session?.selectedVoicenoteBrandIds) {
+  // 2. Resolve Brand (if not yet selected)
+  if (needsBrand && (ctx.session?.selectedVoicenoteBrandIds ?? []).length === 0) {
     if (brands.length === 0) {
       await ctx.editMessageText('⚠️ No tienes marcas configuradas. Crea una marca primero.');
       return;
     }
     if (brands.length === 1) {
-      ctx.session.selectedVoicenoteBrandIds = [brands[0].id];
+      ctx.session!.selectedVoicenoteBrandIds = [brands[0].id];
     } else {
       await ctx.editMessageText('💡 ¿A qué marca(s) enviamos el contenido?', {
         reply_markup: buildBrandKeyboard(brands, []),
