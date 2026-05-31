@@ -45,15 +45,17 @@ function buildBrandKeyboard(brands: Brand[], selected: string[]) {
   }
 }
 
-function buildWorkspaceKeyboard(workspaces: Workspace[], selected: string[]) {
+function buildWorkspaceKeyboard(workspaces: Workspace[], selected: string[], intent: 'journal' | 'actions' = 'journal') {
+  const prefix = intent === 'journal' ? 'vnote_ws_journal_' : 'vnote_ws_actions_';
+  const confirmData = intent === 'journal' ? 'vnote_ws_journal_confirm' : 'vnote_ws_actions_confirm';
   const wsButtons = workspaces.map((w) => ([{
     text: selected.includes(w.id) ? `✅ ${w.name}` : `☐ ${w.name}`,
-    callback_data: `vnote_ws_${w.id}`,
+    callback_data: `${prefix}${w.id}`,
   }]))
   return {
     inline_keyboard: [
       ...wsButtons,
-      [{ text: '▶️ Confirmar', callback_data: 'vnote_ws_confirm' }],
+      [{ text: '▶️ Confirmar', callback_data: confirmData }],
     ],
   }
 }
@@ -75,7 +77,8 @@ class VoicenoteSkillImpl implements ZazuSkill {
 
     ctx.session ??= {}
     ctx.session.selectedVoicenoteBrandIds = []
-    ctx.session.selectedVoicenoteWorkspaceIds = []
+    ctx.session.selectedVoicenoteJournalWorkspaceId = undefined
+    ctx.session.selectedVoicenoteActionsWorkspaceId = undefined
     ctx.session.selectedVoicenoteIntents = []
     ctx.session.pendingVoicenoteId = undefined
     ctx.session.pendingVoicenoteClean = undefined
@@ -262,46 +265,43 @@ Return only valid JSON: { "cleanTranscription": "...", "summary": "..." }`,
   async splitIntent(cleanTranscription: string, intents: string[]): Promise<any> {
     const { client, model } = getClientForFeature('voicenote_split')
     
-    // Dynamically build schema and prompt based on selected intents
-    const shape: any = {}
+    const fields: string[] = []
     const rules: string[] = []
     
     if (intents.includes('journal')) {
-      shape.journal_entry = z.string().nullable().describe('Personal thoughts, feelings, plans, reflections, life observations. Null if none.')
-      rules.push('- "journal_entry": personal thoughts, feelings, reflections. Return null if nothing personal.')
-    }
-    if (intents.includes('content')) {
-      shape.content_idea = z.string().nullable().describe('Ideas for social media content, hooks, topics, angles for a brand or creator. Null if none.')
-      rules.push('- "content_idea": ideas for social media content, hooks, topics, angles. Return null if no content ideas.')
+      fields.push('"journal_entry": string | null')
+      rules.push('- "journal_entry": personal thoughts, feelings, reflections. null if none.')
     }
     if (intents.includes('actions')) {
-      shape.action_items = z.string().nullable().describe('Actionable tasks, errands, or project steps. Null if none.')
-      rules.push('- "action_items": concrete tasks, errands, or project steps. Return null if no actionable items.')
+      fields.push('"action_items": string | null')
+      rules.push('- "action_items": concrete tasks, errands, or project steps. null if none.')
+    }
+    if (intents.includes('content')) {
+      fields.push('"content_idea": string | null')
+      rules.push('- "content_idea": ideas for social media content, hooks, topics, angles. null if none.')
     }
 
-    const DynamicSchema = z.object(shape)
-
-    const result = await client.parseCompletion({
+    const result = await client.chatCompletion({
       model,
       temperature: 0.1,
-      schema: DynamicSchema as any,
-      schemaName: 'VoicenoteSplit',
       messages: [
         {
           role: 'system',
-          content: `You receive a voice transcription. Your task is to extract relevant parts into the following fields:
+          content: `You receive a voice transcription. Extract relevant parts into these fields:
 
 ${rules.join('\n')}
 
 Rules:
-- Keep the full meaning of each part. Do not summarize or shorten unless necessary.
+- Keep the full meaning of each part. Do not summarize unless necessary.
 - Write in the same language as the input.
-- Return valid JSON matching the schema.`,
+- Return valid JSON with only these keys: { ${fields.join(', ')} }
+- Use null for fields with no relevant content.`,
         },
         { role: 'user', content: cleanTranscription },
       ],
+      responseFormat: { type: 'json_object' },
     })
-    return result.data
+    return JSON.parse(result.content as string)
   }
 }
 

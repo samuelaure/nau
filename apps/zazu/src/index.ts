@@ -126,7 +126,7 @@ bot.on('callback_query', async (ctx) => {
         await ctx.editMessageText('⚠️ Sesión expirada. Por favor envía la nota de voz de nuevo.');
         return;
       }
-      if (ctx.session?.pendingVoicenoteSplitJournal || (ctx.session?.selectedVoicenoteWorkspaceIds ?? []).length > 0) {
+      if (ctx.session?.pendingVoicenoteSplitJournal || ctx.session?.selectedVoicenoteJournalWorkspaceId || ctx.session?.selectedVoicenoteActionsWorkspaceId) {
         await ctx.answerCbQuery('Esta etapa ya fue confirmada.');
         return;
       }
@@ -174,26 +174,39 @@ bot.on('callback_query', async (ctx) => {
       return;
     }
 
-    if (data.startsWith('vnote_ws_') && data !== 'vnote_ws_confirm') {
+    if (data.startsWith('vnote_ws_journal_') || data.startsWith('vnote_ws_actions_')) {
       if (!ctx.session) {
         await ctx.answerCbQuery('⚠️ La sesión expiró. Envía la nota de voz de nuevo.');
         return;
       }
-      const workspaceId = data.replace('vnote_ws_', '');
+      const isJournal = data.startsWith('vnote_ws_journal_');
+      const workspaceId = isJournal
+        ? data.replace('vnote_ws_journal_', '')
+        : data.replace('vnote_ws_actions_', '');
       const workspaces: Array<{ id: string; name: string }> = ctx.session?.pendingVoicenoteWorkspaces ?? [];
-      let selected: string[] = ctx.session?.selectedVoicenoteWorkspaceIds ?? [];
-      selected = selected.includes(workspaceId)
-        ? selected.filter((id) => id !== workspaceId)
-        : [...selected, workspaceId];
-      ctx.session.selectedVoicenoteWorkspaceIds = selected;
-      await ctx.editMessageReplyMarkup(buildWorkspaceKeyboard(workspaces, selected));
+      if (isJournal) {
+        // Journal: single-select (last click wins)
+        ctx.session.selectedVoicenoteJournalWorkspaceId = workspaceId;
+        await ctx.editMessageReplyMarkup(buildWorkspaceKeyboard(workspaces, [workspaceId], 'journal'));
+      } else {
+        // Actions: single-select
+        ctx.session.selectedVoicenoteActionsWorkspaceId = workspaceId;
+        await ctx.editMessageReplyMarkup(buildWorkspaceKeyboard(workspaces, [workspaceId], 'actions'));
+      }
       return;
     }
 
-    if (data === 'vnote_ws_confirm') {
-      const selectedWs: string[] = ctx.session?.selectedVoicenoteWorkspaceIds ?? [];
-      if (selectedWs.length === 0) {
-        await ctx.answerCbQuery('Selecciona al menos un espacio de trabajo.');
+    if (data === 'vnote_ws_journal_confirm' || data === 'vnote_ws_actions_confirm') {
+      if (!ctx.session) {
+        await ctx.answerCbQuery('⚠️ La sesión expiró. Envía la nota de voz de nuevo.');
+        return;
+      }
+      if (data === 'vnote_ws_journal_confirm' && !ctx.session.selectedVoicenoteJournalWorkspaceId) {
+        await ctx.answerCbQuery('Selecciona un espacio de trabajo.');
+        return;
+      }
+      if (data === 'vnote_ws_actions_confirm' && !ctx.session.selectedVoicenoteActionsWorkspaceId) {
+        await ctx.answerCbQuery('Selecciona un espacio de trabajo.');
         return;
       }
       await handleTriageState(ctx);
@@ -273,33 +286,41 @@ async function handleTriageState(ctx: ZazuContext) {
   const intents: string[] = ctx.session?.selectedVoicenoteIntents ?? [];
   const workspaces: Array<{ id: string; name: string }> = ctx.session?.pendingVoicenoteWorkspaces ?? [];
   const brands: Array<{ id: string; name: string }> = ctx.session?.pendingVoicenoteBrands ?? [];
-  
-  const needsWorkspace = intents.includes('journal') || intents.includes('actions');
-  const needsBrand = intents.includes('content');
 
-  // 1. Resolve Workspace (if not yet selected)
-  if (needsWorkspace && (ctx.session?.selectedVoicenoteWorkspaceIds ?? []).length === 0) {
+  // 1. Resolve Journal Workspace
+  if (intents.includes('journal') && !ctx.session?.selectedVoicenoteJournalWorkspaceId) {
     if (workspaces.length === 0) {
       await ctx.editMessageText('⚠️ No tienes espacios de trabajo configurados.');
       return;
     }
     if (workspaces.length === 1) {
-      ctx.session!.selectedVoicenoteWorkspaceIds = [workspaces[0].id];
+      ctx.session!.selectedVoicenoteJournalWorkspaceId = workspaces[0].id;
     } else {
-      const wsLabel = intents.includes('journal') && intents.includes('actions')
-        ? '📓🎯 ¿A qué espacio de trabajo va esto?'
-        : intents.includes('journal')
-          ? '📓 ¿A qué espacio de trabajo va el diario?'
-          : '🎯 ¿A qué espacio de trabajo van las tareas?';
-      await ctx.editMessageText(wsLabel, {
-        reply_markup: buildWorkspaceKeyboard(workspaces, []),
+      await ctx.editMessageText('📓 ¿A qué espacio de trabajo va el diario?', {
+        reply_markup: buildWorkspaceKeyboard(workspaces, [], 'journal'),
       });
       return;
     }
   }
 
-  // 2. Resolve Brand (if not yet selected)
-  if (needsBrand && (ctx.session?.selectedVoicenoteBrandIds ?? []).length === 0) {
+  // 2. Resolve Actions Workspace
+  if (intents.includes('actions') && !ctx.session?.selectedVoicenoteActionsWorkspaceId) {
+    if (workspaces.length === 0) {
+      await ctx.editMessageText('⚠️ No tienes espacios de trabajo configurados.');
+      return;
+    }
+    if (workspaces.length === 1) {
+      ctx.session!.selectedVoicenoteActionsWorkspaceId = workspaces[0].id;
+    } else {
+      await ctx.editMessageText('🎯 ¿A qué espacio de trabajo van las tareas?', {
+        reply_markup: buildWorkspaceKeyboard(workspaces, [], 'actions'),
+      });
+      return;
+    }
+  }
+
+  // 3. Resolve Brand (if not yet selected)
+  if (intents.includes('content') && (ctx.session?.selectedVoicenoteBrandIds ?? []).length === 0) {
     if (brands.length === 0) {
       await ctx.editMessageText('⚠️ No tienes marcas configuradas. Crea una marca primero.');
       return;
@@ -314,7 +335,7 @@ async function handleTriageState(ctx: ZazuContext) {
     }
   }
 
-  // 3. Dispatch
+  // 4. Dispatch
   await handleFinalDispatch(ctx);
 }
 
@@ -327,7 +348,8 @@ function clearVoicenoteSession(ctx: ZazuContext) {
   ctx.session.pendingVoicenoteBrands = undefined;
   ctx.session.pendingVoicenoteWorkspaces = undefined;
   ctx.session.selectedVoicenoteBrandIds = undefined;
-  ctx.session.selectedVoicenoteWorkspaceIds = undefined;
+  ctx.session.selectedVoicenoteJournalWorkspaceId = undefined;
+  ctx.session.selectedVoicenoteActionsWorkspaceId = undefined;
   ctx.session.selectedVoicenoteIntents = undefined;
   ctx.session.pendingVoicenoteSplitJournal = undefined;
   ctx.session.pendingVoicenoteSplitContent = undefined;
@@ -374,22 +396,22 @@ async function handleFinalDispatch(ctx: ZazuContext) {
     }
   }
 
-  const selectedWsIds: string[] = ctx.session?.selectedVoicenoteWorkspaceIds ?? [];
+  const journalWorkspaceId: string = ctx.session?.selectedVoicenoteJournalWorkspaceId ?? '';
+  const actionsWorkspaceId: string = ctx.session?.selectedVoicenoteActionsWorkspaceId ?? '';
   const selectedBrandIds: string[] = ctx.session?.selectedVoicenoteBrandIds ?? [];
   const brands: Brand[] = (ctx.session?.pendingVoicenoteBrands ?? []).filter((b: Brand) => selectedBrandIds.includes(b.id));
-  const workspaceId = selectedWsIds[0];
 
   await ctx.editMessageText('⏳ Despachando a la plataforma...');
 
-  const [, contentResults, actionResults] = await Promise.allSettled([
-    intents.includes('journal') && workspaceId
-      ? voicenoteSkill.dispatchToJournal(voicenoteId, journalText, workspaceId, nauUserId)
+  const [journalResult, contentResults, actionResults] = await Promise.allSettled([
+    intents.includes('journal') && journalWorkspaceId
+      ? voicenoteSkill.dispatchToJournal(voicenoteId, journalText, journalWorkspaceId, nauUserId)
       : Promise.resolve(),
     intents.includes('content') && brands.length > 0
       ? voicenoteSkill.dispatchToBrands(voicenoteId, contentText, brands)
       : Promise.resolve([]),
-    intents.includes('actions') && workspaceId
-      ? voicenoteSkill.dispatchToActions(voicenoteId, actionText, workspaceId, nauUserId)
+    intents.includes('actions') && actionsWorkspaceId
+      ? voicenoteSkill.dispatchToActions(voicenoteId, actionText, actionsWorkspaceId, nauUserId)
       : Promise.resolve({ blocks: [] }),
   ]);
 
@@ -400,18 +422,18 @@ async function handleFinalDispatch(ctx: ZazuContext) {
     : [];
 
   const actionsResultData = actionResults.status === 'fulfilled' && actionResults.value && (actionResults.value as any).blocks
-    ? ((actionResults.value as any).blocks.length as number)
+    ? ((actionResults.value as any).blocks as any[]).filter((b: any) => b.type === 'action').length
     : 0;
 
   const contentLines = contentResultData.map((r) => `- ${r.ideaCount} ideas para ${r.brandName}`).join('\n');
   const journalLine = intents.includes('journal') ? '📓 Entrada de diario guardada.' : '';
   const contentLine = contentLines ? `💡 Ideas de contenido:\n${contentLines}` : '';
-  const actionLine = intents.includes('actions') ? `✅ Tareas: ${actionsResultData} bloques creados.` : '';
+  const actionLine = intents.includes('actions') ? `🎯 Tareas: ${actionsResultData} ${actionsResultData === 1 ? 'bloque creado' : 'bloques creados'}.` : '';
   
   const formattedSummary = summaryText ? `\n📝 *Resumen:* ${summaryText}\n` : '';
 
   await ctx.editMessageText(
-    `✅ Nota de voz procesada.\n${formattedSummary}\n${[journalLine, contentLine, actionLine].filter(Boolean).join('\n')}`,
+    `✅ Nota de voz procesada.\n${formattedSummary}\n${[journalLine, actionLine, contentLine].filter(Boolean).join('\n')}`,
     { parse_mode: 'Markdown' }
   );
 }
