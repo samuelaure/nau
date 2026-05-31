@@ -93,7 +93,7 @@ Return only valid JSON: { "cleanTranscription": "...", "synthesis": "..." }`,
 
   async createFromCapture(
     brandId: string,
-    data: { cleanTranscription: string; synthesis: string; sourceRef?: string },
+    data: { cleanTranscription: string; sourceRef?: string },
   ) {
     const brand = await this.prisma.brand.upsert({
       where: { id: brandId },
@@ -105,7 +105,7 @@ Return only valid JSON: { "cleanTranscription": "...", "synthesis": "..." }`,
     // Re-synthesize using the brand's language so the SourceConcept is always
     // in the correct language regardless of what language zazu processed with.
     const language = brand.language ?? 'Spanish'
-    let synthesis = data.synthesis
+    let synthesis = ''
     try {
       const { client, model } = getClientForFeature('synthesis')
       const result = await client.chatCompletion({
@@ -119,9 +119,13 @@ Return only valid JSON: { "cleanTranscription": "...", "synthesis": "..." }`,
           { role: 'user', content: data.cleanTranscription },
         ],
       })
-      synthesis = result.content?.trim() || data.synthesis
-    } catch {
-      // Non-critical — fall back to the synthesis received from zazu
+      synthesis = result.content?.trim() || ''
+    } catch (err) {
+      this.logger.warn({ err }, 'Failed to generate content synthesis, using fallback')
+    }
+
+    if (!synthesis) {
+      synthesis = `(No content synthesis generated) ${data.cleanTranscription.substring(0, 150)}...`
     }
 
     const voicenote = await this.prisma.voicenote.create({

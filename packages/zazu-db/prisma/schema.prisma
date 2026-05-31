@@ -80,7 +80,7 @@ model Voicenote {
   audioStorageUrl    String
   rawTranscription   String
   cleanTranscription String
-  synthesis          String
+  summary            String
   createdAt          DateTime @default(now())
 
   @@index([userId])
