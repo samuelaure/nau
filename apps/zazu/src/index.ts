@@ -174,7 +174,10 @@ bot.on('callback_query', async (ctx) => {
       return;
     }
 
-    if (data.startsWith('vnote_ws_journal_') || data.startsWith('vnote_ws_actions_')) {
+    if (
+      (data.startsWith('vnote_ws_journal_') && data !== 'vnote_ws_journal_confirm') ||
+      (data.startsWith('vnote_ws_actions_') && data !== 'vnote_ws_actions_confirm')
+    ) {
       if (!ctx.session) {
         await ctx.answerCbQuery('⚠️ La sesión expiró. Envía la nota de voz de nuevo.');
         return;
