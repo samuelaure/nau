@@ -423,16 +423,25 @@ function SortableTextBlock({
 
 // ─── SceneBlock ───────────────────────────────────────────────────────────────
 
+type BrandDefaults = {
+  titleFont?: string
+  primaryColor?: string
+  overlayOpacity?: number
+  maxTextSize?: number
+}
+
 function SortableSceneBlock({
   scene,
   index,
   brandId,
+  brandDefaults,
   onChange,
   onRemove,
 }: {
   scene: SceneDef
   index: number
   brandId: string
+  brandDefaults?: BrandDefaults | null
   onChange: (patch: Partial<SceneDef>) => void
   onRemove: () => void
 }) {
@@ -468,6 +477,9 @@ function SortableSceneBlock({
   const addText = () => {
     const newText: TextDef = {
       ...DEFAULT_TEXT_DEF,
+      ...(brandDefaults?.titleFont ? { font: brandDefaults.titleFont } : {}),
+      ...(brandDefaults?.primaryColor ? { color: brandDefaults.primaryColor } : {}),
+      ...(brandDefaults?.maxTextSize ? { maxTextSize: brandDefaults.maxTextSize } : {}),
       id: createId(),
       content: '',
     }
@@ -682,11 +694,12 @@ function SortableSceneBlock({
 export interface ReelSceneBuilderProps {
   scenes: SceneDef[]
   brandId: string
+  brandDefaults?: BrandDefaults | null
   onSave: (scenes: SceneDef[]) => Promise<void>
   saving?: boolean
 }
 
-export function ReelSceneBuilder({ scenes: initialScenes, brandId, onSave, saving }: ReelSceneBuilderProps) {
+export function ReelSceneBuilder({ scenes: initialScenes, brandId, brandDefaults, onSave, saving }: ReelSceneBuilderProps) {
   const [scenes, setScenes] = useState<SceneDef[]>(initialScenes)
 
   const sensors = useSensors(
@@ -706,10 +719,14 @@ export function ReelSceneBuilder({ scenes: initialScenes, brandId, onSave, savin
   const addScene = () => {
     const newScene: SceneDef = {
       ...DEFAULT_SCENE_DEF,
+      ...(brandDefaults?.overlayOpacity != null ? { overlayOpacity: brandDefaults.overlayOpacity } : {}),
       id: createId(),
       texts: [
         {
           ...DEFAULT_TEXT_DEF,
+          ...(brandDefaults?.titleFont ? { font: brandDefaults.titleFont } : {}),
+          ...(brandDefaults?.primaryColor ? { color: brandDefaults.primaryColor } : {}),
+          ...(brandDefaults?.maxTextSize ? { maxTextSize: brandDefaults.maxTextSize } : {}),
           id: createId(),
           content: '',
         },
@@ -768,6 +785,7 @@ export function ReelSceneBuilder({ scenes: initialScenes, brandId, onSave, savin
               scene={scene}
               index={i}
               brandId={brandId}
+              brandDefaults={brandDefaults}
               onChange={(patch) => updateScene(scene.id, patch)}
               onRemove={() => removeScene(scene.id)}
             />

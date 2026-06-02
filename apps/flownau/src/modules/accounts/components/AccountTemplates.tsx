@@ -26,6 +26,15 @@ import { ReelSceneBuilder } from './ReelSceneBuilder'
 import AddTemplateButton from '@/modules/video/components/AddTemplateButton'
 import type { SceneDef } from '@/types/template-scenes'
 
+type BrandIdentity = {
+  primaryColor?: string
+  secondaryColor?: string
+  titleFont?: string
+  bodyFont?: string
+  overlayOpacity?: number
+  maxTextSize?: number
+}
+
 const FORMAT_ICON: Record<string, React.ElementType> = {
   reel: Film,
   trial_reel: Play,
@@ -292,12 +301,14 @@ function SlotOverrideRow({
 function TemplateModal({
   template,
   brandId,
+  brandIdentity,
   onClose,
   onRefresh,
   onDuplicated,
 }: {
   template: Template
   brandId: string
+  brandIdentity?: BrandIdentity | null
   onClose: () => void
   onRefresh: () => void
   onDuplicated: (newTemplate: Template) => void
@@ -313,8 +324,11 @@ function TemplateModal({
   const [saving, setSaving] = useState(false)
   const [savingPrompt, setSavingPrompt] = useState(false)
   const [savingName, setSavingName] = useState(false)
+  const [savingDescription, setSavingDescription] = useState(false)
   const [duplicating, setDuplicating] = useState(false)
   const [muted, setMuted] = useState(true)
+  const [editingDescription, setEditingDescription] = useState(false)
+  const [localDescription, setLocalDescription] = useState(template.description ?? '')
   const videoRef = useRef<HTMLVideoElement>(null)
 
   const FormatIcon = FORMAT_ICON[template.format] ?? Film
@@ -322,7 +336,24 @@ function TemplateModal({
   const contentSchema = template.contentSchema as Record<string, unknown> | null
   const scenes = (template.scenes ?? null) as SceneDef[] | null
   const isReelFormat = template.format === 'reel' || template.format === 'trial_reel'
+  const isHeadTalkFormat = template.format === 'head_talk' || template.format === 'trial_head_talk'
   const isDynamicReel = isReelFormat && scenes && scenes.length > 0
+
+  // Head Talk custom script/caption prompts — stored in BrandTemplateConfig.customPrompt
+  // Format: "SCRIPT_PROMPT: ...\nCAPTION_PROMPT: ..."
+  const parseHeadTalkPrompts = (raw: string | null | undefined) => {
+    if (!raw) return { scriptPrompt: '', captionPrompt: '' }
+    const scriptMatch = raw.match(/SCRIPT_PROMPT:\s*([\s\S]*?)(?=\nCAPTION_PROMPT:|$)/)
+    const captionMatch = raw.match(/CAPTION_PROMPT:\s*([\s\S]*)$/)
+    return {
+      scriptPrompt: scriptMatch?.[1]?.trim() ?? '',
+      captionPrompt: captionMatch?.[1]?.trim() ?? '',
+    }
+  }
+  const htParsed = parseHeadTalkPrompts(config?.customPrompt)
+  const [htScriptPrompt, setHtScriptPrompt] = useState(htParsed.scriptPrompt)
+  const [htCaptionPrompt, setHtCaptionPrompt] = useState(htParsed.captionPrompt)
+  const [savingHtPrompts, setSavingHtPrompts] = useState(false)
 
   // Tab: 'settings' always shown; 'builder' shown for block-based reels
   const [activeTab, setActiveTab] = useState<'settings' | 'builder'>(
@@ -412,6 +443,49 @@ function TemplateModal({
       toast.error('Failed to save name')
     } finally {
       setSavingName(false)
+    }
+  }
+
+  const saveDescription = async () => {
+    setSavingDescription(true)
+    try {
+      const res = await fetch(`/api/templates/${template.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: localDescription || null }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success('Description saved')
+      setEditingDescription(false)
+      onRefresh()
+    } catch {
+      toast.error('Failed to save description')
+    } finally {
+      setSavingDescription(false)
+    }
+  }
+
+  const saveHtPrompts = async () => {
+    setSavingHtPrompts(true)
+    try {
+      const composed = [
+        htScriptPrompt ? `SCRIPT_PROMPT: ${htScriptPrompt}` : '',
+        htCaptionPrompt ? `CAPTION_PROMPT: ${htCaptionPrompt}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n')
+      const res = await fetch('/api/account-templates', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brandId, templateId: template.id, customPrompt: composed || null }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success('Saved')
+      onRefresh()
+    } catch {
+      toast.error('Failed to save')
+    } finally {
+      setSavingHtPrompts(false)
     }
   }
 
@@ -582,6 +656,53 @@ function TemplateModal({
                   {template.format.replace('_', ' ')}
                 </span>
               </div>
+              {/* Description — inline editable */}
+              {editingDescription ? (
+                <div className="flex flex-col gap-1.5 mt-1">
+                  <textarea
+                    autoFocus
+                    value={localDescription}
+                    onChange={(e) => setLocalDescription(e.target.value)}
+                    placeholder={`Short description of this template…`}
+                    rows={3}
+                    className="text-xs bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-text-secondary focus:outline-none focus:border-gray-400 resize-none w-full"
+                  />
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={saveDescription}
+                      disabled={savingDescription}
+                      className="text-[11px] text-green-400 hover:text-green-300 disabled:opacity-50"
+                    >
+                      {savingDescription ? '…' : 'Save'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setLocalDescription(template.description ?? '')
+                        setEditingDescription(false)
+                      }}
+                      className="text-[11px] text-gray-500 hover:text-gray-300"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setEditingDescription(true)}
+                  className="group flex items-start gap-1 text-left mt-1"
+                >
+                  {localDescription ? (
+                    <p className="text-xs text-text-secondary leading-snug group-hover:text-white/70 transition-colors">
+                      {localDescription}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-gray-700 italic group-hover:text-gray-500 transition-colors">
+                      Add description…
+                    </p>
+                  )}
+                  <Pencil size={10} className="text-gray-700 group-hover:text-gray-400 shrink-0 mt-0.5 transition-colors" />
+                </button>
+              )}
             </div>
             <div className="flex items-center gap-2 shrink-0 mt-0.5">
               <button
@@ -629,6 +750,7 @@ function TemplateModal({
               <ReelSceneBuilder
                 scenes={scenes!}
                 brandId={brandId}
+                brandDefaults={brandIdentity ?? null}
                 onSave={saveScenes}
                 saving={savingScenes}
               />
@@ -659,8 +781,8 @@ function TemplateModal({
                   )}
                 </div>
 
-                {/* Slot / section overrides */}
-                {((slotSchema && slotSchema.length > 0) || (htSections && htSections.length > 0)) && (
+                {/* Slot / section overrides — only for non-head-talk formats */}
+                {!isHeadTalkFormat && ((slotSchema && slotSchema.length > 0) || (htSections && htSections.length > 0)) && (
                   <div className="space-y-2">
                     <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">
                       {slotSchema ? 'What the AI fills in' : 'Script sections'}
@@ -679,6 +801,57 @@ function TemplateModal({
                         />
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {/* Head Talk: script + caption prompt textareas */}
+                {isHeadTalkFormat && (
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">Script prompt</p>
+                      <p className="text-[11px] text-gray-600 mt-0.5 mb-2">
+                        Holistic instructions for how the AI should write the full script for this brand.
+                      </p>
+                      <textarea
+                        value={htScriptPrompt}
+                        onChange={(e) => setHtScriptPrompt(e.target.value)}
+                        placeholder={`e.g. "Write in a warm, direct tone. Open with a personal story. Keep sentences short. No buzzwords."`}
+                        className="w-full text-sm bg-gray-900 border border-gray-800 text-white rounded-lg px-3 py-2 resize-y min-h-[100px] focus:outline-none focus:border-gray-600 placeholder:text-gray-600 leading-relaxed"
+                      />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">Caption prompt</p>
+                      <p className="text-[11px] text-gray-600 mt-0.5 mb-2">
+                        Instructions for how the AI should write the Instagram caption for this brand.
+                      </p>
+                      <textarea
+                        value={htCaptionPrompt}
+                        onChange={(e) => setHtCaptionPrompt(e.target.value)}
+                        placeholder={`e.g. "2-3 sentences. End with a question to drive comments. No hashtags in caption."`}
+                        className="w-full text-sm bg-gray-900 border border-gray-800 text-white rounded-lg px-3 py-2 resize-y min-h-[80px] focus:outline-none focus:border-gray-600 placeholder:text-gray-600 leading-relaxed"
+                      />
+                    </div>
+                    <div className="flex justify-end">
+                      <button
+                        onClick={saveHtPrompts}
+                        disabled={savingHtPrompts}
+                        className="text-xs bg-white text-black rounded px-3 py-1.5 hover:bg-zinc-200 disabled:opacity-50 transition-colors"
+                      >
+                        {savingHtPrompts ? 'Saving…' : 'Save prompts'}
+                      </button>
+                    </div>
+                    {config?.id && (
+                      <PromptHistoryPanel
+                        entityType="brand_account_template"
+                        entityId={config.id}
+                        field="customPrompt"
+                        onRestore={(content) => {
+                          const p = parseHeadTalkPrompts(content)
+                          setHtScriptPrompt(p.scriptPrompt)
+                          setHtCaptionPrompt(p.captionPrompt)
+                        }}
+                      />
+                    )}
                   </div>
                 )}
 
@@ -910,8 +1083,9 @@ const TABS: { id: TabId; label: string }[] = [
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export default function AccountTemplates({ brandId }: { brandId: string }) {
+export default function AccountTemplates({ brandId, brandIdentity: initialBrandIdentity }: { brandId: string; brandIdentity?: BrandIdentity | null }) {
   const [templates, setTemplates] = useState<Template[]>([])
+  const [brandIdentity] = useState<BrandIdentity | null>(initialBrandIdentity ?? null)
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<Template | null>(null)
   const [activeTab, setActiveTab] = useState<TabId>('enabled')
@@ -1058,6 +1232,7 @@ export default function AccountTemplates({ brandId }: { brandId: string }) {
         <TemplateModal
           template={selected}
           brandId={brandId}
+          brandIdentity={brandIdentity}
           onClose={() => setSelected(null)}
           onRefresh={() => {
             fetchTemplates()
