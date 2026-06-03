@@ -1090,13 +1090,16 @@ export default function AccountTemplates({ brandId, brandIdentity: initialBrandI
   const [selected, setSelected] = useState<Template | null>(null)
   const [activeTab, setActiveTab] = useState<TabId>('enabled')
 
-  const fetchTemplates = async () => {
+  const fetchTemplates = async (): Promise<Template[]> => {
     try {
       const res = await fetch(`/api/account-templates?brandId=${brandId}`)
       const data = await res.json()
-      setTemplates(data.templates || [])
+      const fetched: Template[] = data.templates || []
+      setTemplates(fetched)
+      return fetched
     } catch {
       toast.error('Failed to load templates')
+      return []
     } finally {
       setLoading(false)
     }
@@ -1234,9 +1237,9 @@ export default function AccountTemplates({ brandId, brandIdentity: initialBrandI
           brandId={brandId}
           brandIdentity={brandIdentity}
           onClose={() => setSelected(null)}
-          onRefresh={() => {
-            fetchTemplates()
-            setSelected((prev) => (prev ? { ...prev } : null))
+          onRefresh={async () => {
+            const fresh = await fetchTemplates()
+            setSelected((prev) => (prev ? (fresh.find((t) => t.id === prev.id) ?? prev) : null))
           }}
           onDuplicated={(newTemplate) => setSelected(newTemplate)}
         />
