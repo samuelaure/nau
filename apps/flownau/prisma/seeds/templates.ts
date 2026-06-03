@@ -3,12 +3,15 @@ import type { PrismaClient } from '../../src/generated/prisma'
 /**
  * System template definitions — available to all brands.
  *
- * Reel templates use slotSchema to define what text the AI must fill.
- * Each slot has: key, label, intention (why this text), maxWords (hard limit),
- * and style (short/medium/long — drives font size in Remotion component).
+ * Reel templates:
+ *   Block-based (DynamicReel). scenes: SceneDef[] defines each scene's texts,
+ *   background, overlay, and text styling. The AI fills 'prompt'-mode text
+ *   blocks; 'manual'-mode blocks are used verbatim.
  *
- * The AI slot-composer reads slotSchema and produces { slots: Record<string,string>, caption, hashtags, brollMood }.
- * The Remotion component reads those slots and renders them with brand identity applied.
+ * Head Talk templates:
+ *   No Remotion composition. contentSchema holds { scriptPrompt, captionPrompt }
+ *   which are used by the HeadTalk draft pipeline. Brands can override prompts
+ *   per-brand via BrandTemplateConfig.customPrompt.
  */
 
 export interface SlotDef {
@@ -18,6 +21,32 @@ export interface SlotDef {
   minWords?: number // soft lower bound — AI must meet or exceed this
   maxWords: number // hard word limit — AI must not exceed
   style: 'short' | 'medium' | 'long' // drives font size in component
+}
+
+// Minimal scene/text type mirrors for seed use (avoids importing from src)
+interface TextSeed {
+  id: string
+  mode: 'prompt' | 'manual'
+  content: string
+  font: string
+  color: string
+  maxTextSize: number
+  textStyle: 'none' | 'stroke' | 'background_block'
+  styleColor: string
+  horizontalAlign: 'left' | 'center' | 'right'
+  minWords?: number
+  maxWords?: number
+}
+
+interface SceneSeed {
+  id: string
+  backgroundVideoAssetId: null
+  backgroundVideoUrl: null
+  backgroundVideoDurationSecs: null
+  overlayColor: string
+  overlayOpacity: number
+  textVerticalAlign: 'top' | 'center' | 'bottom'
+  texts: TextSeed[]
 }
 
 interface TemplateDefinition {
@@ -31,6 +60,28 @@ interface TemplateDefinition {
   slotSchema?: SlotDef[]
   contentSchema: object
   schemaJson?: object
+  scenes?: SceneSeed[]
+}
+
+// ── Default scene styling ─────────────────────────────────────────────────────
+
+const SCENE_DEFAULTS = {
+  backgroundVideoAssetId: null,
+  backgroundVideoUrl: null,
+  backgroundVideoDurationSecs: null,
+  overlayColor: '#000000',
+  overlayOpacity: 0.5,
+  textVerticalAlign: 'center' as const,
+}
+
+const TEXT_DEFAULTS = {
+  mode: 'prompt' as const,
+  font: 'Anton',
+  color: '#ffffff',
+  maxTextSize: 100,
+  textStyle: 'none' as const,
+  styleColor: '#000000',
+  horizontalAlign: 'center' as const,
 }
 
 // ─── SYSTEM TEMPLATES ─────────────────────────────────────────────────────────
@@ -48,41 +99,10 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     contentSchema: {
       format: 'head_talk',
       targetDurationSeconds: '15-30',
-      structure: 'personal-moment → honest-reflection → open-question',
-      sections: [
-        {
-          key: 'hook',
-          label: 'Hook — The Personal Moment',
-          intention:
-            'Drop into a specific, real-feeling moment the creator experienced — a thought, a feeling, a situation. Not a lesson. Not a claim. Just "this happened to me / I noticed this about myself." Specific enough to be recognisable: "I was [doing X] and suddenly I felt..." or "The other day I caught myself doing [Y] and I couldn\'t stop thinking about it." Max 3 sentences. No moralising. Just the moment.',
-          maxWords: 40,
-        },
-        {
-          key: 'body',
-          label: 'Honest Reflection',
-          intention:
-            "The creator sits with the experience — what they thought, felt, noticed, or couldn't figure out. Not an answer. Not advice. More like thinking out loud. Slightly vulnerable, genuinely curious. The viewer should feel like they're listening in on an honest internal monologue, not a polished lesson. 15-30s = 60-90 spoken words.",
-          maxWords: 90,
-        },
-        {
-          key: 'cta',
-          label: 'Open Question',
-          intention:
-            'A genuine, open question directed at the viewer. Not rhetorical. Not leading. The creator actually wants to know: "Does this happen to you?" / "Am I the only one?" / "I\'d love to know if you\'ve been through this — tell me in the comments." Warm, low-pressure. Max 2 sentences.',
-          maxWords: 25,
-        },
-      ],
-    },
-    schemaJson: {
-      type: 'object',
-      required: ['hook', 'body', 'cta', 'caption', 'hashtags'],
-      properties: {
-        hook: { type: 'string', description: 'Personal moment — max 40 words' },
-        body: { type: 'string', description: 'Honest reflection — max 90 words' },
-        cta: { type: 'string', description: 'Open question — max 25 words' },
-        caption: { type: 'string', description: 'Instagram caption' },
-        hashtags: { type: 'array', items: { type: 'string' } },
-      },
+      scriptPrompt:
+        'Write a continuous spoken script in three movements: (1) Drop into a specific, real-feeling moment — a thought, feeling, or situation. Not a lesson. Specific enough to be recognisable: "I was [doing X] and suddenly I felt…" Max 3 sentences. (2) Sit with the experience — think out loud. Not an answer. Slightly vulnerable, genuinely curious. ~60-90 spoken words. (3) A genuine open question directed at the viewer: "Does this happen to you?" / "Am I the only one?" Warm, low-pressure. Max 2 sentences. Write all three movements as one flowing script. Total: 100-155 spoken words.',
+      captionPrompt:
+        'Instagram caption for when the video is published. 2-3 sentences, engaging, no hashtags. Match the warm, curious tone of the script.',
     },
   },
 
@@ -98,41 +118,10 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     contentSchema: {
       format: 'head_talk',
       targetDurationSeconds: '15-30',
-      structure: 'the-thing → honest-take → invite',
-      sections: [
-        {
-          key: 'hook',
-          label: 'Hook — Name The Thing',
-          intention:
-            'Point at something specific happening in or around the niche — a trend, a belief, a behaviour, a thing people post, say, or do — without immediately judging it. Name it like you\'re pulling your friend aside: "Okay so I need to talk about [thing]." or "Have you noticed that everyone in [niche] is now [doing X]?" Specific and recognisable to insiders. Max 2 sentences.',
-          maxWords: 35,
-        },
-        {
-          key: 'body',
-          label: 'The Honest Take',
-          intention:
-            'The creator\'s real perspective on the thing — not a rant, not a verdict, but an honest, slightly cheeky observation. Can be mildly provocative. Should feel like what you\'d say to a friend over coffee, not what you\'d say in a debate. Use "I think", "I\'ve noticed", "what gets me is" — keeps it personal, not preachy. A small piece of nuance or inside knowledge that makes followers feel like they\'re in the know. 15-30s = 60-90 spoken words.',
-          maxWords: 90,
-        },
-        {
-          key: 'cta',
-          label: 'Invite',
-          intention:
-            'Pull the audience into the conversation: "What do you think?" / "Tell me I\'m not the only one who sees this." / "Am I off base here?" Genuinely open — the creator doesn\'t need to be right, they\'re curious. Max 1 sentence.',
-          maxWords: 20,
-        },
-      ],
-    },
-    schemaJson: {
-      type: 'object',
-      required: ['hook', 'body', 'cta', 'caption', 'hashtags'],
-      properties: {
-        hook: { type: 'string', description: 'Name the thing — max 35 words' },
-        body: { type: 'string', description: 'Honest take — max 90 words' },
-        cta: { type: 'string', description: 'Invite — max 20 words' },
-        caption: { type: 'string', description: 'Instagram caption' },
-        hashtags: { type: 'array', items: { type: 'string' } },
-      },
+      scriptPrompt:
+        'Write a continuous spoken script in three movements: (1) Name something specific happening in or around the niche — a trend, belief, behaviour, or thing people post/say/do — without immediately judging it. Pull the viewer aside: "Okay so I need to talk about [thing]." Max 2 sentences. (2) Give the honest, slightly cheeky take. Not a rant or verdict — an observation you\'d share over coffee. Use "I think", "I\'ve noticed", "what gets me is". Mildly provocative. ~60-90 spoken words. (3) Pull the audience in: "What do you think?" / "Tell me I\'m not the only one who sees this." Genuinely open. Max 1 sentence. Write all three as one flowing script. Total: 90-130 spoken words.',
+      captionPrompt:
+        'Instagram caption for when the video is published. 2-3 sentences, conversational and slightly provocative. No hashtags.',
     },
   },
 
@@ -148,41 +137,10 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     contentSchema: {
       format: 'head_talk',
       targetDurationSeconds: '15-30',
-      structure: 'common-belief → flip → proof → cta',
-      sections: [
-        {
-          key: 'hook',
-          label: 'Hook — Name the Belief & Flip It',
-          intention:
-            'State a widely-held belief in the niche — then immediately flip it. "Everyone says [X]. That\'s wrong." or "[Conventional wisdom]. I disagree." The flip must be specific, not vague. Do not soften it. The viewer should feel a jolt of surprise or mild offense. Max 2 sentences.',
-          maxWords: 30,
-        },
-        {
-          key: 'body',
-          label: 'The Proof',
-          intention:
-            'Give the single strongest reason the contrarian claim is correct. One mechanism, one data point, one lived observation — not a list. Concrete and specific. The viewer should think "I never thought of it that way." 15-30s = 60-90 spoken words.',
-          maxWords: 90,
-        },
-        {
-          key: 'cta',
-          label: 'CTA',
-          intention:
-            'Invite the debate openly. "Tell me I\'m wrong in the comments." or a direct follow prompt that frames them as open-minded for agreeing. Max 1 sentence.',
-          maxWords: 20,
-        },
-      ],
-    },
-    schemaJson: {
-      type: 'object',
-      required: ['hook', 'body', 'cta', 'caption', 'hashtags'],
-      properties: {
-        hook: { type: 'string', description: 'Belief + flip — max 30 words' },
-        body: { type: 'string', description: 'Single proof — max 90 words' },
-        cta: { type: 'string', description: 'Debate invite — max 20 words' },
-        caption: { type: 'string', description: 'Instagram caption' },
-        hashtags: { type: 'array', items: { type: 'string' } },
-      },
+      scriptPrompt:
+        'Write a continuous spoken script in three movements: (1) State a widely-held belief in the niche — then immediately flip it. "Everyone says [X]. That\'s wrong." or "[Conventional wisdom]. I disagree." The flip must be specific, not vague. Do not soften it. Max 2 sentences. (2) Give the single strongest reason the contrarian claim is correct. One mechanism, one data point, one lived observation — not a list. Concrete and specific. ~60-90 spoken words. (3) Invite the debate openly: "Tell me I\'m wrong in the comments." or a direct follow prompt framing them as open-minded for agreeing. Max 1 sentence. Write all three as one flowing script. Total: 90-130 spoken words.',
+      captionPrompt:
+        'Instagram caption for when the video is published. 2-3 sentences that tease the contrarian claim without giving away the argument. No hashtags.',
     },
   },
 
@@ -198,263 +156,191 @@ export const SYSTEM_TEMPLATES: TemplateDefinition[] = [
     contentSchema: {
       format: 'head_talk',
       targetDurationSeconds: '30-45',
-      structure: 'before → turning-point → after → lesson → cta',
-      sections: [
-        {
-          key: 'hook',
-          label: 'Hook — The Before',
-          intention:
-            'Drop the viewer into a specific "before" moment — a number, a feeling, a situation that is recognisably bad or stuck. Be concrete: "12 months ago I was [specific state]." Avoid vague openers. The specificity is what makes it credible and relatable. Max 3 sentences.',
-          maxWords: 45,
-        },
-        {
-          key: 'body',
-          label: 'Turning Point + After + Lesson',
-          intention:
-            'Name the single decision or insight that changed things (turning point — keep it to 1 sentence). Then show the "after" with a specific result (a number, a change, a capability). Extract the transferable lesson in 1-2 sentences — what made the difference that the viewer can apply. 30-45s = 110-150 spoken words.',
-          maxWords: 150,
-        },
-        {
-          key: 'cta',
-          label: 'CTA',
-          intention:
-            'Bridge to the viewer\'s situation: "If you\'re in the before right now..." or a follow prompt that positions future content as the roadmap. Max 2 sentences.',
-          maxWords: 30,
-        },
-      ],
-    },
-    schemaJson: {
-      type: 'object',
-      required: ['hook', 'body', 'cta', 'caption', 'hashtags'],
-      properties: {
-        hook: { type: 'string', description: 'Before state — max 45 words' },
-        body: { type: 'string', description: 'Turning point + after + lesson — max 150 words' },
-        cta: { type: 'string', description: 'Bridge CTA — max 30 words' },
-        caption: { type: 'string', description: 'Instagram caption' },
-        hashtags: { type: 'array', items: { type: 'string' } },
-      },
+      scriptPrompt:
+        'Write a continuous spoken script in four movements: (1) Drop the viewer into a specific "before" moment — a number, feeling, or situation that is recognisably bad or stuck. Be concrete: "12 months ago I was [specific state]." Max 3 sentences. (2) Name the single decision or insight that changed things (turning point — 1 sentence). Then show the "after" with a specific result. (3) Extract the transferable lesson in 1-2 sentences — what made the difference. (4) Bridge to the viewer\'s situation: "If you\'re in the before right now…" Max 2 sentences. Write all four as one flowing script. Total: 155-225 spoken words.',
+      captionPrompt:
+        'Instagram caption for when the video is published. 2-3 sentences that tease the transformation with a concrete before/after detail. No hashtags.',
     },
   },
 
-  // ─── Reel T1: Single Moment (~8s, 1 short text) ───────────────────────────
+  // ─── Reel — Single Moment (~8s, 1 short text) ────────────────────────────
   {
     name: 'Reel — Single Moment',
     format: 'reel',
-    remotionId: 'ReelT1',
+    remotionId: 'DynamicReel',
     sceneType: 'reel',
     scope: 'system',
     previewUrl:
       'https://media.9nau.com/flownau/accounts/cmogyjn5a0006gcv46nis4o0l/outputs/cmoo6vorl0007v4v4oy5qiq3e.mp4',
     description:
       'One punchy line — max 8 words — displayed over full-screen B-roll. Pure pattern interrupt. ~4 s total. Use for quotes, provocations, or single-idea statements that land without context.',
-    slotSchema: [
+    contentSchema: {
+      note: 'Single short text reel. 1 scene, ~4 seconds. Big text, centered, over B-roll.',
+    },
+    scenes: [
       {
-        key: 'text1',
-        label: 'The Moment',
-        intention:
-          'A single punchy statement or question that hits like a punch — the viewer stops scrolling because this one line cuts through. Could be provocative, surprising, or deeply relatable. No setup, no explanation. Just the line.',
-        maxWords: 8,
-        style: 'short',
+        id: 'scene-single-moment-1',
+        ...SCENE_DEFAULTS,
+        overlayOpacity: 0.45,
+        texts: [
+          {
+            id: 'text-single-moment-1',
+            ...TEXT_DEFAULTS,
+            mode: 'prompt',
+            content:
+              'A single punchy statement or question that hits like a punch — the viewer stops scrolling because this one line cuts through. Could be provocative, surprising, or deeply relatable. No setup, no explanation. Just the line.',
+            maxWords: 8,
+          },
+        ],
       },
     ],
-    contentSchema: {
-      note: 'Single short text reel. 1 scene, ~8 seconds. Big text, centered, over B-roll.',
-    },
-    schemaJson: {
-      type: 'object',
-      required: ['slots', 'caption', 'hashtags', 'brollMood'],
-      properties: {
-        slots: {
-          type: 'object',
-          required: ['text1'],
-          properties: {
-            text1: { type: 'string', description: 'The single punchy line — max 8 words' },
-          },
-        },
-        caption: {
-          type: 'string',
-          description: 'Instagram caption — expand on the single line with 2-3 sentences + CTA',
-        },
-        hashtags: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Hashtags without # prefix',
-        },
-        brollMood: {
-          type: 'string',
-          description:
-            'One or two mood keywords for B-roll asset selection (e.g. "family, nature", "urban, movement")',
-        },
-      },
-    },
   },
 
-  // ─── Reel T2: Single Statement (~18s, 1 long text) ───────────────────────
+  // ─── Reel — Single Statement (~18s, 1 long text) ─────────────────────────
   {
     name: 'Reel — Single Statement',
     format: 'reel',
-    remotionId: 'ReelT2',
+    remotionId: 'DynamicReel',
     sceneType: 'reel',
     scope: 'system',
     previewUrl:
       'https://media.9nau.com/flownau/accounts/cmogyjn5a0006gcv46nis4o0l/outputs/cmoo6vork0003v4v4v0f7jhx5.mp4',
     description:
       'One complete paragraph — up to 40 words — displayed over B-roll as the viewer reads along. Meditative pace. ~6.5 s. Best for a nuanced take, a belief, or a self-contained insight that benefits from dwell time.',
-    slotSchema: [
-      {
-        key: 'text1',
-        label: 'The Statement',
-        intention:
-          'A complete, self-contained idea — a mini-paragraph that says something real. It should make the viewer feel smart, seen, or slightly challenged. Flows naturally when read aloud. No bullet points, no line breaks. Just clean prose with a clear point.',
-        minWords: 25,
-        maxWords: 40,
-        style: 'long',
-      },
-    ],
     contentSchema: {
       note: 'Single long text reel. 1 scene, ~18 seconds. Smaller text, over B-roll.',
     },
-    schemaJson: {
-      type: 'object',
-      required: ['slots', 'caption', 'hashtags', 'brollMood'],
-      properties: {
-        slots: {
-          type: 'object',
-          required: ['text1'],
-          properties: {
-            text1: {
-              type: 'string',
-              description: 'The complete statement — max 40 words, reads naturally aloud',
-            },
+    scenes: [
+      {
+        id: 'scene-single-statement-1',
+        ...SCENE_DEFAULTS,
+        overlayOpacity: 0.4,
+        texts: [
+          {
+            id: 'text-single-statement-1',
+            ...TEXT_DEFAULTS,
+            mode: 'prompt',
+            content:
+              'A complete, self-contained idea — a mini-paragraph that says something real. It should make the viewer feel smart, seen, or slightly challenged. Flows naturally when read aloud. No bullet points, no line breaks. Just clean prose with a clear point.',
+            minWords: 25,
+            maxWords: 40,
           },
-        },
-        caption: { type: 'string', description: 'Instagram caption — expand with context and CTA' },
-        hashtags: { type: 'array', items: { type: 'string' } },
-        brollMood: {
-          type: 'string',
-          description: 'Mood keywords for B-roll (e.g. "serene, family", "focus, workspace")',
-        },
+        ],
       },
-    },
+    ],
   },
 
-  // ─── Reel T3: Hook & Reveal (~15s, 2 texts) ──────────────────────────────
+  // ─── Reel — Hook & Reveal (~15s, 2 texts) ────────────────────────────────
   {
     name: 'Reel — Hook & Reveal',
     format: 'reel',
-    remotionId: 'ReelT3',
+    remotionId: 'DynamicReel',
     sceneType: 'reel',
     scope: 'system',
     previewUrl:
       'https://media.9nau.com/flownau/accounts/cmogyjn5a0006gcv46nis4o0l/outputs/cmoo6vork0002v4v4is5hqueg.mp4',
     description:
       'Two scenes: a short hook (≤8 words) that creates tension, followed by the payoff reveal (≤25 words). The gap between them keeps the viewer watching. ~8 s total. Best for curiosity-driven content and contrarian takes.',
-    slotSchema: [
+    contentSchema: {
+      note: 'Two-scene reel. Scene 1: short hook (~4s). Scene 2: medium reveal (~10s). Total ~14s.',
+    },
+    scenes: [
       {
-        key: 'text1',
-        label: 'The Hook',
-        intention:
-          'The opening fragment — creates tension or curiosity. Must be incomplete on its own; the viewer must need text2 to understand it. A question without the answer, a bold claim without the proof, or the first half of a reframe.',
-        maxWords: 8,
-        style: 'short',
+        id: 'scene-hook-reveal-1',
+        ...SCENE_DEFAULTS,
+        overlayOpacity: 0.45,
+        texts: [
+          {
+            id: 'text-hook-reveal-1',
+            ...TEXT_DEFAULTS,
+            mode: 'prompt',
+            content:
+              'The opening fragment — creates tension or curiosity. Must be incomplete on its own; the viewer must need scene 2 to understand it. A question without the answer, a bold claim without the proof, or the first half of a reframe.',
+            maxWords: 8,
+          },
+        ],
       },
       {
-        key: 'text2',
-        label: 'The Reveal',
-        intention:
-          'The direct continuation of text1 — delivers the payoff, answer, or second half of the reframe. Should feel like the natural end of a sentence that text1 started. Together they form one complete thought.',
-        minWords: 15,
-        maxWords: 25,
-        style: 'medium',
+        id: 'scene-hook-reveal-2',
+        ...SCENE_DEFAULTS,
+        overlayOpacity: 0.4,
+        texts: [
+          {
+            id: 'text-hook-reveal-2',
+            ...TEXT_DEFAULTS,
+            mode: 'prompt',
+            content:
+              'The direct continuation of scene 1 — delivers the payoff, answer, or second half of the reframe. Should feel like the natural end of a sentence that scene 1 started. Together they form one complete thought.',
+            minWords: 15,
+            maxWords: 25,
+          },
+        ],
       },
     ],
-    contentSchema: {
-      note: 'Two-scene reel. Scene 1: short hook (~5s). Scene 2: medium reveal (~10s). Total ~15s.',
-    },
-    schemaJson: {
-      type: 'object',
-      required: ['slots', 'caption', 'hashtags', 'brollMood'],
-      properties: {
-        slots: {
-          type: 'object',
-          required: ['text1', 'text2'],
-          properties: {
-            text1: { type: 'string', description: 'The hook — max 8 words' },
-            text2: { type: 'string', description: 'The reveal — max 25 words' },
-          },
-        },
-        caption: {
-          type: 'string',
-          description: 'Instagram caption — expand on the hook/reveal with context + CTA',
-        },
-        hashtags: { type: 'array', items: { type: 'string' } },
-        brollMood: { type: 'string', description: 'Mood keywords for B-roll' },
-      },
-    },
   },
 
-  // ─── Reel T4: Arc (~18s, 3 texts: short-mid-short) ───────────────────────
+  // ─── Reel — Arc (~18s, 3 texts: short-mid-short) ─────────────────────────
   {
     name: 'Reel — Arc',
     format: 'reel',
-    remotionId: 'ReelT4',
+    remotionId: 'DynamicReel',
     sceneType: 'reel',
     scope: 'system',
     previewUrl:
       'https://media.9nau.com/flownau/accounts/cmogyjn5a0006gcv46nis4o0l/outputs/cmoo6vorl0008v4v4fyywc8cv.mp4',
     description:
       'Three scenes forming a mini story arc: punchy opener (≤8 w) → development (≤20 w) → landing line (≤8 w). ~11 s total. The most complete reel structure — best for ideas that need setup and resolution.',
-    slotSchema: [
+    contentSchema: {
+      note: 'Three-scene arc reel. Scene 1: short opener (~4s). Scene 2: medium body (~8s). Scene 3: short landing (~4s).',
+    },
+    scenes: [
       {
-        key: 'text1',
-        label: 'Opening',
-        intention:
-          'The inciting line — sets up a tension, question, or bold claim that demands resolution. Must be incomplete on its own. The viewer should think "wait, what?" and need the next screen.',
-        maxWords: 8,
-        style: 'short',
+        id: 'scene-arc-1',
+        ...SCENE_DEFAULTS,
+        overlayOpacity: 0.45,
+        texts: [
+          {
+            id: 'text-arc-1',
+            ...TEXT_DEFAULTS,
+            mode: 'prompt',
+            content:
+              'The inciting line — sets up a tension, question, or bold claim that demands resolution. Must be incomplete on its own. The viewer should think "wait, what?" and need the next scene.',
+            maxWords: 8,
+          },
+        ],
       },
       {
-        key: 'text2',
-        label: 'Development',
-        intention:
-          'The body of the arc — directly continues from text1 and delivers the substance: the insight, the context, the why. This is where the idea earns its weight. Must be long enough to feel satisfying, not a fragment.',
-        minWords: 12,
-        maxWords: 20,
-        style: 'medium',
+        id: 'scene-arc-2',
+        ...SCENE_DEFAULTS,
+        overlayOpacity: 0.4,
+        texts: [
+          {
+            id: 'text-arc-2',
+            ...TEXT_DEFAULTS,
+            mode: 'prompt',
+            content:
+              'The body of the arc — directly continues from scene 1 and delivers the substance: the insight, the context, the why. This is where the idea earns its weight. Must be long enough to feel satisfying, not a fragment.',
+            minWords: 12,
+            maxWords: 20,
+          },
+        ],
       },
       {
-        key: 'text3',
-        label: 'Landing',
-        intention:
-          'The closing line — the punchline, reframe, or lesson that text1 + text2 were building toward. Short and final, like the last sentence of a paragraph. The viewer should feel the arc is complete.',
-        maxWords: 8,
-        style: 'short',
+        id: 'scene-arc-3',
+        ...SCENE_DEFAULTS,
+        overlayOpacity: 0.45,
+        texts: [
+          {
+            id: 'text-arc-3',
+            ...TEXT_DEFAULTS,
+            mode: 'prompt',
+            content:
+              'The closing line — the punchline, reframe, or lesson that scene 1 + scene 2 were building toward. Short and final, like the last sentence of a paragraph. The viewer should feel the arc is complete.',
+            maxWords: 8,
+          },
+        ],
       },
     ],
-    contentSchema: {
-      note: 'Three-scene arc reel. Scene 1: short (~5s). Scene 2: medium (~8s). Scene 3: short (~5s). Total ~18s.',
-    },
-    schemaJson: {
-      type: 'object',
-      required: ['slots', 'caption', 'hashtags', 'brollMood'],
-      properties: {
-        slots: {
-          type: 'object',
-          required: ['text1', 'text2', 'text3'],
-          properties: {
-            text1: { type: 'string', description: 'Opening — max 8 words' },
-            text2: { type: 'string', description: 'Development — max 20 words' },
-            text3: { type: 'string', description: 'Landing — max 8 words' },
-          },
-        },
-        caption: {
-          type: 'string',
-          description: 'Instagram caption — tell the full arc with context + CTA',
-        },
-        hashtags: { type: 'array', items: { type: 'string' } },
-        brollMood: { type: 'string', description: 'Mood keywords for B-roll' },
-      },
-    },
   },
 ]
 
@@ -498,6 +384,7 @@ export async function seedSystemTemplates(prisma: PrismaClient): Promise<void> {
         contentSchema: t.contentSchema,
         slotSchema: (t.slotSchema as any) ?? undefined,
         schemaJson: t.schemaJson ?? undefined,
+        scenes: (t.scenes as any) ?? undefined,
         useBrandAssets: false,
       },
       update: {
@@ -506,6 +393,7 @@ export async function seedSystemTemplates(prisma: PrismaClient): Promise<void> {
         contentSchema: t.contentSchema,
         slotSchema: (t.slotSchema as any) ?? undefined,
         schemaJson: t.schemaJson ?? undefined,
+        scenes: (t.scenes as any) ?? undefined,
         remotionId: t.remotionId,
         format: t.format,
       },

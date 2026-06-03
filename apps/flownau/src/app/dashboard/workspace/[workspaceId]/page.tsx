@@ -168,7 +168,7 @@ export default async function WorkspaceOverviewPage({
             <AccountCalendar brandId={brandId} workspaceId={workspaceId} />
           )}
           {activeTab === 'ideas' && <BrandPosts brandId={brandId} workspaceId={workspaceId} />}
-          {activeTab === 'templates' && <AccountTemplates brandId={brandId} />}
+          {activeTab === 'templates' && <AccountTemplates brandId={brandId} brandIdentity={localBrand.brandIdentity as any} />}
           {activeTab === 'profiles' && (
             <BrandProfiles
               brandId={brandId}
