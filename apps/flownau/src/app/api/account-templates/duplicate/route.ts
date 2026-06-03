@@ -38,6 +38,7 @@ export async function POST(req: Request) {
         description: template.description,
         previewUrl: template.previewUrl,
         previewThumbnailUrl: template.previewThumbnailUrl,
+        scenes: template.scenes ?? undefined,
         brandConfigs: {
           create: {
             brandId,

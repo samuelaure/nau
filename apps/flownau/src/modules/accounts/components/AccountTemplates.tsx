@@ -76,6 +76,7 @@ type Template = {
   id: string
   name: string
   format: string
+  remotionId?: string | null
   description?: string | null
   previewUrl?: string | null
   previewThumbnailUrl?: string | null
@@ -337,7 +338,12 @@ function TemplateModal({
   const scenes = (template.scenes ?? null) as SceneDef[] | null
   const isReelFormat = template.format === 'reel' || template.format === 'trial_reel'
   const isHeadTalkFormat = template.format === 'head_talk' || template.format === 'trial_head_talk'
-  const isDynamicReel = isReelFormat && scenes && scenes.length > 0
+  // Block-based builder: show for any reel with remotionId=DynamicReel OR existing scenes.
+  // This covers: (a) new duplicated templates that have remotionId but no scenes yet,
+  // (b) system templates freshly migrated, (c) templates with scenes already populated.
+  const remotionId = template.remotionId
+  const isDynamicReel =
+    isReelFormat && (remotionId === 'DynamicReel' || (scenes !== null && scenes.length > 0))
 
   // Head Talk custom script/caption prompts — stored in BrandTemplateConfig.customPrompt
   // Format: "SCRIPT_PROMPT: ...\nCAPTION_PROMPT: ..."
@@ -748,7 +754,7 @@ function TemplateModal({
             {/* Builder tab — block-based reel */}
             {activeTab === 'builder' && isDynamicReel && (
               <ReelSceneBuilder
-                scenes={scenes!}
+                scenes={scenes ?? []}
                 brandId={brandId}
                 brandDefaults={brandIdentity ?? null}
                 onSave={saveScenes}
