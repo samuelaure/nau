@@ -86,7 +86,7 @@ export async function runDraftPipeline(input: DraftPipelineInput): Promise<Draft
       }
     : template
 
-  const templateSchema = buildTemplateSchemaBlock(format, mergedTemplate, captionOverride)
+  const templateSchema = buildTemplateSchemaBlock(format, mergedTemplate, captionOverride, (template as any).scenes)
 
   const { systemPrompt, layers } = buildPrompt({
     base: 'draft',
@@ -273,21 +273,6 @@ async function runDynamicReelPath(args: {
       },
     }
   }
-
-  // Build the slot schema block for the AI
-  const slotInstructions = promptSlots
-    .map((s) => {
-      const wordRange =
-        s.text.minWords != null
-          ? `min ${s.text.minWords} words, max ${s.text.maxWords ?? 60} words`
-          : `max ${s.text.maxWords ?? 60} words`
-      return `• "${s.key}" — ${wordRange}\n  Instructions: ${s.text.content}`
-    })
-    .join('\n\n')
-
-  const schemaBlock = `SCENE TEXT SLOTS TO FILL:\n${slotInstructions}\n\nAlso write:\n• caption — Instagram caption (max 300 chars, 2-3 sentences, no hashtags)\n• hashtags — 5–10 relevant hashtags (without # prefix)\n\nRespond ONLY with valid JSON. Never mention @handles.`
-
-  systemPrompt = `${systemPrompt}\n\n${schemaBlock}`
 
   const messages: Array<{ role: 'system' | 'user'; content: string }> = [
     { role: 'system', content: systemPrompt },
@@ -504,7 +489,34 @@ function buildTemplateSchemaBlock(
   format: string,
   template: { slotSchema: unknown; contentSchema: unknown; schemaJson: unknown },
   captionOverride: { intention?: string; minWords?: number; maxWords?: number } | null = null,
+  scenes?: unknown,
 ): string | null {
+  // Block-based DynamicReel: derive schema from prompt-mode text slots across scenes
+  if (scenes && Array.isArray(scenes) && scenes.length > 0) {
+    const typedScenes = scenes as SceneDef[]
+    const promptSlots: Array<{ key: string; text: TextDef }> = []
+    for (let si = 0; si < typedScenes.length; si++) {
+      for (let ti = 0; ti < typedScenes[si].texts.length; ti++) {
+        const text = typedScenes[si].texts[ti]
+        if (text.mode === 'prompt') {
+          promptSlots.push({ key: `scene_${si}_text_${ti}`, text })
+        }
+      }
+    }
+    if (promptSlots.length === 0) return null
+    const slotInstructions = promptSlots
+      .map((s) => {
+        const wordRange =
+          s.text.minWords != null
+            ? `min ${s.text.minWords} words, max ${s.text.maxWords ?? 60} words`
+            : `max ${s.text.maxWords ?? 60} words`
+        return `• "${s.key}" — ${wordRange}\n  Instructions: ${s.text.content}`
+      })
+      .join('\n\n')
+    const captionLine = buildCaptionInstruction(captionOverride)
+    return `SCENE TEXT SLOTS TO FILL:\n${slotInstructions}\n\nAlso write:\n${captionLine}\n• hashtags — 5–10 relevant hashtags (without # prefix)\n\nRespond ONLY with valid JSON. Never mention @handles.`
+  }
+
   if (template.slotSchema) {
     const slotDefs = template.slotSchema as unknown as SlotDef[]
     const isMultiSlot = slotDefs.length > 1

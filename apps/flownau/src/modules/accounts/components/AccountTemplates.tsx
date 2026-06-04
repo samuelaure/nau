@@ -357,8 +357,8 @@ function TemplateModal({
   const [htCaptionPrompt, setHtCaptionPrompt] = useState(htParsed.captionPrompt)
   const [savingHtPrompts, setSavingHtPrompts] = useState(false)
 
-  const [activeTab, setActiveTab] = useState<'settings' | 'builder'>(
-    isDynamicReel ? 'builder' : 'settings',
+  const [activeTab, setActiveTab] = useState<'content' | 'settings'>(
+    isDynamicReel ? 'content' : 'settings',
   )
   const [savingScenes, setSavingScenes] = useState(false)
   const [savingFormat, setSavingFormat] = useState(false)
@@ -578,11 +578,11 @@ function TemplateModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
       <div
-        className="relative bg-gray-950 border border-gray-800 rounded-xl w-full max-w-2xl max-h-[92vh] overflow-hidden shadow-2xl flex flex-col sm:flex-row"
+        className="relative bg-gray-950 border border-gray-800 rounded-xl w-full max-w-4xl max-h-[92vh] overflow-hidden shadow-2xl flex flex-col sm:flex-row"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Left: video/thumbnail preview */}
-        <div className="sm:w-52 shrink-0 bg-gray-950 flex items-stretch relative sm:rounded-l-xl overflow-hidden min-h-[200px]">
+        <div className="sm:w-64 shrink-0 bg-gray-950 flex items-stretch relative sm:rounded-l-xl overflow-hidden min-h-[200px]">
           {template.previewUrl ? (
             <>
               <video
@@ -749,10 +749,10 @@ function TemplateModal({
             </div>
           </div>
 
-          {/* Tabs — only shown for block-based reels */}
-          {isDynamicReel && (
+          {/* Tabs — shown for block-based reels and head talk */}
+          {(isDynamicReel || isHeadTalkFormat) && (
             <div className="flex border-b border-gray-800 px-5">
-              {(['builder', 'settings'] as const).map((tab) => (
+              {(['content', 'settings'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -763,7 +763,7 @@ function TemplateModal({
                       : 'border-transparent text-gray-500 hover:text-white',
                   )}
                 >
-                  {tab === 'builder' ? <Sliders size={11} /> : <Layers size={11} />}
+                  {tab === 'content' ? <Sliders size={11} /> : <Layers size={11} />}
                   {tab}
                 </button>
               ))}
@@ -772,63 +772,18 @@ function TemplateModal({
 
           {/* Tab content */}
           <div className="p-5 flex-1 overflow-y-auto">
-            {/* Builder tab — block-based reel */}
-            {activeTab === 'builder' && isDynamicReel && (
-              <ReelSceneBuilder
-                scenes={scenes ?? []}
-                brandId={brandId}
-                brandDefaults={brandIdentity ?? null}
-                onSave={saveScenes}
-                saving={savingScenes}
-              />
-            )}
-
-            {/* Settings tab (or legacy/head_talk defaults) */}
-            {(activeTab === 'settings' || !isDynamicReel) && (
-              <div className="space-y-5">
-                {/* Description */}
-                {template.description && (
-                  <p className="text-sm text-text-secondary leading-relaxed">{template.description}</p>
-                )}
-
-                {/* Stats */}
-                <div className="flex flex-wrap gap-2">
-                  {durationLabel && (
-                    <div className="flex items-center gap-1.5 text-xs text-text-secondary bg-gray-900 rounded px-2.5 py-1.5 border border-gray-800">
-                      <Clock size={11} />
-                      {durationLabel}
-                    </div>
-                  )}
-                  {sections && sections.length > 0 && (
-                    <div className="flex items-center gap-1.5 text-xs text-text-secondary bg-gray-900 rounded px-2.5 py-1.5 border border-gray-800">
-                      <Layers size={11} />
-                      {sections.length} {slotSchema ? 'text slot' : 'section'}
-                      {sections.length !== 1 ? 's' : ''}
-                    </div>
-                  )}
-                </div>
-
-                {/* Slot / section overrides — only for non-head-talk formats */}
-                {!isHeadTalkFormat && ((slotSchema && slotSchema.length > 0) || (htSections && htSections.length > 0)) && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">
-                      {slotSchema ? 'What the AI fills in' : 'Script sections'}
-                    </p>
-                    <p className="text-[11px] text-gray-600">
-                      Click a section to customize its instructions for this brand.
-                    </p>
-                    <div className="space-y-2">
-                      {(slotSchema ?? htSections!).map((s) => (
-                        <SlotOverrideRow
-                          key={s.key}
-                          slot={s}
-                          override={slotOverrides[s.key]}
-                          onChange={handleSlotChange}
-                          onRestore={handleSlotRestore}
-                        />
-                      ))}
-                    </div>
-                  </div>
+            {/* Content tab — scene builder (DynamicReel), head talk prompts, legacy caption */}
+            {(activeTab === 'content' || (!isDynamicReel && !isHeadTalkFormat)) && (
+              <div className="space-y-6">
+                {/* Block-based reel scene builder */}
+                {isDynamicReel && (
+                  <ReelSceneBuilder
+                    scenes={scenes ?? []}
+                    brandId={brandId}
+                    brandDefaults={brandIdentity ?? null}
+                    onSave={saveScenes}
+                    saving={savingScenes}
+                  />
                 )}
 
                 {/* Head Talk: script + caption prompt textareas */}
@@ -882,18 +837,71 @@ function TemplateModal({
                   </div>
                 )}
 
-                {/* Caption customization */}
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">Caption</p>
-                  <p className="text-[11px] text-gray-600">
-                    Customize how the AI writes the Instagram caption for this brand.
-                  </p>
-                  <SlotOverrideRow
-                    slot={CAPTION_SLOT}
-                    override={slotOverrides['caption']}
-                    onChange={handleSlotChange}
-                    onRestore={handleSlotRestore}
-                  />
+                {/* Slot / section overrides — only for legacy slot-based non-head-talk templates */}
+                {!isHeadTalkFormat && !isDynamicReel && ((slotSchema && slotSchema.length > 0) || (htSections && htSections.length > 0)) && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">
+                      {slotSchema ? 'What the AI fills in' : 'Script sections'}
+                    </p>
+                    <p className="text-[11px] text-gray-600">
+                      Click a section to customize its instructions for this brand.
+                    </p>
+                    <div className="space-y-2">
+                      {(slotSchema ?? htSections!).map((s) => (
+                        <SlotOverrideRow
+                          key={s.key}
+                          slot={s}
+                          override={slotOverrides[s.key]}
+                          onChange={handleSlotChange}
+                          onRestore={handleSlotRestore}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Caption customization — only for legacy slot-based templates */}
+                {!isDynamicReel && !isHeadTalkFormat && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">Caption</p>
+                    <p className="text-[11px] text-gray-600">
+                      Customize how the AI writes the Instagram caption for this brand.
+                    </p>
+                    <SlotOverrideRow
+                      slot={CAPTION_SLOT}
+                      override={slotOverrides['caption']}
+                      onChange={handleSlotChange}
+                      onRestore={handleSlotRestore}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Settings tab */}
+            {(activeTab === 'settings') && (
+              <div className="space-y-5">
+                {/* Stats */}
+                <div className="flex flex-wrap gap-2">
+                  {durationLabel && (
+                    <div className="flex items-center gap-1.5 text-xs text-text-secondary bg-gray-900 rounded px-2.5 py-1.5 border border-gray-800">
+                      <Clock size={11} />
+                      {durationLabel}
+                    </div>
+                  )}
+                  {scenes && scenes.length > 0 && (
+                    <div className="flex items-center gap-1.5 text-xs text-text-secondary bg-gray-900 rounded px-2.5 py-1.5 border border-gray-800">
+                      <Layers size={11} />
+                      {scenes.length} scene{scenes.length !== 1 ? 's' : ''}
+                    </div>
+                  )}
+                  {sections && sections.length > 0 && !isDynamicReel && (
+                    <div className="flex items-center gap-1.5 text-xs text-text-secondary bg-gray-900 rounded px-2.5 py-1.5 border border-gray-800">
+                      <Layers size={11} />
+                      {sections.length} {slotSchema ? 'text slot' : 'section'}
+                      {sections.length !== 1 ? 's' : ''}
+                    </div>
+                  )}
                 </div>
 
                 {/* Custom prompt */}
@@ -932,7 +940,7 @@ function TemplateModal({
                   )}
                 </div>
 
-                {/* Settings */}
+                {/* Settings toggles */}
                 <div className="space-y-2">
                   <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">Settings</p>
                   <div className="flex flex-col gap-2">
