@@ -94,6 +94,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       updateData.scenes = parsedScenes.data
     }
     if (body.description !== undefined) updateData.description = body.description
+    if (body.format !== undefined) {
+      const allowed = ['reel', 'trial_reel', 'head_talk', 'trial_head_talk']
+      if (!allowed.includes(body.format)) {
+        return NextResponse.json({ error: 'Invalid format value' }, { status: 400 })
+      }
+      updateData.format = body.format
+    }
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
     }

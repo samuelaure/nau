@@ -357,11 +357,11 @@ function TemplateModal({
   const [htCaptionPrompt, setHtCaptionPrompt] = useState(htParsed.captionPrompt)
   const [savingHtPrompts, setSavingHtPrompts] = useState(false)
 
-  // Tab: 'settings' always shown; 'builder' shown for block-based reels
   const [activeTab, setActiveTab] = useState<'settings' | 'builder'>(
     isDynamicReel ? 'builder' : 'settings',
   )
   const [savingScenes, setSavingScenes] = useState(false)
+  const [savingFormat, setSavingFormat] = useState(false)
 
   const durationLabel = (() => {
     const dur = contentSchema?.targetDurationSeconds as string | undefined
@@ -546,6 +546,31 @@ function TemplateModal({
       toast.error('Failed to save template')
     } finally {
       setSavingScenes(false)
+    }
+  }
+
+  const saveFormat = async (trialOnly: boolean) => {
+    setSavingFormat(true)
+    try {
+      const newFormat = trialOnly
+        ? isHeadTalkFormat
+          ? 'trial_head_talk'
+          : 'trial_reel'
+        : isHeadTalkFormat
+          ? 'head_talk'
+          : 'reel'
+      const res = await fetch(`/api/templates/${template.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ format: newFormat }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success(trialOnly ? 'Marked as Trial only' : 'Marked as Standard')
+      onRefresh()
+    } catch {
+      toast.error('Failed to update template type')
+    } finally {
+      setSavingFormat(false)
     }
   }
 
@@ -911,6 +936,24 @@ function TemplateModal({
                 <div className="space-y-2">
                   <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">Settings</p>
                   <div className="flex flex-col gap-2">
+                    {/* Trial only — reel/head_talk templates */}
+                    {(isReelFormat || isHeadTalkFormat) && (
+                      <label className="flex items-center justify-between bg-gray-900 border border-gray-800 rounded-lg px-3 py-2.5 cursor-pointer">
+                        <div>
+                          <p className="text-sm font-medium">Trial only</p>
+                          <p className="text-xs text-text-secondary mt-0.5">
+                            Only selected when a Trial {isHeadTalkFormat ? 'Head Talk' : 'Reel'} is created
+                          </p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={template.format === 'trial_reel' || template.format === 'trial_head_talk'}
+                          disabled={savingFormat}
+                          onChange={(e) => saveFormat(e.target.checked)}
+                          className="w-4 h-4 accent-accent shrink-0"
+                        />
+                      </label>
+                    )}
                     <label className="flex items-center justify-between bg-gray-900 border border-gray-800 rounded-lg px-3 py-2.5 cursor-pointer">
                       <div>
                         <p className="text-sm font-medium">Enabled</p>
