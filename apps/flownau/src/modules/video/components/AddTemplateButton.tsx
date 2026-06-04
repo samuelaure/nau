@@ -66,7 +66,9 @@ export default function AddTemplateButton({
             />
           </div>
 
-          <input type="hidden" name="remotionId" value="Universal" />
+          <input type="hidden" name="remotionId" value="DynamicReel" />
+          <input type="hidden" name="format" value="reel" />
+          <input type="hidden" name="sceneType" value="reel" />
 
           <div className="form-group">
             <label className="form-label">Template Scope</label>

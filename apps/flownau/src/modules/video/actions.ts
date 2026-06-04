@@ -10,6 +10,8 @@ import { TemplateSchema } from '@/types/video-schema'
 const TemplateFormSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   remotionId: z.string().min(1, 'Remotion ID is required'),
+  format: z.string().optional().nullable().transform((val) => val || null),
+  sceneType: z.string().optional().nullable().transform((val) => val || null),
   brandId: z
     .string()
     .optional()
@@ -40,6 +42,8 @@ export async function addTemplate(formData: FormData) {
   const rawData = {
     name: formData.get('name'),
     remotionId: formData.get('remotionId'),
+    format: formData.get('format'),
+    sceneType: formData.get('sceneType'),
     brandId: formData.get('brandId'),
   }
 
