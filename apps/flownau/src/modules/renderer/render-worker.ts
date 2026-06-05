@@ -132,6 +132,22 @@ async function resolveDynamicReelScenes(
     })
   }
 
+  // Debug: log resolvedContent for each text so we can verify text data reaches Remotion
+  resolved.forEach((scene, si) => {
+    scene.texts.forEach((text, ti) => {
+      logger.info(
+        {
+          postId,
+          sceneIdx: si,
+          textIdx: ti,
+          mode: text.mode,
+          resolvedContent: text.resolvedContent?.slice(0, 80) ?? '(undefined)',
+          contentPreview: text.content?.slice(0, 40) ?? '(undefined)',
+        },
+        '[RenderWorker] DynamicReel text slot',
+      )
+    })
+  })
   logger.info({ postId, sceneCount: resolved.length }, '[RenderWorker] DynamicReel scenes resolved')
   return resolved
 }
