@@ -51,51 +51,72 @@ import { loadFont as loadSatisfy } from '@remotion/google-fonts/Satisfy'
 import { loadFont as loadPacifico } from '@remotion/google-fonts/Pacifico'
 import { loadFont as loadCaveat } from '@remotion/google-fonts/Caveat'
 
-// Pre-load all supported fonts so Remotion can wait for them before rendering.
-// Each loadFont() returns a handle; we delay rendering until all resolve.
-const fontLoaders = [
-  loadAnton(),
-  loadBebasNeue(),
-  loadOswald(),
-  loadInter(),
-  loadMontserrat(),
-  loadPoppins(),
-  loadDMSans(),
-  loadNunito(),
-  loadRaleway(),
-  loadPlayfairDisplay(),
-  loadBlackHanSans(),
-  // Modern sans-serif
-  loadManrope(),
-  loadUrbanist(),
-  loadOutfit(),
-  loadFigtree(),
-  loadSpaceGrotesk(),
-  loadSora(),
-  loadLato(),
-  loadRoboto(),
-  loadWorkSans(),
-  loadBarlow(),
-  loadKanit(),
-  // Serif
-  loadMerriweather(),
-  loadLora(),
-  loadCormorant(),
-  loadLibreBaskerville(),
-  loadCrimsonText(),
-  loadCinzel(),
-  // Bold display
-  loadTeko(),
-  loadRighteous(),
-  loadArchivoBlack(),
-  loadBarlowCondensed(),
-  // Handwriting / script
-  loadDancingScript(),
-  loadSacramento(),
-  loadSatisfy(),
-  loadPacifico(),
-  loadCaveat(),
-]
+// ── Font loader registry ──────────────────────────────────────────────────────
+// Maps font name (as stored in DB) → loader function.
+// Each loader returns { fontFamily, waitUntilDone } — we call waitUntilDone()
+// only for fonts actually used in the composition to avoid loading all 37.
+const FONT_LOADERS: Record<string, () => { fontFamily: string; waitUntilDone: () => Promise<void> }> = {
+  'Anton': loadAnton,
+  'Bebas Neue': loadBebasNeue,
+  'Oswald': loadOswald,
+  'Inter': loadInter,
+  'Montserrat': loadMontserrat,
+  'Poppins': loadPoppins,
+  'DM Sans': loadDMSans,
+  'Nunito': loadNunito,
+  'Raleway': loadRaleway,
+  'Playfair Display': loadPlayfairDisplay,
+  'Black Han Sans': loadBlackHanSans,
+  'Manrope': loadManrope,
+  'Urbanist': loadUrbanist,
+  'Outfit': loadOutfit,
+  'Figtree': loadFigtree,
+  'Space Grotesk': loadSpaceGrotesk,
+  'Sora': loadSora,
+  'Lato': loadLato,
+  'Roboto': loadRoboto,
+  'Work Sans': loadWorkSans,
+  'Barlow': loadBarlow,
+  'Kanit': loadKanit,
+  'Merriweather': loadMerriweather,
+  'Lora': loadLora,
+  'Cormorant': loadCormorant,
+  'Libre Baskerville': loadLibreBaskerville,
+  'Crimson Text': loadCrimsonText,
+  'Cinzel': loadCinzel,
+  'Teko': loadTeko,
+  'Righteous': loadRighteous,
+  'Archivo Black': loadArchivoBlack,
+  'Barlow Condensed': loadBarlowCondensed,
+  'Dancing Script': loadDancingScript,
+  'Sacramento': loadSacramento,
+  'Satisfy': loadSatisfy,
+  'Pacifico': loadPacifico,
+  'Caveat': loadCaveat,
+}
+
+// ── useLoadTemplateFonts ──────────────────────────────────────────────────────
+// Loads only the fonts used by this composition, waiting via waitUntilDone()
+// before unblocking Remotion. Guarantees FitText measurements use the real font.
+function useLoadTemplateFonts(fontNames: string[]) {
+  const [fontsLoaded, setFontsLoaded] = useState(false)
+  const [handle] = useState(() => delayRender('ReelTemplate font load'))
+
+  useEffect(() => {
+    const unique = [...new Set(fontNames.filter(Boolean))]
+    const waiters = unique
+      .map((name) => FONT_LOADERS[name])
+      .filter(Boolean)
+      .map((loader) => loader().waitUntilDone())
+
+    Promise.all(waiters).then(() => {
+      setFontsLoaded(true)
+      continueRender(handle)
+    })
+  }, [handle]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  return fontsLoaded
+}
 
 export interface BrandIdentity {
   primaryColor?: string
@@ -150,6 +171,12 @@ export const BROLL_REQUIRED_FRAMES = SCENE_BODY + TRAIL
 const SAFE_ZONE = { top: 220, bottom: 450, left: 160, right: 160 } as const
 const SAFE_W = 1080 - SAFE_ZONE.left - SAFE_ZONE.right // 760
 const SAFE_H = 1920 - SAFE_ZONE.top - SAFE_ZONE.bottom // 1250
+
+// Generous fixed text box height inside the safe zone.
+// Text that is too long will shrink to fit; short text stays at maxTextSize.
+// Keeping this well below SAFE_H (1250) ensures top/center/bottom alignment
+// actually works — a 100%-height child cannot be flex-aligned inside the zone.
+const TEXT_BOX_HEIGHT = 800
 
 // TextZone: centers text on the full 1920px canvas height so text appears
 // visually centered on screen. Horizontal safe margins are still respected.
@@ -285,12 +312,8 @@ function FitText({
   const containerRef = useRef<HTMLDivElement>(null)
   const [fontSize, setFontSize] = useState(() => Math.round(baseFontSize * (maxTextSize / 100)))
 
-  // Remotion font-load delay handle — ensures fonts are loaded before frame 0.
-  const [handle] = useState(() => delayRender('FitText font load'))
-
-  useEffect(() => {
-    Promise.all(fontLoaders).then(() => continueRender(handle))
-  }, [handle])
+  // Font loading is now handled at the composition level via useLoadTemplateFonts.
+  // No per-instance delayRender needed here — the parent blocks until fonts are ready.
 
   useIsomorphicLayoutEffect(() => {
     const el = containerRef.current
@@ -348,7 +371,8 @@ function FitText({
           textShadow: '0 2px 20px rgba(0,0,0,0.8)',
           letterSpacing: '-0.5px',
           width: '100%',
-          overflow: 'hidden',
+          // No overflow:hidden or height on the inner element — scrollHeight must
+          // reflect the true rendered text height for the shrink loop to work.
         }}
       >
         {text}
@@ -362,6 +386,8 @@ function FitText({
 
 export function ReelT1({ slots, brollClips = [], audioUrl, brand = {} }: ReelSlotProps) {
   const b = { ...DEFAULT_BRAND, ...brand }
+  const fontsLoaded = useLoadTemplateFonts([b.titleFont])
+  if (!fontsLoaded) return <div style={{ width: 1080, height: 1920, background: '#000' }} />
 
   return (
     <div
@@ -383,7 +409,7 @@ export function ReelT1({ slots, brollClips = [], audioUrl, brand = {} }: ReelSlo
           fontFamily={b.titleFont}
           color={b.secondaryColor}
           boxWidth={SAFE_W}
-          boxHeight={SAFE_H}
+          boxHeight={TEXT_BOX_HEIGHT}
           frameOffset={0}
           instant
         />
@@ -397,6 +423,8 @@ export function ReelT1({ slots, brollClips = [], audioUrl, brand = {} }: ReelSlo
 
 export function ReelT2({ slots, brollClips = [], audioUrl, brand = {} }: ReelSlotProps) {
   const b = { ...DEFAULT_BRAND, ...brand }
+  const fontsLoaded = useLoadTemplateFonts([b.bodyFont])
+  if (!fontsLoaded) return <div style={{ width: 1080, height: 1920, background: '#000' }} />
 
   return (
     <div
@@ -418,7 +446,7 @@ export function ReelT2({ slots, brollClips = [], audioUrl, brand = {} }: ReelSlo
           fontFamily={b.bodyFont}
           color={b.secondaryColor}
           boxWidth={SAFE_W}
-          boxHeight={SAFE_H}
+          boxHeight={TEXT_BOX_HEIGHT}
           frameOffset={0}
           instant
         />
@@ -435,8 +463,10 @@ const T3_REVEAL = 105 // 3.5s — reveal scene duration
 
 export function ReelT3({ slots, brollClips = [], audioUrl, brand = {} }: ReelSlotProps) {
   const b = { ...DEFAULT_BRAND, ...brand }
+  const fontsLoaded = useLoadTemplateFonts([b.titleFont, b.bodyFont])
   const clip1 = brollClips[0]
   const clip2 = brollClips[1] ?? brollClips[0]
+  if (!fontsLoaded) return <div style={{ width: 1080, height: 1920, background: '#000' }} />
 
   return (
     <div
@@ -459,7 +489,7 @@ export function ReelT3({ slots, brollClips = [], audioUrl, brand = {} }: ReelSlo
             fontFamily={b.titleFont}
             color={b.secondaryColor}
             boxWidth={SAFE_W}
-            boxHeight={SAFE_H}
+            boxHeight={TEXT_BOX_HEIGHT}
             frameOffset={0}
             instant
           />
@@ -475,7 +505,7 @@ export function ReelT3({ slots, brollClips = [], audioUrl, brand = {} }: ReelSlo
             fontFamily={b.bodyFont}
             color={b.secondaryColor}
             boxWidth={SAFE_W}
-            boxHeight={SAFE_H}
+            boxHeight={TEXT_BOX_HEIGHT}
             frameOffset={0}
           />
         </TextZone>
@@ -493,9 +523,11 @@ const T4_LAND = 165 // 5.5s — landing scene duration
 
 export function ReelT4({ slots, brollClips = [], audioUrl, brand = {} }: ReelSlotProps) {
   const b = { ...DEFAULT_BRAND, ...brand }
+  const fontsLoaded = useLoadTemplateFonts([b.titleFont, b.bodyFont])
   const clip1 = brollClips[0]
   const clip2 = brollClips[1] ?? brollClips[0]
   const clip3 = brollClips[2] ?? brollClips[1] ?? brollClips[0]
+  if (!fontsLoaded) return <div style={{ width: 1080, height: 1920, background: '#000' }} />
 
   return (
     <div
@@ -518,7 +550,7 @@ export function ReelT4({ slots, brollClips = [], audioUrl, brand = {} }: ReelSlo
             fontFamily={b.titleFont}
             color={b.secondaryColor}
             boxWidth={SAFE_W}
-            boxHeight={SAFE_H}
+            boxHeight={TEXT_BOX_HEIGHT}
             frameOffset={0}
             instant
           />
@@ -534,7 +566,7 @@ export function ReelT4({ slots, brollClips = [], audioUrl, brand = {} }: ReelSlo
             fontFamily={b.bodyFont}
             color={b.secondaryColor}
             boxWidth={SAFE_W}
-            boxHeight={SAFE_H}
+            boxHeight={TEXT_BOX_HEIGHT}
             frameOffset={0}
           />
         </TextZone>
@@ -549,7 +581,7 @@ export function ReelT4({ slots, brollClips = [], audioUrl, brand = {} }: ReelSlo
             fontFamily={b.titleFont}
             color={b.secondaryColor}
             boxWidth={SAFE_W}
-            boxHeight={SAFE_H}
+            boxHeight={TEXT_BOX_HEIGHT}
             frameOffset={0}
           />
         </TextZone>
