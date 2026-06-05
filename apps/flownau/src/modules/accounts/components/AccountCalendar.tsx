@@ -346,11 +346,22 @@ function HeadTalkContent({
   )
 }
 
-type SceneSlots = Record<string, unknown>
+// Scene types matching @/types/template-scenes
+interface TextDef {
+  id: string
+  mode: 'prompt' | 'manual'
+  content: string
+  resolvedContent?: string
+  [key: string]: unknown
+}
 interface SceneDef {
-  type: string
-  slots?: SceneSlots
+  id?: string
+  type?: string
+  texts?: TextDef[]
+  // legacy field on old slot-based scenes
+  slots?: Record<string, unknown>
   mood?: string
+  [key: string]: unknown
 }
 
 function ReelContent({
@@ -367,9 +378,176 @@ function ReelContent({
     slots?: Record<string, string>
     brollMood?: string
   } | null
-  const slots = creative?.slots
 
-  // ── Slot-based reel (current templates) ──────────────────────────────────
+  // DynamicReel: scenes-based creative
+  const scenes = creative?.scenes
+  if (scenes && Array.isArray(scenes) && scenes.length > 0) {
+    return (
+      <DynamicReelContent
+        comp={comp}
+        creative={creative}
+        scenes={scenes}
+        actioning={actioning}
+        onSaved={onSaved}
+      />
+    )
+  }
+
+  // Legacy slot-based reel
+  return (
+    <LegacySlotContent
+      comp={comp}
+      creative={creative}
+      slots={creative?.slots}
+      actioning={actioning}
+      onSaved={onSaved}
+    />
+  )
+}
+
+// DynamicReel content: reads/writes creative.scenes[i].texts[j].resolvedContent
+type TextRef = { si: number; ti: number; label: string; value: string }
+
+function buildTextRefs(scenes: SceneDef[]): TextRef[] {
+  return scenes.flatMap((scene, si) =>
+    (scene.texts ?? []).map((text, ti) => ({
+      si,
+      ti,
+      label:
+        (scene.texts ?? []).length > 1
+          ? `Scene ${si + 1} · Text ${ti + 1}`
+          : `Scene ${si + 1}`,
+      value: (text as any).resolvedContent ?? text.content ?? '',
+    }))
+  )
+}
+
+function DynamicReelContent({
+  comp,
+  creative,
+  scenes,
+  actioning,
+  onSaved,
+}: {
+  comp: Composition
+  creative: { scenes?: SceneDef[]; slots?: Record<string, string>; brollMood?: string } | null
+  scenes: SceneDef[]
+  actioning: boolean
+  onSaved: () => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [drafts, setDrafts] = useState<TextRef[]>(() => buildTextRefs(scenes))
+  const [saving, setSaving] = useState(false)
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      const updatedScenes = scenes.map((scene, si) => ({
+        ...scene,
+        texts: (scene.texts ?? []).map((text, ti) => {
+          const ref = drafts.find((d) => d.si === si && d.ti === ti)
+          return {
+            ...text,
+            resolvedContent: ref?.value ?? (text as any).resolvedContent ?? text.content,
+          }
+        }),
+      }))
+      const res = await fetch(`/api/posts/${comp.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ creative: { ...(creative ?? {}), scenes: updatedScenes } }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success('Content updated.')
+      setEditing(false)
+      onSaved()
+    } catch {
+      toast.error('Failed to save content')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2 pt-3">
+      <p className="text-xs text-text-secondary uppercase tracking-wider">Content</p>
+      {editing ? (
+        <>
+          {drafts.map((ref, idx) => (
+            <div key={`${ref.si}_${ref.ti}`} className="flex flex-col gap-1">
+              <p className="text-[10px] font-mono text-accent uppercase tracking-wide">
+                {ref.label}
+              </p>
+              <textarea
+                autoFocus={idx === 0}
+                value={ref.value}
+                onChange={(e) =>
+                  setDrafts((prev) =>
+                    prev.map((d) =>
+                      d.si === ref.si && d.ti === ref.ti ? { ...d, value: e.target.value } : d
+                    )
+                  )
+                }
+                rows={3}
+                className="bg-gray-950 border border-gray-800 text-white rounded px-3 py-2 text-sm resize-none w-full focus:outline-none focus:border-accent/50 leading-relaxed"
+              />
+            </div>
+          ))}
+          <div className="flex gap-2 justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setDrafts(buildTextRefs(scenes))
+                setEditing(false)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button size="sm" disabled={saving || actioning} onClick={save}>
+              {saving ? <Loader2 size={12} className="animate-spin" /> : 'Save'}
+            </Button>
+          </div>
+        </>
+      ) : (
+        <div onClick={() => setEditing(true)} className="flex flex-col gap-2 cursor-text">
+          {drafts.map((ref) => (
+            <div
+              key={`${ref.si}_${ref.ti}`}
+              className="rounded-lg bg-white/5 border border-transparent hover:border-white/10 transition-colors px-3 py-2.5 flex flex-col gap-0.5"
+            >
+              <p className="text-[10px] font-mono text-accent uppercase tracking-wide">
+                {ref.label}
+              </p>
+              {ref.value ? (
+                <p className="text-sm text-white leading-relaxed whitespace-pre-wrap">
+                  {ref.value}
+                </p>
+              ) : (
+                <p className="text-sm text-text-secondary italic">Empty</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Legacy slot-based reel: reads/writes creative.slots
+function LegacySlotContent({
+  comp,
+  creative,
+  slots,
+  actioning,
+  onSaved,
+}: {
+  comp: Composition
+  creative: { scenes?: SceneDef[]; slots?: Record<string, string>; brollMood?: string } | null
+  slots: Record<string, string> | undefined
+  actioning: boolean
+  onSaved: () => void
+}) {
   const [editing, setEditing] = useState(false)
   const [slotDrafts, setSlotDrafts] = useState<Record<string, string>>(slots ?? {})
   const [saving, setSaving] = useState(false)
@@ -393,115 +571,66 @@ function ReelContent({
     }
   }
 
-  if (slots && Object.keys(slots).length > 0) {
-    return (
-      <div className="flex flex-col gap-2 pt-3">
-        <p className="text-xs text-text-secondary uppercase tracking-wider">Content</p>
-
-        {editing ? (
-          <>
-            {Object.keys(slotDrafts).map((key) => (
-              <div key={key} className="flex flex-col gap-1">
-                <p className="text-[10px] font-mono text-accent uppercase tracking-wide">{key}</p>
-                <textarea
-                  autoFocus={key === Object.keys(slotDrafts)[0]}
-                  value={slotDrafts[key]}
-                  onChange={(e) => setSlotDrafts((prev) => ({ ...prev, [key]: e.target.value }))}
-                  rows={3}
-                  className="bg-gray-950 border border-gray-800 text-white rounded px-3 py-2 text-sm resize-none w-full focus:outline-none focus:border-accent/50 leading-relaxed"
-                />
-              </div>
-            ))}
-            {creative?.brollMood && (
-              <p className="text-[11px] text-text-secondary italic">
-                B-roll mood: {creative.brollMood}
-              </p>
-            )}
-            <div className="flex gap-2 justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setSlotDrafts(slots)
-                  setEditing(false)
-                }}
-              >
-                Cancel
-              </Button>
-              <Button size="sm" disabled={saving || actioning} onClick={save}>
-                {saving ? <Loader2 size={12} className="animate-spin" /> : 'Save'}
-              </Button>
-            </div>
-          </>
-        ) : (
-          <div onClick={() => setEditing(true)} className="flex flex-col gap-2 cursor-text">
-            {Object.entries(slotDrafts).map(([key, val]) => (
-              <div
-                key={key}
-                className="rounded-lg bg-white/5 border border-transparent hover:border-white/10 transition-colors px-3 py-2.5 flex flex-col gap-0.5"
-              >
-                <p className="text-[10px] font-mono text-accent uppercase tracking-wide">{key}</p>
-                <p className="text-sm text-white leading-relaxed whitespace-pre-wrap">{val}</p>
-              </div>
-            ))}
-            {creative?.brollMood && (
-              <p className="text-[11px] text-text-secondary italic">
-                B-roll mood: {creative.brollMood}
-              </p>
-            )}
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  // ── Legacy scene-based reel (read-only) ───────────────────────────────────
-  const scenes = creative?.scenes ?? []
-  if (scenes.length === 0) {
+  if (!slots || Object.keys(slots).length === 0) {
     return <p className="text-sm text-text-secondary italic pt-3">No content generated yet.</p>
   }
 
   return (
-    <div className="flex flex-col gap-3 pt-3">
-      <p className="text-xs text-text-secondary uppercase tracking-wider">
-        Scenes ({scenes.length})
-      </p>
-      {scenes.map((scene, i) => {
-        const sceneSlots = scene.slots ?? {}
-        const slotEntries = Object.entries(sceneSlots).filter(
-          ([, v]) => v !== null && v !== undefined && v !== '',
-        )
-        return (
-          <div
-            key={i}
-            className="rounded-lg bg-white/5 border border-white/10 px-3 py-2.5 flex flex-col gap-1"
-          >
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono bg-accent/10 text-accent px-1.5 py-0.5 rounded">
-                {scene.type}
-              </span>
-              {scene.mood && (
-                <span className="text-[10px] text-text-secondary italic">{scene.mood}</span>
-              )}
+    <div className="flex flex-col gap-2 pt-3">
+      <p className="text-xs text-text-secondary uppercase tracking-wider">Content</p>
+      {editing ? (
+        <>
+          {Object.keys(slotDrafts).map((key) => (
+            <div key={key} className="flex flex-col gap-1">
+              <p className="text-[10px] font-mono text-accent uppercase tracking-wide">{key}</p>
+              <textarea
+                autoFocus={key === Object.keys(slotDrafts)[0]}
+                value={slotDrafts[key]}
+                onChange={(e) => setSlotDrafts((prev) => ({ ...prev, [key]: e.target.value }))}
+                rows={3}
+                className="bg-gray-950 border border-gray-800 text-white rounded px-3 py-2 text-sm resize-none w-full focus:outline-none focus:border-accent/50 leading-relaxed"
+              />
             </div>
-            {slotEntries.length > 0 ? (
-              slotEntries.map(([key, val]) => (
-                <p key={key} className="text-sm text-white leading-relaxed">
-                  {Array.isArray(val)
-                    ? (val as string[]).map((item, j) => (
-                        <span key={j} className="block">
-                          • {item}
-                        </span>
-                      ))
-                    : String(val)}
-                </p>
-              ))
-            ) : (
-              <p className="text-xs text-text-secondary italic">No text slots (visual scene)</p>
-            )}
+          ))}
+          {creative?.brollMood && (
+            <p className="text-[11px] text-text-secondary italic">
+              B-roll mood: {creative.brollMood}
+            </p>
+          )}
+          <div className="flex gap-2 justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSlotDrafts(slots)
+                setEditing(false)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button size="sm" disabled={saving || actioning} onClick={save}>
+              {saving ? <Loader2 size={12} className="animate-spin" /> : 'Save'}
+            </Button>
           </div>
-        )
-      })}
+        </>
+      ) : (
+        <div onClick={() => setEditing(true)} className="flex flex-col gap-2 cursor-text">
+          {Object.entries(slotDrafts).map(([key, val]) => (
+            <div
+              key={key}
+              className="rounded-lg bg-white/5 border border-transparent hover:border-white/10 transition-colors px-3 py-2.5 flex flex-col gap-0.5"
+            >
+              <p className="text-[10px] font-mono text-accent uppercase tracking-wide">{key}</p>
+              <p className="text-sm text-white leading-relaxed whitespace-pre-wrap">{val}</p>
+            </div>
+          ))}
+          {creative?.brollMood && (
+            <p className="text-[11px] text-text-secondary italic">
+              B-roll mood: {creative.brollMood}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   )
 }
