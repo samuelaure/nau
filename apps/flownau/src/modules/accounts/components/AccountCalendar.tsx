@@ -1663,7 +1663,8 @@ function CompositionModal({
             {/* Draft → approve to start rendering */}
             {comp.status === 'DRAFT_PENDING' &&
               (!REEL_FAMILY.has(comp.format) ||
-                !!(comp.creative as Record<string, unknown> | null)?.slots) && (
+                !!(comp.creative as Record<string, unknown> | null)?.slots ||
+                !!(comp.creative as Record<string, unknown> | null)?.scenes) && (
                 <Button
                   size="sm"
                   onClick={handleApproveDraft}
