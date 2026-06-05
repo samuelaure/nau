@@ -42,7 +42,7 @@ type DisplayStatus = 'Draft' | 'Ready' | 'Published' | 'Error'
 
 function getDisplayStatus(dbStatus: string): DisplayStatus {
   if (dbStatus === 'PUBLISHED') return 'Published'
-  if (dbStatus === 'FAILED') return 'Error'
+  if (dbStatus === 'FAILED' || dbStatus === 'DRAFT_FAILED') return 'Error'
   if (
     dbStatus === 'RENDERED_PENDING' ||
     dbStatus === 'RENDERED_APPROVED' ||
@@ -1410,8 +1410,27 @@ function CompositionModal({
               </Button>
             )}
 
-            {/* Error → retry */}
-            {display === 'Error' && (
+            {/* DRAFT_FAILED → creative is bad, must recompose */}
+            {display === 'Error' && comp.status === 'DRAFT_FAILED' && (
+              <div className="flex flex-col gap-2">
+                <p className="text-xs text-red-400 leading-relaxed">
+                  This draft failed to render because its content was generated before the template
+                  had scenes configured. Recompose it to fix.
+                </p>
+                <Button
+                  size="sm"
+                  onClick={() => setRecomposeOpen(true)}
+                  disabled={actioning}
+                  className="gap-1.5"
+                >
+                  <RefreshCw size={13} />
+                  Recompose
+                </Button>
+              </div>
+            )}
+
+            {/* FAILED (publish error) → retry */}
+            {display === 'Error' && comp.status !== 'DRAFT_FAILED' && (
               <Button
                 size="sm"
                 onClick={handleConfirmRetry}

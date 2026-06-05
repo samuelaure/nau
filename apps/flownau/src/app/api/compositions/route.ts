@@ -25,6 +25,7 @@ export async function GET(req: Request) {
     const CONTENT_STATUSES = [
       'DRAFT_PENDING',
       'DRAFT_APPROVED',
+      'DRAFT_FAILED',
       'RENDERING',
       'RENDERED_PENDING',
       'RENDERED_APPROVED',
