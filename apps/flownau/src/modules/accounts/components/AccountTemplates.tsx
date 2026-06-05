@@ -22,11 +22,11 @@ import {
   PenLine,
   Plus,
   Save,
+  Edit2,
 } from 'lucide-react'
 import { cn } from '@/modules/shared/utils'
 import { PromptHistoryPanel } from './PromptHistoryPanel'
 import { ReelSceneBuilder } from './ReelSceneBuilder'
-import AddTemplateButton from '@/modules/video/components/AddTemplateButton'
 import type { SceneDef } from '@/types/template-scenes'
 
 type BrandIdentity = {
@@ -496,7 +496,8 @@ function TemplateModal({
   const [autoApproveDraft, setAutoApproveDraft] = useState(config?.autoApproveDraft ?? false)
   const [autoApprovePost, setAutoApprovePost] = useState(config?.autoApprovePost ?? false)
   const [customName, setCustomName] = useState(config?.customName ?? '')
-  const [editingName, setEditingName] = useState(false)
+  const [editingName, setEditingName] = useState(template.id === 'new')
+  const [templateName, setTemplateName] = useState(template.name)
   const [customPrompt, setCustomPrompt] = useState(config?.customPrompt ?? '')
   const [slotOverrides, setSlotOverrides] = useState<SlotOverrides>(config?.slotOverrides ?? {})
   const [saving, setSaving] = useState(false)
@@ -713,15 +714,43 @@ function TemplateModal({
     let success = true
     setSavingScenes(true)
     
-    // Save scenes if dynamic reel
+    let activeTemplateId = template.id
+    const isNew = activeTemplateId === 'new'
+
+    // Save or Create Template
     if (isDynamicReel && localScenes) {
       try {
-        const res = await fetch(`/api/templates/${template.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ scenes: localScenes }),
-        })
-        if (!res.ok) throw new Error()
+        if (isNew) {
+          const res = await fetch('/api/templates', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: templateName,
+              brandId,
+              remotionId: 'DynamicReel',
+              sceneType: 'reel',
+              scope: 'brand',
+            }),
+          })
+          if (!res.ok) throw new Error()
+          const data = await res.json()
+          activeTemplateId = data.template.id
+
+          // Save scenes to the newly created template
+          const resPatch = await fetch(`/api/templates/${activeTemplateId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scenes: localScenes }),
+          })
+          if (!resPatch.ok) throw new Error()
+        } else {
+          const res = await fetch(`/api/templates/${activeTemplateId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scenes: localScenes, name: templateName }),
+          })
+          if (!res.ok) throw new Error()
+        }
       } catch {
         success = false
       }
@@ -729,14 +758,14 @@ function TemplateModal({
     
     // Save customizations
     try {
-      const resConfig = await fetch(`/api/account-templates/${config?.id ?? 'new'}`, {
-        method: 'PATCH',
+      const resConfig = await fetch('/api/account-templates', {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           customPrompt: customPrompt || null,
           slotOverrides: Object.keys(slotOverrides).length > 0 ? slotOverrides : null,
           brandId,
-          templateId: template.id,
+          templateId: activeTemplateId,
         }),
       })
       if (!resConfig.ok) throw new Error()
@@ -746,8 +775,12 @@ function TemplateModal({
 
     setSavingScenes(false)
     if (success) {
-      toast.success('Template saved')
+      toast.success(isNew ? 'Template created' : 'Template saved')
       onRefresh()
+      if (isNew) {
+        // Find it in the refreshed list by waiting, or let the parent refresh and close this.
+        // Since we don't have setSelected here, the parent will re-render.
+      }
     } else {
       toast.error('Failed to save template')
     }
@@ -834,30 +867,20 @@ function TemplateModal({
                   <div className="flex items-center gap-1.5">
                     <input
                       autoFocus
-                      value={customName}
-                      onChange={(e) => setCustomName(e.target.value)}
+                      value={templateName}
+                      onChange={(e) => setTemplateName(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') saveCustomName()
+                        if (e.key === 'Enter') setEditingName(false)
                         if (e.key === 'Escape') setEditingName(false)
                       }}
-                      placeholder={template.name}
+                      placeholder="Template Name"
                       className="text-sm font-semibold bg-gray-800 border border-gray-600 rounded px-2 py-0.5 text-white focus:outline-none focus:border-gray-400 w-40"
                     />
                     <button
-                      onClick={saveCustomName}
-                      disabled={savingName}
-                      className="text-[11px] text-green-400 hover:text-green-300 disabled:opacity-50"
+                      onClick={() => setEditingName(false)}
+                      className="text-[11px] text-green-400 hover:text-green-300"
                     >
-                      {savingName ? '…' : 'Save'}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setCustomName(config?.customName ?? '')
-                        setEditingName(false)
-                      }}
-                      className="text-[11px] text-gray-500 hover:text-gray-300"
-                    >
-                      Cancel
+                      Ok
                     </button>
                   </div>
                 ) : (
@@ -866,17 +889,9 @@ function TemplateModal({
                     className="group flex items-center gap-1 text-left"
                   >
                     <h2 className="font-semibold text-sm leading-tight group-hover:text-white/80 transition-colors">
-                      {customName || template.name}
+                      {templateName || template.name}
                     </h2>
-                    {customName && (
-                      <span className="text-[10px] text-gray-600 group-hover:text-gray-500">
-                        (custom)
-                      </span>
-                    )}
-                    <Pencil
-                      size={11}
-                      className="text-gray-700 group-hover:text-gray-400 transition-colors shrink-0"
-                    />
+                    <Edit2 size={10} className="text-gray-600 group-hover:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </button>
                 )}
                 {/* Format badge */}
@@ -1574,8 +1589,33 @@ export default function AccountTemplates({ brandId, brandIdentity: initialBrandI
   const [templates, setTemplates] = useState<Template[]>([])
   const [brandIdentity] = useState<BrandIdentity | null>(initialBrandIdentity ?? null)
   const [loading, setLoading] = useState(true)
-  const [selected, setSelected] = useState<Template | null>(null)
+  const [selected, setSelected] = useState<Template | 'new' | null>(null)
   const [activeTab, setActiveTab] = useState<TabId>('enabled')
+
+  const selectedTemplate =
+    selected === 'new'
+      ? ({
+          id: 'new',
+          name: 'New Template',
+          format: 'reel',
+          sceneType: 'reel',
+          remotionId: 'DynamicReel',
+          scope: 'brand',
+          brandId,
+          scenes: [],
+          useBrandAssets: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          brandConfigs: [
+            {
+              id: 'new',
+              enabled: true,
+              autoApproveDraft: false,
+              autoApprovePost: false,
+            },
+          ],
+        } as unknown as Template)
+      : selected
 
   const fetchTemplates = async (): Promise<Template[]> => {
     try {
@@ -1604,7 +1644,7 @@ export default function AccountTemplates({ brandId, brandIdentity: initialBrandI
     })
     await fetchTemplates()
     // Keep selected in sync
-    setSelected((prev) => (prev?.id === templateId ? { ...prev } : prev))
+    setSelected((prev) => (prev && typeof prev !== 'string' && prev.id === templateId ? { ...prev } : prev))
   }
 
   if (loading) return <p className="text-text-secondary text-sm">Loading…</p>
@@ -1650,7 +1690,10 @@ export default function AccountTemplates({ brandId, brandIdentity: initialBrandI
             Enable templates for this brand and configure how each is used.
           </p>
         </div>
-        <AddTemplateButton defaultAccountId={brandId} />
+        <button onClick={() => setSelected('new')} className="btn-primary">
+          <Plus size={20} />
+          New Template
+        </button>
       </div>
 
       {/* Tabs */}
@@ -1720,13 +1763,16 @@ export default function AccountTemplates({ brandId, brandIdentity: initialBrandI
 
       {selected && (
         <TemplateModal
-          template={selected}
+          template={selectedTemplate as Template}
           brandId={brandId}
           brandIdentity={brandIdentity}
           onClose={() => setSelected(null)}
           onRefresh={async () => {
             const fresh = await fetchTemplates()
-            setSelected((prev) => (prev ? (fresh.find((t) => t.id === prev.id) ?? prev) : null))
+            setSelected((prev) => {
+              if (!prev || typeof prev === 'string') return prev
+              return fresh.find((t) => t.id === prev.id) ?? prev
+            })
           }}
           onDuplicated={(newTemplate) => setSelected(newTemplate)}
         />

@@ -94,6 +94,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       }
       updateData.scenes = parsedScenes.data
     }
+    if (body.name !== undefined) updateData.name = body.name
     if (body.description !== undefined) updateData.description = body.description
     if (body.format !== undefined) {
       const allowed = ['reel', 'trial_reel', 'head_talk', 'trial_head_talk']
