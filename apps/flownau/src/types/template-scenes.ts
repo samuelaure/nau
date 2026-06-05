@@ -69,6 +69,14 @@ export function calcTextDurationFrames(text: string): number {
 }
 
 /**
+ * Resolved display text for a TextDef or ResolvedTextDef.
+ * Uses resolvedContent when present (post-AI), falls back to content.
+ */
+export function resolvedText(t: TextDef | ResolvedTextDef): string {
+  return (t as ResolvedTextDef).resolvedContent ?? t.content
+}
+
+/**
  * Duration in frames for a scene.
  * If the scene has a pinned background video, returns that video's duration in frames.
  * Otherwise, sums the durations of all text blocks.
@@ -80,7 +88,10 @@ export function calcSceneDurationFrames(scene: SceneDef): number {
   if (scene.texts.length === 0) {
     return Math.round(MIN_TEXT_DURATION_SECS * REMOTION_FPS)
   }
-  return scene.texts.reduce((sum, t) => sum + calcTextDurationFrames(t.content), 0)
+  // Use resolvedContent when available (post-AI); fall back to content (template definition).
+  // Critical: using t.content here for resolved scenes would compute duration from the
+  // long prompt instruction, causing a timing mismatch with the render path which uses resolvedContent.
+  return scene.texts.reduce((sum, t) => sum + calcTextDurationFrames(resolvedText(t)), 0)
 }
 
 /**

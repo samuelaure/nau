@@ -50,7 +50,7 @@ import { loadFont as loadCaveat } from '@remotion/google-fonts/Caveat'
 
 import type { BrandIdentity } from './ReelTemplates'
 import type { ResolvedSceneDef, ResolvedTextDef } from '@/types/template-scenes'
-import { calcTextDurationFrames, calcSceneDurationFrames, MIN_TEXT_DURATION_SECS, REMOTION_FPS } from '@/types/template-scenes'
+import { calcTextDurationFrames, calcSceneDurationFrames, resolvedText, MIN_TEXT_DURATION_SECS, REMOTION_FPS } from '@/types/template-scenes'
 
 // ── Font pre-loading (identical to ReelTemplates.tsx) ─────────────────────────
 const fontLoaders = [
@@ -289,7 +289,7 @@ function SceneRenderer({ scene, brand }: { scene: ResolvedSceneDef; brand?: Bran
   let acc = 0
   for (const t of scene.texts) {
     textStartFrames.push(acc)
-    acc += calcTextDurationFrames(t.resolvedContent)
+    acc += calcTextDurationFrames(resolvedText(t))
   }
 
   // Resolve null scene-level fields using brand identity
@@ -313,7 +313,7 @@ function SceneRenderer({ scene, brand }: { scene: ResolvedSceneDef; brand?: Bran
       <TextZone align={scene.textVerticalAlign}>
         {scene.texts.map((text, i) => {
           const textStart = textStartFrames[i]
-          const textDuration = calcTextDurationFrames(text.resolvedContent)
+          const textDuration = calcTextDurationFrames(resolvedText(text))
           const isActive = frame >= textStart && frame < textStart + textDuration
           if (!isActive) return null
           // Resolve null text-level fields using brand identity
@@ -323,7 +323,7 @@ function SceneRenderer({ scene, brand }: { scene: ResolvedSceneDef; brand?: Bran
           return (
             <FitText
               key={text.id}
-              text={text.resolvedContent}
+              text={resolvedText(text)}
               fontFamily={font}
               color={color}
               maxTextSize={maxTextSize}
