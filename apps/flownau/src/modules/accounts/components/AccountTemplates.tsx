@@ -615,16 +615,17 @@ function TemplateModal({
         <div className="flex-1 min-w-0 overflow-y-auto flex flex-col">
           {/* Header */}
           <div className="flex items-start justify-between gap-3 p-5 border-b border-gray-800 sticky top-0 bg-gray-950 z-10">
-            <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex items-start gap-2.5 min-w-0 flex-1">
               <div
                 className={cn(
-                  'p-1.5 rounded-md border',
+                  'p-1.5 rounded-md border shrink-0 mt-0.5',
                   FORMAT_COLOR[template.format] ?? 'bg-white/5 text-white/50 border-gray-800',
                 )}
               >
                 <FormatIcon size={14} />
               </div>
-              <div className="min-w-0">
+              <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                {/* Name row */}
                 {editingName ? (
                   <div className="flex items-center gap-1.5">
                     <input
@@ -674,62 +675,63 @@ function TemplateModal({
                     />
                   </button>
                 )}
+                {/* Format badge */}
                 <span
                   className={cn(
-                    'text-[10px] px-1.5 py-0.5 rounded border mt-0.5 inline-block',
+                    'text-[10px] px-1.5 py-0.5 rounded border inline-block w-fit',
                     FORMAT_COLOR[template.format] ?? 'bg-white/5 text-white/40 border-gray-800',
                   )}
                 >
                   {template.format.replace('_', ' ')}
                 </span>
-              </div>
-              {/* Description — inline editable */}
-              {editingDescription ? (
-                <div className="flex flex-col gap-1.5 mt-1">
-                  <textarea
-                    autoFocus
-                    value={localDescription}
-                    onChange={(e) => setLocalDescription(e.target.value)}
-                    placeholder={`Short description of this template…`}
-                    rows={3}
-                    className="text-xs bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-text-secondary focus:outline-none focus:border-gray-400 resize-none w-full"
-                  />
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={saveDescription}
-                      disabled={savingDescription}
-                      className="text-[11px] text-green-400 hover:text-green-300 disabled:opacity-50"
-                    >
-                      {savingDescription ? '…' : 'Save'}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setLocalDescription(template.description ?? '')
-                        setEditingDescription(false)
-                      }}
-                      className="text-[11px] text-gray-500 hover:text-gray-300"
-                    >
-                      Cancel
-                    </button>
+                {/* Description — inline editable */}
+                {editingDescription ? (
+                  <div className="flex flex-col gap-1.5 mt-1">
+                    <textarea
+                      autoFocus
+                      value={localDescription}
+                      onChange={(e) => setLocalDescription(e.target.value)}
+                      placeholder={`Short description of this template…`}
+                      rows={3}
+                      className="text-xs bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-text-secondary focus:outline-none focus:border-gray-400 resize-none w-full"
+                    />
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={saveDescription}
+                        disabled={savingDescription}
+                        className="text-[11px] text-green-400 hover:text-green-300 disabled:opacity-50"
+                      >
+                        {savingDescription ? '…' : 'Save'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setLocalDescription(template.description ?? '')
+                          setEditingDescription(false)
+                        }}
+                        className="text-[11px] text-gray-500 hover:text-gray-300"
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setEditingDescription(true)}
-                  className="group flex items-start gap-1 text-left mt-1"
-                >
-                  {localDescription ? (
-                    <p className="text-xs text-text-secondary leading-snug group-hover:text-white/70 transition-colors">
-                      {localDescription}
-                    </p>
-                  ) : (
-                    <p className="text-xs text-gray-700 italic group-hover:text-gray-500 transition-colors">
-                      Add description…
-                    </p>
-                  )}
-                  <Pencil size={10} className="text-gray-700 group-hover:text-gray-400 shrink-0 mt-0.5 transition-colors" />
-                </button>
-              )}
+                ) : (
+                  <button
+                    onClick={() => setEditingDescription(true)}
+                    className="group flex items-start gap-1 text-left mt-0.5"
+                  >
+                    {localDescription ? (
+                      <p className="text-xs text-text-secondary leading-snug group-hover:text-white/70 transition-colors">
+                        {localDescription}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-gray-700 italic group-hover:text-gray-500 transition-colors">
+                        Add description…
+                      </p>
+                    )}
+                    <Pencil size={10} className="text-gray-700 group-hover:text-gray-400 shrink-0 mt-0.5 transition-colors" />
+                  </button>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-2 shrink-0 mt-0.5">
               <button

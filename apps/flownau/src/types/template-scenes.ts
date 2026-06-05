@@ -21,9 +21,9 @@ export interface TextDef {
   id: string // stable cuid — used as DnD key and AI slot key
   mode: TextMode // 'prompt' = AI fills; 'manual' = literal text
   content: string // prompt instructions OR literal text depending on mode
-  font: string // Google Font name, e.g. 'Anton', 'Inter'
-  color: string // hex, e.g. '#ffffff'
-  maxTextSize: number // 10–100, percentage of base font size
+  font?: string | null // Google Font name, e.g. 'Anton'. null = brand titleFont
+  color?: string | null // hex, e.g. '#ffffff'. null = brand primaryColor
+  maxTextSize?: number | null // 10–100, percentage of base font size. null = brand maxTextSize
   textStyle: TextStyle
   styleColor: string // hex — color for stroke outline or background pill
   horizontalAlign: HorizontalAlign
@@ -37,8 +37,8 @@ export interface SceneDef {
   backgroundVideoAssetId?: string | null // null = random LRU selection at render
   backgroundVideoUrl?: string | null // cached CDN URL (for builder preview)
   backgroundVideoDurationSecs?: number | null // cached duration in seconds
-  overlayColor: string // hex, e.g. '#000000'
-  overlayOpacity: number // 0–1
+  overlayColor?: string | null // hex, e.g. '#000000'. null = brand overlayColor
+  overlayOpacity?: number | null // 0–1. null = brand overlayOpacity
   textVerticalAlign: VerticalAlign
   texts: TextDef[]
 }
@@ -107,9 +107,9 @@ export interface ResolvedSceneDef extends Omit<SceneDef, 'texts'> {
 
 export const DEFAULT_TEXT_DEF: Omit<TextDef, 'id' | 'content'> = {
   mode: 'prompt',
-  font: 'sans-serif',
-  color: '#ffffff',
-  maxTextSize: 100,
+  font: null,        // null = use brand titleFont at render time
+  color: null,       // null = use brand primaryColor at render time
+  maxTextSize: null, // null = use brand maxTextSize at render time
   textStyle: 'none',
   styleColor: '#000000',
   horizontalAlign: 'center',
@@ -121,7 +121,7 @@ export const DEFAULT_SCENE_DEF: Omit<SceneDef, 'id' | 'texts'> = {
   backgroundVideoAssetId: null,
   backgroundVideoUrl: null,
   backgroundVideoDurationSecs: null,
-  overlayColor: '#000000',
-  overlayOpacity: 0.55,
+  overlayColor: null,   // null = use brand overlayColor at render time
+  overlayOpacity: null, // null = use brand overlayOpacity at render time
   textVerticalAlign: 'center',
 }

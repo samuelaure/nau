@@ -52,17 +52,9 @@ import {
   MAX_REEL_DURATION_SECS,
 } from '@/types/template-scenes'
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+import { FontPicker } from '@/modules/shared/components/FontPicker'
 
-const SUPPORTED_FONTS = [
-  'Anton', 'Bebas Neue', 'Oswald', 'Inter', 'Montserrat', 'Poppins',
-  'DM Sans', 'Nunito', 'Raleway', 'Playfair Display', 'Black Han Sans',
-  'Manrope', 'Urbanist', 'Outfit', 'Figtree', 'Space Grotesk', 'Sora',
-  'Lato', 'Roboto', 'Work Sans', 'Barlow', 'Kanit', 'Merriweather',
-  'Lora', 'Cormorant', 'Libre Baskerville', 'Crimson Text', 'Cinzel',
-  'Teko', 'Righteous', 'Archivo Black', 'Barlow Condensed', 'Dancing Script',
-  'Sacramento', 'Satisfy', 'Pacifico', 'Caveat',
-]
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 // ─── Video picker modal ────────────────────────────────────────────────────────
 
@@ -311,48 +303,84 @@ function SortableTextBlock({
 
           {/* Font */}
           <div>
-            <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wider">Font</label>
-            <select
-              value={text.font}
-              onChange={(e) => onChange({ font: e.target.value })}
-              className="mt-1 w-full text-xs bg-gray-900 border border-gray-800 text-white rounded px-2.5 py-1.5 focus:outline-none focus:border-gray-600"
-            >
-              {SUPPORTED_FONTS.map((f) => (
-                <option key={f} value={f}>
-                  {f}
-                </option>
-              ))}
-            </select>
+            <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wider block mb-1">Font</label>
+            <FontPicker
+              value={text.font ?? null}
+              onChange={(f) => onChange({ font: f })}
+              allowBrandDefault
+            />
           </div>
 
           {/* Color + max text size */}
           <div className="flex gap-3 items-end">
             <div>
-              <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wider">
-                Text color
-              </label>
+              <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wider">Text color</label>
               <div className="mt-1 flex items-center gap-2">
-                <input
-                  type="color"
-                  value={text.color}
-                  onChange={(e) => onChange({ color: e.target.value })}
-                  className="w-7 h-7 rounded border border-gray-700 bg-gray-900 cursor-pointer p-0.5"
-                />
-                <span className="text-[10px] text-gray-600 font-mono">{text.color}</span>
+                {text.color != null ? (
+                  <>
+                    <input
+                      type="color"
+                      value={text.color}
+                      onChange={(e) => onChange({ color: e.target.value })}
+                      className="w-7 h-7 rounded border border-gray-700 bg-gray-900 cursor-pointer p-0.5"
+                    />
+                    <span className="text-[10px] text-gray-600 font-mono">{text.color}</span>
+                    <button
+                      onClick={() => onChange({ color: null })}
+                      className="text-[10px] text-gray-600 hover:text-amber-400 transition-colors"
+                      title="Use brand default"
+                    >
+                      reset
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-[10px] text-gray-500 italic">Brand default</span>
+                    <button
+                      onClick={() => onChange({ color: '#ffffff' })}
+                      className="text-[10px] text-gray-600 hover:text-white transition-colors border border-gray-800 rounded px-1.5 py-0.5"
+                    >
+                      set color
+                    </button>
+                  </>
+                )}
               </div>
             </div>
             <div className="flex-1">
               <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wider">
                 Max size (%)
               </label>
-              <input
-                type="number"
-                min={10}
-                max={100}
-                value={text.maxTextSize}
-                onChange={(e) => onChange({ maxTextSize: Math.min(100, Math.max(10, parseInt(e.target.value) || 100)) })}
-                className="mt-1 w-full text-xs bg-gray-900 border border-gray-800 text-white rounded px-2.5 py-1.5 focus:outline-none focus:border-gray-600"
-              />
+              <div className="mt-1 flex items-center gap-2">
+                {text.maxTextSize != null ? (
+                  <>
+                    <input
+                      type="number"
+                      min={10}
+                      max={100}
+                      value={text.maxTextSize}
+                      onChange={(e) => onChange({ maxTextSize: Math.min(100, Math.max(10, parseInt(e.target.value) || 100)) })}
+                      className="w-full text-xs bg-gray-900 border border-gray-800 text-white rounded px-2.5 py-1.5 focus:outline-none focus:border-gray-600"
+                    />
+                    <button
+                      onClick={() => onChange({ maxTextSize: null })}
+                      className="text-[10px] text-gray-600 hover:text-amber-400 transition-colors shrink-0"
+                      title="Use brand default"
+                    >
+                      reset
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-[10px] text-gray-500 italic w-full">Brand default</span>
+                    <button
+                      onClick={() => onChange({ maxTextSize: 100 })}
+                      className="text-[10px] text-gray-600 hover:text-white transition-colors border border-gray-800 rounded px-1.5 py-0.5 shrink-0"
+                    >
+                      set
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
@@ -477,9 +505,6 @@ function SortableSceneBlock({
   const addText = () => {
     const newText: TextDef = {
       ...DEFAULT_TEXT_DEF,
-      ...(brandDefaults?.titleFont ? { font: brandDefaults.titleFont } : {}),
-      ...(brandDefaults?.primaryColor ? { color: brandDefaults.primaryColor } : {}),
-      ...(brandDefaults?.maxTextSize ? { maxTextSize: brandDefaults.maxTextSize } : {}),
       id: createId(),
       content: '',
     }
@@ -582,33 +607,76 @@ function SortableSceneBlock({
         </div>
 
         {/* Overlay */}
-        <div className="flex gap-4 items-end">
+        <div className="flex gap-4 items-start">
           <div>
-            <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wider">
-              Overlay color
-            </label>
+            <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wider">Overlay color</label>
             <div className="mt-1 flex items-center gap-2">
-              <input
-                type="color"
-                value={scene.overlayColor}
-                onChange={(e) => onChange({ overlayColor: e.target.value })}
-                className="w-7 h-7 rounded border border-gray-700 bg-gray-900 cursor-pointer p-0.5"
-              />
+              {scene.overlayColor != null ? (
+                <>
+                  <input
+                    type="color"
+                    value={scene.overlayColor}
+                    onChange={(e) => onChange({ overlayColor: e.target.value })}
+                    className="w-7 h-7 rounded border border-gray-700 bg-gray-900 cursor-pointer p-0.5"
+                  />
+                  <button
+                    onClick={() => onChange({ overlayColor: null })}
+                    className="text-[10px] text-gray-600 hover:text-amber-400 transition-colors"
+                    title="Use brand default"
+                  >
+                    reset
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="text-[10px] text-gray-500 italic">Brand default</span>
+                  <button
+                    onClick={() => onChange({ overlayColor: '#000000' })}
+                    className="text-[10px] text-gray-600 hover:text-white transition-colors border border-gray-800 rounded px-1.5 py-0.5"
+                  >
+                    set
+                  </button>
+                </>
+              )}
             </div>
           </div>
           <div className="flex-1">
-            <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wider">
-              Overlay opacity ({Math.round(scene.overlayOpacity * 100)}%)
-            </label>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.05}
-              value={scene.overlayOpacity}
-              onChange={(e) => onChange({ overlayOpacity: parseFloat(e.target.value) })}
-              className="mt-1 w-full accent-accent"
-            />
+            {scene.overlayOpacity != null ? (
+              <>
+                <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wider">
+                  Overlay opacity ({Math.round(scene.overlayOpacity * 100)}%)
+                  <button
+                    onClick={() => onChange({ overlayOpacity: null })}
+                    className="ml-2 text-[10px] text-gray-600 hover:text-amber-400 transition-colors"
+                    title="Use brand default"
+                  >
+                    reset
+                  </button>
+                </label>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={scene.overlayOpacity}
+                  onChange={(e) => onChange({ overlayOpacity: parseFloat(e.target.value) })}
+                  className="mt-1 w-full accent-accent"
+                />
+              </>
+            ) : (
+              <>
+                <label className="text-[10px] font-medium text-gray-500 uppercase tracking-wider">Overlay opacity</label>
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="text-[10px] text-gray-500 italic">Brand default</span>
+                  <button
+                    onClick={() => onChange({ overlayOpacity: 0.55 })}
+                    className="text-[10px] text-gray-600 hover:text-white transition-colors border border-gray-800 rounded px-1.5 py-0.5"
+                  >
+                    set
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
 

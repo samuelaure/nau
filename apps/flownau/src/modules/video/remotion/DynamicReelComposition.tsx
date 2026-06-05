@@ -281,7 +281,7 @@ function FitText({
 }
 
 // ── SceneRenderer — renders one scene at relative frame 0 ─────────────────────
-function SceneRenderer({ scene }: { scene: ResolvedSceneDef }) {
+function SceneRenderer({ scene, brand }: { scene: ResolvedSceneDef; brand?: BrandIdentity }) {
   const frame = useCurrentFrame()
 
   // Accumulate text start frames
@@ -291,6 +291,10 @@ function SceneRenderer({ scene }: { scene: ResolvedSceneDef }) {
     textStartFrames.push(acc)
     acc += calcTextDurationFrames(t.resolvedContent)
   }
+
+  // Resolve null scene-level fields using brand identity
+  const overlayColor = scene.overlayColor ?? brand?.primaryColor ?? '#000000'
+  const overlayOpacity = scene.overlayOpacity ?? brand?.overlayOpacity ?? 0.55
 
   return (
     <AbsoluteFill style={{ background: '#000', overflow: 'hidden' }}>
@@ -302,8 +306,8 @@ function SceneRenderer({ scene }: { scene: ResolvedSceneDef }) {
             ? Math.round(scene.backgroundVideoDurationSecs * REMOTION_FPS)
             : undefined
         }
-        overlayColor={scene.overlayColor}
-        overlayOpacity={scene.overlayOpacity}
+        overlayColor={overlayColor}
+        overlayOpacity={overlayOpacity}
       />
 
       <TextZone align={scene.textVerticalAlign}>
@@ -312,13 +316,17 @@ function SceneRenderer({ scene }: { scene: ResolvedSceneDef }) {
           const textDuration = calcTextDurationFrames(text.resolvedContent)
           const isActive = frame >= textStart && frame < textStart + textDuration
           if (!isActive) return null
+          // Resolve null text-level fields using brand identity
+          const font = text.font ?? brand?.titleFont ?? 'Inter'
+          const color = text.color ?? brand?.secondaryColor ?? '#ffffff'
+          const maxTextSize = text.maxTextSize ?? brand?.maxTextSize ?? 100
           return (
             <FitText
               key={text.id}
               text={text.resolvedContent}
-              fontFamily={text.font}
-              color={text.color}
-              maxTextSize={text.maxTextSize}
+              fontFamily={font}
+              color={color}
+              maxTextSize={maxTextSize}
               textStyle={text.textStyle}
               styleColor={text.styleColor}
               horizontalAlign={text.horizontalAlign}
@@ -340,7 +348,7 @@ export interface DynamicReelProps {
   brand?: BrandIdentity
 }
 
-export function DynamicReelComposition({ scenes, audioUrl }: DynamicReelProps) {
+export function DynamicReelComposition({ scenes, audioUrl, brand }: DynamicReelProps) {
   if (!scenes || scenes.length === 0) {
     return (
       <AbsoluteFill style={{ background: '#000', alignItems: 'center', justifyContent: 'center' }}>
@@ -365,7 +373,7 @@ export function DynamicReelComposition({ scenes, audioUrl }: DynamicReelProps) {
         const duration = calcSceneDurationFrames(scene)
         return (
           <Sequence key={scene.id} from={start} durationInFrames={duration}>
-            <SceneRenderer scene={scene} />
+            <SceneRenderer scene={scene} brand={brand} />
           </Sequence>
         )
       })}
