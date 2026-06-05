@@ -189,7 +189,7 @@ function FitText({
   styleColor,
   horizontalAlign,
   boxWidth,
-  frameOffset = 0,
+  textStart = 0,
 }: {
   text: string
   fontFamily: string
@@ -199,7 +199,7 @@ function FitText({
   styleColor: string
   horizontalAlign: 'left' | 'center' | 'right'
   boxWidth: number
-  frameOffset?: number
+  textStart?: number // scene-relative frame when this text block becomes active
 }) {
   const frame = useCurrentFrame()
   const containerRef = useRef<HTMLDivElement>(null)
@@ -225,11 +225,14 @@ function FitText({
     setFontSize(size)
   }, [text, maxTextSize, fontFamily, boxWidth])
 
-  const opacity = interpolate(frame - frameOffset, [0, 10], [0, 1], {
+  // Fade-in: interpolate from 0→1 opacity over first 10 frames since this text became active.
+  // frame - textStart = how many frames have elapsed since the text first appeared.
+  const elapsed = frame - (textStart ?? 0)
+  const opacity = interpolate(elapsed, [0, 10], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   })
-  const translateY = interpolate(frame - frameOffset, [0, 10], [12, 0], {
+  const translateY = interpolate(elapsed, [0, 10], [12, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   })
@@ -331,7 +334,7 @@ function SceneRenderer({ scene, brand }: { scene: ResolvedSceneDef; brand?: Bran
               styleColor={text.styleColor}
               horizontalAlign={text.horizontalAlign}
               boxWidth={SAFE_W}
-              frameOffset={frame - textStart}
+              textStart={textStart}
             />
           )
         })}
