@@ -64,12 +64,12 @@ async function resolveDynamicReelScenes(
   renderJobId: string,
 ): Promise<ResolvedSceneDef[] | null> {
   if (!creative?.scenes || !Array.isArray(creative.scenes)) {
-    await prisma.post.update({ where: { id: postId }, data: { status: 'DRAFT_PENDING' } })
+    await prisma.post.update({ where: { id: postId }, data: { status: 'DRAFT_FAILED' } })
     await prisma.renderJob.update({
       where: { id: renderJobId },
-      data: { status: 'failed', error: 'No scenes creative — please recompose this post', completedAt: new Date() },
+      data: { status: 'failed', error: 'No scenes in creative payload — draft must be recomposed. Template scenes may have been empty at compose time.', completedAt: new Date() },
     })
-    logger.warn({ postId }, '[RenderWorker] DynamicReel: no scenes — reset to DRAFT_PENDING')
+    logger.warn({ postId }, '[RenderWorker] DynamicReel: no scenes — set to DRAFT_FAILED (was: DRAFT_PENDING loop)')
     return null
   }
 
@@ -358,20 +358,21 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
 
   // ── Legacy slot-based path ─────────────────────────────────────────────────
   if (!creative?.slots) {
-    // Creative is missing or was composed with the legacy scene-composer.
-    // Reset so the user can recompose via the calendar modal.
-    await prisma.post.update({ where: { id: postId }, data: { status: 'DRAFT_PENDING' } })
+    // Creative is missing slots — this is unrecoverable without recomposing.
+    // Set DRAFT_FAILED (terminal) so the user knows they must recompose.
+    // DRAFT_PENDING would cause an infinite approve→render→fail loop.
+    await prisma.post.update({ where: { id: postId }, data: { status: 'DRAFT_FAILED' } })
     await prisma.renderJob.update({
       where: { id: renderJob.id },
       data: {
         status: 'failed',
-        error: 'No slot creative — please recompose this post',
+        error: 'No slot creative — draft must be recomposed',
         completedAt: new Date(),
       },
     })
     logger.warn(
       { postId, templateRemotionId },
-      '[RenderWorker] No slot creative — reset to DRAFT_PENDING',
+      '[RenderWorker] No slot creative — set to DRAFT_FAILED (was: DRAFT_PENDING loop)',
     )
     return
   }
