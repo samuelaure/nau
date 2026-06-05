@@ -787,14 +787,10 @@ export function ReelSceneBuilder({ scenes: initialScenes, brandId, brandDefaults
   const addScene = () => {
     const newScene: SceneDef = {
       ...DEFAULT_SCENE_DEF,
-      ...(brandDefaults?.overlayOpacity != null ? { overlayOpacity: brandDefaults.overlayOpacity } : {}),
       id: createId(),
       texts: [
         {
           ...DEFAULT_TEXT_DEF,
-          ...(brandDefaults?.titleFont ? { font: brandDefaults.titleFont } : {}),
-          ...(brandDefaults?.primaryColor ? { color: brandDefaults.primaryColor } : {}),
-          ...(brandDefaults?.maxTextSize ? { maxTextSize: brandDefaults.maxTextSize } : {}),
           id: createId(),
           content: '',
         },

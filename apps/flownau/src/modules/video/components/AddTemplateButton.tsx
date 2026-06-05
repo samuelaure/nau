@@ -5,19 +5,11 @@ import { Plus, Video, Loader2 } from 'lucide-react'
 import { addTemplate } from '@/modules/video/actions'
 import Modal from '@/modules/shared/components/Modal'
 
-interface Account {
-  id: string
-  username: string
-  platform: string
-}
-
 export default function AddTemplateButton({
   label = 'New Template',
-  accounts = [],
   defaultAccountId,
 }: {
   label?: string
-  accounts?: Account[]
   defaultAccountId?: string
 }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -70,17 +62,8 @@ export default function AddTemplateButton({
           <input type="hidden" name="format" value="reel" />
           <input type="hidden" name="sceneType" value="reel" />
 
-          <div className="form-group">
-            <label className="form-label">Template Scope</label>
-            <select name="brandId" className="input-field" defaultValue={defaultAccountId || ''}>
-              <option value="">Global Template (Available to all)</option>
-              {accounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  Brand-Scoped: {account.username} ({account.platform})
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Always brand-scoped to the current brand — no global option via UI */}
+          <input type="hidden" name="brandId" value={defaultAccountId || ''} />
 
           {error && (
             <div className="p-4 bg-error/10 text-error border border-error/20 rounded-2xl text-sm text-center font-medium animate-shake">

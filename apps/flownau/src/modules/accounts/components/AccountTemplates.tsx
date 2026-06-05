@@ -824,8 +824,8 @@ function TemplateModal({
                   </div>
                 )}
 
-                {/* Caption customization — only for legacy slot-based templates */}
-                {!isDynamicReel && !isHeadTalkFormat && (
+                {/* Caption customization — all reel templates (DynamicReel + legacy slot-based) */}
+                {!isHeadTalkFormat && (
                   <div className="space-y-2">
                     <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">Caption</p>
                     <p className="text-[11px] text-gray-600">
