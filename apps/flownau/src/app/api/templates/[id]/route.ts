@@ -9,9 +9,9 @@ const TextDefSchema = z.object({
   id: z.string(),
   mode: z.enum(['prompt', 'manual']),
   content: z.string(),
-  font: z.string(),
-  color: z.string(),
-  maxTextSize: z.number(),
+  font: z.string().nullable().optional(),
+  color: z.string().nullable().optional(),
+  maxTextSize: z.number().nullable().optional(),
   textStyle: z.enum(['none', 'stroke', 'background_block']),
   styleColor: z.string(),
   horizontalAlign: z.enum(['left', 'center', 'right']),
@@ -24,13 +24,14 @@ const SceneDefSchema = z.object({
   backgroundVideoAssetId: z.string().nullable().optional(),
   backgroundVideoUrl: z.string().nullable().optional(),
   backgroundVideoDurationSecs: z.number().nullable().optional(),
-  overlayColor: z.string(),
-  overlayOpacity: z.number(),
+  overlayColor: z.string().nullable().optional(),
+  overlayOpacity: z.number().nullable().optional(),
   textVerticalAlign: z.enum(['top', 'center', 'bottom']),
   texts: z.array(TextDefSchema),
 })
 
 const ScenesArraySchema = z.array(SceneDefSchema)
+
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {

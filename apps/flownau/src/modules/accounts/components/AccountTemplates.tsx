@@ -19,6 +19,8 @@ import {
   ToggleLeft,
   ToggleRight,
   Sliders,
+  PenLine,
+  Plus,
 } from 'lucide-react'
 import { cn } from '@/modules/shared/utils'
 import { PromptHistoryPanel } from './PromptHistoryPanel'
@@ -328,8 +330,8 @@ function TemplateModal({
   const [savingDescription, setSavingDescription] = useState(false)
   const [duplicating, setDuplicating] = useState(false)
   const [muted, setMuted] = useState(true)
-  const [editingDescription, setEditingDescription] = useState(false)
   const [localDescription, setLocalDescription] = useState(template.description ?? '')
+  const [showCreatePost, setShowCreatePost] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
 
   const FormatIcon = FORMAT_ICON[template.format] ?? Film
@@ -458,7 +460,6 @@ function TemplateModal({
       })
       if (!res.ok) throw new Error()
       toast.success('Description saved')
-      setEditingDescription(false)
       onRefresh()
     } catch {
       toast.error('Failed to save description')
@@ -684,56 +685,17 @@ function TemplateModal({
                 >
                   {template.format.replace('_', ' ')}
                 </span>
-                {/* Description — inline editable */}
-                {editingDescription ? (
-                  <div className="flex flex-col gap-1.5 mt-1">
-                    <textarea
-                      autoFocus
-                      value={localDescription}
-                      onChange={(e) => setLocalDescription(e.target.value)}
-                      placeholder={`Short description of this template…`}
-                      rows={3}
-                      className="text-xs bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-text-secondary focus:outline-none focus:border-gray-400 resize-none w-full"
-                    />
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={saveDescription}
-                        disabled={savingDescription}
-                        className="text-[11px] text-green-400 hover:text-green-300 disabled:opacity-50"
-                      >
-                        {savingDescription ? '…' : 'Save'}
-                      </button>
-                      <button
-                        onClick={() => {
-                          setLocalDescription(template.description ?? '')
-                          setEditingDescription(false)
-                        }}
-                        className="text-[11px] text-gray-500 hover:text-gray-300"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setEditingDescription(true)}
-                    className="group flex items-start gap-1 text-left mt-0.5"
-                  >
-                    {localDescription ? (
-                      <p className="text-xs text-text-secondary leading-snug group-hover:text-white/70 transition-colors">
-                        {localDescription}
-                      </p>
-                    ) : (
-                      <p className="text-xs text-gray-700 italic group-hover:text-gray-500 transition-colors">
-                        Add description…
-                      </p>
-                    )}
-                    <Pencil size={10} className="text-gray-700 group-hover:text-gray-400 shrink-0 mt-0.5 transition-colors" />
-                  </button>
-                )}
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0 mt-0.5">
+              <button
+                onClick={() => setShowCreatePost(true)}
+                title="Create a Post from this template"
+                className="flex items-center gap-1.5 text-[11px] font-medium bg-accent/10 text-accent border border-accent/20 rounded-lg px-2.5 py-1 hover:bg-accent/20 transition-colors"
+              >
+                <PenLine size={11} />
+                Create Post
+              </button>
               <button
                 onClick={duplicate}
                 disabled={duplicating}
@@ -883,6 +845,27 @@ function TemplateModal({
             {/* Settings tab */}
             {(activeTab === 'settings') && (
               <div className="space-y-5">
+                {/* Description */}
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">Description</p>
+                  <textarea
+                    value={localDescription}
+                    onChange={(e) => setLocalDescription(e.target.value)}
+                    placeholder="Short description of this template…"
+                    rows={3}
+                    className="w-full text-sm bg-gray-900 border border-gray-800 text-white rounded-lg px-3 py-2 resize-y focus:outline-none focus:border-gray-600 placeholder:text-gray-600 leading-relaxed"
+                  />
+                  <div className="flex justify-end">
+                    <button
+                      onClick={saveDescription}
+                      disabled={savingDescription}
+                      className="text-xs bg-white text-black rounded px-3 py-1 hover:bg-zinc-200 disabled:opacity-50 transition-colors"
+                    >
+                      {savingDescription ? 'Saving…' : 'Save description'}
+                    </button>
+                  </div>
+                </div>
+
                 {/* Stats */}
                 <div className="flex flex-wrap gap-2">
                   {durationLabel && (
@@ -1016,11 +999,247 @@ function TemplateModal({
             )}
           </div>
         </div>
+        {showCreatePost && (
+          <CreatePostModal
+            template={template}
+            brandId={brandId}
+            onClose={() => setShowCreatePost(false)}
+          />
+        )}
       </div>
     </div>
   )
 }
 
+
+// ─── CreatePostModal ───────────────────────────────────────────────────────────
+
+type PostSlot = { key: string; label: string; prefill: string; isManual: boolean }
+
+function derivePostSlots(template: Template): PostSlot[] {
+  const slots: PostSlot[] = []
+  const scenes = (template.scenes ?? null) as SceneDef[] | null
+  const slotSchema = template.slotSchema as SlotDef[] | null
+  const isHeadTalk = template.format === 'head_talk' || template.format === 'trial_head_talk'
+
+  if (isHeadTalk) {
+    slots.push({ key: 'script', label: 'Script', prefill: '', isManual: false })
+  } else if (scenes && scenes.length > 0) {
+    for (let si = 0; si < scenes.length; si++) {
+      const scene = scenes[si]
+      for (let ti = 0; ti < scene.texts.length; ti++) {
+        const text = scene.texts[ti]
+        const key = `scene_${si}_text_${ti}`
+        const preview = text.content ? ` — "${text.content.slice(0, 40)}${text.content.length > 40 ? '…' : ''}"` : ''
+        slots.push({
+          key,
+          label: `Scene ${si + 1} · Text ${ti + 1}${preview}`,
+          prefill: text.mode === 'manual' ? text.content : '',
+          isManual: text.mode === 'manual',
+        })
+      }
+    }
+  } else if (slotSchema && slotSchema.length > 0) {
+    for (const s of slotSchema) {
+      slots.push({ key: s.key, label: s.label, prefill: '', isManual: false })
+    }
+  }
+
+  slots.push({ key: 'caption', label: 'Caption', prefill: '', isManual: false })
+  return slots
+}
+
+function CreatePostModal({
+  template,
+  brandId,
+  onClose,
+}: {
+  template: Template
+  brandId: string
+  onClose: () => void
+}) {
+  const postSlots = derivePostSlots(template)
+  const [idea, setIdea] = useState('')
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>(
+    Object.fromEntries(postSlots.map((s) => [s.key, s.prefill])),
+  )
+  const [submitting, setSubmitting] = useState(false)
+  const isManualMode = idea.trim() === ''
+
+  const setField = (key: string, val: string) =>
+    setFieldValues((prev) => ({ ...prev, [key]: val }))
+
+  const captionVal = fieldValues['caption'] ?? ''
+  const contentSlots = postSlots.filter((s) => s.key !== 'caption')
+
+  const handleSubmit = async () => {
+    if (isManualMode) {
+      const missing = contentSlots.filter(
+        (s) => !s.isManual && !(fieldValues[s.key] ?? '').trim(),
+      )
+      if (missing.length > 0) {
+        toast.error(`Fill in: ${missing.map((s) => s.label).join(', ')}`)
+        return
+      }
+    }
+    setSubmitting(true)
+    try {
+      if (!isManualMode) {
+        const res = await fetch('/api/agent/compose', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: idea.trim(), brandId, templateId: template.id }),
+        })
+        if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? 'Failed')
+        toast.success('Draft created — check your compositions')
+      } else {
+        const slots = contentSlots.map((s) => ({ key: s.key, content: fieldValues[s.key] ?? '' }))
+        const res = await fetch(`/api/templates/${template.id}/create-manual`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brandId, slots, caption: captionVal }),
+        })
+        if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? 'Failed')
+        toast.success('Post created — check your compositions')
+      }
+      onClose()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Something went wrong')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+      <div
+        className="relative bg-gray-950 border border-gray-800 rounded-xl w-full max-w-lg max-h-[88vh] overflow-hidden shadow-2xl flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-gray-800">
+          <div>
+            <h3 className="font-semibold text-sm">Create a Post</h3>
+            <p className="text-[11px] text-gray-500 mt-0.5 truncate max-w-[280px]">
+              {template.name}
+            </p>
+          </div>
+          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+            <X size={15} />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 p-4 space-y-5">
+          {/* Section A: Idea */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-accent bg-accent/10 border border-accent/20 rounded px-1.5 py-0.5">A</span>
+              <p className="text-xs font-medium text-white">
+                Idea <span className="text-gray-500 font-normal">(optional — AI fills all fields)</span>
+              </p>
+            </div>
+            <textarea
+              value={idea}
+              onChange={(e) => setIdea(e.target.value)}
+              placeholder="Describe what this post is about… Leave empty to fill all fields manually below."
+              rows={3}
+              className="w-full text-sm bg-gray-900 border border-gray-800 text-white rounded-lg px-3 py-2 resize-none focus:outline-none focus:border-gray-600 placeholder:text-gray-600 leading-relaxed"
+            />
+          </div>
+
+          {/* Divider */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-800" />
+            </div>
+            <div className="relative flex justify-center">
+              <span className="bg-gray-950 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+                {isManualMode ? 'fill manually below' : 'AI will fill these'}
+              </span>
+            </div>
+          </div>
+
+          {/* Section B: Manual content */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded px-1.5 py-0.5">B</span>
+              <p className="text-xs font-medium text-white">Content fields</p>
+            </div>
+
+            {contentSlots.map((slot) => (
+              <div key={slot.key}>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <label className="text-[11px] font-medium text-gray-400">{slot.label}</label>
+                  {slot.isManual && (
+                    <span className="text-[9px] font-medium text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 rounded px-1">
+                      fixed
+                    </span>
+                  )}
+                </div>
+                <textarea
+                  value={fieldValues[slot.key] ?? ''}
+                  onChange={(e) => setField(slot.key, e.target.value)}
+                  disabled={!isManualMode || slot.isManual}
+                  placeholder={
+                    !isManualMode
+                      ? 'AI will fill this…'
+                      : slot.isManual
+                        ? slot.prefill || 'Fixed content'
+                        : 'Enter text…'
+                  }
+                  rows={2}
+                  className={cn(
+                    'w-full text-xs rounded-lg px-3 py-2 resize-none focus:outline-none leading-relaxed border transition-colors',
+                    !isManualMode || slot.isManual
+                      ? 'bg-gray-900/50 border-gray-800/50 text-gray-600 placeholder:text-gray-700 cursor-not-allowed'
+                      : 'bg-gray-900 border-gray-800 text-white placeholder:text-gray-600 focus:border-gray-600',
+                  )}
+                />
+              </div>
+            ))}
+
+            {/* Caption */}
+            <div>
+              <label className="text-[11px] font-medium text-gray-400 block mb-1">Caption</label>
+              <textarea
+                value={captionVal}
+                onChange={(e) => setField('caption', e.target.value)}
+                disabled={!isManualMode}
+                placeholder={!isManualMode ? 'AI will fill this…' : 'Instagram caption…'}
+                rows={3}
+                className={cn(
+                  'w-full text-xs rounded-lg px-3 py-2 resize-none focus:outline-none leading-relaxed border transition-colors',
+                  !isManualMode
+                    ? 'bg-gray-900/50 border-gray-800/50 text-gray-600 placeholder:text-gray-700 cursor-not-allowed'
+                    : 'bg-gray-900 border-gray-800 text-white placeholder:text-gray-600 focus:border-gray-600',
+                )}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 p-4 border-t border-gray-800">
+          <button
+            onClick={onClose}
+            className="text-xs text-gray-500 hover:text-white transition-colors px-3 py-1.5"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="flex items-center gap-1.5 text-xs bg-white text-black rounded-lg px-4 py-1.5 font-medium hover:bg-zinc-200 disabled:opacity-50 transition-colors"
+          >
+            {submitting ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+            {submitting ? 'Creating…' : 'Create Post'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // ─── Template card ────────────────────────────────────────────────────────────
 
