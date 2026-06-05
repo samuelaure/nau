@@ -49,7 +49,7 @@ import { loadFont as loadPacifico } from '@remotion/google-fonts/Pacifico'
 import { loadFont as loadCaveat } from '@remotion/google-fonts/Caveat'
 
 import type { BrandIdentity } from './ReelTemplates'
-import type { ResolvedSceneDef, ResolvedTextDef } from '@/types/template-scenes'
+import type { ResolvedSceneDef, ResolvedTextDef, TextStyle, HorizontalAlign } from '@/types/template-scenes'
 import { calcTextDurationFrames, calcSceneDurationFrames, resolvedText, MIN_TEXT_DURATION_SECS, REMOTION_FPS } from '@/types/template-scenes'
 
 // ── Font loader registry ──────────────────────────────────────────────────────
@@ -263,18 +263,20 @@ function FitText({
   horizontalAlign,
   boxWidth,
   boxHeight,
-  textStart = 0,
+  textStart,
+  instant,
 }: {
   text: string
   fontFamily: string
   color: string
-  maxTextSize: number // percentage 10-100
-  textStyle: 'none' | 'stroke' | 'background_block'
+  maxTextSize: number
+  textStyle: TextStyle
   styleColor: string
-  horizontalAlign: 'left' | 'center' | 'right'
+  horizontalAlign: HorizontalAlign
   boxWidth: number
   boxHeight: number
-  textStart?: number // scene-relative frame when this text block becomes active
+  textStart?: number
+  instant?: boolean
 }) {
   const frame = useCurrentFrame()
   const containerRef = useRef<HTMLDivElement>(null)
@@ -298,14 +300,18 @@ function FitText({
 
   // Fade-in: interpolate from 0→1 opacity over first 10 frames since this text became active.
   const elapsed = frame - (textStart ?? 0)
-  const opacity = interpolate(elapsed, [0, 10], [0, 1], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  })
-  const translateY = interpolate(elapsed, [0, 10], [12, 0], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  })
+  const opacity = instant
+    ? 1
+    : interpolate(elapsed, [0, 10], [0, 1], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+      })
+  const translateY = instant
+    ? 0
+    : interpolate(elapsed, [0, 10], [12, 0], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+      })
 
   const textShadow = textStyle === 'none' ? '0 2px 20px rgba(0,0,0,0.8)' : 'none'
   const webkitStroke = textStyle === 'stroke' ? `2px ${styleColor}` : undefined
@@ -359,7 +365,15 @@ function FitText({
 }
 
 // ── SceneRenderer — renders one scene at relative frame 0 ─────────────────────
-function SceneRenderer({ scene, brand }: { scene: ResolvedSceneDef; brand?: BrandIdentity }) {
+function SceneRenderer({
+  scene,
+  brand,
+  isFirstScene,
+}: {
+  scene: ResolvedSceneDef
+  brand?: BrandIdentity
+  isFirstScene?: boolean
+}) {
   const frame = useCurrentFrame()
 
   // Accumulate text start frames
@@ -411,6 +425,7 @@ function SceneRenderer({ scene, brand }: { scene: ResolvedSceneDef; brand?: Bran
               boxWidth={SAFE_W}
               boxHeight={TEXT_BOX_HEIGHT}
               textStart={textStart}
+              instant={isFirstScene && i === 0 && textStart === 0}
             />
           )
         })}
@@ -464,7 +479,7 @@ export function DynamicReelComposition({ scenes, audioUrl, brand }: DynamicReelP
         const duration = calcSceneDurationFrames(scene)
         return (
           <Sequence key={scene.id} from={start} durationInFrames={duration}>
-            <SceneRenderer scene={scene} brand={brand} />
+            <SceneRenderer scene={scene} brand={brand} isFirstScene={i === 0} />
           </Sequence>
         )
       })}
