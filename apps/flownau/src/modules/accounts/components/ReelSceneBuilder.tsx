@@ -763,12 +763,20 @@ export interface ReelSceneBuilderProps {
   scenes: SceneDef[]
   brandId: string
   brandDefaults?: BrandDefaults | null
-  onSave: (scenes: SceneDef[]) => Promise<void>
-  saving?: boolean
+  onChange: (scenes: SceneDef[]) => void
 }
 
-export function ReelSceneBuilder({ scenes: initialScenes, brandId, brandDefaults, onSave, saving }: ReelSceneBuilderProps) {
+export function ReelSceneBuilder({ scenes: initialScenes, brandId, brandDefaults, onChange }: ReelSceneBuilderProps) {
   const [scenes, setScenes] = useState<SceneDef[]>(initialScenes)
+
+  // Sync internal state to parent whenever it changes
+  const updateAndNotify = (updater: (prev: SceneDef[]) => SceneDef[]) => {
+    setScenes((prev) => {
+      const next = updater(prev)
+      onChange(next)
+      return next
+    })
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -780,7 +788,7 @@ export function ReelSceneBuilder({ scenes: initialScenes, brandId, brandDefaults
     if (over && active.id !== over.id) {
       const oldIndex = scenes.findIndex((s) => s.id === active.id)
       const newIndex = scenes.findIndex((s) => s.id === over.id)
-      setScenes((prev) => arrayMove(prev, oldIndex, newIndex))
+      updateAndNotify((prev) => arrayMove(prev, oldIndex, newIndex))
     }
   }
 
@@ -796,15 +804,15 @@ export function ReelSceneBuilder({ scenes: initialScenes, brandId, brandDefaults
         },
       ],
     }
-    setScenes((prev) => [...prev, newScene])
+    updateAndNotify((prev) => [...prev, newScene])
   }
 
   const updateScene = (sceneId: string, patch: Partial<SceneDef>) => {
-    setScenes((prev) => prev.map((s) => (s.id === sceneId ? { ...s, ...patch } : s)))
+    updateAndNotify((prev) => prev.map((s) => (s.id === sceneId ? { ...s, ...patch } : s)))
   }
 
   const removeScene = (sceneId: string) => {
-    setScenes((prev) => prev.filter((s) => s.id !== sceneId))
+    updateAndNotify((prev) => prev.filter((s) => s.id !== sceneId))
   }
 
   const totalSecs = Math.round((calcTotalReelFrames(scenes) / REMOTION_FPS) * 10) / 10
@@ -864,17 +872,6 @@ export function ReelSceneBuilder({ scenes: initialScenes, brandId, brandDefaults
         <Plus size={14} />
         Add Scene
       </button>
-
-      <div className="flex justify-end pt-2">
-        <button
-          onClick={() => onSave(scenes)}
-          disabled={saving}
-          className="flex items-center gap-2 bg-white text-black text-xs font-semibold rounded-lg px-4 py-2 hover:bg-zinc-200 disabled:opacity-50 transition-colors"
-        >
-          {saving ? <Loader2 size={13} className="animate-spin" /> : <Maximize2 size={13} />}
-          {saving ? 'Saving…' : 'Save Template'}
-        </button>
-      </div>
     </div>
   )
 }

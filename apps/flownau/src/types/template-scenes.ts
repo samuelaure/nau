@@ -45,7 +45,7 @@ export interface SceneDef {
 
 // ── Duration constants ─────────────────────────────────────────────────────────
 
-export const READING_WPM = 450
+export const READING_WPM = 324 // 180 wpm * 1.8 multiplier
 export const MIN_TEXT_DURATION_SECS = 1.5
 export const REMOTION_FPS = 30
 export const MAX_REEL_DURATION_SECS = 180 // 3 minutes global cap
@@ -53,7 +53,7 @@ export const MAX_REEL_FRAMES = MAX_REEL_DURATION_SECS * REMOTION_FPS // 5400
 
 /**
  * Duration in seconds for a single text block.
- * Based on 450 wpm reading speed with a 1.5s minimum floor.
+ * Based on 324 wpm reading speed (180 avg * 1.8) with a 1.5s minimum floor.
  */
 export function calcTextDurationSecs(text: string): number {
   const wordCount = text.trim().split(/\s+/).filter(Boolean).length

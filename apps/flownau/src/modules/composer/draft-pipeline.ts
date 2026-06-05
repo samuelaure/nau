@@ -75,7 +75,7 @@ export async function runDraftPipeline(input: DraftPipelineInput): Promise<Draft
 
   const slotOverrides = (brandTemplateConfig?.slotOverrides ?? null) as Record<
     string,
-    { intention?: string; minWords?: number; maxWords?: number }
+    { intention?: string; minWords?: number; maxWords?: number; mode?: 'prompt' | 'manual'; manualText?: string }
   > | null
   const captionOverride = slotOverrides?.['caption'] ?? null
   const mergedTemplate = slotOverrides
@@ -111,6 +111,7 @@ export async function runDraftPipeline(input: DraftPipelineInput): Promise<Draft
       ideaText,
       layers,
       language,
+      captionOverride,
     })
   }
 
@@ -128,6 +129,7 @@ export async function runDraftPipeline(input: DraftPipelineInput): Promise<Draft
       ideaText,
       layers,
       language,
+      captionOverride,
     })
   }
 
@@ -141,6 +143,7 @@ export async function runDraftPipeline(input: DraftPipelineInput): Promise<Draft
     ideaText,
     layers,
     language,
+    captionOverride,
   })
 }
 
@@ -155,8 +158,9 @@ async function runHeadTalkPath(args: {
   ideaText: string
   layers: Record<string, string>
   language: string
+  captionOverride: { mode?: 'prompt' | 'manual'; manualText?: string } | null
 }): Promise<DraftPipelineResult> {
-  const { brandId, templateId, format, systemPrompt, userMessage, layers, language } = args
+  const { brandId, templateId, format, systemPrompt, userMessage, layers, language, captionOverride } = args
 
   const { client: llm, model, registryId, provider } = await getAdminModelClient('drafting')
 
@@ -188,6 +192,11 @@ async function runHeadTalkPath(args: {
     caption: normalizeParagraphs(raw.caption ?? ''),
     hashtags: raw.hashtags ?? [],
   }
+  
+  if (captionOverride?.mode === 'manual') {
+    creative.caption = captionOverride.manualText || ''
+  }
+
   const caption = creative.caption
   const hashtags = creative.hashtags
 
@@ -229,8 +238,9 @@ async function runDynamicReelPath(args: {
   ideaText: string
   layers: Record<string, string>
   language: string
+  captionOverride: { mode?: 'prompt' | 'manual'; manualText?: string } | null
 }): Promise<DraftPipelineResult> {
-  const { brandId, templateId, format, scenes, layers, language } = args
+  const { brandId, templateId, format, scenes, layers, language, captionOverride } = args
   let { systemPrompt, userMessage } = args
 
   const { client: llm, model, registryId, provider } = await getAdminModelClient('drafting')
@@ -253,7 +263,7 @@ async function runDynamicReelPath(args: {
       ...scene,
       texts: scene.texts.map((t) => ({ ...t, resolvedContent: t.content })),
     }))
-    const caption = ''
+    const caption = captionOverride?.mode === 'manual' ? captionOverride.manualText || '' : ''
     const hashtags: string[] = []
     const postSynthesis = await generateSynthesis(caption, { scenes: resolvedScenes }, language)
     return {
@@ -327,7 +337,10 @@ async function runDynamicReelPath(args: {
     }),
   }))
 
-  const caption = normalizeParagraphs((parsed.caption as string) ?? '')
+  let caption = normalizeParagraphs((parsed.caption as string) ?? '')
+  if (captionOverride?.mode === 'manual') {
+    caption = captionOverride.manualText || ''
+  }
   const hashtags = Array.isArray(parsed.hashtags) ? (parsed.hashtags as string[]) : []
 
   const postSynthesis = await generateSynthesis(caption, { scenes: resolvedScenes }, language)
@@ -364,9 +377,9 @@ async function runSlotPath(args: {
   ideaText: string
   layers: Record<string, string>
   language: string
+  captionOverride: { mode?: 'prompt' | 'manual'; manualText?: string } | null
 }): Promise<DraftPipelineResult> {
-  const { brandId, templateId, format, template, layers, language } = args
-  let { systemPrompt, userMessage } = args
+  const { brandId, templateId, format, template, systemPrompt, userMessage, layers, language, captionOverride } = args
 
   if (!template.slotSchema) throw new Error(`Template ${templateId} has no slotSchema`)
   const slotDefs = template.slotSchema as unknown as SlotDef[]

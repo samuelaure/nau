@@ -21,6 +21,7 @@ import {
   Sliders,
   PenLine,
   Plus,
+  Save,
 } from 'lucide-react'
 import { cn } from '@/modules/shared/utils'
 import { PromptHistoryPanel } from './PromptHistoryPanel'
@@ -72,7 +73,7 @@ const CAPTION_SLOT: SlotDef = {
   maxWords: 60,
 }
 
-type SlotOverrides = Record<string, { intention?: string; minWords?: number; maxWords?: number }>
+type SlotOverrides = Record<string, { intention?: string; minWords?: number; maxWords?: number; mode?: 'prompt' | 'manual'; manualText?: string }>
 
 type Template = {
   id: string
@@ -299,6 +300,180 @@ function SlotOverrideRow({
   )
 }
 
+// ─── Caption Override Editor ────────────────────────────────────────────────────
+
+function CaptionOverrideRow({
+  slot,
+  override,
+  onChange,
+  onRestore,
+}: {
+  slot: SlotDef
+  override: { intention?: string; minWords?: number; maxWords?: number; mode?: 'prompt' | 'manual'; manualText?: string } | undefined
+  onChange: (
+    key: string,
+    patch: { intention?: string; minWords?: number; maxWords?: number; mode?: 'prompt' | 'manual'; manualText?: string } | null,
+  ) => void
+  onRestore: (key: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [localMode, setLocalMode] = useState<'prompt' | 'manual'>(override?.mode ?? 'prompt')
+  const [localManualText, setLocalManualText] = useState(override?.manualText ?? '')
+  const [localIntention, setLocalIntention] = useState(override?.intention ?? slot.intention)
+  const [localMin, setLocalMin] = useState<number>(override?.minWords ?? slot.minWords ?? 0)
+  const [localMax, setLocalMax] = useState<number>(override?.maxWords ?? slot.maxWords)
+
+  const hasOverride =
+    !!override &&
+    (override.intention !== undefined ||
+      override.minWords !== undefined ||
+      override.maxWords !== undefined ||
+      override.mode !== undefined ||
+      override.manualText !== undefined)
+
+  const effectiveMode = override?.mode ?? 'prompt'
+  const effectiveIntention = effectiveMode === 'manual' ? override?.manualText || 'Manual text' : (override?.intention ?? slot.intention)
+  const effectiveMax = override?.maxWords ?? slot.maxWords
+
+  if (!editing) {
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => {
+          setLocalMode(override?.mode ?? 'prompt')
+          setLocalManualText(override?.manualText ?? '')
+          setLocalIntention(override?.intention ?? slot.intention)
+          setLocalMin(override?.minWords ?? slot.minWords ?? 0)
+          setLocalMax(override?.maxWords ?? slot.maxWords)
+          setEditing(true)
+        }}
+        onKeyDown={(e) => e.key === 'Enter' && setEditing(true)}
+        className="bg-gray-900 border border-gray-800 rounded-lg p-3 space-y-1 cursor-text hover:border-gray-700 transition-colors group"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-white">{slot.label}</span>
+            <span className={cn('text-[9px] px-1.5 py-0.5 rounded border', effectiveMode === 'prompt' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' : 'bg-green-500/10 text-green-400 border-green-500/20')}>
+              {effectiveMode}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {hasOverride && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onRestore(slot.key)
+                }}
+                className="text-[10px] text-amber-400 hover:text-amber-300 transition-colors"
+              >
+                restore default
+              </button>
+            )}
+            {effectiveMode === 'prompt' && (
+              <span
+                className={cn('text-[10px] shrink-0', hasOverride ? 'text-accent' : 'text-gray-600')}
+              >
+                max {effectiveMax}w{hasOverride ? ' ·' : ''}
+                {hasOverride ? ' custom' : ''}
+              </span>
+            )}
+          </div>
+        </div>
+        <p className={cn("text-[11px] leading-relaxed line-clamp-3", effectiveMode === 'manual' ? "text-white font-mono whitespace-pre-wrap" : "text-text-secondary")}>{effectiveIntention}</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="bg-gray-900 border border-accent/40 rounded-lg p-3 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-semibold text-white">{slot.label}</span>
+        
+        <div className="flex items-center bg-gray-950 rounded border border-gray-800 p-0.5">
+          <button
+            onClick={() => setLocalMode('prompt')}
+            className={cn('text-[10px] px-2 py-0.5 rounded transition-colors', localMode === 'prompt' ? 'bg-gray-800 text-white' : 'text-gray-500 hover:text-gray-400')}
+          >
+            Prompt
+          </button>
+          <button
+            onClick={() => setLocalMode('manual')}
+            className={cn('text-[10px] px-2 py-0.5 rounded transition-colors', localMode === 'manual' ? 'bg-gray-800 text-white' : 'text-gray-500 hover:text-gray-400')}
+          >
+            Manual
+          </button>
+        </div>
+      </div>
+
+      {localMode === 'prompt' ? (
+        <>
+          <div className="flex items-center justify-end gap-2 mb-1">
+            <label className="text-[10px] text-gray-500">min</label>
+            <input
+              type="number"
+              value={localMin}
+              min={0}
+              onChange={(e) => setLocalMin(Number(e.target.value))}
+              className="w-14 text-xs bg-gray-800 border border-gray-700 text-white rounded px-1.5 py-0.5 focus:outline-none focus:border-gray-500"
+            />
+            <label className="text-[10px] text-gray-500">max</label>
+            <input
+              type="number"
+              value={localMax}
+              min={1}
+              onChange={(e) => setLocalMax(Number(e.target.value))}
+              className="w-14 text-xs bg-gray-800 border border-gray-700 text-white rounded px-1.5 py-0.5 focus:outline-none focus:border-gray-500"
+            />
+          </div>
+          <textarea
+            value={localIntention}
+            onChange={(e) => setLocalIntention(e.target.value)}
+            rows={3}
+            placeholder="Instruct the AI what to write..."
+            className="w-full text-[11px] bg-gray-800 border border-gray-700 text-white rounded px-2 py-1.5 resize-none focus:outline-none focus:border-gray-500 leading-relaxed"
+          />
+        </>
+      ) : (
+        <textarea
+          value={localManualText}
+          onChange={(e) => setLocalManualText(e.target.value)}
+          rows={3}
+          placeholder="Type the exact text here..."
+          className="w-full text-[11px] bg-gray-800 border border-gray-700 text-white rounded px-2 py-1.5 resize-none focus:outline-none focus:border-gray-500 leading-relaxed font-mono"
+        />
+      )}
+
+      <div className="flex items-center gap-2 justify-end">
+        <button
+          onClick={() => setEditing(false)}
+          className="text-xs text-gray-500 hover:text-white transition-colors px-2 py-1"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={() => {
+            const patch: { intention?: string; minWords?: number; maxWords?: number; mode?: 'prompt'|'manual'; manualText?: string } = {}
+            if (localIntention !== slot.intention) patch.intention = localIntention
+            if (localMin !== (slot.minWords ?? 0)) patch.minWords = localMin
+            if (localMax !== slot.maxWords) patch.maxWords = localMax
+            if (localMode !== 'prompt') patch.mode = localMode
+            if (localManualText !== '') patch.manualText = localManualText
+            
+            if (localMode === 'prompt' && override?.mode === 'manual') patch.mode = 'prompt'
+
+            onChange(slot.key, Object.keys(patch).length > 0 ? patch : null)
+            setEditing(false)
+          }}
+          className="text-xs bg-white text-black rounded px-3 py-1 hover:bg-zinc-200 transition-colors"
+        >
+          Apply
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Detail Modal ─────────────────────────────────────────────────────────────
 
 function TemplateModal({
@@ -342,6 +517,8 @@ function TemplateModal({
   const isHeadTalkFormat = template.format === 'head_talk' || template.format === 'trial_head_talk'
   
   const isDynamicReel = isReelFormat
+
+  const [localScenes, setLocalScenes] = useState<SceneDef[] | null>(scenes)
 
   // Head Talk custom script/caption prompts — stored in BrandTemplateConfig.customPrompt
   // Format: "SCRIPT_PROMPT: ...\nCAPTION_PROMPT: ..."
@@ -532,21 +709,47 @@ function TemplateModal({
     saveCustomizations(next)
   }
 
-  const saveScenes = async (newScenes: SceneDef[]) => {
+  const handleSaveAll = async () => {
+    let success = true
     setSavingScenes(true)
+    
+    // Save scenes if dynamic reel
+    if (isDynamicReel && localScenes) {
+      try {
+        const res = await fetch(`/api/templates/${template.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scenes: localScenes }),
+        })
+        if (!res.ok) throw new Error()
+      } catch {
+        success = false
+      }
+    }
+    
+    // Save customizations
     try {
-      const res = await fetch(`/api/templates/${template.id}`, {
+      const resConfig = await fetch(`/api/account-templates/${config?.id ?? 'new'}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scenes: newScenes }),
+        body: JSON.stringify({
+          customPrompt: customPrompt || null,
+          slotOverrides: Object.keys(slotOverrides).length > 0 ? slotOverrides : null,
+          brandId,
+          templateId: template.id,
+        }),
       })
-      if (!res.ok) throw new Error()
+      if (!resConfig.ok) throw new Error()
+    } catch {
+      success = false
+    }
+
+    setSavingScenes(false)
+    if (success) {
       toast.success('Template saved')
       onRefresh()
-    } catch {
+    } else {
       toast.error('Failed to save template')
-    } finally {
-      setSavingScenes(false)
     }
   }
 
@@ -742,11 +945,10 @@ function TemplateModal({
                 {/* Block-based reel scene builder */}
                 {isDynamicReel && (
                   <ReelSceneBuilder
-                    scenes={scenes ?? []}
+                    scenes={localScenes ?? []}
                     brandId={brandId}
                     brandDefaults={brandIdentity ?? null}
-                    onSave={saveScenes}
-                    saving={savingScenes}
+                    onChange={setLocalScenes}
                   />
                 )}
 
@@ -831,12 +1033,23 @@ function TemplateModal({
                     <p className="text-[11px] text-gray-600">
                       Customize how the AI writes the Instagram caption for this brand.
                     </p>
-                    <SlotOverrideRow
+                    <CaptionOverrideRow
                       slot={CAPTION_SLOT}
                       override={slotOverrides['caption']}
                       onChange={handleSlotChange}
                       onRestore={handleSlotRestore}
                     />
+                    
+                    <div className="flex justify-end pt-4">
+                      <button
+                        onClick={handleSaveAll}
+                        disabled={savingScenes}
+                        className="flex items-center gap-2 bg-white text-black text-xs font-semibold rounded-lg px-6 py-2.5 hover:bg-zinc-200 disabled:opacity-50 transition-colors"
+                      >
+                        {savingScenes ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                        {savingScenes ? 'Saving…' : 'Save Template'}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
