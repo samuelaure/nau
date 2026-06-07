@@ -6,6 +6,7 @@ import { logger } from './lib/logger'
 import { buildServiceHeaders } from './lib/service-auth'
 import { getStorage } from './lib/storage'
 import { getClientForFeature, getFeatureFallbackChain } from '@nau/llm-client'
+import { withRetry } from './lib/retry'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
@@ -115,10 +116,17 @@ class VoicenoteSkillImpl implements ZazuSkill {
 
     ctx.session.voicenoteProcessPromise = (async () => {
       try {
-        const file = await ctx.telegram.getFile(voice.file_id)
-        const telegramFileUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${file.file_path}`
-        const audioResp = await axios.get(telegramFileUrl, { responseType: 'arraybuffer', timeout: 30_000 })
-        const audioBuffer = Buffer.from(audioResp.data)
+        // Wrap getFile + download in retry — Telegram occasionally returns
+        // "400: temporarily unavailable" for valid files due to transient glitches.
+        const { audioBuffer } = await withRetry(
+          async () => {
+            const file = await ctx.telegram.getFile(voice.file_id)
+            const telegramFileUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${file.file_path}`
+            const audioResp = await axios.get(telegramFileUrl, { responseType: 'arraybuffer', timeout: 60_000 })
+            return { audioBuffer: Buffer.from(audioResp.data) }
+          },
+          { retries: 3, baseDelayMs: 2000, label: 'getFile+download' },
+        )
 
         const storage = getStorage()
         const storageKey = `zazu/voicenotes/${user.telegramId}/${crypto.randomUUID()}.ogg`
