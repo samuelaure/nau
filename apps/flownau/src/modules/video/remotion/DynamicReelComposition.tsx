@@ -313,11 +313,11 @@ function FitText({
         extrapolateRight: 'clamp',
       })
 
-  const textShadow = textStyle === 'none' ? '0 2px 20px rgba(0,0,0,0.8)' : 'none'
+  const textShadow = textStyle === 'none' ? '0 4px 28px rgba(0,0,0,0.9)' : 'none'
   const webkitStroke = textStyle === 'stroke' ? `2px ${styleColor}` : undefined
-  const bgPadding = textStyle === 'background_block' ? '8px 20px' : undefined
+  const bgPadding = textStyle === 'background_block' ? '12px 32px' : undefined
   const bgColor = textStyle === 'background_block' ? styleColor : undefined
-  const borderRadius = textStyle === 'background_block' ? '8px' : undefined
+  const borderRadius = textStyle === 'background_block' ? '16px' : undefined
 
   return (
     <div
@@ -395,7 +395,7 @@ function SceneRenderer({
         startFrom={scene.resolvedBrollStartFrom}
         durationInFrames={
           scene.backgroundVideoDurationSecs
-            ? Math.round(scene.backgroundVideoDurationSecs * REMOTION_FPS)
+            ? Math.max(1, Math.round(scene.backgroundVideoDurationSecs * REMOTION_FPS) - (scene.resolvedBrollStartFrom ?? 0))
             : undefined
         }
         overlayColor={overlayColor}
