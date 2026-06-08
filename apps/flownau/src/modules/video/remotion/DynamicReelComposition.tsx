@@ -248,118 +248,126 @@ function BrollBackground({
   )
 }
 
-// ── FitText — font-size auto-shrink to fit bounding box ───────────────────────
-// Renders text inside a fixed bounding box. If the text overflows in either
-// dimension, font size is reduced in steps until it fits. This mirrors the
-// "text block" behaviour in design tools: the area is fixed, the type scales
-// down to fill it completely.
-function FitText({
-  text,
+// ── FitTextGroup — renders all texts of a scene with a shared font size ────────
+// All text blocks in a scene share one common font-size. A single shrink loop
+// runs on the whole group container, so a longer block will cause ALL blocks
+// to shrink together — keeping visual consistency across the scene.
+// Blocks appear sequentially (fade-in at their textStart frame) and remain
+// visible for the rest of the scene, producing a progressive accumulation.
+function FitTextGroup({
+  texts,
+  textStartFrames,
   fontFamily,
-  color,
   maxTextSize,
-  textStyle,
-  styleColor,
-  horizontalAlign,
   boxWidth,
   boxHeight,
-  textStart,
-  instant,
+  isFirstScene,
 }: {
-  text: string
+  texts: Array<{
+    id: string
+    text: string
+    color: string
+    textStyle: TextStyle
+    styleColor: string
+    horizontalAlign: HorizontalAlign
+  }>
+  textStartFrames: number[]
   fontFamily: string
-  color: string
   maxTextSize: number
-  textStyle: TextStyle
-  styleColor: string
-  horizontalAlign: HorizontalAlign
   boxWidth: number
   boxHeight: number
-  textStart?: number
-  instant?: boolean
+  isFirstScene?: boolean
 }) {
   const frame = useCurrentFrame()
-  const containerRef = useRef<HTMLDivElement>(null)
+  const groupRef = useRef<HTMLDivElement>(null)
   const BASE_FONT_SIZE = 80
   const [fontSize, setFontSize] = useState(() => Math.round(BASE_FONT_SIZE * (maxTextSize / 100)))
 
+  // Single shrink loop over the whole group — all blocks shrink in unison.
   useIsomorphicLayoutEffect(() => {
-    const el = containerRef.current
+    const el = groupRef.current
     if (!el) return
     const target = Math.round(BASE_FONT_SIZE * (maxTextSize / 100))
     let size = target
     el.style.fontSize = `${size}px`
-    // Shrink until text fits within both the width AND height of the box.
-    // This is the critical dual-axis check that was working pre-feat/block-based-templates.
     while ((el.scrollWidth > boxWidth || el.scrollHeight > boxHeight) && size > 12) {
       size -= 2
       el.style.fontSize = `${size}px`
     }
     setFontSize(size)
-  }, [text, maxTextSize, fontFamily, boxWidth, boxHeight])
-
-  // Fade-in: interpolate from 0→1 opacity over first 10 frames since this text became active.
-  const elapsed = frame - (textStart ?? 0)
-  const opacity = instant
-    ? 1
-    : interpolate(elapsed, [0, 10], [0, 1], {
-        extrapolateLeft: 'clamp',
-        extrapolateRight: 'clamp',
-      })
-  const translateY = instant
-    ? 0
-    : interpolate(elapsed, [0, 10], [12, 0], {
-        extrapolateLeft: 'clamp',
-        extrapolateRight: 'clamp',
-      })
-
-  const textShadow = textStyle === 'none' ? '0 4px 28px rgba(0,0,0,0.9)' : 'none'
-  const webkitStroke = textStyle === 'stroke' ? `2px ${styleColor}` : undefined
-  const bgPadding = textStyle === 'background_block' ? '12px 32px' : undefined
-  const bgColor = textStyle === 'background_block' ? styleColor : undefined
-  const borderRadius = textStyle === 'background_block' ? '16px' : undefined
+  }, [texts.map((t) => t.text).join('|'), maxTextSize, fontFamily, boxWidth, boxHeight])
 
   return (
     <div
+      ref={groupRef}
       style={{
-        opacity,
-        transform: `translateY(${translateY}px)`,
-        // Fixed bounding box — overflow is clipped so text never escapes the safe zone
+        // The group owns the font size — children inherit via `em` units.
+        fontSize,
+        fontFamily,
+        fontWeight: 700,
+        lineHeight: 1.2,
+        letterSpacing: '-0.5px',
         width: boxWidth,
-        height: boxHeight,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent:
-          horizontalAlign === 'left' ? 'flex-start' : horizontalAlign === 'right' ? 'flex-end' : 'center',
+        maxHeight: boxHeight,
         overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 16,
       }}
     >
-      <div
-        ref={containerRef}
-        style={{
-          fontFamily,
-          fontSize,
-          fontWeight: 700,
-          color,
-          textAlign: horizontalAlign,
-          lineHeight: 1.2,
-          wordBreak: 'break-word',
-          overflowWrap: 'break-word',
-          whiteSpace: 'pre-wrap',
-          textShadow,
-          letterSpacing: '-0.5px',
-          WebkitTextStroke: webkitStroke,
-          padding: bgPadding,
-          backgroundColor: bgColor,
-          borderRadius,
-          display: 'inline-block',
-          maxWidth: '100%',
-          // No height/maxHeight on the inner element — scrollHeight must
-          // reflect the true rendered text height for the shrink loop to work.
-        }}
-      >
-        {text}
-      </div>
+      {texts.map((text, i) => {
+        const textStart = textStartFrames[i]
+        const elapsed = frame - textStart
+        const isInstant = isFirstScene && i === 0 && textStart === 0
+
+        // Block is invisible until its textStart frame.
+        const opacity = isInstant
+          ? 1
+          : interpolate(elapsed, [0, 10], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })
+        const translateY = isInstant
+          ? 0
+          : interpolate(elapsed, [0, 10], [12, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })
+
+        const textShadow = text.textStyle === 'none' ? '0 4px 28px rgba(0,0,0,0.9)' : 'none'
+        const webkitStroke = text.textStyle === 'stroke' ? `2px ${text.styleColor}` : undefined
+        const bgPadding = text.textStyle === 'background_block' ? '12px 32px' : undefined
+        const bgColor = text.textStyle === 'background_block' ? text.styleColor : undefined
+        const borderRadius = text.textStyle === 'background_block' ? '16px' : undefined
+        const justifyContent =
+          text.horizontalAlign === 'left' ? 'flex-start' : text.horizontalAlign === 'right' ? 'flex-end' : 'center'
+
+        return (
+          <div
+            key={text.id}
+            style={{
+              opacity,
+              transform: `translateY(${translateY}px)`,
+              display: 'flex',
+              justifyContent,
+              width: '100%',
+            }}
+          >
+            <div
+              style={{
+                color: text.color,
+                textAlign: text.horizontalAlign,
+                wordBreak: 'break-word',
+                overflowWrap: 'break-word',
+                whiteSpace: 'pre-wrap',
+                textShadow,
+                WebkitTextStroke: webkitStroke,
+                padding: bgPadding,
+                backgroundColor: bgColor,
+                borderRadius,
+                display: 'inline-block',
+                maxWidth: '100%',
+              }}
+            >
+              {text.text}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -403,32 +411,22 @@ function SceneRenderer({
       />
 
       <TextZone align={scene.textVerticalAlign}>
-        {scene.texts.map((text, i) => {
-          const textStart = textStartFrames[i]
-          const textDuration = calcTextDurationFrames(resolvedText(text))
-          const isActive = frame >= textStart && frame < textStart + textDuration
-          if (!isActive) return null
-          // Resolve null text-level fields using brand identity
-          const font = text.font ?? brand?.titleFont ?? 'Inter'
-          const color = text.color ?? brand?.secondaryColor ?? '#ffffff'
-          const maxTextSize = text.maxTextSize ?? brand?.maxTextSize ?? 100
-          return (
-            <FitText
-              key={text.id}
-              text={resolvedText(text)}
-              fontFamily={font}
-              color={color}
-              maxTextSize={maxTextSize}
-              textStyle={text.textStyle}
-              styleColor={text.styleColor}
-              horizontalAlign={text.horizontalAlign}
-              boxWidth={SAFE_W}
-              boxHeight={TEXT_BOX_HEIGHT}
-              textStart={textStart}
-              instant={isFirstScene && i === 0 && textStart === 0}
-            />
-          )
-        })}
+        <FitTextGroup
+          texts={scene.texts.map((text) => ({
+            id: text.id,
+            text: resolvedText(text),
+            color: text.color ?? brand?.secondaryColor ?? '#ffffff',
+            textStyle: text.textStyle,
+            styleColor: text.styleColor,
+            horizontalAlign: text.horizontalAlign,
+          }))}
+          textStartFrames={textStartFrames}
+          fontFamily={scene.texts[0]?.font ?? brand?.titleFont ?? 'Inter'}
+          maxTextSize={scene.texts[0]?.maxTextSize ?? brand?.maxTextSize ?? 100}
+          boxWidth={SAFE_W}
+          boxHeight={TEXT_BOX_HEIGHT}
+          isFirstScene={isFirstScene}
+        />
       </TextZone>
     </AbsoluteFill>
   )
