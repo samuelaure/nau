@@ -330,9 +330,9 @@ function FitTextGroup({
 
         const textShadow = text.textStyle === 'none' ? '0 4px 28px rgba(0,0,0,0.9)' : 'none'
         const webkitStroke = text.textStyle === 'stroke' ? `2px ${text.styleColor}` : undefined
-        const bgPadding = text.textStyle === 'background_block' ? '12px 32px' : undefined
+        const bgPadding = text.textStyle === 'background_block' ? '24px 48px 64px 48px' : undefined
         const bgColor = text.textStyle === 'background_block' ? text.styleColor : undefined
-        const borderRadius = text.textStyle === 'background_block' ? '16px' : undefined
+        const borderRadius = text.textStyle === 'background_block' ? '32px' : undefined
         const justifyContent =
           text.horizontalAlign === 'left' ? 'flex-start' : text.horizontalAlign === 'right' ? 'flex-end' : 'center'
 
