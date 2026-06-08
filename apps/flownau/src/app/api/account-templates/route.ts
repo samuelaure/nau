@@ -106,6 +106,44 @@ export async function PUT(req: Request) {
   }
 }
 
+/**
+ * DELETE /api/account-templates?brandId=&templateId=
+ * Brand-scoped template  → permanently deletes the Template record (cascade removes BrandTemplateConfig).
+ * System/workspace template → only removes the BrandTemplateConfig, leaving the gallery intact.
+ */
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url)
+    const brandId = searchParams.get('brandId')
+    const templateId = searchParams.get('templateId')
+    if (!brandId || !templateId) {
+      return NextResponse.json({ error: 'Missing brandId or templateId' }, { status: 400 })
+    }
+
+    const template = await prisma.template.findUnique({
+      where: { id: templateId },
+      select: { scope: true, brandId: true },
+    })
+    if (!template) {
+      return NextResponse.json({ error: 'Template not found' }, { status: 404 })
+    }
+
+    if (template.scope === 'brand' && template.brandId === brandId) {
+      // Fully owned by this brand — delete the template (cascades to BrandTemplateConfig)
+      await prisma.template.delete({ where: { id: templateId } })
+    } else {
+      // System or workspace template — only disconnect the brand's config
+      await prisma.brandTemplateConfig.deleteMany({
+        where: { brandId, templateId },
+      })
+    }
+
+    return NextResponse.json({ success: true }, { status: 200 })
+  } catch {
+    return NextResponse.json({ error: 'Failed to delete template' }, { status: 500 })
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json()

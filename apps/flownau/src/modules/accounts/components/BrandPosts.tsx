@@ -714,20 +714,14 @@ export default function BrandPosts({
     setOpenIdea(null)
     const toastId = toast.loading('Composing draft…')
     try {
-      // Resolve format + template: explicit selection > idea format > random enabled template
+      // Resolve format + template: explicit template > idea format; let backend pick enabled template
       let finalFormat: string = idea.format ?? ''
       let resolvedTemplateId: string = templateId
       if (resolvedTemplateId) {
         finalFormat = templates.find((t) => t.id === resolvedTemplateId)?.format ?? finalFormat
       }
       if (!finalFormat) {
-        if (templates.length > 0) {
-          const picked = templates[Math.floor(Math.random() * templates.length)]
-          finalFormat = picked.format ?? 'reel'
-          if (!resolvedTemplateId) resolvedTemplateId = picked.id
-        } else {
-          finalFormat = 'reel'
-        }
+        finalFormat = 'reel'
       }
       const res = await fetch('/api/agent/compose', {
         method: 'POST',
@@ -765,14 +759,8 @@ export default function BrandPosts({
 
   const handleReformat = async () => {
     if (!reformatIdea) return
-    let finalTemplateId = reformatTemplateId
-    let finalFormat = reformatFormat
-
-    if (reformatMode === 'format' && finalFormat) {
-      const candidates = templates.filter((t) => t.format === finalFormat)
-      const picked = candidates[Math.floor(Math.random() * candidates.length)]
-      finalTemplateId = picked?.id ?? ''
-    }
+    const finalTemplateId = reformatMode === 'template' ? reformatTemplateId : undefined
+    const finalFormat = reformatMode === 'format' ? reformatFormat : undefined
 
     if (!finalTemplateId && !finalFormat) {
       toast.error('Select a format or template')

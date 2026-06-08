@@ -23,6 +23,7 @@ import {
   Plus,
   Save,
   Edit2,
+  Trash2,
 } from 'lucide-react'
 import { cn } from '@/modules/shared/utils'
 import { PromptHistoryPanel } from './PromptHistoryPanel'
@@ -483,6 +484,7 @@ function TemplateModal({
   onClose,
   onRefresh,
   onDuplicated,
+  onDeleted,
 }: {
   template: Template
   brandId: string
@@ -490,6 +492,7 @@ function TemplateModal({
   onClose: () => void
   onRefresh: () => void
   onDuplicated: (newTemplate: Template) => void
+  onDeleted: () => void
 }) {
   const config = template.brandConfigs?.[0]
   const [isEnabled, setIsEnabled] = useState(config?.enabled ?? false)
@@ -505,6 +508,7 @@ function TemplateModal({
   const [savingName, setSavingName] = useState(false)
   const [savingDescription, setSavingDescription] = useState(false)
   const [duplicating, setDuplicating] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [muted, setMuted] = useState(true)
   const [localDescription, setLocalDescription] = useState(template.description ?? '')
   const [showCreatePost, setShowCreatePost] = useState(false)
@@ -703,6 +707,24 @@ function TemplateModal({
       toast.error('Failed to duplicate template')
     } finally {
       setDuplicating(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!confirm(`Delete "${templateName || template.name}"? This cannot be undone.`)) return
+    setDeleting(true)
+    try {
+      const res = await fetch(
+        `/api/account-templates?brandId=${brandId}&templateId=${template.id}`,
+        { method: 'DELETE' },
+      )
+      if (!res.ok) throw new Error()
+      toast.success('Template deleted')
+      onDeleted()
+    } catch {
+      toast.error('Failed to delete template')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -958,6 +980,16 @@ function TemplateModal({
               >
                 {duplicating ? <Loader2 size={15} className="animate-spin" /> : <Copy size={15} />}
               </button>
+              {!isNew && (
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  title="Delete template"
+                  className="text-gray-600 hover:text-red-400 transition-colors disabled:opacity-50"
+                >
+                  {deleting ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+                </button>
+              )}
               <button
                 onClick={onClose}
                 className="text-gray-500 hover:text-white transition-colors"
@@ -1811,6 +1843,10 @@ export default function AccountTemplates({ brandId, brandIdentity: initialBrandI
             })
           }}
           onDuplicated={(newTemplate) => setSelected(newTemplate)}
+          onDeleted={() => {
+            setSelected(null)
+            fetchTemplates()
+          }}
         />
       )}
     </div>
