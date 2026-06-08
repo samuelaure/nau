@@ -640,18 +640,39 @@ async function generateSynthesis(
   }
 }
 
+/**
+ * Splits every sentence in `text` onto its own paragraph (separated by \n\n).
+ * Sentence boundaries are detected at . ? ! followed by whitespace.
+ * Trailing periods are removed; ? and ! are preserved on their sentence.
+ * Intra-block single newlines are collapsed to a single space first,
+ * so the input format doesn't matter.
+ */
 function normalizeParagraphs(text: string): string {
-  return text
-    .split(/\n{2,}/)
-    .map((chunk) =>
-      chunk
-        .split('\n')
-        .map((l) => l.trim())
-        .filter(Boolean)
-        .join(' '),
-    )
-    .filter(Boolean)
-    .join('\n\n')
+  const sentences: string[] = []
+
+  for (const block of text.split(/\n{2,}/)) {
+    // Flatten any single newlines inside the block into spaces
+    const flat = block
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .join(' ')
+      .trim()
+
+    if (!flat) continue
+
+    // Split at sentence boundaries:
+    //   (?<=[?!])\s+  → after ? or ! (delimiter kept on the preceding sentence)
+    //   (?<=\.)\s+    → after .  (period stripped via replace below)
+    const parts = flat
+      .split(/(?<=[?!])\s+|(?<=\.)\s+/g)
+      .map((s) => s.trim().replace(/\.$/, '')) // strip trailing period only
+      .filter(Boolean)
+
+    sentences.push(...parts)
+  }
+
+  return sentences.join('\n\n')
 }
 
 function buildUserMessage(
