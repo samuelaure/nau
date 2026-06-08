@@ -226,9 +226,9 @@ async function renderReelVideo({
   cleanupFile(outputPath)
   await job.updateProgress(90)
 
-  // Extract cover frame — use midpoint of first scene
+  // Extract cover frame — use the first frame (frame 0)
   let coverUrl: string | null = null
-  const coverFrame = Math.min(Math.floor(remotionComp.durationInFrames / 2), remotionComp.durationInFrames - 1)
+  const coverFrame = 0
   const coverPath = path.join(OUTPUT_DIR, `cover-${postId}.jpg`)
   try {
     await renderStill({

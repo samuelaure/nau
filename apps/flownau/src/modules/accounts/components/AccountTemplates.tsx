@@ -510,12 +510,15 @@ function TemplateModal({
   const [showCreatePost, setShowCreatePost] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
 
-  const FormatIcon = FORMAT_ICON[template.format] ?? Film
+  const [localFormat, setLocalFormat] = useState(template.format)
+  const isNew = template.id === 'new'
+
+  const FormatIcon = FORMAT_ICON[localFormat] ?? Film
   const slotSchema = template.slotSchema as SlotDef[] | null
   const contentSchema = template.contentSchema as Record<string, unknown> | null
   const scenes = (template.scenes ?? null) as SceneDef[] | null
-  const isReelFormat = template.format === 'reel' || template.format === 'trial_reel'
-  const isHeadTalkFormat = template.format === 'head_talk' || template.format === 'trial_head_talk'
+  const isReelFormat = localFormat === 'reel' || localFormat === 'trial_reel'
+  const isHeadTalkFormat = localFormat === 'head_talk' || localFormat === 'trial_head_talk'
   
   const isDynamicReel = isReelFormat
 
@@ -564,6 +567,12 @@ function TemplateModal({
     autoApproveDraft?: boolean
     autoApprovePost?: boolean
   }) => {
+    if (patch.enabled !== undefined) setIsEnabled(patch.enabled)
+    if (patch.autoApproveDraft !== undefined) setAutoApproveDraft(patch.autoApproveDraft)
+    if (patch.autoApprovePost !== undefined) setAutoApprovePost(patch.autoApprovePost)
+    
+    if (isNew) return
+
     setSaving(true)
     try {
       const res = await fetch('/api/account-templates', {
@@ -572,9 +581,6 @@ function TemplateModal({
         body: JSON.stringify({ brandId, templateId: template.id, ...patch }),
       })
       if (!res.ok) throw new Error()
-      if (patch.enabled !== undefined) setIsEnabled(patch.enabled)
-      if (patch.autoApproveDraft !== undefined) setAutoApproveDraft(patch.autoApproveDraft)
-      if (patch.autoApprovePost !== undefined) setAutoApprovePost(patch.autoApprovePost)
       toast.success('Updated')
       onRefresh()
     } catch {
@@ -587,6 +593,8 @@ function TemplateModal({
   const saveCustomizations = async (newOverrides?: SlotOverrides, newPrompt?: string) => {
     const overridesToSave = newOverrides ?? slotOverrides
     const promptToSave = newPrompt ?? customPrompt
+    if (isNew) return
+
     setSavingPrompt(true)
     try {
       const res = await fetch('/api/account-templates', {
@@ -610,6 +618,9 @@ function TemplateModal({
   }
 
   const saveCustomName = async () => {
+    setEditingName(false)
+    if (isNew) return
+
     setSavingName(true)
     try {
       const res = await fetch('/api/account-templates', {
@@ -619,7 +630,6 @@ function TemplateModal({
       })
       if (!res.ok) throw new Error()
       toast.success('Name saved')
-      setEditingName(false)
       onRefresh()
     } catch {
       toast.error('Failed to save name')
@@ -629,6 +639,11 @@ function TemplateModal({
   }
 
   const saveDescription = async () => {
+    if (isNew) {
+      toast.success('Description saved')
+      return
+    }
+
     setSavingDescription(true)
     try {
       const res = await fetch(`/api/templates/${template.id}`, {
@@ -647,6 +662,8 @@ function TemplateModal({
   }
 
   const saveHtPrompts = async () => {
+    if (isNew) return
+
     setSavingHtPrompts(true)
     try {
       const composed = [
@@ -715,7 +732,6 @@ function TemplateModal({
     setSavingScenes(true)
     
     let activeTemplateId = template.id
-    const isNew = activeTemplateId === 'new'
 
     // Save or Create Template
     if (isDynamicReel && localScenes) {
@@ -730,6 +746,8 @@ function TemplateModal({
               remotionId: 'DynamicReel',
               sceneType: 'reel',
               scope: 'brand',
+              format: localFormat,
+              description: localDescription || null,
             }),
           })
           if (!res.ok) throw new Error()
@@ -758,14 +776,28 @@ function TemplateModal({
     
     // Save customizations
     try {
+      const composedHtPrompt = [
+        htScriptPrompt ? `SCRIPT_PROMPT: ${htScriptPrompt}` : '',
+        htCaptionPrompt ? `CAPTION_PROMPT: ${htCaptionPrompt}` : '',
+      ].filter(Boolean).join('\n')
+
+      const finalCustomPrompt = isHeadTalkFormat ? (composedHtPrompt || null) : (customPrompt || null)
+
       const resConfig = await fetch('/api/account-templates', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          customPrompt: customPrompt || null,
+          customPrompt: finalCustomPrompt,
           slotOverrides: Object.keys(slotOverrides).length > 0 ? slotOverrides : null,
           brandId,
           templateId: activeTemplateId,
+          // Only send these if creating a new template to set the initial toggles
+          ...(isNew && {
+            customName: customName || null,
+            enabled: isEnabled,
+            autoApproveDraft,
+            autoApprovePost,
+          }),
         }),
       })
       if (!resConfig.ok) throw new Error()
@@ -787,15 +819,19 @@ function TemplateModal({
   }
 
   const saveFormat = async (trialOnly: boolean) => {
+    const newFormat = trialOnly
+      ? isHeadTalkFormat
+        ? 'trial_head_talk'
+        : 'trial_reel'
+      : isHeadTalkFormat
+        ? 'head_talk'
+        : 'reel'
+    
+    setLocalFormat(newFormat)
+    if (isNew) return
+
     setSavingFormat(true)
     try {
-      const newFormat = trialOnly
-        ? isHeadTalkFormat
-          ? 'trial_head_talk'
-          : 'trial_reel'
-        : isHeadTalkFormat
-          ? 'head_talk'
-          : 'reel'
       const res = await fetch(`/api/templates/${template.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -1168,7 +1204,7 @@ function TemplateModal({
                         </div>
                         <input
                           type="checkbox"
-                          checked={template.format === 'trial_reel' || template.format === 'trial_head_talk'}
+                          checked={localFormat === 'trial_reel' || localFormat === 'trial_head_talk'}
                           disabled={savingFormat}
                           onChange={(e) => saveFormat(e.target.checked)}
                           className="w-4 h-4 accent-accent shrink-0"

@@ -41,6 +41,8 @@ export async function POST(req: Request) {
         creationPrompt: body.creationPrompt ?? null,
         captionPrompt: body.captionPrompt ?? null,
         sceneType: body.sceneType ?? null,
+        format: body.format ?? 'reel',
+        description: body.description ?? null,
       },
     })
     return NextResponse.json({ template }, { status: 201 })
