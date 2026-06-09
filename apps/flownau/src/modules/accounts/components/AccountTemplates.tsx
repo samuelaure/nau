@@ -24,6 +24,7 @@ import {
   Save,
   Edit2,
   Trash2,
+  Download,
 } from 'lucide-react'
 import { cn } from '@/modules/shared/utils'
 import { PromptHistoryPanel } from './PromptHistoryPanel'
@@ -80,6 +81,7 @@ type Template = {
   id: string
   name: string
   format: string
+  brandId?: string | null
   remotionId?: string | null
   description?: string | null
   previewUrl?: string | null
@@ -980,7 +982,7 @@ function TemplateModal({
               >
                 {duplicating ? <Loader2 size={15} className="animate-spin" /> : <Copy size={15} />}
               </button>
-              {!isNew && (
+              {!isNew && template.brandId === brandId && (
                 <button
                   onClick={handleDelete}
                   disabled={deleting}
@@ -1021,7 +1023,37 @@ function TemplateModal({
           )}
 
           {/* Tab content */}
-          <div className="p-5 flex-1 overflow-y-auto">
+          <div className="p-5 flex-1 overflow-y-auto relative">
+            {template.brandId !== brandId ? (
+              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-gray-950/80 backdrop-blur-sm p-6 text-center">
+                <Download size={32} className="text-gray-500 mb-4" />
+                <h3 className="text-lg font-semibold text-white mb-2">Gallery Template</h3>
+                <p className="text-sm text-text-secondary mb-6 max-w-sm">
+                  This template is available in the gallery. Download a copy to your brand to start customizing and using it.
+                </p>
+                <button
+                  onClick={async () => {
+                    const res = await fetch('/api/account-templates/duplicate', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ brandId, templateId: template.id, keepName: true }),
+                    })
+                    if (res.ok) {
+                      toast.success('Template downloaded!')
+                      onRefresh()
+                      onClose()
+                    } else {
+                      toast.error('Failed to download template')
+                    }
+                  }}
+                  className="bg-accent text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-accent/90 transition-colors flex items-center gap-2"
+                >
+                  <Download size={15} />
+                  Download to Brand
+                </button>
+              </div>
+            ) : null}
+
             {/* Content tab — scene builder (DynamicReel), head talk prompts, legacy caption */}
             {(activeTab === 'content' || (!isDynamicReel && !isHeadTalkFormat)) && (
               <div className="space-y-6">
@@ -1544,15 +1576,18 @@ function TemplateCard({
   brandId,
   onClick,
   onToggle,
+  onDownload,
 }: {
   template: Template
   brandId: string
   onClick: () => void
   onToggle: (enabled: boolean) => Promise<void>
+  onDownload?: () => Promise<void>
 }) {
   const config = template.brandConfigs?.[0]
   const isEnabled = config?.enabled ?? false
   const isPortrait = template.format === 'reel' || template.format === 'trial_reel'
+  const isGallery = template.brandId !== brandId
   const [toggling, setToggling] = useState(false)
 
   const handleToggle = async (e: React.MouseEvent) => {
@@ -1560,6 +1595,16 @@ function TemplateCard({
     setToggling(true)
     try {
       await onToggle(!isEnabled)
+    } finally {
+      setToggling(false)
+    }
+  }
+
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setToggling(true)
+    try {
+      await onDownload?.()
     } finally {
       setToggling(false)
     }
@@ -1583,26 +1628,37 @@ function TemplateCard({
           format={template.format}
           className="w-full h-full"
         />
-        {/* Enable/disable toggle — bottom-left */}
-        <button
-          onClick={handleToggle}
-          disabled={toggling}
-          className={cn(
-            'absolute bottom-2 left-2 flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-full border transition-colors',
-            isEnabled
-              ? 'bg-green-900/80 border-green-700/50 text-green-300 hover:bg-green-800/80'
-              : 'bg-gray-900/80 border-gray-700 text-gray-400 hover:bg-gray-800/80',
-          )}
-        >
-          {toggling ? (
-            <Loader2 size={9} className="animate-spin" />
-          ) : isEnabled ? (
-            <ToggleRight size={11} />
-          ) : (
-            <ToggleLeft size={11} />
-          )}
-          {isEnabled ? 'On' : 'Off'}
-        </button>
+        {/* Enable/disable toggle or Download button — bottom-left */}
+        {isGallery ? (
+          <button
+            onClick={handleDownload}
+            disabled={toggling}
+            className="absolute bottom-2 left-2 flex items-center gap-1.5 text-[10px] font-medium px-2.5 py-1 rounded-full border bg-accent/90 border-accent text-white hover:bg-accent transition-colors"
+          >
+            {toggling ? <Loader2 size={11} className="animate-spin" /> : <Download size={11} />}
+            Download
+          </button>
+        ) : (
+          <button
+            onClick={handleToggle}
+            disabled={toggling}
+            className={cn(
+              'absolute bottom-2 left-2 flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-full border transition-colors',
+              isEnabled
+                ? 'bg-green-900/80 border-green-700/50 text-green-300 hover:bg-green-800/80'
+                : 'bg-gray-900/80 border-gray-700 text-gray-400 hover:bg-gray-800/80',
+            )}
+          >
+            {toggling ? (
+              <Loader2 size={9} className="animate-spin" />
+            ) : isEnabled ? (
+              <ToggleRight size={11} />
+            ) : (
+              <ToggleLeft size={11} />
+            )}
+            {isEnabled ? 'On' : 'Off'}
+          </button>
+        )}
       </div>
 
       {/* Info */}
@@ -1715,13 +1771,30 @@ export default function AccountTemplates({ brandId, brandIdentity: initialBrandI
     setSelected((prev) => (prev && typeof prev !== 'string' && prev.id === templateId ? { ...prev } : prev))
   }
 
+  const downloadTemplate = async (templateId: string) => {
+    const res = await fetch('/api/account-templates/duplicate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brandId, templateId, keepName: true }),
+    })
+    if (!res.ok) {
+      toast.error('Failed to download template')
+      return
+    }
+    toast.success('Template downloaded to your brand')
+    await fetchTemplates()
+  }
+
   if (loading) return <p className="text-text-secondary text-sm">Loading…</p>
 
-  const enabled = templates.filter((t) => t.brandConfigs?.[0]?.enabled)
-  const disabled = templates.filter((t) => !t.brandConfigs?.[0]?.enabled)
+  const brandTemplates = templates.filter((t) => t.brandId === brandId)
+  const galleryTemplates = templates.filter((t) => t.brandId !== brandId)
+
+  const enabled = brandTemplates.filter((t) => t.brandConfigs?.[0]?.enabled === true)
+  const disabled = brandTemplates.filter((t) => t.brandConfigs?.[0]?.enabled !== true)
 
   const visibleTemplates =
-    activeTab === 'enabled' ? enabled : activeTab === 'disabled' ? disabled : templates
+    activeTab === 'enabled' ? enabled : activeTab === 'disabled' ? disabled : galleryTemplates
 
   const reelTemplates = visibleTemplates.filter(
     (t) => t.format === 'reel' || t.format === 'trial_reel',
@@ -1772,7 +1845,7 @@ export default function AccountTemplates({ brandId, brandIdentity: initialBrandI
               ? enabled.length
               : tab.id === 'disabled'
                 ? disabled.length
-                : templates.length
+                : galleryTemplates.length
           return (
             <button
               key={tab.id}
@@ -1821,6 +1894,7 @@ export default function AccountTemplates({ brandId, brandIdentity: initialBrandI
                     brandId={brandId}
                     onClick={() => setSelected(t)}
                     onToggle={(enabled) => toggleTemplate(t.id, enabled)}
+                    onDownload={() => downloadTemplate(t.id)}
                   />
                 ))}
               </div>

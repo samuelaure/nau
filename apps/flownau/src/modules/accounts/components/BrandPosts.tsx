@@ -500,10 +500,14 @@ export default function BrandPosts({
   useEffect(() => {
     fetchIdeas()
     fetchIdeationPrompt()
-    fetch('/api/templates')
+    fetch(`/api/account-templates?brandId=${brandId}`)
       .then((r) => r.json())
       .then((d) => {
-        setTemplates((d.templates || []).filter((t: any) => t.brandId === brandId || !t.brandId))
+        const fetched = d.templates || []
+        const enabledBrandTemplates = fetched.filter(
+          (t: any) => t.brandId === brandId && t.brandConfigs?.[0]?.enabled === true
+        )
+        setTemplates(enabledBrandTemplates)
       })
       .catch(() => {})
   }, [brandId])
@@ -1365,50 +1369,54 @@ export default function BrandPosts({
                 </button>
               ))}
             </div>
-            {reformatMode === 'format' ? (
-              <div>
-                <label className="text-xs text-text-secondary block mb-2">
-                  Choose a format — a template will be picked at random
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {[...new Set(templates.map((t) => t.format).filter(Boolean))].map((fmt) => {
-                    const fc = FORMAT_CONFIG[fmt]
-                    const Icon = fc?.icon
-                    return (
-                      <button
-                        key={fmt}
-                        onClick={() => setReformatFormat(fmt === reformatFormat ? '' : fmt)}
-                        className={cn(
-                          'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all',
-                          reformatFormat === fmt
-                            ? 'bg-accent border-accent text-white'
-                            : 'border-white/10 text-text-secondary hover:border-white/30 hover:text-white',
-                        )}
-                      >
-                        {Icon && <Icon size={12} />}
-                        {fc?.label ?? fmt}
-                      </button>
-                    )
-                  })}
+            
+            {(() => {
+              const availableTemplates = templates.filter(t => t.id !== reformatIdea.templateId)
+              return reformatMode === 'format' ? (
+                <div>
+                  <label className="text-xs text-text-secondary block mb-2">
+                    Choose a format — a template will be picked at random
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {[...new Set(availableTemplates.map((t) => t.format).filter(Boolean))].map((fmt) => {
+                      const fc = FORMAT_CONFIG[fmt]
+                      const Icon = fc?.icon
+                      return (
+                        <button
+                          key={fmt}
+                          onClick={() => setReformatFormat(fmt === reformatFormat ? '' : fmt)}
+                          className={cn(
+                            'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all',
+                            reformatFormat === fmt
+                              ? 'bg-accent border-accent text-white'
+                              : 'border-white/10 text-text-secondary hover:border-white/30 hover:text-white',
+                          )}
+                        >
+                          {Icon && <Icon size={12} />}
+                          {fc?.label ?? fmt}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div>
-                <label className="text-xs text-text-secondary block mb-1">Choose a template</label>
-                <select
-                  className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-sm"
-                  value={reformatTemplateId}
-                  onChange={(e) => setReformatTemplateId(e.target.value)}
-                >
-                  <option value="">Select a template…</option>
-                  {templates.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+              ) : (
+                <div>
+                  <label className="text-xs text-text-secondary block mb-1">Choose a template</label>
+                  <select
+                    className="w-full bg-gray-900 border border-gray-800 rounded p-2 text-sm"
+                    value={reformatTemplateId}
+                    onChange={(e) => setReformatTemplateId(e.target.value)}
+                  >
+                    <option value="">Select a template…</option>
+                    {availableTemplates.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )
+            })()}
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setReformatIdea(null)}>
                 Cancel

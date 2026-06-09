@@ -3,7 +3,7 @@ import { prisma } from '@/modules/shared/prisma'
 
 export async function POST(req: Request) {
   try {
-    const { brandId, templateId } = (await req.json()) as { brandId?: string; templateId?: string }
+    const { brandId, templateId, keepName } = (await req.json()) as { brandId?: string; templateId?: string; keepName?: boolean }
     if (!brandId || !templateId) {
       return NextResponse.json({ error: 'Missing brandId or templateId' }, { status: 400 })
     }
@@ -17,9 +17,10 @@ export async function POST(req: Request) {
     if (!template) return NextResponse.json({ error: 'Template not found' }, { status: 404 })
 
     const baseName = config?.customName || template.name
+    const newTemplateName = keepName ? baseName : `Copy of ${baseName}`
     const newTemplate = await prisma.template.create({
       data: {
-        name: `Copy of ${baseName}`,
+        name: newTemplateName,
         format: template.format,
         remotionId: template.remotionId,
         config: template.config ?? undefined,
@@ -45,7 +46,7 @@ export async function POST(req: Request) {
             enabled: config?.enabled ?? true,
             autoApproveDraft: config?.autoApproveDraft ?? false,
             autoApprovePost: config?.autoApprovePost ?? false,
-            customName: config?.customName ? `Copy of ${config.customName}` : null,
+            customName: config?.customName ? (keepName ? config.customName : `Copy of ${config.customName}`) : null,
             customPrompt: config?.customPrompt ?? null,
             slotOverrides: config?.slotOverrides ?? undefined,
           },
