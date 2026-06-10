@@ -98,8 +98,38 @@ export function calcSceneDurationFrames(scene: SceneDef): number {
  * Total reel duration in frames, capped at MAX_REEL_FRAMES (3 min).
  */
 export function calcTotalReelFrames(scenes: SceneDef[]): number {
-  const total = scenes.reduce((sum, s) => sum + calcSceneDurationFrames(s), 0)
+  const adjusted = getAdjustedSceneDurations(scenes)
+  const total = adjusted.reduce((sum, d) => sum + d, 0)
   return Math.min(total, MAX_REEL_FRAMES)
+}
+
+/**
+ * Returns an array of durations (in frames) for each scene.
+ * If the total duration is below 7 seconds, the remaining frames
+ * are distributed equally across all scenes.
+ */
+export function getAdjustedSceneDurations(scenes: SceneDef[]): number[] {
+  if (!scenes || scenes.length === 0) return []
+  const baseDurations = scenes.map(calcSceneDurationFrames)
+  const totalBase = baseDurations.reduce((sum, d) => sum + d, 0)
+  
+  const MIN_REEL_FRAMES = 7 * REMOTION_FPS
+  if (totalBase < MIN_REEL_FRAMES) {
+    const deficit = MIN_REEL_FRAMES - totalBase
+    const addPerScene = Math.floor(deficit / scenes.length)
+    let remainder = deficit % scenes.length
+    
+    return baseDurations.map(duration => {
+      let adj = duration + addPerScene
+      if (remainder > 0) {
+        adj += 1
+        remainder -= 1
+      }
+      return adj
+    })
+  }
+  
+  return baseDurations
 }
 
 // ── Resolved types (post-AI, post-asset-resolution) ───────────────────────────

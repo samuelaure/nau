@@ -50,7 +50,7 @@ import { loadFont as loadCaveat } from '@remotion/google-fonts/Caveat'
 
 import type { BrandIdentity } from './ReelTemplates'
 import type { ResolvedSceneDef, ResolvedTextDef, TextStyle, HorizontalAlign } from '@/types/template-scenes'
-import { calcTextDurationFrames, calcSceneDurationFrames, resolvedText, MIN_TEXT_DURATION_SECS, REMOTION_FPS } from '@/types/template-scenes'
+import { calcTextDurationFrames, calcSceneDurationFrames, getAdjustedSceneDurations, resolvedText, MIN_TEXT_DURATION_SECS, REMOTION_FPS } from '@/types/template-scenes'
 
 // ── Font loader registry ──────────────────────────────────────────────────────
 // Maps font name (as stored in DB) → loader function.
@@ -463,10 +463,11 @@ export function DynamicReelComposition({ scenes, audioUrl, brand }: DynamicReelP
 
   // Build scene start frames
   const sceneStartFrames: number[] = []
+  const adjustedDurations = getAdjustedSceneDurations(scenes)
   let frameAcc = 0
-  for (const scene of scenes) {
+  for (const duration of adjustedDurations) {
     sceneStartFrames.push(frameAcc)
-    frameAcc += calcSceneDurationFrames(scene)
+    frameAcc += duration
   }
 
   return (
@@ -474,7 +475,7 @@ export function DynamicReelComposition({ scenes, audioUrl, brand }: DynamicReelP
       {audioUrl && <Audio src={audioUrl} />}
       {scenes.map((scene, i) => {
         const start = sceneStartFrames[i]
-        const duration = calcSceneDurationFrames(scene)
+        const duration = adjustedDurations[i]
         return (
           <Sequence key={scene.id} from={start} durationInFrames={duration}>
             <SceneRenderer scene={scene} brand={brand} isFirstScene={i === 0} />
