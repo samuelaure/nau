@@ -458,7 +458,7 @@ async function fillCalendarForBrand(
           const past = pastUnpublished.splice(pastIdx, 1)[0]!
           await prisma.post.update({ where: { id: past.id }, data: { scheduledAt: targetTime } })
           timeline.push({ time: targetTime.getTime(), batchId: past.generationBatchId })
-          timeline.sort((a, b) =\u003e a.time - b.time)
+          timeline.sort((a, b) => a.time - b.time)
           pastRescheduled++
           postsFilled++
           ;(occupiedByDate[localDate] ??= []).push(targetTime.getTime())
@@ -487,7 +487,7 @@ async function fillCalendarForBrand(
             data: { format: existingDraft.format ?? format, scheduledAt: targetTime },
           })
           timeline.push({ time: targetTime.getTime(), batchId: existingDraft.generationBatchId })
-          timeline.sort((a, b) =\u003e a.time - b.time)
+          timeline.sort((a, b) => a.time - b.time)
           postsFilled++
           ;(occupiedByDate[localDate] ??= []).push(targetTime.getTime())
           countByDate[localDate] = (countByDate[localDate] ?? 0) + 1
@@ -512,7 +512,7 @@ async function fillCalendarForBrand(
           const filled = await composeAndSchedule(brandId, candidate, format, targetTime, deck)
           if (filled) {
             timeline.push({ time: targetTime.getTime(), batchId: candidate.generationBatchId })
-            timeline.sort((a, b) =\u003e a.time - b.time)
+            timeline.sort((a, b) => a.time - b.time)
             postsFilled++
             ;(occupiedByDate[localDate] ??= []).push(targetTime.getTime())
             countByDate[localDate] = (countByDate[localDate] ?? 0) + 1
@@ -575,7 +575,7 @@ async function fillCalendarForBrand(
             )
             if (filled) {
               timeline.push({ time: targetTime.getTime(), batchId: retryCandidate.generationBatchId })
-              timeline.sort((a, b) =\u003e a.time - b.time)
+              timeline.sort((a, b) => a.time - b.time)
               postsFilled++
               ;(occupiedByDate[localDate] ??= []).push(targetTime.getTime())
               countByDate[localDate] = (countByDate[localDate] ?? 0) + 1
