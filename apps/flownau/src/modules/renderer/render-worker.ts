@@ -329,7 +329,11 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
   const brandId = post.brandId
 
   // Determine which Remotion composition to use
-  const templateRemotionId = post.template?.remotionId ?? ''
+  let templateRemotionId = post.template?.remotionId ?? ''
+  if (format === 'trial_reel' && !templateRemotionId) {
+    templateRemotionId = DYNAMIC_REEL_ID
+  }
+
   if (!isVideo || !VIDEO_REEL_IDS.has(templateRemotionId)) {
     throw new Error(
       `Post ${postId} has unsupported format/template: ${format}/${templateRemotionId}`,
