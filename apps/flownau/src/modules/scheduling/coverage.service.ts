@@ -290,8 +290,8 @@ async function fillCalendarForBrand(
 
   // Load all posts with scheduledAt in horizon to determine per-day counts
   const existingPosts = await prisma.post.findMany({
-    where: { brandId, scheduledAt: { gte: todayLocal, lt: horizonEnd } },
-    select: { scheduledAt: true },
+    where: { brandId, scheduledAt: { gte: todayLocal, lt: horizonEnd }, status: { notIn: ['IDEA_PENDING', 'IDEA_APPROVED'] } },
+    select: { scheduledAt: true, generationBatchId: true },
     orderBy: { scheduledAt: 'asc' },
   })
 
@@ -390,8 +390,8 @@ async function fillCalendarForBrand(
   let skippedByBatchRule = 0
   let notifyUserApproveIdeas = false
 
-  // Initialise batch-rule window from last 2 scheduled posts before the horizon
-  const recentBatchIds: (string | null)[] = []
+  // Build a timeline of all scheduled posts to track batch usage chronologically
+  const timeline: { time: number; batchId: string | null }[] = []
   const priorPosts = await prisma.post.findMany({
     where: {
       brandId,
@@ -400,13 +400,14 @@ async function fillCalendarForBrand(
     },
     orderBy: { scheduledAt: 'desc' },
     take: BATCH_GAP,
-    select: { generationBatchId: true },
+    select: { scheduledAt: true, generationBatchId: true },
   })
-  priorPosts.reverse().forEach((p) => recentBatchIds.push(p.generationBatchId ?? null))
-
-  const advanceBatchWindow = (batchId: string | null) => {
-    recentBatchIds.push(batchId)
-    if (recentBatchIds.length > BATCH_GAP) recentBatchIds.shift()
+  
+  for (const p of priorPosts.reverse()) {
+    timeline.push({ time: p.scheduledAt!.getTime(), batchId: p.generationBatchId })
+  }
+  for (const p of existingPosts) {
+    timeline.push({ time: p.scheduledAt!.getTime(), batchId: p.generationBatchId })
   }
 
   // Reload existing post times per day (including ones just added during this run)
@@ -444,6 +445,10 @@ async function fillCalendarForBrand(
         const format = schedule.formatChain[chainPos % schedule.formatChain.length]!
         chainPos++
 
+        const recentBatchIds = timeline
+          .filter((t) => t.time < targetTime.getTime())
+          .slice(-BATCH_GAP)
+          .map((t) => t.batchId)
         const batchFilter = batchExcludeFilter(recentBatchIds)
         const batchAnd = Object.keys(batchFilter).length > 0 ? [batchFilter] : []
 
@@ -452,7 +457,8 @@ async function fillCalendarForBrand(
         if (pastIdx !== -1) {
           const past = pastUnpublished.splice(pastIdx, 1)[0]!
           await prisma.post.update({ where: { id: past.id }, data: { scheduledAt: targetTime } })
-          advanceBatchWindow(past.generationBatchId)
+          timeline.push({ time: targetTime.getTime(), batchId: past.generationBatchId })
+          timeline.sort((a, b) =\u003e a.time - b.time)
           pastRescheduled++
           postsFilled++
           ;(occupiedByDate[localDate] ??= []).push(targetTime.getTime())
@@ -480,7 +486,8 @@ async function fillCalendarForBrand(
             where: { id: existingDraft.id },
             data: { format: existingDraft.format ?? format, scheduledAt: targetTime },
           })
-          advanceBatchWindow(existingDraft.generationBatchId)
+          timeline.push({ time: targetTime.getTime(), batchId: existingDraft.generationBatchId })
+          timeline.sort((a, b) =\u003e a.time - b.time)
           postsFilled++
           ;(occupiedByDate[localDate] ??= []).push(targetTime.getTime())
           countByDate[localDate] = (countByDate[localDate] ?? 0) + 1
@@ -504,7 +511,8 @@ async function fillCalendarForBrand(
         if (candidate) {
           const filled = await composeAndSchedule(brandId, candidate, format, targetTime, deck)
           if (filled) {
-            advanceBatchWindow(candidate.generationBatchId)
+            timeline.push({ time: targetTime.getTime(), batchId: candidate.generationBatchId })
+            timeline.sort((a, b) =\u003e a.time - b.time)
             postsFilled++
             ;(occupiedByDate[localDate] ??= []).push(targetTime.getTime())
             countByDate[localDate] = (countByDate[localDate] ?? 0) + 1
@@ -566,7 +574,8 @@ async function fillCalendarForBrand(
               deck,
             )
             if (filled) {
-              advanceBatchWindow(retryCandidate.generationBatchId)
+              timeline.push({ time: targetTime.getTime(), batchId: retryCandidate.generationBatchId })
+              timeline.sort((a, b) =\u003e a.time - b.time)
               postsFilled++
               ;(occupiedByDate[localDate] ??= []).push(targetTime.getTime())
               countByDate[localDate] = (countByDate[localDate] ?? 0) + 1
