@@ -356,9 +356,40 @@ async function processRenderJob(job: Job<RenderJobData>): Promise<void> {
     if (!resolvedScenes) return // error already written to DB
 
     const brandIdentity = (post.brand?.brandIdentity ?? {}) as BrandIdentity
+
+    let audioUrl = (creative as any)?.audioUrl as string | undefined
+    if (!audioUrl) {
+      const audioAssets = await prisma.asset.findMany({
+        where: { brandId: post.brandId, type: { in: ['audio', 'AUD'] } },
+        select: { id: true, url: true, lastUsedAt: true },
+        take: 50,
+        orderBy: { lastUsedAt: { sort: 'asc', nulls: 'first' } },
+      })
+      if (audioAssets.length > 0) {
+        const audioPool = shuffle(audioAssets.slice(0, 3))
+        const selectedAudio = audioPool[0]
+        audioUrl = selectedAudio?.url
+        if (selectedAudio) {
+          await prisma.asset.update({
+            where: { id: selectedAudio.id },
+            data: { lastUsedAt: new Date(), usageCount: { increment: 1 } },
+          })
+          await prisma.post.update({
+            where: { id: postId },
+            data: {
+              creative: {
+                ...(creative as object),
+                audioUrl,
+              },
+            },
+          })
+        }
+      }
+    }
+
     const inputProps: Record<string, unknown> = {
       scenes: resolvedScenes,
-      audioUrl: (creative as any)?.audioUrl ?? undefined,
+      audioUrl: audioUrl ?? undefined,
       brand: brandIdentity,
     }
 
