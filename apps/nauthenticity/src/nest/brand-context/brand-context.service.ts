@@ -252,7 +252,7 @@ Requirements:
 - Every field should reflect real signals from the sources provided.
 - Omit sections you have no evidence for — do not fabricate.
 - Keep all values concise: strings under 120 characters, arrays under 6 items.
-- Write all output in ${language}.
+- Write all output in ${language}, EXCEPT for the enum values in 'voice.register', 'voice.energy', and 'voice.pov', which MUST be kept in English exactly as defined in the schema.
 
 Return ONLY valid JSON matching this shape:
 {
