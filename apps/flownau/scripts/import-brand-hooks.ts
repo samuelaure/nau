@@ -26,7 +26,7 @@ function createText(content: string, minWords: number, maxWords: number) {
         content: content,
         maxWords: maxWords,
         minWords: minWords,
-        textStyle: "background_block",
+        textStyle: "none",
         styleColor: "#000000",
         maxTextSize: null,
         horizontalAlign: "center"
