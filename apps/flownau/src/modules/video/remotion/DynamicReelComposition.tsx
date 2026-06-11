@@ -2,7 +2,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
   useCurrentFrame,
   interpolate,
-  OffthreadVideo,
+  Video,
   Loop,
   Sequence,
   Audio,
@@ -229,14 +229,13 @@ function BrollBackground({
   }
   return (
     <>
-      <Loop durationInFrames={durationInFrames || 9999}>
-        <OffthreadVideo
-          src={videoUrl}
-          startFrom={startFrom ?? 0}
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-          muted
-        />
-      </Loop>
+      <Video
+        src={videoUrl}
+        startFrom={startFrom ?? 0}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+        muted
+        loop
+      />
       <div
         style={{
           position: 'absolute',
