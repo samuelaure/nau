@@ -661,15 +661,36 @@ function normalizeParagraphs(text: string): string {
 
     if (!flat) continue
 
-    // Split at sentence boundaries:
-    //   (?<=[?!])\s+  → after ? or ! (delimiter kept on the preceding sentence)
-    //   (?<=\.)\s+    → after .  (period stripped via replace below)
-    const parts = flat
-      .split(/(?<=[?!])\s+|(?<=\.)\s+/g)
-      .map((s) => s.trim().replace(/\.$/, '')) // strip trailing period only
-      .filter(Boolean)
+    const parts: string[] = []
+    let current = ""
+    let inQuotes = false
 
-    sentences.push(...parts)
+    for (let i = 0; i < flat.length; i++) {
+      const char = flat[i]
+      
+      if (char === '"' || char === '“' || char === '”' || char === '«' || char === '»') {
+        inQuotes = !inQuotes
+      }
+      
+      current += char
+
+      // Split at sentence boundaries only if outside quotes
+      if (!inQuotes && (char === '.' || char === '?' || char === '!')) {
+        const nextChar = flat[i + 1]
+        if (nextChar === ' ' || nextChar === undefined) {
+          parts.push(current.trim().replace(/\.$/, '')) // strip trailing period only
+          current = ""
+          // Skip trailing spaces
+          while (flat[i + 1] === ' ') i++
+        }
+      }
+    }
+
+    if (current.trim()) {
+      parts.push(current.trim().replace(/\.$/, ''))
+    }
+
+    sentences.push(...parts.filter(Boolean))
   }
 
   return sentences.join('\n\n')
