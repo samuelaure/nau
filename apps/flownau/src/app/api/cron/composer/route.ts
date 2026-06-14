@@ -46,6 +46,12 @@ export async function GET(request: Request) {
 
         if (!templateConfig?.template.id) {
           logger.warn({ postId: post.id, format }, '[Composer] No template found — skipping')
+          
+          await prisma.post.update({
+            where: { id: post.id },
+            data: { status: 'DRAFT_FAILED' }
+          }).catch(e => logError(`[Composer] Failed to mark post as DRAFT_FAILED`, e))
+
           results.push({
             postId: post.id,
             brandId: post.brandId,
@@ -92,6 +98,12 @@ export async function GET(request: Request) {
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         logError(`[Composer] Failed to compose post ${post.id}`, err)
+        
+        await prisma.post.update({
+          where: { id: post.id },
+          data: { status: 'DRAFT_FAILED' }
+        }).catch(e => logError(`[Composer] Failed to mark post as DRAFT_FAILED`, e))
+
         results.push({ postId: post.id, brandId: post.brandId, status: 'failed', error: msg })
       }
     }
