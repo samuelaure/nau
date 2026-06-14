@@ -554,7 +554,10 @@ async function fillCalendarForBrand(
                 `⚠️ *Calendar fill blocked* — _${name}_\n\nNew ideas were generated to satisfy the batch rule, but auto-approve is off.\n\nPlease approve ideas in the Ideas tab to continue filling the calendar.`,
               )
             }
-            continue
+            // [FIX] Break the dayLoop completely. If we just continue, the next slots/days will also 
+            // hit this batch rule block and generate HUNDREDS of pending ideas.
+            dayLoop.setTime(horizonEnd.getTime()) // Forces the outer while-loop to terminate
+            break
           }
           // Retry with the fresh batch
           const retryCandidate = await prisma.post.findFirst({
@@ -682,6 +685,10 @@ async function composeAndSchedule(
     return true
   } catch (err) {
     logger.error({ brandId, postId: candidate.id, err }, '[COVERAGE] Auto-compose failed')
+    await prisma.post.update({
+      where: { id: candidate.id },
+      data: { status: 'DRAFT_FAILED' }
+    }).catch(() => {})
     return false
   }
 }
