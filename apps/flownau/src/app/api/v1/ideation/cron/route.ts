@@ -47,11 +47,17 @@ export async function POST(request: NextRequest) {
       select: { language: true },
     })
 
-    const result = await generateContentIdeas({
-      topic,
-      language: brand?.language ?? 'Spanish',
-      recentContent: [],
-    })
+    let result
+    try {
+      result = await generateContentIdeas({
+        topic,
+        language: brand?.language ?? 'Spanish',
+        recentContent: [],
+      })
+    } catch (err: unknown) {
+      await Promise.all(batch.map((c) => markSourceConceptConsumed(c.id)))
+      throw err
+    }
 
     // Mark all concepts in this batch as consumed
     await Promise.all(batch.map((c) => markSourceConceptConsumed(c.id)))
