@@ -527,7 +527,7 @@ function buildTemplateSchemaBlock(
       })
       .join('\n\n')
     const captionLine = buildCaptionInstruction(captionOverride)
-    return `SCENE TEXT SLOTS TO FILL:\n${slotInstructions}\n\nAlso write:\n${captionLine}\n• hashtags — 5–10 relevant hashtags (without # prefix)\n\nRespond ONLY with valid JSON. Never mention @handles.`
+    return `SCENE TEXT SLOTS TO FILL:\n${slotInstructions}\n\nAlso write:\n${captionLine}\n\nRespond ONLY with valid JSON. Never mention @handles.`
   }
 
   if (template.slotSchema) {
@@ -550,7 +550,7 @@ function buildTemplateSchemaBlock(
 
     const captionLine = buildCaptionInstruction(captionOverride)
 
-    return `SLOTS TO FILL:\n${slotBlock}\n${multiSlotRule}\nAlso write:\n${captionLine}\n• hashtags — 5–10 relevant hashtags (without # prefix)\n• brollMood — 1-2 mood/theme keywords for B-roll asset selection\n\nRespond ONLY with valid JSON matching the schema. Never mention @handles.`
+    return `SLOTS TO FILL:\n${slotBlock}\n${multiSlotRule}\nAlso write:\n${captionLine}\n• brollMood — 1-2 mood/theme keywords for B-roll asset selection\n\nRespond ONLY with valid JSON matching the schema. Never mention @handles.`
   }
 
   if (template.contentSchema) {
@@ -678,8 +678,8 @@ function normalizeParagraphs(text: string): string {
       if (!inQuotes && (char === '.' || char === '?' || char === '!')) {
         const nextChar = flat[i + 1]
         if (nextChar === ' ' || nextChar === undefined) {
-          parts.push(current.trim().replace(/\.$/, '')) // strip trailing period only
-          current = ""
+          parts.push(current.trim()) // Removed period deletion here
+          current = ''
           // Skip trailing spaces
           while (flat[i + 1] === ' ') i++
         }
@@ -687,7 +687,7 @@ function normalizeParagraphs(text: string): string {
     }
 
     if (current.trim()) {
-      parts.push(current.trim().replace(/\.$/, ''))
+      parts.push(current.trim()) // Removed period deletion here
     }
 
     sentences.push(...parts.filter(Boolean))
