@@ -56,28 +56,44 @@ export async function selectTemplateForIdea(params: {
 
   if (candidates.length === 0) return null
 
-  // Loose format match: look at sceneType and config.format (if present).
-  const matchesFormat = (t: Template): boolean => {
+  // Two-pass format match to prioritize exact matches (e.g. trial_reel idea -> trial_reel template)
+  // over loose fallback matches.
+  const isExactMatch = (t: Template): boolean => {
+    if (t.format === format) return true
     const configFormat =
       typeof t.config === 'object' && t.config && 'format' in t.config
         ? String((t.config as Record<string, unknown>).format)
         : null
     if (configFormat === format) return true
     if (t.sceneType && t.sceneType === format) return true
-    // Reels vs trial_reels use the same template per Phase 18 decision.
-    if ((format === 'reel' || format === 'trial_reel') && configFormat === 'reel') return true
-    if ((format === 'reel' || format === 'trial_reel') && t.sceneType === 'reel') return true
-    // trial_head_talk uses the same templates as head_talk.
-    if ((format === 'head_talk' || format === 'trial_head_talk') && configFormat === 'head_talk')
-      return true
-    if ((format === 'head_talk' || format === 'trial_head_talk') && t.sceneType === 'head_talk')
-      return true
-    // If a template declares no format, treat it as universal.
-    return !configFormat && !t.sceneType
+    return false
   }
 
-  const filtered = candidates.filter(matchesFormat)
-  const pool = filtered.length > 0 ? filtered : candidates
+  const isLooseMatch = (t: Template): boolean => {
+    // Explicit exclusions: "trial_*" templates are ONLY for their specific formats.
+    if (t.format === 'trial_reel' && format !== 'trial_reel') return false
+    if (t.format === 'trial_head_talk' && format !== 'trial_head_talk') return false
+
+    const configFormat =
+      typeof t.config === 'object' && t.config && 'format' in t.config
+        ? String((t.config as Record<string, unknown>).format)
+        : null
+
+    // Reels vs trial_reels fallback (Phase 18).
+    if (format === 'trial_reel' && (t.format === 'reel' || configFormat === 'reel' || t.sceneType === 'reel')) return true
+    if (format === 'reel' && (t.format === 'reel' || configFormat === 'reel' || t.sceneType === 'reel')) return true
+
+    // Head talk fallback.
+    if (format === 'trial_head_talk' && (t.format === 'head_talk' || configFormat === 'head_talk' || t.sceneType === 'head_talk')) return true
+    if (format === 'head_talk' && (t.format === 'head_talk' || configFormat === 'head_talk' || t.sceneType === 'head_talk')) return true
+
+    // If a template declares no format, treat it as universal.
+    return !t.format && !configFormat && !t.sceneType
+  }
+
+  const exactMatches = candidates.filter(isExactMatch)
+  const looseMatches = candidates.filter(isLooseMatch)
+  const pool = exactMatches.length > 0 ? exactMatches : (looseMatches.length > 0 ? looseMatches : candidates)
 
   // Usage-weighted: count recent Post usage per template and prefer the least-used.
   const recentWindow = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
