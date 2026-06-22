@@ -389,6 +389,7 @@ async function fillCalendarForBrand(
   let pastRescheduled = 0
   let skippedByBatchRule = 0
   let notifyUserApproveIdeas = false
+  let consecutiveDraftFailures = 0
 
   // Build a timeline of all scheduled posts to track batch usage chronologically
   const timeline: { time: number; batchId: string | null }[] = []
@@ -511,11 +512,19 @@ async function fillCalendarForBrand(
         if (candidate) {
           const filled = await composeAndSchedule(brandId, candidate, format, targetTime, deck)
           if (filled) {
+            consecutiveDraftFailures = 0
             timeline.push({ time: targetTime.getTime(), batchId: candidate.generationBatchId })
             timeline.sort((a, b) => a.time - b.time)
             postsFilled++
             ;(occupiedByDate[localDate] ??= []).push(targetTime.getTime())
             countByDate[localDate] = (countByDate[localDate] ?? 0) + 1
+          } else {
+            consecutiveDraftFailures++
+            if (consecutiveDraftFailures >= 3) {
+              logger.error({ brandId }, '[COVERAGE] Too many draft failures, aborting.')
+              dayLoop.setTime(horizonEnd.getTime())
+              break
+            }
           }
           continue
         }

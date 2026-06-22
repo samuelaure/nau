@@ -1,0 +1,30 @@
+{
+  "brandName": "Nombre de la Marca Aquí",
+  "baseBlock": "Eres un experto en... \n\nMARCA: ... \n\nOBJETIVO: ...",
+  "presentationBlock": "[PRESENTACIÓN] \n\nSoy ... y te ayudo a ...",
+  "hooks": [
+    {
+      "index": 1,
+      "name": "Hook 1 Name",
+      "systemPrompt": "Instrucciones específicas para el prompt de texto del video del Hook 1...",
+      "captionPrompt": "Instrucciones específicas para el caption del Hook 1...",
+      "minCap": 150,
+      "maxCap": 200,
+      "texts": [
+        "Contenido de ejemplo para el único bloque de texto del hook 1"
+      ]
+    },
+    {
+      "index": 2,
+      "name": "Hook 2 Name",
+      "systemPrompt": "Instrucciones específicas para el prompt de texto del video del Hook 2...",
+      "captionPrompt": "Instrucciones específicas para el caption del Hook 2...",
+      "minCap": 150,
+      "maxCap": 200,
+      "texts": [
+        "Contenido para el primer texto del hook 2",
+        "Contenido para el segundo texto del hook 2"
+      ]
+    }
+  ]
+}

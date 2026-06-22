@@ -29,7 +29,6 @@ export async function GET(req: NextRequest) {
       optimizationStatus: true,
     },
     orderBy: { createdAt: 'desc' },
-    take: 48,
   })
 
   return NextResponse.json({ assets })
