@@ -28,11 +28,19 @@ export async function verifyAccessToken(token: string, secret: string): Promise<
   }
 }
 
-export async function verifyServiceToken(token: string, secret: string): Promise<ServiceTokenPayload> {
+export async function verifyServiceToken(
+  token: string,
+  secret: string,
+  expectedAudience?: string,
+): Promise<ServiceTokenPayload> {
   try {
     const { payload } = await jwtVerify(token, getSecret(secret))
+    if (expectedAudience && payload.aud !== expectedAudience) {
+      throw new AuthError('Service token audience mismatch', 'INVALID')
+    }
     return payload as unknown as ServiceTokenPayload
   } catch (err: unknown) {
+    if (err instanceof AuthError) throw err
     const message = err instanceof Error ? err.message : String(err)
     if (message.includes('expired')) {
       throw new AuthError('Service token expired', 'EXPIRED')
