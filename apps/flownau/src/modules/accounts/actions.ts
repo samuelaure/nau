@@ -20,7 +20,7 @@ const SocialProfileSchema = z.object({
   username: z
     .string()
     .min(1, 'Username is required')
-    .transform((val) => val.replace(/^@/, '')),
+    .transform((val) => val.replace(/^@/, '').toLowerCase()),
   accessToken: z.string().min(1, 'Access Token is required'),
   platformId: z.string().min(1, 'Platform ID is required'),
 })
@@ -28,21 +28,35 @@ const SocialProfileSchema = z.object({
 /**
  * Sync a social profile to nauthenticity so it's discoverable from nauthenticity's content section
  */
-async function syncToNauthenticity(username: string, profileImageUrl: string | null = null) {
+async function syncToNauthenticity(
+  username: string,
+  profileImageUrl: string | null = null,
+  brandId?: string,
+  workspaceId?: string,
+) {
   try {
     const nauthenticityUrl = process.env.NAUTHENTICITY_URL || 'http://localhost:3007'
-    const serviceKey = process.env.NAU_SERVICE_KEY || ''
+    const authSecret = process.env.AUTH_SECRET
+    if (!authSecret) {
+      console.warn('[SyncToNauthenticity] AUTH_SECRET missing — cannot sync')
+      return
+    }
+
+    const { signServiceToken } = await import('@nau/auth')
+    const token = await signServiceToken({ secret: authSecret, iss: 'flownau', aud: 'nauthenticity' })
 
     await fetch(`${nauthenticityUrl}/api/v1/social-profiles/sync`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Nau-Service-Key': serviceKey,
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
         username,
         platform: 'instagram',
         profileImageUrl,
+        brandId,
+        workspaceId,
       }),
     }).catch((err) => {
       // Log but don't fail — sync to nauthenticity is nice-to-have
@@ -340,7 +354,8 @@ export async function addSocialProfile(formData: FormData) {
   })
 
   // Sync profile to nauthenticity so it's discoverable there
-  if (profile.username) await syncToNauthenticity(profile.username, profile.profileImage)
+  if (profile.username)
+    await syncToNauthenticity(profile.username, profile.profileImage, brandId, workspaceId)
 
   await syncSocialProfile(profile.id)
   revalidatePath('/dashboard')

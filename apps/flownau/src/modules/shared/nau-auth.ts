@@ -17,7 +17,7 @@ export async function validateServiceToken(request: Request): Promise<boolean> {
   if (!token) return false
 
   try {
-    await verifyServiceToken(token, secret)
+    await verifyServiceToken(token, secret, 'flownau')
     return true
   } catch (err) {
     if (err instanceof AuthError) {

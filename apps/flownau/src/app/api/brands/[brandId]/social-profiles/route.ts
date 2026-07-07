@@ -57,6 +57,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ brandId
       profileImage,
       nauthenticityProfileId,
       syncedFromNauthenticity = false,
+      workspaceId: incomingWorkspaceId,
     } = body as {
       username?: string
       platform?: string
@@ -64,6 +65,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ brandId
       profileImage?: string | null
       nauthenticityProfileId?: string | null
       syncedFromNauthenticity?: boolean
+      workspaceId?: string | null
     }
 
     if (!username) {
@@ -99,7 +101,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ brandId
       return NextResponse.json({ profile, deduped: true }, { status: 200 })
     }
 
-    const brand = await prisma.brand.findUnique({ where: { id: brandId } })
+    let brand = await prisma.brand.findUnique({ where: { id: brandId } })
+
+    // Service-to-service sync (nauthenticity -> flownau) can arrive before flownau has
+    // its own local shadow Brand row for a brand created elsewhere. Auto-create it so the
+    // sync doesn't silently fail; user-initiated requests still require an existing brand.
+    if (!brand && isServiceCall && incomingWorkspaceId) {
+      brand = await prisma.brand.create({
+        data: { id: brandId, workspaceId: incomingWorkspaceId },
+      })
+    }
+
     if (!brand?.workspaceId) {
       return NextResponse.json({ error: 'Brand not found or invalid workspace' }, { status: 404 })
     }
