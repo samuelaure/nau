@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import React from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { getBrandOwnedProfiles, getAccount, getProfileImageUrl } from '../lib/api';
+import { getBrandOwnedProfiles, getAccount, getProfileImageUrl, addOwnedProfile } from '../lib/api';
 import { Database, TrendingUp } from 'lucide-react';
 import { PostGrid } from '../components/PostGrid';
 import { ScrapeModal } from '../components/ScrapeModal';
@@ -31,21 +31,12 @@ export const BrandContentView = () => {
     if (!usernameToLink.trim() || !brandId) return;
     setIsLinking(true);
     try {
-      const workspaceId = location.pathname.match(/\/workspaces\/([^/]+)/)?.[1];
-      // 1. Sync to nauthenticity
-      await import('../lib/api').then(api => api.syncSocialProfile({
-        username: usernameToLink.trim(),
-        brandId,
-        workspaceId,
-      }));
-      // 2. Sync to flownau
-      await import('../lib/api').then(api => api.syncProfilesToFlownau(brandId));
-      
+      await addOwnedProfile(brandId, usernameToLink.trim());
       setUsernameToLink('');
       refetchProfiles();
     } catch (err) {
       console.error('Failed to link profile:', err);
-      alert('Failed to link profile. Ensure the brand exists and is accessible.');
+      alert('Failed to link profile. Please check the username and try again.');
     } finally {
       setIsLinking(false);
     }
@@ -177,7 +168,7 @@ export const BrandContentView = () => {
         <form onSubmit={handleLinkProfile} style={{ display: 'flex', gap: '0.5rem' }}>
           <input
             type="text"
-            placeholder="@username"
+            placeholder="username"
             value={usernameToLink}
             onChange={(e) => setUsernameToLink(e.target.value.replace(/^@/, ''))}
             style={{

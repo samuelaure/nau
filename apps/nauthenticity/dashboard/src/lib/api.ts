@@ -601,16 +601,6 @@ export const saveBrandContext = async (brandId: string, content: string) => {
   return data;
 };
 
-export const syncSocialProfile = async (payload: { username: string; brandId?: string; workspaceId?: string }) => {
-  const { data } = await api.post(`/social-profiles/sync`, payload);
-  return data;
-};
-
-export const syncProfilesToFlownau = async (brandId: string) => {
-  const { data } = await api.post(`/brands/${brandId}/social-profiles/sync-to-flownau`);
-  return data;
-};
-
 export const dispatchSourceConcept = async (
   brandId: string,
   itemType: 'post' | 'profile' | 'voicenote' | 'youtube' | 'blog',

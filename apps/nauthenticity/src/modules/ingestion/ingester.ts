@@ -1,6 +1,7 @@
 import { runInstagramScraper } from '../../services/apify.service';
 import { prisma } from '../../modules/shared/prisma';
 import { upsertSocialProfile } from '../../modules/shared/upsert-social-profile';
+import { sanitiseUsername } from '../../modules/shared/sanitize-username';
 import { downloadQueue } from '../../queues/download.queue';
 import { logger } from '../../utils/logger';
 
@@ -181,13 +182,15 @@ export const ingestProfile = async (
 
       // 1. Identify all collaborators (Owner + Co-authors + Tagged)
       const collaborators: any[] = [];
-      const primaryOwner = item.ownerUsername || item.accountUsername || item.account_username;
+      const rawPrimaryOwner = item.ownerUsername || item.accountUsername || item.account_username;
+      const primaryOwner = rawPrimaryOwner ? sanitiseUsername(rawPrimaryOwner) : rawPrimaryOwner;
 
       // Joint Authors (Official collab)
       const coauthors = item.coauthorProducers || item.coauthor_producers || [];
       if (Array.isArray(coauthors)) {
         coauthors.forEach((c: any) => {
-          const u = c.username || c.user?.username;
+          const rawU = c.username || c.user?.username;
+          const u = rawU ? sanitiseUsername(rawU) : rawU;
           const p = c.profilePicUrl || c.profile_pic_url || c.user?.profilePicUrl;
           if (u && u !== username) {
             collaborators.push({ username: u, profilePicUrl: p, role: 'co-author' });

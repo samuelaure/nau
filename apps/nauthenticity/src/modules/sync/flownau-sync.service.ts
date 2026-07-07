@@ -36,6 +36,7 @@ export class FlownauSyncService {
         platform: true,
         externalId: true,
         profileImageUrl: true,
+        owner: { select: { workspaceId: true } },
       },
     })
 
@@ -59,6 +60,7 @@ export class FlownauSyncService {
           profileImage: profile.profileImageUrl ?? null,
           nauthenticityProfileId: profile.id,
           syncedFromNauthenticity: true,
+          workspaceId: profile.owner?.workspaceId || undefined,
         },
         {
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

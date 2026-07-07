@@ -33,7 +33,7 @@ export class AnyAuthGuard implements CanActivate {
       return true
     } catch {
       try {
-        await verifyServiceToken(token, secret)
+        await verifyServiceToken(token, secret, 'nauthenticity')
         return true
       } catch (err) {
         if (err instanceof AuthError) throw new UnauthorizedException('Invalid token')

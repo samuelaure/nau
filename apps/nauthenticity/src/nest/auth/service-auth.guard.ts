@@ -17,7 +17,11 @@ export class ServiceAuthGuard implements CanActivate {
     if (!token) throw new UnauthorizedException('Missing service token')
 
     try {
-      req.serviceClient = await verifyServiceToken(token, this.config.getOrThrow<string>('AUTH_SECRET'))
+      req.serviceClient = await verifyServiceToken(
+        token,
+        this.config.getOrThrow<string>('AUTH_SECRET'),
+        'nauthenticity',
+      )
       return true
     } catch (err) {
       if (err instanceof AuthError) throw new UnauthorizedException(err.message)
