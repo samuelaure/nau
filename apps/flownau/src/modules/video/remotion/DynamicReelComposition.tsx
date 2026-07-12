@@ -2,7 +2,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
   useCurrentFrame,
   interpolate,
-  Video,
+  OffthreadVideo,
   Loop,
   Sequence,
   Audio,
@@ -227,15 +227,23 @@ function BrollBackground({
   if (!videoUrl) {
     return <div style={{ position: 'absolute', inset: 0, background: '#111' }} />
   }
+  const video = (
+    <OffthreadVideo
+      src={videoUrl}
+      startFrom={startFrom ?? 0}
+      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+      muted
+    />
+  )
   return (
     <>
-      <Video
-        src={videoUrl}
-        startFrom={startFrom ?? 0}
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-        muted
-        loop
-      />
+      {/* OffthreadVideo has no native `loop` attribute (unlike <Video>) — looping
+          requires wrapping in <Loop>, which needs the source's own duration in frames. */}
+      {durationInFrames ? (
+        <Loop durationInFrames={durationInFrames}>{video}</Loop>
+      ) : (
+        video
+      )}
       <div
         style={{
           position: 'absolute',

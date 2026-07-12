@@ -120,6 +120,7 @@ async function resolveDynamicReelScenes(
         ...scene,
         resolvedBackgroundVideoUrl: pick?.url ?? null,
         resolvedBrollStartFrom: startFrom,
+        backgroundVideoDurationSecs: pick?.duration ?? scene.backgroundVideoDurationSecs ?? null,
       })
     }
   }
