@@ -58,6 +58,8 @@ export interface Brand {
     workspaceId: string;
     name: string;
     handle: string;
+    timezone?: string;
+    isActive?: boolean;
     createdAt: string;
     updatedAt: string;
 }
@@ -94,10 +96,32 @@ export interface UpdateWorkspaceDto {
 export interface CreateBrandDto {
     name: string;
     handle?: string;
+    timezone?: string;
 }
 export interface UpdateBrandDto {
     name?: string;
     handle?: string;
+}
+export interface Project {
+    id: string;
+    workspaceId: string;
+    brandId?: string | null;
+    name: string;
+    description?: string | null;
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+export interface CreateProjectDto {
+    name: string;
+    description?: string;
+    brandId?: string;
+}
+export interface UpdateProjectDto {
+    name?: string;
+    description?: string;
+    brandId?: string | null;
+    isActive?: boolean;
 }
 export interface CreateSocialProfileDto {
     platform: SocialPlatform;
@@ -164,11 +188,36 @@ export interface CreateBlockDto {
     type: string;
     parentId?: string | null;
     properties: Record<string, unknown>;
+    workspaceId?: string;
+    userId?: string;
 }
 export interface UpdateBlockDto {
     type?: string;
     parentId?: string | null;
     properties?: Record<string, unknown>;
+}
+export interface Tag {
+    id: string;
+    workspaceId: string;
+    name: string;
+    color: string | null;
+    parentId: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+export interface CreateTagDto {
+    name: string;
+    parentId?: string | null;
+    color?: string;
+}
+export interface UpdateTagDto {
+    name?: string;
+    parentId?: string | null;
+    color?: string | null;
+}
+export interface Schedule {
+    startDate: string;
+    rrule?: string;
 }
 export interface PaginatedResponse<T> {
     data: T[];
