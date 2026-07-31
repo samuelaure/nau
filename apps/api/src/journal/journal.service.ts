@@ -179,7 +179,7 @@ LENGTH: ${periodType === 'daily' ? 'Brief (1-2 paragraphs)' : periodType === 'ye
     }
 
     // 5. Save as Block
-    const newSummaryBlock = await this.blocksService.create({
+    const newSummaryBlock = await this.blocksService.createInternal({
       type: 'journal_summary',
       properties: {
         periodType,
@@ -277,7 +277,7 @@ LENGTH: ${periodType === 'daily' ? 'Brief (1-2 paragraphs)' : periodType === 'ye
 
     this.logger.log(`Saving direct summary of type ${type} for period ${periodType}`);
 
-    const newSummaryBlock = await this.blocksService.create({
+    const newSummaryBlock = await this.blocksService.createInternal({
       type, // 'journal_summary' or 'content_brief'
       properties: {
         periodType,

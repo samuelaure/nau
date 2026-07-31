@@ -5,10 +5,20 @@ import { Block } from '@prisma/client';
 import { CreateBlockDto } from './dto/create-block.dto';
 import { UpdateBlockDto } from './dto/update-block.dto';
 import { FindBlocksQueryDto } from './dto/find-blocks-query.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import type { AccessTokenPayload } from '@nau/types';
 
 describe('BlocksController', () => {
   let controller: BlocksController;
   let service: BlocksService;
+
+  const user = {
+    sub: 'user-1',
+    workspaceId: 'ws-1',
+    role: 'OWNER',
+    iat: 0,
+    exp: 0,
+  } as AccessTokenPayload;
 
   const mockBlock = {
     id: 'block-1',
@@ -36,10 +46,15 @@ describe('BlocksController', () => {
             remove: jest.fn(),
             findOne: jest.fn(),
             getRemindableBlocks: jest.fn(),
+            addTag: jest.fn(),
+            removeTag: jest.fn(),
           },
         },
       ],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<BlocksController>(BlocksController);
     service = module.get<BlocksService>(BlocksService);
@@ -50,53 +65,73 @@ describe('BlocksController', () => {
   });
 
   describe('create', () => {
-    it('should call blocksService.create with the correct DTO', async () => {
+    it('should call blocksService.create with the caller and the DTO', async () => {
       const createDto: CreateBlockDto = { type: 'note', properties: {} };
       jest.spyOn(service, 'create').mockResolvedValue(mockBlock as any);
-      await controller.create(createDto);
-      expect(service.create).toHaveBeenCalledWith(createDto);
+      await controller.create(user, createDto);
+      expect(service.create).toHaveBeenCalledWith(user, createDto);
     });
   });
 
   describe('findAll', () => {
-    it('should call blocksService.findAll with the correct query', async () => {
+    it('should scope the query to the calling user', async () => {
       const queryDto: FindBlocksQueryDto = { type: 'note' };
       jest.spyOn(service, 'findAll').mockResolvedValue([mockBlock] as any);
-      await controller.findAll(queryDto);
-      expect(service.findAll).toHaveBeenCalledWith(queryDto);
+      await controller.findAll(user, queryDto);
+      expect(service.findAll).toHaveBeenCalledWith(user.sub, queryDto);
     });
   });
 
   describe('update', () => {
-    it('should call blocksService.update with the correct ID and DTO', async () => {
+    it('should call blocksService.update with the caller, ID and DTO', async () => {
       const updateDto: UpdateBlockDto = { properties: { text: 'updated' } };
       jest.spyOn(service, 'update').mockResolvedValue(mockBlock as any);
-      await controller.update('block-1', updateDto);
-      expect(service.update).toHaveBeenCalledWith('block-1', updateDto);
+      await controller.update(user, 'block-1', updateDto);
+      expect(service.update).toHaveBeenCalledWith(user.sub, 'block-1', updateDto);
     });
   });
 
   describe('remove', () => {
-    it('should call blocksService.remove with the correct ID', async () => {
+    it('should call blocksService.remove with the caller and ID', async () => {
       jest.spyOn(service, 'remove').mockResolvedValue(mockBlock as any);
-      await controller.remove('block-1');
-      expect(service.remove).toHaveBeenCalledWith('block-1');
+      await controller.remove(user, 'block-1');
+      expect(service.remove).toHaveBeenCalledWith(user.sub, 'block-1');
     });
   });
 
   describe('findOne', () => {
-    it('should call blocksService.findOne with the correct ID', async () => {
+    it('should call blocksService.findOne with the caller and ID', async () => {
       jest.spyOn(service, 'findOne').mockResolvedValue(mockBlock as any);
-      await controller.findOne('block-1');
-      expect(service.findOne).toHaveBeenCalledWith('block-1');
+      await controller.findOne(user, 'block-1');
+      expect(service.findOne).toHaveBeenCalledWith(user.sub, 'block-1');
     });
   });
 
   describe('getRemindableBlocks', () => {
-    it('should call blocksService.getRemindableBlocks', async () => {
-      jest.spyOn(service, 'getRemindableBlocks').mockResolvedValue([mockBlock] as any);
-      await controller.getRemindableBlocks();
-      expect(service.getRemindableBlocks).toHaveBeenCalled();
+    it('should scope remindable blocks to the calling user', async () => {
+      jest
+        .spyOn(service, 'getRemindableBlocks')
+        .mockResolvedValue([mockBlock] as any);
+      await controller.getRemindableBlocks(user);
+      expect(service.getRemindableBlocks).toHaveBeenCalledWith(user.sub);
+    });
+  });
+
+  describe('tags', () => {
+    it('should scope addTag to the calling user', async () => {
+      jest.spyOn(service, 'addTag').mockResolvedValue({} as any);
+      await controller.addTag(user, 'block-1', 'tag-1');
+      expect(service.addTag).toHaveBeenCalledWith(user.sub, 'block-1', 'tag-1');
+    });
+
+    it('should scope removeTag to the calling user', async () => {
+      jest.spyOn(service, 'removeTag').mockResolvedValue({} as any);
+      await controller.removeTag(user, 'block-1', 'tag-1');
+      expect(service.removeTag).toHaveBeenCalledWith(
+        user.sub,
+        'block-1',
+        'tag-1',
+      );
     });
   });
 });

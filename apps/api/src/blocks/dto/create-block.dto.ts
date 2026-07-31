@@ -16,8 +16,4 @@ export class CreateBlockDto implements ICreateBlockDto {
   @IsString()
   @IsOptional()
   workspaceId?: string;
-
-  @IsString()
-  @IsOptional()
-  userId?: string;
 }

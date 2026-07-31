@@ -68,7 +68,7 @@ export class TriageService {
       }
 
       // 1. Fetch context — projects + brand DNA
-      const recentBlocks = await this.blocksService.findAll({});
+      const recentBlocks = await this.blocksService.findAllInternal({});
 
       const activeProjects = recentBlocks
         .filter(b => b.type === 'project' && (b.properties as any)?.status !== 'done')
@@ -220,7 +220,7 @@ OUTPUT: Return valid JSON matching the schema.`,
         properties.flownauSyncStatus = 'pending';
       }
 
-      const block = await this.blocksService.create({ type, properties, workspaceId });
+      const block = await this.blocksService.createInternal({ type, properties, workspaceId });
 
       // Forward content_idea blocks with a resolved brand to flownaŭ
       if (segment.category === 'content_idea' && properties.brandId) {
@@ -232,12 +232,12 @@ OUTPUT: Return valid JSON matching the schema.`,
             await this.flownauService.ingestIdeas(accountId, [
               { text: segment.text, sourceRef: block.id, aiLinked: properties.aiLinked },
             ]);
-            await this.blocksService.update(block.id, {
+            await this.blocksService.updateInternal(block.id, {
               properties: { flownauSyncStatus: 'success' },
             });
           } else {
             this.logger.warn(`[Flownau-Integration] No flownaŭ account found for brandId ${properties.brandId}. Idea not forwarded.`);
-            await this.blocksService.update(block.id, {
+            await this.blocksService.updateInternal(block.id, {
               properties: { flownauSyncStatus: 'no_account' },
             });
           }
@@ -246,7 +246,7 @@ OUTPUT: Return valid JSON matching the schema.`,
           this.logger.error(
             `[Flownau-Integration-Error] Failed to ingest idea block ${block.id}: ${msg}`,
           );
-          await this.blocksService.update(block.id, {
+          await this.blocksService.updateInternal(block.id, {
             properties: { flownauSyncStatus: 'error' },
           });
         }
@@ -257,7 +257,7 @@ OUTPUT: Return valid JSON matching the schema.`,
 
     // Save Journal Summary
     if (result.journalSummary) {
-      const journalBlock = await this.blocksService.create({
+      const journalBlock = await this.blocksService.createInternal({
         type: 'journal_entry',
         properties: {
           summary: result.journalSummary,
@@ -310,7 +310,7 @@ Write in the same language as the input.`,
       this.logger.error('LLM failed for journal-only path, using raw text', err);
     }
 
-    const journalBlock = await this.blocksService.create({
+    const journalBlock = await this.blocksService.createInternal({
       type: 'journal_entry',
       properties: {
         summary: journalText,
@@ -350,7 +350,7 @@ Write in the same language as the input.`,
   }
 
   async retroprocess(userId: string) {
-    const captures = await this.blocksService.findAll({ type: 'voice_capture' });
+    const captures = await this.blocksService.findAllInternal({ type: 'voice_capture' });
     
     const pendingCaptures = captures.filter(b => {
       const props = b.properties as any;
@@ -364,7 +364,7 @@ Write in the same language as the input.`,
       try {
         const text = (capture.properties as any)?.text;
         if (!text) {
-           await this.blocksService.update(capture.id, {
+           await this.blocksService.updateInternal(capture.id, {
              properties: { triageStatus: 'error', error: 'No text found' }
            });
            continue;
@@ -372,14 +372,14 @@ Write in the same language as the input.`,
 
         const result = await this.processRawText(text, userId, capture.id);
         
-        await this.blocksService.update(capture.id, {
+        await this.blocksService.updateInternal(capture.id, {
            properties: { triageStatus: 'processed' }
         });
 
         results.push({ id: capture.id, success: true, blocksCreated: result.blocks.length });
       } catch (error) {
         this.logger.error(`Failed to retroprocess capture ${capture.id}`, error);
-        await this.blocksService.update(capture.id, {
+        await this.blocksService.updateInternal(capture.id, {
            properties: { triageStatus: 'error', error: String(error) }
         });
         results.push({ id: capture.id, success: false, error: String(error) });

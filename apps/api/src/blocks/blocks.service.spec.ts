@@ -3,14 +3,22 @@ import { BlocksService } from './blocks.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma, Block } from '@prisma/client';
 import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
-import { NotFoundException } from '@nestjs/common';
-import { CreateBlockDto } from './dto/create-block.dto';
+import { NotFoundException, ForbiddenException } from '@nestjs/common';
 import { UpdateBlockDto } from './dto/update-block.dto';
 import { FindBlocksQueryDto } from './dto/find-blocks-query.dto';
+import type { AccessTokenPayload, CreateBlockDto } from '@nau/types';
 
 describe('BlocksService', () => {
   let service: BlocksService;
   let prisma: DeepMockProxy<PrismaService>;
+
+  const user = {
+    sub: 'user-1',
+    workspaceId: 'ws-1',
+    role: 'OWNER',
+    iat: 0,
+    exp: 0,
+  } as AccessTokenPayload;
 
   const mockBlock: Block = {
     id: 'block-1',
@@ -23,8 +31,20 @@ describe('BlocksService', () => {
     deletedAt: null,
     source: null,
     sourceRef: null,
-    workspaceId: null,
+    workspaceId: 'ws-1',
     userId: null,
+  };
+
+  /** Makes user-1 a member of ws-1 and nothing else. */
+  const asMemberOfWs1 = () => {
+    prisma.workspaceMember.findUnique.mockImplementation((args: any) =>
+      args.where.userId_workspaceId.workspaceId === 'ws-1'
+        ? ({ userId: 'user-1', workspaceId: 'ws-1', role: 'OWNER' } as any)
+        : (null as any),
+    );
+    prisma.workspaceMember.findMany.mockResolvedValue([
+      { workspaceId: 'ws-1' },
+    ] as any);
   };
 
   beforeEach(async () => {
@@ -40,13 +60,14 @@ describe('BlocksService', () => {
 
     service = module.get<BlocksService>(BlocksService);
     prisma = module.get(PrismaService);
+    asMemberOfWs1();
   });
 
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
 
-  describe('create', () => {
+  describe('createInternal', () => {
     const createBlockDto: CreateBlockDto = {
       type: 'note',
       properties: { text: 'New note' },
@@ -59,7 +80,7 @@ describe('BlocksService', () => {
         properties: { text: 'New note', sortOrder: 1 } as Prisma.JsonObject,
       });
 
-      const result = await service.create(createBlockDto);
+      const result = await service.createInternal(createBlockDto);
 
       expect(prisma.block.create).toHaveBeenCalledWith({
         data: {
@@ -90,7 +111,7 @@ describe('BlocksService', () => {
         properties: { text: 'New note', sortOrder: 6 } as Prisma.JsonObject,
       });
 
-      const result = await service.create(createBlockDto);
+      const result = await service.createInternal(createBlockDto);
 
       expect(prisma.block.create).toHaveBeenCalledWith({
         data: {
@@ -103,33 +124,59 @@ describe('BlocksService', () => {
     });
   });
 
-  describe('findAll', () => {
+  describe('create', () => {
+    it('should stamp the caller as owner and scope to their workspace', async () => {
+      prisma.block.findMany.mockResolvedValueOnce([]);
+      prisma.block.create.mockResolvedValueOnce(mockBlock);
+
+      await service.create(user, { type: 'note', properties: { text: 'hi' } });
+
+      expect(prisma.block.create).toHaveBeenCalledWith({
+        data: {
+          type: 'note',
+          properties: { text: 'hi', sortOrder: 1 },
+          workspace: { connect: { id: 'ws-1' } },
+          userId: 'user-1',
+        },
+      });
+    });
+
+    it('should compute sortOrder among siblings of the same workspace only', async () => {
+      prisma.block.findMany.mockResolvedValueOnce([]);
+      prisma.block.create.mockResolvedValueOnce(mockBlock);
+
+      await service.create(user, { type: 'note', properties: {} });
+
+      expect(prisma.block.findMany).toHaveBeenCalledWith({
+        where: { parentId: null, type: 'note', workspaceId: 'ws-1' },
+      });
+    });
+
+    it('should reject a workspace the caller does not belong to', async () => {
+      await expect(
+        service.create(user, {
+          type: 'note',
+          properties: {},
+          workspaceId: 'ws-other',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.block.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('findAllInternal', () => {
     it('should return all blocks filtered by type and excluding trash status', async () => {
-      const blocks: Block[] = [
+      prisma.block.findMany.mockResolvedValueOnce([
         {
           ...mockBlock,
           id: 'b1',
           type: 'action',
           properties: { status: 'inbox' } as Prisma.JsonObject,
         },
-        {
-          ...mockBlock,
-          id: 'b2',
-          type: 'note',
-          properties: { status: 'inbox' } as Prisma.JsonObject,
-        },
-        {
-          ...mockBlock,
-          id: 'b3',
-          type: 'action',
-          properties: { status: 'trash' } as Prisma.JsonObject,
-        },
-      ];
-      // Mock with the expected filtered array
-      prisma.block.findMany.mockResolvedValueOnce([blocks[0]!]);
+      ]);
 
       const query: FindBlocksQueryDto = { type: 'action' };
-      const result = await service.findAll(query);
+      const result = await service.findAllInternal(query);
 
       expect(prisma.block.findMany).toHaveBeenCalledWith({
         where: {
@@ -138,59 +185,65 @@ describe('BlocksService', () => {
           properties: { path: ['status'], not: 'trash' },
         },
       });
-      expect(result).toEqual([
-        {
-          ...mockBlock,
-          id: 'b1',
-          type: 'action',
-          properties: { status: 'inbox' } as Prisma.JsonObject,
-        },
-      ]);
+      expect(result.map((b) => b.id)).toEqual(['b1']);
     });
 
     it('should filter by specific status', async () => {
-      const blocks: Block[] = [
-        {
-          ...mockBlock,
-          id: 'b1',
-          type: 'action',
-          properties: { status: 'inbox' } as Prisma.JsonObject,
-        },
-        {
-          ...mockBlock,
-          id: 'b2',
-          type: 'note',
-          properties: { status: 'inbox' } as Prisma.JsonObject,
-        },
+      prisma.block.findMany.mockResolvedValueOnce([
         {
           ...mockBlock,
           id: 'b3',
           type: 'action',
           properties: { status: 'completed' } as Prisma.JsonObject,
         },
-      ];
-      // Mock with the expected filtered array
-      prisma.block.findMany.mockResolvedValueOnce([blocks[2]!]);
-      const query: FindBlocksQueryDto = { status: 'completed' };
-      const result = await service.findAll(query);
+      ]);
+
+      const result = await service.findAllInternal({ status: 'completed' });
+
       expect(prisma.block.findMany).toHaveBeenCalledWith({
         where: {
           deletedAt: null,
           properties: { path: ['status'], equals: 'completed' },
         },
       });
-      expect(result).toEqual([
-        {
-          ...mockBlock,
-          id: 'b3',
+      expect(result.map((b) => b.id)).toEqual(['b3']);
+    });
+  });
+
+  describe('findAll', () => {
+    it('should restrict results to the workspaces the caller belongs to', async () => {
+      prisma.block.findMany.mockResolvedValueOnce([mockBlock]);
+
+      await service.findAll(user.sub, { type: 'action' });
+
+      expect(prisma.block.findMany).toHaveBeenCalledWith({
+        where: {
+          deletedAt: null,
+          workspaceId: { in: ['ws-1'] },
           type: 'action',
-          properties: { status: 'completed' } as Prisma.JsonObject,
+          properties: { path: ['status'], not: 'trash' },
         },
-      ]);
+      });
+    });
+
+    it('should reject an explicit workspace the caller does not belong to', async () => {
+      await expect(
+        service.findAll(user.sub, { workspaceId: 'ws-other' }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.block.findMany).not.toHaveBeenCalled();
+    });
+
+    it('should return nothing for a user with no memberships', async () => {
+      prisma.workspaceMember.findMany.mockResolvedValueOnce([] as any);
+
+      const result = await service.findAll('stranger', {});
+
+      expect(result).toEqual([]);
+      expect(prisma.block.findMany).not.toHaveBeenCalled();
     });
 
     it('should sort blocks correctly when dates are present', async () => {
-      const blocks: Block[] = [
+      prisma.block.findMany.mockResolvedValueOnce([
         {
           ...mockBlock,
           id: 'b1',
@@ -206,11 +259,45 @@ describe('BlocksService', () => {
           id: 'b3',
           properties: { date: '2025-08-06' } as Prisma.JsonObject,
         },
-      ];
-      // Mock with the unsorted array, as the service is responsible for sorting
-      prisma.block.findMany.mockResolvedValueOnce(blocks);
-      const result = await service.findAll({});
+      ]);
+
+      const result = await service.findAll(user.sub, {});
       expect(result.map((b) => b.id)).toEqual(['b2', 'b3', 'b1']);
+    });
+  });
+
+  describe('assertBlockAccess', () => {
+    it('should reject a block belonging to another workspace', async () => {
+      prisma.block.findUnique.mockResolvedValueOnce({
+        ...mockBlock,
+        workspaceId: 'ws-other',
+      });
+
+      await expect(
+        service.assertBlockAccess(user.sub, 'block-1'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should reject an orphan block with no workspace', async () => {
+      prisma.block.findUnique.mockResolvedValueOnce({
+        ...mockBlock,
+        workspaceId: null,
+      });
+
+      await expect(
+        service.assertBlockAccess(user.sub, 'block-1'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw NotFoundException for a soft deleted block', async () => {
+      prisma.block.findUnique.mockResolvedValueOnce({
+        ...mockBlock,
+        deletedAt: new Date(),
+      });
+
+      await expect(
+        service.assertBlockAccess(user.sub, 'block-1'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -226,7 +313,7 @@ describe('BlocksService', () => {
         properties: { text: 'Updated note' } as Prisma.JsonObject,
       });
 
-      const result = await service.update('block-1', updateBlockDto);
+      const result = await service.update(user.sub, 'block-1', updateBlockDto);
 
       expect(prisma.block.update).toHaveBeenCalledWith({
         where: { id: 'block-1' },
@@ -238,19 +325,20 @@ describe('BlocksService', () => {
     it('should throw NotFoundException if block does not exist', async () => {
       prisma.block.findUnique.mockResolvedValueOnce(null);
       await expect(
-        service.update('non-existent-id', updateBlockDto),
+        service.update(user.sub, 'non-existent-id', updateBlockDto),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should update a block type', async () => {
-      const dto: UpdateBlockDto = { type: 'action' };
       prisma.block.findUnique.mockResolvedValueOnce(mockBlock);
       prisma.block.update.mockResolvedValueOnce({
         ...mockBlock,
         type: 'action',
       });
 
-      const result = await service.update('block-1', dto);
+      const result = await service.update(user.sub, 'block-1', {
+        type: 'action',
+      });
 
       expect(prisma.block.update).toHaveBeenCalledWith({
         where: { id: 'block-1' },
@@ -264,7 +352,8 @@ describe('BlocksService', () => {
     it('should soft delete a block successfully', async () => {
       prisma.block.findUnique.mockResolvedValueOnce(mockBlock);
       prisma.block.update.mockResolvedValueOnce(mockBlock);
-      const result = await service.remove('block-1');
+
+      const result = await service.remove(user.sub, 'block-1');
 
       expect(prisma.block.update).toHaveBeenCalledWith({
         where: { id: 'block-1' },
@@ -275,17 +364,20 @@ describe('BlocksService', () => {
 
     it('should throw NotFoundException if block does not exist', async () => {
       prisma.block.findUnique.mockResolvedValueOnce(null);
-      await expect(service.remove('non-existent-id')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.remove(user.sub, 'non-existent-id'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('findOne', () => {
     it('should find a block by id', async () => {
       prisma.block.findUnique.mockResolvedValueOnce(mockBlock);
-      const result = await service.findOne('block-1');
-      expect(prisma.block.findUnique).toHaveBeenCalledWith({
+      prisma.block.findUnique.mockResolvedValueOnce(mockBlock);
+
+      const result = await service.findOne(user.sub, 'block-1');
+
+      expect(prisma.block.findUnique).toHaveBeenLastCalledWith({
         where: { id: 'block-1' },
         include: {
           children: true,
@@ -294,7 +386,7 @@ describe('BlocksService', () => {
           schedule: true,
         },
       });
-      expect(result.id).toBe('block-1');
+      expect(result!.id).toBe('block-1');
     });
 
     it('should throw NotFoundException if block is soft deleted', async () => {
@@ -302,24 +394,57 @@ describe('BlocksService', () => {
         ...mockBlock,
         deletedAt: new Date(),
       });
-      await expect(service.findOne('block-1')).rejects.toThrow(
+      await expect(service.findOne(user.sub, 'block-1')).rejects.toThrow(
         NotFoundException,
       );
     });
   });
 
   describe('getRemindableBlocks', () => {
-    it('should return blocks with schedules', async () => {
+    it('should return blocks with schedules scoped to the caller', async () => {
       prisma.block.findMany.mockResolvedValueOnce([mockBlock]);
-      const result = await service.getRemindableBlocks();
+
+      const result = await service.getRemindableBlocks(user.sub);
+
       expect(prisma.block.findMany).toHaveBeenCalledWith({
         where: {
           deletedAt: null,
+          workspaceId: { in: ['ws-1'] },
           schedule: { isNot: null },
         },
         include: { schedule: true },
       });
       expect(result).toHaveLength(1);
+    });
+  });
+
+  describe('addTag', () => {
+    it('should reject a tag from a different workspace', async () => {
+      prisma.block.findUnique.mockResolvedValueOnce(mockBlock);
+      prisma.tag.findUnique.mockResolvedValueOnce({
+        id: 'tag-1',
+        workspaceId: 'ws-other',
+      } as any);
+
+      await expect(
+        service.addTag(user.sub, 'block-1', 'tag-1'),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.blockTag.create).not.toHaveBeenCalled();
+    });
+
+    it('should link a tag from the same workspace', async () => {
+      prisma.block.findUnique.mockResolvedValueOnce(mockBlock);
+      prisma.tag.findUnique.mockResolvedValueOnce({
+        id: 'tag-1',
+        workspaceId: 'ws-1',
+      } as any);
+      prisma.blockTag.create.mockResolvedValueOnce({} as any);
+
+      await service.addTag(user.sub, 'block-1', 'tag-1');
+
+      expect(prisma.blockTag.create).toHaveBeenCalledWith({
+        data: { blockId: 'block-1', tagId: 'tag-1' },
+      });
     });
   });
 });

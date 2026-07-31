@@ -101,9 +101,9 @@ describe('TriageService', () => {
         {
           provide: BlocksService,
           useValue: {
-            create: jest.fn(),
-            update: jest.fn(),
-            findAll: jest.fn(),
+            createInternal: jest.fn(),
+            updateInternal: jest.fn(),
+            findAllInternal: jest.fn(),
           },
         },
         {
@@ -137,9 +137,9 @@ describe('TriageService', () => {
     // Default mocks
     nauthenticityService.getBrandsForWorkspace.mockResolvedValue([]);
     flownauService.resolveAccountByBrandId.mockResolvedValue('acc-123');
-    blocksService.findAll.mockResolvedValue([]);
-    blocksService.create.mockResolvedValue(makeBlock() as any);
-    blocksService.update.mockResolvedValue(makeBlock() as any);
+    blocksService.findAllInternal.mockResolvedValue([]);
+    blocksService.createInternal.mockResolvedValue(makeBlock() as any);
+    blocksService.updateInternal.mockResolvedValue(makeBlock() as any);
   });
 
   afterEach(() => {
@@ -155,7 +155,7 @@ describe('TriageService', () => {
 
     it('calls FlownauIntegrationService.ingestIdeas when a content_idea with a brandId is triaged', async () => {
       mockParseCompletion.mockResolvedValueOnce({ data: contentIdeaTriageResult });
-      blocksService.create.mockResolvedValueOnce(makeBlock({ id: 'idea-block-1' }) as any);
+      blocksService.createInternal.mockResolvedValueOnce(makeBlock({ id: 'idea-block-1' }) as any);
 
       await service.processRawText('Create a reel about productivity hacks', 'user-123');
 
@@ -168,12 +168,12 @@ describe('TriageService', () => {
     it('marks the block as flownauSyncStatus: "success" after a successful ingest', async () => {
       mockParseCompletion.mockResolvedValueOnce({ data: contentIdeaTriageResult });
       const ideaBlock = makeBlock({ id: 'idea-block-2' });
-      blocksService.create.mockResolvedValueOnce(ideaBlock as any);
+      blocksService.createInternal.mockResolvedValueOnce(ideaBlock as any);
       flownauService.ingestIdeas.mockResolvedValueOnce(undefined);
 
       await service.processRawText('some text', 'user-123');
 
-      expect(blocksService.update).toHaveBeenCalledWith(
+      expect(blocksService.updateInternal).toHaveBeenCalledWith(
         'idea-block-2',
         { properties: { flownauSyncStatus: 'success' } },
       );
@@ -182,7 +182,7 @@ describe('TriageService', () => {
     it('marks the block as flownauSyncStatus: "error" and does NOT throw when Flownau is unreachable', async () => {
       mockParseCompletion.mockResolvedValueOnce({ data: contentIdeaTriageResult });
       const ideaBlock = makeBlock({ id: 'idea-block-3' });
-      blocksService.create.mockResolvedValueOnce(ideaBlock as any);
+      blocksService.createInternal.mockResolvedValueOnce(ideaBlock as any);
       flownauService.ingestIdeas.mockRejectedValueOnce(new Error('ECONNREFUSED'));
 
       // Should NOT throw — fault-tolerance requirement
@@ -190,7 +190,7 @@ describe('TriageService', () => {
         service.processRawText('some text', 'user-123'),
       ).resolves.not.toThrow();
 
-      expect(blocksService.update).toHaveBeenCalledWith(
+      expect(blocksService.updateInternal).toHaveBeenCalledWith(
         'idea-block-3',
         { properties: { flownauSyncStatus: 'error' } },
       );
@@ -198,7 +198,7 @@ describe('TriageService', () => {
 
     it('does NOT call FlownauIntegrationService for non-content_idea segments', async () => {
       mockParseCompletion.mockResolvedValueOnce({ data: actionTriageResult });
-      blocksService.create.mockResolvedValue(makeBlock({ type: 'action' }) as any);
+      blocksService.createInternal.mockResolvedValue(makeBlock({ type: 'action' }) as any);
 
       await service.processRawText('Send the report by Friday', 'user-123');
 
@@ -218,7 +218,7 @@ describe('TriageService', () => {
         journalSummary: 'Generic idea captured.',
       };
       mockParseCompletion.mockResolvedValueOnce({ data: noBrandResult });
-      blocksService.create.mockResolvedValue(makeBlock() as any);
+      blocksService.createInternal.mockResolvedValue(makeBlock() as any);
 
       await service.processRawText('generic idea', 'user-123');
 
@@ -227,11 +227,11 @@ describe('TriageService', () => {
 
     it('sets flownauSyncStatus: "pending" in block properties before calling Flownau', async () => {
       mockParseCompletion.mockResolvedValueOnce({ data: contentIdeaTriageResult });
-      blocksService.create.mockResolvedValueOnce(makeBlock({ id: 'idea-block-4' }) as any);
+      blocksService.createInternal.mockResolvedValueOnce(makeBlock({ id: 'idea-block-4' }) as any);
 
       await service.processRawText('some idea', 'user-123');
 
-      const createCall = blocksService.create.mock.calls[0]![0];
+      const createCall = blocksService.createInternal.mock.calls[0]![0];
       expect((createCall.properties as Record<string, unknown>).flownauSyncStatus).toBe('pending');
     });
   });
