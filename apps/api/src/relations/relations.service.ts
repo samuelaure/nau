@@ -1,17 +1,25 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { BlocksService } from '../blocks/blocks.service';
 import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class RelationsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private blocks: BlocksService,
+  ) {}
 
-  create(
+  async create(
+    userId: string,
     fromBlockId: string,
     toBlockId: string,
     type: string,
     properties: Record<string, unknown> = {},
   ) {
+    await this.blocks.assertBlockAccess(userId, fromBlockId);
+    await this.blocks.assertBlockAccess(userId, toBlockId);
+
     return this.prisma.relation.create({
       data: {
         fromBlockId,
@@ -22,7 +30,12 @@ export class RelationsService {
     });
   }
 
-  remove(id: string) {
+  async remove(userId: string, id: string) {
+    const relation = await this.prisma.relation.findUnique({ where: { id } });
+    if (!relation) throw new NotFoundException(`Relation ${id} not found`);
+
+    await this.blocks.assertBlockAccess(userId, relation.fromBlockId);
+
     return this.prisma.relation.delete({ where: { id } });
   }
 }

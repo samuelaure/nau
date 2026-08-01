@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ScheduleService } from './schedule.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { BlocksService } from '../blocks/blocks.service';
 import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
 import { Schedule } from '@prisma/client';
 
@@ -15,6 +16,10 @@ describe('ScheduleService', () => {
         {
           provide: PrismaService,
           useValue: mockDeep<PrismaService>(),
+        },
+        {
+          provide: BlocksService,
+          useValue: { assertBlockAccess: jest.fn().mockResolvedValue({ id: 'b1', workspaceId: 'ws-1' }) },
         },
       ],
     }).compile();
@@ -40,7 +45,7 @@ describe('ScheduleService', () => {
       updatedAt: date,
     } as Schedule);
 
-    await service.upsert('b1', date);
+    await service.upsert('user-1', 'b1', date);
 
     expect(prisma.schedule.upsert).toHaveBeenCalledWith({
       where: { blockId: 'b1' },
@@ -58,17 +63,21 @@ describe('ScheduleService', () => {
     prisma.schedule.findUnique.mockResolvedValueOnce({
       id: 'sch-1',
     } as unknown as Schedule);
-    await service.findOne('b1');
+    await service.findOne('user-1', 'b1');
     expect(prisma.schedule.findUnique).toHaveBeenCalledWith({
       where: { blockId: 'b1' },
     });
   });
 
   it('should remove a schedule', async () => {
+    prisma.schedule.findUnique.mockResolvedValueOnce({
+      id: 'sch-1',
+      blockId: 'b1',
+    } as unknown as Schedule);
     prisma.schedule.delete.mockResolvedValueOnce({
       id: 'sch-1',
     } as unknown as Schedule);
-    await service.remove('sch-1');
+    await service.remove('user-1', 'sch-1');
     expect(prisma.schedule.delete).toHaveBeenCalledWith({
       where: { id: 'sch-1' },
     });

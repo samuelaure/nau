@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { EventsService } from './events.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { BlocksService } from '../blocks/blocks.service';
 import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
 import { Event } from '@prisma/client';
 
@@ -15,6 +16,10 @@ describe('EventsService', () => {
         {
           provide: PrismaService,
           useValue: mockDeep<PrismaService>(),
+        },
+        {
+          provide: BlocksService,
+          useValue: { assertBlockAccess: jest.fn().mockResolvedValue({ id: 'b1', workspaceId: 'ws-1' }) },
         },
       ],
     }).compile();
@@ -35,7 +40,7 @@ describe('EventsService', () => {
       metadata: {},
       createdAt: new Date(),
     } as Event);
-    await service.create('b1', 'done');
+    await service.create('user-1', 'b1', 'done');
     expect(prisma.event.create).toHaveBeenCalledWith({
       data: { blockId: 'b1', type: 'done', metadata: {} },
     });
@@ -43,7 +48,7 @@ describe('EventsService', () => {
 
   it('should find events by block', async () => {
     prisma.event.findMany.mockResolvedValueOnce([]);
-    await service.findByBlock('b1');
+    await service.findByBlock('user-1', 'b1');
     expect(prisma.event.findMany).toHaveBeenCalledWith({
       where: { blockId: 'b1' },
       orderBy: { createdAt: 'desc' },
