@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
 import { getClientForFeature } from '@nau/llm-client';
+import { signServiceToken } from '@nau/auth';
 import { z } from 'zod';
 import { BlocksService } from '../blocks/blocks.service';
 import dayjs from 'dayjs';
@@ -43,7 +44,7 @@ export class JournalService {
     periodType: 'daily' | 'weekly' | 'monthly' | 'trimester' | 'yearly' | 'custom',
     startDateStr: string,
     endDateStr: string,
-    tzOffset: number = 0
+    workspaceId: string,
   ) {
     const startDate = dayjs(startDateStr).startOf('day').toDate();
     const endDate = dayjs(endDateStr).endOf('day').toDate();
@@ -54,6 +55,7 @@ export class JournalService {
     const existingSummary = await this.prisma.block.findFirst({
       where: {
         type: 'journal_summary',
+        workspaceId,
         properties: {
           path: ['periodType'],
           equals: periodType
@@ -73,6 +75,7 @@ export class JournalService {
     // 1. Fetch RAW data (journal_entries, actions, etc.)
     const rawBlocksInPeriod = await this.prisma.block.findMany({
       where: {
+        workspaceId,
         createdAt: { gte: startDate, lte: endDate },
         deletedAt: null
       }
@@ -85,11 +88,20 @@ export class JournalService {
       b => b.type === 'action' && ((b.properties as any)?.status === 'done' || (b.properties as any)?.status === 'completed')
     );
 
+    // Nothing happened in this period. Generating anyway costs an LLM call and
+    // writes a summary of nothing, which is what produced 128 summaries against
+    // 76 entries while the journal sat idle.
+    if (journalEntries.length === 0 && actionBlocks.length === 0 && contentIdeas.length === 0) {
+      this.logger.log(`No journal activity for ${periodType} in workspace ${workspaceId}. Skipping.`);
+      return { success: true, skipped: true, reason: 'no activity' };
+    }
+
     // 2. Recursive/Hierarchical context: fetch existing INFERIOR summaries
     // We fetch summaries that are strictly "smaller" than the current periodType
     const inferiorSummaries = await this.prisma.block.findMany({
       where: {
         type: 'journal_summary',
+        workspaceId,
         createdAt: { gte: startDate, lte: endDate },
         // Simple logic: we include all existing summaries in the period
         // (The AI prompt will be instructed on how to treat them as condensed knowledge)
@@ -181,6 +193,7 @@ LENGTH: ${periodType === 'daily' ? 'Brief (1-2 paragraphs)' : periodType === 'ye
     // 5. Save as Block
     const newSummaryBlock = await this.blocksService.createInternal({
       type: 'journal_summary',
+      workspaceId,
       properties: {
         periodType,
         periodStart: startDate.toISOString(),
@@ -234,25 +247,34 @@ LENGTH: ${periodType === 'daily' ? 'Brief (1-2 paragraphs)' : periodType === 'ye
 
     // 8. Notify Zazu (if configured)
     const zazuUrl = process.env.ZAZU_INTERNAL_URL || 'http://zazu:3000';
-    const nauKey = process.env.NAU_SERVICE_KEY;
 
     const periodTitle = `${periodType === 'daily' ? 'Diario' : periodType === 'weekly' ? 'Semanal' : periodType === 'monthly' ? 'Mensual' : periodType === 'trimester' ? 'Trimestral' : periodType === 'yearly' ? 'Anual' : 'Personalizado'}`;
     const displayDate = dayjs(startDate).format('DD MMM YYYY');
 
-    if (periodType !== 'custom' && nauKey) {
-      try {
-        await axios.post(`${zazuUrl}/api/internal/notify`, {
-           userId: '1', // Default MVP user
-           type: 'journal_summary',
-           periodType,
-           periodTitle: `Resumen ${periodTitle} — ${displayDate}`,
-           summaryData: finalDeliveryText
-        }, {
-           headers: { Authorization: `Bearer ${nauKey}` },
-           timeout: 10000
-        });
-      } catch (err: any) {
-        this.logger.error(`Failed to notify Zazŭ for hierarchical summary: ${err.message}`);
+    if (periodType !== 'custom') {
+      const recipients = await this.getWorkspaceRecipients(workspaceId);
+
+      for (const nauUserId of recipients) {
+        try {
+          const token = await signServiceToken({
+            iss: '9nau-api',
+            aud: 'zazu',
+            secret: this.configService.getOrThrow<string>('AUTH_SECRET'),
+          });
+
+          await axios.post(`${zazuUrl}/api/internal/notify`, {
+             nauUserId,
+             type: 'journal_summary',
+             periodType,
+             periodTitle: `Resumen ${periodTitle} — ${displayDate}`,
+             summaryData: finalDeliveryText
+          }, {
+             headers: { Authorization: `Bearer ${token}` },
+             timeout: 10000
+          });
+        } catch (err: any) {
+          this.logger.error(`Failed to notify Zazŭ for ${nauUserId}: ${err.message}`);
+        }
       }
     }
 
@@ -296,6 +318,58 @@ LENGTH: ${periodType === 'daily' ? 'Brief (1-2 paragraphs)' : periodType === 'ye
     };
   }
 
+  /**
+   * Workspaces with journal activity in the period. The cron used to summarise
+   * every Block on the platform in one pass, which mixed tenants into a single
+   * summary; it now produces one summary per workspace.
+   */
+  private async getActiveWorkspaces(startDate: Date, endDate: Date): Promise<string[]> {
+    const rows = await this.prisma.block.findMany({
+      where: {
+        workspaceId: { not: null },
+        deletedAt: null,
+        createdAt: { gte: startDate, lte: endDate },
+        type: { in: ['journal_entry', 'action', 'content_idea'] },
+      },
+      select: { workspaceId: true },
+      distinct: ['workspaceId'],
+    });
+    return rows.map((r) => r.workspaceId!).filter(Boolean);
+  }
+
+  /** naŭ user ids of every member of a workspace, for proactive delivery. */
+  private async getWorkspaceRecipients(workspaceId: string): Promise<string[]> {
+    const members = await this.prisma.workspaceMember.findMany({
+      where: { workspaceId },
+      select: { userId: true },
+    });
+    return members.map((m) => m.userId);
+  }
+
+  /** Runs one scoped summary per workspace that saw activity. */
+  private async generateForActiveWorkspaces(
+    periodType: 'daily' | 'weekly' | 'monthly' | 'trimester' | 'yearly',
+    startIso: string,
+    endIso: string,
+  ) {
+    const startDate = dayjs(startIso).startOf('day').toDate();
+    const endDate = dayjs(endIso).endOf('day').toDate();
+    const workspaceIds = await this.getActiveWorkspaces(startDate, endDate);
+
+    if (workspaceIds.length === 0) {
+      this.logger.log(`No workspace had activity for the ${periodType} period. Skipping.`);
+      return;
+    }
+
+    for (const workspaceId of workspaceIds) {
+      try {
+        await this.generateSummary(periodType, startIso, endIso, workspaceId);
+      } catch (err: any) {
+        this.logger.error(`${periodType} summary failed for workspace ${workspaceId}: ${err.message}`);
+      }
+    }
+  }
+
   // --- REFACTORED TRIGGERS ---
 
   @Cron('0 23 * * *')
@@ -304,7 +378,7 @@ LENGTH: ${periodType === 'daily' ? 'Brief (1-2 paragraphs)' : periodType === 'ye
     if (!prefs.autoDaily) return;
     
     this.logger.log('Daily Summary Triggered (Config-aware)');
-    await this.generateSummary('daily', dayjs().startOf('day').toISOString(), dayjs().endOf('day').toISOString());
+    await this.generateForActiveWorkspaces('daily', dayjs().startOf('day').toISOString(), dayjs().endOf('day').toISOString());
   }
 
   @Cron('0 20 * * 0')
@@ -315,7 +389,7 @@ LENGTH: ${periodType === 'daily' ? 'Brief (1-2 paragraphs)' : periodType === 'ye
     this.logger.log('Weekly Summary Triggered (Config-aware)');
     const start = dayjs().startOf('week').add(1, 'day').toISOString();
     const end = dayjs().endOf('week').add(1, 'day').toISOString();
-    await this.generateSummary('weekly', start, end);
+    await this.generateForActiveWorkspaces('weekly', start, end);
   }
 
   @Cron('0 18 1 * *')
@@ -326,7 +400,7 @@ LENGTH: ${periodType === 'daily' ? 'Brief (1-2 paragraphs)' : periodType === 'ye
     this.logger.log('Monthly Summary Triggered (Config-aware)');
     const start = dayjs().subtract(1, 'month').startOf('month').toISOString();
     const end = dayjs().subtract(1, 'month').endOf('month').toISOString();
-    await this.generateSummary('monthly', start, end);
+    await this.generateForActiveWorkspaces('monthly', start, end);
   }
 
   @Cron('0 18 1 1,4,7,10 *')
@@ -336,7 +410,7 @@ LENGTH: ${periodType === 'daily' ? 'Brief (1-2 paragraphs)' : periodType === 'ye
 
     const start = dayjs().subtract(3, 'months').startOf('month').toISOString();
     const end = dayjs().subtract(1, 'month').endOf('month').toISOString();
-    await this.generateSummary('trimester', start, end);
+    await this.generateForActiveWorkspaces('trimester', start, end);
   }
 
   @Cron('0 18 1 1 *')
@@ -346,6 +420,6 @@ LENGTH: ${periodType === 'daily' ? 'Brief (1-2 paragraphs)' : periodType === 'ye
 
     const start = dayjs().subtract(1, 'year').startOf('year').toISOString();
     const end = dayjs().subtract(1, 'year').endOf('year').toISOString();
-    await this.generateSummary('yearly', start, end);
+    await this.generateForActiveWorkspaces('yearly', start, end);
   }
 }
