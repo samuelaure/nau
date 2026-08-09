@@ -16,6 +16,12 @@ export class SummarySkill implements ZazuSkill {
   async handle(ctx: ZazuContext): Promise<void> {
     if (!ctx.textContent) return;
 
+    const nauUserId = ctx.dbUser?.nauUserId;
+    if (!nauUserId) {
+      await ctx.reply('Vincula tu cuenta naŭ con /link para poder generar resúmenes.');
+      return;
+    }
+
     const parts = ctx.textContent.trim().split(' ');
     
     // Default to 'custom' and use last week if no dates provided
@@ -34,10 +40,24 @@ export class SummarySkill implements ZazuSkill {
       const nauUrl = process.env.NAU_API_URL || 'http://localhost:3000';
       const headers = await buildServiceHeaders('9nau-api');
 
-      const res = await fetch(`${nauUrl}/_service/journal/summary`, {
+      const wsRes = await fetch(`${nauUrl}/_service/workspaces?userId=${nauUserId}`, { headers });
+      const workspaces = wsRes.ok ? ((await wsRes.json()) as { id: string }[]) : [];
+      const workspaceId = workspaces[0]?.id;
+
+      if (!workspaceId) {
+        await ctx.telegram.editMessageText(
+          ctx.chat?.id,
+          waitMsg.message_id,
+          undefined,
+          '⚠️ No encontré ningún workspace asociado a tu cuenta.',
+        );
+        return;
+      }
+
+      const res = await fetch(`${nauUrl}/journal/summary`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ periodType, startDate, endDate }),
+        body: JSON.stringify({ periodType, startDate, endDate, workspaceId }),
       });
       const responseData = res.ok ? await res.json() as { success?: boolean; error?: string } : { success: false, error: `HTTP ${res.status}` };
 
