@@ -7,8 +7,8 @@ export async function voicePreprocessor(ctx: ZazuContext, next: () => Promise<vo
     ctx.textContent = ctx.message.text;
   }
 
-  // Voice messages are handled entirely by voicenote-skill, which delegates
-  // transcription + synthesis to nauthenticity. No local transcription here.
+  // Voice messages are handled entirely by voicenote-skill, which transcribes
+  // in-process via the LLM client fallback chain.
 
   return next();
 }
