@@ -7,6 +7,7 @@ export class GenerateSummaryDto {
   periodType!: 'daily' | 'weekly' | 'monthly' | 'trimester' | 'yearly' | 'custom';
   startDate!: string;
   endDate!: string;
+  workspaceId!: string;
 }
 
 export class DirectSummaryDto {
@@ -25,10 +26,18 @@ export class JournalController {
 
   @Post('summary')
   async generateSummary(@Body() request: GenerateSummaryDto) {
-    if (!request.periodType || !request.startDate || !request.endDate) {
-      return { success: false, error: 'Missing required fields: periodType, startDate, endDate' };
+    if (!request.periodType || !request.startDate || !request.endDate || !request.workspaceId) {
+      return {
+        success: false,
+        error: 'Missing required fields: periodType, startDate, endDate, workspaceId',
+      };
     }
-    return this.journalService.generateSummary(request.periodType, request.startDate, request.endDate);
+    return this.journalService.generateSummary(
+      request.periodType,
+      request.startDate,
+      request.endDate,
+      request.workspaceId,
+    );
   }
 
   @Post('summary/direct')
