@@ -106,12 +106,18 @@ When adding or modifying a BullMQ queue in nauthenticity:
 |---|---|---|---|
 | 9naŭ API | `apps/api` | NestJS, Postgres | Identity control plane |
 | accounts | `apps/accounts` | Next.js 15 | SSO UI |
-| app | `apps/app` | Next.js 15 | Second Brain UI |
+| app | `apps/app` | Next.js 14 | Second Brain UI (web) |
 | flownau | `apps/flownau` | Next.js 15, BullMQ, Remotion | Content creation engine |
 | nauthenticity | `apps/nauthenticity` | NestJS, Postgres+pgvector, BullMQ | Brand intelligence |
-| zazu-bot | `apps/zazu-bot` | Telegraf | Telegram bot |
-| zazu-dashboard | `apps/zazu-dashboard` | Next.js 15 | Telegram Mini App |
+| zazu | `apps/zazu` | Telegraf | Telegram bot (voice journaling, triage, summaries) |
 | whatsnau | `apps/whatsnau` | Node.js | WhatsApp CRM (deferred) |
+
+The Zazu admin dashboard is **not** a separate app. It lives inside accounts, at
+`apps/accounts/src/app/admin/zazu/`, and proxies to Zazu's `/api/internal/admin/*` routes.
+
+**The mobile app is not in this monorepo.** It is a standalone repository at
+`github.com/samuelaure/nau-mobile`. There is no `apps/mobile`; docs that reference one
+are stale.
 
 ---
 
@@ -127,6 +133,7 @@ When adding or modifying a BullMQ queue in nauthenticity:
 | nauthenticity workers | `apps/nauthenticity/src/queues/` |
 | nauthenticity worker registry | `apps/nauthenticity/src/nest/workers/workers.service.ts` |
 | flownau cron | `apps/flownau/src/modules/scheduling/internal-cron.ts` |
+| Voice journaling pipeline | `apps/zazu/src/voicenote-skill.ts` -> `apps/api/src/triage/` -> `apps/api/src/journal/` |
 | flownau Remotion templates | `apps/flownau/src/modules/video/remotion/ReelTemplates.tsx` |
 
 ---

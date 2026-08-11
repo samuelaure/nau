@@ -28,8 +28,7 @@ naŭ Platform is a multi-tenant SaaS for creators managing a **fleet of brands**
 | **9naŭ mobile** | Mobile | Instagram capture overlay, voice capture, mobile access to Second Brain. | Expo / React Native |
 | **flownaŭ** (`flownau.9nau.com`) | Full-stack | Content creation engine: ideation, composition, video rendering (Remotion), Instagram publishing, scheduling. Owns Assets, Compositions, Templates, RenderJobs. Stores OAuth credentials for owned SocialProfiles. | Next.js 15, PostgreSQL, Prisma, BullMQ, Remotion |
 | **nauthenticity** (`nauthenticity.9nau.com`) | Full-stack | Brand intelligence: Instagram scraping (Apify), transcription, semantic search, benchmark/monitor, InspoBase, comment generation. | NestJS, PostgreSQL + pgvector, Prisma, BullMQ |
-| **zazu-bot** | Backend | Telegram bot for voice journal, daily briefs, comment suggestions, brand capture, and platform commands. | Node.js, Telegraf |
-| **zazu-dashboard** | Frontend | Telegram Mini App — in-chat UI for brand selection, target management, feedback. | Next.js 15 |
+| **zazu** (`apps/zazu`) | Backend | Telegram bot for voice journaling, daily briefs, comment suggestions, brand capture, and platform commands. Transcribes voice notes in-process. | Node.js, Telegraf |
 | **whatsnaŭ** | Standalone | WhatsApp CRM. Not integrated with the rest of the platform this round. | Node.js, Prisma, React/Vite |
 
 ---
@@ -52,7 +51,7 @@ Every entity in the platform has exactly one owning service. When in doubt, this
 | `Asset`, `Template`, `Composition`, `RenderJob`, `ContentPlan`, `ContentIdea` | flownaŭ | — |
 | `Post`, `Media`, `Transcript`, `Embedding`, `ScrapingRun` | nauthenticity | — |
 | `InspoItem`, `BrandSynthesis`, `CommentFeedback` | nauthenticity | — |
-| `TelegramUser` (link table), `ConversationState` | zazu-bot | — |
+| `User` (holds `telegramId` + `nauUserId`), `Message`, `Voicenote`, `NotificationQueue` | zazu | — |
 | `Block`, `JournalEntry`, `Schedule` | 9naŭ API (Second Brain subsystem) | 9naŭ app, mobile |
 
 See [ENTITIES.md](ENTITIES.md) for field-by-field schemas.
@@ -143,7 +142,7 @@ POST nauthenticity.9nau.com/api/v1/brands/:id/comment-suggestions  (user JWT)
     │ body: { postUrl }
     │ scrape post, fetch Brand + commentStrategy prompt from 9naŭ API
     │ generate suggestions via OpenAI
-    │ deliver via Telegram through zazu-bot
+    │ deliver via Telegram through zazu
     ▼
 User taps "Use this comment" → feedback logged in CommentFeedback
 ```
@@ -182,20 +181,18 @@ answer streamed back
                                  └────────────┘                     └────────────┘
 
     ┌──────────────┐             ┌──────────────┐
-    │ 9naŭ mobile  │             │  zazu-bot    │
-    │ (Expo)       │─────────────▶│ (Telegraf)   │──── Telegram Bot API
-    └──────────────┘             └──────┬───────┘
-                                        │
-                                        ▼
-                                 ┌──────────────┐
-                                 │zazu-dashboard│
-                                 │(Mini App UI) │
-                                 └──────────────┘
+    │ 9naŭ mobile  │             │    zazu      │──── Telegram Bot API
+    │ (Expo, own   │             │  (Telegraf)  │
+    │  repo)       │             └──────────────┘
+    └──────────────┘
 ```
 
 Legend:
 - Solid arrows: HTTP/API dependency
 - Every arrow terminating at 9naŭ API carries either user JWT (client-origin) or service JWT (service-to-service).
+- 9naŭ mobile lives in a separate repository and is local-first: it works with no account and
+  no network, and only talks to the API once the user links an account.
+- Zazu's admin UI is part of accounts, not a separate deployable.
 
 ---
 
@@ -208,7 +205,7 @@ Single Hetzner CX23 server today (4 GB RAM, 2 vCPU). Traefik reverse proxy termi
 - `app.9nau.com` → `app:3000`
 - `flownau.9nau.com` → `flownau:3000`
 - `nauthenticity.9nau.com` → `nauthenticity:3000`
-- `zazu.9nau.com` → `zazu-dashboard:3000`
+- Zazu admin UI is served from accounts, at `accounts.9nau.com/admin/zazu` (there is no `zazu.9nau.com`)
 - `whatsnau.9nau.com` → `whatsnau:3000`
 
 Each service has its own Postgres (per-service isolation) and shares one Redis instance for BullMQ + session storage. Media in Cloudflare R2 (`users/{userId}/…`, `brands/{brandId}/…`).

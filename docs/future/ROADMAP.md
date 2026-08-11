@@ -153,11 +153,11 @@ Flatten the repo into a single pnpm + turbo workspace.
     - `9nau/apps/api` → `apps/9nau-api`
     - `9nau/apps/accounts` → `apps/accounts`
     - `9nau/apps/app` → `apps/app`
-    - `9nau/apps/mobile` → `apps/mobile`
+    - ~~`9nau/apps/mobile` → `apps/mobile`~~ — reverted 2026-05-21; the app is a standalone repo (`samuelaure/nau-mobile`)
     - `flownau` → `apps/flownau`
     - `nauthenticity` → `apps/nauthenticity`
-    - `zazu/apps/bot` → `apps/zazu-bot`
-    - `zazu/apps/dashboard` → `apps/zazu-dashboard`
+    - `zazu/apps/bot` → `apps/zazu` (done; final name has no `-bot` suffix)
+    - ~~`zazu/apps/dashboard` → `apps/zazu-dashboard`~~ — the dashboard was deleted; its admin UI now lives in `apps/accounts/src/app/admin/zazu/`
     - `whatsnau/packages/backend` → `apps/whatsnau-backend`
     - `whatsnau/packages/frontend` → `apps/whatsnau-frontend`
 - [ ] All `packages/*` retained at root
@@ -242,6 +242,6 @@ Once production traffic exists (post-launch), rollback becomes non-trivial and s
 | 4 | 🟡 partial | SSO with HttpOnly cookies works; refresh rotation and nauthenticity `/auth/callback` done |
 | 5 | 🟢 complete | nauthenticity migrated to NestJS; BullMQ workers, all modules ported |
 | 6 | 🟡 in progress | flownau uses `Post` model (unified pipeline); `BrandPersona`/`IdeasFramework` still in schema (prompt centralization pending) |
-| 7 | 🔴 not started | zazu-dashboard still uses NextAuth |
+| 7 | 🟢 obsolete | zazu-dashboard was deleted rather than migrated; admin UI moved into accounts, which already uses SSO |
 | 8 | 🟢 complete | Flat monorepo under `apps/` + `packages/` with turbo |
 | 9 | 🟡 in progress | This cleanup pass — docs updated; service stubs still partial |
