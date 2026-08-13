@@ -145,12 +145,13 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           envs: GITHUB_TOKEN
           script: |
+            set -e
             echo "$GITHUB_TOKEN" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             mkdir -p ~/apps/nauthenticity/storage
             echo "${{ secrets.NAUTHENTICITY_ENV_FILE }}" > ~/apps/nauthenticity/.env
             cd ~/apps/nauthenticity
             docker compose pull
             docker compose up -d nauthenticity-postgres nauthenticity-redis
-            docker compose run --rm --no-deps nauthenticity npx prisma migrate deploy
+            docker compose run --rm --no-deps -w /app/apps/nauthenticity nauthenticity npx prisma migrate deploy
             docker compose up -d
             docker image prune -f || true
