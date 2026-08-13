@@ -141,12 +141,13 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           envs: GITHUB_TOKEN
           script: |
+            set -e
             echo "$GITHUB_TOKEN" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             mv ~/apps/zazu/.env.production.deploy ~/apps/zazu/.env
             cd ~/apps/zazu
             docker compose pull
             docker compose up -d zazu-postgres
-            docker compose run --rm --no-deps zazu npx prisma migrate deploy
+            docker compose run --rm --no-deps -w /app/packages/zazu-db zazu npx prisma migrate deploy
             docker compose up -d
             docker image prune -f || true
 

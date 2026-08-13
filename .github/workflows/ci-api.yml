@@ -144,11 +144,12 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           envs: GITHUB_TOKEN
           script: |
+            set -e
             echo "$GITHUB_TOKEN" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             echo "${{ secrets.API_ENV_FILE }}" > ~/apps/api/.env
             cd ~/apps/api
             docker compose pull
             docker compose up -d api-postgres api-redis
-            docker compose run --rm --no-deps api npx prisma migrate deploy
+            docker compose run --rm --no-deps -w /app/apps/api api npx prisma migrate deploy
             docker compose up -d
             docker image prune -f || true
