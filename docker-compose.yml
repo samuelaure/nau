@@ -7,6 +7,8 @@ services:
       - --providers.docker=true
       - --providers.docker.exposedByDefault=false
       - --providers.docker.network=nau-network
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --providers.file.watch=true
       - --entrypoints.web.address=:80
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
       - --entrypoints.web.http.redirections.entrypoint.scheme=https
@@ -14,14 +16,28 @@ services:
       - --certificatesresolvers.letsencrypt.acme.tlschallenge=true
       - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}
       - --certificatesresolvers.letsencrypt.acme.storage=/acme.json
+      - --certificatesresolvers.letsencrypt-dns.acme.dnschallenge=true
+      - --certificatesresolvers.letsencrypt-dns.acme.dnschallenge.provider=cloudflare
+      - --certificatesresolvers.letsencrypt-dns.acme.email=${ACME_EMAIL}
+      - --certificatesresolvers.letsencrypt-dns.acme.storage=/acme.json
+    environment:
+      - CF_DNS_API_TOKEN=${CLOUDFLARE_DNS_API_TOKEN}
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./acme.json:/acme.json
+      - ./traefik-dynamic:/etc/traefik/dynamic:ro
     networks:
       - nau-network
+      - violeta-network
+      - karen-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.50'
 
   backup:
     build:
@@ -38,10 +54,34 @@ services:
       - FLOWNAU_DB_PASSWORD=${FLOWNAU_DB_PASSWORD}
       - NAUTHENTICITY_DB_PASSWORD=${NAUTHENTICITY_DB_PASSWORD}
       - ZAZU_DB_PASSWORD=${ZAZU_DB_PASSWORD}
+      - CONNECT_DB_PASSWORD=${CONNECT_DB_PASSWORD}
       - WHATSNAU_DB_PASSWORD=${WHATSNAU_DB_PASSWORD}
+      - VIOLETA_LISTMONK_DB_PASSWORD=${VIOLETA_LISTMONK_DB_PASSWORD}
+      - FREESCOUT_DB_PASSWORD=${FREESCOUT_DB_PASSWORD}
+      # Alerting goes direct to Telegram, not through the platform: an alert path
+      # that depends on the system being backed up is not an alert path.
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - ADMIN_TELEGRAM_ID=${ADMIN_TELEGRAM_ID}
+      - BACKUP_NOTIFY_ON_SUCCESS=${BACKUP_NOTIFY_ON_SUCCESS:-false}
+    volumes:
+      # Dumps must outlive the container. The previous image wrote to /tmp, so a
+      # rebuild would have destroyed the only copies that existed while the R2
+      # uploads were failing.
+      - ./backups/auto:/backups
     networks:
       - nau-network
+      - violeta-network
+      - karen-network
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.20'
 
 networks:
   nau-network:
+    external: true
+  violeta-network:
+    external: true
+  karen-network:
     external: true

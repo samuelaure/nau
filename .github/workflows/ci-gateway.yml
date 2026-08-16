@@ -37,13 +37,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Copy compose file to server
+      # infra/ carries the backup image's build context. It used to be left out,
+      # so the repo and the server drifted: the deployed backup.sh had grown
+      # three databases the repo never knew about, edited straight on the box.
+      - name: Copy compose file and build contexts to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DEPLOY_SSH_HOST }}
           username: root
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: docker-compose.yml
+          source: "docker-compose.yml,infra/**"
           target: ~/
 
       - name: Restart gateway
@@ -56,8 +59,10 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           envs: ROOT_ENV_FILE
           script: |
+            set -e
             echo "$ROOT_ENV_FILE" > ~/.env
             cd ~
             docker compose pull
-            docker compose up -d
+            # --build so changes to infra/backup actually reach the running image
+            docker compose up -d --build
             docker image prune -f || true
