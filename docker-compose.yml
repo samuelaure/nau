@@ -63,6 +63,10 @@ services:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - ADMIN_TELEGRAM_ID=${ADMIN_TELEGRAM_ID}
       - BACKUP_NOTIFY_ON_SUCCESS=${BACKUP_NOTIFY_ON_SUCCESS:-false}
+      # Dumps are encrypted before leaving the machine. Only the public key is
+      # here — the server cannot decrypt its own backups, so compromising it
+      # does not expose the archive.
+      - BACKUP_AGE_PUBLIC_KEY=${BACKUP_AGE_PUBLIC_KEY}
     volumes:
       # Dumps must outlive the container. The previous image wrote to /tmp, so a
       # rebuild would have destroyed the only copies that existed while the R2

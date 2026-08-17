@@ -94,9 +94,9 @@ done
 # rclone copy exiting zero is not proof the object is readable at the far end.
 VERIFIED=""
 for name in $UPLOADED; do
-  file="${STAGING}/${name}.sql.gz"
-  local_size=$(stat -c %s "$file" 2>/dev/null)
-  remote_size=$(rclone size "${BUCKET}/${name}/${name}-${DATE}.sql.gz" \
+  enc="${STAGING}/${name}.sql.gz.age"
+  local_size=$(stat -c %s "$enc" 2>/dev/null)
+  remote_size=$(rclone size "${BUCKET}/${name}/${name}-${DATE}.sql.gz.age" \
                   --json $RCLONE_FLAGS 2>/dev/null \
                 | sed -n 's/.*"bytes":\([0-9]*\).*/\1/p')
 

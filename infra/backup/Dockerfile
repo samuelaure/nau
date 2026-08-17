@@ -5,6 +5,7 @@ RUN apk add --no-cache \
     rclone \
     supercronic \
     curl \
+    age \
     tzdata
 
 COPY backup.sh /usr/local/bin/backup.sh
