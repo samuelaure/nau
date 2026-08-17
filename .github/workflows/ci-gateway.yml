@@ -1,12 +1,13 @@
 name: CI — gateway
 
-# Deploys the root docker-compose.yml (Traefik) to production.
-# Triggers only when the gateway config changes on main.
+# Deploys the root docker-compose.yml (Traefik + backup) and infra/ to production.
+# Triggers when the gateway config or a build context under infra/ changes on main.
 on:
   push:
     branches: [main]
     paths:
       - 'docker-compose.yml'
+      - 'infra/**'
       - '.github/workflows/ci-gateway.yml'
 
 jobs:
