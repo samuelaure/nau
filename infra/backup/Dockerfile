@@ -22,7 +22,11 @@ RUN echo "0 2 * * * /usr/local/bin/backup.sh >> /var/log/backup.log 2>&1" \
 
 # Reports unhealthy if the last run failed or has not happened in over 48h, so a
 # silently broken backup surfaces in `docker ps` instead of only in a log.
-HEALTHCHECK --interval=1h --timeout=10s --start-period=5m \
+#
+# start-period is 26h on purpose: the job runs once a day, so a freshly deployed
+# container has no LAST_RUN yet and would otherwise sit unhealthy until its first
+# 02:00 tick. The window covers one full cycle plus slack.
+HEALTHCHECK --interval=1h --timeout=10s --start-period=26h \
   CMD grep -q '^OK' /backups/LAST_RUN 2>/dev/null \
    && [ -z "$(find /backups/LAST_RUN -mmin +2880 2>/dev/null)" ] \
    || exit 1
