@@ -117,7 +117,10 @@ model Media {
   post         Post    @relation(fields: [postId], references: [id])
   type         String
   url          String?
-  storageUrl   String
+  /// Null once the file has been released from storage. Videos are deleted
+  /// after ingestion has extracted what it needs (transcript + post synthesis);
+  /// the thumbnail is kept so the UI can still show the post and link out.
+  storageUrl   String?
   thumbnailUrl String?
   duration     Float?
   index        Int     @default(0)
