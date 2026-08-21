@@ -382,6 +382,7 @@ async function handleFinalDispatch(ctx: ZazuContext) {
   const cleanTranscription: string = ctx.session?.pendingVoicenoteClean ?? '';
   const summaryText: string = ctx.session?.pendingVoicenoteSummary ?? '';
   const nauUserId: string = ctx.dbUser?.nauUserId ?? '';
+  const voicenoteCreatedAt: string | undefined = ctx.session?.pendingVoicenoteCapturedAt;
 
   let journalText: string = cleanTranscription;
   let contentText: string = cleanTranscription;
@@ -408,7 +409,7 @@ async function handleFinalDispatch(ctx: ZazuContext) {
 
   const [journalResult, contentResults, actionResults] = await Promise.allSettled([
     intents.includes('journal') && journalWorkspaceId
-      ? voicenoteSkill.dispatchToJournal(voicenoteId, journalText, journalWorkspaceId, nauUserId)
+      ? voicenoteSkill.dispatchToJournal(voicenoteId, journalText, journalWorkspaceId, nauUserId, voicenoteCreatedAt)
       : Promise.resolve(),
     intents.includes('content') && brands.length > 0
       ? voicenoteSkill.dispatchToBrands(voicenoteId, contentText, brands)

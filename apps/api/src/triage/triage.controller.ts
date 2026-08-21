@@ -9,6 +9,8 @@ export class TriageDto {
   brandId?: string | null;
   workspaceId?: string;
   journalOnly?: boolean;
+  /** When the capture was recorded. Falls back to now if the caller omits it. */
+  capturedAt?: string;
 }
 
 @UseGuards(ServiceAuthGuard)
@@ -25,6 +27,7 @@ export class TriageController {
       body.brandId,
       body.workspaceId,
       body.journalOnly,
+      body.capturedAt,
     );
     return result;
   }

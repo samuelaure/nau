@@ -46,6 +46,7 @@ export class TriageService {
     brandId?: string | null,
     workspaceId?: string,
     journalOnly?: boolean,
+    capturedAt?: string,
   ) {
 
     try {
@@ -64,7 +65,21 @@ export class TriageService {
           });
           resolvedWorkspaceId = user?.workspaces?.[0]?.workspaceId;
         }
-        return await this.processJournalOnly(text, sourceBlockId, resolvedWorkspaceId);
+        // userId arrives from Zazu but was never passed on, so every journal
+        // entry was written with no record of who wrote it. The caller may send
+        // a Telegram id, so resolve it to the naŭ user before stamping.
+        const owner = await this.prisma.user.findFirst({
+          where: { OR: [{ id: userId }, { telegramId: userId }] },
+          select: { id: true },
+        });
+
+        return await this.processJournalOnly(
+          text,
+          sourceBlockId,
+          resolvedWorkspaceId,
+          owner?.id,
+          capturedAt,
+        );
       }
 
       // 1. Fetch context — projects + brand DNA
@@ -278,7 +293,13 @@ OUTPUT: Return valid JSON matching the schema.`,
    * using a simplified LLM prompt, then saves it as a journal_entry block.
    * No brand context. No content_idea segments. No flownau dispatch.
    */
-  private async processJournalOnly(text: string, sourceBlockId?: string, workspaceId?: string) {
+  private async processJournalOnly(
+    text: string,
+    sourceBlockId?: string,
+    workspaceId?: string,
+    userId?: string,
+    capturedAt?: string,
+  ) {
     const JournalOnlySchema = z.object({
       journalEntry: z.string().describe('A reflective, first-person journal entry distilled from the raw voice capture. Preserve the personal tone and emotional context.'),
     });
@@ -314,12 +335,16 @@ Write in the same language as the input.`,
       type: 'journal_entry',
       properties: {
         summary: journalText,
-        date: new Date().toISOString(),
+        // When the note was recorded, not when it happened to be processed. A
+        // journal entry that lands on the wrong day because ingestion was slow
+        // is wrong in the one dimension a journal is organised by.
+        date: capturedAt ?? new Date().toISOString(),
         sourceBlockId,
         source: 'zazu_voicenote',
         status: 'published',
       },
       workspaceId,
+      userId,
     });
 
     return {

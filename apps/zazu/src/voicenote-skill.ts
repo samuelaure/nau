@@ -82,6 +82,7 @@ class VoicenoteSkillImpl implements ZazuSkill {
     ctx.session.selectedVoicenoteActionsWorkspaceId = undefined
     ctx.session.selectedVoicenoteIntents = []
     ctx.session.pendingVoicenoteId = undefined
+    ctx.session.pendingVoicenoteCapturedAt = undefined
     ctx.session.pendingVoicenoteClean = undefined
     ctx.session.pendingVoicenoteSummary = undefined
     ctx.session.pendingVoicenoteBrands = []
@@ -179,6 +180,13 @@ Return only valid JSON: { "cleanTranscription": "...", "summary": "..." }`,
         })
 
         ctx.session.pendingVoicenoteId = voicenote.id
+        // Telegram's own timestamp for the message: the moment the note was
+        // recorded, which is what the journal entry should be dated by. The
+        // Voicenote row is created after transcription, so its createdAt is
+        // already minutes late.
+        ctx.session.pendingVoicenoteCapturedAt = ctx.message?.date
+          ? new Date(ctx.message.date * 1000).toISOString()
+          : new Date().toISOString()
         ctx.session.pendingVoicenoteClean = cleanTranscription
         ctx.session.pendingVoicenoteSummary = summary
       } catch (err) {
@@ -230,6 +238,7 @@ Return only valid JSON: { "cleanTranscription": "...", "summary": "..." }`,
     cleanTranscription: string,
     workspaceId: string,
     nauUserId: string,
+    capturedAt?: string,
   ): Promise<void> {
     const headers = await buildServiceHeaders('9nau-api')
     await axios.post(
@@ -240,6 +249,10 @@ Return only valid JSON: { "cleanTranscription": "...", "summary": "..." }`,
         sourceBlockId: voicenoteId,
         workspaceId,
         journalOnly: true,
+        // The moment the note was recorded. Without it the entry is dated when
+        // the API happened to process it, which puts it on the wrong day
+        // whenever ingestion lags.
+        capturedAt: capturedAt ?? new Date().toISOString(),
       },
       { headers, timeout: 60_000 },
     )
