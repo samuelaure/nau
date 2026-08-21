@@ -66,27 +66,33 @@ export const mobileReprocessWorker = new Worker(
       }
 
       const username = scraped.author.username;
+      const platformId = scraped.id || scraped.shortcode;
+      const postData = {
+        caption: scraped.caption,
+        likes: Math.max(0, scraped.likesCount ?? 0),
+        comments: Math.max(0, scraped.commentsCount ?? 0),
+      };
 
       // Keep the Post row so re-runs and the dashboard can see this was reprocessed,
       // but don't build the full collaborator/socialProfile graph — mobile only needs media.
-      const post = await prisma.post.upsert({
-        where: { url },
-        update: {
-          caption: scraped.caption,
-          likes: Math.max(0, scraped.likesCount ?? 0),
-          comments: Math.max(0, scraped.commentsCount ?? 0),
-        },
-        create: {
-          platformId: scraped.id || scraped.shortcode,
-          url,
-          username,
-          caption: scraped.caption,
-          postedAt: new Date(scraped.takenAt),
-          likes: Math.max(0, scraped.likesCount ?? 0),
-          comments: Math.max(0, scraped.commentsCount ?? 0),
-        },
-        include: { media: true },
-      });
+      //
+      // Can't upsert by url alone: Instagram serves the same post under both
+      // /p/<code>/ and /reel/<code>/, and mobile's saved URL doesn't always
+      // match the form nauthenticity's own profile-ingestion pipeline already
+      // scraped it under. Two different url strings, same platformId — a
+      // plain upsert-by-url tried to create a second row and hit the
+      // Post.platformId unique constraint. Look up by platformId first so we
+      // attach mobile's media to the post nauthenticity already has, and only
+      // create a new row when this is genuinely new content.
+      let post = await prisma.post.findUnique({ where: { url }, include: { media: true } });
+      if (!post) post = await prisma.post.findUnique({ where: { platformId }, include: { media: true } });
+
+      post = post
+        ? await prisma.post.update({ where: { id: post.id }, data: postData, include: { media: true } })
+        : await prisma.post.create({
+            data: { platformId, url, username, postedAt: new Date(scraped.takenAt), ...postData },
+            include: { media: true },
+          });
 
       ensureDir(config.paths.temp);
 
