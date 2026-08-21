@@ -124,6 +124,10 @@ model Media {
   thumbnailUrl String?
   duration     Float?
   index        Int     @default(0)
+  /// Native pixel dimensions, captured at scrape time. Lets a consumer (e.g.
+  /// naŭ mobile) size a player without probing the file or guessing aspect ratio.
+  width        Int?
+  height       Int?
 
   transcript Transcript?
 
