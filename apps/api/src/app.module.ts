@@ -25,9 +25,11 @@ import { TagsModule } from './tags/tags.module';
 import { ScheduleModule as NestScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { CapturesModule } from './captures/captures.module';
 
 @Module({
   imports: [
+    CapturesModule,
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: [`.env.${process.env.NODE_ENV ?? 'development'}.local`, `.env.${process.env.NODE_ENV ?? 'development'}`, '.env.local', '.env'],

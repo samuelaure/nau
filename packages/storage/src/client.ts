@@ -1,6 +1,7 @@
 import {
   S3Client,
   PutObjectCommand,
+  GetObjectCommand,
   DeleteObjectCommand,
   DeleteObjectsCommand,
   ListObjectsV2Command,
@@ -96,6 +97,29 @@ export class NauStorage {
   // ---------------------------------------------------------------------------
   // Delete
   // ---------------------------------------------------------------------------
+
+  /**
+   * Reads an object into memory. Intended for small artefacts — a voice note,
+   * a thumbnail — not for streaming media to a client.
+   */
+  async download(key: string): Promise<Buffer> {
+    const response = await this.s3.send(
+      new GetObjectCommand({ Bucket: this.bucket, Key: this.pk(key) }),
+    );
+    if (!response.Body) throw new Error(`Object has no body: ${key}`);
+    const bytes = await response.Body.transformToByteArray();
+    return Buffer.from(bytes);
+  }
+
+  /**
+   * Issues a time-limited GET URL. This is how private objects are served:
+   * the bucket stays closed and the link expires, rather than the object being
+   * permanently reachable by anyone who learns its path.
+   */
+  async presignDownload(key: string, expiresIn = 900): Promise<string> {
+    const command = new GetObjectCommand({ Bucket: this.bucket, Key: this.pk(key) });
+    return getSignedUrl(this.s3, command, { expiresIn });
+  }
 
   async delete(key: string): Promise<void> {
     await this.s3.send(
