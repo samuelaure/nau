@@ -84,33 +84,35 @@ export const mobileReprocessWorker = new Worker(
       }
 
       const username = scraped.author.username;
-      const platformId = scraped.id || scraped.shortcode;
+
+      // Do NOT trust scraped.id/shortcode as an identity key: confirmed against
+      // the real batch that a postUrls scrape can return the SAME id for
+      // completely different posts — every one of 92 distinct URLs resolved to
+      // the platformId of the very first post processed, which (combined with
+      // the platformId-fallback lookup this comment used to describe) collapsed
+      // all 92 into a single Post row, silently overwriting the same 6 R2
+      // objects on every run. That is the third unreliable field this actor has
+      // produced for direct-URL scrapes, after author.username and media[].type.
+      // The post's own URL is the one thing we supplied and know is correct, so
+      // derive identity from it instead — the shortcode is unique per post.
+      const shortcodeMatch = url.match(/\/(?:p|reel|tv)\/([^/?#]+)/);
+      const platformId = `mobile-${shortcodeMatch?.[1] ?? randomUUID()}`;
       const postData = {
         caption: scraped.caption,
         likes: Math.max(0, scraped.likesCount ?? 0),
         comments: Math.max(0, scraped.commentsCount ?? 0),
       };
 
-      // Keep the Post row so re-runs and the dashboard can see this was reprocessed,
-      // but don't build the full collaborator/socialProfile graph — mobile only needs media.
-      //
-      // Can't upsert by url alone: Instagram serves the same post under both
-      // /p/<code>/ and /reel/<code>/, and mobile's saved URL doesn't always
-      // match the form nauthenticity's own profile-ingestion pipeline already
-      // scraped it under. Two different url strings, same platformId — a
-      // plain upsert-by-url tried to create a second row and hit the
-      // Post.platformId unique constraint. Look up by platformId first so we
-      // attach mobile's media to the post nauthenticity already has, and only
-      // create a new row when this is genuinely new content.
-      let post = await prisma.post.findUnique({ where: { url }, include: { media: true } });
-      if (!post) post = await prisma.post.findUnique({ where: { platformId }, include: { media: true } });
-
-      post = post
-        ? await prisma.post.update({ where: { id: post.id }, data: postData, include: { media: true } })
-        : await prisma.post.create({
-            data: { platformId, url, username, postedAt: new Date(scraped.takenAt), ...postData },
-            include: { media: true },
-          });
+      // Keep the Post row so re-runs and the dashboard can see this was
+      // reprocessed, but don't build the full collaborator/socialProfile graph
+      // — mobile only needs media. Upsert by url alone: no platformId-based
+      // fallback lookup — see above for why that merged unrelated posts.
+      const post = await prisma.post.upsert({
+        where: { url },
+        update: postData,
+        create: { platformId, url, username, postedAt: new Date(scraped.takenAt), ...postData },
+        include: { media: true },
+      });
 
       ensureDir(config.paths.temp);
 

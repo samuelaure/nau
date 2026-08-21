@@ -95,8 +95,14 @@ async function runReprocess(db: DatabaseSync) {
 
   console.log(`[reprocess] ${pending.length} posts pending\n`);
 
+  // username is deliberately not written back: the actor's author.username for
+  // a postUrls scrape is unreliable (confirmed: it returns the literal string
+  // "reel" or "p" for direct post/reel URLs, parsed from the wrong part of the
+  // URL). Writing a wrong username would be a worse, quieter defect than
+  // leaving the field as it was — caption comes from the per-post scrape
+  // response itself, not the fabricated profile object, so it is trustworthy.
   const updateMedia = db.prepare(
-    `UPDATE posts SET mediaData = ?, isProcessed = 1, sync_status = 'processed', local_updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    `UPDATE posts SET mediaData = ?, instagram_caption = ?, isProcessed = 1, sync_status = 'processed', local_updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
   );
   const markPreserved = db.prepare(
     `UPDATE posts SET isProcessed = 1, sync_status = 'gone_preserved', local_updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
@@ -107,6 +113,13 @@ async function runReprocess(db: DatabaseSync) {
   let foundCount = 0;
   let preservedCount = 0;
 
+  // Cheap integrity net: if two different posts ever end up with the exact
+  // same set of storageUrls, something is wrong upstream (this is exactly how
+  // the platformId-collision bug surfaced — every post silently got the same
+  // 6 R2 objects). Track signatures as we go and fail loudly instead of
+  // writing the second occurrence.
+  const seenMediaSignatures = new Map<string, number>();
+
   for (const post of pending) {
     process.stdout.write(`[${post.id}] ${post.instagramUrl} … `);
     try {
@@ -114,8 +127,18 @@ async function runReprocess(db: DatabaseSync) {
       const result = await pollUntilDone(jobId);
 
       if (result.outcome === 'found') {
+        const urls = result.media.map((m) => m.storageUrl).sort();
+        const signature = urls.join('|');
+        const priorPostId = seenMediaSignatures.get(signature);
+        if (signature && priorPostId !== undefined) {
+          throw new Error(
+            `identical media set as post id=${priorPostId} (${urls.length} urls) — refusing to write, this is the collision bug, investigate before continuing`,
+          );
+        }
+        seenMediaSignatures.set(signature, post.id);
+
         const mediaData = result.media.map((m) => ({ type: m.type, url: m.storageUrl, width: m.width, height: m.height }));
-        updateMedia.run(JSON.stringify(mediaData), post.id);
+        updateMedia.run(JSON.stringify(mediaData), result.caption ?? null, post.id);
         foundCount++;
         console.log(`found, ${result.media.length} media`);
       } else {
