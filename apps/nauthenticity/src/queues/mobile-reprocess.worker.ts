@@ -97,16 +97,27 @@ export const mobileReprocessWorker = new Worker(
         if (!m.url) continue;
 
         const mediaId = post.media[i]?.id ?? randomUUID();
-        const fileExt = m.type === 'video' ? 'mp4' : 'jpg';
-        const rawPath = path.join(config.paths.temp, `${mediaId}_mobile_raw.${fileExt}`);
-        const finalPath = path.join(config.paths.temp, `${mediaId}_mobile_final.${fileExt}`);
+        // Don't trust m.type: for a single-post scrape (postUrls) the actor
+        // labels every carousel child "sidecar_child" regardless of whether it
+        // is a photo or a video, so 'video' vs not-'video' silently mis-sorts
+        // any video hiding inside a carousel into the image path — one ffmpeg
+        // frame grab and the only surviving copy is gone. Content-Type from
+        // the actual fetch is authoritative; m.type is not used at all below.
+        const rawPathNoExt = path.join(config.paths.temp, `${mediaId}_mobile_raw`);
+        const finalPathNoExt = path.join(config.paths.temp, `${mediaId}_mobile_final`);
 
         try {
           const response = await fetch(m.url);
           if (!response.ok) throw new Error(`Failed to fetch media: ${response.status}`);
+          const contentType = response.headers.get('content-type') ?? '';
+          const isVideo = contentType.startsWith('video/');
+          const fileExt = isVideo ? 'mp4' : 'jpg';
+          const mediaType: 'image' | 'video' = isVideo ? 'video' : 'image';
+          const rawPath = `${rawPathNoExt}.${fileExt}`;
+          const finalPath = `${finalPathNoExt}.${fileExt}`;
           await pipeline(response.body as any, createWriteStream(rawPath));
 
-          if (m.type === 'video') {
+          if (isVideo) {
             await optimizeVideoForArchive(rawPath, finalPath, () => job.extendLock(mediaId, 600_000));
           } else {
             await optimizeImage(rawPath, finalPath);
@@ -115,9 +126,15 @@ export const mobileReprocessWorker = new Worker(
           const dimensions =
             m.width && m.height ? { width: m.width, height: m.height } : await probeDimensions(rawPath);
 
-          const storageKey = nauthenticity.post(username, mediaId, fileExt);
+          // Don't key the storage path on scraped.author.username either: the
+          // same actor bug that mislabels media type also mis-parses the
+          // username for postUrls scrapes of /reel/ and /p/ URLs — it takes
+          // the URL's second path segment, which for those two forms is the
+          // literal string "reel" or "p", not a real account. The path only
+          // needs to be a stable, collision-free namespace, not the account.
+          const storageKey = nauthenticity.post('mobile-archive', mediaId, fileExt);
           const publicUrl = await storage.upload(storageKey, fs.createReadStream(finalPath), {
-            mimeType: m.type === 'video' ? 'video/mp4' : 'image/jpeg',
+            mimeType: isVideo ? 'video/mp4' : 'image/jpeg',
           });
 
           await prisma.media.upsert({
@@ -126,7 +143,7 @@ export const mobileReprocessWorker = new Worker(
             create: {
               id: mediaId,
               postId: post.id,
-              type: m.type,
+              type: mediaType,
               url: m.url,
               storageUrl: publicUrl,
               width: dimensions?.width,
@@ -136,15 +153,21 @@ export const mobileReprocessWorker = new Worker(
           });
 
           results.push({
-            type: m.type,
+            type: mediaType,
             storageUrl: publicUrl,
             width: dimensions?.width ?? null,
             height: dimensions?.height ?? null,
             index: i,
           });
         } finally {
-          if (fs.existsSync(rawPath)) fs.unlinkSync(rawPath);
-          if (fs.existsSync(finalPath)) fs.unlinkSync(finalPath);
+          // Extension is only known once Content-Type comes back, so clean up
+          // by prefix rather than a single known path.
+          for (const ext of ['mp4', 'jpg']) {
+            const raw = `${rawPathNoExt}.${ext}`;
+            const final = `${finalPathNoExt}.${ext}`;
+            if (fs.existsSync(raw)) fs.unlinkSync(raw);
+            if (fs.existsSync(final)) fs.unlinkSync(final);
+          }
         }
       }
 
