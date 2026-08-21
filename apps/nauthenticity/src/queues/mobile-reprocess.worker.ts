@@ -59,9 +59,27 @@ export const mobileReprocessWorker = new Worker(
       const { url } = job.data;
       logger.info(`[MobileReprocess] Scraping ${url}`);
 
-      const scraped = await scrapePostByUrl(url);
+      // scrapePostByUrl returns null both when the post is genuinely gone AND
+      // when the actor got blocked scraping it (Instagram serving HTML instead
+      // of JSON — a proxy/rate-limit block, not a verdict on the post). The
+      // actor already retries 3x internally over ~30s before giving up with no
+      // distinguishing error in the dataset, so a null here isn't reliable
+      // evidence of "not found" on its own. Confirmed against a real batch:
+      // 7/98 came back null this way for posts that, checked by hand, all
+      // still existed. Retry across a longer window — spaced further apart
+      // than the actor's own internal retries — before treating this as a
+      // disposition-relevant outcome.
+      let scraped: Awaited<ReturnType<typeof scrapePostByUrl>> = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        scraped = await scrapePostByUrl(url);
+        if (scraped) break;
+        if (attempt < 3) {
+          logger.warn(`[MobileReprocess] ${url} scrape returned nothing (attempt ${attempt}/3) — retrying`);
+          await new Promise((r) => setTimeout(r, 30_000));
+        }
+      }
       if (!scraped) {
-        logger.warn(`[MobileReprocess] ${url} no longer resolves on Instagram`);
+        logger.warn(`[MobileReprocess] ${url} did not resolve after 3 attempts — reporting not_found`);
         return { outcome: 'not_found', postUrl: url };
       }
 
