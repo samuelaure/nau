@@ -4,7 +4,7 @@ import { z } from 'zod'
 import prisma from '@zazu/db'
 import { logger } from './lib/logger'
 import { buildServiceHeaders } from './lib/service-auth'
-import { getStorage } from './lib/storage'
+import { getPrivateStorage } from './lib/storage'
 import { getClientForFeature, getFeatureFallbackChain } from '@nau/llm-client'
 import { withRetry } from './lib/retry'
 import fs from 'fs'
@@ -129,9 +129,12 @@ class VoicenoteSkillImpl implements ZazuSkill {
           { retries: 3, baseDelayMs: 2000, label: 'getFile+download' },
         )
 
-        const storage = getStorage()
+        // Private bucket, and the key is what gets stored — not a URL. A URL
+        // bakes the delivery mechanism into the row; a key can be served later
+        // as a presigned link, through a proxy, or however else suits.
+        const storage = getPrivateStorage()
         const storageKey = `zazu/voicenotes/${user.telegramId}/${crypto.randomUUID()}.ogg`
-        const audioUrl = await storage.upload(storageKey, audioBuffer, { mimeType: 'audio/ogg' })
+        await storage.upload(storageKey, audioBuffer, { mimeType: 'audio/ogg' })
 
         // Save buffer to tmp file
         const tmpPath = path.join(os.tmpdir(), `nau-voice-${crypto.randomUUID()}.ogg`)
@@ -176,7 +179,7 @@ Return only valid JSON: { "cleanTranscription": "...", "summary": "..." }`,
         const { cleanTranscription, summary } = parsed
 
         const voicenote = await prisma.voicenote.create({
-          data: { userId: user.id, audioStorageUrl: audioUrl, rawTranscription, cleanTranscription, summary },
+          data: { userId: user.id, audioStorageUrl: storageKey, rawTranscription, cleanTranscription, summary },
         })
 
         ctx.session.pendingVoicenoteId = voicenote.id
