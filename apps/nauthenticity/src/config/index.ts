@@ -15,6 +15,7 @@ export const config = {
   apify: {
     token: env.APIFY_TOKEN,
     instagramUniversalActorId: env.APIFY_INSTAGRAM_UNIVERSAL_ACTOR_ID,
+    instagramDirectScraperActorId: env.APIFY_INSTAGRAM_DIRECT_SCRAPER_ACTOR_ID,
   },
   openai: {
     apiKey: env.OPENAI_API_KEY,

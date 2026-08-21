@@ -8,7 +8,7 @@ import { config } from '../config';
 import { prisma } from '../modules/shared/prisma';
 import { logger } from '../utils/logger';
 import { logContextStorage } from '../utils/context';
-import { scrapePostByUrl } from '../services/apify.service';
+import { scrapeMobileCapture } from '../services/apify.service';
 import { optimizeVideoForArchive, optimizeImage, probeDimensions } from '../utils/media';
 import { createStorage, nauthenticity } from 'nau-storage';
 
@@ -41,7 +41,14 @@ export interface ReprocessedMedia {
 }
 
 export type ReprocessCaptureResult =
-  | { outcome: 'found'; postUrl: string; caption: string | null; postedAt: string; media: ReprocessedMedia[] }
+  | {
+      outcome: 'found';
+      postUrl: string;
+      username: string | null;
+      caption: string | null;
+      postedAt: string;
+      media: ReprocessedMedia[];
+    }
   | { outcome: 'not_found'; postUrl: string };
 
 const ensureDir = (dir: string) => {
@@ -59,58 +66,51 @@ export const mobileReprocessWorker = new Worker(
       const { url } = job.data;
       logger.info(`[MobileReprocess] Scraping ${url}`);
 
-      // scrapePostByUrl returns null both when the post is genuinely gone AND
-      // when the actor got blocked scraping it (Instagram serving HTML instead
-      // of JSON — a proxy/rate-limit block, not a verdict on the post). The
-      // actor already retries 3x internally over ~30s before giving up with no
-      // distinguishing error in the dataset, so a null here isn't reliable
-      // evidence of "not found" on its own. Confirmed against a real batch:
-      // 7/98 came back null this way for posts that, checked by hand, all
-      // still existed. Retry across a longer window — spaced further apart
-      // than the actor's own internal retries — before treating this as a
-      // disposition-relevant outcome.
-      let scraped: Awaited<ReturnType<typeof scrapePostByUrl>> = null;
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        scraped = await scrapePostByUrl(url);
-        if (scraped) break;
-        if (attempt < 3) {
-          logger.warn(`[MobileReprocess] ${url} scrape returned nothing (attempt ${attempt}/3) — retrying`);
-          await new Promise((r) => setTimeout(r, 30_000));
-        }
+      // Uses apify/instagram-scraper (Apify's maintained actor), not
+      // nau-ig-actor — verified against real posts to return correct,
+      // distinct content per URL. nau-ig-actor's postUrls path could not be
+      // used here: confirmed against a real 98-post batch that it returned
+      // the exact same wrong post for every /reel/ URL requested (its input
+      // recognition only matched the plural, non-post /reels/), and its
+      // single-post detail endpoint for /p/ URLs hits a Instagram API that
+      // now requires a login it doesn't have. See
+      // nau-mobile/docs/reprocessing-pipeline.md.
+      // A single null isn't necessarily "gone" — any scraper can hit a
+      // transient block, and returning normally (not throwing) means BullMQ's
+      // own job-retry never engages. Learned the hard way on the previous
+      // actor: 7/98 came back null on the first pass and all still existed.
+      // Two tries, spaced out, before treating this as disposition-relevant.
+      let scraped = await scrapeMobileCapture(url);
+      if (!scraped) {
+        logger.warn(`[MobileReprocess] ${url} scrape returned nothing — retrying once`);
+        await new Promise((r) => setTimeout(r, 20_000));
+        scraped = await scrapeMobileCapture(url);
       }
       if (!scraped) {
-        logger.warn(`[MobileReprocess] ${url} did not resolve after 3 attempts — reporting not_found`);
+        logger.warn(`[MobileReprocess] ${url} did not resolve after retry — reporting not_found`);
         return { outcome: 'not_found', postUrl: url };
       }
 
-      const username = scraped.author.username;
-
-      // Do NOT trust scraped.id/shortcode as an identity key: confirmed against
-      // the real batch that a postUrls scrape can return the SAME id for
-      // completely different posts — every one of 92 distinct URLs resolved to
-      // the platformId of the very first post processed, which (combined with
-      // the platformId-fallback lookup this comment used to describe) collapsed
-      // all 92 into a single Post row, silently overwriting the same 6 R2
-      // objects on every run. That is the third unreliable field this actor has
-      // produced for direct-URL scrapes, after author.username and media[].type.
-      // The post's own URL is the one thing we supplied and know is correct, so
-      // derive identity from it instead — the shortcode is unique per post.
-      const shortcodeMatch = url.match(/\/(?:p|reel|tv)\/([^/?#]+)/);
-      const platformId = `mobile-${shortcodeMatch?.[1] ?? randomUUID()}`;
+      const platformId = `mobile-${scraped.shortcode}`;
       const postData = {
         caption: scraped.caption,
-        likes: Math.max(0, scraped.likesCount ?? 0),
-        comments: Math.max(0, scraped.commentsCount ?? 0),
       };
 
-      // Keep the Post row so re-runs and the dashboard can see this was
-      // reprocessed, but don't build the full collaborator/socialProfile graph
-      // — mobile only needs media. Upsert by url alone: no platformId-based
-      // fallback lookup — see above for why that merged unrelated posts.
+      // Upsert by url; platformId is derived from our own shortcode match
+      // above and namespaced with 'mobile-' so it can never collide with a
+      // platformId nauthenticity's normal profile-ingestion pipeline assigned
+      // to the same content under a different url — worst case is a second
+      // Post row for the same real post, never a merge of unrelated ones.
       const post = await prisma.post.upsert({
         where: { url },
         update: postData,
-        create: { platformId, url, username, postedAt: new Date(scraped.takenAt), ...postData },
+        create: {
+          platformId,
+          url,
+          username: scraped.ownerUsername ?? undefined,
+          postedAt: new Date(scraped.takenAt),
+          ...postData,
+        },
         include: { media: true },
       });
 
@@ -123,12 +123,10 @@ export const mobileReprocessWorker = new Worker(
         if (!m.url) continue;
 
         const mediaId = post.media[i]?.id ?? randomUUID();
-        // Don't trust m.type: for a single-post scrape (postUrls) the actor
-        // labels every carousel child "sidecar_child" regardless of whether it
-        // is a photo or a video, so 'video' vs not-'video' silently mis-sorts
-        // any video hiding inside a carousel into the image path — one ffmpeg
-        // frame grab and the only surviving copy is gone. Content-Type from
-        // the actual fetch is authoritative; m.type is not used at all below.
+        // scraped.media[i].type comes from apify/instagram-scraper's own
+        // per-item `type` field, which is reliable — but Content-Type on the
+        // actual fetch is free to check and is the one signal no actor's
+        // input-shape bug can misreport, so it stays authoritative here.
         const rawPathNoExt = path.join(config.paths.temp, `${mediaId}_mobile_raw`);
         const finalPathNoExt = path.join(config.paths.temp, `${mediaId}_mobile_final`);
 
@@ -136,7 +134,7 @@ export const mobileReprocessWorker = new Worker(
           const response = await fetch(m.url);
           if (!response.ok) throw new Error(`Failed to fetch media: ${response.status}`);
           const contentType = response.headers.get('content-type') ?? '';
-          const isVideo = contentType.startsWith('video/');
+          const isVideo = contentType.startsWith('video/') || (contentType === '' && m.type === 'video');
           const fileExt = isVideo ? 'mp4' : 'jpg';
           const mediaType: 'image' | 'video' = isVideo ? 'video' : 'image';
           const rawPath = `${rawPathNoExt}.${fileExt}`;
@@ -152,12 +150,8 @@ export const mobileReprocessWorker = new Worker(
           const dimensions =
             m.width && m.height ? { width: m.width, height: m.height } : await probeDimensions(rawPath);
 
-          // Don't key the storage path on scraped.author.username either: the
-          // same actor bug that mislabels media type also mis-parses the
-          // username for postUrls scrapes of /reel/ and /p/ URLs — it takes
-          // the URL's second path segment, which for those two forms is the
-          // literal string "reel" or "p", not a real account. The path only
-          // needs to be a stable, collision-free namespace, not the account.
+          // Namespaced under 'mobile-archive' rather than the scraped
+          // username: R2 key organisation only, has no bearing on identity.
           const storageKey = nauthenticity.post('mobile-archive', mediaId, fileExt);
           const publicUrl = await storage.upload(storageKey, fs.createReadStream(finalPath), {
             mimeType: isVideo ? 'video/mp4' : 'image/jpeg',
@@ -203,7 +197,8 @@ export const mobileReprocessWorker = new Worker(
       return {
         outcome: 'found',
         postUrl: url,
-        caption: scraped.caption ?? null,
+        username: scraped.ownerUsername,
+        caption: scraped.caption,
         postedAt: scraped.takenAt,
         media: results,
       };

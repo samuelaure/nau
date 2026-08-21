@@ -9,6 +9,13 @@ const envSchema = z.object({
   REDIS_PASSWORD: z.string().optional(),
   APIFY_TOKEN: z.string().min(1),
   APIFY_INSTAGRAM_UNIVERSAL_ACTOR_ID: z.string().default('samuelaure/nau-ig-actor'),
+  // Apify's own maintained Instagram Scraper — used for the mobile single-post
+  // reprocessing path. The custom nau-ig-actor above cannot be used for that:
+  // its /reel/ URL handling and single-post detail endpoint are both broken
+  // (see nau-mobile/docs/reprocessing-pipeline.md and the fix commits around
+  // 2026-08-21). Left as its own actor rather than folded into the field
+  // above so the two scraping paths stay independently swappable.
+  APIFY_INSTAGRAM_DIRECT_SCRAPER_ACTOR_ID: z.string().default('apify/instagram-scraper'),
   OPENAI_API_KEY: z.string().min(1),
   NAU_SERVICE_KEY: z.string().default('development_key'),
   NAU_API_URL: z.string().url().optional(),

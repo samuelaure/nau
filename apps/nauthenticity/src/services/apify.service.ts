@@ -469,3 +469,82 @@ export const scrapePostByUrl = async (
     return null;
   }
 };
+
+// --- Mobile single-post scraper (apify/instagram-scraper) ---
+//
+// The custom nau-ig-actor's postUrls path cannot be used for this: it never
+// recognised /reel/<code>/ (only the plural, non-post /reels/), so it treated
+// every reel URL as a username and scraped that account's own feed instead —
+// same wrong post for every request, confirmed against a real batch of 98.
+// Its single-post detail endpoint for /p/ URLs also hit a dead Instagram API
+// (__a=1) that requires a login this actor doesn't have. Both are fixed or
+// documented in code/apify-actors/actors/nau-ig-actor, but rather than lean
+// on a same-day fix under this much scrutiny, mobile reprocessing uses
+// Apify's own maintained Instagram Scraper instead — verified against real
+// posts to return correct, distinct content per URL requested.
+
+export interface MobileCaptureMedia {
+  type: 'image' | 'video';
+  url: string;
+  width?: number;
+  height?: number;
+}
+
+export interface MobileCapturePost {
+  shortcode: string;
+  url: string;
+  caption: string | null;
+  takenAt: string;
+  ownerUsername: string | null;
+  media: MobileCaptureMedia[];
+}
+
+export const scrapeMobileCapture = async (url: string): Promise<MobileCapturePost | null> => {
+  logger.info(`[Apify] Scraping mobile capture via official Instagram Scraper: ${url}`);
+
+  try {
+    const actorRun = await client.actor(config.apify.instagramDirectScraperActorId).call(
+      { directUrls: [url], resultsLimit: 1 },
+      { waitSecs: 600, memory: 1024 },
+    );
+
+    if (actorRun.status !== 'SUCCEEDED') {
+      logger.warn(`[Apify] instagram-scraper run ${actorRun.id} status: ${actorRun.status}`);
+      return null;
+    }
+
+    const { items } = await client.dataset(actorRun.defaultDatasetId).listItems();
+    const item = items[0] as any;
+    if (!item || !item.shortCode) return null;
+
+    // Sidecar (carousel) posts carry their media in childPosts; everything
+    // else is a single item described at the top level.
+    const rawMediaItems: any[] = item.childPosts?.length ? item.childPosts : [item];
+
+    const media: MobileCaptureMedia[] = rawMediaItems
+      .map((m) => {
+        const isVideo = m.type === 'Video' && !!m.videoUrl;
+        const mediaUrl = isVideo ? m.videoUrl : m.displayUrl;
+        if (!mediaUrl) return null;
+        return {
+          type: isVideo ? 'video' : 'image',
+          url: mediaUrl,
+          width: m.originalWidth ?? m.dimensionsWidth ?? undefined,
+          height: m.originalHeight ?? m.dimensionsHeight ?? undefined,
+        } as MobileCaptureMedia;
+      })
+      .filter((m): m is MobileCaptureMedia => m !== null);
+
+    return {
+      shortcode: item.shortCode,
+      url: item.url ?? url,
+      caption: item.caption ?? null,
+      takenAt: item.timestamp ?? new Date().toISOString(),
+      ownerUsername: item.ownerUsername ?? null,
+      media,
+    };
+  } catch (error: any) {
+    logger.error(`[Apify] Error scraping mobile capture ${url}: ${error.message}`);
+    return null;
+  }
+};

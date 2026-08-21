@@ -47,7 +47,14 @@ interface ReprocessedMedia {
 }
 
 type JobResult =
-  | { outcome: 'found'; postUrl: string; caption: string | null; postedAt: string; media: ReprocessedMedia[] }
+  | {
+      outcome: 'found';
+      postUrl: string;
+      username: string | null;
+      caption: string | null;
+      postedAt: string;
+      media: ReprocessedMedia[];
+    }
   | { outcome: 'not_found'; postUrl: string };
 
 async function serviceHeaders(): Promise<Record<string, string>> {
@@ -95,14 +102,12 @@ async function runReprocess(db: DatabaseSync) {
 
   console.log(`[reprocess] ${pending.length} posts pending\n`);
 
-  // username is deliberately not written back: the actor's author.username for
-  // a postUrls scrape is unreliable (confirmed: it returns the literal string
-  // "reel" or "p" for direct post/reel URLs, parsed from the wrong part of the
-  // URL). Writing a wrong username would be a worse, quieter defect than
-  // leaving the field as it was — caption comes from the per-post scrape
-  // response itself, not the fabricated profile object, so it is trustworthy.
+  // As of the switch to apify/instagram-scraper, username is reliable (the
+  // custom nau-ig-actor's was not — confirmed it returned the literal string
+  // "reel" for /reel/ URLs, sourced from the wrong part of the input URL) and
+  // gets written back along with caption.
   const updateMedia = db.prepare(
-    `UPDATE posts SET mediaData = ?, instagram_caption = ?, isProcessed = 1, sync_status = 'processed', local_updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    `UPDATE posts SET mediaData = ?, instagram_caption = ?, username = COALESCE(?, username), isProcessed = 1, sync_status = 'processed', local_updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
   );
   const markPreserved = db.prepare(
     `UPDATE posts SET isProcessed = 1, sync_status = 'gone_preserved', local_updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
@@ -138,11 +143,11 @@ async function runReprocess(db: DatabaseSync) {
         seenMediaSignatures.set(signature, post.id);
 
         const mediaData = result.media.map((m) => ({ type: m.type, url: m.storageUrl, width: m.width, height: m.height }));
-        updateMedia.run(JSON.stringify(mediaData), result.caption ?? null, post.id);
+        updateMedia.run(JSON.stringify(mediaData), result.caption ?? null, result.username ?? null, post.id);
         foundCount++;
-        console.log(`found, ${result.media.length} media`);
+        console.log(`found, ${result.media.length} media, owner=${result.username ?? '?'}`);
       } else {
-        // 'not_found' also covers restricted/private — scrapePostByUrl cannot
+        // 'not_found' also covers restricted/private — nauthenticity cannot
         // currently tell them apart. Preserved posts are unaffected either
         // way; genuinely-deletable candidates should be opened by hand before
         // apply-deletions runs.
