@@ -3,6 +3,7 @@ import { ingestionWorker } from '../../queues/ingestion.worker'
 import { downloadWorker } from '../../queues/download.worker'
 import { computeWorker } from '../../queues/compute.worker'
 import { optimizationWorker } from '../../queues/optimization.worker'
+import { mobileReprocessWorker } from '../../queues/mobile-reprocess.worker'
 import { optimizationQueue } from '../../queues/optimization.queue'
 import { computeQueue } from '../../queues/compute.queue'
 import { prisma } from '../../modules/shared/prisma'
@@ -10,7 +11,7 @@ import { prisma } from '../../modules/shared/prisma'
 @Injectable()
 export class WorkersService implements OnApplicationBootstrap, OnApplicationShutdown {
   private readonly logger = new Logger(WorkersService.name)
-  private readonly workers = [ingestionWorker, downloadWorker, computeWorker, optimizationWorker]
+  private readonly workers = [ingestionWorker, downloadWorker, computeWorker, optimizationWorker, mobileReprocessWorker]
 
   async onApplicationBootstrap() {
     this.logger.log('Starting BullMQ workers...')
