@@ -15,6 +15,10 @@ model User {
   name         String?
   telegramId         String?  @unique
   defaultWorkspaceId String?
+  // IANA zone. A person's day starts and ends where they are, and the journal is
+  // organised by day: without this every period boundary falls on the server's
+  // midnight, which for a user in Madrid cuts the day at 02:00 local.
+  timezone           String   @default("UTC")
   createdAt          DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -281,15 +285,31 @@ model Schedule {
   updatedAt   DateTime  @updatedAt
 }
 
+/// Append-only record of what happened to a block and when.
+///
+/// The journal reads this to reconstruct a day's activity: a block's current
+/// state says what is true now, never when it became true. `status: 'done'`
+/// carries no completion time, and `Block.updatedAt` is overwritten by the next
+/// edit, so without this log "what did I finish today" is unanswerable.
+///
+/// workspaceId and userId are denormalised so a day can be queried without
+/// joining Block — and so the record survives its block being hard-deleted,
+/// which is itself an event worth keeping.
 model Event {
-  id        String   @id @default(cuid())
-  type      String
-  metadata  Json     @default("{}")
+  id          String   @id @default(cuid())
+  type        String
+  metadata    Json     @default("{}")
 
-  blockId   String
-  block     Block    @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  blockId     String
+  block       Block    @relation(fields: [blockId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime @default(now())
+  workspaceId String?
+  userId      String?
+
+  createdAt   DateTime @default(now())
+
+  @@index([workspaceId, createdAt])
+  @@index([blockId])
 }
 
 model SyncCursor {
