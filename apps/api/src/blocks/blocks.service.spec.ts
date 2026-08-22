@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BlocksService } from './blocks.service';
+import { BlockEventsService } from './block-events.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma, Block } from '@prisma/client';
 import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
@@ -54,6 +55,13 @@ describe('BlocksService', () => {
         {
           provide: PrismaService,
           useValue: mockDeep<PrismaService>(),
+        },
+        {
+          // The activity log is written alongside every mutation. It is
+          // best-effort by design, so these tests assert the mutation and leave
+          // the log's own behaviour to block-events.service.spec.
+          provide: BlockEventsService,
+          useValue: { record: jest.fn(), recordUpdate: jest.fn() },
         },
       ],
     }).compile();

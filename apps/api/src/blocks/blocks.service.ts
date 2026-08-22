@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { BlockEventsService } from './block-events.service';
 import { CreateBlockDto } from './dto/create-block.dto';
 import { UpdateBlockDto } from './dto/update-block.dto';
 import { FindBlocksQueryDto } from './dto/find-blocks-query.dto';
@@ -11,7 +12,10 @@ import type {
 
 @Injectable()
 export class BlocksService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private events: BlockEventsService,
+  ) {}
 
   async getMemberWorkspaceIds(userId: string): Promise<string[]> {
     const memberships = await this.prisma.workspaceMember.findMany({
@@ -101,7 +105,9 @@ export class BlocksService {
       userId: userId ?? null,
     };
 
-    return this.prisma.block.create({ data });
+    const created = await this.prisma.block.create({ data });
+    await this.events.record('block.created', created, { blockType: type }, userId);
+    return created;
   }
 
   /**
@@ -178,13 +184,14 @@ export class BlocksService {
       await this.assertBlockAccess(userId, updateBlockDto.parentId);
     }
 
-    return this.applyUpdate(id, block, updateBlockDto);
+    return this.applyUpdate(id, block, updateBlockDto, userId);
   }
 
-  private applyUpdate(
+  private async applyUpdate(
     id: string,
-    block: { properties: Prisma.JsonValue },
+    block: { id?: string; workspaceId?: string | null; userId?: string | null; properties: Prisma.JsonValue },
     updateBlockDto: UpdateBlockDto,
+    actorUserId?: string,
   ) {
     const { type, properties, parentId } = updateBlockDto;
     const data: Prisma.BlockUpdateInput = {};
@@ -208,7 +215,9 @@ export class BlocksService {
           : { connect: { id: parentId } };
     }
 
-    return this.prisma.block.update({ where: { id }, data });
+    const updated = await this.prisma.block.update({ where: { id }, data });
+    await this.events.recordUpdate({ ...block, id }, updated, actorUserId);
+    return updated;
   }
 
   private sortByDateThenOrder<T extends { properties: Prisma.JsonValue }>(
@@ -260,11 +269,13 @@ export class BlocksService {
   }
 
   async remove(userId: string, id: string) {
-    await this.assertBlockAccess(userId, id);
-    return this.prisma.block.update({
+    const block = await this.assertBlockAccess(userId, id);
+    const removed = await this.prisma.block.update({
       where: { id },
       data: { deletedAt: new Date() },
     });
+    await this.events.record('block.deleted', block, { blockType: block.type }, userId);
+    return removed;
   }
 
   async addTag(userId: string, blockId: string, tagId: string) {
@@ -276,15 +287,19 @@ export class BlocksService {
       throw new ForbiddenException('Tag belongs to a different workspace');
     }
 
-    return this.prisma.blockTag.create({
+    const link = await this.prisma.blockTag.create({
       data: { blockId, tagId },
     });
+    await this.events.record('block.tagged', block, { tagId, tagName: tag.name }, userId);
+    return link;
   }
 
   async removeTag(userId: string, blockId: string, tagId: string) {
-    await this.assertBlockAccess(userId, blockId);
-    return this.prisma.blockTag.delete({
+    const block = await this.assertBlockAccess(userId, blockId);
+    const removed = await this.prisma.blockTag.delete({
       where: { blockId_tagId: { blockId, tagId } },
     });
+    await this.events.record('block.untagged', block, { tagId }, userId);
+    return removed;
   }
 }
