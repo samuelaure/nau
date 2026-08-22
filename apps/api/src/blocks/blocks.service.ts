@@ -131,7 +131,7 @@ export class BlocksService {
   }
 
   async findAll(userId: string, query: FindBlocksQueryDto) {
-    const { type, status, workspaceId } = query;
+    const { type, status, workspaceId, types, from, to, limit } = query;
 
     const memberWorkspaceIds = await this.getMemberWorkspaceIds(userId);
     if (memberWorkspaceIds.length === 0) return [];
@@ -146,11 +146,28 @@ export class BlocksService {
     };
 
     if (type) where.type = type;
-    where.properties = status
-      ? { path: ['status'], equals: status }
-      : { path: ['status'], not: 'trash' };
+    if (types) where.type = { in: types.split(',').map((t) => t.trim()).filter(Boolean) };
 
-    const blocks = await this.prisma.block.findMany({ where });
+    // Several conditions can apply to `properties` at once, and a single object
+    // would let the last one silently replace the others.
+    const propertyFilters: Prisma.BlockWhereInput[] = [
+      status
+        ? { properties: { path: ['status'], equals: status } }
+        : { properties: { path: ['status'], not: 'trash' } },
+    ];
+
+    // Range filtering happens here rather than in the browser. The journal view
+    // used to fetch every block in the workspace — including 968 Instagram
+    // captures — to render a single day.
+    if (from) propertyFilters.push({ properties: { path: ['date'], gte: from } });
+    if (to) propertyFilters.push({ properties: { path: ['date'], lte: to } });
+
+    where.AND = propertyFilters;
+
+    const blocks = await this.prisma.block.findMany({
+      where,
+      ...(limit ? { take: Math.min(Number(limit) || 200, 1000) } : {}),
+    });
     return this.sortByDateThenOrder(blocks);
   }
 

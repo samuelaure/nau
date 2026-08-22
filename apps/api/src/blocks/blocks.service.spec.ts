@@ -221,9 +221,27 @@ describe('BlocksService', () => {
           deletedAt: null,
           workspaceId: { in: ['ws-1'] },
           type: 'action',
-          properties: { path: ['status'], not: 'trash' },
+          AND: [{ properties: { path: ['status'], not: 'trash' } }],
         },
       });
+    });
+
+    it('should filter by date range on the server', async () => {
+      prisma.block.findMany.mockResolvedValueOnce([]);
+
+      await service.findAll(user.sub, {
+        types: 'journal_entry,journal_summary',
+        from: '2026-08-01',
+        to: '2026-08-31',
+      });
+
+      const arg = prisma.block.findMany.mock.calls[0]![0] as any;
+      expect(arg.where.type).toEqual({ in: ['journal_entry', 'journal_summary'] });
+      expect(arg.where.AND).toEqual([
+        { properties: { path: ['status'], not: 'trash' } },
+        { properties: { path: ['date'], gte: '2026-08-01' } },
+        { properties: { path: ['date'], lte: '2026-08-31' } },
+      ]);
     });
 
     it('should reject an explicit workspace the caller does not belong to', async () => {

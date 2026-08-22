@@ -6,6 +6,8 @@ import { Block } from '@9nau/types'
 import { ChevronLeft, ChevronRight, Calendar, Sparkles, BookOpen, FileText } from 'lucide-react'
 import { Button } from '@9nau/ui/components/button'
 import { cn } from '@9nau/ui/lib/utils'
+import { JournalCapture } from './JournalCapture'
+import { useUiStore } from '@/lib/state/ui-store'
 
 type PeriodType = 'day' | 'week' | 'month' | 'year'
 
@@ -77,19 +79,26 @@ function formatPeriodTitle(date: Date, period: PeriodType): string {
 }
 
 export function JournalView() {
+  const activeWorkspaceId = useUiStore((st) => st.activeWorkspaceId)
   const [currentDate, setCurrentDate] = useState(new Date())
   const [period, setPeriod] = useState<PeriodType>('day')
 
-  const { data: allBlocks, isLoading } = useGetBlocks({})
+  const range = useMemo(() => getDateRange(currentDate, period), [currentDate, period])
+
+  // Only the period being viewed, and only the types this view renders. It used
+  // to request every block in the workspace — 968 Instagram captures included —
+  // and filter in the browser to show a single day.
+  const { data: allBlocks, isLoading } = useGetBlocks({
+    types: ['journal_entry', 'journal_summary', 'note', 'action'],
+    from: range.start.toISOString(),
+    to: range.end.toISOString(),
+    workspaceId: activeWorkspaceId ?? undefined,
+  })
 
   const { entries, summaries } = useMemo(() => {
     if (!allBlocks) return { entries: [], summaries: [] }
-    const range = getDateRange(currentDate, period)
 
-    const inRange = allBlocks.filter((b: Block) => {
-      const d = new Date(b.createdAt)
-      return d >= range.start && d <= range.end
-    })
+    const inRange = allBlocks
 
     const entries = inRange
       .filter((b: Block) => b.type === 'journal_entry' || b.type === 'note' || b.type === 'action')
@@ -100,7 +109,7 @@ export function JournalView() {
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
     return { entries, summaries }
-  }, [allBlocks, currentDate, period])
+  }, [allBlocks])
 
   const handleNavigate = (direction: -1 | 1) => {
     setCurrentDate(navigate(currentDate, period, direction))
@@ -138,6 +147,14 @@ export function JournalView() {
           ))}
         </div>
       </div>
+
+      {/* Capture box, only on the day view: an entry written while looking at a
+          month would be filed under today anyway, which is confusing. */}
+      {period === 'day' && (
+        <div className="mb-6">
+          <JournalCapture />
+        </div>
+      )}
 
       {/* Navigation */}
       <div className="flex items-center justify-between mb-8">

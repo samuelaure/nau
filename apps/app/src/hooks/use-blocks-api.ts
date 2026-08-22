@@ -4,8 +4,14 @@ import { Block, CreateBlockDto, UpdateBlockDto } from '@9nau/types'
 
 type FindBlocksParams = {
   type?: string
+  /** Several types at once, so a view can ask for what it needs and no more. */
+  types?: string[]
   status?: string
   workspaceId?: string
+  /** ISO dates, inclusive, matched against properties.date on the server. */
+  from?: string
+  to?: string
+  limit?: number
 }
 
 export const useGetBlocks = (params: FindBlocksParams) => {
@@ -21,6 +27,10 @@ export const useGetBlocks = (params: FindBlocksParams) => {
       if (params.workspaceId) {
         searchParams.append('workspaceId', params.workspaceId)
       }
+      if (params.types?.length) searchParams.append('types', params.types.join(','))
+      if (params.from) searchParams.append('from', params.from)
+      if (params.to) searchParams.append('to', params.to)
+      if (params.limit) searchParams.append('limit', String(params.limit))
       return apiClient.get(`/blocks?${searchParams.toString()}`)
     },
     select: (data) => {
