@@ -62,7 +62,6 @@ const contentIdeaTriageResult = {
       metadata: { brandId: 'brand-abc', brandName: 'TestBrand' },
     },
   ],
-  journalSummary: 'User captured a content idea.',
 };
 
 const actionTriageResult = {
@@ -74,7 +73,6 @@ const actionTriageResult = {
       metadata: { priority: 'high', deadline: '2026-04-25' },
     },
   ],
-  journalSummary: 'User has a task to complete.',
 };
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -215,7 +213,6 @@ describe('TriageService', () => {
             metadata: {},
           },
         ],
-        journalSummary: 'Generic idea captured.',
       };
       mockParseCompletion.mockResolvedValueOnce({ data: noBrandResult });
       blocksService.createInternal.mockResolvedValue(makeBlock() as any);
@@ -223,6 +220,17 @@ describe('TriageService', () => {
       await service.processRawText('generic idea', 'user-123');
 
       expect(flownauService.ingestIdeas).not.toHaveBeenCalled();
+    });
+
+    it('writes no journal entry: the triage path was not asked for one', async () => {
+      // It used to write one from a model-generated "journalSummary", which put
+      // a third-person recap of the user's tasks into their diary.
+      mockParseCompletion.mockResolvedValueOnce({ data: actionTriageResult });
+
+      await service.processRawText('send the report by friday', 'user-123');
+
+      const types = blocksService.createInternal.mock.calls.map((c) => c[0]!.type);
+      expect(types).not.toContain('journal_entry');
     });
 
     it('sets flownauSyncStatus: "pending" in block properties before calling Flownau', async () => {
@@ -233,6 +241,67 @@ describe('TriageService', () => {
 
       const createCall = blocksService.createInternal.mock.calls[0]![0];
       expect((createCall.properties as Record<string, unknown>).flownauSyncStatus).toBe('pending');
+    });
+  });
+
+  // ─── journal-only path ────────────────────────────────────────────────────
+
+  describe('processRawText (journalOnly)', () => {
+    beforeEach(() => {
+      const prisma = (service as unknown as { prisma: { user: { findFirst: jest.Mock } } }).prisma;
+      prisma.user.findFirst.mockResolvedValue({ id: 'user-123', workspaces: [] });
+    });
+
+    it('stores the text exactly as received, without a further model rewrite', async () => {
+      const spoken = 'Hoy fui al taller y por fin arreglaron la bici.';
+      blocksService.createInternal.mockResolvedValueOnce(makeBlock({ type: 'journal_entry' }) as any);
+
+      await service.processRawText(spoken, 'user-123', 'vn-1', null, 'ws-1', true);
+
+      // Zazu already transcribed and cleaned this once. A second pass here made
+      // three rewrites stand between what was said and what the diary records.
+      expect(mockParseCompletion).not.toHaveBeenCalled();
+
+      const props = blocksService.createInternal.mock.calls[0]![0].properties as Record<string, unknown>;
+      expect(props.summary).toBe(spoken);
+    });
+
+    it('keeps the untouched transcription when the caller sends one', async () => {
+      blocksService.createInternal.mockResolvedValueOnce(makeBlock({ type: 'journal_entry' }) as any);
+
+      await service.processRawText(
+        'Hoy fui al taller.',
+        'user-123',
+        'vn-1',
+        null,
+        'ws-1',
+        true,
+        undefined,
+        'eh hoy fui al al taller o sea',
+      );
+
+      const props = blocksService.createInternal.mock.calls[0]![0].properties as Record<string, unknown>;
+      expect(props.raw).toBe('eh hoy fui al al taller o sea');
+      expect(props.summary).toBe('Hoy fui al taller.');
+    });
+
+    it('falls back to the given text when no raw transcription is sent', async () => {
+      blocksService.createInternal.mockResolvedValueOnce(makeBlock({ type: 'journal_entry' }) as any);
+
+      await service.processRawText('Escrito a mano.', 'user-123', undefined, null, 'ws-1', true);
+
+      const props = blocksService.createInternal.mock.calls[0]![0].properties as Record<string, unknown>;
+      expect(props.raw).toBe('Escrito a mano.');
+    });
+
+    it('dates the entry when it was captured, not when it was processed', async () => {
+      blocksService.createInternal.mockResolvedValueOnce(makeBlock({ type: 'journal_entry' }) as any);
+      const capturedAt = '2026-08-21T23:50:00.000Z';
+
+      await service.processRawText('tarde', 'user-123', 'vn-1', null, 'ws-1', true, capturedAt);
+
+      const props = blocksService.createInternal.mock.calls[0]![0].properties as Record<string, unknown>;
+      expect(props.date).toBe(capturedAt);
     });
   });
 });

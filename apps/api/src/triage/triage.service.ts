@@ -23,7 +23,6 @@ const TriageResultSchema = z.object({
       topic: z.string().nullable().optional(),
     }).nullable().optional()
   })),
-  journalSummary: z.string()
 });
 
 export type TriageResult = z.infer<typeof TriageResultSchema>;
@@ -47,6 +46,7 @@ export class TriageService {
     workspaceId?: string,
     journalOnly?: boolean,
     capturedAt?: string,
+    rawText?: string,
   ) {
 
     try {
@@ -79,6 +79,7 @@ export class TriageService {
           resolvedWorkspaceId,
           owner?.id,
           capturedAt,
+          rawText,
         );
       }
 
@@ -167,7 +168,8 @@ RULES:
 1. Break down the user's input into logical segments. Each segment should have exactly ONE category.
 2. If a segment is an idea for social media, map it to 'content_idea'. Populate brandId and brandName if a matching brand is found.
 3. If an action could belong to a project, note the project topic.
-4. You MUST ALWAYS write a 'journalSummary'. Keep it brief and reflective.
+4. Use the user's own wording for each segment's text. Do not paraphrase, summarise or translate it.
+5. If nothing in the input fits a category, return an empty segments array. Do not invent a segment to have something to return.
 
 OUTPUT: Return valid JSON matching the schema.`,
           },
@@ -270,28 +272,32 @@ OUTPUT: Return valid JSON matching the schema.`,
       createdBlocks.push(block);
     }
 
-    // Save Journal Summary
-    if (result.journalSummary) {
-      const journalBlock = await this.blocksService.createInternal({
-        type: 'journal_entry',
-        properties: {
-          summary: result.journalSummary,
-          date: new Date().toISOString(),
-          sourceBlockId,
-          status: 'published'
-        },
-        workspaceId
-      });
-      createdBlocks.push(journalBlock);
-    }
+    // No journal entry is written here.
+    //
+    // This path runs when the capture was routed to tasks or ideas, so no diary
+    // entry was asked for — and what it used to write was a `journalSummary`
+    // the model produced under "keep it brief and reflective": a summary of the
+    // capture, often in third person and in whatever language the model chose.
+    // The one such entry in production reads "Today's focus includes scheduling
+    // and communication tasks", which is nobody's diary.
+    //
+    // The journal is fed by the journal path, where the person's own words are
+    // what gets stored.
 
     return createdBlocks;
   }
 
   /**
-   * Journal-only fast path. Extracts a reflective journal entry from raw text
-   * using a simplified LLM prompt, then saves it as a journal_entry block.
-   * No brand context. No content_idea segments. No flownau dispatch.
+   * Journal-only fast path: stores the capture as a journal_entry.
+   *
+   * The text is stored as it arrives. Callers send text that has already been
+   * cleaned once — Zazŭ transcribes, cleans the disfluencies out, and where the
+   * note mixed intents splits the journal part out of it. Running a further
+   * distillation here made three model rewrites stand between what the person
+   * said and what their diary records, and every one of them moves the wording
+   * a little further from theirs.
+   *
+   * `rawText` carries the untouched transcription so the original is never lost.
    */
   private async processJournalOnly(
     text: string,
@@ -299,42 +305,13 @@ OUTPUT: Return valid JSON matching the schema.`,
     workspaceId?: string,
     userId?: string,
     capturedAt?: string,
+    rawText?: string,
   ) {
-    const JournalOnlySchema = z.object({
-      journalEntry: z.string().describe('A reflective, first-person journal entry distilled from the raw voice capture. Preserve the personal tone and emotional context.'),
-    });
-
-    let journalText = text; // fallback: raw text as-is
-
-    try {
-      const { client: llm, model } = getClientForFeature('triage');
-      const result = await llm.parseCompletion({
-        model,
-        temperature: 0.2,
-        schema: JournalOnlySchema as any,
-        schemaName: 'JournalOnlyEntry',
-        messages: [
-          {
-            role: 'system',
-            content: `You receive a raw voice transcription from a personal voice capture. 
-Your ONLY task: distill it into a clear, reflective, first-person journal entry. 
-Preserve the personal tone, thoughts, and emotional context. 
-Remove filler words and repetition but keep the full meaning.
-Do NOT generate tasks, content ideas, or any structured output — only a journal entry paragraph.
-Write in the same language as the input.`,
-          },
-          { role: 'user', content: text },
-        ],
-      });
-      journalText = (result.data as any)?.journalEntry ?? text;
-    } catch (err) {
-      this.logger.error('LLM failed for journal-only path, using raw text', err);
-    }
-
     const journalBlock = await this.blocksService.createInternal({
       type: 'journal_entry',
       properties: {
-        summary: journalText,
+        summary: text,
+        raw: rawText ?? text,
         // When the note was recorded, not when it happened to be processed. A
         // journal entry that lands on the wrong day because ingestion was slow
         // is wrong in the one dimension a journal is organised by.
@@ -351,7 +328,7 @@ Write in the same language as the input.`,
       success: true,
       summary: 'Entrada de diario guardada.',
       blocks: [journalBlock],
-      rawResult: { segments: [], journalSummary: journalText },
+      rawResult: { segments: [], journalEntry: text },
     };
   }
 

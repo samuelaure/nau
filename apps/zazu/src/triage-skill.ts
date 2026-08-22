@@ -115,7 +115,7 @@ export class TriageSkill implements ZazuSkill {
       const result = await callTriageApi(text, userId, brandId);
 
       if (result.success && result.rawResult) {
-        const { segments, journalSummary } = result.rawResult;
+        const { segments } = result.rawResult;
 
         let message = `📝 *Nota de voz procesada:*\n`;
 
@@ -136,10 +136,6 @@ export class TriageSkill implements ZazuSkill {
 
         for (const [cat, count] of Object.entries(categoryCounts)) {
           message += `${icons[cat] || '•'} ${count} ${cat.replace('_', ' ')}\n`;
-        }
-
-        if (journalSummary) {
-          message += `📓 Entrada de diario guardada\n`;
         }
 
         const actions = segments.filter((s: any) => s.category === 'action');
