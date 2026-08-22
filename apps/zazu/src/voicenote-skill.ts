@@ -83,6 +83,7 @@ class VoicenoteSkillImpl implements ZazuSkill {
     ctx.session.selectedVoicenoteIntents = []
     ctx.session.pendingVoicenoteId = undefined
     ctx.session.pendingVoicenoteCapturedAt = undefined
+    ctx.session.pendingVoicenoteRaw = undefined
     ctx.session.pendingVoicenoteClean = undefined
     ctx.session.pendingVoicenoteSummary = undefined
     ctx.session.pendingVoicenoteBrands = []
@@ -166,7 +167,7 @@ class VoicenoteSkillImpl implements ZazuSkill {
             {
               role: 'system',
               content: `You receive a raw voice transcription. Return JSON with two fields:
-- "cleanTranscription": the transcription cleaned of filler words, repeated phrases, and disfluencies, with proper punctuation. Keep all meaning intact. Write in the same language as the input.
+- "cleanTranscription": the same transcription, with filler words, false starts and repeated phrases removed and proper punctuation added. This is a transcription clean-up, NOT a rewrite: keep the speaker's own words, wording, order and language. Do not rephrase, do not condense, do not improve the style, do not add anything that was not said. If the speaker was already fluent, return the input essentially unchanged.
 - "summary": a condensed re-narration of the voice note in the same language, person (first-person if the speaker uses it), and perspective as the original. Do NOT interpret, explain, or add context. Just faithfully compress the content into 2-4 sentences that capture all key points. Imagine the speaker re-reading a shorter version of what they said.
 
 Return only valid JSON: { "cleanTranscription": "...", "summary": "..." }`,
@@ -190,6 +191,7 @@ Return only valid JSON: { "cleanTranscription": "...", "summary": "..." }`,
         ctx.session.pendingVoicenoteCapturedAt = ctx.message?.date
           ? new Date(ctx.message.date * 1000).toISOString()
           : new Date().toISOString()
+        ctx.session.pendingVoicenoteRaw = rawTranscription
         ctx.session.pendingVoicenoteClean = cleanTranscription
         ctx.session.pendingVoicenoteSummary = summary
       } catch (err) {
@@ -242,12 +244,18 @@ Return only valid JSON: { "cleanTranscription": "...", "summary": "..." }`,
     workspaceId: string,
     nauUserId: string,
     capturedAt?: string,
+    rawTranscription?: string,
   ): Promise<void> {
     const headers = await buildServiceHeaders('9nau-api')
     await axios.post(
       `${NAU_API_URL}/triage`,
       {
         text: cleanTranscription,
+        // The transcription before any clean-up. It lives in Zazŭ's own
+        // Voicenote row, but the journal entry is in another service and
+        // another database, so without sending it there is no way back to the
+        // original from the entry itself.
+        rawText: rawTranscription,
         userId: nauUserId,
         sourceBlockId: voicenoteId,
         workspaceId,
