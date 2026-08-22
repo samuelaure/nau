@@ -26,6 +26,7 @@ export type LLMFeature =
   | 'planning'             // scheduling/ordering content pieces (flownau)
   | 'template_compile'     // template schema → system prompt compilation (flownau)
   | 'journal_summary'      // hierarchical journal summaries (api)
+  | 'journal_activity'     // prose narration of a day's recorded activity (api)
   | 'comment_suggestions'  // Instagram comment suggestions (nauthenticity)
   | 'post_intelligence'    // post hook/theme/sentiment extraction (nauthenticity)
   | 'synthesis'            // brand creative synthesis (nauthenticity)
@@ -48,6 +49,9 @@ const DEFAULT_FEATURE_MODELS: Record<LLMFeature, string> = {
   planning:            'openai/gpt-4o-mini',
   template_compile:    'openai/gpt-4o',
   journal_summary:     'openai/gpt-4o',
+  // Prose only: the timeline arrives already rendered, so there is nothing to
+  // reason about and a small model does the job exactly as well.
+  journal_activity:    'openai/gpt-4o-mini',
   comment_suggestions: 'openai/gpt-4o-mini',
   post_intelligence:   'openai/gpt-4o-mini',
   synthesis:           'openai/gpt-4o-mini',

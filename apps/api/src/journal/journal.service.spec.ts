@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { JournalService } from './journal.service';
 import { BlocksService } from '../blocks/blocks.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { ActivityService } from './activity.service';
 
 jest.mock('@prisma/client', () => ({
   PrismaClient: jest.fn().mockImplementation(() => ({})),
@@ -24,9 +25,17 @@ jest.mock('axios', () => ({ post: jest.fn().mockResolvedValue({ data: {} }) }));
 /** The rows the mocked findMany should answer with, keyed by what was asked for. */
 type Fixture = {
   entries?: unknown[];
+  activity?: unknown[];
   sideBlocks?: unknown[];
   summaries?: unknown[];
 };
+
+const activityBlock = (dateIso: string, text: string) => ({
+  id: `a-${dateIso}`,
+  type: 'journal_activity',
+  createdAt: new Date(dateIso),
+  properties: { date: dateIso, raw: text, summary: text, source: 'activity_synthesis' },
+});
 
 const entry = (dateIso: string, props: Record<string, unknown>) => ({
   id: `e-${dateIso}`,
@@ -62,6 +71,7 @@ describe('JournalService — what each period reads', () => {
   const load = (f: Fixture) => {
     findMany.mockImplementation(({ where }: any) => {
       if (where.type === 'journal_entry') return Promise.resolve(f.entries ?? []);
+      if (where.type === 'journal_activity') return Promise.resolve(f.activity ?? []);
       if (where.type === 'journal_summary') {
         const wanted = where.AND?.[0]?.properties?.equals;
         return Promise.resolve(
@@ -96,12 +106,22 @@ describe('JournalService — what each period reads', () => {
             block: { findMany, findFirst },
             relation: { createMany: jest.fn() },
             workspaceMember: { findMany: jest.fn().mockResolvedValue([]) },
+            // Every period boundary is resolved in the workspace's zone. These
+            // tests pin it to UTC so the expected instants stay readable.
+            workspace: {
+              findUnique: jest.fn().mockResolvedValue({ timezone: 'UTC' }),
+              findMany: jest.fn().mockResolvedValue([]),
+            },
           },
         },
         { provide: ConfigService, useValue: { getOrThrow: jest.fn(() => 'secret') } },
         {
           provide: BlocksService,
           useValue: { createInternal: jest.fn().mockResolvedValue({ id: 'new-summary' }) },
+        },
+        {
+          provide: ActivityService,
+          useValue: { generateForDay: jest.fn().mockResolvedValue({ success: true, skipped: true }) },
         },
       ],
     }).compile();
@@ -174,6 +194,61 @@ describe('JournalService — what each period reads', () => {
       const { user } = await promptFor('daily', '2026-08-20', '2026-08-20');
 
       expect(user).not.toContain('qué pasó en el daily');
+    });
+  });
+
+  describe('recorded activity', () => {
+    it('gives the day its activity block as well as the entries', async () => {
+      load({
+        entries: [entry('2026-08-20T09:12:00.000Z', { raw: 'lo que dije' })],
+        activity: [activityBlock('2026-08-20T23:59:59.999Z', 'Creé dos tareas y completé una.')],
+      });
+
+      const { user } = await promptFor('daily', '2026-08-20', '2026-08-20');
+
+      expect(user).toContain('lo que dije');
+      expect(user).toContain('Creé dos tareas y completé una.');
+    });
+
+    it('labels the two sources so the model does not weigh them alike', async () => {
+      load({
+        entries: [entry('2026-08-20T09:12:00.000Z', { raw: 'lo que dije' })],
+        activity: [activityBlock('2026-08-20T23:59:59.999Z', 'Creé dos tareas.')],
+      });
+
+      const { system, user } = await promptFor('daily', '2026-08-20', '2026-08-20');
+
+      expect(user).toContain('lo que la persona escribió o dictó');
+      expect(user).toContain('lo que el sistema observó');
+      expect(system).toContain('ACTIVIDAD REGISTRADA');
+    });
+
+    it('says nothing about activity in the prompt when the day had none', async () => {
+      load({ entries: [entry('2026-08-20T09:12:00.000Z', { raw: 'lo que dije' })] });
+
+      const { system } = await promptFor('daily', '2026-08-20', '2026-08-20');
+
+      expect(system).not.toContain('ACTIVIDAD REGISTRADA');
+    });
+
+    it('carries a day on activity alone, which is the point on days with no entry', async () => {
+      load({ activity: [activityBlock('2026-08-20T23:59:59.999Z', 'Completé tres tareas.')] });
+
+      const result = await service.generateSummary('daily', '2026-08-20', '2026-08-20', 'ws-1');
+
+      expect(result).not.toMatchObject({ skipped: true });
+      expect(blocksService.createInternal).toHaveBeenCalled();
+    });
+
+    it('does not feed activity into the levels that read summaries', async () => {
+      load({
+        activity: [activityBlock('2026-07-04T23:59:59.999Z', 'Actividad de julio.')],
+        summaries: [summary('daily', '2026-07-04T00:00:00.000Z', '2026-07-04T23:59:59.999Z')],
+      });
+
+      const { user } = await promptFor('monthly', '2026-07-01', '2026-07-31');
+
+      expect(user).not.toContain('Actividad de julio.');
     });
   });
 
@@ -274,13 +349,13 @@ describe('JournalService — what each period reads', () => {
         {
           properties: {
             path: ['periodStart'],
-            equals: dayjs('2026-07-01').startOf('day').toISOString(),
+            equals: '2026-07-01T00:00:00.000Z',
           },
         },
         {
           properties: {
             path: ['periodEnd'],
-            equals: dayjs('2026-07-31').endOf('day').toISOString(),
+            equals: '2026-07-31T23:59:59.999Z',
           },
         },
       ]);
