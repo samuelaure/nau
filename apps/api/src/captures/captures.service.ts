@@ -30,9 +30,12 @@ export class CapturesService {
   ) {}
 
   /**
-   * Turns raw text into an entry. The distillation is best-effort: if the model
-   * is unavailable the user's own words are stored unchanged, which is a far
-   * better failure than losing the capture.
+   * Cleans up a spoken transcription: removes filler and repetition while
+   * keeping the meaning. Only ever applied to audio — typed text is stored as
+   * written.
+   *
+   * Best-effort: if the model is unavailable the raw transcription is stored
+   * unchanged, which is a far better failure than losing the capture.
    */
   private async distil(raw: string): Promise<string> {
     try {
@@ -98,10 +101,13 @@ Write in the same language as the input.`,
     const trimmed = params.text?.trim();
     if (!trimmed) throw new BadRequestException('text is required');
 
-    const distilled = await this.distil(trimmed);
+    // Written text is stored exactly as typed. Distillation exists to strip the
+    // filler and false starts of speech; running it over something the user
+    // deliberately wrote just rewrites their words in a model's voice, which is
+    // the opposite of what a personal journal is for.
     const block = await this.createEntry({
       ...params,
-      text: distilled,
+      text: trimmed,
       rawText: trimmed,
       source: 'web_text',
     });
