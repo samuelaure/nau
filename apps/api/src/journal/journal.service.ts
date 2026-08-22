@@ -83,17 +83,28 @@ export class JournalService {
   }
 
   /**
-   * An entry as the author left it: the raw capture when it exists, the cleaned
-   * version otherwise.
+   * The text of an entry, as the summaries read it.
    *
-   * Never a summary of the entry. A day built from summaries of its entries is
-   * a summary of summaries, and every layer of that drops the specifics — the
-   * names, the numbers, the turns of phrase — which are the part worth keeping.
-   * Entries written before `raw` existed fall back to `summary`, which for them
-   * holds the cleaned transcription rather than a summary.
+   * Every entry stores two forms of itself: `raw`, the capture as it arrived,
+   * and `summary`, that same text with the disfluencies taken out. Summaries
+   * read ONE of them. Reading both would put the same content in front of the
+   * model twice and weight it accordingly.
+   *
+   * `raw` is the one, because it is the only form with no model standing between
+   * the microphone and the summary. The cleaned version is itself a model
+   * output, and however tightly its prompt is written it remains one more place
+   * the wording can drift. The filler it strips costs a handful of tokens and
+   * confuses nothing.
+   *
+   * Neither is ever a summary of the entry: a day built from summaries of its
+   * entries is a summary of summaries, and each such layer drops the specifics —
+   * the names, the numbers, the turns of phrase — which are the part worth
+   * keeping.
    */
   private entryText(block: { properties: unknown }): string {
     const p = block.properties as Record<string, unknown> | null;
+    // The fallbacks are for rows that predate the field, not a routine path:
+    // every entry has carried `raw` since the backfill.
     return (p?.raw as string) || (p?.summary as string) || (p?.text as string) || '';
   }
 

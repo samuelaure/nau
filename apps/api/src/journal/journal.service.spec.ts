@@ -131,6 +131,19 @@ describe('JournalService — what each period reads', () => {
       expect(user).toContain('segunda nota cruda');
     });
 
+    it('reads only one of the two stored forms, not both', async () => {
+      load({
+        entries: [
+          entry('2026-08-20T09:12:00.000Z', { raw: 'la forma cruda', summary: 'la forma limpia' }),
+        ],
+      });
+
+      const { user } = await promptFor('daily', '2026-08-20', '2026-08-20');
+
+      expect(user).toContain('la forma cruda');
+      expect(user).not.toContain('la forma limpia');
+    });
+
     it('falls back to the cleaned text for entries written before raw existed', async () => {
       load({ entries: [entry('2026-08-20T09:12:00.000Z', { summary: 'sólo tengo el limpio' })] });
 
