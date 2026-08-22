@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
@@ -7,13 +6,17 @@ import { getClientForFeature } from '@nau/llm-client';
 import { signServiceToken } from '@nau/auth';
 import { z } from 'zod';
 import { BlocksService } from '../blocks/blocks.service';
-import dayjs from 'dayjs';
-import 'dayjs/locale/es';
 import axios from 'axios';
-
-// The summary prompt names its own period in Spanish. Without the locale
-// dayjs renders the month in English, so the model is handed "20 de August".
-dayjs.locale('es');
+import { ActivityService } from './activity.service';
+import {
+  dayjs,
+  dayIn,
+  localNow,
+  closedPeriodBounds,
+  safeZone,
+  type PeriodBounds,
+  type PeriodType,
+} from '../common/time';
 
 const JournalSummarySchema = z.object({
   synthesis: z.string().describe('What the period meant: recurring themes, how the mood moved, what it was really about. Interpretation of the record, never beyond it.'),
@@ -22,8 +25,6 @@ const JournalSummarySchema = z.object({
 });
 
 type JournalSummaryOutput = z.infer<typeof JournalSummarySchema>;
-
-type PeriodType = 'daily' | 'weekly' | 'monthly' | 'trimester' | 'yearly' | 'custom';
 
 /**
  * What each period reads.
@@ -66,7 +67,23 @@ export class JournalService {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly blocksService: BlocksService,
+    private readonly activity: ActivityService,
   ) {}
+
+  /**
+   * The zone a workspace's periods are lived in.
+   *
+   * Summaries are workspace-scoped artefacts, so the boundary has to be a
+   * property of the workspace rather than of whoever happens to trigger the run.
+   * Workspace.timezone is seeded from the owner's own timezone.
+   */
+  private async getWorkspaceTimezone(workspaceId: string): Promise<string> {
+    const ws = await this.prisma.workspace.findUnique({
+      where: { id: workspaceId },
+      select: { timezone: true },
+    });
+    return safeZone(ws?.timezone);
+  }
 
   /**
    * Mock for user preferences. In Phase 9 this will be a real DB model.
@@ -108,14 +125,40 @@ export class JournalService {
     return (p?.raw as string) || (p?.summary as string) || (p?.text as string) || '';
   }
 
+  /**
+   * Public entry point: a period named by two date strings.
+   *
+   * The strings name calendar days, and a calendar day only becomes an instant
+   * once you know where it is being lived. They are resolved in the workspace's
+   * own zone — the same boundary the scheduled runs use, so a summary asked for
+   * by hand covers exactly the period the cron would have generated.
+   */
   async generateSummary(
     periodType: PeriodType,
     startDateStr: string,
     endDateStr: string,
     workspaceId: string,
   ) {
-    const startDate = dayjs(startDateStr).startOf('day').toDate();
-    const endDate = dayjs(endDateStr).endOf('day').toDate();
+    const tz = await this.getWorkspaceTimezone(workspaceId);
+    const start = dayIn(startDateStr, tz).startOf('day');
+    const end = dayIn(endDateStr, tz).endOf('day');
+
+    return this.generateForBounds(periodType, workspaceId, tz, {
+      start: start.toDate(),
+      end: end.toDate(),
+      label: start.isSame(end, 'day')
+        ? start.format('D [de] MMMM [de] YYYY')
+        : `${start.format('D [de] MMMM')} al ${end.format('D [de] MMMM [de] YYYY')}`,
+    });
+  }
+
+  private async generateForBounds(
+    periodType: PeriodType,
+    workspaceId: string,
+    tz: string,
+    bounds: PeriodBounds,
+  ) {
+    const { start: startDate, end: endDate } = bounds;
     const startIso = startDate.toISOString();
     const endIso = endDate.toISOString();
     const source = SUMMARY_SOURCE[periodType];
@@ -163,6 +206,27 @@ export class JournalService {
       orderBy: { createdAt: 'asc' },
     });
 
+    // What the system observed the author doing, as written by ActivityService.
+    //
+    // Fetched separately from the entries and never merged with them: an entry
+    // is what the author chose to say, an activity block is what the system saw
+    // them do. The prompt is told which is which, because otherwise "created
+    // four tasks" gets weighed like a reflection about someone's daughter.
+    const activityBlocks = source === 'entries'
+      ? await this.prisma.block.findMany({
+          where: {
+            workspaceId,
+            type: 'journal_activity',
+            deletedAt: null,
+            AND: [
+              { properties: { path: ['date'], gte: startIso } },
+              { properties: { path: ['date'], lte: endIso } },
+            ],
+          },
+          orderBy: { createdAt: 'asc' },
+        })
+      : [];
+
     // Actions and ideas are context, not the record itself, and are not
     // guaranteed to carry a date property, so they stay on createdAt.
     const sideBlocks = await this.prisma.block.findMany({
@@ -203,7 +267,10 @@ export class JournalService {
     // of nothing, which is what produced 128 summaries against 76 entries while
     // the journal sat idle.
     const hasInput = source === 'entries'
-      ? journalEntries.length > 0 || actionBlocks.length > 0 || contentIdeas.length > 0
+      ? journalEntries.length > 0 ||
+        activityBlocks.length > 0 ||
+        actionBlocks.length > 0 ||
+        contentIdeas.length > 0
       : sourceSummaries.length > 0;
 
     if (!hasInput) {
@@ -216,12 +283,20 @@ export class JournalService {
 
     if (source === 'entries') {
       if (journalEntries.length > 0) {
-        contextText += '## ENTRADAS DEL DIARIO\n';
+        contextText += '## ENTRADAS DEL DIARIO — lo que la persona escribió o dictó\n';
         journalEntries.forEach(entry => {
           const text = this.entryText(entry);
           if (!text) return;
           const at = (entry.properties as any)?.date ?? entry.createdAt;
-          contextText += `\n### ${dayjs(at).format('YYYY-MM-DD HH:mm')}\n${text}\n`;
+          contextText += `\n### ${dayjs(at).tz(tz).format('YYYY-MM-DD HH:mm')}\n${text}\n`;
+        });
+      }
+
+      if (activityBlocks.length > 0) {
+        contextText += '\n## ACTIVIDAD REGISTRADA — lo que el sistema observó, no lo que la persona dijo\n';
+        activityBlocks.forEach(block => {
+          const at = (block.properties as any)?.date ?? block.createdAt;
+          contextText += `\n### ${dayjs(at).tz(tz).format('YYYY-MM-DD')}\n${this.entryText(block)}\n`;
         });
       }
     } else {
@@ -268,9 +343,12 @@ export class JournalService {
           messages: [
             {
               role: 'system',
-              content: `Estás escribiendo el resumen ${PERIOD_LABEL[periodType].toLowerCase()} del diario personal de alguien, que cubre del ${dayjs(startDate).format('D [de] MMMM [de] YYYY')} al ${dayjs(endDate).format('D [de] MMMM [de] YYYY')}.
+              content: `Estás escribiendo el resumen ${PERIOD_LABEL[periodType].toLowerCase()} del diario personal de alguien, que cubre ${bounds.label}.
 
 Recibes ${source === 'entries' ? 'las entradas que esa persona escribió o dictó durante el periodo, tal cual las dejó' : `los resúmenes ${source} que ya cubren este periodo`}. Eso es todo el registro que existe. No hay más.
+${activityBlocks.length > 0 ? `
+Parte de lo que recibes viene marcado como ACTIVIDAD REGISTRADA. Eso no lo dijo la persona: es lo que el sistema observó que hizo — tareas creadas o completadas, ideas capturadas, cosas agendadas. Trátalo como contexto de apoyo, no como voz propia. Lo que la persona dijo pesa más que lo que hizo: si las dos fuentes hablan de lo mismo, manda la entrada; si la actividad menciona algo que la persona no comentó, puedes recogerlo como hecho, nunca atribuirle intención ni sentimiento.
+` : ''}
 
 Devuelve tres cosas:
 
@@ -322,6 +400,8 @@ EXTENSIÓN: ${periodType === 'daily' ? 'breve, uno o dos párrafos' : periodType
         // summary predates this hierarchy.
         sourceType: source,
         sourceCount: source === 'entries' ? journalEntries.length : sourceSummaries.length,
+        activityCount: activityBlocks.length,
+        timezone: tz,
       }
     });
 
@@ -361,7 +441,7 @@ EXTENSIÓN: ${periodType === 'daily' ? 'breve, uno o dos párrafos' : periodType
       finalDeliveryText += `\n📅 *ENTRADAS CRONOLÓGICAS:*\n`;
       journalEntries.forEach(e => {
         const at = (e.properties as any)?.date ?? e.createdAt;
-        finalDeliveryText += `• _${dayjs(at).format('HH:mm')}_: ${this.entryText(e)}\n`;
+        finalDeliveryText += `• _${dayjs(at).tz(tz).format('HH:mm')}_: ${this.entryText(e)}\n`;
       });
     }
 
@@ -369,7 +449,6 @@ EXTENSIÓN: ${periodType === 'daily' ? 'breve, uno o dos párrafos' : periodType
     const zazuUrl = process.env.ZAZU_INTERNAL_URL || 'http://zazu:3000';
 
     const periodTitle = PERIOD_LABEL[periodType];
-    const displayDate = dayjs(startDate).format('DD MMM YYYY');
 
     if (periodType !== 'custom') {
       const recipients = await this.getWorkspaceRecipients(workspaceId);
@@ -386,7 +465,7 @@ EXTENSIÓN: ${periodType === 'daily' ? 'breve, uno o dos párrafos' : periodType
              nauUserId,
              type: 'journal_summary',
              periodType,
-             periodTitle: `Resumen ${periodTitle} — ${displayDate}`,
+             periodTitle: `Resumen ${periodTitle} — ${bounds.label}`,
              summaryData: finalDeliveryText
           }, {
              headers: { Authorization: `Bearer ${token}` },
@@ -438,61 +517,6 @@ EXTENSIÓN: ${periodType === 'daily' ? 'breve, uno o dos párrafos' : periodType
     };
   }
 
-  /**
-   * Workspaces with journal activity in the period. The cron used to summarise
-   * every Block on the platform in one pass, which mixed tenants into a single
-   * summary; it now produces one summary per workspace.
-   */
-  private async getActiveWorkspaces(
-    periodType: PeriodType,
-    startDate: Date,
-    endDate: Date,
-  ): Promise<string[]> {
-    const source = SUMMARY_SOURCE[periodType];
-    const startIso = startDate.toISOString();
-    const endIso = endDate.toISOString();
-
-    // A workspace is a candidate when it holds whatever this period reads. Ask
-    // for the wrong thing and the run is skipped for a workspace that has
-    // perfectly good input — a month whose days are all summarised still has no
-    // blocks created inside the month if ingestion ran late.
-    const where: Prisma.BlockWhereInput = source === 'entries'
-      ? {
-          workspaceId: { not: null },
-          deletedAt: null,
-          OR: [
-            {
-              type: 'journal_entry',
-              AND: [
-                { properties: { path: ['date'], gte: startIso } },
-                { properties: { path: ['date'], lte: endIso } },
-              ],
-            },
-            {
-              type: { in: ['action', 'content_idea'] },
-              createdAt: { gte: startDate, lte: endDate },
-            },
-          ],
-        }
-      : {
-          workspaceId: { not: null },
-          deletedAt: null,
-          type: 'journal_summary',
-          AND: [
-            { properties: { path: ['periodType'], equals: source } },
-            { properties: { path: ['periodStart'], gte: startIso } },
-            { properties: { path: ['periodEnd'], lte: endIso } },
-          ],
-        };
-
-    const rows = await this.prisma.block.findMany({
-      where,
-      select: { workspaceId: true },
-      distinct: ['workspaceId'],
-    });
-    return rows.map((r) => r.workspaceId!).filter(Boolean);
-  }
-
   /** naŭ user ids of every member of a workspace, for proactive delivery. */
   private async getWorkspaceRecipients(workspaceId: string): Promise<string[]> {
     const members = await this.prisma.workspaceMember.findMany({
@@ -502,87 +526,72 @@ EXTENSIÓN: ${periodType === 'daily' ? 'breve, uno o dos párrafos' : periodType
     return members.map((m) => m.userId);
   }
 
-  /** Runs one scoped summary per workspace that saw activity. */
-  private async generateForActiveWorkspaces(
-    periodType: 'daily' | 'weekly' | 'monthly' | 'trimester' | 'yearly',
-    startIso: string,
-    endIso: string,
-  ) {
-    const startDate = dayjs(startIso).startOf('day').toDate();
-    const endDate = dayjs(endIso).endOf('day').toDate();
-    const workspaceIds = await this.getActiveWorkspaces(periodType, startDate, endDate);
+  /**
+   * One tick an hour, which decides per workspace what is due in its own zone.
+   *
+   * There used to be five crons, each firing at a fixed UTC hour for everyone.
+   * That cannot be right once a day belongs to a place: 23:00 UTC is one in the
+   * morning in Madrid, so the "daily" summary closed a day that still had two
+   * hours to run, and the two hours it did include belonged to the day before.
+   *
+   * An hourly tick asks each workspace what time it is there, and acts when the
+   * local clock says so. Every generator is idempotent on the period it covers,
+   * so a repeated hour — which is exactly what happens when the clocks go back —
+   * is skipped rather than duplicated.
+   */
+  @Cron('0 * * * *')
+  async handleScheduledSummaries() {
+    const prefs = await this.getUserPreferences();
 
-    if (workspaceIds.length === 0) {
-      this.logger.log(`No workspace had activity for the ${periodType} period. Skipping.`);
-      return;
-    }
+    const workspaces = await this.prisma.workspace.findMany({
+      select: { id: true, timezone: true },
+    });
+    const now = new Date();
 
-    for (const workspaceId of workspaceIds) {
+    for (const ws of workspaces) {
+      const tz = safeZone(ws.timezone);
+      const local = localNow(tz, now);
+
       try {
-        await this.generateSummary(periodType, startIso, endIso, workspaceId);
+        // 23:00 local closes the day. Order matters and is the whole point of
+        // doing these together: the activity block is written first so the daily
+        // can read it, and the weekly runs after the daily rather than racing it.
+        if (local.hour() === 23) {
+          await this.activity.generateForDay(ws.id, tz, now);
+
+          if (prefs.autoDaily) {
+            await this.runPeriod('daily', ws.id, tz, now);
+          }
+          // isoWeekday 7 is Sunday: the last day of the week that is ending.
+          if (prefs.autoWeekly && local.isoWeekday() === 7) {
+            await this.runPeriod('weekly', ws.id, tz, now);
+          }
+        }
+
+        // The larger periods run early on the first local day, staggered so each
+        // reads what the level it depends on has already written.
+        if (local.date() === 1) {
+          if (prefs.autoMonthly && local.hour() === 1) {
+            await this.runPeriod('monthly', ws.id, tz, now);
+          }
+          if (prefs.autoTrimester && local.hour() === 2 && local.month() % 3 === 0) {
+            await this.runPeriod('trimester', ws.id, tz, now);
+          }
+          if (prefs.autoYearly && local.hour() === 3 && local.month() === 0) {
+            await this.runPeriod('yearly', ws.id, tz, now);
+          }
+        }
       } catch (err: any) {
-        this.logger.error(`${periodType} summary failed for workspace ${workspaceId}: ${err.message}`);
+        // One workspace's failure must not stop the tick for the rest.
+        this.logger.error(`Scheduled journal run failed for workspace ${ws.id}: ${err.message}`);
       }
     }
   }
 
-  // --- REFACTORED TRIGGERS ---
-
-  @Cron('0 23 * * *')
-  async handleDailySummary() {
-    const prefs = await this.getUserPreferences();
-    if (!prefs.autoDaily) return;
-    
-    this.logger.log('Daily Summary Triggered (Config-aware)');
-    await this.generateForActiveWorkspaces('daily', dayjs().startOf('day').toISOString(), dayjs().endOf('day').toISOString());
-  }
-
-  // Sunday, after the daily has run. The previous window ran on Sunday at 20:00
-  // over startOf('week').add(1,'day') → endOf('week').add(1,'day'), which with
-  // dayjs' Sunday-based week resolves to the Monday–Sunday that has not happened
-  // yet: every weekly summary was generated over an empty future week.
-  @Cron('30 23 * * 0')
-  async handleWeeklySummary() {
-    const prefs = await this.getUserPreferences();
-    if (!prefs.autoWeekly) return;
-
-    this.logger.log('Weekly Summary Triggered (Config-aware)');
-    const start = dayjs().subtract(6, 'day').startOf('day').toISOString();
-    const end = dayjs().endOf('day').toISOString();
-    await this.generateForActiveWorkspaces('weekly', start, end);
-  }
-
-  @Cron('0 18 1 * *')
-  async handleMonthlySummary() {
-    const prefs = await this.getUserPreferences();
-    if (!prefs.autoMonthly) return;
-
-    this.logger.log('Monthly Summary Triggered (Config-aware)');
-    const start = dayjs().subtract(1, 'month').startOf('month').toISOString();
-    const end = dayjs().subtract(1, 'month').endOf('month').toISOString();
-    await this.generateForActiveWorkspaces('monthly', start, end);
-  }
-
-  // Staggered after the monthly, and the yearly after both: each level reads
-  // what the level it depends on has already written, and running them in the
-  // same minute is a race.
-  @Cron('0 19 1 1,4,7,10 *')
-  async handleTrimesterSummary() {
-    const prefs = await this.getUserPreferences();
-    if (!prefs.autoTrimester) return;
-
-    const start = dayjs().subtract(3, 'months').startOf('month').toISOString();
-    const end = dayjs().subtract(1, 'month').endOf('month').toISOString();
-    await this.generateForActiveWorkspaces('trimester', start, end);
-  }
-
-  @Cron('0 20 1 1 *')
-  async handleYearlySummary() {
-    const prefs = await this.getUserPreferences();
-    if (!prefs.autoYearly) return;
-
-    const start = dayjs().subtract(1, 'year').startOf('year').toISOString();
-    const end = dayjs().subtract(1, 'year').endOf('year').toISOString();
-    await this.generateForActiveWorkspaces('yearly', start, end);
+  /** The period that has just closed in this workspace's zone. */
+  private async runPeriod(periodType: PeriodType, workspaceId: string, tz: string, now: Date) {
+    const bounds = closedPeriodBounds(periodType, tz, now);
+    this.logger.log(`${periodType} for workspace ${workspaceId} — ${bounds.label} (${tz})`);
+    return this.generateForBounds(periodType, workspaceId, tz, bounds);
   }
 }
