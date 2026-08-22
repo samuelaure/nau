@@ -29,7 +29,18 @@ const AUTH_SECRET = process.env.AUTH_SECRET;
 const DB_PATH = process.env.MOBILE_DB_PATH;
 const DEFAULT_TITLE = 'Instagram Capture';
 const POLL_INTERVAL_MS = 5000;
-const POLL_TIMEOUT_MS = 15 * 60 * 1000; // HEVC transcode at native res can take a while
+// HEVC CRF36 at native res with preset:medium on a modest VPS CPU can genuinely
+// run past 15 minutes for a long/large video. Confirmed on the real batch:
+// once one job ran long, giving up and enqueuing the next post (concurrency:1
+// worker) meant every subsequent post inherited the growing backlog delay —
+// a cascade of "timeouts" that were really just queue wait, not failures, and
+// each abandoned-but-still-running job wasted its own completed work since
+// the script never came back to record it. This is a one-off background
+// script with nobody waiting on wall-clock time per post, so there is no
+// reason to give up early at all — a long timeout here only exists as a
+// backstop against a genuinely stuck job, which BullMQ's own lockDuration/
+// stalledInterval already catches independently.
+const POLL_TIMEOUT_MS = 60 * 60 * 1000;
 
 interface MobilePost {
   id: number;
