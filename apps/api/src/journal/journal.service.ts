@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
@@ -7,15 +8,56 @@ import { signServiceToken } from '@nau/auth';
 import { z } from 'zod';
 import { BlocksService } from '../blocks/blocks.service';
 import dayjs from 'dayjs';
+import 'dayjs/locale/es';
 import axios from 'axios';
 
+// The summary prompt names its own period in Spanish. Without the locale
+// dayjs renders the month in English, so the model is handed "20 de August".
+dayjs.locale('es');
+
 const JournalSummarySchema = z.object({
-  synthesis: z.string().describe('A high-level interpretation of "what it means" (main themes, mood, focus trajectory, patterns). Priorities in position.'),
-  summary: z.string().describe('An objective, beautifully written recount of "what happened" (facts, completed tasks, metrics).'),
-  highlights: z.array(z.string()).describe('List of key themes or highlights.'),
+  synthesis: z.string().describe('What the period meant: recurring themes, how the mood moved, what it was really about. Interpretation of the record, never beyond it.'),
+  summary: z.string().describe('What happened: events, decisions, work, people, places. First person, plain, factual.'),
+  highlights: z.array(z.string()).describe('The few things worth remembering, one short line each. Empty if the record does not support any.'),
 });
 
 type JournalSummaryOutput = z.infer<typeof JournalSummarySchema>;
+
+type PeriodType = 'daily' | 'weekly' | 'monthly' | 'trimester' | 'yearly' | 'custom';
+
+/**
+ * What each period reads.
+ *
+ * The day and the week read the entries themselves, because they are close
+ * enough to the writing that the author's own words still fit. From the month
+ * up, each level reads summaries one step down — a size that keeps the input
+ * bounded (≈30 dailies, ≈13 weeklies, 12 monthlies) and keeps the hierarchy
+ * meaningful: a year built from every entry of the year would overflow the
+ * context window and silently drop whatever fell off the end.
+ *
+ * Note that the month and the trimester are parallel branches rather than
+ * nested: the trimester reads weeks, not months, and the year reads months, not
+ * trimesters. That is deliberate — each level picks the granularity that gives
+ * it a useful number of inputs, rather than inheriting whatever the level below
+ * happened to produce.
+ */
+const SUMMARY_SOURCE: Record<PeriodType, 'entries' | PeriodType> = {
+  daily: 'entries',
+  weekly: 'entries',
+  monthly: 'daily',
+  trimester: 'weekly',
+  yearly: 'monthly',
+  custom: 'entries',
+};
+
+const PERIOD_LABEL: Record<PeriodType, string> = {
+  daily: 'Diario',
+  weekly: 'Semanal',
+  monthly: 'Mensual',
+  trimester: 'Trimestral',
+  yearly: 'Anual',
+  custom: 'Personalizado',
+};
 
 @Injectable()
 export class JournalService {
@@ -40,102 +82,155 @@ export class JournalService {
     };
   }
 
+  /**
+   * An entry as the author left it: the raw capture when it exists, the cleaned
+   * version otherwise.
+   *
+   * Never a summary of the entry. A day built from summaries of its entries is
+   * a summary of summaries, and every layer of that drops the specifics — the
+   * names, the numbers, the turns of phrase — which are the part worth keeping.
+   * Entries written before `raw` existed fall back to `summary`, which for them
+   * holds the cleaned transcription rather than a summary.
+   */
+  private entryText(block: { properties: unknown }): string {
+    const p = block.properties as Record<string, unknown> | null;
+    return (p?.raw as string) || (p?.summary as string) || (p?.text as string) || '';
+  }
+
   async generateSummary(
-    periodType: 'daily' | 'weekly' | 'monthly' | 'trimester' | 'yearly' | 'custom',
+    periodType: PeriodType,
     startDateStr: string,
     endDateStr: string,
     workspaceId: string,
   ) {
     const startDate = dayjs(startDateStr).startOf('day').toDate();
     const endDate = dayjs(endDateStr).endOf('day').toDate();
+    const startIso = startDate.toISOString();
+    const endIso = endDate.toISOString();
+    const source = SUMMARY_SOURCE[periodType];
 
-    this.logger.log(`Generating hierarchical ${periodType} summary from ${startDate.toISOString()} to ${endDate.toISOString()}`);
+    this.logger.log(`Generating ${periodType} summary (source: ${source}) from ${startIso} to ${endIso}`);
 
-    // Idempotency check: don't regenerate if already exists for the exact period
+    // Idempotency, matched on the period the summary covers. This used to match
+    // on createdAt falling inside the period, which is wrong in both directions:
+    // a monthly summary is written on the 1st of the following month and so
+    // never matched itself, while any daily written today blocked every other
+    // daily for today.
     const existingSummary = await this.prisma.block.findFirst({
       where: {
         type: 'journal_summary',
         workspaceId,
-        properties: {
-          path: ['periodType'],
-          equals: periodType
-        },
-        createdAt: {
-          gte: startDate,
-          lte: endDate
-        }
-      }
+        deletedAt: null,
+        AND: [
+          { properties: { path: ['periodType'], equals: periodType } },
+          { properties: { path: ['periodStart'], equals: startIso } },
+          { properties: { path: ['periodEnd'], equals: endIso } },
+        ],
+      },
     });
 
     if (existingSummary && periodType !== 'custom') {
-      this.logger.log(`Summary for ${periodType} already exists (ID: ${existingSummary.id}). Skipping.`);
+      this.logger.log(`Summary for ${periodType} ${startIso} already exists (${existingSummary.id}). Skipping.`);
       return { success: true, blockId: existingSummary.id, cached: true };
     }
 
-    // 1. Fetch RAW data (journal_entries, actions, etc.)
-    const rawBlocksInPeriod = await this.prisma.block.findMany({
+    // Entries are selected by properties.date — when the thought was captured —
+    // not by createdAt, which is when ingestion happened to finish. A note
+    // recorded at 23:50 and transcribed at 00:05 belongs to the day it was
+    // spoken. In the existing 76 entries these differ by a day in 20 cases, so
+    // filtering on createdAt misfiles a quarter of the journal.
+    const journalEntries = await this.prisma.block.findMany({
       where: {
         workspaceId,
-        createdAt: { gte: startDate, lte: endDate },
-        deletedAt: null
-      }
+        type: 'journal_entry',
+        deletedAt: null,
+        AND: [
+          { properties: { path: ['date'], gte: startIso } },
+          { properties: { path: ['date'], lte: endIso } },
+        ],
+      },
+      orderBy: { createdAt: 'asc' },
     });
 
-    const journalEntries = rawBlocksInPeriod.filter(b => b.type === 'journal_entry');
-    const actionBlocks = rawBlocksInPeriod.filter(b => b.type === 'action');
-    const contentIdeas = rawBlocksInPeriod.filter(b => b.type === 'content_idea');
-    const completedBlocks = rawBlocksInPeriod.filter(
-      b => b.type === 'action' && ((b.properties as any)?.status === 'done' || (b.properties as any)?.status === 'completed')
+    // Actions and ideas are context, not the record itself, and are not
+    // guaranteed to carry a date property, so they stay on createdAt.
+    const sideBlocks = await this.prisma.block.findMany({
+      where: {
+        workspaceId,
+        type: { in: ['action', 'content_idea'] },
+        deletedAt: null,
+        createdAt: { gte: startDate, lte: endDate },
+      },
+    });
+
+    const actionBlocks = sideBlocks.filter(b => b.type === 'action');
+    const contentIdeas = sideBlocks.filter(b => b.type === 'content_idea');
+    const completedBlocks = actionBlocks.filter(
+      b => ((b.properties as any)?.status === 'done' || (b.properties as any)?.status === 'completed')
     );
 
-    // Nothing happened in this period. Generating anyway costs an LLM call and
-    // writes a summary of nothing, which is what produced 128 summaries against
-    // 76 entries while the journal sat idle.
-    if (journalEntries.length === 0 && actionBlocks.length === 0 && contentIdeas.length === 0) {
-      this.logger.log(`No journal activity for ${periodType} in workspace ${workspaceId}. Skipping.`);
-      return { success: true, skipped: true, reason: 'no activity' };
-    }
-
-    // 2. Recursive/Hierarchical context: fetch existing INFERIOR summaries
-    // We fetch summaries that are strictly "smaller" than the current periodType
-    const inferiorSummaries = await this.prisma.block.findMany({
+    // The summaries this period is built from, if it is built from summaries.
+    // Selected by the period they cover and by their own type, so a month reads
+    // its days and nothing else. deletedAt matters here: the 95 fabricated
+    // summaries were soft-deleted, and the previous query would have fed them
+    // straight back in as context.
+    const sourceSummaries = source === 'entries' ? [] : await this.prisma.block.findMany({
       where: {
         type: 'journal_summary',
         workspaceId,
-        createdAt: { gte: startDate, lte: endDate },
-        // Simple logic: we include all existing summaries in the period
-        // (The AI prompt will be instructed on how to treat them as condensed knowledge)
-      }
+        deletedAt: null,
+        AND: [
+          { properties: { path: ['periodType'], equals: source } },
+          { properties: { path: ['periodStart'], gte: startIso } },
+          { properties: { path: ['periodEnd'], lte: endIso } },
+        ],
+      },
+      orderBy: { createdAt: 'asc' },
     });
 
-    // 3. Format context for AI
-    let contextText = '';
+    // Nothing to read. Generating anyway costs an LLM call and writes a summary
+    // of nothing, which is what produced 128 summaries against 76 entries while
+    // the journal sat idle.
+    const hasInput = source === 'entries'
+      ? journalEntries.length > 0 || actionBlocks.length > 0 || contentIdeas.length > 0
+      : sourceSummaries.length > 0;
 
-    if (inferiorSummaries.length > 0) {
-      contextText += "### INFERIOR PERIOD SUMMARIES (Condensed Knowledge):\n";
-      inferiorSummaries.forEach(sum => {
-        const props = sum.properties as any;
-        contextText += `#### ${props.periodType} Summary (${dayjs(sum.createdAt).format('YYYY-MM-DD')}):\n`;
-        contextText += `**Synthesis**: ${props.synthesis || ''}\n`;
-        contextText += `**Summary**: ${props.summary || ''}\n\n`;
-      });
+    if (!hasInput) {
+      this.logger.log(`No ${source} input for ${periodType} in workspace ${workspaceId}. Skipping.`);
+      return { success: true, skipped: true, reason: 'no input' };
     }
 
-    contextText += "### RAW DATA (Individual Experiences):\n";
-    if (journalEntries.length > 0) {
-      contextText += "#### Journal Entries:\n";
-      journalEntries.forEach(entry => {
-        const text = (entry.properties as any)?.summary || (entry.properties as any)?.text || '';
-        if (text) contextText += `- [${dayjs(entry.createdAt).format('HH:mm')}] ${text}\n`;
+    // Format the input for the model
+    let contextText = '';
+
+    if (source === 'entries') {
+      if (journalEntries.length > 0) {
+        contextText += '## ENTRADAS DEL DIARIO\n';
+        journalEntries.forEach(entry => {
+          const text = this.entryText(entry);
+          if (!text) return;
+          const at = (entry.properties as any)?.date ?? entry.createdAt;
+          contextText += `\n### ${dayjs(at).format('YYYY-MM-DD HH:mm')}\n${text}\n`;
+        });
+      }
+    } else {
+      contextText += `## RESÚMENES ${source.toUpperCase()} DEL PERIODO\n`;
+      sourceSummaries.forEach(sum => {
+        const props = sum.properties as any;
+        const from = dayjs(props.periodStart).format('YYYY-MM-DD');
+        const to = dayjs(props.periodEnd).format('YYYY-MM-DD');
+        contextText += `\n### ${from} → ${to}\n`;
+        if (props.summary) contextText += `Qué pasó: ${props.summary}\n`;
+        if (props.synthesis) contextText += `Qué significó: ${props.synthesis}\n`;
       });
     }
 
     if (actionBlocks.length > 0) {
-      contextText += "\n#### Actions (Created/Status):\n";
+      contextText += '\n## TAREAS DEL PERIODO\n';
       actionBlocks.forEach(action => {
-        const text = (action.properties as any)?.text || (action.properties as any)?.name || 'Untitled';
+        const text = (action.properties as any)?.text || (action.properties as any)?.name || 'Sin título';
         const st = (action.properties as any)?.status;
-        contextText += `- [${st || 'pending'}] ${text}\n`;
+        contextText += `- [${st || 'pendiente'}] ${text}\n`;
       });
     }
 
@@ -162,18 +257,25 @@ export class JournalService {
           messages: [
             {
               role: 'system',
-              content: `You are an AI Second Brain architect creating a ${periodType} review.
-Your output MUST contain two distinct parts:
-1. **Synthesis**: The "Soul" of the period. A deep, high-level interpretation of what these experiences mean, mood trajectory, recurring patterns, and overall impact. Prioritize this in position.
-2. **Summary**: The "Body". An objective, structured recount of what actually happened, tasks completed, metrics, and facts.
+              content: `Estás escribiendo el resumen ${PERIOD_LABEL[periodType].toLowerCase()} del diario personal de alguien, que cubre del ${dayjs(startDate).format('D [de] MMMM [de] YYYY')} al ${dayjs(endDate).format('D [de] MMMM [de] YYYY')}.
 
-RECURSIVE LOGIC:
-You are provided with both "Inferior Summaries" (condensed knowledge from smaller periods) and "Raw Data" (individual events).
-Use the Inferior Summaries as your primary cognitive anchor to avoid getting lost in noise, while using Raw Data to extract specific flavor and evidence.
+Recibes ${source === 'entries' ? 'las entradas que esa persona escribió o dictó durante el periodo, tal cual las dejó' : `los resúmenes ${source} que ya cubren este periodo`}. Eso es todo el registro que existe. No hay más.
 
-TONE: Reflective, elite, concise yet profound.
-LANGUAGE: Spanish (predominantly).
-LENGTH: ${periodType === 'daily' ? 'Brief (1-2 paragraphs)' : periodType === 'yearly' ? 'Comprehensive (4-5 paragraphs)' : 'Balanced (2-3 paragraphs)'}.`
+Devuelve tres cosas:
+
+1. "summary" — qué pasó. Hechos concretos: acontecimientos, decisiones, trabajo hecho, personas, lugares, cifras. En primera persona, en prosa llana, como un registro que esta persona va a releer dentro de años y necesita que sea exacto.
+
+2. "synthesis" — qué significó. Los temas que se repiten, cómo se movió el ánimo, de qué iba realmente el periodo. Interpretación de lo que está en el registro, nunca más allá de él.
+
+3. "highlights" — lo poco que merece recordarse, una línea corta cada uno. Devuelve una lista vacía si el registro no da para ninguno.
+
+REGLA ABSOLUTA — nada de lo que escribas puede no estar en la entrada. No infieras acontecimientos, emociones ni detalles que no aparezcan. Si el registro es escaso, escribe poco. Una entrada breve y fiel es correcta; una entrada rica e inventada es un recuerdo falso, y esto es el registro que esta persona tiene de su propia vida.
+
+No añadas consejos, ánimos, moralejas ni conclusiones a las que la persona no haya llegado ella misma. No adornes. No uses lenguaje grandilocuente.
+
+Escribe en el mismo idioma en que está escrito el registro.
+
+EXTENSIÓN: ${periodType === 'daily' ? 'breve, uno o dos párrafos' : periodType === 'yearly' ? 'amplia, cuatro o cinco párrafos' : 'media, dos o tres párrafos'}.`
             },
             {
               role: 'user',
@@ -203,29 +305,35 @@ LENGTH: ${periodType === 'daily' ? 'Brief (1-2 paragraphs)' : periodType === 'ye
         highlights: aiResult.highlights,
         actionCount: actionBlocks.length,
         completedCount: completedBlocks.length,
-        contentIdeasCount: contentIdeas.length
+        contentIdeasCount: contentIdeas.length,
+        // What this summary was actually built from, recorded on the summary
+        // itself. Without it there is no way to tell later whether a given
+        // summary predates this hierarchy.
+        sourceType: source,
+        sourceCount: source === 'entries' ? journalEntries.length : sourceSummaries.length,
       }
     });
 
-    // 6. Build Relations (Hierarchical Graph)
-    // Link to inferior summaries
-    for (const inf of inferiorSummaries) {
-      await this.prisma.relation.create({
-        data: {
+    // The hierarchy as a graph: each summary points at exactly what it read.
+    if (sourceSummaries.length > 0) {
+      await this.prisma.relation.createMany({
+        data: sourceSummaries.map(inf => ({
           type: 'parent_summary_of',
           fromBlockId: newSummaryBlock.id,
-          toBlockId: inf.id
-        }
+          toBlockId: inf.id,
+        })),
+        skipDuplicates: true,
       });
     }
-    // Link to raw entries
-    for (const j of journalEntries) {
-      await this.prisma.relation.create({
-        data: {
+
+    if (source === 'entries' && journalEntries.length > 0) {
+      await this.prisma.relation.createMany({
+        data: journalEntries.map(j => ({
           type: 'summarized_by',
           fromBlockId: j.id,
-          toBlockId: newSummaryBlock.id
-        }
+          toBlockId: newSummaryBlock.id,
+        })),
+        skipDuplicates: true,
       });
     }
 
@@ -236,19 +344,20 @@ LENGTH: ${periodType === 'daily' ? 'Brief (1-2 paragraphs)' : periodType === 'ye
     const statsLine = `📊 Stats: ✅ ${completedBlocks.length}/${actionBlocks.length} | 💡 ${contentIdeas.length} | 📓 ${journalEntries.length}\n`;
     finalDeliveryText += statsLine;
 
-    // Daily specific: chronological list
+    // Daily specific: chronological list, showing the entries themselves rather
+    // than anything derived from them — the same text the summary was built on.
     if (periodType === 'daily' && journalEntries.length > 0) {
       finalDeliveryText += `\n📅 *ENTRADAS CRONOLÓGICAS:*\n`;
       journalEntries.forEach(e => {
-        const text = (e.properties as any)?.summary || (e.properties as any)?.text || '';
-        finalDeliveryText += `• _${dayjs(e.createdAt).format('HH:mm')}_: ${text}\n`;
+        const at = (e.properties as any)?.date ?? e.createdAt;
+        finalDeliveryText += `• _${dayjs(at).format('HH:mm')}_: ${this.entryText(e)}\n`;
       });
     }
 
     // 8. Notify Zazu (if configured)
     const zazuUrl = process.env.ZAZU_INTERNAL_URL || 'http://zazu:3000';
 
-    const periodTitle = `${periodType === 'daily' ? 'Diario' : periodType === 'weekly' ? 'Semanal' : periodType === 'monthly' ? 'Mensual' : periodType === 'trimester' ? 'Trimestral' : periodType === 'yearly' ? 'Anual' : 'Personalizado'}`;
+    const periodTitle = PERIOD_LABEL[periodType];
     const displayDate = dayjs(startDate).format('DD MMM YYYY');
 
     if (periodType !== 'custom') {
@@ -323,14 +432,50 @@ LENGTH: ${periodType === 'daily' ? 'Brief (1-2 paragraphs)' : periodType === 'ye
    * every Block on the platform in one pass, which mixed tenants into a single
    * summary; it now produces one summary per workspace.
    */
-  private async getActiveWorkspaces(startDate: Date, endDate: Date): Promise<string[]> {
+  private async getActiveWorkspaces(
+    periodType: PeriodType,
+    startDate: Date,
+    endDate: Date,
+  ): Promise<string[]> {
+    const source = SUMMARY_SOURCE[periodType];
+    const startIso = startDate.toISOString();
+    const endIso = endDate.toISOString();
+
+    // A workspace is a candidate when it holds whatever this period reads. Ask
+    // for the wrong thing and the run is skipped for a workspace that has
+    // perfectly good input — a month whose days are all summarised still has no
+    // blocks created inside the month if ingestion ran late.
+    const where: Prisma.BlockWhereInput = source === 'entries'
+      ? {
+          workspaceId: { not: null },
+          deletedAt: null,
+          OR: [
+            {
+              type: 'journal_entry',
+              AND: [
+                { properties: { path: ['date'], gte: startIso } },
+                { properties: { path: ['date'], lte: endIso } },
+              ],
+            },
+            {
+              type: { in: ['action', 'content_idea'] },
+              createdAt: { gte: startDate, lte: endDate },
+            },
+          ],
+        }
+      : {
+          workspaceId: { not: null },
+          deletedAt: null,
+          type: 'journal_summary',
+          AND: [
+            { properties: { path: ['periodType'], equals: source } },
+            { properties: { path: ['periodStart'], gte: startIso } },
+            { properties: { path: ['periodEnd'], lte: endIso } },
+          ],
+        };
+
     const rows = await this.prisma.block.findMany({
-      where: {
-        workspaceId: { not: null },
-        deletedAt: null,
-        createdAt: { gte: startDate, lte: endDate },
-        type: { in: ['journal_entry', 'action', 'content_idea'] },
-      },
+      where,
       select: { workspaceId: true },
       distinct: ['workspaceId'],
     });
@@ -354,7 +499,7 @@ LENGTH: ${periodType === 'daily' ? 'Brief (1-2 paragraphs)' : periodType === 'ye
   ) {
     const startDate = dayjs(startIso).startOf('day').toDate();
     const endDate = dayjs(endIso).endOf('day').toDate();
-    const workspaceIds = await this.getActiveWorkspaces(startDate, endDate);
+    const workspaceIds = await this.getActiveWorkspaces(periodType, startDate, endDate);
 
     if (workspaceIds.length === 0) {
       this.logger.log(`No workspace had activity for the ${periodType} period. Skipping.`);
@@ -381,14 +526,18 @@ LENGTH: ${periodType === 'daily' ? 'Brief (1-2 paragraphs)' : periodType === 'ye
     await this.generateForActiveWorkspaces('daily', dayjs().startOf('day').toISOString(), dayjs().endOf('day').toISOString());
   }
 
-  @Cron('0 20 * * 0')
+  // Sunday, after the daily has run. The previous window ran on Sunday at 20:00
+  // over startOf('week').add(1,'day') → endOf('week').add(1,'day'), which with
+  // dayjs' Sunday-based week resolves to the Monday–Sunday that has not happened
+  // yet: every weekly summary was generated over an empty future week.
+  @Cron('30 23 * * 0')
   async handleWeeklySummary() {
     const prefs = await this.getUserPreferences();
     if (!prefs.autoWeekly) return;
 
     this.logger.log('Weekly Summary Triggered (Config-aware)');
-    const start = dayjs().startOf('week').add(1, 'day').toISOString();
-    const end = dayjs().endOf('week').add(1, 'day').toISOString();
+    const start = dayjs().subtract(6, 'day').startOf('day').toISOString();
+    const end = dayjs().endOf('day').toISOString();
     await this.generateForActiveWorkspaces('weekly', start, end);
   }
 
@@ -403,7 +552,10 @@ LENGTH: ${periodType === 'daily' ? 'Brief (1-2 paragraphs)' : periodType === 'ye
     await this.generateForActiveWorkspaces('monthly', start, end);
   }
 
-  @Cron('0 18 1 1,4,7,10 *')
+  // Staggered after the monthly, and the yearly after both: each level reads
+  // what the level it depends on has already written, and running them in the
+  // same minute is a race.
+  @Cron('0 19 1 1,4,7,10 *')
   async handleTrimesterSummary() {
     const prefs = await this.getUserPreferences();
     if (!prefs.autoTrimester) return;
@@ -413,7 +565,7 @@ LENGTH: ${periodType === 'daily' ? 'Brief (1-2 paragraphs)' : periodType === 'ye
     await this.generateForActiveWorkspaces('trimester', start, end);
   }
 
-  @Cron('0 18 1 1 *')
+  @Cron('0 20 1 1 *')
   async handleYearlySummary() {
     const prefs = await this.getUserPreferences();
     if (!prefs.autoYearly) return;

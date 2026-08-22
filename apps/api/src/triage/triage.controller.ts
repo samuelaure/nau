@@ -11,6 +11,11 @@ export class TriageDto {
   journalOnly?: boolean;
   /** When the capture was recorded. Falls back to now if the caller omits it. */
   capturedAt?: string;
+  /**
+   * The untouched transcription, when the caller has already cleaned `text`.
+   * Stored alongside so there is always a way back to what was actually said.
+   */
+  rawText?: string;
 }
 
 @UseGuards(ServiceAuthGuard)
@@ -28,6 +33,7 @@ export class TriageController {
       body.workspaceId,
       body.journalOnly,
       body.capturedAt,
+      body.rawText,
     );
     return result;
   }

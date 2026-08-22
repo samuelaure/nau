@@ -346,6 +346,7 @@ async function handleTriageState(ctx: ZazuContext) {
 function clearVoicenoteSession(ctx: ZazuContext) {
   if (!ctx.session) return;
   ctx.session.pendingVoicenoteId = undefined;
+  ctx.session.pendingVoicenoteRaw = undefined;
   ctx.session.pendingVoicenoteClean = undefined;
   ctx.session.pendingVoicenoteSummary = undefined;
   ctx.session.pendingVoicenoteBrands = undefined;
@@ -380,6 +381,7 @@ async function handleFinalDispatch(ctx: ZazuContext) {
   const intents: string[] = ctx.session?.selectedVoicenoteIntents ?? [];
   const voicenoteId: string = ctx.session?.pendingVoicenoteId ?? '';
   const cleanTranscription: string = ctx.session?.pendingVoicenoteClean ?? '';
+  const rawTranscription: string | undefined = ctx.session?.pendingVoicenoteRaw;
   const summaryText: string = ctx.session?.pendingVoicenoteSummary ?? '';
   const nauUserId: string = ctx.dbUser?.nauUserId ?? '';
   const voicenoteCreatedAt: string | undefined = ctx.session?.pendingVoicenoteCapturedAt;
@@ -409,7 +411,17 @@ async function handleFinalDispatch(ctx: ZazuContext) {
 
   const [journalResult, contentResults, actionResults] = await Promise.allSettled([
     intents.includes('journal') && journalWorkspaceId
-      ? voicenoteSkill.dispatchToJournal(voicenoteId, journalText, journalWorkspaceId, nauUserId, voicenoteCreatedAt)
+      ? voicenoteSkill.dispatchToJournal(
+          voicenoteId,
+          journalText,
+          journalWorkspaceId,
+          nauUserId,
+          voicenoteCreatedAt,
+          // Only meaningful when the whole note went to the journal. Once
+          // splitIntent has carved the journal part out of it, the full
+          // transcription is no longer the raw form of this entry.
+          intents.length > 1 ? undefined : rawTranscription,
+        )
       : Promise.resolve(),
     intents.includes('content') && brands.length > 0
       ? voicenoteSkill.dispatchToBrands(voicenoteId, contentText, brands)
