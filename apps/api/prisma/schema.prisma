@@ -9,10 +9,10 @@ generator client {
 // ── Identity ──────────────────────────────────────────────────────────────────
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  name         String?
+  id                 String   @id @default(cuid())
+  email              String   @unique
+  passwordHash       String
+  name               String?
   telegramId         String?  @unique
   defaultWorkspaceId String?
   // IANA zone. A person's day starts and ends where they are, and the journal is
@@ -20,22 +20,22 @@ model User {
   // midnight, which for a user in Madrid cuts the day at 02:00 local.
   timezone           String   @default("UTC")
   createdAt          DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  updatedAt          DateTime @updatedAt
 
-  workspaces   WorkspaceMember[]
-  sessions     Session[]
-  linkTokens   AuthLinkToken[]
+  workspaces WorkspaceMember[]
+  sessions   Session[]
+  linkTokens AuthLinkToken[]
 }
 
 model Session {
-  id           String   @id @default(cuid())
-  userId       String
-  tokenFamily  String   // groups all rotated descendants of one login; reuse = revoke family
-  tokenHash    String   @unique // SHA-256 hex hash of the opaque refresh token
-  expiresAt    DateTime
-  createdAt    DateTime @default(now())
+  id          String   @id @default(cuid())
+  userId      String
+  tokenFamily String // groups all rotated descendants of one login; reuse = revoke family
+  tokenHash   String   @unique // SHA-256 hex hash of the opaque refresh token
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
 
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([tokenFamily])
@@ -44,8 +44,8 @@ model Session {
 model AuthLinkToken {
   id         String   @id @default(cuid())
   token      String   @unique
-  userId     String?  // null in bot-initiated flow (user unknown until accounts page login)
-  telegramId String?  // null in app-initiated flow (unknown until bot catches the deep link)
+  userId     String? // null in bot-initiated flow (user unknown until accounts page login)
+  telegramId String? // null in app-initiated flow (unknown until bot catches the deep link)
   user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt  DateTime
   createdAt  DateTime @default(now())
@@ -54,7 +54,7 @@ model AuthLinkToken {
 model ServiceClient {
   id         String   @id @default(cuid())
   slug       String   @unique // e.g. "flownau", "nauthenticity", "zazu-bot"
-  secretHash String   // bcrypt hash of the service's signing secret
+  secretHash String // bcrypt hash of the service's signing secret
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }
@@ -68,12 +68,12 @@ enum WorkspaceRole {
 }
 
 model Workspace {
-  id        String            @id @default(cuid())
+  id        String   @id @default(cuid())
   name      String
   slug      String
-  timezone  String            @default("UTC")
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
+  timezone  String   @default("UTC")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   members      WorkspaceMember[]
   brands       Brand[]
@@ -91,8 +91,8 @@ model WorkspaceMember {
   notificationSettings Json          @default("{}")
   createdAt            DateTime      @default(now())
 
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([userId, workspaceId])
   @@index([workspaceId])
@@ -110,7 +110,7 @@ model InviteToken {
   expiresAt    DateTime
   createdAt    DateTime      @default(now())
 
-  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId])
   @@index([email])
@@ -175,14 +175,14 @@ model SocialProfile {
   id          String            @id @default(cuid())
   brandId     String
   platform    SocialPlatform
-  platformId  String            // platform-native user/channel ID for dedup
+  platformId  String // platform-native user/channel ID for dedup
   handle      String
   displayName String?
   role        SocialProfileRole
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
-  brand       Brand             @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
 
   @@unique([brandId, platform, platformId, role])
   @@index([brandId])
@@ -217,8 +217,8 @@ model Prompt {
   updatedAt DateTime        @updatedAt
 
   // Optional FK for brand-scoped prompts (facilitates cascade delete)
-  brandId   String?
-  brand     Brand?          @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  brandId String?
+  brand   Brand?  @relation(fields: [brandId], references: [id], onDelete: Cascade)
 
   @@unique([ownerType, ownerId, type])
   @@index([ownerType, ownerId])
@@ -227,62 +227,206 @@ model Prompt {
 // ── Second Brain ──────────────────────────────────────────────────────────────
 
 model Block {
-  id          String   @id @default(cuid())
-  type        String
-  properties  Json     @default("{}")
+  id         String @id @default(cuid())
+  type       String
+  properties Json   @default("{}")
 
   workspaceId String?
   userId      String?
   workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  parentId    String?
-  parent      Block?     @relation("BlockChildren", fields: [parentId], references: [id], onDelete: Cascade)
-  children    Block[]    @relation("BlockChildren")
+  parentId String?
+  parent   Block?  @relation("BlockChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children Block[] @relation("BlockChildren")
 
   relationsFrom Relation[] @relation("FromBlock")
   relationsTo   Relation[] @relation("ToBlock")
 
   schedule    Schedule?
+  timeEntries TimeEntry[]
   events      Event[]
   tags        BlockTag[]
 
-  uuid        String   @unique @default(uuid())
-  updatedAt   DateTime @updatedAt
-  createdAt   DateTime @default(now())
-  deletedAt   DateTime?
+  uuid      String    @unique @default(uuid())
+  updatedAt DateTime  @updatedAt
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
 
-  source      String?
-  sourceRef   String?
+  source    String?
+  sourceRef String?
 
   @@index([workspaceId])
   @@index([userId])
 }
 
 model Relation {
-  id          String  @id @default(cuid())
-  type        String
-  properties  Json    @default("{}")
+  id         String @id @default(cuid())
+  type       String
+  properties Json   @default("{}")
 
   fromBlockId String
-  fromBlock   Block   @relation("FromBlock", fields: [fromBlockId], references: [id], onDelete: Cascade)
+  fromBlock   Block  @relation("FromBlock", fields: [fromBlockId], references: [id], onDelete: Cascade)
   toBlockId   String
-  toBlock     Block   @relation("ToBlock", fields: [toBlockId], references: [id], onDelete: Cascade)
+  toBlock     Block  @relation("ToBlock", fields: [toBlockId], references: [id], onDelete: Cascade)
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([fromBlockId, toBlockId, type])
 }
 
+/// When a block is meant to happen. The plan, never the record.
+///
+/// The range is what carries the intent, and it is deliberately not always a
+/// point: an action due today is start = end = today, while one deferred to
+/// "sometime this week" is start = Monday, end = Sunday. Widening the range is
+/// how something moves from a day to a week to a quarter without changing shape.
+///
+/// Recurrence follows RFC 5545. `rrule` holds one rule string; occurrences are
+/// DERIVED from it and never stored — a daily habit would otherwise be 365 rows
+/// a year saying nothing the rule does not already say. Only a deviation earns a
+/// row, in ScheduleException.
+///
+/// `timezone` is required for a rule to mean anything: "every weekday at 08:00"
+/// resolves to different instants either side of a daylight-saving change, and
+/// without a zone the rule silently drifts by an hour twice a year.
 model Schedule {
-  id          String    @id @default(cuid())
-  blockId     String    @unique
-  block       Block     @relation(fields: [blockId], references: [id], onDelete: Cascade)
-  startDate   DateTime
-  endDate     DateTime?
-  rrule       String?
+  id      String @id @default(cuid())
+  blockId String @unique
+  block   Block  @relation(fields: [blockId], references: [id], onDelete: Cascade)
+
+  startDate DateTime
+  endDate   DateTime?
+
+  rrule    String?
+  /// IANA zone the rule is read in. Null means the workspace's own zone.
+  timezone String?
+
+  /// Kept for blocks that are not recurring, where completion is a property of
+  /// the schedule itself. For recurring ones, completion belongs to an
+  /// occurrence and lives in Event — a habit has no single completion date.
   completedAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+
+  exceptions ScheduleException[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([startDate])
+}
+
+enum ScheduleExceptionKind {
+  /// The occurrence does not happen. RFC 5545 EXDATE.
+  SKIPPED
+  /// The occurrence happens at a different time. RFC 5545 RECURRENCE-ID.
+  MOVED
+}
+
+/// A single occurrence that departs from its rule.
+///
+/// The only reason an occurrence is ever stored. Everything a rule predicts is
+/// computed on read; this table holds the exceptions to it, which is the same
+/// shape every calendar system uses.
+model ScheduleException {
+  id String @id @default(cuid())
+
+  scheduleId String
+  schedule   Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  /// The instant the rule predicted, which is how the exception is matched back
+  /// to the occurrence it replaces.
+  occurrenceAt DateTime
+  kind         ScheduleExceptionKind
+  /// Where it moved to. Null when skipped.
+  movedTo      DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@unique([scheduleId, occurrenceAt])
+  @@index([scheduleId])
+}
+
+/// Real time spent on something. A fact about the past, never a plan.
+///
+/// Separate from Schedule on purpose: a plan is edited, a session happened and
+/// does not change. One block accumulates many sessions, which is how a task
+/// worked across three sittings stays one task.
+///
+/// Shape follows every time tracker that exists — Toggl, Harvest, Clockify.
+model TimeEntry {
+  id String @id @default(cuid())
+
+  blockId String
+  block   Block  @relation(fields: [blockId], references: [id], onDelete: Cascade)
+
+  workspaceId String?
+  userId      String?
+
+  startedAt DateTime
+  /// Null while a session is still running.
+  endedAt   DateTime?
+  note      String?
+
+  createdAt DateTime @default(now())
+
+  @@index([blockId])
+  @@index([workspaceId, startedAt])
+}
+
+/// A way of dividing time. Gregorian is one of several, not the ground truth.
+///
+/// The naŭ calendar runs 9-day weeks and 27-day months; astrological periods
+/// follow transits; personal epochs follow where someone was living. Each is a
+/// different way of grouping the same instants, so the calendar decides how a
+/// range is named and bounded, never what the data is.
+///
+/// Ordinary periods are DERIVED from a date range — "August 2026" needs no row.
+/// Only named or irregular ones are stored, in Period.
+model Calendar {
+  id          String       @id @default(cuid())
+  kind        CalendarKind
+  name        String
+  /// Null for the built-in calendars, which every workspace can use.
+  workspaceId String?
+  isDefault   Boolean      @default(false)
+
+  periods Period[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([workspaceId, kind, name])
+}
+
+enum CalendarKind {
+  GREGORIAN
+  NAU
+  ASTROLOGICAL
+  /// Personal epochs: a stay in one country, a trip, a chapter of a life.
+  PERSONAL
+}
+
+/// A named stretch of time.
+///
+/// Rows exist only where a range cannot be computed — a personal epoch, or a
+/// period someone chose to name. "The year of the dragon" recalls a life in a
+/// way "2024" does not, and that name is the entire reason this table exists.
+model Period {
+  id String @id @default(cuid())
+
+  calendarId String
+  calendar   Calendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+
+  workspaceId String?
+
+  name     String?
+  startsAt DateTime
+  endsAt   DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([workspaceId, startsAt])
+  @@index([calendarId])
 }
 
 /// Append-only record of what happened to a block and when.
@@ -296,17 +440,17 @@ model Schedule {
 /// joining Block — and so the record survives its block being hard-deleted,
 /// which is itself an event worth keeping.
 model Event {
-  id          String   @id @default(cuid())
-  type        String
-  metadata    Json     @default("{}")
+  id       String @id @default(cuid())
+  type     String
+  metadata Json   @default("{}")
 
-  blockId     String
-  block       Block    @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  blockId String
+  block   Block  @relation(fields: [blockId], references: [id], onDelete: Cascade)
 
   workspaceId String?
   userId      String?
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([workspaceId, createdAt])
   @@index([blockId])
@@ -333,10 +477,10 @@ model Tag {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  parent      Tag?       @relation("TagChildren", fields: [parentId], references: [id], onDelete: SetNull)
-  children    Tag[]      @relation("TagChildren")
-  blocks      BlockTag[]
+  workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  parent    Tag?       @relation("TagChildren", fields: [parentId], references: [id], onDelete: SetNull)
+  children  Tag[]      @relation("TagChildren")
+  blocks    BlockTag[]
 
   @@unique([workspaceId, name])
   @@index([workspaceId])
@@ -351,31 +495,30 @@ model BlockTag {
   @@id([blockId, tagId])
 }
 
-
 // ── Usage Tracking ────────────────────────────────────────────────────────────
 
 model UsageEvent {
-  id          String   @id @default(cuid())
+  id String @id @default(cuid())
 
   workspaceId String
   brandId     String?
   userId      String?
 
-  service     String   // "api" | "flownau" | "nauthenticity" | "zazu-bot"
-  operation   String   // "chat_completion" | "embedding" | "transcription" | "apify_scrape"
-  model       String?  // "gpt-4o" | "text-embedding-3-small" | "whisper-1" | null
-  provider    String?  // "openai" | "groq" | "apify" | null
+  service   String // "api" | "flownau" | "nauthenticity" | "zazu-bot"
+  operation String // "chat_completion" | "embedding" | "transcription" | "apify_scrape"
+  model     String? // "gpt-4o" | "text-embedding-3-small" | "whisper-1" | null
+  provider  String? // "openai" | "groq" | "apify" | null
 
   promptTokens     Int?
   completionTokens Int?
   totalTokens      Int?
-  quantity         Float?   // units consumed (e.g. characters, pages, API calls)
-  unit             String?  // "tokens" | "characters" | "calls"
-  costUsd          Float?   // estimated cost in USD
+  quantity         Float? // units consumed (e.g. characters, pages, API calls)
+  unit             String? // "tokens" | "characters" | "calls"
+  costUsd          Float? // estimated cost in USD
 
-  metadata    Json     @default("{}")
+  metadata Json @default("{}")
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([workspaceId, createdAt])
   @@index([brandId, createdAt])

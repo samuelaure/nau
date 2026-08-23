@@ -11,6 +11,18 @@ dayjs.locale('es');
 
 export { dayjs };
 
+/**
+ * The names the Gregorian calendar gives to its own divisions.
+ *
+ * Deliberately not "the period types the system has". Gregorian is one calendar
+ * among several — the naŭ calendar runs nine-day weeks and twenty-seven-day
+ * months, astrological periods follow transits, personal epochs follow where
+ * someone was living — and each will name its divisions differently.
+ *
+ * What every calendar shares is the shape of the answer, `PeriodBounds`: two
+ * instants and a label. Adding one is a new bounds function and a `Calendar`
+ * row, not a change to everything that consumes a period.
+ */
 export type PeriodType = 'daily' | 'weekly' | 'monthly' | 'trimester' | 'yearly' | 'custom';
 
 export interface PeriodBounds {
