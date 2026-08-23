@@ -80,10 +80,31 @@ for entry in $DATABASES; do
   fi
 done
 
-# ── Phase 2: upload everything ───────────────────────────────────────────────
+# ── Phase 2: encrypt, then upload ────────────────────────────────────────────
+# Nothing leaves this machine in the clear. Only the public key is here, so the
+# server cannot read its own archive and compromising it does not expose the
+# backups.
+#
+# A missing key is a failure and never a reason to fall back to plaintext.
+# Uploading an unencrypted dump because the key was absent is precisely how a
+# safeguard becomes a formality, and this archive already spent three months
+# publicly readable once.
 for name in $DUMPED; do
   file="${STAGING}/${name}.sql.gz"
-  if rclone copyto "$file" "${BUCKET}/${name}/${name}-${DATE}.sql.gz" $RCLONE_FLAGS 2>&1; then
+  enc="${file}.age"
+
+  if [ -z "$BACKUP_AGE_PUBLIC_KEY" ]; then
+    fail "$name" "BACKUP_AGE_PUBLIC_KEY unset — refusing to upload an unencrypted dump"
+    continue
+  fi
+
+  if ! age -r "$BACKUP_AGE_PUBLIC_KEY" -o "$enc" "$file" 2>/dev/null; then
+    fail "$name" "encryption failed"
+    rm -f "$enc"
+    continue
+  fi
+
+  if rclone copyto "$enc" "${BUCKET}/${name}/${name}-${DATE}.sql.gz.age" $RCLONE_FLAGS 2>&1; then
     UPLOADED="${UPLOADED} ${name}"
   else
     fail "$name" "upload to R2 failed"
