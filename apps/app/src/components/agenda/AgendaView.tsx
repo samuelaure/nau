@@ -14,20 +14,23 @@ import {
   SortableContext,
   arrayMove,
   sortableKeyboardCoordinates,
-  useSortable,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
-import { ChevronLeft, ChevronRight, GripVertical, Repeat, CalendarRange, Clock, ListChecks } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Clock, ListChecks, CornerDownRight } from 'lucide-react'
 import { Button } from '@9nau/ui/components/button'
 import { cn } from '@9nau/ui/lib/utils'
-import { useAgenda, useSetCompletion, useReorderAgenda, type AgendaItem, type AgendaPeriod } from '@/hooks/use-agenda-api'
+import {
+  useAgenda,
+  useSetCompletion,
+  useReorderAgenda,
+  type AgendaItem,
+  type AgendaPeriod,
+} from '@/hooks/use-agenda-api'
+import { useUpsertSchedule } from '@/hooks/use-schedule-api'
 import { useUiStore } from '@/lib/state/ui-store'
-
-function toInputDate(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
-}
+import { AgendaRow } from './AgendaRow'
+import { ItemComposer } from './ItemComposer'
+import { toInputDate } from './scheduling'
 
 function shift(date: Date, period: AgendaPeriod, direction: -1 | 1): Date {
   const d = new Date(date)
@@ -44,81 +47,11 @@ function formatDuration(minutes: number): string {
   return m ? `${h} h ${m} min` : `${h} h`
 }
 
-/** One agenda line. A habit and a task look alike on purpose. */
-function Row({
-  item,
-  onToggle,
-  timezone,
-}: {
-  item: AgendaItem
-  onToggle: (item: AgendaItem, done: boolean) => void
-  timezone: string
-}) {
-  const id = `${item.blockId}@${item.occurrenceAt}`
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
-
-  const time = new Date(item.effectiveAt).toLocaleTimeString('es-ES', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: timezone,
-  })
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={cn(
-        'flex items-center gap-3 rounded-xl border bg-white p-3 dark:bg-gray-800',
-        'border-gray-100 dark:border-gray-700',
-        isDragging && 'opacity-60 shadow-lg',
-        item.done && 'opacity-60',
-      )}
-    >
-      <button
-        {...attributes}
-        {...listeners}
-        aria-label="Reordenar"
-        className="cursor-grab touch-none text-gray-300 hover:text-gray-500 active:cursor-grabbing dark:text-gray-600"
-      >
-        <GripVertical className="h-4 w-4" />
-      </button>
-
-      <input
-        type="checkbox"
-        checked={item.done}
-        onChange={(e) => onToggle(item, e.target.checked)}
-        className="h-4 w-4 shrink-0 cursor-pointer rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-      />
-
-      <div className="min-w-0 flex-1">
-        <p className={cn('truncate text-sm text-gray-800 dark:text-gray-200', item.done && 'line-through')}>
-          {item.title}
-        </p>
-        <div className="mt-0.5 flex items-center gap-2 text-[10px] text-gray-400 dark:text-gray-500">
-          {item.recurring ? (
-            <span className="inline-flex items-center gap-1">
-              <Repeat className="h-3 w-3" /> hábito
-            </span>
-          ) : (
-            <span className="uppercase">{item.type}</span>
-          )}
-          {/* Deferred to the period rather than to a moment in it: showing a
-              clock time here would invent a precision the plan never had. */}
-          {item.spansPeriod ? (
-            <span className="inline-flex items-center gap-1">
-              <CalendarRange className="h-3 w-3" /> en el periodo
-            </span>
-          ) : (
-            <span>{time}</span>
-          )}
-          {item.moved && <span>· movido</span>}
-          {item.estimateMinutes != null && <span>· {formatDuration(item.estimateMinutes)}</span>}
-          {item.priority && <span>· {item.priority}</span>}
-        </div>
-      </div>
-    </div>
-  )
-}
+const PERIODS: { value: AgendaPeriod; label: string; composerDefault: 'today' | 'week' | 'month' }[] = [
+  { value: 'daily', label: 'Día', composerDefault: 'today' },
+  { value: 'weekly', label: 'Semana', composerDefault: 'week' },
+  { value: 'monthly', label: 'Mes', composerDefault: 'month' },
+]
 
 /**
  * Everything due in a period, in one list.
@@ -140,6 +73,7 @@ export function AgendaView() {
 
   const setCompletion = useSetCompletion()
   const reorder = useReorderAgenda()
+  const upsertSchedule = useUpsertSchedule()
 
   // Held locally so a drag lands instantly; the server order arrives back on the
   // next fetch and replaces it.
@@ -172,7 +106,29 @@ export function AgendaView() {
     reorder.mutate({ blockIds, workspaceId: activeWorkspaceId ?? undefined })
   }
 
-  const pending = order.filter((i) => !i.done).length
+  /**
+   * Pushes something to the next day by hand.
+   *
+   * Distinct from the automatic carry-over, and recorded as such: this is a
+   * decision, and the counter that shows it is the one that should make a person
+   * uncomfortable after the third time.
+   */
+  const defer = (item: AgendaItem) => {
+    const from = new Date(item.occurrenceAt)
+    const to = new Date(from)
+    to.setDate(to.getDate() + 1)
+    const end = new Date(to)
+    end.setHours(23, 59, 59, 999)
+
+    upsertSchedule.mutate({
+      blockId: item.blockId,
+      startDate: to.toISOString(),
+      endDate: end.toISOString(),
+      rrule: null,
+    })
+  }
+
+  const pending = order.filter((i) => !i.done && !i.projected).length
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -182,11 +138,7 @@ export function AgendaView() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Agenda</h1>
         </div>
         <div className="flex items-center gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
-          {([
-            { value: 'daily', label: 'Día' },
-            { value: 'weekly', label: 'Semana' },
-            { value: 'monthly', label: 'Mes' },
-          ] as const).map((p) => (
+          {PERIODS.map((p) => (
             <button
               key={p.value}
               onClick={() => setPeriod(p.value)}
@@ -218,8 +170,14 @@ export function AgendaView() {
         </Button>
       </div>
 
+      <ItemComposer
+        workspaceId={activeWorkspaceId ?? undefined}
+        defaultWhen={PERIODS.find((p) => p.value === period)?.composerDefault ?? 'today'}
+        defaultDate={date}
+      />
+
       {data && order.length > 0 && (
-        <div className="mb-4 flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+        <div className="mb-4 flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
           <span>{pending} pendientes</span>
           {data.plannedMinutes > 0 && (
             <span className="inline-flex items-center gap-1">
@@ -230,6 +188,12 @@ export function AgendaView() {
           {data.unestimatedCount > 0 && (
             <span className="text-gray-400 dark:text-gray-500">
               · {data.unestimatedCount} sin estimar
+            </span>
+          )}
+          {data.carriedCount > 0 && (
+            <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
+              <CornerDownRight className="h-3 w-3" />
+              {data.carriedCount} viene de antes
             </span>
           )}
         </div>
@@ -248,7 +212,7 @@ export function AgendaView() {
         <SortableContext items={ids} strategy={verticalListSortingStrategy}>
           <div className="space-y-2">
             {order.map((item) => (
-              <Row
+              <AgendaRow
                 key={`${item.blockId}@${item.occurrenceAt}`}
                 item={item}
                 timezone={data?.timezone ?? 'UTC'}
@@ -259,6 +223,7 @@ export function AgendaView() {
                     done,
                   })
                 }
+                onDefer={defer}
               />
             ))}
           </div>

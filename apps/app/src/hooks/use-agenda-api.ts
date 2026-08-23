@@ -14,10 +14,22 @@ export interface AgendaItem {
   /** Due at some point inside the period rather than at a moment in it. */
   spansPeriod: boolean
   recurring: boolean
+  /** Derived from having a recurrence. There is no stored habit type. */
+  isHabit: boolean
+  /** An estimate rather than a commitment. Only anchored schedules produce these. */
+  projected: boolean
   done: boolean
   sortOrder: number
   estimateMinutes: number | null
   priority: string | null
+  /** Set when shown outside the period it was planned for; carries the original date. */
+  carriedFrom: string | null
+  /** Periods elapsed since it was planned. Time passing, not a decision. */
+  carriedPeriods: number
+  /** Times it was moved by hand. A decision, counted separately. */
+  rescheduledCount: number
+  /** How far past due, as a multiple of the schedule's own interval. */
+  overdue: number
 }
 
 export interface Agenda {
@@ -30,6 +42,7 @@ export interface Agenda {
   /** Minutes still to do. Finished work does not make a day look busier. */
   plannedMinutes: number
   unestimatedCount: number
+  carriedCount: number
 }
 
 export const useAgenda = (params: { date: string; period: AgendaPeriod; workspaceId?: string }) =>
