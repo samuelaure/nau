@@ -14,6 +14,10 @@ export type BlockEventType =
   | 'block.completed'
   | 'block.reopened'
   | 'block.scheduled'
+  // Moved by hand to another date. The only source for "how many times have I
+  // pushed this back myself", which the agenda shows apart from the automatic
+  // carry-over — one is a decision, the other is just time passing.
+  | 'block.rescheduled'
   | 'block.deleted'
   | 'block.tagged'
   | 'block.untagged'

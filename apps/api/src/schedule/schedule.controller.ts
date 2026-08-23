@@ -23,18 +23,21 @@ export class ScheduleController {
     @Body()
     dto: {
       blockId: string;
-      startDate: Date;
-      endDate?: Date;
-      rrule?: string;
+      startDate: string;
+      endDate?: string | null;
+      rrule?: string | null;
+      timezone?: string | null;
+      recurrenceMode?: 'FIXED' | 'AFTER_COMPLETION';
     },
   ) {
-    return this.scheduleService.upsert(
-      user.sub,
-      dto.blockId,
-      new Date(dto.startDate),
-      dto.endDate ? new Date(dto.endDate) : undefined,
-      dto.rrule,
-    );
+    return this.scheduleService.upsert(user.sub, {
+      blockId: dto.blockId,
+      startDate: new Date(dto.startDate),
+      endDate: dto.endDate ? new Date(dto.endDate) : null,
+      rrule: dto.rrule ?? null,
+      timezone: dto.timezone ?? null,
+      recurrenceMode: dto.recurrenceMode ?? 'FIXED',
+    });
   }
 
   @Get(':blockId')

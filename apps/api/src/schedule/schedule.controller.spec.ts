@@ -43,16 +43,18 @@ describe('ScheduleController', () => {
   });
 
   it('should call service.upsert', async () => {
-    const date = new Date().toISOString();
-    const dto = { blockId: 'b1', startDate: date as unknown as Date };
-    await controller.upsert(user, dto);
-    expect(service.upsert).toHaveBeenCalledWith(
-      user.sub,
-      'b1',
-      expect.any(Date),
-      undefined,
-      undefined,
-    );
+    const date = new Date('2026-08-17T08:00:00.000Z').toISOString();
+
+    await controller.upsert(user, { blockId: 'b1', startDate: date });
+
+    expect(service.upsert).toHaveBeenCalledWith(user.sub, {
+      blockId: 'b1',
+      startDate: new Date(date),
+      endDate: null,
+      rrule: null,
+      timezone: null,
+      recurrenceMode: 'FIXED',
+    });
   });
 
   it('should call service.findOne', async () => {

@@ -7,6 +7,14 @@ export interface Occurrence {
   /** Where it actually happens. Differs from `at` only when it was moved. */
   effectiveAt: Date;
   moved: boolean;
+  /**
+   * True when this occurrence is a guess rather than a commitment.
+   *
+   * Only anchored schedules produce these. Their next-but-one occurrence cannot
+   * be known until the next one is done, so anything beyond the first is shown
+   * as an estimate and never as a plan.
+   */
+  projected: boolean;
 }
 
 export interface ScheduleLike {
@@ -14,6 +22,7 @@ export interface ScheduleLike {
   endDate: Date | null;
   rrule: string | null;
   timezone: string | null;
+  recurrenceMode?: 'FIXED' | 'AFTER_COMPLETION';
 }
 
 export interface ExceptionLike {
@@ -53,6 +62,8 @@ export function occurrencesIn(
   exceptions: ExceptionLike[],
   windowStart: Date,
   windowEnd: Date,
+  /** Latest completion, for anchored schedules. Ignored by fixed ones. */
+  lastCompletedAt?: Date | null,
 ): Occurrence[] {
   const skipped = new Set<number>();
   const movedTo = new Map<number, Date>();
@@ -63,6 +74,11 @@ export function occurrencesIn(
     else if (ex.movedTo) movedTo.set(key, ex.movedTo);
   }
 
+  const decorate = (at: Date, projected: boolean): Occurrence => {
+    const moved = movedTo.get(at.getTime());
+    return { at, effectiveAt: moved ?? at, moved: Boolean(moved), projected };
+  };
+
   // No rule: the schedule is a single span, and it either overlaps the window or
   // it does not. A range rather than a point, because an action deferred to
   // "this week" is due across the whole week.
@@ -70,34 +86,125 @@ export function occurrencesIn(
     const start = schedule.startDate;
     const end = schedule.endDate ?? schedule.startDate;
     if (end < windowStart || start > windowEnd) return [];
-    const moved = movedTo.get(start.getTime());
     if (skipped.has(start.getTime())) return [];
-    return [{ at: start, effectiveAt: moved ?? start, moved: Boolean(moved) }];
+    return [decorate(start, false)];
   }
 
-  let rule: RRule;
-  try {
-    // A rule may arrive as a bare RRULE line or as a full RFC 5545 block.
-    rule = rrulestr(
-      schedule.rrule.includes('DTSTART')
-        ? schedule.rrule
-        : `DTSTART:${toICalUtc(schedule.startDate)}\n${normaliseRule(schedule.rrule)}`,
-    ) as RRule;
-  } catch {
-    // A malformed rule yields nothing rather than taking down the whole agenda
-    // for every other block on the day.
-    return [];
+  if (schedule.recurrenceMode === 'AFTER_COMPLETION') {
+    return anchoredOccurrences(schedule, windowStart, windowEnd, lastCompletedAt, decorate, skipped);
   }
+
+  const rule = parseRule(schedule.rrule, schedule.startDate);
+  if (!rule) return [];
 
   const hardEnd = schedule.endDate && schedule.endDate < windowEnd ? schedule.endDate : windowEnd;
 
   return rule
     .between(windowStart, hardEnd, true)
     .filter((at) => !skipped.has(at.getTime()))
-    .map((at) => {
-      const moved = movedTo.get(at.getTime());
-      return { at, effectiveAt: moved ?? at, moved: Boolean(moved) };
-    });
+    .map((at) => decorate(at, false));
+}
+
+/**
+ * Occurrences of a schedule that counts from its last completion.
+ *
+ * There is only ever one real occurrence: the one that is due now. Everything
+ * after it depends on when this one is actually done, so it is returned marked
+ * as projected — useful to fill a week view, never to be mistaken for a plan.
+ *
+ * The pending occurrence is returned even when it falls before the window. An
+ * overdue shave does not stop being due because the day it was due has passed;
+ * dropping it would hide exactly the thing the person needs to see.
+ */
+function anchoredOccurrences(
+  schedule: ScheduleLike,
+  windowStart: Date,
+  windowEnd: Date,
+  lastCompletedAt: Date | null | undefined,
+  decorate: (at: Date, projected: boolean) => Occurrence,
+  skipped: Set<number>,
+): Occurrence[] {
+  const anchor = lastCompletedAt ?? schedule.startDate;
+  const rule = parseRule(schedule.rrule!, anchor);
+  if (!rule) return [];
+
+  if (schedule.endDate && anchor > schedule.endDate) return [];
+
+  const pending = rule.after(anchor, false);
+  if (!pending) return [];
+  if (schedule.endDate && pending > schedule.endDate) return [];
+  if (pending > windowEnd) return [];
+  if (skipped.has(pending.getTime())) return [];
+
+  const out: Occurrence[] = [decorate(pending, false)];
+
+  // An overdue occurrence gets no projections. Every one of them would be
+  // premised on a completion that has not happened, so they would be answering
+  // "when is the next shave, assuming you shaved on the fourth of July" — which
+  // is a question nobody asked. One honest row beats a filled-in week.
+  if (pending < windowStart) return out;
+
+  let cursor = pending;
+  for (let i = 0; i < 64; i += 1) {
+    const next = rule.after(cursor, false);
+    if (!next || next > windowEnd) break;
+    if (schedule.endDate && next > schedule.endDate) break;
+    if (!skipped.has(next.getTime())) out.push(decorate(next, true));
+    cursor = next;
+  }
+
+  return out;
+}
+
+/**
+ * How long one turn of the rule lasts, in milliseconds.
+ *
+ * Measured from the rule rather than read off its options, so it holds for
+ * anything expressible in RFC 5545 — including rules whose gap is uneven, where
+ * this returns the first gap and is right about the one that matters.
+ *
+ * Used to say how late an anchored schedule is *relative to its own rhythm*: two
+ * days late means something different for a daily habit than for a monthly one.
+ */
+export function intervalMsOf(schedule: ScheduleLike, anchor: Date): number | null {
+  if (!schedule.rrule) return null;
+  const rule = parseRule(schedule.rrule, anchor);
+  if (!rule) return null;
+
+  const first = rule.after(anchor, false);
+  if (!first) return null;
+  const second = rule.after(first, false);
+  if (!second) return null;
+
+  return second.getTime() - first.getTime();
+}
+
+/**
+ * How far past due an anchored schedule is, as a multiple of its own interval.
+ *
+ * 0 means due now, 1 means one whole interval late. The interface maps this onto
+ * colour; keeping the arithmetic here means the scale is one decision in one
+ * place rather than a magic number in a stylesheet.
+ */
+export function overdueRatio(dueAt: Date, intervalMs: number | null, now: Date): number {
+  if (!intervalMs || intervalMs <= 0) return 0;
+  const late = now.getTime() - dueAt.getTime();
+  return late <= 0 ? 0 : late / intervalMs;
+}
+
+function parseRule(rule: string, dtstart: Date): RRule | null {
+  try {
+    // A rule may arrive as a bare RRULE line or as a full RFC 5545 block.
+    return rrulestr(
+      rule.includes('DTSTART')
+        ? rule
+        : `DTSTART:${toICalUtc(dtstart)}\n${normaliseRule(rule)}`,
+    ) as RRule;
+  } catch {
+    // A malformed rule yields nothing rather than taking down the whole agenda
+    // for every other block on the day.
+    return null;
+  }
 }
 
 /**
