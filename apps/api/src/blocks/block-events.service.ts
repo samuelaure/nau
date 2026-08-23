@@ -16,7 +16,12 @@ export type BlockEventType =
   | 'block.scheduled'
   | 'block.deleted'
   | 'block.tagged'
-  | 'block.untagged';
+  | 'block.untagged'
+  // A single occurrence of a recurring schedule. A habit has no one completion
+  // date, so completion belongs to the occurrence and not to the block — which
+  // is why these carry `occurrenceAt` in metadata and `block.completed` does not.
+  | 'occurrence.completed'
+  | 'occurrence.reopened';
 
 const DONE_STATUSES = new Set(['done', 'completed']);
 
