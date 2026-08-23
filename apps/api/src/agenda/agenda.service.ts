@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { BlocksService } from '../blocks/blocks.service';
 import { BlockEventsService } from '../blocks/block-events.service';
-import { occurrencesIn } from '../schedule/occurrences';
+import { occurrencesIn, intervalMsOf, overdueRatio } from '../schedule/occurrences';
 import { dayjs, dayIn, periodBounds, safeZone, type PeriodType } from '../common/time';
 
 /** Block types that belong on an agenda. */
@@ -20,10 +20,28 @@ export interface AgendaItem {
   /** True when the schedule spans more than the day: due *within* the period. */
   spansPeriod: boolean;
   recurring: boolean;
+  /** A habit is anything with a recurrence. The type is derived, never stored. */
+  isHabit: boolean;
+  /** An estimate rather than a commitment. Only anchored schedules produce these. */
+  projected: boolean;
   done: boolean;
   sortOrder: number;
   estimateMinutes: number | null;
   priority: string | null;
+  /**
+   * Set when the item is being shown outside the period it was planned for.
+   * Carries the original date so the person can go back and tick it there.
+   */
+  carriedFrom: string | null;
+  /** Periods elapsed since it was planned. Derived, never written. */
+  carriedPeriods: number;
+  /** Times the person moved it by hand. Counted from the event log. */
+  rescheduledCount: number;
+  /**
+   * How far past due, as a multiple of the schedule's own interval. 0 is on
+   * time, 1 is a whole interval late. The interface maps it onto colour.
+   */
+  overdue: number;
 }
 
 /**
@@ -56,16 +74,20 @@ export class AgendaService {
     period: PeriodType;
     /** Any date inside the period being asked about. */
     date: string;
+    now?: Date;
   }) {
     await this.blocks.assertWorkspaceMembership(params.userId, params.workspaceId);
 
+    const now = params.now ?? new Date();
     const tz = await this.workspaceTimezone(params.workspaceId);
     const ref = dayIn(params.date, tz).toDate();
     const { start, end, label } = periodBounds(params.period, tz, ref);
 
-    // Every scheduled block in the workspace whose schedule could reach into the
-    // window. A recurring schedule has no end, so it cannot be filtered by
-    // startDate alone — the rule decides, and the rule is evaluated below.
+    // Whether the period being viewed is the one currently being lived. Only the
+    // current period carries anything forward: looking back at last Tuesday
+    // should show last Tuesday, not last Tuesday plus everything still open.
+    const isCurrent = now >= start && now <= end;
+
     const scheduled = await this.prisma.block.findMany({
       where: {
         workspaceId: params.workspaceId,
@@ -76,7 +98,7 @@ export class AgendaService {
       include: { schedule: { include: { exceptions: true } } },
     });
 
-    const completions = await this.completionsIn(params.workspaceId, start, end);
+    const history = await this.historyFor(params.workspaceId);
 
     const items: AgendaItem[] = [];
 
@@ -85,9 +107,33 @@ export class AgendaService {
       if (!schedule) continue;
 
       const props = (block.properties ?? {}) as Record<string, unknown>;
-      const occurrences = occurrencesIn(schedule, schedule.exceptions, start, end);
+      const recurring = Boolean(schedule.rrule);
+      const anchored = schedule.recurrenceMode === 'AFTER_COMPLETION';
+      const lastDone = history.lastCompletion.get(block.id) ?? null;
 
-      for (const occ of occurrences) {
+      const occurrences = occurrencesIn(
+        schedule,
+        schedule.exceptions,
+        start,
+        end,
+        lastDone,
+      );
+
+      // A one-off action that was never completed keeps showing up, in the
+      // period being lived now as well as in the one it was planned for. It is
+      // derived rather than written: no cron moves anything, so nothing can
+      // drift if a night fails, and the two counters fall out of arithmetic and
+      // the event log rather than out of a column somebody has to maintain.
+      const carried =
+        isCurrent && !recurring && occurrences.length === 0
+          ? this.carriedOccurrence(schedule, params.period, tz, start, history, block.id)
+          : null;
+
+      const all = carried ? [...occurrences, carried.occurrence] : occurrences;
+      const interval = anchored ? intervalMsOf(schedule, lastDone ?? schedule.startDate) : null;
+
+      for (const occ of all) {
+        const isCarried = carried?.occurrence === occ;
         items.push({
           blockId: block.id,
           type: block.type,
@@ -95,16 +141,23 @@ export class AgendaService {
           occurrenceAt: occ.at.toISOString(),
           effectiveAt: occ.effectiveAt.toISOString(),
           moved: occ.moved,
-          // An action deferred to "this week" carries a range wider than a day.
-          // It is due at some point inside the period, not at a moment in it.
           spansPeriod: Boolean(
             schedule.endDate && !dayjs(schedule.startDate).isSame(schedule.endDate, 'day'),
           ),
-          recurring: Boolean(schedule.rrule),
-          done: completions.has(completionKey(block.id, occ.at)),
+          recurring,
+          // "Habit" is not a stored type. Anything with a recurrence is one, so
+          // adding a frequency turns an action into a habit and removing it
+          // turns it back, with no write and no second transition to maintain.
+          isHabit: recurring,
+          projected: occ.projected,
+          done: history.done.has(completionKey(block.id, occ.at)),
           sortOrder: (props.sortOrder as number) ?? 0,
           estimateMinutes: (props.estimateMinutes as number) ?? null,
           priority: (props.priority as string) ?? null,
+          carriedFrom: isCarried ? carried!.originalAt.toISOString() : null,
+          carriedPeriods: isCarried ? carried!.periods : 0,
+          rescheduledCount: history.rescheduled.get(block.id) ?? 0,
+          overdue: anchored ? overdueRatio(occ.effectiveAt, interval, now) : 0,
         });
       }
     }
@@ -116,7 +169,7 @@ export class AgendaService {
     );
 
     const plannedMinutes = items
-      .filter((i) => !i.done)
+      .filter((i) => !i.done && !i.projected)
       .reduce((total, i) => total + (i.estimateMinutes ?? 0), 0);
 
     return {
@@ -126,50 +179,106 @@ export class AgendaService {
       end: end.toISOString(),
       timezone: tz,
       items,
-      // What is left to do in the period, so a caller can say the period is
-      // overloaded without summing it again.
       plannedMinutes,
-      unestimatedCount: items.filter((i) => !i.done && i.estimateMinutes == null).length,
+      unestimatedCount: items.filter((i) => !i.done && !i.projected && i.estimateMinutes == null)
+        .length,
+      carriedCount: items.filter((i) => i.carriedFrom).length,
     };
   }
 
   /**
-   * Which occurrences in the window are currently done.
+   * The single occurrence of an overdue one-off, carried into the period being
+   * lived now.
    *
-   * Derived from the event log rather than stored on the block: a habit has no
-   * single completion date, and a block only ever holds one state. Reopening
-   * writes another event, so the last event for an occurrence wins.
+   * Only when the thing was planned at this granularity: an action deferred to a
+   * month belongs in the month view, and putting it in today's list would defeat
+   * the point of having deferred it.
    */
-  private async completionsIn(workspaceId: string, start: Date, end: Date): Promise<Set<string>> {
+  private carriedOccurrence(
+    schedule: { startDate: Date; endDate: Date | null },
+    period: PeriodType,
+    tz: string,
+    windowStart: Date,
+    history: History,
+    blockId: string,
+  ) {
+    const originalAt = schedule.startDate;
+    if (originalAt >= windowStart) return null;
+    if (granularityOf(schedule) !== period) return null;
+    if (history.done.has(completionKey(blockId, originalAt))) return null;
+
+    const originalBounds = periodBounds(period, tz, originalAt);
+    const periods = countPeriodsBetween(period, tz, originalBounds.start, windowStart);
+
+    return {
+      occurrence: {
+        at: originalAt,
+        effectiveAt: originalAt,
+        moved: false,
+        projected: false,
+      },
+      originalAt,
+      periods,
+    };
+  }
+
+  /**
+   * Everything the event log knows about these blocks.
+   *
+   * Read once for the whole agenda rather than per block: a day has a handful of
+   * items but a week of a busy month has dozens, and this is the query that
+   * would otherwise run once each.
+   */
+  private async historyFor(workspaceId: string): Promise<History> {
     const events = await this.prisma.event.findMany({
       where: {
         workspaceId,
-        type: { in: ['occurrence.completed', 'occurrence.reopened'] },
+        type: {
+          in: ['occurrence.completed', 'occurrence.reopened', 'block.rescheduled'],
+        },
       },
       orderBy: { createdAt: 'asc' },
       select: { type: true, blockId: true, metadata: true },
     });
 
     const done = new Set<string>();
+    const lastCompletion = new Map<string, Date>();
+    const rescheduled = new Map<string, number>();
 
     for (const ev of events) {
+      if (ev.type === 'block.rescheduled') {
+        rescheduled.set(ev.blockId, (rescheduled.get(ev.blockId) ?? 0) + 1);
+        continue;
+      }
+
       const at = (ev.metadata as Record<string, unknown> | null)?.occurrenceAt as string | undefined;
       if (!at) continue;
       const when = new Date(at);
-      if (when < start || when > end) continue;
-
       const key = completionKey(ev.blockId, when);
-      if (ev.type === 'occurrence.completed') done.add(key);
-      else done.delete(key);
+
+      if (ev.type === 'occurrence.completed') {
+        done.add(key);
+        const previous = lastCompletion.get(ev.blockId);
+        if (!previous || when > previous) lastCompletion.set(ev.blockId, when);
+      } else {
+        done.delete(key);
+        // Reopening the latest completion moves the anchor back. Recomputing it
+        // exactly would need the full history; taking the reopened instant out
+        // is enough, because a reopened occurrence is due again.
+        const previous = lastCompletion.get(ev.blockId);
+        if (previous && previous.getTime() === when.getTime()) {
+          lastCompletion.delete(ev.blockId);
+        }
+      }
     }
 
-    return done;
+    return { done, lastCompletion, rescheduled };
   }
 
   /**
    * Ticks or unticks one occurrence.
    *
-   * Recorded against the instant the rule predicted, not against the moment of
+   * Recorded against the instant the rule predicted, never the moment of
    * ticking — otherwise catching up on yesterday's habit would mark it done
    * today, and the streak would describe the wrong days.
    */
@@ -241,6 +350,44 @@ export class AgendaService {
   }
 }
 
+interface History {
+  done: Set<string>;
+  lastCompletion: Map<string, Date>;
+  rescheduled: Map<string, number>;
+}
+
 function completionKey(blockId: string, at: Date): string {
   return `${blockId}@${at.toISOString()}`;
+}
+
+/**
+ * The granularity something was planned at, read off the span of its schedule.
+ *
+ * Derived rather than stored, so that widening a range is the only thing anyone
+ * has to do to defer an action from a day to a week.
+ */
+function granularityOf(schedule: { startDate: Date; endDate: Date | null }): PeriodType {
+  const end = schedule.endDate ?? schedule.startDate;
+  const days = dayjs(end).diff(dayjs(schedule.startDate), 'day') + 1;
+  if (days <= 1) return 'daily';
+  if (days <= 8) return 'weekly';
+  if (days <= 32) return 'monthly';
+  if (days <= 95) return 'trimester';
+  return 'yearly';
+}
+
+/** How many whole periods separate two instants, in the workspace's zone. */
+function countPeriodsBetween(period: PeriodType, tz: string, from: Date, to: Date): number {
+  const unit =
+    period === 'daily'
+      ? 'day'
+      : period === 'weekly'
+        ? 'week'
+        : period === 'monthly'
+          ? 'month'
+          : period === 'trimester'
+            ? 'month'
+            : 'year';
+  const raw = dayjs(to).tz(safeZone(tz)).diff(dayjs(from).tz(safeZone(tz)), unit);
+  return period === 'trimester' ? Math.floor(raw / 3) : raw;
 }

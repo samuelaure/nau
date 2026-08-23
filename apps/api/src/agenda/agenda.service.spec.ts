@@ -20,6 +20,7 @@ const scheduledBlock = (over: {
   endDate?: string | null;
   sortOrder?: number;
   estimateMinutes?: number;
+  recurrenceMode?: 'FIXED' | 'AFTER_COMPLETION';
   exceptions?: unknown[];
 }) => ({
   id: over.id,
@@ -36,6 +37,7 @@ const scheduledBlock = (over: {
     endDate: over.endDate ? new Date(over.endDate) : null,
     rrule: over.rrule ?? null,
     timezone: null,
+    recurrenceMode: over.recurrenceMode ?? 'FIXED',
     exceptions: over.exceptions ?? [],
   },
 });
@@ -83,8 +85,8 @@ describe('AgendaService — one list for actions and habits', () => {
 
   afterEach(() => jest.clearAllMocks());
 
-  const agenda = (period: any = 'daily', date = MONDAY) =>
-    service.forPeriod({ userId: 'u1', workspaceId: 'ws-1', period, date });
+  const agenda = (period: any = 'daily', date = MONDAY, now = new Date('2026-08-17T12:00:00.000Z')) =>
+    service.forPeriod({ userId: 'u1', workspaceId: 'ws-1', period, date, now });
 
   it('puts a habit and an action in the same list, ordered together', async () => {
     blockFindMany.mockResolvedValue([
@@ -260,6 +262,177 @@ describe('AgendaService — one list for actions and habits', () => {
       });
 
       expect(blocks.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('carry-over of what was not done', () => {
+    const overdueTask = () =>
+      blockFindMany.mockResolvedValue([
+        scheduledBlock({
+          id: 'olvidada',
+          title: 'Enviar el informe',
+          startDate: '2026-08-14T09:00:00.000Z',
+          endDate: '2026-08-14T09:00:00.000Z',
+        }),
+      ]);
+
+    it('shows an unfinished action in the period being lived now', async () => {
+      overdueTask();
+
+      const result = await agenda('daily', MONDAY);
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]!.carriedFrom).toBe('2026-08-14T09:00:00.000Z');
+    });
+
+    it('counts the periods it has been carried, so it cannot be ignored forever', async () => {
+      overdueTask();
+
+      const result = await agenda('daily', MONDAY);
+
+      // Friday to Monday.
+      expect(result.items[0]!.carriedPeriods).toBe(3);
+    });
+
+    it('does not carry into a past period that is merely being looked at', async () => {
+      // Looking back at last Tuesday should show last Tuesday, not last Tuesday
+      // plus everything still open since.
+      overdueTask();
+
+      const result = await agenda('daily', '2026-08-16', new Date('2026-08-17T12:00:00.000Z'));
+
+      expect(result.items).toHaveLength(0);
+    });
+
+    it('stops carrying once it is done', async () => {
+      overdueTask();
+      eventFindMany.mockResolvedValue([
+        {
+          type: 'occurrence.completed',
+          blockId: 'olvidada',
+          metadata: { occurrenceAt: '2026-08-14T09:00:00.000Z' },
+        },
+      ]);
+
+      const result = await agenda('daily', MONDAY);
+
+      expect(result.items).toHaveLength(0);
+    });
+
+    it('carries at the granularity it was planned at, not into today', async () => {
+      // An action deferred to a month belongs in the month view. Dropping it
+      // into today's list would defeat the point of having deferred it.
+      blockFindMany.mockResolvedValue([
+        scheduledBlock({
+          id: 'mensual',
+          startDate: '2026-07-01T00:00:00.000Z',
+          endDate: '2026-07-31T23:59:59.999Z',
+        }),
+      ]);
+
+      const daily = await agenda('daily', MONDAY);
+      const monthly = await agenda('monthly', MONDAY);
+
+      expect(daily.items).toHaveLength(0);
+      expect(monthly.items).toHaveLength(1);
+      expect(monthly.items[0]!.carriedPeriods).toBe(1);
+    });
+
+    it('never carries a habit: a missed one does not accumulate', async () => {
+      blockFindMany.mockResolvedValue([
+        scheduledBlock({
+          id: 'habit',
+          type: 'habit',
+          rrule: 'FREQ=DAILY',
+          startDate: '2026-08-01T08:00:00.000Z',
+        }),
+      ]);
+
+      const result = await agenda('daily', MONDAY);
+
+      expect(result.items.every((i) => i.carriedFrom === null)).toBe(true);
+    });
+
+    it('counts manual deferrals separately from the automatic carry', async () => {
+      // One is a decision, the other is time passing. Two counters, two signals.
+      overdueTask();
+      eventFindMany.mockResolvedValue([
+        { type: 'block.rescheduled', blockId: 'olvidada', metadata: {} },
+        { type: 'block.rescheduled', blockId: 'olvidada', metadata: {} },
+      ]);
+
+      const result = await agenda('daily', MONDAY);
+
+      expect(result.items[0]!.rescheduledCount).toBe(2);
+      expect(result.items[0]!.carriedPeriods).toBe(3);
+    });
+  });
+
+  describe('habits derived and anchored', () => {
+    it('calls anything with a recurrence a habit, without storing the type', async () => {
+      blockFindMany.mockResolvedValue([
+        scheduledBlock({ id: 'con-frecuencia', type: 'action', rrule: 'FREQ=DAILY' }),
+        scheduledBlock({ id: 'sin-frecuencia', type: 'action' }),
+      ]);
+
+      const result = await agenda();
+
+      expect(result.items.find((i) => i.blockId === 'con-frecuencia')!.isHabit).toBe(true);
+      expect(result.items.find((i) => i.blockId === 'sin-frecuencia')!.isHabit).toBe(false);
+    });
+
+    it('reports how late an anchored habit is, relative to its own rhythm', async () => {
+      blockFindMany.mockResolvedValue([
+        scheduledBlock({
+          id: 'afeitarme',
+          type: 'habit',
+          rrule: 'FREQ=DAILY;INTERVAL=3',
+          recurrenceMode: 'AFTER_COMPLETION',
+          startDate: '2026-08-01T08:00:00.000Z',
+        }),
+      ]);
+      eventFindMany.mockResolvedValue([
+        {
+          type: 'occurrence.completed',
+          blockId: 'afeitarme',
+          metadata: { occurrenceAt: '2026-08-11T08:00:00.000Z' },
+        },
+      ]);
+
+      // Due on the 14th, looked at on the 17th: one whole interval late.
+      const result = await agenda('daily', MONDAY, new Date('2026-08-17T08:00:00.000Z'));
+
+      expect(result.items[0]!.overdue).toBe(1);
+    });
+
+    it('leaves a fixed habit with no lateness, because it does not accumulate', async () => {
+      blockFindMany.mockResolvedValue([
+        scheduledBlock({ id: 'diario', type: 'habit', rrule: 'FREQ=DAILY' }),
+      ]);
+
+      const result = await agenda();
+
+      expect(result.items.every((i) => i.overdue === 0)).toBe(true);
+    });
+
+    it('keeps projections out of the planned time', async () => {
+      // Half of a projected week is a guess. Counting it as planned would make
+      // the capacity warning fire on work that may never be scheduled.
+      blockFindMany.mockResolvedValue([
+        scheduledBlock({
+          id: 'anclado',
+          type: 'habit',
+          rrule: 'FREQ=DAILY;INTERVAL=2',
+          recurrenceMode: 'AFTER_COMPLETION',
+          estimateMinutes: 30,
+          startDate: '2026-08-17T08:00:00.000Z',
+        }),
+      ]);
+
+      const result = await agenda('weekly', MONDAY, new Date('2026-08-17T07:00:00.000Z'));
+
+      expect(result.items.filter((i) => i.projected).length).toBeGreaterThan(0);
+      expect(result.plannedMinutes).toBe(30);
     });
   });
 });

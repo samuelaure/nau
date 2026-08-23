@@ -1,4 +1,10 @@
-import { occurrencesIn, type ScheduleLike, type ExceptionLike } from './occurrences';
+import {
+  occurrencesIn,
+  intervalMsOf,
+  overdueRatio,
+  type ScheduleLike,
+  type ExceptionLike,
+} from './occurrences';
 
 const iso = (d: Date) => d.toISOString();
 
@@ -149,6 +155,104 @@ describe('occurrences — derived, never stored', () => {
       const out = occurrencesIn(daily, exceptions, week.start, week.end);
 
       expect(out).toHaveLength(7);
+    });
+  });
+
+  describe('anchored to completion', () => {
+    // "Shave three days after the last shave." RFC 5545 cannot express this: an
+    // RRULE counts from DTSTART and knows nothing about what was done.
+    const anchored = (over: Partial<ScheduleLike> = {}): ScheduleLike =>
+      schedule({ rrule: 'FREQ=DAILY;INTERVAL=3', recurrenceMode: 'AFTER_COMPLETION', ...over });
+
+    it('counts from the last completion, not from the start date', () => {
+      const lastDone = new Date('2026-08-19T08:00:00.000Z');
+
+      const out = occurrencesIn(anchored(), [], week.start, week.end, lastDone);
+
+      expect(iso(out[0]!.at)).toBe('2026-08-22T08:00:00.000Z');
+    });
+
+    it('moves with a late completion instead of staying where the calendar said', () => {
+      // Done a day late, so the next one is a day later. A fixed rule would have
+      // kept it on the original grid.
+      const onTime = occurrencesIn(anchored(), [], week.start, week.end, new Date('2026-08-19T08:00:00.000Z'));
+      const late = occurrencesIn(anchored(), [], week.start, week.end, new Date('2026-08-20T08:00:00.000Z'));
+
+      expect(iso(onTime[0]!.at)).toBe('2026-08-22T08:00:00.000Z');
+      expect(iso(late[0]!.at)).toBe('2026-08-23T08:00:00.000Z');
+    });
+
+    it('falls back to the start date when it has never been completed', () => {
+      const out = occurrencesIn(anchored(), [], week.start, week.end);
+
+      expect(iso(out[0]!.at)).toBe('2026-08-20T08:00:00.000Z');
+    });
+
+    it('marks everything after the pending one as a projection', () => {
+      const out = occurrencesIn(anchored(), [], week.start, week.end, new Date('2026-08-17T08:00:00.000Z'));
+
+      expect(out[0]!.projected).toBe(false);
+      expect(out.slice(1).every((o) => o.projected)).toBe(true);
+    });
+
+    it('still returns the pending occurrence when it is already overdue', () => {
+      // An overdue shave does not stop being due because its day has passed.
+      // Dropping it would hide the one thing the person needs to see.
+      const longAgo = new Date('2026-07-01T08:00:00.000Z');
+
+      const out = occurrencesIn(anchored(), [], week.start, week.end, longAgo);
+
+      expect(out).toHaveLength(1);
+      expect(out[0]!.at.getTime()).toBeLessThan(week.start.getTime());
+      expect(out[0]!.projected).toBe(false);
+    });
+
+    it('projects nothing while the pending occurrence is overdue', () => {
+      // Every projection would be premised on a completion that has not
+      // happened — "when is the next shave, assuming you shaved in July".
+      const out = occurrencesIn(
+        anchored(),
+        [],
+        week.start,
+        week.end,
+        new Date('2026-07-01T08:00:00.000Z'),
+      );
+
+      expect(out.filter((o) => o.projected)).toHaveLength(0);
+    });
+
+    it('stops at the schedule end date', () => {
+      const out = occurrencesIn(
+        anchored({ endDate: new Date('2026-08-21T00:00:00.000Z') }),
+        [],
+        week.start,
+        week.end,
+        new Date('2026-08-19T08:00:00.000Z'),
+      );
+
+      expect(out).toHaveLength(0);
+    });
+  });
+
+  describe('lateness', () => {
+    const anchored = schedule({ rrule: 'FREQ=DAILY;INTERVAL=3', recurrenceMode: 'AFTER_COMPLETION' });
+
+    it('measures the interval from the rule itself', () => {
+      const ms = intervalMsOf(anchored, new Date('2026-08-17T08:00:00.000Z'));
+
+      expect(ms).toBe(3 * 24 * 60 * 60 * 1000);
+    });
+
+    it('reports lateness relative to the rhythm, not in absolute days', () => {
+      // Two days late is a lot for a daily habit and nothing for a monthly one,
+      // which is why the ratio and not the gap is what the colour reads.
+      const due = new Date('2026-08-20T08:00:00.000Z');
+      const threeDays = 3 * 24 * 60 * 60 * 1000;
+
+      expect(overdueRatio(due, threeDays, new Date('2026-08-20T08:00:00.000Z'))).toBe(0);
+      expect(overdueRatio(due, threeDays, new Date('2026-08-19T08:00:00.000Z'))).toBe(0);
+      expect(overdueRatio(due, threeDays, new Date('2026-08-23T08:00:00.000Z'))).toBe(1);
+      expect(overdueRatio(due, threeDays, new Date('2026-08-26T08:00:00.000Z'))).toBe(2);
     });
   });
 });

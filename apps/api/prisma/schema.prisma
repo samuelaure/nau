@@ -301,6 +301,9 @@ model Schedule {
   /// IANA zone the rule is read in. Null means the workspace's own zone.
   timezone String?
 
+  /// Where the rule counts from. See RecurrenceMode.
+  recurrenceMode RecurrenceMode @default(FIXED)
+
   /// Kept for blocks that are not recurring, where completion is a property of
   /// the schedule itself. For recurring ones, completion belongs to an
   /// occurrence and lives in Event — a habit has no single completion date.
@@ -312,6 +315,24 @@ model Schedule {
   updatedAt DateTime @updatedAt
 
   @@index([startDate])
+}
+
+/// Where a recurrence rule counts from.
+///
+/// RFC 5545 only describes FIXED: an RRULE is a pure function of DTSTART, which
+/// is what lets a calendar answer for 2030 without knowing what anyone did. That
+/// is the right model for "write in the journal every day" — missing today does
+/// not make tomorrow count double.
+///
+/// It cannot describe the other kind at all. "Shave three days after the last
+/// shave" depends on completion history: shaving a day late should push the next
+/// one a day out, not leave it where the calendar originally said. Todoist draws
+/// the same line between `every 3 days` and `every! 3 days`.
+enum RecurrenceMode {
+  /// Counts from startDate and never moves.
+  FIXED
+  /// Counts from the last completion, and moves with it.
+  AFTER_COMPLETION
 }
 
 enum ScheduleExceptionKind {
