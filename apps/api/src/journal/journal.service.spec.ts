@@ -151,6 +151,23 @@ describe('JournalService — what each period reads', () => {
       expect(user).toContain('segunda nota cruda');
     });
 
+    it('prefers a hand-made correction over the original capture', async () => {
+      load({
+        entries: [
+          entry('2026-08-20T09:12:00.000Z', {
+            raw: 'lo que el microfono oyo',
+            summary: 'lo que yo quise decir',
+            editedAt: '2026-08-21T10:00:00.000Z',
+          }),
+        ],
+      });
+
+      const { user } = await promptFor('daily', '2026-08-20', '2026-08-20');
+
+      expect(user).toContain('lo que yo quise decir');
+      expect(user).not.toContain('lo que el microfono oyo');
+    });
+
     it('reads only one of the two stored forms, not both', async () => {
       load({
         entries: [

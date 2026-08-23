@@ -120,6 +120,13 @@ export class JournalService {
    */
   private entryText(block: { properties: unknown }): string {
     const p = block.properties as Record<string, unknown> | null;
+
+    // A correction made by hand outranks the original capture. If the person
+    // opened the entry and fixed it, that is the most authoritative version of
+    // what they meant — more so than a transcription of what a microphone heard.
+    // `raw` still holds the original either way, so nothing is lost.
+    if (p?.editedAt) return (p.summary as string) || '';
+
     // The fallbacks are for rows that predate the field, not a routine path:
     // every entry has carried `raw` since the backfill.
     return (p?.raw as string) || (p?.summary as string) || (p?.text as string) || '';

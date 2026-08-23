@@ -6,7 +6,7 @@ import { cn } from '@9nau/ui/lib/utils'
 import { Button } from '@9nau/ui/components/button'
 import {
   Home, Inbox, Zap, Coffee, Trash2, Archive, BookOpen, Search,
-  Moon, Sun, Settings, FolderOpen, ChevronDown, Check, Building2,
+  Moon, Sun, Settings, FolderOpen, ChevronDown, Check, Building2, ListChecks,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useUpdateBlock } from '@/hooks/use-blocks-api'
@@ -14,6 +14,7 @@ import { useGetWorkspaces } from '@/hooks/use-workspaces-api'
 
 const NAV_ITEMS: Array<{ key: View; icon: React.ElementType; title: string }> = [
   { key: 'home',         icon: Home,       title: 'Home' },
+  { key: 'agenda',       icon: ListChecks, title: 'Agenda' },
   { key: 'inbox',        icon: Inbox,       title: 'Inbox' },
   { key: 'actions',      icon: Zap,         title: 'Actions' },
   { key: 'projects',     icon: FolderOpen,  title: 'Projects' },
