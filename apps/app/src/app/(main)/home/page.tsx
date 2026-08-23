@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { NoteInput } from '@/components/notes/note-input'
 import { Dashboard } from '@/components/dashboard/Dashboard'
 import { JournalView } from '@/components/journal/JournalView'
+import { AgendaView } from '@/components/agenda/AgendaView'
 import { SearchView } from '@/components/search/SearchView'
 import { ProjectsView } from '@/components/projects/ProjectsView'
 import { useGetBlocks } from '@/hooks/use-blocks-api'
@@ -81,6 +82,10 @@ export default function HomePage() {
   }
 
   // Route to special views
+  if (activeView === 'agenda') {
+    return <AgendaView />
+  }
+
   if (activeView === 'journal') {
     return <JournalView />
   }

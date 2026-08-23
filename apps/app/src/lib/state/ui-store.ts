@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type View = 'home' | 'inbox' | 'actions' | 'projects' | 'journal' | 'experiences' | 'information' | 'search' | 'schedule' | 'trash'
+export type View = 'home' | 'agenda' | 'inbox' | 'actions' | 'projects' | 'journal' | 'experiences' | 'information' | 'search' | 'schedule' | 'trash'
 
 const WS_STORAGE_KEY = 'nau:activeWorkspaceId'
 
