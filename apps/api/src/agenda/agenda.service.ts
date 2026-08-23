@@ -105,6 +105,7 @@ export class AgendaService {
       start,
       end,
       now,
+      displayGranularity: params.period,
       carry: isCurrent ? { period: params.period, from: start } : undefined,
       config,
     });
@@ -157,6 +158,7 @@ export class AgendaService {
       start,
       end,
       now,
+      displayGranularity: period,
       carry: currentInRange ? { period, from: current.start } : undefined,
       config,
     });
@@ -237,11 +239,17 @@ export class AgendaService {
     start: Date;
     end: Date;
     now: Date;
+    /**
+     * The granularity being displayed. A one-off block is shown only at the
+     * single level matching its own duration — see the note by `granularityOf`
+     * for why this is not an overlap test.
+     */
+    displayGranularity: PeriodType;
     /** When set, overdue one-offs of this granularity land at `from`. */
     carry?: { period: PeriodType; from: Date };
     config?: CalendarConfig;
   }): Promise<AgendaItem[]> {
-    const { workspaceId, tz, start, end, now, carry, config } = params;
+    const { workspaceId, tz, start, end, now, displayGranularity, carry, config } = params;
 
     const scheduled = await this.prisma.block.findMany({
       where: {
@@ -263,6 +271,16 @@ export class AgendaService {
 
       const props = (block.properties ?? {}) as Record<string, unknown>;
       const recurring = Boolean(schedule.rrule);
+
+      // Each one-off lives at exactly one level, the one its own duration
+      // belongs to — never cascaded down to every window it happens to
+      // overlap. Without this, an action spanning the whole of August would
+      // show up on every single day of August in the day view, not only in the
+      // month view where it belongs; the design is deliberately a single bucket
+      // per item, not "visible everywhere it fits". Recurring items are exempt:
+      // a habit's occurrences are governed by its rule, not by a span.
+      if (!recurring && granularityOf(schedule) !== displayGranularity) continue;
+
       const anchored = schedule.recurrenceMode === 'AFTER_COMPLETION';
       const lastDone = history.lastCompletion.get(block.id) ?? null;
 
@@ -508,10 +526,21 @@ function completionKey(blockId: string, at: Date): string {
 }
 
 /**
- * The granularity something was planned at, read off the span of its schedule.
+ * The single level something was planned at, read off the span of its schedule.
  *
  * Derived rather than stored, so that widening a range is the only thing anyone
- * has to do to defer an action from a day to a week.
+ * has to do to defer an action from a day to a week — and so a level always
+ * agrees with the schedule that produced it, never a stale label left behind
+ * after an edit.
+ *
+ * This is the whole basis of the display rule: something greater than a week
+ * and no more than a month shows at month level, something a month and a half
+ * long shows at quarter level, and so on for every level up. A block is shown
+ * at exactly the one level its duration falls into — never cascaded down into
+ * every window its range happens to overlap. Without that rule, a block spanning
+ * all of August would appear on every single day of August in the day view
+ * rather than only in the month view where it belongs, which is the bug this
+ * function exists to prevent.
  */
 function granularityOf(schedule: { startDate: Date; endDate: Date | null }): PeriodType {
   const end = schedule.endDate ?? schedule.startDate;

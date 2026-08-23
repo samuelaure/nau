@@ -75,6 +75,8 @@ export function PeriodBlock({
     >
       <ActionsSection
         dateStr={slot.key}
+        periodStart={slot.start.toISOString()}
+        periodEnd={slot.end.toISOString()}
         occurrences={contents.occurrences}
         blocksById={blocksById}
         workspaceId={workspaceId}
