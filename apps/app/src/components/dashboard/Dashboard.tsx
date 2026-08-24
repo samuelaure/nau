@@ -6,9 +6,10 @@ import { PeriodBlock, type PeriodContents } from './PeriodBlock'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
 import { useUiStore } from '@/lib/state/ui-store'
 import { usePeriodAgenda } from './usePeriodAgenda'
+import { NextActions } from './NextActions'
 import { HierarchicalBlock, findItemAndParent, calculateSortOrder } from '@9nau/core'
 import { Button } from '@9nau/ui/components/button'
-import { ChevronsLeft, ChevronsRight, ArrowUp, ArrowDown, X } from 'lucide-react'
+import { ChevronsLeft, ChevronsRight, ArrowUp, ArrowDown, X, Crosshair } from 'lucide-react'
 import { useUpdateBlock } from '@/hooks/use-blocks-api'
 import { cn } from '@9nau/ui/lib/utils'
 import {
@@ -262,6 +263,23 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
     </>
   )
 
+  /** What the period being lived now is called, at this grain. */
+  const currentLabel = {
+    day: 'Hoy',
+    week: 'Semana actual',
+    month: 'Mes actual',
+    quarter: 'Trimestre actual',
+    year: 'Año actual',
+  }[granularity]
+
+  const goToCurrent = () => {
+    setCurrentDate(new Date())
+    // Scrolling rather than reloading: the current period is already on screen
+    // in every ordinary case, and jumping the window would lose the scroll
+    // position the person built up getting here.
+    todayRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+
   const granularityPicker = (
     <div className="mb-4 flex items-center justify-center gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
       {GRANULARITIES.map((g) => (
@@ -281,6 +299,16 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
     </div>
   )
 
+  const currentButton = (
+    <button
+      onClick={goToCurrent}
+      className="mx-auto mb-4 flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300"
+    >
+      <Crosshair className="h-3 w-3" />
+      {currentLabel}
+    </button>
+  )
+
   const containerProps = { onDrop: handleDrop, 'data-testid': 'dashboard-main-content' }
 
   if (viewMode === 'horizontal') {
@@ -288,6 +316,7 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
     return (
       <div {...containerProps} className="relative">
         {granularityPicker}
+        {currentButton}
         <div className="mb-2 flex items-center justify-center space-x-1">
           <Button
             variant="ghost"
@@ -326,6 +355,10 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
   return (
     <div {...containerProps} className="relative space-y-6">
       {granularityPicker}
+      {currentButton}
+
+      {/* Above the periods, because it belongs to none of them. */}
+      <NextActions />
 
       <div className="flex items-center justify-center text-gray-500">
         <button

@@ -54,6 +54,17 @@ export class AgendaController {
     });
   }
 
+  /** What has no period at all. See AgendaService.nextActions. */
+  @Get('next')
+  async nextActions(
+    @CurrentUser() user: AccessTokenPayload,
+    @Query('workspaceId') workspaceId?: string,
+  ) {
+    const ws = workspaceId ?? user.workspaceId;
+    if (!ws) throw new BadRequestException('workspaceId is required');
+    return this.agenda.nextActions({ userId: user.sub, workspaceId: ws });
+  }
+
   @Post('complete')
   async setCompletion(
     @CurrentUser() user: AccessTokenPayload,

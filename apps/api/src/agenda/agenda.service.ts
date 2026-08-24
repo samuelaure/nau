@@ -174,6 +174,48 @@ export class AgendaService {
     };
   }
 
+  /**
+   * Everything with no schedule at all: GTD's next actions.
+   *
+   * Not a defect and not a leftover. An action with no period is one nobody has
+   * decided when to do, which is exactly where a capture should wait — and it is
+   * why triage deliberately creates without one. Capturing is not planning.
+   *
+   * Returned separately from any period because it belongs to none: putting it
+   * under today would be deciding on the person's behalf, which is the decision
+   * this list exists to leave open.
+   */
+  async nextActions(params: { userId: string; workspaceId: string }) {
+    await this.blocks.assertWorkspaceMembership(params.userId, params.workspaceId);
+
+    const blocks = await this.prisma.block.findMany({
+      where: {
+        workspaceId: params.workspaceId,
+        deletedAt: null,
+        type: { in: AGENDA_TYPES },
+        schedule: { is: null },
+        AND: [{ properties: { path: ['status'], not: 'done' } }],
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return {
+      items: blocks.map((block) => {
+        const props = (block.properties ?? {}) as Record<string, unknown>;
+        return {
+          blockId: block.id,
+          type: block.type,
+          title: (props.text as string) || (props.name as string) || 'Sin título',
+          parentId: block.parentId,
+          sortOrder: (props.sortOrder as number) ?? 0,
+          estimateMinutes: (props.estimateMinutes as number) ?? null,
+          priority: (props.priority as string) ?? null,
+          createdAt: block.createdAt.toISOString(),
+        };
+      }),
+    };
+  }
+
   /** The counts a view shows above the list, computed once. */
   private summarise(items: AgendaItem[]) {
     return {
