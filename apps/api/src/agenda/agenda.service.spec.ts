@@ -435,4 +435,94 @@ describe('AgendaService — one list for actions and habits', () => {
       expect(result.plannedMinutes).toBe(30);
     });
   });
+
+  describe('forRange — many periods at once', () => {
+    const range = (from = '2026-08-17', to = '2026-08-23', now = new Date('2026-08-20T12:00:00.000Z')) =>
+      service.forRange({ userId: 'u1', workspaceId: 'ws-1', from, to, period: 'daily', now });
+
+    it('expands a daily habit across every day in the span', async () => {
+      blockFindMany.mockResolvedValue([
+        scheduledBlock({ id: 'habit', type: 'habit', rrule: 'FREQ=DAILY' }),
+      ]);
+
+      const result = await range();
+
+      expect(result.items).toHaveLength(7);
+    });
+
+    it('tells each row which day to draw it under', async () => {
+      blockFindMany.mockResolvedValue([
+        scheduledBlock({ id: 'habit', type: 'habit', rrule: 'FREQ=DAILY' }),
+      ]);
+
+      const result = await range();
+
+      // Grouping back into days is arithmetic on the client, so every row has to
+      // say where it belongs without the client recomputing occurrences.
+      expect(result.items.every((i) => i.shownAt === i.effectiveAt)).toBe(true);
+    });
+
+    it('carries an overdue task onto today, not onto every day in the span', async () => {
+      blockFindMany.mockResolvedValue([
+        scheduledBlock({
+          id: 'olvidada',
+          startDate: '2026-08-14T09:00:00.000Z',
+          endDate: '2026-08-14T09:00:00.000Z',
+        }),
+      ]);
+
+      const result = await range();
+      const carried = result.items.filter((i) => i.carriedFrom);
+
+      expect(carried).toHaveLength(1);
+      // Drawn under today while still recorded against the day it was planned
+      // for, which is what lets it be ticked from either.
+      expect(carried[0]!.shownAt).toBe('2026-08-20T00:00:00.000Z');
+      expect(carried[0]!.occurrenceAt).toBe('2026-08-14T09:00:00.000Z');
+    });
+
+    it('carries nothing when the span does not reach today', async () => {
+      blockFindMany.mockResolvedValue([
+        scheduledBlock({
+          id: 'olvidada',
+          startDate: '2026-07-01T09:00:00.000Z',
+          endDate: '2026-07-01T09:00:00.000Z',
+        }),
+      ]);
+
+      const result = await range('2026-08-01', '2026-08-10');
+
+      expect(result.items.filter((i) => i.carriedFrom)).toHaveLength(0);
+    });
+
+    it('agrees with forPeriod about a day inside the span', async () => {
+      // A day rendered inside a run of days and the same day rendered on its own
+      // must never disagree, which is why both go through one collector.
+      blockFindMany.mockResolvedValue([
+        scheduledBlock({ id: 'habit', type: 'habit', rrule: 'FREQ=DAILY' }),
+      ]);
+
+      const spanned = await range('2026-08-17', '2026-08-23', new Date('2026-08-17T12:00:00.000Z'));
+      const alone = await service.forPeriod({
+        userId: 'u1',
+        workspaceId: 'ws-1',
+        period: 'daily',
+        date: '2026-08-17',
+        now: new Date('2026-08-17T12:00:00.000Z'),
+      });
+
+      const fromSpan = spanned.items.filter((i) => i.shownAt.startsWith('2026-08-17'));
+      expect(fromSpan.map((i) => i.occurrenceAt)).toEqual(alone.items.map((i) => i.occurrenceAt));
+    });
+
+    it('carries the parent id, so a view can place it in a tree', async () => {
+      blockFindMany.mockResolvedValue([
+        { ...scheduledBlock({ id: 'hija' }), parentId: 'padre' },
+      ]);
+
+      const result = await range();
+
+      expect(result.items[0]!.parentId).toBe('padre');
+    });
+  });
 });
