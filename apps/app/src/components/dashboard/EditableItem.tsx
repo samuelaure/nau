@@ -6,6 +6,7 @@ import { HierarchicalBlock } from '@9nau/core'
 import { X, Maximize2 } from 'lucide-react'
 import { Button } from '@9nau/ui/components/button'
 import { BlockEditorModal } from '../editor/BlockEditorModal'
+import type { AgendaItem } from '@/hooks/use-agenda-api'
 
 interface EditableItemProps {
   item: Block
@@ -21,6 +22,16 @@ interface EditableItemProps {
   parentList: HierarchicalBlock[]
   index: number
   onFullUpdate?: (id: string, dto: UpdateBlockDto) => void
+  /**
+   * The occurrence this row stands for, when the item is scheduled.
+   *
+   * Its presence changes what "done" means. A block has one state; an occurrence
+   * has its own, which is the only way a habit can be performed today and still
+   * be owed tomorrow.
+   */
+  occurrence?: AgendaItem
+  /** Marks the row carries. Nothing is drawn when there is nothing to say. */
+  badges?: React.ReactNode
 }
 
 export function EditableItem({
@@ -37,6 +48,8 @@ export function EditableItem({
   parentList,
   index,
   onFullUpdate,
+  occurrence,
+  badges,
 }: EditableItemProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -138,9 +151,13 @@ export function EditableItem({
     })
   }
 
+  // An occurrence answers for itself; a bare block answers for its own status.
+  const isDone = occurrence ? occurrence.done : item.properties.status === 'done'
+  const isHabit = occurrence?.isHabit ?? false
+
   const sharedClasses = cn(
     'w-full py-0.5 px-1 rounded-md text-sm whitespace-pre-wrap break-words',
-    item.properties.completed ? 'line-through text-gray-500' : 'text-gray-700 dark:text-gray-200'
+    isDone ? 'line-through text-gray-500' : 'text-gray-700 dark:text-gray-200'
   )
 
   return (
@@ -157,12 +174,18 @@ export function EditableItem({
           <div className="absolute -top-1 left-0 w-full h-0.5 bg-blue-500 rounded-full z-10" />
         )}
         <div className="relative flex items-start p-1 pr-14">
-          {item.type === 'action' && (
+          {(item.type === 'action' || item.type === 'habit' || item.type === 'appointment') && (
             <input
               type="checkbox"
-              checked={!!item.properties.completed}
+              checked={isDone}
+              disabled={occurrence?.projected}
               onChange={() => onToggle(item.id)}
-              className="w-4 h-4 mt-1 mr-3 bg-gray-100 border-gray-300 rounded text-yellow-500 dark:text-emerald-500 focus:ring-yellow-600 dark:focus:ring-emerald-500 cursor-pointer flex-shrink-0"
+              aria-label={isHabit ? 'Marcar como hecho' : 'Marcar como completada'}
+              className={cn(
+                'w-4 h-4 mt-1 mr-3 bg-gray-100 border-gray-300 text-yellow-500 dark:text-emerald-500 focus:ring-yellow-600 dark:focus:ring-emerald-500 cursor-pointer flex-shrink-0 disabled:cursor-not-allowed',
+                // A square is completed, a circle is performed. Decided in 2022.
+                isHabit ? 'rounded-full' : 'rounded-[3px]'
+              )}
             />
           )}
           {item.type === 'experience' && <span className="mr-3 mt-1.5 text-gray-400 flex-shrink-0">•</span>}
@@ -182,6 +205,7 @@ export function EditableItem({
           ) : (
             <span className={cn(sharedClasses, 'cursor-text block')} onClick={() => setIsEditing(true)}>
               {text || <span className="text-transparent select-none">Empty</span>}
+              {badges}
             </span>
           )}
           

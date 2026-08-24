@@ -407,8 +407,20 @@ model Calendar {
   kind        CalendarKind
   name        String
   /// Null for the built-in calendars, which every workspace can use.
+  ///
+  /// A workspace that wants to configure one gets its own row, which overrides
+  /// the built-in of the same kind. That is what this being nullable is for.
   workspaceId String?
   isDefault   Boolean      @default(false)
+
+  /// Settings that belong to this way of dividing time, and to no other.
+  ///
+  /// Gregorian carries `firstDayOfWeek` (0 = Sunday, 1 = Monday). The naŭ
+  /// calendar cannot be asked that question — its naŭ are nine days and do not
+  /// align to a weekday — and astrological transits have no weeks at all. Hanging
+  /// the setting off the person would force every ordering system to carry
+  /// options that do not apply to it.
+  config      Json         @default("{}")
 
   periods Period[]
 

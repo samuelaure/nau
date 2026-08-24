@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AgendaService } from './agenda.service';
 import { BlocksService } from '../blocks/blocks.service';
 import { BlockEventsService } from '../blocks/block-events.service';
+import { CalendarService } from '../calendar/calendar.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 jest.mock('@prisma/client', () => ({
@@ -48,6 +49,7 @@ describe('AgendaService — one list for actions and habits', () => {
   let eventFindMany: jest.Mock;
   let blocks: jest.Mocked<BlocksService>;
   let events: jest.Mocked<BlockEventsService>;
+  let calendar: { forWorkspace: jest.Mock };
 
   beforeEach(async () => {
     blockFindMany = jest.fn().mockResolvedValue([]);
@@ -75,12 +77,23 @@ describe('AgendaService — one list for actions and habits', () => {
           },
         },
         { provide: BlockEventsService, useValue: { record: jest.fn() } },
+        {
+          // The calendar answers where a period starts and how a week is cut.
+          // Pinned to UTC and ISO Monday so the expected instants stay readable.
+          provide: CalendarService,
+          useValue: {
+            forWorkspace: jest
+              .fn()
+              .mockResolvedValue({ timezone: 'UTC', config: { firstDayOfWeek: 1 } }),
+          },
+        },
       ],
     }).compile();
 
     service = module.get(AgendaService);
     blocks = module.get(BlocksService);
     events = module.get(BlockEventsService);
+    calendar = module.get(CalendarService) as unknown as { forWorkspace: jest.Mock };
   });
 
   afterEach(() => jest.clearAllMocks());
@@ -433,6 +446,114 @@ describe('AgendaService — one list for actions and habits', () => {
 
       expect(result.items.filter((i) => i.projected).length).toBeGreaterThan(0);
       expect(result.plannedMinutes).toBe(30);
+    });
+  });
+
+  describe('forRange — many periods at once', () => {
+    const range = (from = '2026-08-17', to = '2026-08-23', now = new Date('2026-08-20T12:00:00.000Z')) =>
+      service.forRange({ userId: 'u1', workspaceId: 'ws-1', from, to, period: 'daily', now });
+
+    it('expands a daily habit across every day in the span', async () => {
+      blockFindMany.mockResolvedValue([
+        scheduledBlock({ id: 'habit', type: 'habit', rrule: 'FREQ=DAILY' }),
+      ]);
+
+      const result = await range();
+
+      expect(result.items).toHaveLength(7);
+    });
+
+    it('tells each row which day to draw it under', async () => {
+      blockFindMany.mockResolvedValue([
+        scheduledBlock({ id: 'habit', type: 'habit', rrule: 'FREQ=DAILY' }),
+      ]);
+
+      const result = await range();
+
+      // Grouping back into days is arithmetic on the client, so every row has to
+      // say where it belongs without the client recomputing occurrences.
+      expect(result.items.every((i) => i.shownAt === i.effectiveAt)).toBe(true);
+    });
+
+    it('carries an overdue task onto today, not onto every day in the span', async () => {
+      blockFindMany.mockResolvedValue([
+        scheduledBlock({
+          id: 'olvidada',
+          startDate: '2026-08-14T09:00:00.000Z',
+          endDate: '2026-08-14T09:00:00.000Z',
+        }),
+      ]);
+
+      const result = await range();
+      const carried = result.items.filter((i) => i.carriedFrom);
+
+      expect(carried).toHaveLength(1);
+      // Drawn under today while still recorded against the day it was planned
+      // for, which is what lets it be ticked from either.
+      expect(carried[0]!.shownAt).toBe('2026-08-20T00:00:00.000Z');
+      expect(carried[0]!.occurrenceAt).toBe('2026-08-14T09:00:00.000Z');
+    });
+
+    it('carries nothing when the span does not reach today', async () => {
+      blockFindMany.mockResolvedValue([
+        scheduledBlock({
+          id: 'olvidada',
+          startDate: '2026-07-01T09:00:00.000Z',
+          endDate: '2026-07-01T09:00:00.000Z',
+        }),
+      ]);
+
+      const result = await range('2026-08-01', '2026-08-10');
+
+      expect(result.items.filter((i) => i.carriedFrom)).toHaveLength(0);
+    });
+
+    it('agrees with forPeriod about a day inside the span', async () => {
+      // A day rendered inside a run of days and the same day rendered on its own
+      // must never disagree, which is why both go through one collector.
+      blockFindMany.mockResolvedValue([
+        scheduledBlock({ id: 'habit', type: 'habit', rrule: 'FREQ=DAILY' }),
+      ]);
+
+      const spanned = await range('2026-08-17', '2026-08-23', new Date('2026-08-17T12:00:00.000Z'));
+      const alone = await service.forPeriod({
+        userId: 'u1',
+        workspaceId: 'ws-1',
+        period: 'daily',
+        date: '2026-08-17',
+        now: new Date('2026-08-17T12:00:00.000Z'),
+      });
+
+      const fromSpan = spanned.items.filter((i) => i.shownAt.startsWith('2026-08-17'));
+      expect(fromSpan.map((i) => i.occurrenceAt)).toEqual(alone.items.map((i) => i.occurrenceAt));
+    });
+
+    it('resolves the calendar day in the workspace zone, not in UTC', async () => {
+      // Madrid is UTC+2 in August, so a local midnight is 22:00 the day before.
+      // Slicing the ISO string on the client would file two hours of every day
+      // under the one before it.
+      calendar.forWorkspace.mockResolvedValue({
+        timezone: 'Europe/Madrid',
+        config: { firstDayOfWeek: 1 },
+      });
+      blockFindMany.mockResolvedValue([
+        scheduledBlock({ id: 'tarde', startDate: '2026-08-19T22:30:00.000Z' }),
+      ]);
+
+      const result = await range('2026-08-17', '2026-08-23');
+
+      expect(result.items[0]!.day).toBe('2026-08-20');
+      expect(result.items[0]!.shownAt.slice(0, 10)).toBe('2026-08-19');
+    });
+
+    it('carries the parent id, so a view can place it in a tree', async () => {
+      blockFindMany.mockResolvedValue([
+        { ...scheduledBlock({ id: 'hija' }), parentId: 'padre' },
+      ]);
+
+      const result = await range();
+
+      expect(result.items[0]!.parentId).toBe('padre');
     });
   });
 });

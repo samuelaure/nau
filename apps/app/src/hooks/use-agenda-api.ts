@@ -11,6 +11,10 @@ export interface AgendaItem {
   occurrenceAt: string
   effectiveAt: string
   moved: boolean
+  /** Which period to draw the row under. Differs from effectiveAt only when carried. */
+  shownAt: string
+  /** The calendar day it belongs to, in the workspace's zone. Computed server-side. */
+  day: string
   /** Due at some point inside the period rather than at a moment in it. */
   spansPeriod: boolean
   recurring: boolean
@@ -22,6 +26,8 @@ export interface AgendaItem {
   sortOrder: number
   estimateMinutes: number | null
   priority: string | null
+  /** Where it hangs in the tree. Null for a root item of its day. */
+  parentId: string | null
   /** Set when shown outside the period it was planned for; carries the original date. */
   carriedFrom: string | null
   /** Periods elapsed since it was planned. Time passing, not a decision. */
@@ -109,3 +115,30 @@ export const useReorderAgenda = () => {
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['agenda'] }),
   })
 }
+
+/**
+ * Occurrences across a span of periods, for a view that shows many at once.
+ *
+ * Home lists a run of days, so asking one period at a time would be a request
+ * per day on screen. Every row carries `shownAt`, so grouping them back into
+ * days is arithmetic here rather than a second expansion of the same rules.
+ */
+export const useAgendaRange = (params: {
+  from: string
+  to: string
+  period: AgendaPeriod
+  workspaceId?: string
+}) =>
+  useQuery<Agenda, Error>({
+    queryKey: ['agenda', 'range', params],
+    queryFn: () => {
+      const search = new URLSearchParams({
+        from: params.from,
+        to: params.to,
+        period: params.period,
+      })
+      if (params.workspaceId) search.append('workspaceId', params.workspaceId)
+      return apiClient.get(`/agenda?${search.toString()}`)
+    },
+    enabled: Boolean(params.workspaceId),
+  })

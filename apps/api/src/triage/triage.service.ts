@@ -239,6 +239,14 @@ OUTPUT: Return valid JSON matching the schema.`,
 
       const block = await this.blocksService.createInternal({ type, properties, workspaceId });
 
+      // Deliberately unscheduled.
+      //
+      // An action with no schedule is a *next action*, which is a state with
+      // meaning rather than a defect: it is where a capture waits until someone
+      // decides when it happens. Capturing is not planning, and scheduling on
+      // the person's behalf takes that decision away from them — every capture
+      // would arrive already committed to the day it was spoken.
+
       // Forward content_idea blocks with a resolved brand to flownaŭ
       if (segment.category === 'content_idea' && properties.brandId) {
         try {

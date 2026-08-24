@@ -15,6 +15,7 @@ import { MediaModule } from './media/media.module';
 import { TriageModule } from './triage/triage.module';
 import { JournalModule } from './journal/journal.module';
 import { AgendaModule } from './agenda/agenda.module';
+import { CalendarModule } from './calendar/calendar.module';
 import { AuthModule } from './auth/auth.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
 import { BrandsModule } from './brands/brands.module';
@@ -52,6 +53,7 @@ import { CapturesModule } from './captures/captures.module';
     TriageModule,
     JournalModule,
     AgendaModule,
+    CalendarModule,
     AuthModule,
     WorkspacesModule,
     BrandsModule,

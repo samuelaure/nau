@@ -3,7 +3,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { BlocksService } from '../blocks/blocks.service';
 import { BlockEventsService } from '../blocks/block-events.service';
 import { occurrencesIn, intervalMsOf, overdueRatio } from '../schedule/occurrences';
-import { dayjs, dayIn, periodBounds, safeZone, type PeriodType } from '../common/time';
+import { dayjs, dayIn, periodBounds, safeZone, type CalendarConfig, type PeriodType } from '../common/time';
+import { CalendarService } from '../calendar/calendar.service';
 
 /** Block types that belong on an agenda. */
 const AGENDA_TYPES = ['action', 'habit', 'appointment'];
@@ -17,6 +18,21 @@ export interface AgendaItem {
   /** Where it actually falls. Differs only when the occurrence was moved. */
   effectiveAt: string;
   moved: boolean;
+  /**
+   * The period this row is drawn under. Equals `effectiveAt` except for a carried
+   * item, which is shown today while still recorded against the day it was
+   * planned for — so it can be ticked from either.
+   */
+  shownAt: string;
+  /**
+   * The calendar day this row belongs to, in the workspace's own zone.
+   *
+   * Computed here rather than left to the client: an instant only becomes a day
+   * once you know where it is being lived, and slicing an ISO string answers for
+   * UTC. In Madrid that moves the boundary by an hour and files two hours of
+   * every day under the one before.
+   */
+  day: string;
   /** True when the schedule spans more than the day: due *within* the period. */
   spansPeriod: boolean;
   recurring: boolean;
@@ -28,6 +44,8 @@ export interface AgendaItem {
   sortOrder: number;
   estimateMinutes: number | null;
   priority: string | null;
+  /** Where it hangs in the tree. Null for a root item of its day. */
+  parentId: string | null;
   /**
    * Set when the item is being shown outside the period it was planned for.
    * Carries the original date so the person can go back and tick it there.
@@ -58,15 +76,8 @@ export class AgendaService {
     private readonly prisma: PrismaService,
     private readonly blocks: BlocksService,
     private readonly events: BlockEventsService,
+    private readonly calendar: CalendarService,
   ) {}
-
-  private async workspaceTimezone(workspaceId: string): Promise<string> {
-    const ws = await this.prisma.workspace.findUnique({
-      where: { id: workspaceId },
-      select: { timezone: true },
-    });
-    return safeZone(ws?.timezone);
-  }
 
   async forPeriod(params: {
     userId: string;
@@ -79,18 +90,162 @@ export class AgendaService {
     await this.blocks.assertWorkspaceMembership(params.userId, params.workspaceId);
 
     const now = params.now ?? new Date();
-    const tz = await this.workspaceTimezone(params.workspaceId);
+    const { timezone: tz, config } = await this.calendar.forWorkspace(params.workspaceId);
     const ref = dayIn(params.date, tz).toDate();
-    const { start, end, label } = periodBounds(params.period, tz, ref);
+    const { start, end, label } = periodBounds(params.period, tz, ref, config);
 
     // Whether the period being viewed is the one currently being lived. Only the
     // current period carries anything forward: looking back at last Tuesday
     // should show last Tuesday, not last Tuesday plus everything still open.
     const isCurrent = now >= start && now <= end;
 
-    const scheduled = await this.prisma.block.findMany({
+    const items = await this.collect({
+      workspaceId: params.workspaceId,
+      tz,
+      start,
+      end,
+      now,
+      carry: isCurrent ? { period: params.period, from: start } : undefined,
+      config,
+    });
+
+    return {
+      ...this.summarise(items),
+      period: params.period,
+      label,
+      start: start.toISOString(),
+      end: end.toISOString(),
+      timezone: tz,
+    };
+  }
+
+  /**
+   * Occurrences across an arbitrary span, for a view showing many periods at once.
+   *
+   * Home lists a run of days rather than one, so asking period by period would be
+   * one request per day on screen. Every item carries its own occurrence instant,
+   * so grouping them back into days is arithmetic on the client.
+   *
+   * Carry-over still lands only on the period being lived now, never on every day
+   * in the span: an unfinished task belongs to today and to the day it was
+   * planned for, and nowhere in between.
+   */
+  async forRange(params: {
+    userId: string;
+    workspaceId: string;
+    from: string;
+    to: string;
+    /** Granularity the view is showing, which is what carry-over matches. */
+    period?: PeriodType;
+    now?: Date;
+  }) {
+    await this.blocks.assertWorkspaceMembership(params.userId, params.workspaceId);
+
+    const now = params.now ?? new Date();
+    const { timezone: tz, config } = await this.calendar.forWorkspace(params.workspaceId);
+    const period = params.period ?? 'daily';
+
+    const start = dayIn(params.from, tz).startOf('day').toDate();
+    const end = dayIn(params.to, tz).endOf('day').toDate();
+
+    const current = periodBounds(period, tz, now, config);
+    const currentInRange = current.start >= start && current.start <= end;
+
+    const items = await this.collect({
+      workspaceId: params.workspaceId,
+      tz,
+      start,
+      end,
+      now,
+      carry: currentInRange ? { period, from: current.start } : undefined,
+      config,
+    });
+
+    return {
+      ...this.summarise(items),
+      period,
+      start: start.toISOString(),
+      end: end.toISOString(),
+      timezone: tz,
+    };
+  }
+
+  /**
+   * Everything with no schedule at all: GTD's next actions.
+   *
+   * Not a defect and not a leftover. An action with no period is one nobody has
+   * decided when to do, which is exactly where a capture should wait — and it is
+   * why triage deliberately creates without one. Capturing is not planning.
+   *
+   * Returned separately from any period because it belongs to none: putting it
+   * under today would be deciding on the person's behalf, which is the decision
+   * this list exists to leave open.
+   */
+  async nextActions(params: { userId: string; workspaceId: string }) {
+    await this.blocks.assertWorkspaceMembership(params.userId, params.workspaceId);
+
+    const blocks = await this.prisma.block.findMany({
       where: {
         workspaceId: params.workspaceId,
+        deletedAt: null,
+        type: { in: AGENDA_TYPES },
+        schedule: { is: null },
+        AND: [{ properties: { path: ['status'], not: 'done' } }],
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return {
+      items: blocks.map((block) => {
+        const props = (block.properties ?? {}) as Record<string, unknown>;
+        return {
+          blockId: block.id,
+          type: block.type,
+          title: (props.text as string) || (props.name as string) || 'Sin título',
+          parentId: block.parentId,
+          sortOrder: (props.sortOrder as number) ?? 0,
+          estimateMinutes: (props.estimateMinutes as number) ?? null,
+          priority: (props.priority as string) ?? null,
+          createdAt: block.createdAt.toISOString(),
+        };
+      }),
+    };
+  }
+
+  /** The counts a view shows above the list, computed once. */
+  private summarise(items: AgendaItem[]) {
+    return {
+      items,
+      plannedMinutes: items
+        .filter((i) => !i.done && !i.projected)
+        .reduce((total, i) => total + (i.estimateMinutes ?? 0), 0),
+      unestimatedCount: items.filter((i) => !i.done && !i.projected && i.estimateMinutes == null)
+        .length,
+      carriedCount: items.filter((i) => i.carriedFrom).length,
+    };
+  }
+
+  /**
+   * Expands every scheduled block in the workspace across a window.
+   *
+   * Shared by both entry points, so a day rendered inside a run of days and the
+   * same day rendered on its own can never disagree.
+   */
+  private async collect(params: {
+    workspaceId: string;
+    tz: string;
+    start: Date;
+    end: Date;
+    now: Date;
+    /** When set, overdue one-offs of this granularity land at `from`. */
+    carry?: { period: PeriodType; from: Date };
+    config?: CalendarConfig;
+  }): Promise<AgendaItem[]> {
+    const { workspaceId, tz, start, end, now, carry, config } = params;
+
+    const scheduled = await this.prisma.block.findMany({
+      where: {
+        workspaceId,
         deletedAt: null,
         type: { in: AGENDA_TYPES },
         schedule: { is: { startDate: { lte: end } } },
@@ -98,7 +253,7 @@ export class AgendaService {
       include: { schedule: { include: { exceptions: true } } },
     });
 
-    const history = await this.historyFor(params.workspaceId);
+    const history = await this.historyFor(workspaceId);
 
     const items: AgendaItem[] = [];
 
@@ -125,8 +280,8 @@ export class AgendaService {
       // drift if a night fails, and the two counters fall out of arithmetic and
       // the event log rather than out of a column somebody has to maintain.
       const carried =
-        isCurrent && !recurring && occurrences.length === 0
-          ? this.carriedOccurrence(schedule, params.period, tz, start, history, block.id)
+        carry && !recurring && occurrences.length === 0
+          ? this.carriedOccurrence(schedule, carry.period, tz, carry.from, history, block.id, config)
           : null;
 
       const all = carried ? [...occurrences, carried.occurrence] : occurrences;
@@ -140,6 +295,11 @@ export class AgendaService {
           title: (props.text as string) || (props.name as string) || 'Sin título',
           occurrenceAt: occ.at.toISOString(),
           effectiveAt: occ.effectiveAt.toISOString(),
+          // Where the row is drawn. A carried item appears under the period being
+          // lived now while staying recorded against the day it was planned for,
+          // which is what lets it be ticked from either.
+          shownAt: (isCarried ? carry!.from : occ.effectiveAt).toISOString(),
+          day: dayjs(isCarried ? carry!.from : occ.effectiveAt).tz(tz).format('YYYY-MM-DD'),
           moved: occ.moved,
           spansPeriod: Boolean(
             schedule.endDate && !dayjs(schedule.startDate).isSame(schedule.endDate, 'day'),
@@ -154,6 +314,7 @@ export class AgendaService {
           sortOrder: (props.sortOrder as number) ?? 0,
           estimateMinutes: (props.estimateMinutes as number) ?? null,
           priority: (props.priority as string) ?? null,
+          parentId: block.parentId,
           carriedFrom: isCarried ? carried!.originalAt.toISOString() : null,
           carriedPeriods: isCarried ? carried!.periods : 0,
           rescheduledCount: history.rescheduled.get(block.id) ?? 0,
@@ -168,22 +329,7 @@ export class AgendaService {
         new Date(a.effectiveAt).getTime() - new Date(b.effectiveAt).getTime(),
     );
 
-    const plannedMinutes = items
-      .filter((i) => !i.done && !i.projected)
-      .reduce((total, i) => total + (i.estimateMinutes ?? 0), 0);
-
-    return {
-      period: params.period,
-      label,
-      start: start.toISOString(),
-      end: end.toISOString(),
-      timezone: tz,
-      items,
-      plannedMinutes,
-      unestimatedCount: items.filter((i) => !i.done && !i.projected && i.estimateMinutes == null)
-        .length,
-      carriedCount: items.filter((i) => i.carriedFrom).length,
-    };
+    return items;
   }
 
   /**
@@ -201,13 +347,14 @@ export class AgendaService {
     windowStart: Date,
     history: History,
     blockId: string,
+    config?: CalendarConfig,
   ) {
     const originalAt = schedule.startDate;
     if (originalAt >= windowStart) return null;
     if (granularityOf(schedule) !== period) return null;
     if (history.done.has(completionKey(blockId, originalAt))) return null;
 
-    const originalBounds = periodBounds(period, tz, originalAt);
+    const originalBounds = periodBounds(period, tz, originalAt, config);
     const periods = countPeriodsBetween(period, tz, originalBounds.start, windowStart);
 
     return {

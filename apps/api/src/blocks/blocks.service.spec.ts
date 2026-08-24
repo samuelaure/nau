@@ -231,6 +231,10 @@ describe('BlocksService', () => {
           type: 'action',
           AND: [{ properties: { path: ['status'], not: 'trash' } }],
         },
+        // When something is due lives in its own table, so it has to travel
+        // with the block. A view that cannot see it has to guess, which is how
+        // properties.date came to mean two different things in two screens.
+        include: { schedule: { include: { exceptions: true } } },
       });
     });
 

@@ -172,6 +172,11 @@ export class BlocksService {
 
     const blocks = await this.prisma.block.findMany({
       where,
+      // The schedule travels with the block. When something is due is not a
+      // property of the block — it lives in its own table — and a view that
+      // cannot see it has to guess, which is how `properties.date` came to mean
+      // two different things in two different screens.
+      include: { schedule: { include: { exceptions: true } } },
       ...(limit ? { take: Math.min(Number(limit) || 200, 1000) } : {}),
     });
     return this.sortByDateThenOrder(blocks);
