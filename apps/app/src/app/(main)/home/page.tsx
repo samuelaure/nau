@@ -49,9 +49,14 @@ export default function HomePage() {
     }
     const notes = blocks.filter((b: Block) => b.type === 'note')
     const actions = blocks.filter((b: Block) => b.type === 'action')
-    // `journal_entry`, not `experience`: one concept, and the normalisation kept
-    // the name that everything else already writes.
-    const experiences = blocks.filter((b: Block) => b.type === 'journal_entry')
+    // `journal_entry` is the canonical type and the only one anything writes
+    // today. `experience` is read too, because six rows of it predate the
+    // normalisation and were invisible everywhere while the filter named one
+    // type — showing them is not the same as endorsing the second name, and
+    // they stay readable until they are migrated.
+    const experiences = blocks.filter(
+      (b: Block) => b.type === 'journal_entry' || b.type === 'experience',
+    )
 
     const notesByDate = groupBlocksByDate(notes)
     const actionsHierarchy = buildHierarchy(actions)

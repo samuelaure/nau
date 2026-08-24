@@ -4,7 +4,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react'
 import { EditableItem } from './EditableItem'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
 import { useCreateBlock, useUpdateBlock, useDeleteBlock } from '@/hooks/use-blocks-api'
-import { findItemAndParent, HierarchicalBlock } from '@9nau/core'
+import { findItemAndParent, HierarchicalBlock, entryEditPatch } from '@9nau/core'
 
 interface HierarchicalSectionProps {
   dateStr: string
@@ -19,9 +19,23 @@ interface HierarchicalSectionProps {
   sectionType: 'journal_entry' | 'action'
   title: string
   items: HierarchicalBlock[]
+  /**
+   * The workspace this section writes into.
+   *
+   * Sent explicitly rather than left to the server's default. Without it the
+   * block lands in whichever workspace the API picks first, which is how
+   * entries ended up split between two workspaces without anyone choosing.
+   */
+  workspaceId?: string
 }
 
-export function HierarchicalSection({ dateStr, sectionType, title, items }: HierarchicalSectionProps) {
+export function HierarchicalSection({
+  dateStr,
+  sectionType,
+  title,
+  items,
+  workspaceId,
+}: HierarchicalSectionProps) {
   const [isOpen, setIsOpen] = useState(true)
   const { setDraggedItem, setDropTarget, dropTarget, setFocusedItemId } = useDashboardStore((s) => ({
     setDraggedItem: s.actions.setDraggedItem,
@@ -35,10 +49,20 @@ export function HierarchicalSection({ dateStr, sectionType, title, items }: Hier
   const updateBlock = useUpdateBlock()
   const deleteBlock = useDeleteBlock()
 
+  /**
+   * Writes the edit to whichever field this entry speaks through.
+   *
+   * Writing `text` unconditionally stranded every correction to a voice note:
+   * nothing reads `text` when `summary` is present, so the edit saved and then
+   * vanished on reload. `entryEditPatch` also stamps `editedAt`, which is what
+   * tells the summary generator to prefer the correction over the original
+   * transcription — without it, a fixed entry is silently re-outranked.
+   */
   const handleUpdate = (id: string, newText: string) => {
+    const item = findItemAndParent(items, id)?.item
     updateBlock.mutate({
       id,
-      updateDto: { properties: { text: newText } },
+      updateDto: { properties: entryEditPatch(item ?? { properties: {} }, newText) },
     })
   }
 
@@ -56,6 +80,7 @@ export function HierarchicalSection({ dateStr, sectionType, title, items }: Hier
     const newBlock: CreateBlockDto = {
       type: sectionType,
       parentId,
+      workspaceId,
       // `date` is when this belongs, which for an experience is the day it
       // happened — not a due date. Creating it from a past period files it
       // there, which is the whole point of being able to add one late.
