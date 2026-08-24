@@ -48,6 +48,7 @@ describe('AgendaService — one list for actions and habits', () => {
   let eventFindMany: jest.Mock;
   let blocks: jest.Mocked<BlocksService>;
   let events: jest.Mocked<BlockEventsService>;
+  let prismaWorkspace: { findUnique: jest.Mock };
 
   beforeEach(async () => {
     blockFindMany = jest.fn().mockResolvedValue([]);
@@ -81,6 +82,9 @@ describe('AgendaService — one list for actions and habits', () => {
     service = module.get(AgendaService);
     blocks = module.get(BlocksService);
     events = module.get(BlockEventsService);
+    prismaWorkspace = module.get(PrismaService).workspace as unknown as {
+      findUnique: jest.Mock;
+    };
   });
 
   afterEach(() => jest.clearAllMocks());
@@ -513,6 +517,21 @@ describe('AgendaService — one list for actions and habits', () => {
 
       const fromSpan = spanned.items.filter((i) => i.shownAt.startsWith('2026-08-17'));
       expect(fromSpan.map((i) => i.occurrenceAt)).toEqual(alone.items.map((i) => i.occurrenceAt));
+    });
+
+    it('resolves the calendar day in the workspace zone, not in UTC', async () => {
+      // Madrid is UTC+2 in August, so a local midnight is 22:00 the day before.
+      // Slicing the ISO string on the client would file two hours of every day
+      // under the one before it.
+      prismaWorkspace.findUnique.mockResolvedValue({ timezone: 'Europe/Madrid' });
+      blockFindMany.mockResolvedValue([
+        scheduledBlock({ id: 'tarde', startDate: '2026-08-19T22:30:00.000Z' }),
+      ]);
+
+      const result = await range('2026-08-17', '2026-08-23');
+
+      expect(result.items[0]!.day).toBe('2026-08-20');
+      expect(result.items[0]!.shownAt.slice(0, 10)).toBe('2026-08-19');
     });
 
     it('carries the parent id, so a view can place it in a tree', async () => {

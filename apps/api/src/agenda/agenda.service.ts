@@ -23,6 +23,15 @@ export interface AgendaItem {
    * planned for — so it can be ticked from either.
    */
   shownAt: string;
+  /**
+   * The calendar day this row belongs to, in the workspace's own zone.
+   *
+   * Computed here rather than left to the client: an instant only becomes a day
+   * once you know where it is being lived, and slicing an ISO string answers for
+   * UTC. In Madrid that moves the boundary by an hour and files two hours of
+   * every day under the one before.
+   */
+  day: string;
   /** True when the schedule spans more than the day: due *within* the period. */
   spansPeriod: boolean;
   recurring: boolean;
@@ -251,6 +260,7 @@ export class AgendaService {
           // lived now while staying recorded against the day it was planned for,
           // which is what lets it be ticked from either.
           shownAt: (isCarried ? carry!.from : occ.effectiveAt).toISOString(),
+          day: dayjs(isCarried ? carry!.from : occ.effectiveAt).tz(tz).format('YYYY-MM-DD'),
           moved: occ.moved,
           spansPeriod: Boolean(
             schedule.endDate && !dayjs(schedule.startDate).isSame(schedule.endDate, 'day'),

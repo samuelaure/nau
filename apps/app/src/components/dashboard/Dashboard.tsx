@@ -14,9 +14,12 @@ import {
 import { Button } from '@9nau/ui/components/button'
 import { ChevronsLeft, ChevronsRight, ArrowUp, X } from 'lucide-react'
 import { useUpdateBlock } from '@/hooks/use-blocks-api'
+import { useDayAgenda } from './useDayAgenda'
+import { useUiStore } from '@/lib/state/ui-store'
 
 interface DashboardProps {
   notesByDate: Map<string, Block[]>
+  /** Every action block, for text, tree and editing. What is *owed* comes from the agenda. */
   actions: HierarchicalBlock[]
   experiences: HierarchicalBlock[]
 }
@@ -56,6 +59,24 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
 
   const updateBlock = useUpdateBlock()
   const todayRef = useRef<HTMLDivElement>(null)
+  const activeWorkspaceId = useUiStore((s) => s.activeWorkspaceId)
+
+  // Which day something appears under is decided by its schedule. The blocks
+  // still carry the text and the tree; the agenda decides what is owed, which is
+  // the only way one recurring block can show up on seven days.
+  const { byDay } = useDayAgenda()
+
+  const blocksById = useMemo(() => {
+    const map = new Map<string, Block>()
+    const walk = (list: HierarchicalBlock[]) => {
+      for (const b of list) {
+        map.set(b.id, b)
+        if (b.children?.length) walk(b.children)
+      }
+    }
+    walk(actions)
+    return map
+  }, [actions])
 
   useEffect(() => {
     setTodayRef(todayRef)
@@ -89,11 +110,10 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
     return dateArray.map((date) => {
       const dateStr = format(date, 'yyyy-MM-dd')
       const dailyNotes = notesByDate.get(dateStr) || []
-      const dailyActions = actions.filter((a) => (a.properties.date as string) === dateStr)
       const dailyExperiences = experiences.filter((e) => (e.properties.date as string) === dateStr)
-      return { dateStr, dailyActions, dailyExperiences, dailyNotes }
+      return { dateStr, occurrences: byDay.get(dateStr) ?? [], dailyExperiences, dailyNotes }
     })
-  }, [notesByDate, actions, experiences, visiblePastDays, visibleFutureDays])
+  }, [notesByDate, byDay, experiences, visiblePastDays, visibleFutureDays])
 
   const handleDrop = () => {
     if (!draggedItem || !dropTarget) {
@@ -217,7 +237,7 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
   if (viewMode === 'horizontal') {
     const dateStr = format(currentDate, 'yyyy-MM-dd')
     const dataForDay = {
-      dailyActions: actions.filter((a) => (a.properties.date as string) === dateStr),
+      occurrences: byDay.get(dateStr) ?? [],
       dailyExperiences: experiences.filter((e) => (e.properties.date as string) === dateStr),
       dailyNotes: notesByDate.get(dateStr) || [],
     }
@@ -246,7 +266,13 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
           </Button>
         </div>
         <div ref={isDateToday(dateStr) ? todayRef : null}>
-          <DailyPeriod showHeader={false} dateStr={dateStr} {...dataForDay} />
+          <DailyPeriod
+            showHeader={false}
+            dateStr={dateStr}
+            blocksById={blocksById}
+            workspaceId={activeWorkspaceId ?? undefined}
+            {...dataForDay}
+          />
         </div>
       </div>
     )
@@ -272,11 +298,13 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
           </button>
         )}
       </div>
-      {allGroupedData.map(({ dateStr, dailyActions, dailyExperiences, dailyNotes }) => (
+      {allGroupedData.map(({ dateStr, occurrences, dailyExperiences, dailyNotes }) => (
         <div key={dateStr} ref={isDateToday(dateStr) ? todayRef : null}>
           <DailyPeriod
             dateStr={dateStr}
-            dailyActions={dailyActions}
+            occurrences={occurrences}
+            blocksById={blocksById}
+            workspaceId={activeWorkspaceId ?? undefined}
             dailyExperiences={dailyExperiences}
             dailyNotes={dailyNotes}
           />

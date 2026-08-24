@@ -3,24 +3,31 @@ import { cn } from '@9nau/ui/lib/utils'
 import { ChevronDown } from 'lucide-react'
 import { Block } from '@9nau/types'
 import { HierarchicalSection } from './HierarchicalSection'
+import { ActionsSection } from './ActionsSection'
+import type { AgendaItem } from '@/hooks/use-agenda-api'
 import { NotesInboxSection } from '../notes/NotesInboxSection'
 import { formatDisplayDate, isDateToday, HierarchicalBlock } from '@9nau/core'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
 
 interface DailyPeriodProps {
   dateStr: string
-  dailyActions: HierarchicalBlock[]
+  /** What the schedules say is owed today. Not a date-filtered list of blocks. */
+  occurrences: AgendaItem[]
+  blocksById: Map<string, Block>
   dailyExperiences: HierarchicalBlock[]
   dailyNotes: Block[]
   showHeader?: boolean
+  workspaceId?: string
 }
 
 export function DailyPeriod({
   dateStr,
-  dailyActions,
+  occurrences,
+  blocksById,
   dailyExperiences,
   dailyNotes,
   showHeader = true,
+  workspaceId,
 }: DailyPeriodProps) {
   const [isOpen, setIsOpen] = useState(() => isDateToday(dateStr))
   const { setDropTarget } = useDashboardStore((s) => ({
@@ -50,7 +57,12 @@ export function DailyPeriod({
       className={cn(showHeader && 'pt-4 pl-4 border-l-2 ml-2')}
       onDragOver={handleDragOver}
     >
-      <HierarchicalSection dateStr={dateStr} sectionType="action" title="Actions" items={dailyActions} />
+      <ActionsSection
+        dateStr={dateStr}
+        occurrences={occurrences}
+        blocksById={blocksById}
+        workspaceId={workspaceId}
+      />
       <HierarchicalSection
         dateStr={dateStr}
         sectionType="experience"
