@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import { useAgendaRange, type AgendaItem } from '@/hooks/use-agenda-api'
 import { useUiStore } from '@/lib/state/ui-store'
-import { API_PERIOD, periodOf, toKey, type PeriodSlot } from '@/lib/periods'
+import { API_PERIOD, periodOf, toKey, type CalendarConfig, type PeriodSlot } from '@/lib/periods'
 
 /** Occurrences owed, keyed by the period they are drawn under. */
 export type OccurrencesByPeriod = Map<string, AgendaItem[]>
@@ -21,7 +21,7 @@ export type OccurrencesByPeriod = Map<string, AgendaItem[]>
  * It is also the only way recurrence works at all. A daily habit is one block
  * that shows on seven days, and no amount of reading a date field produces that.
  */
-export function usePeriodAgenda(slots: PeriodSlot[]) {
+export function usePeriodAgenda(slots: PeriodSlot[], config?: CalendarConfig) {
   const activeWorkspaceId = useUiStore((s) => s.activeWorkspaceId)
 
   const span = useMemo(() => {
@@ -54,13 +54,13 @@ export function usePeriodAgenda(slots: PeriodSlot[]) {
     if (!span) return map
 
     for (const item of data?.items ?? []) {
-      const key = periodOf(new Date(`${item.day}T12:00:00`), span.granularity).key
+      const key = periodOf(new Date(`${item.day}T12:00:00`), span.granularity, config).key
       const list = map.get(key)
       if (list) list.push(item)
       else map.set(key, [item])
     }
     return map
-  }, [data?.items, span])
+  }, [data?.items, span, config])
 
   return { byPeriod, timezone: data?.timezone ?? 'UTC', isLoading }
 }

@@ -18,6 +18,7 @@ import {
 } from '@/hooks/use-workspaces-api'
 import type { WorkspaceWithRole, WorkspaceMember } from '@/hooks/use-workspaces-api'
 import { WorkspaceRole } from '@9nau/types'
+import { CalendarSettings } from '@/components/settings/CalendarSettings'
 
 export default function PlatformSettingsPage() {
   const { data: workspaces, isLoading } = useGetWorkspaces()
@@ -44,6 +45,8 @@ export default function PlatformSettingsPage() {
           Manage workspaces and members. Projects and Brands are managed in the Projects section.
         </p>
       </div>
+
+      <CalendarSettings />
 
       {/* Create new workspace */}
       <div className="flex gap-2">

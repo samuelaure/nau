@@ -6,6 +6,7 @@ import { PeriodBlock, type PeriodContents } from './PeriodBlock'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
 import { useUiStore } from '@/lib/state/ui-store'
 import { usePeriodAgenda } from './usePeriodAgenda'
+import { useWorkspaceCalendar } from '@/hooks/use-calendar-api'
 import { NextActions } from './NextActions'
 import { HierarchicalBlock, findItemAndParent, calculateSortOrder } from '@9nau/core'
 import { Button } from '@9nau/ui/components/button'
@@ -71,19 +72,25 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
   const todayRef = useRef<HTMLDivElement>(null)
   const activeWorkspaceId = useUiStore((s) => s.activeWorkspaceId)
 
+  // Fetched rather than assumed. Where a week starts belongs to the calendar,
+  // and if this disagreed with the server the list would draw one week while the
+  // summaries described another, with nothing to say so.
+  const { data: calendar } = useWorkspaceCalendar()
+  const calendarConfig = calendar?.config
+
   useEffect(() => {
     setTodayRef(todayRef)
   }, [todayRef, setTodayRef])
 
   const slots = useMemo(
-    () => periodRun(granularity, visiblePast, visibleFuture),
-    [granularity, visiblePast, visibleFuture],
+    () => periodRun(granularity, visiblePast, visibleFuture, new Date(), calendarConfig),
+    [granularity, visiblePast, visibleFuture, calendarConfig],
   )
 
   // Which period something appears under is decided by its schedule. The blocks
   // still carry the text and the tree; the agenda decides what is owed, which is
   // the only way one recurring block can show up across many periods.
-  const { byPeriod } = usePeriodAgenda(slots)
+  const { byPeriod } = usePeriodAgenda(slots, calendarConfig)
 
   const blocksById = useMemo(() => {
     const map = new Map<string, Block>()
@@ -251,7 +258,7 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
 
   const renderSubPeriod = (parent: PeriodSlot) => (
     <>
-      {subPeriods(parent).map((sub) => (
+      {subPeriods(parent, calendarConfig).map((sub) => (
         <PeriodBlock
           key={sub.key}
           slot={sub}
@@ -312,7 +319,7 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
   const containerProps = { onDrop: handleDrop, 'data-testid': 'dashboard-main-content' }
 
   if (viewMode === 'horizontal') {
-    const slot = periodOf(currentDate, granularity)
+    const slot = periodOf(currentDate, granularity, calendarConfig)
     return (
       <div {...containerProps} className="relative">
         {granularityPicker}
@@ -321,7 +328,7 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setCurrentDate(shiftPeriod(slot, -1).start)}
+            onClick={() => setCurrentDate(shiftPeriod(slot, -1, calendarConfig).start)}
             aria-label="Previous"
           >
             <ChevronsLeft className="h-4 w-4" />
@@ -332,7 +339,7 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setCurrentDate(shiftPeriod(slot, 1).start)}
+            onClick={() => setCurrentDate(shiftPeriod(slot, 1, calendarConfig).start)}
             aria-label="Next"
           >
             <ChevronsRight className="h-4 w-4" />

@@ -11,6 +11,17 @@
 
 export type Granularity = 'day' | 'week' | 'month' | 'quarter' | 'year'
 
+/**
+ * Settings that belong to the calendar rather than to the person reading it.
+ *
+ * A week only exists inside Gregorian, so which day opens one is a property of
+ * that calendar. The naŭ calendar will answer entirely different questions.
+ */
+export interface CalendarConfig {
+  /** 0 = Sunday, 1 = Monday. ISO says Monday; plenty of the world says Sunday. */
+  firstDayOfWeek?: number
+}
+
 export interface PeriodSlot {
   /** Stable identity, and what the API is asked about. `YYYY-MM-DD` of its start. */
   key: string
@@ -72,21 +83,29 @@ function endOfDay(d: Date): Date {
  * getting it wrong by a day is what made every weekly summary cover an empty
  * future week for months.
  */
-export function periodOf(date: Date, granularity: Granularity): PeriodSlot {
+export function periodOf(
+  date: Date,
+  granularity: Granularity,
+  config?: CalendarConfig,
+): PeriodSlot {
   const d = new Date(date)
 
   switch (granularity) {
     case 'week': {
-      const weekday = d.getDay()
-      const monday = new Date(d)
-      monday.setDate(d.getDate() - (weekday === 0 ? 6 : weekday - 1))
-      const sunday = new Date(monday)
-      sunday.setDate(monday.getDate() + 6)
+      // Must match the server exactly. If the two disagree about where a week
+      // starts, the list draws one week while the summaries describe another and
+      // nothing says so.
+      const firstDay = config?.firstDayOfWeek ?? 1
+      const offset = (d.getDay() - firstDay + 7) % 7
+      const first = new Date(d)
+      first.setDate(d.getDate() - offset)
+      const last = new Date(first)
+      last.setDate(first.getDate() + 6)
       return {
-        key: toKey(startOfDay(monday)),
-        start: startOfDay(monday),
-        end: endOfDay(sunday),
-        label: `${monday.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} — ${sunday.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}`,
+        key: toKey(startOfDay(first)),
+        start: startOfDay(first),
+        end: endOfDay(last),
+        label: `${first.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} — ${last.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}`,
         granularity,
       }
     }
@@ -142,7 +161,11 @@ export function periodOf(date: Date, granularity: Granularity): PeriodSlot {
 }
 
 /** The period `offset` steps away from this one. Negative goes back. */
-export function shiftPeriod(slot: PeriodSlot, offset: number): PeriodSlot {
+export function shiftPeriod(
+  slot: PeriodSlot,
+  offset: number,
+  config?: CalendarConfig,
+): PeriodSlot {
   const d = new Date(slot.start)
   switch (slot.granularity) {
     case 'week':
@@ -160,7 +183,7 @@ export function shiftPeriod(slot: PeriodSlot, offset: number): PeriodSlot {
     default:
       d.setDate(d.getDate() + offset)
   }
-  return periodOf(d, slot.granularity)
+  return periodOf(d, slot.granularity, config)
 }
 
 /**
@@ -174,26 +197,27 @@ export function periodRun(
   past: number,
   future: number,
   today = new Date(),
+  config?: CalendarConfig,
 ): PeriodSlot[] {
-  const current = periodOf(today, granularity)
+  const current = periodOf(today, granularity, config)
   const out: PeriodSlot[] = []
-  for (let i = future; i > 0; i -= 1) out.push(shiftPeriod(current, i))
-  for (let i = 0; i < past; i += 1) out.push(shiftPeriod(current, -i))
+  for (let i = future; i > 0; i -= 1) out.push(shiftPeriod(current, i, config))
+  for (let i = 0; i < past; i += 1) out.push(shiftPeriod(current, -i, config))
   return out
 }
 
 /** The sub-periods a period contains, for expanding it one level in place. */
-export function subPeriods(slot: PeriodSlot): PeriodSlot[] {
+export function subPeriods(slot: PeriodSlot, config?: CalendarConfig): PeriodSlot[] {
   const sub = SUB_GRANULARITY[slot.granularity]
   if (!sub) return []
 
   const out: PeriodSlot[] = []
-  let cursor = periodOf(slot.start, sub)
+  let cursor = periodOf(slot.start, sub, config)
   // Bounded so a malformed range can never spin: a year holds twelve months and
   // a month at most thirty-one days.
   for (let guard = 0; guard < 400 && cursor.start <= slot.end; guard += 1) {
     out.push(cursor)
-    cursor = shiftPeriod(cursor, 1)
+    cursor = shiftPeriod(cursor, 1, config)
   }
   return out
 }
