@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { Block } from '@9nau/types'
 import { RefObject } from 'react'
+import type { Granularity } from '@/lib/periods'
 
 type ViewMode = 'list' | 'horizontal'
 
@@ -14,8 +15,17 @@ type DropTarget = {
 export interface DashboardState {
   viewMode: ViewMode
   currentDate: Date
-  visiblePastDays: number
-  visibleFutureDays: number
+  /**
+   * The size of the periods the list is made of.
+   *
+   * Days, weeks, months, quarters or years — the same scroll, at whichever
+   * grain. Stored here rather than in the view so that switching grain keeps
+   * everything else in place.
+   */
+  granularity: Granularity
+  /** How many periods are shown behind and ahead of the current one. */
+  visiblePast: number
+  visibleFuture: number
   draggedItem: Block | null
   dropTarget: DropTarget | null
   editingNote: Block | null
@@ -26,9 +36,10 @@ export interface DashboardState {
   actions: {
     setViewMode: (mode: ViewMode) => void
     setCurrentDate: (date: Date) => void
-    loadMorePastDays: () => void
-    showFutureDays: () => void
-    hideFutureDays: () => void
+    setGranularity: (granularity: Granularity) => void
+    loadMorePast: () => void
+    loadMoreFuture: () => void
+    hideFuture: () => void
     setDraggedItem: (item: Block | null) => void
     setDropTarget: (target: DropTarget | null) => void
     setEditingNoteId: (id: string | null) => void
@@ -42,8 +53,9 @@ export interface DashboardState {
 const useDashboardStore = create<DashboardState>((set, get) => ({
   viewMode: 'list',
   currentDate: new Date(),
-  visiblePastDays: 7,
-  visibleFutureDays: 0,
+  granularity: 'day',
+  visiblePast: 7,
+  visibleFuture: 0,
   draggedItem: null,
   dropTarget: null,
   editingNote: null,
@@ -54,9 +66,12 @@ const useDashboardStore = create<DashboardState>((set, get) => ({
   actions: {
     setViewMode: (mode) => set({ viewMode: mode }),
     setCurrentDate: (date) => set({ currentDate: date }),
-    loadMorePastDays: () => set((state) => ({ visiblePastDays: state.visiblePastDays + 7 })),
-    showFutureDays: () => set((state) => ({ visibleFutureDays: state.visibleFutureDays + 1 })),
-    hideFutureDays: () => set({ visibleFutureDays: 0 }),
+    // Changing grain resets the window. Seven years of scroll left over from
+    // seven days would be a very long list and never what was meant.
+    setGranularity: (granularity) => set({ granularity, visiblePast: 7, visibleFuture: 0 }),
+    loadMorePast: () => set((state) => ({ visiblePast: state.visiblePast + 7 })),
+    loadMoreFuture: () => set((state) => ({ visibleFuture: state.visibleFuture + 7 })),
+    hideFuture: () => set({ visibleFuture: 0 }),
     setDraggedItem: (item) => {
       set({ draggedItem: item })
       if (item === null) {
