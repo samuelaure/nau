@@ -5,6 +5,10 @@ import { BlocksService } from '../blocks/blocks.service';
 import { NauthenticityService } from '../integrations/nauthenticity.service';
 import { FlownauIntegrationService } from '../integrations/flownau.service';
 import { PrismaService } from '../prisma/prisma.service';
+import dayjs from 'dayjs';
+
+/** Types that are answerable on a day, and therefore need a schedule. */
+const SCHEDULABLE_TYPES = new Set(['action', 'habit', 'appointment']);
 
 const TriageResultSchema = z.object({
   segments: z.array(z.object({
@@ -194,6 +198,29 @@ OUTPUT: Return valid JSON matching the schema.`,
     }
   }
 
+  /**
+   * Gives a block a one-day schedule on the day it was captured.
+   *
+   * Best-effort: a capture that lands without a schedule is recoverable — it
+   * shows up and can be dragged onto a day — while a capture lost because the
+   * schedule write failed is not.
+   */
+  private async scheduleFor(blockId: string, dateIso?: string) {
+    try {
+      const day = dayjs(dateIso ?? new Date().toISOString());
+      await this.prisma.schedule.create({
+        data: {
+          blockId,
+          startDate: day.startOf('day').toDate(),
+          endDate: day.endOf('day').toDate(),
+          recurrenceMode: 'FIXED',
+        },
+      });
+    } catch (err) {
+      this.logger.warn(`Could not schedule block ${blockId}: ${String(err)}`);
+    }
+  }
+
   private async saveTriagedBlocks(
     result: TriageResult,
     sourceBlockId?: string,
@@ -238,6 +265,15 @@ OUTPUT: Return valid JSON matching the schema.`,
       }
 
       const block = await this.blocksService.createInternal({ type, properties, workspaceId });
+
+      // Anything that can be done gets a schedule at the moment it is created.
+      // Without one it exists but is due nowhere, which is exactly how six
+      // actions came to be invisible on the agenda while sitting in plain view
+      // at home. The capture day is the honest default: it is when the person
+      // said it, and moving it is one drag.
+      if (SCHEDULABLE_TYPES.has(type)) {
+        await this.scheduleFor(block.id, properties.date as string);
+      }
 
       // Forward content_idea blocks with a resolved brand to flownaŭ
       if (segment.category === 'content_idea' && properties.brandId) {
