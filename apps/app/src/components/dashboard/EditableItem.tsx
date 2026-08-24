@@ -32,6 +32,8 @@ interface EditableItemProps {
   occurrence?: AgendaItem
   /** Marks the row carries. Nothing is drawn when there is nothing to say. */
   badges?: React.ReactNode
+  /** Controls pinned to the right of the row, away from the text. */
+  trailing?: React.ReactNode
 }
 
 export function EditableItem({
@@ -50,6 +52,7 @@ export function EditableItem({
   onFullUpdate,
   occurrence,
   badges,
+  trailing,
 }: EditableItemProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -209,8 +212,12 @@ export function EditableItem({
             </span>
           )}
           
-          {/* Action Buttons */}
-          <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+          {/* Controls, pinned right. Separate from the badges, which sit with
+              the text because they describe it rather than act on it. */}
+          <div className="absolute right-0 top-1/2 flex -translate-y-1/2 items-center">
+            {trailing}
+          </div>
+          <div className="absolute right-16 top-1/2 -translate-y-1/2 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
             <Button
               variant="ghost"
               size="icon"

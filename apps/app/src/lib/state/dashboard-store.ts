@@ -70,7 +70,9 @@ const useDashboardStore = create<DashboardState>((set, get) => ({
     // seven days would be a very long list and never what was meant.
     setGranularity: (granularity) => set({ granularity, visiblePast: 7, visibleFuture: 0 }),
     loadMorePast: () => set((state) => ({ visiblePast: state.visiblePast + 7 })),
-    loadMoreFuture: () => set((state) => ({ visibleFuture: state.visibleFuture + 7 })),
+    // Three at a time. Future periods render above the current one, so nine
+    // would push today off the screen and make reaching it work.
+    loadMoreFuture: () => set((state) => ({ visibleFuture: state.visibleFuture + 3 })),
     hideFuture: () => set({ visibleFuture: 0 }),
     setDraggedItem: (item) => {
       set({ draggedItem: item })

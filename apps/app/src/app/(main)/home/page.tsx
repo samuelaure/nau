@@ -49,7 +49,9 @@ export default function HomePage() {
     }
     const notes = blocks.filter((b: Block) => b.type === 'note')
     const actions = blocks.filter((b: Block) => b.type === 'action')
-    const experiences = blocks.filter((b: Block) => b.type === 'experience')
+    // `journal_entry`, not `experience`: one concept, and the normalisation kept
+    // the name that everything else already writes.
+    const experiences = blocks.filter((b: Block) => b.type === 'journal_entry')
 
     const notesByDate = groupBlocksByDate(notes)
     const actionsHierarchy = buildHierarchy(actions)

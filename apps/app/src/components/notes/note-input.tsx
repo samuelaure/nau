@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { useCreateBlock } from '@/hooks/use-blocks-api'
+import { useUiStore } from '@/lib/state/ui-store'
 import { Card } from '@9nau/ui/components/card'
 import { Button } from '@9nau/ui/components/button'
 
@@ -20,32 +21,59 @@ export function NoteInput() {
     }
   }, [text])
 
-  const handleClose = () => {
-    if (text.trim()) {
-      const today = new Date()
-      const year = today.getFullYear()
-      const month = String(today.getMonth() + 1).padStart(2, '0')
-      const day = String(today.getDate()).padStart(2, '0')
-      const dateInUserTimeZone = `${year}-${month}-${day}`
+  const activeWorkspaceId = useUiStore((s) => s.activeWorkspaceId)
 
-      createBlock.mutate({
-        type: 'note',
-        properties: { text: text.trim(), status: 'inbox', date: dateInUserTimeZone },
-      })
+  /**
+   * Saves, and only then clears.
+   *
+   * The text is cleared on success rather than on submit: a capture lost to a
+   * failed request is not recoverable from anywhere, and this box is the first
+   * thing a thought lands in.
+   */
+  const handleClose = () => {
+    const trimmed = text.trim()
+    if (!trimmed) {
+      setExpanded(false)
+      return
     }
-    setText('')
-    setExpanded(false)
+
+    const today = new Date()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    // The day the person is looking at, in their own clock. A note belongs to
+    // the day it was captured, which is not a due date and never becomes one.
+    const dateInUserTimeZone = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`
+
+    createBlock.mutate(
+      {
+        type: 'note',
+        workspaceId: activeWorkspaceId ?? undefined,
+        properties: { text: trimmed, status: 'inbox', date: dateInUserTimeZone },
+      },
+      {
+        onSuccess: () => {
+          setText('')
+          setExpanded(false)
+        },
+      },
+    )
   }
 
+  // Bound to the latest handler on every render. The previous version listed
+  // `formRef.current` as a dependency, which never changes identity, so the
+  // listener kept whichever `handleClose` it captured first.
+  const closeRef = React.useRef(handleClose)
+  closeRef.current = handleClose
+
   React.useEffect(() => {
+    if (!isExpanded) return
     const handleClickOutside = (event: MouseEvent) => {
       if (formRef.current && !formRef.current.contains(event.target as Node)) {
-        handleClose()
+        closeRef.current()
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [formRef.current, text])
+  }, [isExpanded])
 
   if (!isExpanded) {
     return (
@@ -78,9 +106,14 @@ export function NoteInput() {
             rows={1}
             autoFocus
           />
-          <div className="flex justify-end mt-2 space-x-2">
-            <Button type="button" variant="ghost" onClick={handleClose}>
-              Close
+          <div className="mt-2 flex items-center justify-end gap-2">
+            {createBlock.isError && (
+              <span className="mr-auto text-xs text-red-600">
+                No se pudo guardar. El texto sigue aquí.
+              </span>
+            )}
+            <Button type="button" variant="ghost" onClick={handleClose} disabled={createBlock.isPending}>
+              {createBlock.isPending ? 'Guardando…' : 'Listo'}
             </Button>
           </div>
         </div>

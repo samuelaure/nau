@@ -56,11 +56,30 @@ export class BlocksService {
       await this.assertBlockAccess(user.sub, createBlockDto.parentId);
     }
 
-    return this.createInternal({
+    const block = await this.createInternal({
       ...createBlockDto,
       workspaceId,
       userId: user.sub,
     });
+
+    // Scheduled in the same request that created it. Two round trips to put a
+    // line on a day is what made the keyboard flow lag, and it left a window
+    // where a block existed but was due nowhere — which is how six actions once
+    // came to be invisible on the agenda.
+    if (createBlockDto.schedule) {
+      const { startDate, endDate, rrule, recurrenceMode } = createBlockDto.schedule;
+      await this.prisma.schedule.create({
+        data: {
+          blockId: block.id,
+          startDate: new Date(startDate),
+          endDate: endDate ? new Date(endDate) : null,
+          rrule: rrule ?? null,
+          recurrenceMode: recurrenceMode ?? 'FIXED',
+        },
+      });
+    }
+
+    return block;
   }
 
   /**

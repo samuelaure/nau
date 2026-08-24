@@ -81,8 +81,8 @@ export function PeriodBlock({
       />
       <HierarchicalSection
         dateStr={slot.key}
-        sectionType="experience"
-        title="Experiences & Gratitude"
+        sectionType="journal_entry"
+        title="Experiencias"
         items={contents.experiences}
       />
       <NotesInboxSection title="Notes Inbox" notes={contents.notes} />

@@ -8,7 +8,15 @@ import { findItemAndParent, HierarchicalBlock } from '@9nau/core'
 
 interface HierarchicalSectionProps {
   dateStr: string
-  sectionType: 'action' | 'experience'
+  /**
+   * The block type this section writes.
+   *
+   * `journal_entry` and not `experience`: they were two names for one concept
+   * and the normalisation kept the one that is actually written — by Zazŭ, by
+   * the web capture, by the voice pipeline. Creating `experience` here produced
+   * rows of a type nothing else in the system reads.
+   */
+  sectionType: 'journal_entry' | 'action'
   title: string
   items: HierarchicalBlock[]
 }
@@ -48,7 +56,10 @@ export function HierarchicalSection({ dateStr, sectionType, title, items }: Hier
     const newBlock: CreateBlockDto = {
       type: sectionType,
       parentId,
-      properties: { text: '', date: dateStr, status: 'inbox' },
+      // `date` is when this belongs, which for an experience is the day it
+      // happened — not a due date. Creating it from a past period files it
+      // there, which is the whole point of being able to add one late.
+      properties: { text: '', date: dateStr, status: 'published' },
     }
     createBlock.mutate(newBlock, {
       onSuccess: (createdBlock) => {

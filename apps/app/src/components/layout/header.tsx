@@ -1,6 +1,7 @@
 'use client'
 
 import { Menu, Search, Settings, List, Columns } from 'lucide-react'
+import { GRANULARITIES, type Granularity } from '@/lib/periods'
 import { useUiActions, useUiStore } from '@/lib/state/ui-store'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
 import { Button } from '@9nau/ui/components/button'
@@ -13,9 +14,11 @@ interface HeaderProps {
 
 export function Header({ isScrolled }: HeaderProps) {
   const { toggleSidebar } = useUiActions()
-  const { viewMode, setViewMode } = useDashboardStore((s) => ({
+  const { viewMode, setViewMode, granularity, setGranularity } = useDashboardStore((s) => ({
     viewMode: s.viewMode,
     setViewMode: s.actions.setViewMode,
+    granularity: s.granularity,
+    setGranularity: s.actions.setGranularity,
   }))
   const currentView = useUiStore((s) => s.activeView)
 
@@ -45,6 +48,21 @@ export function Header({ isScrolled }: HeaderProps) {
       <div className="flex items-center space-x-1">
         {currentView === 'home' && (
           <>
+            {/* The size of the periods the list is made of, next to the choice
+                of how they are laid out. Both answer the same question — how am
+                I looking at time — so they belong together. */}
+            <select
+              value={granularity}
+              onChange={(e) => setGranularity(e.target.value as Granularity)}
+              aria-label="Nivel temporal"
+              className="mr-1 rounded-md border border-gray-200 bg-transparent px-2 py-1.5 text-sm text-gray-700 outline-none hover:bg-gray-50 focus:border-gray-400"
+            >
+              {GRANULARITIES.map((g) => (
+                <option key={g.value} value={g.value}>
+                  {g.label}
+                </option>
+              ))}
+            </select>
             <Button
               variant="ghost"
               size="icon"

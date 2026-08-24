@@ -42,12 +42,25 @@ export const useGetBlocks = (params: FindBlocksParams) => {
   })
 }
 
+/** A block, optionally placed on a day in the same request. */
+type CreateBlockInput = CreateBlockDto & {
+  schedule?: {
+    startDate: string
+    endDate?: string | null
+    rrule?: string | null
+    recurrenceMode?: 'FIXED' | 'AFTER_COMPLETION'
+  }
+}
+
 export const useCreateBlock = () => {
   const queryClient = useQueryClient()
-  return useMutation<Block, Error, CreateBlockDto>({
+  return useMutation<Block, Error, CreateBlockInput>({
     mutationFn: (newBlock) => apiClient.post('/blocks', newBlock),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['blocks'] })
+      // A block that arrived with a schedule is owed somewhere, so the agenda
+      // has to be asked again too.
+      queryClient.invalidateQueries({ queryKey: ['agenda'] })
     },
   })
 }

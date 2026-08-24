@@ -10,11 +10,10 @@ import { useWorkspaceCalendar } from '@/hooks/use-calendar-api'
 import { NextActions } from './NextActions'
 import { HierarchicalBlock, findItemAndParent, calculateSortOrder } from '@9nau/core'
 import { Button } from '@9nau/ui/components/button'
-import { ChevronsLeft, ChevronsRight, ArrowUp, ArrowDown, X, Crosshair } from 'lucide-react'
+import { ChevronsLeft, ChevronsRight, ArrowUp, ArrowDown, X } from 'lucide-react'
 import { useUpdateBlock } from '@/hooks/use-blocks-api'
 import { cn } from '@9nau/ui/lib/utils'
 import {
-  GRANULARITIES,
   isCurrent,
   periodOf,
   periodRun,
@@ -136,8 +135,14 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
     }
   }, [byPeriod, experiences, notesByDate])
 
-  // Infinite scroll in both directions: reaching either end widens the window
-  // rather than paging, so moving through time never asks for a click.
+  // Scrolling loads the past and only the past.
+  //
+  // The future is behind a button on purpose. The current period is drawn at the
+  // top of the list, so a scroll-to-top trigger fires on first render and then
+  // again on every scroll event while up there — each one widening the window
+  // and refetching. Measured in production: enough requests to trip the API's
+  // rate limiter, which is what made the whole app feel slow and made some
+  // writes fail outright.
   useEffect(() => {
     const el = mainContentRef?.current
     if (viewMode !== 'list' || !el) return
@@ -145,18 +150,17 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
     const handleScroll = () => {
       const { scrollTop, scrollHeight, clientHeight } = el
       if (scrollHeight - scrollTop - clientHeight < 200) loadMorePast()
-      if (scrollTop < 120) loadMoreFuture()
     }
     el.addEventListener('scroll', handleScroll)
     return () => el.removeEventListener('scroll', handleScroll)
-  }, [viewMode, mainContentRef, loadMorePast, loadMoreFuture])
+  }, [viewMode, mainContentRef, loadMorePast])
 
   const handleDrop = () => {
     if (!draggedItem || !dropTarget) return
 
     if (
       draggedItem.type === 'note' &&
-      (dropTarget.section === 'action' || dropTarget.section === 'experience')
+      (dropTarget.section === 'action' || dropTarget.section === 'journal_entry')
     ) {
       updateBlock.mutate({
         id: draggedItem.id,
@@ -270,60 +274,12 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
     </>
   )
 
-  /** What the period being lived now is called, at this grain. */
-  const currentLabel = {
-    day: 'Hoy',
-    week: 'Semana actual',
-    month: 'Mes actual',
-    quarter: 'Trimestre actual',
-    year: 'Año actual',
-  }[granularity]
-
-  const goToCurrent = () => {
-    setCurrentDate(new Date())
-    // Scrolling rather than reloading: the current period is already on screen
-    // in every ordinary case, and jumping the window would lose the scroll
-    // position the person built up getting here.
-    todayRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  }
-
-  const granularityPicker = (
-    <div className="mb-4 flex items-center justify-center gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
-      {GRANULARITIES.map((g) => (
-        <button
-          key={g.value}
-          onClick={() => setGranularity(g.value)}
-          className={cn(
-            'rounded-md px-3 py-1 text-xs font-medium transition-all',
-            granularity === g.value
-              ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white'
-              : 'text-gray-500 hover:text-gray-700 dark:text-gray-400',
-          )}
-        >
-          {g.label}
-        </button>
-      ))}
-    </div>
-  )
-
-  const currentButton = (
-    <button
-      onClick={goToCurrent}
-      className="mx-auto mb-4 flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300"
-    >
-      <Crosshair className="h-3 w-3" />
-      {currentLabel}
-    </button>
-  )
-
   const containerProps = { onDrop: handleDrop, 'data-testid': 'dashboard-main-content' }
 
   if (viewMode === 'horizontal') {
     const slot = periodOf(currentDate, granularity, calendarConfig)
     return (
       <div {...containerProps} className="relative">
-        {granularityPicker}
-        {currentButton}
         <div className="mb-2 flex items-center justify-center space-x-1">
           <Button
             variant="ghost"
@@ -361,12 +317,10 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
 
   return (
     <div {...containerProps} className="relative space-y-6">
-      {granularityPicker}
-      {currentButton}
-
       {/* Above the periods, because it belongs to none of them. */}
       <NextActions />
 
+      {/* Deliberately a button and not a scroll trigger. See the effect above. */}
       <div className="flex items-center justify-center text-gray-500">
         <button
           onClick={loadMoreFuture}

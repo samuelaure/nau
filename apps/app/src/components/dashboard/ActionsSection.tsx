@@ -7,8 +7,9 @@ import { Block } from '@9nau/types'
 import { EditableItem } from './EditableItem'
 import type { AgendaItem } from '@/hooks/use-agenda-api'
 import { useSetCompletion } from '@/hooks/use-agenda-api'
-import { useCreateBlock, useUpdateBlock, useDeleteBlock } from '@/hooks/use-blocks-api'
 import { useUpsertSchedule } from '@/hooks/use-schedule-api'
+import { rangeOf, WHEN_LABELS, type WhenKind } from '@/components/agenda/scheduling'
+import { useCreateBlock, useUpdateBlock, useDeleteBlock } from '@/hooks/use-blocks-api'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
 
 /**
@@ -35,6 +36,45 @@ function overdueTint(overdue: number): string {
  * agreement that lets the agenda's metadata live inside home's clean rows
  * without turning every line into a dashboard.
  */
+/**
+ * Moves one item to another period.
+ *
+ * Sits on the right of the row, away from the text, because it is a control and
+ * not an annotation. The full hierarchical navigator replaces this list later;
+ * these four cover the moves that actually happen daily.
+ */
+function MoveTo({ item, onMove }: { item: AgendaItem; onMove: (when: WhenKind) => void }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <span className="relative shrink-0">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        title="Mover a…"
+        className="rounded p-1 text-gray-300 opacity-0 transition-opacity hover:bg-gray-100 hover:text-gray-600 group-hover:opacity-100 dark:text-gray-600 dark:hover:bg-gray-700"
+      >
+        <CalendarRange className="h-4 w-4" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded-md border bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800">
+          {(['today', 'week', 'month'] as WhenKind[]).map((kind) => (
+            <button
+              key={kind}
+              onClick={() => {
+                onMove(kind)
+                setOpen(false)
+              }}
+              className="block w-full px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700"
+            >
+              {WHEN_LABELS[kind]}
+            </button>
+          ))}
+        </div>
+      )}
+    </span>
+  )
+}
+
 function Badges({ item }: { item: AgendaItem }) {
   const carriedOn = item.carriedFrom
     ? new Date(item.carriedFrom).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
@@ -45,11 +85,6 @@ function Badges({ item }: { item: AgendaItem }) {
       {item.isHabit && (
         <span className="inline-flex items-center gap-0.5" title="Hábito">
           <Repeat className="h-3 w-3" />
-        </span>
-      )}
-      {item.spansPeriod && (
-        <span className="inline-flex items-center gap-0.5" title="En cualquier momento del periodo">
-          <CalendarRange className="h-3 w-3" />
         </span>
       )}
       {item.projected && (
@@ -103,6 +138,22 @@ export function ActionsSection({
   const deleteBlock = useDeleteBlock()
   const upsertSchedule = useUpsertSchedule()
   const setFocusedItemId = useDashboardStore((s) => s.actions.setFocusedItemId)
+
+  /**
+   * Puts an item in another period without going there.
+   *
+   * Planning something for next month is not wanting to be in next month, so
+   * the view stays where it is.
+   */
+  const moveTo = (item: AgendaItem, kind: WhenKind) => {
+    const { start, end } = rangeOf({ kind })
+    upsertSchedule.mutate({
+      blockId: item.blockId,
+      startDate: start.toISOString(),
+      endDate: end.toISOString(),
+      rrule: item.recurring ? undefined : null,
+    })
+  }
   const setDraggedItem = useDashboardStore((s) => s.actions.setDraggedItem)
   const setDropTarget = useDashboardStore((s) => s.actions.setDropTarget)
 
@@ -115,20 +166,18 @@ export function ActionsSection({
    * and typing should never be able to produce that.
    */
   const handleAdd = async (_afterId: string | null, parentId: string | null) => {
+    const start = new Date(`${dateStr}T00:00:00`)
+    const end = new Date(`${dateStr}T23:59:59.999`)
+
     const created = await createBlock.mutateAsync({
       type: 'action',
       parentId: parentId ?? undefined,
       workspaceId,
       properties: { text: '', status: 'todo' },
-    })
-
-    const start = new Date(`${dateStr}T00:00:00`)
-    const end = new Date(`${dateStr}T23:59:59.999`)
-    await upsertSchedule.mutateAsync({
-      blockId: created.id,
-      startDate: start.toISOString(),
-      endDate: end.toISOString(),
-      rrule: null,
+      // One request. Typing a line and putting it on a day is a single act, and
+      // splitting it into two calls made every Enter wait for two round trips
+      // and two refetches.
+      schedule: { startDate: start.toISOString(), endDate: end.toISOString(), rrule: null },
     })
 
     setFocusedItemId(created.id)
@@ -207,6 +256,7 @@ export function ActionsSection({
               })
             }
             badges={<Badges item={item} />}
+            trailing={<MoveTo item={item} onMove={(kind) => moveTo(item, kind)} />}
           />
           {children.length > 0 && render(children, level + 1)}
         </div>,

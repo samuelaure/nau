@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react'
+'use client'
+
+import React, { useState, useEffect, useRef } from 'react'
 import { Block, UpdateBlockDto } from '@9nau/types'
-import { X, Calendar, Tag, Folder, Link2, Type, Trash, MapPin } from 'lucide-react'
-import { Button } from '@9nau/ui/components/button'
+import { Trash, Tag, Repeat, Clock, Calendar } from 'lucide-react'
 import { cn } from '@9nau/ui/lib/utils'
 
 interface BlockEditorModalProps {
@@ -12,162 +13,147 @@ interface BlockEditorModalProps {
   onDelete: (id: string) => void
 }
 
-export function BlockEditorModal({ block, isOpen, onClose, onUpdate, onDelete }: BlockEditorModalProps) {
-  const [text, setText] = useState('')
-  const [type, setType] = useState('')
-  const [tags, setTags] = useState<string[]>([])
-  const [schedule, setSchedule] = useState('')
-  const [projectItem, setProjectItem] = useState('')
+/**
+ * A block, opened.
+ *
+ * Shaped after Google Keep rather than a form: title, then the body, then the
+ * controls tucked along the bottom edge. A form puts its fields between the
+ * person and their words; this puts the words first and keeps everything else
+ * out of the way until it is wanted.
+ *
+ * The body is where the free canvas will live — blocks of any type, nested
+ * without an imposed structure, which is the other half of how home works.
+ */
+export function BlockEditorModal({
+  block,
+  isOpen,
+  onClose,
+  onUpdate,
+  onDelete,
+}: BlockEditorModalProps) {
+  const [title, setTitle] = useState('')
+  const [body, setBody] = useState('')
+  const bodyRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
-    if (block) {
-      const props = block.properties as Record<string, unknown>
-      setText((props.text || props.summary || props.name || '') as string)
-      setType(block.type)
-      setTags((props.tags as string[]) || [])
-      setSchedule((props.schedule as string) || '')
-      setProjectItem((props.project as string) || '')
-    }
+    if (!block) return
+    const props = block.properties as Record<string, unknown>
+    setTitle((props.text || props.summary || props.name || '') as string)
+    setBody((props.body as string) || '')
   }, [block])
+
+  useEffect(() => {
+    if (!bodyRef.current) return
+    bodyRef.current.style.height = 'auto'
+    bodyRef.current.style.height = `${bodyRef.current.scrollHeight}px`
+  }, [body, isOpen])
 
   if (!isOpen || !block) return null
 
-  const handleSave = () => {
+  /**
+   * Saves on the way out.
+   *
+   * Keep has no save button and neither does this: closing is the confirmation,
+   * and an explicit one would only add a step to something that already ended.
+   */
+  const commit = () => {
     const props = block.properties as Record<string, unknown>
-    const newProps = {
-      ...props,
-      text,
-      tags: tags.length > 0 ? tags : undefined,
-      schedule: schedule || undefined,
-      project: projectItem || undefined,
+    const nextTitle = title.trim()
+    const nextBody = body.trim()
+
+    const changed = nextTitle !== (props.text ?? '') || nextBody !== (props.body ?? '')
+    if (changed) {
+      onUpdate(block.id, {
+        properties: { ...props, text: nextTitle, body: nextBody || undefined },
+      })
     }
-    
-    // Clean undefined
-    const cleanProps = { ...newProps } as Record<string, any>;
-    Object.keys(cleanProps).forEach((k) => {
-      if (cleanProps[k] === undefined) delete cleanProps[k];
-    });
-
-    onUpdate(block.id, {
-      type,
-      properties: cleanProps,
-    });
-    onClose();
-  }
-
-  const handleDelete = () => {
-    onDelete(block.id)
     onClose()
   }
 
+  const isHabit = Boolean((block as { schedule?: { rrule?: string } }).schedule?.rrule)
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-gray-900 w-full max-w-2xl rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col max-h-[90vh]">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800">
-          <div className="flex items-center gap-2">
-            <Type className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Editor de Bloque</h2>
-          </div>
-          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-            <X className="w-5 h-5" />
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 pt-[10vh]"
+      onMouseDown={commit}
+    >
+      <div
+        onMouseDown={(e) => e.stopPropagation()}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') commit()
+        }}
+        className="flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-800"
+      >
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Título"
+          autoFocus
+          className="w-full bg-transparent px-5 pt-5 text-lg font-medium text-gray-900 outline-none placeholder:text-gray-400 dark:text-gray-100"
+        />
+
+        <textarea
+          ref={bodyRef}
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          placeholder="Escribe algo…"
+          rows={4}
+          className="w-full flex-1 resize-none overflow-y-auto bg-transparent px-5 py-3 text-sm leading-relaxed text-gray-700 outline-none placeholder:text-gray-400 dark:text-gray-300"
+        />
+
+        {/* Along the bottom edge, out of the way of the words. Icon-only with
+            titles, the way Keep does it, so the row stays quiet. */}
+        <div className="flex items-center gap-1 border-t px-3 py-2 dark:border-gray-700">
+          <ToolbarButton title="Recordatorio" icon={Clock} disabled />
+          <ToolbarButton title="Frecuencia" icon={Repeat} disabled active={isHabit} />
+          <ToolbarButton title="Mover a…" icon={Calendar} disabled />
+          <ToolbarButton title="Etiquetas" icon={Tag} disabled />
+          <ToolbarButton
+            title="Eliminar"
+            icon={Trash}
+            onClick={() => {
+              onDelete(block.id)
+              onClose()
+            }}
+          />
+          <button
+            onClick={commit}
+            className="ml-auto rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            Cerrar
           </button>
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Main Content Area */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Contenido</label>
-            <textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 min-h-[150px] resize-y"
-              placeholder="Escribe el contenido..."
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-6">
-            {/* Meta - Type */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Tipo de Bloque</label>
-              <select
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-                className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-              >
-                <option value="note">Nota</option>
-                <option value="action">Acción</option>
-                <option value="experience">Experiencia</option>
-                <option value="content_idea">Idea de Contenido</option>
-                <option value="journal_entry">Journal Entry</option>
-              </select>
-            </div>
-
-            {/* Meta - Schedule */}
-            <div>
-              <label className="block flex items-center gap-2 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                <Calendar className="w-4 h-4" /> Schedule (RRULE)
-              </label>
-              <input
-                type="text"
-                value={schedule}
-                onChange={(e) => setSchedule(e.target.value)}
-                placeholder="Ex: FREQ=DAILY"
-                className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-              />
-            </div>
-
-            {/* Meta - Project */}
-            <div>
-              <label className="block flex items-center gap-2 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                <Folder className="w-4 h-4" /> Proyecto / Entidad
-              </label>
-              <input
-                type="text"
-                value={projectItem}
-                onChange={(e) => setProjectItem(e.target.value)}
-                placeholder="Nombre del proyecto..."
-                className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-              />
-            </div>
-
-            {/* Meta - Tags */}
-            <div>
-              <label className="block flex items-center gap-2 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                <Tag className="w-4 h-4" /> Etiquetas (csv)
-              </label>
-              <input
-                type="text"
-                value={tags.join(', ')}
-                onChange={(e) => setTags(e.target.value.split(',').map(t => t.trim()).filter(Boolean))}
-                placeholder="vlog, coding..."
-                className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-              />
-            </div>
-          </div>
-          
-          <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
-             <label className="block flex items-center gap-2 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                <Link2 className="w-4 h-4" /> Relaciones Linkeadas
-              </label>
-              <p className="text-sm text-gray-400 italic">No hay relaciones adjuntas en este momento.</p>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-800">
-          <Button variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={handleDelete}>
-            <Trash className="w-4 h-4 mr-2" /> Eliminar
-          </Button>
-          <div className="space-x-3">
-            <Button variant="outline" onClick={onClose}>Cancelar</Button>
-            <Button onClick={handleSave} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-              Guardar Cambios
-            </Button>
-          </div>
         </div>
       </div>
     </div>
+  )
+}
+
+function ToolbarButton({
+  title,
+  icon: Icon,
+  onClick,
+  disabled,
+  active,
+}: {
+  title: string
+  icon: React.ElementType
+  onClick?: () => void
+  disabled?: boolean
+  active?: boolean
+}) {
+  return (
+    <button
+      title={disabled ? `${title} — próximamente` : title}
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'rounded-full p-2 transition-colors',
+        'text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700',
+        active && 'text-emerald-600 dark:text-emerald-400',
+        disabled && 'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-gray-400',
+      )}
+    >
+      <Icon className="h-4 w-4" />
+    </button>
   )
 }
