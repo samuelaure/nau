@@ -117,7 +117,10 @@ describe('JournalService — what each period reads', () => {
         { provide: ConfigService, useValue: { getOrThrow: jest.fn(() => 'secret') } },
         {
           provide: BlocksService,
-          useValue: { createInternal: jest.fn().mockResolvedValue({ id: 'new-summary' }) },
+          useValue: {
+            createInternal: jest.fn().mockResolvedValue({ id: 'new-summary' }),
+            updateInternal: jest.fn(),
+          },
         },
         {
           provide: ActivityService,

@@ -159,11 +159,19 @@ export class JournalService {
     });
   }
 
+  /**
+   * @param deliver Whether to push the result to Zazŭ immediately once written.
+   *   False for the scheduled run, which writes the summary the moment its day
+   *   closes at local midnight but holds delivery for the 06:00 tick — nobody
+   *   wants a Telegram message at 00:00. True for anything triggered by a
+   *   person asking for a summary directly, who is by definition awake to read it.
+   */
   private async generateForBounds(
     periodType: PeriodType,
     workspaceId: string,
     tz: string,
     bounds: PeriodBounds,
+    deliver = true,
   ) {
     const { start: startDate, end: endDate } = bounds;
     const startIso = startDate.toISOString();
@@ -388,7 +396,26 @@ EXTENSIÓN: ${periodType === 'daily' ? 'breve, uno o dos párrafos' : periodType
       this.logger.warn('LLM not configured. Skipping journal AI summary.');
     }
 
-    // 5. Save as Block
+    // 5. Format the delivery message before saving, so it can be stored
+    // verbatim on the block rather than reconstructed later for a delayed or
+    // retried delivery.
+    let finalDeliveryText = `✨ *SÍNTESIS*\n${aiResult.synthesis}\n\n`;
+    finalDeliveryText += `📝 *RESUMEN*\n${aiResult.summary}\n\n`;
+
+    const statsLine = `📊 Stats: ✅ ${completedBlocks.length}/${actionBlocks.length} | 💡 ${contentIdeas.length} | 📓 ${journalEntries.length}\n`;
+    finalDeliveryText += statsLine;
+
+    // Daily specific: chronological list, showing the entries themselves rather
+    // than anything derived from them — the same text the summary was built on.
+    if (periodType === 'daily' && journalEntries.length > 0) {
+      finalDeliveryText += `\n📅 *ENTRADAS CRONOLÓGICAS:*\n`;
+      journalEntries.forEach(e => {
+        const at = (e.properties as any)?.date ?? e.createdAt;
+        finalDeliveryText += `• _${dayjs(at).tz(tz).format('HH:mm')}_: ${this.entryText(e)}\n`;
+      });
+    }
+
+    // 6. Save as Block
     const newSummaryBlock = await this.blocksService.createInternal({
       type: 'journal_summary',
       workspaceId,
@@ -409,6 +436,18 @@ EXTENSIÓN: ${periodType === 'daily' ? 'breve, uno o dos párrafos' : periodType
         sourceCount: source === 'entries' ? journalEntries.length : sourceSummaries.length,
         activityCount: activityBlocks.length,
         timezone: tz,
+        // False only for a scheduled run holding delivery for the 06:00 tick.
+        // Everything else — a person asking for a summary directly, or a
+        // period Zazŭ never auto-delivers — has nothing pending, so it starts
+        // true. `deliverPending` is the only thing that flips it afterwards,
+        // so a delivery that failed there is visible and retried on the next
+        // tick rather than silently lost.
+        delivered: deliver || periodType === 'custom',
+        // The exact message a delivery sends, stored so a delayed or retried
+        // delivery reproduces it byte for byte rather than reconstructing an
+        // approximation from the other properties.
+        deliveryText: finalDeliveryText,
+        periodLabel: bounds.label,
       }
     });
 
@@ -435,53 +474,10 @@ EXTENSIÓN: ${periodType === 'daily' ? 'breve, uno o dos párrafos' : periodType
       });
     }
 
-    // 7. Format Delivery Message
-    let finalDeliveryText = `✨ *SÍNTESIS*\n${aiResult.synthesis}\n\n`;
-    finalDeliveryText += `📝 *RESUMEN*\n${aiResult.summary}\n\n`;
-    
-    const statsLine = `📊 Stats: ✅ ${completedBlocks.length}/${actionBlocks.length} | 💡 ${contentIdeas.length} | 📓 ${journalEntries.length}\n`;
-    finalDeliveryText += statsLine;
-
-    // Daily specific: chronological list, showing the entries themselves rather
-    // than anything derived from them — the same text the summary was built on.
-    if (periodType === 'daily' && journalEntries.length > 0) {
-      finalDeliveryText += `\n📅 *ENTRADAS CRONOLÓGICAS:*\n`;
-      journalEntries.forEach(e => {
-        const at = (e.properties as any)?.date ?? e.createdAt;
-        finalDeliveryText += `• _${dayjs(at).tz(tz).format('HH:mm')}_: ${this.entryText(e)}\n`;
-      });
-    }
-
-    // 8. Notify Zazu (if configured)
-    const zazuUrl = process.env.ZAZU_INTERNAL_URL || 'http://zazu:3000';
-
-    const periodTitle = PERIOD_LABEL[periodType];
-
-    if (periodType !== 'custom') {
-      const recipients = await this.getWorkspaceRecipients(workspaceId);
-
-      for (const nauUserId of recipients) {
-        try {
-          const token = await signServiceToken({
-            iss: '9nau-api',
-            aud: 'zazu',
-            secret: this.configService.getOrThrow<string>('AUTH_SECRET'),
-          });
-
-          await axios.post(`${zazuUrl}/api/internal/notify`, {
-             nauUserId,
-             type: 'journal_summary',
-             periodType,
-             periodTitle: `Resumen ${periodTitle} — ${bounds.label}`,
-             summaryData: finalDeliveryText
-          }, {
-             headers: { Authorization: `Bearer ${token}` },
-             timeout: 10000
-          });
-        } catch (err: any) {
-          this.logger.error(`Failed to notify Zazŭ for ${nauUserId}: ${err.message}`);
-        }
-      }
+    // 7. Deliver, unless this is a scheduled run holding it for the 06:00 tick —
+    // `delivered` was already written true above in every case that reaches here.
+    if (deliver && periodType !== 'custom') {
+      await this.notifyZazu(newSummaryBlock.id, workspaceId, periodType, bounds.label, finalDeliveryText);
     }
 
     return {
@@ -490,6 +486,78 @@ EXTENSIÓN: ${periodType === 'daily' ? 'breve, uno o dos párrafos' : periodType
       data: newSummaryBlock,
       summaryData: finalDeliveryText
     };
+  }
+
+  /** Pushes one already-written summary to every member of its workspace via Zazŭ. */
+  private async notifyZazu(
+    blockId: string,
+    workspaceId: string,
+    periodType: PeriodType,
+    periodLabel: string,
+    deliveryText: string,
+  ) {
+    const zazuUrl = process.env.ZAZU_INTERNAL_URL || 'http://zazu:3000';
+    const periodTitle = PERIOD_LABEL[periodType];
+    const recipients = await this.getWorkspaceRecipients(workspaceId);
+
+    for (const nauUserId of recipients) {
+      try {
+        const token = await signServiceToken({
+          iss: '9nau-api',
+          aud: 'zazu',
+          secret: this.configService.getOrThrow<string>('AUTH_SECRET'),
+        });
+
+        await axios.post(`${zazuUrl}/api/internal/notify`, {
+          nauUserId,
+          type: 'journal_summary',
+          periodType,
+          periodTitle: `Resumen ${periodTitle} — ${periodLabel}`,
+          summaryData: deliveryText,
+        }, {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 10000,
+        });
+      } catch (err: any) {
+        this.logger.error(`Failed to notify Zazŭ for ${nauUserId} (summary ${blockId}): ${err.message}`);
+      }
+    }
+  }
+
+  /**
+   * Sends every summary generated but not yet pushed, for one workspace.
+   *
+   * Split from generation so a summary can be written the moment its period
+   * closes — at local midnight, so nothing captured right up to 23:59 is
+   * missed — while the Telegram message waits for a decent hour. Matched by
+   * `delivered: false` rather than by time window, so a delivery that failed
+   * once is retried on the next tick instead of lost.
+   */
+  private async deliverPending(workspaceId: string) {
+    const pending = await this.prisma.block.findMany({
+      where: {
+        type: 'journal_summary',
+        workspaceId,
+        deletedAt: null,
+        properties: { path: ['delivered'], equals: false },
+      },
+    });
+
+    for (const block of pending) {
+      const props = block.properties as Record<string, unknown>;
+      const periodType = props.periodType as PeriodType;
+
+      await this.notifyZazu(
+        block.id,
+        workspaceId,
+        periodType,
+        (props.periodLabel as string) ?? '',
+        props.deliveryText as string,
+      );
+      await this.blocksService.updateInternal(block.id, {
+        properties: { ...props, delivered: true },
+      });
+    }
   }
 
   async saveDirectSummary(
@@ -545,6 +613,16 @@ EXTENSIÓN: ${periodType === 'daily' ? 'breve, uno o dos párrafos' : periodType
    * local clock says so. Every generator is idempotent on the period it covers,
    * so a repeated hour — which is exactly what happens when the clocks go back —
    * is skipped rather than duplicated.
+   *
+   * Generation and delivery are two different hours. The daily/weekly summary
+   * is written right at local midnight, once the day is genuinely over — firing
+   * at 23:00 instead, as this used to, closed the book on a day that still had
+   * an hour left in it, so anything captured between 23:00 and 23:59 fell into
+   * the next day's summary instead of this one. Delivery waits until 06:00
+   * local so nobody gets a Telegram message at midnight; `deliverPending`
+   * sends whatever generation left marked `delivered: false`, on a workspace
+   * that may not even be the one that just generated something (a summary
+   * written just before 06:00 still goes out on the same run).
    */
   @Cron('0 * * * *')
   async handleScheduledSummaries() {
@@ -558,21 +636,32 @@ EXTENSIÓN: ${periodType === 'daily' ? 'breve, uno o dos párrafos' : periodType
     for (const ws of workspaces) {
       const tz = safeZone(ws.timezone);
       const local = localNow(tz, now);
+      // The day that just closed, for generators anchored on local midnight —
+      // any instant within it works, since periodBounds only reads the
+      // calendar day off `ref`.
+      const closedDay = local.subtract(1, 'day').toDate();
 
       try {
-        // 23:00 local closes the day. Order matters and is the whole point of
-        // doing these together: the activity block is written first so the daily
+        // 00:00 local: the day that just ended is now closed and safe to
+        // summarise in full. Order matters and is the whole point of doing
+        // these together: the activity block is written first so the daily
         // can read it, and the weekly runs after the daily rather than racing it.
-        if (local.hour() === 23) {
-          await this.activity.generateForDay(ws.id, tz, now);
+        if (local.hour() === 0) {
+          await this.activity.generateForDay(ws.id, tz, closedDay);
 
           if (prefs.autoDaily) {
-            await this.runPeriod('daily', ws.id, tz, now);
+            await this.runPeriod('daily', ws.id, tz, closedDay, false);
           }
-          // isoWeekday 7 is Sunday: the last day of the week that is ending.
-          if (prefs.autoWeekly && local.isoWeekday() === 7) {
-            await this.runPeriod('weekly', ws.id, tz, now);
+          // isoWeekday 1 is Monday: the day that just started, so the week
+          // that just closed ended on the Sunday before it.
+          if (prefs.autoWeekly && local.isoWeekday() === 1) {
+            await this.runPeriod('weekly', ws.id, tz, closedDay, false);
           }
+        }
+
+        // 06:00 local: send whatever the midnight run generated but held back.
+        if (local.hour() === 6) {
+          await this.deliverPending(ws.id);
         }
 
         // The larger periods run early on the first local day, staggered so each
@@ -596,9 +685,15 @@ EXTENSIÓN: ${periodType === 'daily' ? 'breve, uno o dos párrafos' : periodType
   }
 
   /** The period that has just closed in this workspace's zone. */
-  private async runPeriod(periodType: PeriodType, workspaceId: string, tz: string, now: Date) {
+  private async runPeriod(
+    periodType: PeriodType,
+    workspaceId: string,
+    tz: string,
+    now: Date,
+    deliver = true,
+  ) {
     const bounds = closedPeriodBounds(periodType, tz, now);
     this.logger.log(`${periodType} for workspace ${workspaceId} — ${bounds.label} (${tz})`);
-    return this.generateForBounds(periodType, workspaceId, tz, bounds);
+    return this.generateForBounds(periodType, workspaceId, tz, bounds, deliver);
   }
 }
