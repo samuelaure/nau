@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Block, UpdateBlockDto } from '@9nau/types'
 import { cn } from '@9nau/ui/lib/utils'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
-import { HierarchicalBlock } from '@9nau/core'
+import { HierarchicalBlock, displayText, entryEditPatch } from '@9nau/core'
 import { X, Maximize2 } from 'lucide-react'
 import { Button } from '@9nau/ui/components/button'
 import { BlockEditorModal } from '../editor/BlockEditorModal'
@@ -56,7 +56,11 @@ export function EditableItem({
 }: EditableItemProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [text, setText] = useState((item.properties.text as string) || '')
+  // Not `properties.text`. An entry captured by voice has no `text` at all — it
+  // carries `raw` and `summary` — so reading that one field rendered every
+  // voice note as a blank row. `displayText` is the same resolution the journal
+  // view and the summary generator use.
+  const [text, setText] = useState(displayText(item))
   const textAreaRef = useRef<HTMLTextAreaElement>(null)
 
   const { setDropTarget, dropTarget, focusedItemId, setFocusedItemId } = useDashboardStore((s) => ({
@@ -93,9 +97,13 @@ export function EditableItem({
   const handleSave = () => {
     if (isModalOpen) return
     setIsEditing(false)
-    if (text.trim() === '' && !item.properties.text) {
+    // Compared against the resolved text, never `properties.text` alone: a
+    // voice note has no `text`, so the old check read "empty" for an entry
+    // full of words and deleted it the moment the row lost focus.
+    const current = displayText(item)
+    if (text.trim() === '' && current.trim() === '') {
       onDelete(item.id)
-    } else if (text !== item.properties.text) {
+    } else if (text !== current) {
       onUpdate(item.id, text)
     }
   }
@@ -108,7 +116,7 @@ export function EditableItem({
       handleSave()
       onAddItem(item.id, item.parentId)
     } else if (e.key === 'Escape') {
-      setText((item.properties.text as string) || '')
+      setText(displayText(item))
       setIsEditing(false)
     } else if (e.key === 'Backspace' && text === '') {
       e.preventDefault()

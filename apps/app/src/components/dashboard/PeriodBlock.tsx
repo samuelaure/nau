@@ -86,6 +86,7 @@ export function PeriodBlock({
         sectionType="journal_entry"
         title="Experiencias"
         items={contents.experiences}
+        workspaceId={workspaceId}
       />
       <NotesInboxSection title="Notes Inbox" notes={contents.notes} />
 
