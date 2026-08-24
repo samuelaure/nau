@@ -3,7 +3,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { BlocksService } from '../blocks/blocks.service';
 import { BlockEventsService } from '../blocks/block-events.service';
 import { occurrencesIn, intervalMsOf, overdueRatio } from '../schedule/occurrences';
-import { dayjs, dayIn, periodBounds, safeZone, type PeriodType } from '../common/time';
+import { dayjs, dayIn, periodBounds, safeZone, type CalendarConfig, type PeriodType } from '../common/time';
+import { CalendarService } from '../calendar/calendar.service';
 
 /** Block types that belong on an agenda. */
 const AGENDA_TYPES = ['action', 'habit', 'appointment'];
@@ -75,15 +76,8 @@ export class AgendaService {
     private readonly prisma: PrismaService,
     private readonly blocks: BlocksService,
     private readonly events: BlockEventsService,
+    private readonly calendar: CalendarService,
   ) {}
-
-  private async workspaceTimezone(workspaceId: string): Promise<string> {
-    const ws = await this.prisma.workspace.findUnique({
-      where: { id: workspaceId },
-      select: { timezone: true },
-    });
-    return safeZone(ws?.timezone);
-  }
 
   async forPeriod(params: {
     userId: string;
@@ -96,9 +90,9 @@ export class AgendaService {
     await this.blocks.assertWorkspaceMembership(params.userId, params.workspaceId);
 
     const now = params.now ?? new Date();
-    const tz = await this.workspaceTimezone(params.workspaceId);
+    const { timezone: tz, config } = await this.calendar.forWorkspace(params.workspaceId);
     const ref = dayIn(params.date, tz).toDate();
-    const { start, end, label } = periodBounds(params.period, tz, ref);
+    const { start, end, label } = periodBounds(params.period, tz, ref, config);
 
     // Whether the period being viewed is the one currently being lived. Only the
     // current period carries anything forward: looking back at last Tuesday
@@ -112,6 +106,7 @@ export class AgendaService {
       end,
       now,
       carry: isCurrent ? { period: params.period, from: start } : undefined,
+      config,
     });
 
     return {
@@ -147,13 +142,13 @@ export class AgendaService {
     await this.blocks.assertWorkspaceMembership(params.userId, params.workspaceId);
 
     const now = params.now ?? new Date();
-    const tz = await this.workspaceTimezone(params.workspaceId);
+    const { timezone: tz, config } = await this.calendar.forWorkspace(params.workspaceId);
     const period = params.period ?? 'daily';
 
     const start = dayIn(params.from, tz).startOf('day').toDate();
     const end = dayIn(params.to, tz).endOf('day').toDate();
 
-    const current = periodBounds(period, tz, now);
+    const current = periodBounds(period, tz, now, config);
     const currentInRange = current.start >= start && current.start <= end;
 
     const items = await this.collect({
@@ -163,6 +158,7 @@ export class AgendaService {
       end,
       now,
       carry: currentInRange ? { period, from: current.start } : undefined,
+      config,
     });
 
     return {
@@ -243,8 +239,9 @@ export class AgendaService {
     now: Date;
     /** When set, overdue one-offs of this granularity land at `from`. */
     carry?: { period: PeriodType; from: Date };
+    config?: CalendarConfig;
   }): Promise<AgendaItem[]> {
-    const { workspaceId, tz, start, end, now, carry } = params;
+    const { workspaceId, tz, start, end, now, carry, config } = params;
 
     const scheduled = await this.prisma.block.findMany({
       where: {
@@ -284,7 +281,7 @@ export class AgendaService {
       // the event log rather than out of a column somebody has to maintain.
       const carried =
         carry && !recurring && occurrences.length === 0
-          ? this.carriedOccurrence(schedule, carry.period, tz, carry.from, history, block.id)
+          ? this.carriedOccurrence(schedule, carry.period, tz, carry.from, history, block.id, config)
           : null;
 
       const all = carried ? [...occurrences, carried.occurrence] : occurrences;
@@ -350,13 +347,14 @@ export class AgendaService {
     windowStart: Date,
     history: History,
     blockId: string,
+    config?: CalendarConfig,
   ) {
     const originalAt = schedule.startDate;
     if (originalAt >= windowStart) return null;
     if (granularityOf(schedule) !== period) return null;
     if (history.done.has(completionKey(blockId, originalAt))) return null;
 
-    const originalBounds = periodBounds(period, tz, originalAt);
+    const originalBounds = periodBounds(period, tz, originalAt, config);
     const periods = countPeriodsBetween(period, tz, originalBounds.start, windowStart);
 
     return {

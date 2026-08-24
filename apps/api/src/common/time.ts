@@ -25,6 +25,18 @@ export { dayjs };
  */
 export type PeriodType = 'daily' | 'weekly' | 'monthly' | 'trimester' | 'yearly' | 'custom';
 
+/**
+ * Settings that belong to a calendar rather than to a person.
+ *
+ * A week only exists inside Gregorian, so this is where the question of which
+ * day starts one belongs. The naŭ calendar will answer different questions
+ * entirely.
+ */
+export interface CalendarConfig {
+  /** 0 = Sunday, 1 = Monday. ISO says Monday; plenty of the world says Sunday. */
+  firstDayOfWeek?: number
+}
+
 export interface PeriodBounds {
   /** Inclusive start, as an absolute instant. */
   start: Date;
@@ -83,7 +95,12 @@ export function dayIn(value: string, tz: string) {
  * Madrid is 2026-08-19T22:00Z to 2026-08-20T21:59Z, not midnight to midnight
  * UTC. `ref` is any instant inside the period being asked about.
  */
-export function periodBounds(period: PeriodType, tz: string, ref: Date): PeriodBounds {
+export function periodBounds(
+  period: PeriodType,
+  tz: string,
+  ref: Date,
+  config?: CalendarConfig,
+): PeriodBounds {
   const zone = safeZone(tz);
   const local = dayjs(ref).tz(zone);
 
@@ -98,10 +115,13 @@ export function periodBounds(period: PeriodType, tz: string, ref: Date): PeriodB
       return of(local.startOf('day'), local.endOf('day'), local.format('D [de] MMMM [de] YYYY'));
 
     case 'weekly': {
-      // ISO weeks: Monday to Sunday. dayjs' plain `week` starts on Sunday, which
-      // is what produced a weekly window offset by a day.
-      const start = local.startOf('isoWeek');
-      const end = local.endOf('isoWeek');
+      // Which day starts a week is a property of the calendar, not a fact. ISO
+      // says Monday and that stays the default, but a person whose week begins on
+      // Sunday should not have to live inside someone else's convention.
+      const firstDay = config?.firstDayOfWeek ?? 1;
+      const offset = (local.day() - firstDay + 7) % 7;
+      const start = local.subtract(offset, 'day').startOf('day');
+      const end = start.add(6, 'day').endOf('day');
       return of(start, end, `semana del ${start.format('D [de] MMMM')} al ${end.format('D [de] MMMM [de] YYYY')}`);
     }
 
@@ -132,7 +152,12 @@ export function periodBounds(period: PeriodType, tz: string, ref: Date): PeriodB
  * before. Passing `now` to periodBounds would give the period currently in
  * progress for everything except the daily.
  */
-export function closedPeriodBounds(period: PeriodType, tz: string, ref: Date): PeriodBounds {
+export function closedPeriodBounds(
+  period: PeriodType,
+  tz: string,
+  ref: Date,
+  config?: CalendarConfig,
+): PeriodBounds {
   const zone = safeZone(tz);
   const local = dayjs(ref).tz(zone);
 
@@ -140,16 +165,16 @@ export function closedPeriodBounds(period: PeriodType, tz: string, ref: Date): P
     // The daily runs late on the day it covers, so the period in progress is the
     // one to summarise.
     case 'daily':
-      return periodBounds('daily', zone, ref);
+      return periodBounds('daily', zone, ref, config);
     case 'weekly':
-      return periodBounds('weekly', zone, ref);
+      return periodBounds('weekly', zone, ref, config);
     case 'monthly':
-      return periodBounds('monthly', zone, local.subtract(1, 'month').toDate());
+      return periodBounds('monthly', zone, local.subtract(1, 'month').toDate(), config);
     case 'trimester':
-      return periodBounds('trimester', zone, local.subtract(1, 'month').toDate());
+      return periodBounds('trimester', zone, local.subtract(1, 'month').toDate(), config);
     case 'yearly':
-      return periodBounds('yearly', zone, local.subtract(1, 'day').toDate());
+      return periodBounds('yearly', zone, local.subtract(1, 'day').toDate(), config);
     default:
-      return periodBounds(period, zone, ref);
+      return periodBounds(period, zone, ref, config);
   }
 }

@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AgendaService } from './agenda.service';
 import { BlocksService } from '../blocks/blocks.service';
 import { BlockEventsService } from '../blocks/block-events.service';
+import { CalendarService } from '../calendar/calendar.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 jest.mock('@prisma/client', () => ({
@@ -48,7 +49,7 @@ describe('AgendaService — one list for actions and habits', () => {
   let eventFindMany: jest.Mock;
   let blocks: jest.Mocked<BlocksService>;
   let events: jest.Mocked<BlockEventsService>;
-  let prismaWorkspace: { findUnique: jest.Mock };
+  let calendar: { forWorkspace: jest.Mock };
 
   beforeEach(async () => {
     blockFindMany = jest.fn().mockResolvedValue([]);
@@ -76,15 +77,23 @@ describe('AgendaService — one list for actions and habits', () => {
           },
         },
         { provide: BlockEventsService, useValue: { record: jest.fn() } },
+        {
+          // The calendar answers where a period starts and how a week is cut.
+          // Pinned to UTC and ISO Monday so the expected instants stay readable.
+          provide: CalendarService,
+          useValue: {
+            forWorkspace: jest
+              .fn()
+              .mockResolvedValue({ timezone: 'UTC', config: { firstDayOfWeek: 1 } }),
+          },
+        },
       ],
     }).compile();
 
     service = module.get(AgendaService);
     blocks = module.get(BlocksService);
     events = module.get(BlockEventsService);
-    prismaWorkspace = module.get(PrismaService).workspace as unknown as {
-      findUnique: jest.Mock;
-    };
+    calendar = module.get(CalendarService) as unknown as { forWorkspace: jest.Mock };
   });
 
   afterEach(() => jest.clearAllMocks());
@@ -523,7 +532,10 @@ describe('AgendaService — one list for actions and habits', () => {
       // Madrid is UTC+2 in August, so a local midnight is 22:00 the day before.
       // Slicing the ISO string on the client would file two hours of every day
       // under the one before it.
-      prismaWorkspace.findUnique.mockResolvedValue({ timezone: 'Europe/Madrid' });
+      calendar.forWorkspace.mockResolvedValue({
+        timezone: 'Europe/Madrid',
+        config: { firstDayOfWeek: 1 },
+      });
       blockFindMany.mockResolvedValue([
         scheduledBlock({ id: 'tarde', startDate: '2026-08-19T22:30:00.000Z' }),
       ]);

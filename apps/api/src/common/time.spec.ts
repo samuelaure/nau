@@ -54,6 +54,38 @@ describe('time — a day belongs to a place', () => {
       expect(w.end.toISOString()).toBe('2026-08-23T23:59:59.999Z');
     });
 
+    it('starts the week where the calendar says, not where ISO does', () => {
+      // 20 August 2026 is a Thursday. A week only exists inside Gregorian, so
+      // which day opens it is a property of that calendar and not of the person
+      // reading it.
+      const monday = periodBounds('weekly', 'UTC', ref, { firstDayOfWeek: 1 });
+      expect(monday.start.toISOString()).toBe('2026-08-17T00:00:00.000Z');
+      expect(monday.end.toISOString()).toBe('2026-08-23T23:59:59.999Z');
+
+      const sunday = periodBounds('weekly', 'UTC', ref, { firstDayOfWeek: 0 });
+      expect(sunday.start.toISOString()).toBe('2026-08-16T00:00:00.000Z');
+      expect(sunday.end.toISOString()).toBe('2026-08-22T23:59:59.999Z');
+    });
+
+    it('defaults to Monday, which is what every existing calculation assumed', () => {
+      const withoutConfig = periodBounds('weekly', 'UTC', ref);
+      const explicitMonday = periodBounds('weekly', 'UTC', ref, { firstDayOfWeek: 1 });
+
+      expect(withoutConfig.start.toISOString()).toBe(explicitMonday.start.toISOString());
+    });
+
+    it('handles the Sunday edge, where ISO and a Sunday week disagree most', () => {
+      // On a Sunday, ISO says the week is ending; a Sunday-first week says it is
+      // beginning. Getting this backwards is what made every weekly summary
+      // cover an empty future week for months.
+      const onSunday = new Date('2026-08-23T12:00:00.000Z');
+
+      expect(periodBounds('weekly', 'UTC', onSunday, { firstDayOfWeek: 1 }).start.toISOString())
+        .toBe('2026-08-17T00:00:00.000Z');
+      expect(periodBounds('weekly', 'UTC', onSunday, { firstDayOfWeek: 0 }).start.toISOString())
+        .toBe('2026-08-23T00:00:00.000Z');
+    });
+
     it('bounds the month and the quarter the day falls in', () => {
       const m = periodBounds('monthly', 'UTC', ref);
       expect(m.start.toISOString()).toBe('2026-08-01T00:00:00.000Z');
