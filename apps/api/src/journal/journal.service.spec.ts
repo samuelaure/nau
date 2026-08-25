@@ -128,7 +128,7 @@ describe('JournalService — what each period reads', () => {
     blocksService = module.get(BlocksService);
 
     mockParseCompletion.mockResolvedValue({
-      data: { synthesis: 's', summary: 'r', highlights: [] },
+      data: { synthesis: 's', digest: 'd', summary: 'r', highlights: [] },
     });
   });
 
@@ -264,6 +264,57 @@ describe('JournalService — what each period reads', () => {
       const { user } = await promptFor('monthly', '2026-07-01', '2026-07-31');
 
       expect(user).not.toContain('Actividad de julio.');
+    });
+  });
+
+  /**
+   * The derived entry is read in the app; Telegram gets a short notice about
+   * it. Sending the entry itself is what put a 15,669-character message in
+   * front of Telegram's 4,096 limit and crash-looped Zazŭ 1,215 times.
+   */
+  describe('the entry is read in the app, the digest is what is sent', () => {
+    const generated = async () => {
+      load({ entries: [entry('2026-08-20T09:12:00.000Z', { raw: 'lo que viví' })] });
+      mockParseCompletion.mockResolvedValueOnce({
+        data: {
+          synthesis: 'el día entero, homogeneizado, largo'.repeat(50),
+          digest: 'Hoy fue sobre dinero y sobre reconectar con la familia.',
+          summary: 'dinero y familia',
+          highlights: [],
+        },
+      });
+      await service.generateSummary('daily', '2026-08-20', '2026-08-20', 'ws-1');
+      return blocksService.createInternal.mock.calls[0]![0].properties as Record<string, unknown>;
+    };
+
+    it('sends the digest, not the derived entry', async () => {
+      const props = await generated();
+      expect(props.deliveryText).toBe('Hoy fue sobre dinero y sobre reconectar con la familia.');
+    });
+
+    it('never puts the full entry into the delivery text', async () => {
+      const props = await generated();
+      expect(props.deliveryText).not.toContain('el día entero, homogeneizado');
+      expect((props.deliveryText as string).length).toBeLessThan(4096);
+    });
+
+    it('keeps the full entry on the block, which is what the app reads', async () => {
+      const props = await generated();
+      expect(props.synthesis).toContain('el día entero, homogeneizado');
+    });
+
+    it('stores the digest too, so what was sent can be read back later', async () => {
+      const props = await generated();
+      expect(props.digest).toBe('Hoy fue sobre dinero y sobre reconectar con la familia.');
+    });
+
+    it('asks the model for a digest meant for a phone', async () => {
+      load({ entries: [entry('2026-08-20T09:12:00.000Z', { raw: 'x' })] });
+      const { system } = await promptFor('daily', '2026-08-20', '2026-08-20');
+      expect(system).toContain('"digest"');
+      expect(system).toContain('móvil');
+      // It must be clear it replaces nothing — the app holds the real thing.
+      expect(system).toContain('Nunca lo sustituye');
     });
   });
 

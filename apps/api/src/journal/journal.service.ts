@@ -20,19 +20,29 @@ import {
 /**
  * What a period's derived entry holds.
  *
- * `synthesis` is the piece that matters and the reason this is not called a
- * summary. The captures of one day arrive scattered — a note at 14:25, another
- * at 20:55, each written without knowledge of the others — and what is missing
- * is not brevity but continuity. This field is the day told as one continuous
- * experience, at the length the day deserves rather than compressed.
+ * Three fields for three different readers, produced in one model call so they
+ * cannot disagree about the same day:
  *
- * `summary` stays as the short orienting line a list needs to show something
- * next to a date. It is deliberately secondary: nothing reads it to understand
- * the day, only to label it.
+ * - `synthesis` — the derived entry itself, read in the web app. The captures
+ *   of one day arrive scattered, each written without knowledge of the others,
+ *   and this is them returned as one thing. It is the artefact; everything
+ *   else here describes it.
+ * - `digest` — what Zazŭ sends to Telegram. Deliberately NOT the synthesis:
+ *   the whole point of the derived entry is to be read in the app, and pushing
+ *   its full text into a chat both defeats that and is what produced a 15,669
+ *   character message Telegram refused. This is a notice that the day has been
+ *   interpreted, carrying enough of what it said to be worth reading on a
+ *   phone.
+ * - `summary` — one line, to label the period in a list. Nothing reads it to
+ *   understand the day.
+ *
+ * The same relationship Zazŭ already has with a voice note: the note is stored
+ * in full, and the reply confirms it landed and says roughly what it was.
  */
 const JournalSummarySchema = z.object({
-  synthesis: z.string().describe('The period lived as one continuous experience, in the order it happened, weighted by what mattered to the person. Not compressed — this is the piece someone reads to recognise their own day.'),
-  summary: z.string().describe('One or two lines, enough to tell this period apart from another in a list. An orienting label, not a retelling.'),
+  synthesis: z.string().describe('The derived entry: every experience of the period brought together as one piece, ordered by what mattered rather than by clock time. This is what the person reads in the app.'),
+  digest: z.string().describe('A short notice for a chat message — a few sentences naming what the period was about. Read on a phone, in place of the full entry, never a substitute for it.'),
+  summary: z.string().describe('One line, enough to tell this period apart from another in a list. An orienting label, not a retelling.'),
   highlights: z.array(z.string()).describe('The few things worth remembering, one short line each. Empty if the record does not support any.'),
 });
 
@@ -299,10 +309,11 @@ export class JournalService {
     }
 
     // 4. Call OpenAI with Synthesis + Summary requirement
-    let aiResult: JournalSummaryOutput = { 
-      synthesis: 'Resumen no disponible.', 
-      summary: 'No se encontraron datos procesables.', 
-      highlights: [] 
+    let aiResult: JournalSummaryOutput = {
+      synthesis: 'Resumen no disponible.',
+      digest: 'No se pudo interpretar el periodo.',
+      summary: 'No se encontraron datos procesables.',
+      highlights: [],
     };
 
     try {
@@ -323,7 +334,7 @@ Recibes ${source === 'entries' ? 'las experiencias que esa persona capturó a lo
 
 Esto NO es un resumen. No estás condensando ni recortando. Las capturas llegaron sueltas — una a media tarde, otra de noche, cada una escrita sin saber de las demás — y tu trabajo es devolverlas como UNA sola experiencia continua. Homogeneizar, no comprimir: lo que estaba disperso queda unido, lo que se repite a lo largo del día se reconoce como una misma cosa, y lo que la persona vivió con más peso ocupa más espacio.
 
-Devuelve tres cosas:
+Devuelve cuatro cosas:
 
 1. "synthesis" — el periodo entero, contado como una sola experiencia continua.
 
@@ -333,9 +344,13 @@ Devuelve tres cosas:
 
    Es la pieza principal. Debe poder leerse sola y que la persona se reconozca en ella.
 
-2. "summary" — una o dos líneas para distinguir este periodo de otro en una lista. Una etiqueta para orientarse, no un recuento.
+2. "digest" — un aviso breve para leer en el móvil, de dos a cuatro frases.
 
-3. "highlights" — lo poco que merece recordarse, una línea corta cada uno. Lista vacía si el registro no da para ninguno.
+   La persona lee la pieza completa en su aplicación; esto sólo le dice que su día ya está interpretado y de qué fue. Nombra lo que de verdad ocupó el periodo, sin desarrollarlo. No es un índice ni una lista de temas: son frases, en el mismo tono e idioma que "synthesis". Nunca lo sustituye — si alguien quiere el día entero, va a la aplicación.
+
+3. "summary" — una línea para distinguir este periodo de otro en una lista. Una etiqueta para orientarse, no un recuento.
+
+4. "highlights" — lo poco que merece recordarse, una línea corta cada uno. Lista vacía si el registro no da para ninguno.
 
 REGLA ABSOLUTA — nada de lo que escribas puede no estar en el registro. No infieras acontecimientos, emociones ni detalles que no aparezcan. Si el registro es escaso, escribe poco. Una entrada breve y fiel es correcta; una entrada rica e inventada es un recuerdo falso, y esto es el registro que esta persona tiene de su propia vida.
 
@@ -361,15 +376,19 @@ Escribe en el mismo idioma del registro.`
     // 5. Format the delivery message before saving, so it can be stored
     // verbatim on the block rather than reconstructed later for a delayed or
     // retried delivery.
-    // The interpretation, and nothing else. It is written to be read on its
-    // own, so a stats line about tasks and ideas would sit oddly under it —
-    // those modules no longer feed this and should not decorate it either.
+    // What Zazŭ sends is the digest, never the derived entry itself.
     //
-    // The entries are also no longer appended verbatim. That is what they were
-    // read from, and repeating them under their own interpretation both undoes
-    // the point of homogenising them and made one delivery 15,669 characters
-    // long — four times what Telegram accepts.
-    const finalDeliveryText = aiResult.synthesis;
+    // The entry exists to be read in the web app; that is where the day is
+    // reviewed and edited. A chat message is a different medium with a
+    // different job — it says the day has been interpreted and roughly what it
+    // held, the same way Zazŭ already answers a voice note with a short
+    // confirmation rather than the transcription.
+    //
+    // It is also what keeps delivery bounded. Sending the full text put a
+    // 15,669-character message in front of Telegram's 4,096 limit; the digest
+    // is short by construction rather than by truncation, so the reader never
+    // gets half a sentence.
+    const finalDeliveryText = aiResult.digest;
 
     // 6. Save as Block
     const newSummaryBlock = await this.blocksService.createInternal({
@@ -380,6 +399,9 @@ Escribe en el mismo idioma del registro.`
         periodStart: startDate.toISOString(),
         periodEnd: endDate.toISOString(),
         synthesis: aiResult.synthesis,
+        // Stored alongside the entry rather than only sent, so what went out
+        // over Telegram can be read back later next to what it described.
+        digest: aiResult.digest,
         summary: aiResult.summary,
         highlights: aiResult.highlights,
         // What this entry was actually built from, recorded on the entry
