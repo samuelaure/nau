@@ -122,11 +122,22 @@ function Badges({ item }: { item: AgendaItem }) {
  */
 export function ActionsSection({
   dateStr,
+  periodStart,
+  periodEnd,
   occurrences,
   blocksById,
   workspaceId,
 }: {
   dateStr: string
+  /**
+   * The full span of the period being viewed — a day, a week, a month, however
+   * wide. An item created here is scheduled across the whole span, never
+   * collapsed to a single day: creating from the month view has to produce a
+   * month-wide item, or it silently becomes a day-level item that shows up
+   * "22 days late" the next time someone looks at today.
+   */
+  periodStart: string
+  periodEnd: string
   occurrences: AgendaItem[]
   blocksById: Map<string, Block>
   workspaceId?: string
@@ -158,26 +169,29 @@ export function ActionsSection({
   const setDropTarget = useDashboardStore((s) => s.actions.setDropTarget)
 
   /**
-   * Enter creates the next line, and schedules it for this day in the same
-   * breath.
+   * Enter creates the next line, and schedules it across the period being
+   * viewed, in the same breath.
    *
    * The schedule is not optional. A block without one exists but is due nowhere,
    * which is exactly how six actions came to sit invisibly outside the agenda —
    * and typing should never be able to produce that.
+   *
+   * The span is the whole period, not the one day `dateStr` names. Creating from
+   * the month view has to span the month: a single-day schedule stamped with the
+   * month's first day is what previously showed up "22 days late" the next time
+   * someone opened today, because the item was really a day-level item that
+   * happened to be dated in August, not a month-level one at all.
    */
   const handleAdd = async (_afterId: string | null, parentId: string | null) => {
-    const start = new Date(`${dateStr}T00:00:00`)
-    const end = new Date(`${dateStr}T23:59:59.999`)
-
     const created = await createBlock.mutateAsync({
       type: 'action',
       parentId: parentId ?? undefined,
       workspaceId,
       properties: { text: '', status: 'todo' },
-      // One request. Typing a line and putting it on a day is a single act, and
-      // splitting it into two calls made every Enter wait for two round trips
-      // and two refetches.
-      schedule: { startDate: start.toISOString(), endDate: end.toISOString(), rrule: null },
+      // One request. Typing a line and putting it on a period is a single act,
+      // and splitting it into two calls made every Enter wait for two round
+      // trips and two refetches.
+      schedule: { startDate: periodStart, endDate: periodEnd, rrule: null },
     })
 
     setFocusedItemId(created.id)

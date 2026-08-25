@@ -556,4 +556,145 @@ describe('AgendaService — one list for actions and habits', () => {
       expect(result.items[0]!.parentId).toBe('padre');
     });
   });
+
+  describe('single-level display — an item lives at exactly one granularity', () => {
+    // The reported bug: an action scheduled for the whole of August must not
+    // leak into every day inside it. "Greater than a week and no more than a
+    // month" belongs at month level, full stop — never cascaded down.
+    const augustWhole = () =>
+      blockFindMany.mockResolvedValue([
+        scheduledBlock({
+          id: 'agosto',
+          title: 'Revisar objetivos del mes',
+          startDate: '2026-08-01T00:00:00.000Z',
+          endDate: '2026-08-31T23:59:59.999Z',
+        }),
+      ]);
+
+    it('shows a month-spanning item in the month view', async () => {
+      augustWhole();
+
+      const result = await service.forPeriod({
+        userId: 'u1',
+        workspaceId: 'ws-1',
+        period: 'monthly',
+        date: '2026-08-15',
+        now: new Date('2026-08-23T12:00:00.000Z'),
+      });
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]!.blockId).toBe('agosto');
+    });
+
+    it('does NOT show a month-spanning item in the day view for a day inside it', async () => {
+      // This is the exact scenario reported: created at month level, then found
+      // 22 days "late" the next time today was opened. It must not appear at
+      // all in the day view — not carried, not overdue, simply absent, because
+      // it belongs to its own month, not to any day inside it.
+      augustWhole();
+
+      const result = await agenda('daily', '2026-08-23', new Date('2026-08-23T12:00:00.000Z'));
+
+      expect(result.items).toHaveLength(0);
+    });
+
+    it('does NOT show a month-spanning item in the week view either', async () => {
+      augustWhole();
+
+      const result = await agenda('weekly', '2026-08-17', new Date('2026-08-23T12:00:00.000Z'));
+
+      expect(result.items).toHaveLength(0);
+    });
+
+    it('does NOT show a week-long item in the month view containing it', async () => {
+      // The other direction: a week-level item must not leak up into month
+      // view either. Exactly one level, not "this level and everything above".
+      blockFindMany.mockResolvedValue([
+        scheduledBlock({
+          id: 'semana',
+          startDate: '2026-08-17T00:00:00.000Z',
+          endDate: '2026-08-23T23:59:59.999Z',
+        }),
+      ]);
+
+      const result = await service.forPeriod({
+        userId: 'u1',
+        workspaceId: 'ws-1',
+        period: 'monthly',
+        date: '2026-08-15',
+        now: new Date('2026-08-23T12:00:00.000Z'),
+      });
+
+      expect(result.items).toHaveLength(0);
+    });
+
+    it('carries a month-spanning item forward only into the current month, never into today', async () => {
+      // Unfinished work still has to surface — but at its own level. A month
+      // item that goes unfinished reappears in the current month, not in today.
+      blockFindMany.mockResolvedValue([
+        scheduledBlock({
+          id: 'julio',
+          startDate: '2026-07-01T00:00:00.000Z',
+          endDate: '2026-07-31T23:59:59.999Z',
+        }),
+      ]);
+
+      const daily = await agenda('daily', '2026-08-23', new Date('2026-08-23T12:00:00.000Z'));
+      const monthly = await service.forPeriod({
+        userId: 'u1',
+        workspaceId: 'ws-1',
+        period: 'monthly',
+        date: '2026-08-15',
+        now: new Date('2026-08-23T12:00:00.000Z'),
+      });
+
+      expect(daily.items).toHaveLength(0);
+      expect(monthly.items).toHaveLength(1);
+      expect(monthly.items[0]!.carriedFrom).not.toBeNull();
+    });
+
+    it('does not filter recurring items: a habit shows regardless of its schedule span', async () => {
+      blockFindMany.mockResolvedValue([
+        scheduledBlock({
+          id: 'habito',
+          type: 'habit',
+          rrule: 'FREQ=DAILY',
+          startDate: '2026-08-01T00:00:00.000Z',
+          endDate: '2026-08-31T23:59:59.999Z',
+        }),
+      ]);
+
+      const result = await agenda('daily', '2026-08-17', new Date('2026-08-17T12:00:00.000Z'));
+
+      expect(result.items).toHaveLength(1);
+    });
+
+    it('shows a quarter-and-a-half item at year level, past the trimester bucket', async () => {
+      blockFindMany.mockResolvedValue([
+        scheduledBlock({
+          id: 'largo',
+          startDate: '2026-01-01T00:00:00.000Z',
+          endDate: '2026-12-31T23:59:59.999Z',
+        }),
+      ]);
+
+      const yearly = await service.forPeriod({
+        userId: 'u1',
+        workspaceId: 'ws-1',
+        period: 'yearly',
+        date: '2026-06-01',
+        now: new Date('2026-08-23T12:00:00.000Z'),
+      });
+      const trimester = await service.forPeriod({
+        userId: 'u1',
+        workspaceId: 'ws-1',
+        period: 'trimester',
+        date: '2026-06-01',
+        now: new Date('2026-08-23T12:00:00.000Z'),
+      });
+
+      expect(yearly.items).toHaveLength(1);
+      expect(trimester.items).toHaveLength(0);
+    });
+  });
 });
