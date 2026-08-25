@@ -8,6 +8,47 @@ import { requireServiceAuth, buildServiceHeaders } from './lib/service-auth';
 
 const ADMIN_TELEGRAM_ID = process.env['ADMIN_TELEGRAM_ID'];
 
+/**
+ * Telegram rejects any message over 4096 characters. Chunks are cut a little
+ * under it to leave room for the continuation marker.
+ */
+const TELEGRAM_MAX_CHARS = 4096;
+const CHUNK_CHARS = 3900;
+
+/**
+ * Splits a message into pieces Telegram will accept, preferring to break where
+ * a reader would anyway.
+ *
+ * Paragraph first, then line, then a hard cut. A daily journal summary carrying
+ * the day's entries verbatim runs to fifteen thousand characters, and cutting
+ * that mid-sentence every 3900 would make it unreadable — which matters here
+ * because this is someone's diary being read back to them.
+ */
+export function splitForTelegram(text: string, limit = CHUNK_CHARS): string[] {
+  if (text.length <= TELEGRAM_MAX_CHARS) return [text];
+
+  const chunks: string[] = [];
+  let rest = text;
+
+  while (rest.length > limit) {
+    // Look for the last natural boundary inside the window, in order of how
+    // little the break costs the reader.
+    const window = rest.slice(0, limit);
+    const cut =
+      window.lastIndexOf('\n\n') > limit * 0.5
+        ? window.lastIndexOf('\n\n')
+        : window.lastIndexOf('\n') > limit * 0.5
+          ? window.lastIndexOf('\n')
+          : limit;
+
+    chunks.push(rest.slice(0, cut).trimEnd());
+    rest = rest.slice(cut).trimStart();
+  }
+
+  if (rest.length) chunks.push(rest);
+  return chunks;
+}
+
 export class ProactiveDeliverySystem {
   private bot: Telegraf<ZazuContext>;
   private app: express.Application;
@@ -49,7 +90,7 @@ export class ProactiveDeliverySystem {
         });
 
         if (windowOpen) {
-          setImmediate(() => this.flushQueue());
+          setImmediate(() => this.flushSafely());
         }
 
         return res.status(200).json({ success: true, queued: !windowOpen });
@@ -549,11 +590,101 @@ export class ProactiveDeliverySystem {
 
   private async forwardToAdmin(text: string): Promise<void> {
     if (!ADMIN_TELEGRAM_ID) return;
-    try {
-      await this.bot.telegram.sendMessage(ADMIN_TELEGRAM_ID, text, { parse_mode: 'Markdown' });
-    } catch {
-      // Non-critical — never let forwarding block delivery
+    // Forwarding is best-effort by design, and goes through the same chunking
+    // so a long summary cannot fail here either.
+    await this.sendChunked(ADMIN_TELEGRAM_ID, text).catch(() => {});
+  }
+
+  /**
+   * Sends one message, in as many parts as Telegram will accept.
+   *
+   * Every send in this file goes through here. A raw `sendMessage` with a
+   * 15,669-character daily summary threw `400: message is too long`, and
+   * because `flushQueue` is invoked without `await` in three places, that
+   * rejection was unhandled — which terminates the process on Node 20. The
+   * container restarted, retried the same still-PENDING row, and crashed
+   * again: 1,215 restarts, ~54% CPU, and enough load to time out the health
+   * checks of api, app and nauthenticity, which looked like four services
+   * failing rather than one.
+   *
+   * Throws on a genuine send failure so the caller can mark the item FAILED;
+   * what it must never do is let a formatting problem escape as a crash.
+   */
+  private async sendChunked(
+    chatId: string,
+    text: string,
+    extra: Record<string, unknown> = {},
+  ): Promise<void> {
+    const chunks = splitForTelegram(text);
+
+    for (const [index, chunk] of chunks.entries()) {
+      // Interactive controls belong on the last part only — buttons attached
+      // to part one of four sit above the text they act on.
+      const isLast = index === chunks.length - 1;
+      const options = { parse_mode: 'Markdown' as const, ...(isLast ? extra : {}) };
+
+      try {
+        await this.bot.telegram.sendMessage(chatId, chunk, options);
+      } catch (err: unknown) {
+        const description = (err as { response?: { description?: string } })?.response?.description ?? '';
+
+        // Splitting can land a cut between a `*` and its pair, which makes
+        // Telegram reject the whole message. The text still matters more than
+        // the styling, so it goes out unformatted rather than not at all.
+        if (description.includes("can't parse entities")) {
+          logger.warn({ description }, 'ProactiveDelivery: markdown rejected, retrying as plain text');
+          await this.bot.telegram.sendMessage(chatId, chunk, isLast ? extra : {});
+          continue;
+        }
+        throw err;
+      }
     }
+  }
+
+  /**
+   * Sends one queued item and records what happened to it.
+   *
+   * The status write is the point: an item that threw used to stay PENDING, so
+   * the next tick — or the next restart — picked up the identical row and
+   * failed on it again. Marking it FAILED means a message that can never be
+   * delivered is retired instead of retried forever, and a failure in one
+   * item cannot stop the rest of the queue from going out.
+   */
+  private async deliver(
+    itemId: string,
+    send: () => Promise<void>,
+    afterSend?: () => Promise<void>,
+  ): Promise<void> {
+    try {
+      await send();
+      await afterSend?.();
+      await prisma.notificationQueue.update({
+        where: { id: itemId },
+        data: { status: 'SENT', sentAt: new Date() },
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.error({ err: message, itemId }, 'ProactiveDelivery: delivery failed, marking FAILED');
+      await prisma.notificationQueue
+        .update({ where: { id: itemId }, data: { status: 'FAILED' } })
+        .catch(() => {});
+    }
+  }
+
+  /**
+   * Runs the queue without letting it take the process down.
+   *
+   * `flushQueue` is triggered from a cron tick, a `setImmediate` and once at
+   * startup — none of which can await it. An unawaited rejection is an
+   * unhandled rejection, and Node 20 exits on those by default, so a single
+   * bad message became a restart loop. Every fire-and-forget entry point goes
+   * through here.
+   */
+  private flushSafely(): void {
+    void this.flushQueue().catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.error({ err: message }, 'ProactiveDelivery: flushQueue failed');
+    });
   }
 
   public async flushQueue() {
@@ -600,16 +731,20 @@ export class ProactiveDeliverySystem {
       for (const item of journalItems) {
         const payload = item.payloadJson as { summaryData: string; periodTitle: string };
         const text = `📊 *${payload.periodTitle}*\n\n${payload.summaryData}`;
-        await this.bot.telegram.sendMessage(tidStr, text, { parse_mode: 'Markdown' });
-        if (shouldForward && !isSelfAdmin) await this.forwardToAdmin(`👤 *${user.displayName ?? user.firstName ?? tidStr}*\n\n${text}`);
-        await prisma.notificationQueue.update({ where: { id: item.id }, data: { status: 'SENT', sentAt: new Date() } });
+        await this.deliver(item.id, () => this.sendChunked(tidStr, text), async () => {
+          if (shouldForward && !isSelfAdmin) {
+            await this.forwardToAdmin(`👤 *${user.displayName ?? user.firstName ?? tidStr}*\n\n${text}`);
+          }
+        });
       }
 
       for (const item of briefItems) {
         const payload = item.payloadJson as { markdown: string; brandName: string };
-        await this.bot.telegram.sendMessage(tidStr, payload.markdown, { parse_mode: 'Markdown' });
-        if (shouldForward && !isSelfAdmin) await this.forwardToAdmin(`👤 *${user.displayName ?? user.firstName ?? tidStr}*\n\n${payload.markdown}`);
-        await prisma.notificationQueue.update({ where: { id: item.id }, data: { status: 'SENT', sentAt: new Date() } });
+        await this.deliver(item.id, () => this.sendChunked(tidStr, payload.markdown), async () => {
+          if (shouldForward && !isSelfAdmin) {
+            await this.forwardToAdmin(`👤 *${user.displayName ?? user.firstName ?? tidStr}*\n\n${payload.markdown}`);
+          }
+        });
       }
 
       const brandGroups = new Map<string, typeof suggestionItems>();
@@ -637,14 +772,15 @@ export class ProactiveDeliverySystem {
             }]),
           ];
 
-          await this.bot.telegram.sendMessage(tidStr, headerMsg, {
-            parse_mode: 'Markdown',
-            reply_markup: { inline_keyboard },
-          });
-
-          if (shouldForward && !isSelfAdmin) await this.forwardToAdmin(`👤 *${user.displayName ?? user.firstName ?? tidStr}*\n\n${headerMsg}`);
-
-          await prisma.notificationQueue.update({ where: { id: item.id }, data: { status: 'SENT', sentAt: new Date() } });
+          await this.deliver(
+            item.id,
+            () => this.sendChunked(tidStr, headerMsg, { reply_markup: { inline_keyboard } }),
+            async () => {
+              if (shouldForward && !isSelfAdmin) {
+                await this.forwardToAdmin(`👤 *${user.displayName ?? user.firstName ?? tidStr}*\n\n${headerMsg}`);
+              }
+            },
+          );
         }
       }
     }
@@ -655,10 +791,10 @@ export class ProactiveDeliverySystem {
       logger.info('Zazŭ Proactive Gateway listening on :3000');
     });
 
-    cron.schedule('*/5 * * * *', () => this.flushQueue());
+    cron.schedule('*/5 * * * *', () => this.flushSafely());
     logger.info('Zazŭ Proactive Cron is online');
 
-    this.flushQueue();
+    this.flushSafely();
   }
 }
 
