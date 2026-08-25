@@ -4,7 +4,6 @@ import { ConfigService } from '@nestjs/config';
 import { JournalService } from './journal.service';
 import { BlocksService } from '../blocks/blocks.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { ActivityService } from './activity.service';
 
 jest.mock('@prisma/client', () => ({
   PrismaClient: jest.fn().mockImplementation(() => ({})),
@@ -122,10 +121,6 @@ describe('JournalService — what each period reads', () => {
             updateInternal: jest.fn(),
           },
         },
-        {
-          provide: ActivityService,
-          useValue: { generateForDay: jest.fn().mockResolvedValue({ success: true, skipped: true }) },
-        },
       ],
     }).compile();
 
@@ -217,8 +212,16 @@ describe('JournalService — what each period reads', () => {
     });
   });
 
-  describe('recorded activity', () => {
-    it('gives the day its activity block as well as the entries', async () => {
+  /**
+   * A period is built from captured experiences and nothing else.
+   *
+   * Recorded activity, tasks and inbox captures used to be read in as
+   * supporting context, and the result opened by telling its author they had
+   * created two tasks named "sin título" — the system's own noise in the place
+   * where a person's life was meant to be. These tests hold that line.
+   */
+  describe('only what the person captured', () => {
+    it('never reads the activity the system recorded about itself', async () => {
       load({
         entries: [entry('2026-08-20T09:12:00.000Z', { raw: 'lo que dije' })],
         activity: [activityBlock('2026-08-20T23:59:59.999Z', 'Creé dos tareas y completé una.')],
@@ -227,37 +230,29 @@ describe('JournalService — what each period reads', () => {
       const { user } = await promptFor('daily', '2026-08-20', '2026-08-20');
 
       expect(user).toContain('lo que dije');
-      expect(user).toContain('Creé dos tareas y completé una.');
+      expect(user).not.toContain('Creé dos tareas y completé una.');
     });
 
-    it('labels the two sources so the model does not weigh them alike', async () => {
-      load({
-        entries: [entry('2026-08-20T09:12:00.000Z', { raw: 'lo que dije' })],
-        activity: [activityBlock('2026-08-20T23:59:59.999Z', 'Creé dos tareas.')],
-      });
-
-      const { system, user } = await promptFor('daily', '2026-08-20', '2026-08-20');
-
-      expect(user).toContain('lo que la persona escribió o dictó');
-      expect(user).toContain('lo que el sistema observó');
-      expect(system).toContain('ACTIVIDAD REGISTRADA');
-    });
-
-    it('says nothing about activity in the prompt when the day had none', async () => {
+    it('does not query for activity, tasks or captures at all', async () => {
       load({ entries: [entry('2026-08-20T09:12:00.000Z', { raw: 'lo que dije' })] });
 
-      const { system } = await promptFor('daily', '2026-08-20', '2026-08-20');
+      await service.generateSummary('daily', '2026-08-20', '2026-08-20', 'ws-1');
 
-      expect(system).not.toContain('ACTIVIDAD REGISTRADA');
+      const typesQueried = findMany.mock.calls.map((c) => c[0].where.type);
+      expect(typesQueried).not.toContain('journal_activity');
+      // `{ in: [...] }` was the action/content_idea query.
+      expect(typesQueried.some((t) => t && typeof t === 'object' && 'in' in t)).toBe(false);
     });
 
-    it('carries a day on activity alone, which is the point on days with no entry', async () => {
+    it('writes nothing for a day whose only trace is system activity', async () => {
       load({ activity: [activityBlock('2026-08-20T23:59:59.999Z', 'Completé tres tareas.')] });
 
       const result = await service.generateSummary('daily', '2026-08-20', '2026-08-20', 'ws-1');
 
-      expect(result).not.toMatchObject({ skipped: true });
-      expect(blocksService.createInternal).toHaveBeenCalled();
+      // Silence is the honest answer. A day nobody wrote about is not a day to
+      // narrate from event rows.
+      expect(result).toMatchObject({ skipped: true });
+      expect(blocksService.createInternal).not.toHaveBeenCalled();
     });
 
     it('does not feed activity into the levels that read summaries', async () => {
@@ -269,6 +264,43 @@ describe('JournalService — what each period reads', () => {
       const { user } = await promptFor('monthly', '2026-07-01', '2026-07-31');
 
       expect(user).not.toContain('Actividad de julio.');
+    });
+  });
+
+  describe('an interpretation, not a summary', () => {
+    it('tells the model to homogenise rather than condense', async () => {
+      load({ entries: [entry('2026-08-20T09:12:00.000Z', { raw: 'x' })] });
+
+      const { system } = await promptFor('daily', '2026-08-20', '2026-08-20');
+
+      expect(system).toContain('NO es un resumen');
+      expect(system).toContain('UNA sola experiencia continua');
+    });
+
+    it('asks for the person\'s own words, which is what makes it recognisable', async () => {
+      load({ entries: [entry('2026-08-20T09:12:00.000Z', { raw: 'x' })] });
+
+      const { system } = await promptFor('daily', '2026-08-20', '2026-08-20');
+
+      expect(system).toContain('primera persona');
+      expect(system).toContain('con las palabras de la persona');
+    });
+
+    it('forbids the model from commenting on what was lived', async () => {
+      load({ entries: [entry('2026-08-20T09:12:00.000Z', { raw: 'x' })] });
+
+      const { system } = await promptFor('daily', '2026-08-20', '2026-08-20');
+
+      expect(system).toContain('No opines');
+      expect(system).toContain('no eres un observador');
+    });
+
+    it('weights each experience by what it meant rather than evenly', async () => {
+      load({ entries: [entry('2026-08-20T09:12:00.000Z', { raw: 'x' })] });
+
+      const { system } = await promptFor('daily', '2026-08-20', '2026-08-20');
+
+      expect(system).toContain('el espacio que merece');
     });
   });
 
