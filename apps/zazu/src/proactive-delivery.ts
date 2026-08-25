@@ -5,6 +5,7 @@ import { ZazuContext } from '@zazu/skills-core';
 import prisma, { Role } from '@zazu/db';
 import { logger } from './lib/logger';
 import { requireServiceAuth, buildServiceHeaders } from './lib/service-auth';
+import { requireClientAuth } from './lib/client-auth';
 
 const ADMIN_TELEGRAM_ID = process.env['ADMIN_TELEGRAM_ID'];
 
@@ -131,112 +132,55 @@ export class ProactiveDeliverySystem {
       }
     });
 
-    // ── nispiras: app feedback (nispiras Android → admin Telegram) ─────────────
+    // ── External clients: generic notify (any registered client → admin Telegram) ──
     //
-    // Called by the nispiras Android app when a user submits a suggestion or
-    // feedback. Auth uses a static shared secret in `x-nispiras-secret`.
+    // Single endpoint for any external, non-Docker-network system (nispiras
+    // Android app, nau-web contact form, samuelaure-web, future callers) to
+    // deliver a message to the admin's Telegram. Auth is per-client via
+    // `x-client-id` + `x-client-secret`, checked against the CLIENT_KEYS
+    // registry (see lib/client-auth.ts) — adding a new caller is a config
+    // change (one new entry in CLIENT_KEYS), not a new route.
     //
     // Payload shape:
-    //   { message: string, appVersion?: string, device?: string }
+    //   { message: string, meta?: Record<string, string> }
+    // `meta` is arbitrary short key/value context (e.g. { name, email } for a
+    // contact form, or { appVersion, device } for app feedback) and is
+    // rendered as a trailing line, source-labeled by clientId.
 
-    this.app.post('/api/public/nispiras/feedback', async (req, res) => {
-      const incomingSecret = req.headers['x-nispiras-secret'];
-      const expectedSecret = process.env['NISPIRAS_WEBHOOK_SECRET'];
-
-      if (!expectedSecret) {
-        logger.error('[NispirasFeedback] NISPIRAS_WEBHOOK_SECRET is not configured');
-        return res.status(503).json({ error: 'Feedback endpoint not configured' });
-      }
-      if (!incomingSecret || incomingSecret !== expectedSecret) {
-        logger.warn({ incomingSecret: '***' }, '[NispirasFeedback] Invalid or missing x-nispiras-secret');
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
+    this.app.post('/api/public/notify', requireClientAuth, async (req, res) => {
       if (!ADMIN_TELEGRAM_ID) {
-        logger.error('[NispirasFeedback] ADMIN_TELEGRAM_ID is not configured');
+        logger.error('[ClientNotify] ADMIN_TELEGRAM_ID is not configured');
         return res.status(503).json({ error: 'Admin not configured' });
       }
 
-      const { message, appVersion, device } = req.body as {
+      const { message, meta } = req.body as {
         message?: string;
-        appVersion?: string;
-        device?: string;
+        meta?: Record<string, string>;
       };
 
       if (!message || message.trim().length === 0) {
         return res.status(400).json({ error: 'Missing message' });
       }
 
-      logger.info({ appVersion, device }, '[NispirasFeedback] Received feedback');
+      logger.info({ clientId: req.clientId, meta }, '[ClientNotify] Received external notification');
 
-      const metaLine = [
-        appVersion ? `v${appVersion}` : null,
-        device ?? null,
-      ].filter(Boolean).join(' · ');
+      const metaLines = meta
+        ? Object.entries(meta)
+            .filter(([, v]) => v)
+            .map(([k, v]) => `*${k}:* ${v}`)
+            .join('\n')
+        : '';
 
       const telegramMessage =
-        `💬 *nispiras feedback*\n\n` +
-        `${message.trim()}\n\n` +
-        (metaLine ? `_${metaLine}_` : '');
+        `📩 *${req.clientId}*\n\n` +
+        (metaLines ? `${metaLines}\n\n` : '') +
+        message.trim();
 
       try {
         await this.bot.telegram.sendMessage(ADMIN_TELEGRAM_ID, telegramMessage, { parse_mode: 'Markdown' });
         return res.status(200).json({ ok: true });
       } catch (err: any) {
-        logger.error({ err }, '[NispirasFeedback] Failed to send Telegram message');
-        return res.status(500).json({ error: err.message });
-      }
-    });
-
-    // ── nau-web: contact form (9nau.com → admin Telegram) ────────────────────
-    //
-    // Called by the nau-web Express server when a visitor submits the contact
-    // form on 9nau.com. Auth uses a static shared secret in `x-nau-web-secret`.
-    //
-    // Payload shape:
-    //   { name: string, email: string, service?: string, message: string }
-
-    this.app.post('/api/public/nau-web/contact', async (req, res) => {
-      const incomingSecret = req.headers['x-nau-web-secret'];
-      const expectedSecret = process.env['NAU_WEB_WEBHOOK_SECRET'];
-
-      if (!expectedSecret) {
-        logger.error('[NauWebContact] NAU_WEB_WEBHOOK_SECRET is not configured');
-        return res.status(503).json({ error: 'Contact endpoint not configured' });
-      }
-      if (!incomingSecret || incomingSecret !== expectedSecret) {
-        logger.warn({ incomingSecret: '***' }, '[NauWebContact] Invalid or missing x-nau-web-secret');
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-      if (!ADMIN_TELEGRAM_ID) {
-        logger.error('[NauWebContact] ADMIN_TELEGRAM_ID is not configured');
-        return res.status(503).json({ error: 'Admin not configured' });
-      }
-
-      const { name, email, service, message } = req.body as {
-        name?: string;
-        email?: string;
-        service?: string;
-        message?: string;
-      };
-
-      if (!name || !email || !message) {
-        return res.status(400).json({ error: 'Missing required fields' });
-      }
-
-      logger.info({ name, email, service }, '[NauWebContact] Received contact form submission');
-
-      const telegramMessage =
-        `📩 *Nuevo contacto — 9nau.com*\n\n` +
-        `👤 *Nombre:* ${name.trim()}\n` +
-        `📧 *Email:* ${email.trim()}\n` +
-        (service ? `🛠 *Servicio:* ${service}\n` : '') +
-        `\n💬 *Mensaje:*\n${message.trim()}`;
-
-      try {
-        await this.bot.telegram.sendMessage(ADMIN_TELEGRAM_ID, telegramMessage, { parse_mode: 'Markdown' });
-        return res.status(200).json({ ok: true });
-      } catch (err: any) {
-        logger.error({ err }, '[NauWebContact] Failed to send Telegram message');
+        logger.error({ err, clientId: req.clientId }, '[ClientNotify] Failed to send Telegram message');
         return res.status(500).json({ error: err.message });
       }
     });
