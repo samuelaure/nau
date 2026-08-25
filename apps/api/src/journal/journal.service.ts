@@ -7,7 +7,6 @@ import { signServiceToken } from '@nau/auth';
 import { z } from 'zod';
 import { BlocksService } from '../blocks/blocks.service';
 import axios from 'axios';
-import { ActivityService } from './activity.service';
 import {
   dayjs,
   dayIn,
@@ -18,9 +17,22 @@ import {
   type PeriodType,
 } from '../common/time';
 
+/**
+ * What a period's derived entry holds.
+ *
+ * `synthesis` is the piece that matters and the reason this is not called a
+ * summary. The captures of one day arrive scattered — a note at 14:25, another
+ * at 20:55, each written without knowledge of the others — and what is missing
+ * is not brevity but continuity. This field is the day told as one continuous
+ * experience, at the length the day deserves rather than compressed.
+ *
+ * `summary` stays as the short orienting line a list needs to show something
+ * next to a date. It is deliberately secondary: nothing reads it to understand
+ * the day, only to label it.
+ */
 const JournalSummarySchema = z.object({
-  synthesis: z.string().describe('What the period meant: recurring themes, how the mood moved, what it was really about. Interpretation of the record, never beyond it.'),
-  summary: z.string().describe('What happened: events, decisions, work, people, places. First person, plain, factual.'),
+  synthesis: z.string().describe('The period lived as one continuous experience, in the order it happened, weighted by what mattered to the person. Not compressed — this is the piece someone reads to recognise their own day.'),
+  summary: z.string().describe('One or two lines, enough to tell this period apart from another in a list. An orienting label, not a retelling.'),
   highlights: z.array(z.string()).describe('The few things worth remembering, one short line each. Empty if the record does not support any.'),
 });
 
@@ -67,7 +79,6 @@ export class JournalService {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly blocksService: BlocksService,
-    private readonly activity: ActivityService,
   ) {}
 
   /**
@@ -221,43 +232,13 @@ export class JournalService {
       orderBy: { createdAt: 'asc' },
     });
 
-    // What the system observed the author doing, as written by ActivityService.
-    //
-    // Fetched separately from the entries and never merged with them: an entry
-    // is what the author chose to say, an activity block is what the system saw
-    // them do. The prompt is told which is which, because otherwise "created
-    // four tasks" gets weighed like a reflection about someone's daughter.
-    const activityBlocks = source === 'entries'
-      ? await this.prisma.block.findMany({
-          where: {
-            workspaceId,
-            type: 'journal_activity',
-            deletedAt: null,
-            AND: [
-              { properties: { path: ['date'], gte: startIso } },
-              { properties: { path: ['date'], lte: endIso } },
-            ],
-          },
-          orderBy: { createdAt: 'asc' },
-        })
-      : [];
-
-    // Actions and ideas are context, not the record itself, and are not
-    // guaranteed to carry a date property, so they stay on createdAt.
-    const sideBlocks = await this.prisma.block.findMany({
-      where: {
-        workspaceId,
-        type: { in: ['action', 'content_idea'] },
-        deletedAt: null,
-        createdAt: { gte: startDate, lte: endDate },
-      },
-    });
-
-    const actionBlocks = sideBlocks.filter(b => b.type === 'action');
-    const contentIdeas = sideBlocks.filter(b => b.type === 'content_idea');
-    const completedBlocks = actionBlocks.filter(
-      b => ((b.properties as any)?.status === 'done' || (b.properties as any)?.status === 'completed')
-    );
+    // Nothing else is read. Recorded activity, tasks and inbox captures used to
+    // be pulled in here as supporting context, and the result was a diary that
+    // opened by telling its author they had created two tasks named "sin
+    // título" — the system's own noise, in the place where a person's life was
+    // supposed to be. What someone lived is what they said they lived. If a day
+    // holds no entries, it produces no interpretation, which is the honest
+    // answer rather than a paragraph assembled from event rows.
 
     // The summaries this period is built from, if it is built from summaries.
     // Selected by the period they cover and by their own type, so a month reads
@@ -282,10 +263,7 @@ export class JournalService {
     // of nothing, which is what produced 128 summaries against 76 entries while
     // the journal sat idle.
     const hasInput = source === 'entries'
-      ? journalEntries.length > 0 ||
-        activityBlocks.length > 0 ||
-        actionBlocks.length > 0 ||
-        contentIdeas.length > 0
+      ? journalEntries.length > 0
       : sourceSummaries.length > 0;
 
     if (!hasInput) {
@@ -297,23 +275,13 @@ export class JournalService {
     let contextText = '';
 
     if (source === 'entries') {
-      if (journalEntries.length > 0) {
-        contextText += '## ENTRADAS DEL DIARIO — lo que la persona escribió o dictó\n';
-        journalEntries.forEach(entry => {
-          const text = this.entryText(entry);
-          if (!text) return;
-          const at = (entry.properties as any)?.date ?? entry.createdAt;
-          contextText += `\n### ${dayjs(at).tz(tz).format('YYYY-MM-DD HH:mm')}\n${text}\n`;
-        });
-      }
-
-      if (activityBlocks.length > 0) {
-        contextText += '\n## ACTIVIDAD REGISTRADA — lo que el sistema observó, no lo que la persona dijo\n';
-        activityBlocks.forEach(block => {
-          const at = (block.properties as any)?.date ?? block.createdAt;
-          contextText += `\n### ${dayjs(at).tz(tz).format('YYYY-MM-DD')}\n${this.entryText(block)}\n`;
-        });
-      }
+      contextText += '## EXPERIENCIAS CAPTURADAS\n';
+      journalEntries.forEach(entry => {
+        const text = this.entryText(entry);
+        if (!text) return;
+        const at = (entry.properties as any)?.date ?? entry.createdAt;
+        contextText += `\n### ${dayjs(at).tz(tz).format('YYYY-MM-DD HH:mm')}\n${text}\n`;
+      });
     } else {
       contextText += `## RESÚMENES ${source.toUpperCase()} DEL PERIODO\n`;
       sourceSummaries.forEach(sum => {
@@ -323,15 +291,6 @@ export class JournalService {
         contextText += `\n### ${from} → ${to}\n`;
         if (props.summary) contextText += `Qué pasó: ${props.summary}\n`;
         if (props.synthesis) contextText += `Qué significó: ${props.synthesis}\n`;
-      });
-    }
-
-    if (actionBlocks.length > 0) {
-      contextText += '\n## TAREAS DEL PERIODO\n';
-      actionBlocks.forEach(action => {
-        const text = (action.properties as any)?.text || (action.properties as any)?.name || 'Sin título';
-        const st = (action.properties as any)?.status;
-        contextText += `- [${st || 'pendiente'}] ${text}\n`;
       });
     }
 
@@ -358,28 +317,31 @@ export class JournalService {
           messages: [
             {
               role: 'system',
-              content: `Estás escribiendo el resumen ${PERIOD_LABEL[periodType].toLowerCase()} del diario personal de alguien, que cubre ${bounds.label}.
+              content: `Estás escribiendo la entrada ${PERIOD_LABEL[periodType].toLowerCase()} del diario de alguien: ${bounds.label}.
 
-Recibes ${source === 'entries' ? 'las entradas que esa persona escribió o dictó durante el periodo, tal cual las dejó' : `los resúmenes ${source} que ya cubren este periodo`}. Eso es todo el registro que existe. No hay más.
-${activityBlocks.length > 0 ? `
-Parte de lo que recibes viene marcado como ACTIVIDAD REGISTRADA. Eso no lo dijo la persona: es lo que el sistema observó que hizo — tareas creadas o completadas, ideas capturadas, cosas agendadas. Trátalo como contexto de apoyo, no como voz propia. Lo que la persona dijo pesa más que lo que hizo: si las dos fuentes hablan de lo mismo, manda la entrada; si la actividad menciona algo que la persona no comentó, puedes recogerlo como hecho, nunca atribuirle intención ni sentimiento.
-` : ''}
+Recibes ${source === 'entries' ? 'las experiencias que esa persona capturó a lo largo del periodo, en el orden en que las vivió' : `las entradas ${source} que ya cubren este periodo`}. Eso es todo el registro que existe. No hay más, y no hace falta más.
+
+Esto NO es un resumen. No estás condensando ni recortando. Las capturas llegaron sueltas — una a media tarde, otra de noche, cada una escrita sin saber de las demás — y tu trabajo es devolverlas como UNA sola experiencia continua. Homogeneizar, no comprimir: lo que estaba disperso queda unido, lo que se repite a lo largo del día se reconoce como una misma cosa, y lo que la persona vivió con más peso ocupa más espacio.
 
 Devuelve tres cosas:
 
-1. "summary" — qué pasó. Hechos concretos: acontecimientos, decisiones, trabajo hecho, personas, lugares, cifras. En primera persona, en prosa llana, como un registro que esta persona va a releer dentro de años y necesita que sea exacto.
+1. "synthesis" — el periodo entero, contado como una sola experiencia continua.
 
-2. "synthesis" — qué significó. Los temas que se repiten, cómo se movió el ánimo, de qué iba realmente el periodo. Interpretación de lo que está en el registro, nunca más allá de él.
+   Sigue el orden en que ocurrió. Deja que cada experiencia ocupe el espacio que merece según lo que pesó para la persona: algo que atravesó el día entero se cuenta con detalle; algo mencionado de paso se menciona de paso. No inventes transiciones suaves entre cosas que no tienen relación — si el día saltó de un tema a otro sin conexión, el salto es parte de cómo fue el día.
 
-3. "highlights" — lo poco que merece recordarse, una línea corta cada uno. Devuelve una lista vacía si el registro no da para ninguno.
+   Escribe en primera persona, con las palabras de la persona siempre que sea posible. Si dijo "me siento dormido, dejado", eso se queda; no lo conviertas en "experimenté una sensación de letargo". Conserva los nombres propios, las cifras, los lugares, las frases que sólo usaría esta persona. Esa es la diferencia entre releerse y leer a un desconocido.
 
-REGLA ABSOLUTA — nada de lo que escribas puede no estar en la entrada. No infieras acontecimientos, emociones ni detalles que no aparezcan. Si el registro es escaso, escribe poco. Una entrada breve y fiel es correcta; una entrada rica e inventada es un recuerdo falso, y esto es el registro que esta persona tiene de su propia vida.
+   Es la pieza principal. Debe poder leerse sola y que la persona se reconozca en ella.
 
-No añadas consejos, ánimos, moralejas ni conclusiones a las que la persona no haya llegado ella misma. No adornes. No uses lenguaje grandilocuente.
+2. "summary" — una o dos líneas para distinguir este periodo de otro en una lista. Una etiqueta para orientarse, no un recuento.
 
-Escribe en el mismo idioma en que está escrito el registro.
+3. "highlights" — lo poco que merece recordarse, una línea corta cada uno. Lista vacía si el registro no da para ninguno.
 
-EXTENSIÓN: ${periodType === 'daily' ? 'breve, uno o dos párrafos' : periodType === 'yearly' ? 'amplia, cuatro o cinco párrafos' : 'media, dos o tres párrafos'}.`
+REGLA ABSOLUTA — nada de lo que escribas puede no estar en el registro. No infieras acontecimientos, emociones ni detalles que no aparezcan. Si el registro es escaso, escribe poco. Una entrada breve y fiel es correcta; una entrada rica e inventada es un recuerdo falso, y esto es el registro que esta persona tiene de su propia vida.
+
+No opines sobre lo que la persona vivió. No añadas consejos, ánimos, moralejas ni conclusiones a las que no haya llegado ella misma. No juzgues sus decisiones ni celebres sus logros — no eres un observador, eres su propia voz ordenando el día. No adornes y no uses lenguaje grandilocuente.
+
+Escribe en el mismo idioma del registro.`
             },
             {
               role: 'user',
@@ -399,21 +361,15 @@ EXTENSIÓN: ${periodType === 'daily' ? 'breve, uno o dos párrafos' : periodType
     // 5. Format the delivery message before saving, so it can be stored
     // verbatim on the block rather than reconstructed later for a delayed or
     // retried delivery.
-    let finalDeliveryText = `✨ *SÍNTESIS*\n${aiResult.synthesis}\n\n`;
-    finalDeliveryText += `📝 *RESUMEN*\n${aiResult.summary}\n\n`;
-
-    const statsLine = `📊 Stats: ✅ ${completedBlocks.length}/${actionBlocks.length} | 💡 ${contentIdeas.length} | 📓 ${journalEntries.length}\n`;
-    finalDeliveryText += statsLine;
-
-    // Daily specific: chronological list, showing the entries themselves rather
-    // than anything derived from them — the same text the summary was built on.
-    if (periodType === 'daily' && journalEntries.length > 0) {
-      finalDeliveryText += `\n📅 *ENTRADAS CRONOLÓGICAS:*\n`;
-      journalEntries.forEach(e => {
-        const at = (e.properties as any)?.date ?? e.createdAt;
-        finalDeliveryText += `• _${dayjs(at).tz(tz).format('HH:mm')}_: ${this.entryText(e)}\n`;
-      });
-    }
+    // The interpretation, and nothing else. It is written to be read on its
+    // own, so a stats line about tasks and ideas would sit oddly under it —
+    // those modules no longer feed this and should not decorate it either.
+    //
+    // The entries are also no longer appended verbatim. That is what they were
+    // read from, and repeating them under their own interpretation both undoes
+    // the point of homogenising them and made one delivery 15,669 characters
+    // long — four times what Telegram accepts.
+    const finalDeliveryText = aiResult.synthesis;
 
     // 6. Save as Block
     const newSummaryBlock = await this.blocksService.createInternal({
@@ -426,15 +382,11 @@ EXTENSIÓN: ${periodType === 'daily' ? 'breve, uno o dos párrafos' : periodType
         synthesis: aiResult.synthesis,
         summary: aiResult.summary,
         highlights: aiResult.highlights,
-        actionCount: actionBlocks.length,
-        completedCount: completedBlocks.length,
-        contentIdeasCount: contentIdeas.length,
-        // What this summary was actually built from, recorded on the summary
+        // What this entry was actually built from, recorded on the entry
         // itself. Without it there is no way to tell later whether a given
-        // summary predates this hierarchy.
+        // entry predates this hierarchy.
         sourceType: source,
         sourceCount: source === 'entries' ? journalEntries.length : sourceSummaries.length,
-        activityCount: activityBlocks.length,
         timezone: tz,
         // False only for a scheduled run holding delivery for the 06:00 tick.
         // Everything else — a person asking for a summary directly, or a
@@ -642,13 +594,15 @@ EXTENSIÓN: ${periodType === 'daily' ? 'breve, uno o dos párrafos' : periodType
       const closedDay = local.subtract(1, 'day').toDate();
 
       try {
-        // 00:00 local: the day that just ended is now closed and safe to
-        // summarise in full. Order matters and is the whole point of doing
-        // these together: the activity block is written first so the daily
-        // can read it, and the weekly runs after the daily rather than racing it.
+        // 00:00 local: the day that just ended is now closed and safe to read
+        // in full. The weekly runs after the daily rather than racing it.
+        //
+        // No activity block is written any more. It narrated what the system
+        // observed — tasks created, things scheduled — and nothing reads it
+        // now that a period is built from captured experiences alone, so
+        // generating one was an LLM call per workspace per night for an
+        // artefact with no reader.
         if (local.hour() === 0) {
-          await this.activity.generateForDay(ws.id, tz, closedDay);
-
           if (prefs.autoDaily) {
             await this.runPeriod('daily', ws.id, tz, closedDay, false);
           }
