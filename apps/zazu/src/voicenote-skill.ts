@@ -211,6 +211,13 @@ Return only valid JSON: { "cleanTranscription": "...", "summary": "..." }`,
 
   /**
    * Dispatches clean transcription to one or more brands in nauthenticity.
+   *
+   * // TODO: This is the correct shape for a module attached to Zazŭ's capture
+   * // channel: receives the already-cleaned text, owns everything after that
+   * // point. nauthenticity does its own thing with it from here — no shared
+   * // triage call. Journal and future modules attaching to this channel
+   * // should follow the same contract: clean text in, one pipeline, no
+   * // request shared with another module's classification.
    */
   async dispatchToBrands(
     voicenoteId: string,
