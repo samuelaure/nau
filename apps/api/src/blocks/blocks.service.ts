@@ -184,8 +184,30 @@ export class BlocksService {
     // Range filtering happens here rather than in the browser. The journal view
     // used to fetch every block in the workspace — including 968 Instagram
     // captures — to render a single day.
-    if (from) propertyFilters.push({ properties: { path: ['date'], gte: from } });
-    if (to) propertyFilters.push({ properties: { path: ['date'], lte: to } });
+    //
+    // A `journal_summary` has no `date` at all — it covers a span, stored as
+    // `periodStart`/`periodEnd`, not an instant. Filtering only on `date` is an
+    // AND against a key that key never exists on that type, so it matched zero
+    // rows: every summary ever generated was invisible to any range-scoped
+    // query, including the one the journal view itself uses. A block is in
+    // range if either its `date` falls inside the window, or its period
+    // overlaps the window — the two block shapes this table actually holds.
+    if (from || to) {
+      const dateInRange: Prisma.BlockWhereInput = {
+        properties: {
+          path: ['date'],
+          ...(from ? { gte: from } : {}),
+          ...(to ? { lte: to } : {}),
+        },
+      };
+      const periodOverlaps: Prisma.BlockWhereInput = {
+        AND: [
+          from ? { properties: { path: ['periodEnd'], gte: from } } : {},
+          to ? { properties: { path: ['periodStart'], lte: to } } : {},
+        ],
+      };
+      propertyFilters.push({ OR: [dateInRange, periodOverlaps] });
+    }
 
     where.AND = propertyFilters;
 
@@ -247,9 +269,15 @@ export class BlocksService {
   private sortByDateThenOrder<T extends { properties: Prisma.JsonValue }>(
     blocks: T[],
   ): T[] {
+    // A journal_summary has no `date` — it covers a span. `periodStart` is its
+    // equivalent for ordering: the instant a summary is "about", same as
+    // `date` is the instant an entry is about.
+    const sortKey = (props: Prisma.JsonObject | undefined) =>
+      (props?.date as string) || (props?.periodStart as string);
+
     return blocks.sort((a, b) => {
-      const dateA = (a.properties as Prisma.JsonObject)?.date as string;
-      const dateB = (b.properties as Prisma.JsonObject)?.date as string;
+      const dateA = sortKey(a.properties as Prisma.JsonObject);
+      const dateB = sortKey(b.properties as Prisma.JsonObject);
       const sortOrderA =
         ((a.properties as Prisma.JsonObject)?.sortOrder as number) || 0;
       const sortOrderB =

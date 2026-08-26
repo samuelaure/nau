@@ -251,9 +251,53 @@ describe('BlocksService', () => {
       expect(arg.where.type).toEqual({ in: ['journal_entry', 'journal_summary'] });
       expect(arg.where.AND).toEqual([
         { properties: { path: ['status'], not: 'trash' } },
-        { properties: { path: ['date'], gte: '2026-08-01' } },
-        { properties: { path: ['date'], lte: '2026-08-31' } },
+        {
+          OR: [
+            { properties: { path: ['date'], gte: '2026-08-01', lte: '2026-08-31' } },
+            {
+              AND: [
+                { properties: { path: ['periodEnd'], gte: '2026-08-01' } },
+                { properties: { path: ['periodStart'], lte: '2026-08-31' } },
+              ],
+            },
+          ],
+        },
       ]);
+    });
+
+    /**
+     * The exact regression: a journal_summary carries no `date` at all — it
+     * covers a span, stored as periodStart/periodEnd. Filtering only on `date`
+     * is an AND against a key that never exists on that type, so it matches
+     * zero rows. Every summary ever generated was invisible to any
+     * range-scoped query — including the journal view's own request — while
+     * appearing correctly in an unscoped query. Confirmed against production:
+     * 0 of 33 summaries in the database carry a `date` property.
+     */
+    it('includes a journal_summary whose period overlaps the requested range, even with no `date` property', async () => {
+      const summaryBlock = {
+        ...mockBlock,
+        type: 'journal_summary',
+        properties: {
+          periodType: 'daily',
+          periodStart: '2026-08-24T22:00:00.000Z',
+          periodEnd: '2026-08-25T21:59:59.999Z',
+          synthesis: 'lo que pasó el 25',
+          // Deliberately no `date` key — this is the real shape in production.
+        },
+      };
+      prisma.block.findMany.mockResolvedValueOnce([summaryBlock]);
+
+      const result = await service.findAll(user.sub, {
+        types: 'journal_summary',
+        from: '2026-08-25T00:00:00.000Z',
+        to: '2026-08-25T23:59:59.999Z',
+      });
+
+      // The where-clause construction is asserted above; this asserts the
+      // actual failure mode — a summary the person just received not showing
+      // up in the exact view built to display it.
+      expect(result).toEqual([summaryBlock]);
     });
 
     it('should reject an explicit workspace the caller does not belong to', async () => {
