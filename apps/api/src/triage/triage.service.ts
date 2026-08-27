@@ -13,9 +13,8 @@ import { PrismaService } from '../prisma/prisma.service';
 // one category's behaviour risks the others. Journal and content-idea are
 // already correctly separated (their own pipelines, see
 // VoicenoteSkill.dispatchToJournal / dispatchToBrands). This module — the
-// GTD/Actions side — is the one still owed that separation. See
-// docs/future/actions-gtd-smart-capture.md for the planned redesign
-// (rename to GTD, add Journal/Capture categories, add a confirmation step).
+// GTD/Actions side — is the one still owed that separation. Tracked as
+// https://github.com/samuelaure/nau/issues/5 (design: docs/future/actions-gtd-smart-capture.md).
 // Deliberately not touched now — Actions is out of scope while journal work
 // is in progress.
 const TriageResultSchema = z.object({

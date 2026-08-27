@@ -1,7 +1,8 @@
 # Actions → GTD: smart capture with a confirmation step
 
-> **Status: not started.** Notes only, captured 2026-08-25 while auditing the triage pipeline for
-> the journal work. No code touched — this is out of scope until Actions is actively worked on.
+> **Migrated to [nau#5](https://github.com/samuelaure/nau/issues/5) on 2026-08-26.** This document
+> is kept as the full design writeup — the issue summarizes it and is where status/priority live
+> going forward. Update the issue, not this file, when the state changes.
 
 ## Rename
 
