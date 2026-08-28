@@ -385,7 +385,6 @@ async function handleFinalDispatch(ctx: ZazuContext) {
   const intents: string[] = ctx.session?.selectedVoicenoteIntents ?? [];
   const voicenoteId: string = ctx.session?.pendingVoicenoteId ?? '';
   const cleanTranscription: string = ctx.session?.pendingVoicenoteClean ?? '';
-  const rawTranscription: string | undefined = ctx.session?.pendingVoicenoteRaw;
   const summaryText: string = ctx.session?.pendingVoicenoteSummary ?? '';
   const nauUserId: string = ctx.dbUser?.nauUserId ?? '';
   const voicenoteCreatedAt: string | undefined = ctx.session?.pendingVoicenoteCapturedAt;
@@ -423,10 +422,6 @@ async function handleFinalDispatch(ctx: ZazuContext) {
           journalWorkspaceId,
           nauUserId,
           voicenoteCreatedAt,
-          // Only meaningful when the whole note went to the journal. Once
-          // splitIntent has carved the journal part out of it, the full
-          // transcription is no longer the raw form of this entry.
-          intents.length > 1 ? undefined : rawTranscription,
         )
       : Promise.resolve(),
     intents.includes('content') && brands.length > 0

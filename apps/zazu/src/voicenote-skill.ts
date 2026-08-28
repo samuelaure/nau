@@ -8,6 +8,7 @@ import { getPrivateStorage } from './lib/storage'
 import { getClientForFeature, getFeatureFallbackChain } from '@nau/llm-client'
 import { withRetry } from './lib/retry'
 import { extractYouTubeUrl, hasYouTubeDigestAccess } from './youtube-skill'
+import type { TriageRequestDto } from '@nau/types'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
@@ -328,6 +329,13 @@ Return only valid JSON: { "cleanTranscription": "...", "summary": "..." }`,
 
   /**
    * Dispatches clean transcription to nau-api as a journal entry.
+   *
+   * No longer sends `rawText`: as of api's `81b3737c` a journal entry holds
+   * one text field, and the untouched transcription already lives where it
+   * belongs — Zazŭ's own `Voicenote.rawTranscription` row, reachable from the
+   * entry through `sourceBlockId`. The API tolerated the field for a while
+   * so the two services didn't have to deploy in lockstep, but it was never
+   * read — see nau#43.
    */
   async dispatchToJournal(
     voicenoteId: string,
@@ -335,29 +343,20 @@ Return only valid JSON: { "cleanTranscription": "...", "summary": "..." }`,
     workspaceId: string,
     nauUserId: string,
     capturedAt?: string,
-    rawTranscription?: string,
   ): Promise<void> {
     const headers = await buildServiceHeaders('9nau-api')
-    await axios.post(
-      `${NAU_API_URL}/triage`,
-      {
-        text: cleanTranscription,
-        // The transcription before any clean-up. It lives in Zazŭ's own
-        // Voicenote row, but the journal entry is in another service and
-        // another database, so without sending it there is no way back to the
-        // original from the entry itself.
-        rawText: rawTranscription,
-        userId: nauUserId,
-        sourceBlockId: voicenoteId,
-        workspaceId,
-        journalOnly: true,
-        // The moment the note was recorded. Without it the entry is dated when
-        // the API happened to process it, which puts it on the wrong day
-        // whenever ingestion lags.
-        capturedAt: capturedAt ?? new Date().toISOString(),
-      },
-      { headers, timeout: 60_000 },
-    )
+    const body: TriageRequestDto = {
+      text: cleanTranscription,
+      userId: nauUserId,
+      sourceBlockId: voicenoteId,
+      workspaceId,
+      journalOnly: true,
+      // The moment the note was recorded. Without it the entry is dated when
+      // the API happened to process it, which puts it on the wrong day
+      // whenever ingestion lags.
+      capturedAt: capturedAt ?? new Date().toISOString(),
+    }
+    await axios.post(`${NAU_API_URL}/triage`, body, { headers, timeout: 60_000 })
   }
 
   async dispatchToActions(
@@ -367,17 +366,14 @@ Return only valid JSON: { "cleanTranscription": "...", "summary": "..." }`,
     nauUserId: string,
   ): Promise<any> {
     const headers = await buildServiceHeaders('9nau-api')
-    const res = await axios.post(
-      `${NAU_API_URL}/triage`,
-      {
-        text: actionText,
-        userId: nauUserId,
-        sourceBlockId: voicenoteId,
-        workspaceId,
-        journalOnly: false,
-      },
-      { headers, timeout: 60_000 },
-    )
+    const body: TriageRequestDto = {
+      text: actionText,
+      userId: nauUserId,
+      sourceBlockId: voicenoteId,
+      workspaceId,
+      journalOnly: false,
+    }
+    const res = await axios.post(`${NAU_API_URL}/triage`, body, { headers, timeout: 60_000 })
     return res.data
   }
 
