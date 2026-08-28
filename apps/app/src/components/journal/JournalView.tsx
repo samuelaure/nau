@@ -2,25 +2,18 @@
 
 import React, { useState, useMemo } from 'react'
 import { useGetBlocks, useUpdateBlock } from '@/hooks/use-blocks-api'
-import { useCustomSummary } from '@/hooks/use-journal-api'
 import { Block } from '@9nau/types'
-import { ChevronLeft, ChevronRight, Sparkles, BookOpen, FileText, Activity, Wand2, Loader2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Sparkles, BookOpen, FileText } from 'lucide-react'
 import { Button } from '@9nau/ui/components/button'
 import { cn } from '@9nau/ui/lib/utils'
 import { JournalCapture } from './JournalCapture'
 import { EditableText } from './EditableText'
-import { EntryAudio } from './EntryAudio'
 import { useUiStore } from '@/lib/state/ui-store'
 
-type PeriodType = 'day' | 'week' | 'month' | 'year' | 'custom'
+type PeriodType = 'day' | 'week' | 'month' | 'year'
 
 /** Types the journal timeline renders. Everything else is another module's. */
-const JOURNAL_TYPES = ['journal_entry', 'journal_summary', 'journal_activity', 'note', 'action']
-
-function toInputDate(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
-}
+const JOURNAL_TYPES = ['journal_entry', 'journal_synthesis', 'note', 'action']
 
 function getDateRange(date: Date, period: PeriodType): { start: Date; end: Date } {
   const d = new Date(date)
@@ -89,26 +82,9 @@ export function JournalView() {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [period, setPeriod] = useState<PeriodType>('day')
 
-  // Only meaningful in the custom period. Seeded to the last week so the inputs
-  // are never empty.
-  const [customStart, setCustomStart] = useState(() => {
-    const d = new Date()
-    d.setDate(d.getDate() - 7)
-    return toInputDate(d)
-  })
-  const [customEnd, setCustomEnd] = useState(() => toInputDate(new Date()))
-
   const updateBlock = useUpdateBlock()
-  const customSummary = useCustomSummary()
 
-  const range = useMemo(() => {
-    if (period !== 'custom') return getDateRange(currentDate, period)
-    // Read as local calendar days, which is what the person typed.
-    return {
-      start: new Date(`${customStart}T00:00:00`),
-      end: new Date(`${customEnd}T23:59:59.999`),
-    }
-  }, [currentDate, period, customStart, customEnd])
+  const range = useMemo(() => getDateRange(currentDate, period), [currentDate, period])
 
   // Only the period being viewed, and only the types this view renders. It used
   // to request every block in the workspace — 968 Instagram captures included —
@@ -120,8 +96,8 @@ export function JournalView() {
     workspaceId: activeWorkspaceId ?? undefined,
   })
 
-  const { entries, summaries, activity } = useMemo(() => {
-    if (!allBlocks) return { entries: [], summaries: [], activity: [] }
+  const { entries, syntheses } = useMemo(() => {
+    if (!allBlocks) return { entries: [], syntheses: [] }
 
     const byDate = (a: Block, b: Block) => {
       const da = ((a.properties as any)?.date as string) || a.createdAt
@@ -133,9 +109,8 @@ export function JournalView() {
       entries: allBlocks
         .filter((b: Block) => b.type === 'journal_entry' || b.type === 'note' || b.type === 'action')
         .sort(byDate),
-      activity: allBlocks.filter((b: Block) => b.type === 'journal_activity').sort(byDate),
-      summaries: allBlocks
-        .filter((b: Block) => b.type === 'journal_summary')
+      syntheses: allBlocks
+        .filter((b: Block) => b.type === 'journal_synthesis')
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
     }
   }, [allBlocks])
@@ -157,7 +132,6 @@ export function JournalView() {
     { value: 'week', label: 'Semana' },
     { value: 'month', label: 'Mes' },
     { value: 'year', label: 'Año' },
-    { value: 'custom', label: 'Personalizado' },
   ]
 
   return (
@@ -193,151 +167,79 @@ export function JournalView() {
         </div>
       )}
 
-      {period === 'custom' ? (
-        <div className="mb-8 flex flex-wrap items-end gap-3 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          <label className="flex flex-col gap-1 text-xs text-gray-500 dark:text-gray-400">
-            Desde
-            <input
-              type="date"
-              value={customStart}
-              max={customEnd}
-              onChange={(e) => setCustomStart(e.target.value)}
-              className="rounded-md border border-gray-300 bg-transparent px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:text-gray-100"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-xs text-gray-500 dark:text-gray-400">
-            Hasta
-            <input
-              type="date"
-              value={customEnd}
-              min={customStart}
-              onChange={(e) => setCustomEnd(e.target.value)}
-              className="rounded-md border border-gray-300 bg-transparent px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:text-gray-100"
-            />
-          </label>
-          <button
-            onClick={() =>
-              customSummary.mutate({
-                startDate: customStart,
-                endDate: customEnd,
-                workspaceId: activeWorkspaceId ?? undefined,
-              })
-            }
-            disabled={customSummary.isPending || !activeWorkspaceId}
-            className="flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-1.5 text-sm text-white disabled:opacity-40"
-          >
-            {customSummary.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Wand2 className="h-4 w-4" />
-            )}
-            Resumir este periodo
-          </button>
-          {customSummary.isError && (
-            <span className="text-xs text-red-600">No se pudo generar el resumen.</span>
-          )}
-          {customSummary.data?.skipped && (
-            <span className="text-xs text-gray-500">No hay nada registrado en ese rango.</span>
-          )}
-        </div>
-      ) : (
-        <div className="flex items-center justify-between mb-8">
-          <Button variant="ghost" size="icon" onClick={() => setCurrentDate(navigate(currentDate, period, -1))}>
-            <ChevronLeft className="w-5 h-5" />
-          </Button>
-          <button
-            onClick={() => setCurrentDate(new Date())}
-            className="text-lg font-semibold text-gray-800 dark:text-gray-100 capitalize hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
-          >
-            {formatPeriodTitle(currentDate, period)}
-          </button>
-          <Button variant="ghost" size="icon" onClick={() => setCurrentDate(navigate(currentDate, period, 1))}>
-            <ChevronRight className="w-5 h-5" />
-          </Button>
-        </div>
-      )}
+      <div className="flex items-center justify-between mb-8">
+        <Button variant="ghost" size="icon" onClick={() => setCurrentDate(navigate(currentDate, period, -1))}>
+          <ChevronLeft className="w-5 h-5" />
+        </Button>
+        <button
+          onClick={() => setCurrentDate(new Date())}
+          className="text-lg font-semibold text-gray-800 dark:text-gray-100 capitalize hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+        >
+          {formatPeriodTitle(currentDate, period)}
+        </button>
+        <Button variant="ghost" size="icon" onClick={() => setCurrentDate(navigate(currentDate, period, 1))}>
+          <ChevronRight className="w-5 h-5" />
+        </Button>
+      </div>
 
       {isLoading && (
         <div className="text-center text-gray-500 dark:text-gray-400 mt-10">Cargando datos...</div>
       )}
 
-      {/* Summaries. Both halves are editable: a summary is a first draft written
-          by a model, and the person's correction of it is worth more. */}
-      {summaries.length > 0 && (
+      {/* The interpretation of a period: the account of it, then the reading of
+          that account. Two model calls produced them and they are stored apart,
+          but they are one piece of writing to read — which is why they sit in
+          one card, synthesis first, with no heading between them competing for
+          attention. Both are editable: what a model wrote is a first draft, and
+          the person's correction of it is worth more. */}
+      {syntheses.length > 0 && (
         <div className="mb-8 space-y-4">
-          {summaries.map((summary: Block) => {
-            const props = summary.properties as any
+          {syntheses.map((synthesis: Block) => {
+            const props = synthesis.properties as any
+            const from = props.from ? new Date(props.from as string) : null
+            const to = props.to ? new Date(props.to as string) : null
+            const fmt = (d: Date) =>
+              d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
+
             return (
               <div
-                key={summary.id}
+                key={synthesis.id}
                 className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-2xl p-6 border border-emerald-200/50 dark:border-emerald-800/50"
               >
                 <div className="flex items-center gap-2 mb-3">
                   <Sparkles className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                   <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
-                    {(props.periodType as string) || 'Resumen'}
+                    {from && to ? `${fmt(from)} — ${fmt(to)}` : 'Síntesis'}
                   </span>
                   {props.editedAt && (
                     <span className="text-[10px] text-emerald-600/60 dark:text-emerald-400/60">editado</span>
                   )}
                 </div>
-                <div className="mb-4">
-                  <h3 className="text-sm font-bold text-emerald-800 dark:text-emerald-200 mb-1">✨ Síntesis</h3>
-                  <EditableText
-                    value={(props.synthesis as string) || ''}
-                    label="la síntesis"
-                    onSave={(next) => saveProperty(summary, 'synthesis', next)}
-                    className="text-sm leading-relaxed text-gray-700 dark:text-gray-300"
-                  />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-teal-800 dark:text-teal-200 mb-1">📝 Resumen</h3>
-                  <EditableText
-                    value={(props.summary as string) || ''}
-                    label="el resumen"
-                    onSave={(next) => saveProperty(summary, 'summary', next)}
-                    className="text-sm leading-relaxed text-gray-600 dark:text-gray-400"
-                  />
-                </div>
-                {(props.highlights as string[])?.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {(props.highlights as string[]).map((h, i) => (
-                      <span key={i} className="px-2 py-1 bg-emerald-100 dark:bg-emerald-800/40 text-emerald-700 dark:text-emerald-300 rounded-full text-xs font-medium">
-                        {h}
-                      </span>
-                    ))}
+
+                {props.noData ? (
+                  <p className="text-sm italic text-gray-500 dark:text-gray-400">
+                    No hay nada registrado en este periodo.
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    <EditableText
+                      value={(props.synthesis as string) || ''}
+                      label="la síntesis"
+                      onSave={(next) => saveProperty(synthesis, 'synthesis', next)}
+                      className="text-sm leading-relaxed text-gray-700 dark:text-gray-300"
+                    />
+                    {(props.reflection as string) && (
+                      <div className="border-t border-emerald-200/60 pt-4 dark:border-emerald-800/40">
+                        <EditableText
+                          value={(props.reflection as string) || ''}
+                          label="la reflexión"
+                          onSave={(next) => saveProperty(synthesis, 'reflection', next)}
+                          className="text-sm leading-relaxed text-gray-600 dark:text-gray-400"
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {/* Recorded activity. Kept visually apart from the entries because it is
-          what the system observed, not what the person wrote — and confusing the
-          two is what a journal must never do. */}
-      {activity.length > 0 && (
-        <div className="mb-8 space-y-3">
-          {activity.map((block: Block) => {
-            const props = block.properties as any
-            return (
-              <div
-                key={block.id}
-                className="rounded-xl border border-dashed border-gray-300 bg-gray-50/60 p-4 dark:border-gray-600 dark:bg-gray-800/40"
-              >
-                <div className="mb-2 flex items-center gap-2">
-                  <Activity className="h-4 w-4 text-gray-400" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                    Actividad registrada
-                  </span>
-                  <span className="text-[10px] text-gray-300 dark:text-gray-600">
-                    {new Date((props.date as string) || block.createdAt).toLocaleDateString('es-ES')}
-                  </span>
-                </div>
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-600 dark:text-gray-400">
-                  {(props.summary as string) || ''}
-                </p>
               </div>
             )
           })}
@@ -354,10 +256,9 @@ export function JournalView() {
           </div>
           {entries.map((entry: Block) => {
             const props = entry.properties as any
-            // The readable version is shown. `raw` is the faithful one and is what
-            // the summaries are built from, but it carries every hesitation of
-            // speech and this is a page meant for reading.
-            const text = (props.summary || props.text || props.name || '') as string
+            // One field holds the entry now. `textOriginal` keeps what it said
+            // before any edit, but this page shows what it says.
+            const text = (props.text || '') as string
             const at = (props.date as string) || entry.createdAt
             const time = new Date(at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
             const source = (props.source as string) || entry.source || ''
@@ -380,7 +281,7 @@ export function JournalView() {
                     value={text}
                     label="la entrada"
                     placeholder="Sin contenido"
-                    onSave={(next) => saveProperty(entry, props.summary !== undefined ? 'summary' : 'text', next)}
+                    onSave={(next) => saveProperty(entry, 'text', next)}
                     className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed"
                   />
                   <div className="flex items-center gap-2 mt-1">
@@ -390,10 +291,12 @@ export function JournalView() {
                     {source && (
                       <span className="text-[10px] text-gray-300 dark:text-gray-600">• {source}</span>
                     )}
+                    {props.originFormat === 'voice' && (
+                      <span className="text-[10px] text-gray-300 dark:text-gray-600">• voz</span>
+                    )}
                     {props.editedAt && (
                       <span className="text-[10px] text-gray-300 dark:text-gray-600">• editado</span>
                     )}
-                    {props.audioKey && <EntryAudio audioKey={props.audioKey as string} />}
                   </div>
                 </div>
               </div>
