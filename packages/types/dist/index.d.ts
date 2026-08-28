@@ -316,6 +316,39 @@ export interface GenerateSynthesisDto {
     sourceKind: SynthesisSourceKind;
     sourceIds: string[];
 }
+/**
+ * What a capture service sends to `POST /triage`.
+ *
+ * The wire contract between Zazŭ (and any future capture client) and the API.
+ * It lives here rather than in either service because a body assembled as an
+ * object literal on one side and destructured on the other agrees only by
+ * coincidence: `rawText` was sent for weeks after the field stopped being read,
+ * and nothing said so.
+ *
+ * Being here does not make the request typed — an HTTP body is `unknown` until
+ * something validates it. What it does is make a drift visible at compile time
+ * to whichever side changes first.
+ */
+export interface TriageRequestDto {
+    /** The capture, already cleaned by whoever transcribed it. */
+    text: string;
+    /** naŭ user id, or a Telegram id the API will resolve to one. */
+    userId?: string;
+    /** The capture record this came from, in the caller's own database. */
+    sourceBlockId?: string;
+    brandId?: string | null;
+    workspaceId?: string;
+    /**
+     * Skip classification: the caller already knows this is a diary entry.
+     * The API files it through Journal without a model call.
+     */
+    journalOnly?: boolean;
+    /**
+     * When the capture was recorded, not when it was sent. Without it an entry
+     * lands on the day ingestion finished, which is wrong whenever that lags.
+     */
+    capturedAt?: string;
+}
 export interface PaginatedResponse<T> {
     data: T[];
     total: number;

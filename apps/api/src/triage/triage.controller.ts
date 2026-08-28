@@ -1,15 +1,22 @@
 import { Controller, Post, Get, Query, Body, UseGuards } from '@nestjs/common';
 import { TriageService } from './triage.service';
 import { ServiceAuthGuard } from '../common/guards/service-auth.guard';
+import type { TriageRequestDto } from '@nau/types';
 
-export class TriageDto {
+/**
+ * Implements the shared wire contract rather than restating it.
+ *
+ * The class exists because Nest needs one at runtime for `@Body()`; the shape
+ * comes from `@nau/types`, which is what Zazŭ builds its request against. If
+ * the two drift, this stops compiling.
+ */
+export class TriageDto implements TriageRequestDto {
   text!: string;
   userId?: string;
   sourceBlockId?: string;
   brandId?: string | null;
   workspaceId?: string;
   journalOnly?: boolean;
-  /** When the capture was recorded. Falls back to now if the caller omits it. */
   capturedAt?: string;
 }
 
