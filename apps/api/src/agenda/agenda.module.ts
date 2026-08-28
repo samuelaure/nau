@@ -3,10 +3,10 @@ import { AgendaService } from './agenda.service';
 import { AgendaController } from './agenda.controller';
 import { BlocksModule } from '../blocks/blocks.module';
 import { PrismaModule } from '../prisma/prisma.module';
-import { CalendarModule } from '../calendar/calendar.module';
+import { TimeModule } from '../time/time.module';
 
 @Module({
-  imports: [BlocksModule, PrismaModule, CalendarModule],
+  imports: [BlocksModule, PrismaModule, TimeModule],
   controllers: [AgendaController],
   providers: [AgendaService],
   exports: [AgendaService],
