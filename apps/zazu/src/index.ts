@@ -25,15 +25,27 @@ if (!token) {
 const bot = new Telegraf<ZazuContext>(token);
 
 // --- 1. Skill Registration ---
-import { triageSkill } from './triage-skill';
-import { summarySkill } from './summary-skill';
-import { voicenoteSkill, buildBrandKeyboard, buildWorkspaceKeyboard } from './voicenote-skill';
+//
+// TriageSkill (the '#triage' text/voice trigger that re-classified into 7 GTD
+// categories via LLM) and SummarySkill (`/resumen`, `#resumen`) were removed
+// on 2026-08-27 — not deactivated, deleted — per the decision that Zazŭ's
+// only responsibilities for a capture are: transcribe, clean, summarize
+// (voice) / distribute as-is (text), then hand off to the in-chat form.
+// Neither fit that contract, and the in-chat form now covers everything
+// TriageSkill did without a second, competing code path. See git history for
+// triage-skill.ts and summary-skill.ts if either needs to be resurrected.
+//
+// ConversationalSkill is registered but effectively unreachable now that
+// VoicenoteSkill claims all plain text (see voicenote-skill.ts canHandle) —
+// left registered rather than removed since it's someone else's module
+// surface (@zazu/feature-conversational) and the decision on its fate
+// (reactivate, refactor, or deprecate for good) is still open. Tracked in
+// https://github.com/samuelaure/nau/issues/24.
+import { voicenoteSkill, buildBrandKeyboard, buildWorkspaceKeyboard, buildIntentKeyboard } from './voicenote-skill';
 import type { Brand, Workspace } from './voicenote-skill';
 import { youtubeDigestSkill } from './youtube-skill';
 skillManager.register(youtubeDigestSkill);
 skillManager.register(voicenoteSkill);
-skillManager.register(triageSkill);
-skillManager.register(summarySkill);
 skillManager.register(new ConversationalSkill());
 
 // --- 2. Middlewares ---
@@ -96,24 +108,6 @@ bot.on('callback_query', async (ctx) => {
   const data = ctx.callbackQuery.data;
   if (!data) return;
 
-  // ── Triage brand selection ──
-  if (data.startsWith('triage_brand:')) {
-    await ctx.answerCbQuery();
-    const brandToken = data.replace('triage_brand:', '');
-    const brandId = brandToken === 'auto' ? null : brandToken;
-    const text: string | undefined = ctx.session?.pendingTriageText;
-    if (!text) {
-      await ctx.editMessageText('⚠️ No encontré el texto pendiente. Envía el mensaje de voz de nuevo.');
-      return;
-    }
-    ctx.session.pendingTriageText = undefined;
-    ctx.session.pendingTriageUserId = undefined;
-    const label = brandId ? `marca seleccionada` : `auto-detección de marca`;
-    await ctx.editMessageText(`⏳ Procesando con ${label}...`);
-    await triageSkill.runTriage(ctx as any, text, brandId);
-    return;
-  }
-
   // ── Voicenote triage flow ──
   if (data.startsWith('vnote_')) {
     await ctx.answerCbQuery();
@@ -143,14 +137,7 @@ bot.on('callback_query', async (ctx) => {
         : [...intents, intent];
       ctx.session.selectedVoicenoteIntents = intents;
 
-      await ctx.editMessageReplyMarkup({
-        inline_keyboard: [
-          [{ text: intents.includes('journal') ? '✅ 📓 Diario (Journal)' : '☐ 📓 Diario (Journal)', callback_data: 'vnote_triage_journal' }],
-          [{ text: intents.includes('actions') ? '✅ 🎯 Tareas (Actions)' : '☐ 🎯 Tareas (Actions)', callback_data: 'vnote_triage_actions' }],
-          [{ text: intents.includes('content') ? '✅ 💡 Idea de Contenido' : '☐ 💡 Idea de Contenido', callback_data: 'vnote_triage_content' }],
-          [{ text: '▶️ Confirmar', callback_data: 'vnote_triage_confirm' }],
-        ],
-      });
+      await ctx.editMessageReplyMarkup(buildIntentKeyboard(intents));
       return;
     }
 
@@ -285,6 +272,20 @@ bot.on('message', async (ctx) => {
   return ctx.reply('Entendido. ¿Necesitas algo más?');
 });
 
+/**
+ * Step 2 of the in-chat form (workspace selection) is DESACTIVADO
+ * TEMPORALMENTE (2026-08-27): instead of asking, both Journal and GTD are
+ * auto-assigned to the user's Personal Workspace via
+ * `voicenoteSkill.resolvePersonalWorkspaceId` — see that method's docstring
+ * in voicenote-skill.ts for exactly how fragile that heuristic is and what
+ * the correct fix looks like.
+ *
+ * To reactivate manual selection: replace the two
+ * `resolvePersonalWorkspaceId(...)` calls below with the original
+ * `workspaces.length === 1 ? auto-assign : show buildWorkspaceKeyboard`
+ * branching (kept below, commented out, unchanged) for both Journal and
+ * Actions.
+ */
 async function handleTriageState(ctx: ZazuContext) {
   const intents: string[] = ctx.session?.selectedVoicenoteIntents ?? [];
   const workspaces: Array<{ id: string; name: string }> = ctx.session?.pendingVoicenoteWorkspaces ?? [];
@@ -296,14 +297,15 @@ async function handleTriageState(ctx: ZazuContext) {
       await ctx.editMessageText('⚠️ No tienes espacios de trabajo configurados.');
       return;
     }
-    if (workspaces.length === 1) {
-      ctx.session!.selectedVoicenoteJournalWorkspaceId = workspaces[0].id;
-    } else {
-      await ctx.editMessageText('📓 ¿A qué espacio de trabajo va el diario?', {
-        reply_markup: buildWorkspaceKeyboard(workspaces, [], 'journal'),
-      });
-      return;
-    }
+    ctx.session!.selectedVoicenoteJournalWorkspaceId = voicenoteSkill.resolvePersonalWorkspaceId(workspaces);
+    // if (workspaces.length === 1) {
+    //   ctx.session!.selectedVoicenoteJournalWorkspaceId = workspaces[0].id;
+    // } else {
+    //   await ctx.editMessageText('📓 ¿A qué espacio de trabajo va el diario?', {
+    //     reply_markup: buildWorkspaceKeyboard(workspaces, [], 'journal'),
+    //   });
+    //   return;
+    // }
   }
 
   // 2. Resolve Actions Workspace
@@ -312,14 +314,15 @@ async function handleTriageState(ctx: ZazuContext) {
       await ctx.editMessageText('⚠️ No tienes espacios de trabajo configurados.');
       return;
     }
-    if (workspaces.length === 1) {
-      ctx.session!.selectedVoicenoteActionsWorkspaceId = workspaces[0].id;
-    } else {
-      await ctx.editMessageText('🎯 ¿A qué espacio de trabajo van las tareas?', {
-        reply_markup: buildWorkspaceKeyboard(workspaces, [], 'actions'),
-      });
-      return;
-    }
+    ctx.session!.selectedVoicenoteActionsWorkspaceId = voicenoteSkill.resolvePersonalWorkspaceId(workspaces);
+    // if (workspaces.length === 1) {
+    //   ctx.session!.selectedVoicenoteActionsWorkspaceId = workspaces[0].id;
+    // } else {
+    //   await ctx.editMessageText('🎯 ¿A qué espacio de trabajo van las tareas?', {
+    //     reply_markup: buildWorkspaceKeyboard(workspaces, [], 'actions'),
+    //   });
+    //   return;
+    // }
   }
 
   // 3. Resolve Brand (if not yet selected)
@@ -361,6 +364,7 @@ function clearVoicenoteSession(ctx: ZazuContext) {
   ctx.session.voicenoteProcessError = undefined;
   ctx.session.voicenoteMessageId = undefined;
   ctx.session.voicenoteChatId = undefined;
+  ctx.session.pendingVoicenoteOrigin = undefined;
 }
 
 async function awaitVoicenoteProcessingAndHandleError(ctx: ZazuContext): Promise<boolean> {
@@ -406,6 +410,8 @@ async function handleFinalDispatch(ctx: ZazuContext) {
   const actionsWorkspaceId: string = ctx.session?.selectedVoicenoteActionsWorkspaceId ?? '';
   const selectedBrandIds: string[] = ctx.session?.selectedVoicenoteBrandIds ?? [];
   const brands: Brand[] = (ctx.session?.pendingVoicenoteBrands ?? []).filter((b: Brand) => selectedBrandIds.includes(b.id));
+  // Read before clearVoicenoteSession() wipes it below.
+  const isVoiceOrigin = ctx.session?.pendingVoicenoteOrigin === 'voice';
 
   await ctx.editMessageText('⏳ Despachando a la plataforma...');
 
@@ -442,14 +448,22 @@ async function handleFinalDispatch(ctx: ZazuContext) {
     : 0;
 
   const contentLines = contentResultData.map((r) => `- ${r.ideaCount} ideas para ${r.brandName}`).join('\n');
-  const journalLine = intents.includes('journal') ? '📓 Entrada de diario guardada.' : '';
+  const journalLine = intents.includes('journal') ? '📓 Entrada de journal guardada.' : '';
   const contentLine = contentLines ? `💡 Ideas de contenido:\n${contentLines}` : '';
-  const actionLine = intents.includes('actions') ? `🎯 Tareas: ${actionsResultData} ${actionsResultData === 1 ? 'bloque creado' : 'bloques creados'}.` : '';
-  
+  const actionLine = intents.includes('actions') ? `🎯 GTD: ${actionsResultData} ${actionsResultData === 1 ? 'bloque creado' : 'bloques creados'}.` : '';
+
+  // Voice gets its own summary line (produced during transcription clean-up);
+  // text has nothing to summarize — it's distributed as written, so the
+  // confirmation is just that: a confirmation, per the 2026-08-27 decision
+  // that Zazŭ only transcribes/cleans/summarizes voice and distributes text
+  // as-is. `summaryText` is naturally empty for text origin (never set in
+  // VoicenoteSkillImpl.handleText), so this stays a single code path rather
+  // than an explicit origin branch.
   const formattedSummary = summaryText ? `\n📝 *Resumen:* ${summaryText}\n` : '';
+  const header = isVoiceOrigin ? '✅ Nota de voz procesada.' : '✅ Recibido.';
 
   await ctx.editMessageText(
-    `✅ Nota de voz procesada.\n${formattedSummary}\n${[journalLine, actionLine, contentLine].filter(Boolean).join('\n')}`,
+    `${header}\n${formattedSummary}\n${[journalLine, actionLine, contentLine].filter(Boolean).join('\n')}`,
     { parse_mode: 'Markdown' }
   );
 }

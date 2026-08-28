@@ -7,6 +7,7 @@ import { buildServiceHeaders } from './lib/service-auth'
 import { getPrivateStorage } from './lib/storage'
 import { getClientForFeature, getFeatureFallbackChain } from '@nau/llm-client'
 import { withRetry } from './lib/retry'
+import { extractYouTubeUrl, hasYouTubeDigestAccess } from './youtube-skill'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
@@ -46,6 +47,29 @@ function buildBrandKeyboard(brands: Brand[], selected: string[]) {
   }
 }
 
+/**
+ * Builds the initial intent-selection keyboard (Journal / GTD / Content idea).
+ *
+ * DESACTIVADO TEMPORALMENTE (2026-08-27): la opción "Idea de Contenido" está
+ * oculta para simplificar el flujo mientras se estabiliza journal + GTD. La
+ * lógica y el dispatch de content (dispatchToBrands, vnote_brand_*, vnote_all,
+ * vnote_confirm) siguen intactos — solo se dejó de ofrecer el botón de
+ * entrada. Para reactivar: descomentar la fila `contentRow` más abajo.
+ */
+function buildIntentKeyboard(intents: string[]) {
+  const journalRow = [{ text: intents.includes('journal') ? '✅ 📓 Journal' : '☐ 📓 Journal', callback_data: 'vnote_triage_journal' }]
+  const actionsRow = [{ text: intents.includes('actions') ? '✅ 🎯 GTD' : '☐ 🎯 GTD', callback_data: 'vnote_triage_actions' }]
+  // const contentRow = [{ text: intents.includes('content') ? '✅ 💡 Idea de Contenido' : '☐ 💡 Idea de Contenido', callback_data: 'vnote_triage_content' }]
+  return {
+    inline_keyboard: [
+      journalRow,
+      actionsRow,
+      // contentRow,
+      [{ text: '▶️ Confirmar', callback_data: 'vnote_triage_confirm' }],
+    ],
+  }
+}
+
 function buildWorkspaceKeyboard(workspaces: Workspace[], selected: string[], intent: 'journal' | 'actions' = 'journal') {
   const prefix = intent === 'journal' ? 'vnote_ws_journal_' : 'vnote_ws_actions_';
   const confirmData = intent === 'journal' ? 'vnote_ws_journal_confirm' : 'vnote_ws_actions_confirm';
@@ -62,20 +86,67 @@ function buildWorkspaceKeyboard(workspaces: Workspace[], selected: string[], int
 }
 
 // ── Skill ─────────────────────────────────────────────────────────────────────
+//
+// Handles both capture origins that feed the same in-chat distribution form:
+// voice notes (transcribe → clean → summarize → distribute) and plain text
+// (distribute only — see `handleText`). Both share the intent form, the
+// workspace/brand resolution and the dispatch functions below; only the
+// pre-form step differs.
 class VoicenoteSkillImpl implements ZazuSkill {
   id = 'voicenote-capture'
   name = 'Voicenote Capture'
   priority = 1010
 
   async canHandle(ctx: ZazuContext): Promise<boolean> {
-    if (!ctx.message || !('voice' in ctx.message)) return false
-    return ctx.dbUser?.onboardingState === 'COMPLETED' && !!ctx.dbUser?.nauUserId
+    const user = ctx.dbUser
+    if (user?.onboardingState !== 'COMPLETED' || !user?.nauUserId) return false
+
+    if (ctx.message && 'voice' in ctx.message) return true
+
+    // Plain text: only claims it if nothing more specific already will.
+    // YouTube links go to YouTubeDigestSkill when the user has that feature
+    // active (checked here, not just relying on skill registration order,
+    // because canHandle must reflect the same decision handle() would make).
+    if (ctx.textContent && ctx.textContent.trim().length > 0) {
+      const youtubeUrl = extractYouTubeUrl(ctx.textContent)
+      if (youtubeUrl && hasYouTubeDigestAccess(ctx)) return false
+      return true
+    }
+
+    return false
   }
 
   async handle(ctx: ZazuContext): Promise<void> {
-    const user = ctx.dbUser
-    const voice = (ctx.message as any).voice
+    const isVoice = !!(ctx.message && 'voice' in ctx.message)
+    if (isVoice) {
+      await this.handleVoice(ctx)
+    } else {
+      await this.handleText(ctx)
+    }
+  }
 
+  /**
+   * Plain-text capture: no transcription, no clean-up, no summary — the text
+   * is already what the user wrote. Starts the same in-chat distribution form
+   * as voicenotes; `pendingVoicenoteClean` is set directly to the raw input so
+   * the shared dispatch path (handleFinalDispatch in index.ts) needs no branch
+   * on origin except for which confirmation message it sends.
+   */
+  async handleText(ctx: ZazuContext): Promise<void> {
+    const text = ctx.textContent
+    if (!text) return
+
+    await this.resetSession(ctx)
+    ctx.session.pendingVoicenoteOrigin = 'text'
+    ctx.session.pendingVoicenoteClean = text
+    ctx.session.pendingVoicenoteCapturedAt = ctx.message?.date
+      ? new Date(ctx.message.date * 1000).toISOString()
+      : new Date().toISOString()
+
+    await this.startIntentForm(ctx)
+  }
+
+  private async resetSession(ctx: ZazuContext): Promise<void> {
     ctx.session ??= {}
     ctx.session.selectedVoicenoteBrandIds = []
     ctx.session.selectedVoicenoteJournalWorkspaceId = undefined
@@ -89,7 +160,15 @@ class VoicenoteSkillImpl implements ZazuSkill {
     ctx.session.pendingVoicenoteBrands = []
     ctx.session.pendingVoicenoteWorkspaces = []
     ctx.session.voicenoteProcessError = undefined
+    ctx.session.pendingVoicenoteOrigin = undefined
+  }
 
+  /**
+   * Fetches the user's workspaces/brands and shows the intent-selection
+   * keyboard. Shared by both the voice and text entry points.
+   */
+  private async startIntentForm(ctx: ZazuContext): Promise<{ chatId: number; msgId: number }> {
+    const user = ctx.dbUser
     const apiHeaders = await buildServiceHeaders('9nau-api')
     const wsResp = await axios.get(`${NAU_API_URL}/_service/workspaces?userId=${user.nauUserId}`, { headers: apiHeaders })
     const wsData = wsResp.data as Array<{ id: string; name: string; brands: Brand[] }>
@@ -99,22 +178,26 @@ class VoicenoteSkillImpl implements ZazuSkill {
     ctx.session.pendingVoicenoteBrands = brands
     ctx.session.pendingVoicenoteWorkspaces = workspaces
 
-    const statusMsg = await ctx.reply('¿Qué contiene esta nota de voz?', {
-      parse_mode: 'MarkdownV2',
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: '☐ 📓 Diario (Journal)', callback_data: 'vnote_triage_journal' }],
-          [{ text: '☐ 🎯 Tareas (Actions)', callback_data: 'vnote_triage_actions' }],
-          [{ text: '☐ 💡 Idea de Contenido', callback_data: 'vnote_triage_content' }],
-          [{ text: '▶️ Confirmar', callback_data: 'vnote_triage_confirm' }],
-        ],
-      },
+    const statusMsg = await ctx.reply('¿Qué contiene esto?', {
+      reply_markup: buildIntentKeyboard([]),
     })
     const chatId = statusMsg.chat.id
     const msgId = statusMsg.message_id
-    
+
     ctx.session.voicenoteMessageId = msgId
     ctx.session.voicenoteChatId = chatId
+
+    return { chatId, msgId }
+  }
+
+  async handleVoice(ctx: ZazuContext): Promise<void> {
+    const user = ctx.dbUser
+    const voice = (ctx.message as any).voice
+
+    await this.resetSession(ctx)
+    ctx.session.pendingVoicenoteOrigin = 'voice'
+
+    const { chatId, msgId } = await this.startIntentForm(ctx)
 
     ctx.session.voicenoteProcessPromise = (async () => {
       try {
@@ -299,6 +382,52 @@ Return only valid JSON: { "cleanTranscription": "...", "summary": "..." }`,
   }
 
   /**
+   * Resolves the user's "Personal Workspace" from the list already fetched
+   * for the form (`pendingVoicenoteWorkspaces`) — no extra request.
+   *
+   * DESACTIVADO TEMPORALMENTE (2026-08-27): the workspace-selection step
+   * (step 2 of the in-chat form — `vnote_ws_journal_*` / `vnote_ws_actions_*`,
+   * see index.ts) is skipped and this heuristic is used instead, to simplify
+   * the flow while only one workspace per user matters in practice.
+   *
+   * THIS IS A NAME MATCH, NOT A REAL "IS PERSONAL" FLAG — there is no such
+   * flag in the api schema. It matches on `name === 'Personal Workspace'`,
+   * the literal string api's auth.service.ts stamps onto the workspace it
+   * creates at signup. It breaks silently if that workspace is ever renamed,
+   * or the moment a user has more than one workspace and needs to choose
+   * between them for real. Safe today only because there is a single user
+   * and workspace naming is fully under that same person's control.
+   *
+   * The correct fix, even after this exception is reverted, is NOT to
+   * restore the manual keyboard by default — it's to have api expose the
+   * already-existing `User.defaultWorkspaceId` (see
+   * apps/api/src/auth/auth.service.ts) on `/_service/workspaces`, e.g. as an
+   * `isDefault` flag per workspace or a dedicated
+   * `/_service/workspaces/default?userId=` route, and have Zazŭ preselect
+   * that one while still letting the person override it when they have more
+   * than one workspace. That work is cross-module (api) — see the handoff
+   * prompt drafted for the api/module:actions session on 2026-08-27.
+   *
+   * To reactivate manual selection: restore the `workspaces.length === 1`
+   * branch and the `buildWorkspaceKeyboard` prompt in `handleTriageState`
+   * (apps/zazu/src/index.ts) instead of calling this method.
+   */
+  resolvePersonalWorkspaceId(workspaces: Workspace[]): string | undefined {
+    const personal = workspaces.find((w) => w.name === 'Personal Workspace')
+    if (personal) return personal.id
+    // Name match failed — falling back to the first workspace rather than
+    // failing the dispatch outright, but this is exactly the silent-drift
+    // case the docstring above warns about: logged so it doesn't go unnoticed.
+    if (workspaces.length > 0) {
+      logger.warn(
+        { workspaceNames: workspaces.map((w) => w.name) },
+        '[VoicenoteSkill] No workspace named "Personal Workspace" — falling back to the first one. See resolvePersonalWorkspaceId docstring.',
+      )
+    }
+    return workspaces[0]?.id
+  }
+
+  /**
    * Calls the LLM to split a transcription into selected intents.
    * Uses the voicenote_split feature (gpt-4o-mini).
    */
@@ -346,5 +475,5 @@ Rules:
 }
 
 export const voicenoteSkill = new VoicenoteSkillImpl()
-export { buildSummaryMessage, buildBrandKeyboard, buildWorkspaceKeyboard, escapeMarkdown }
+export { buildSummaryMessage, buildBrandKeyboard, buildWorkspaceKeyboard, buildIntentKeyboard, escapeMarkdown }
 export type { Brand, Workspace }

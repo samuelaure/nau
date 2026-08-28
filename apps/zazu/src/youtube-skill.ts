@@ -15,18 +15,26 @@ const MAKE_YOUTUBE_WEBHOOK_URL = process.env.MAKE_YOUTUBE_WEBHOOK_URL ?? ''
  *  - Next:    seed UserFeature for more users, or expose an admin UI
  *  - Future:  remove this gate entirely and let all users access it
  */
-function hasYouTubeDigestAccess(ctx: ZazuContext): boolean {
+export function hasYouTubeDigestAccess(ctx: ZazuContext): boolean {
   const activeFeatureIds: string[] = ctx.dbUser?.features?.map((f: any) => f.featureId) ?? []
   return activeFeatureIds.includes('youtube_digest')
 }
 
 
 // ── YouTube URL detection ──────────────────────────────────────────────────────
+//
+// Covers the URL shapes YouTube actually issues: standard watch links,
+// shortened youtu.be links, embeds, the legacy /v/ form, Shorts, and live
+// streams (youtube.com/live/<id>, both pre-stream scheduling links and live
+// broadcasts). Also exported for VoicenoteSkill's text path (see
+// voicenote-skill.ts canHandle), which is today's one-off version of the
+// general dynamic-form/rule-based routing design tracked in
+// https://github.com/samuelaure/nau/issues/23.
 
 const YOUTUBE_REGEX =
-  /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/i
+  /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/|live\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/i
 
-function extractYouTubeUrl(text: string): string | null {
+export function extractYouTubeUrl(text: string): string | null {
   const match = text.match(YOUTUBE_REGEX)
   if (!match) return null
   // Return the full matched URL (not just the video ID)
@@ -38,7 +46,7 @@ function extractYouTubeUrl(text: string): string | null {
 class YouTubeDigestSkillImpl implements ZazuSkill {
   id = 'youtube_digest'
   name = 'YouTube Video Digester'
-  priority = 10 // High priority — runs before voicenote, triage, conversational
+  priority = 10 // High priority — runs before voicenote-capture (text) and conversational
 
   async canHandle(ctx: ZazuContext): Promise<boolean> {
     if (ctx.dbUser?.onboardingState !== 'COMPLETED') return false
