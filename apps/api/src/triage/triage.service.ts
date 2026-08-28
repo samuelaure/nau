@@ -5,6 +5,7 @@ import { BlocksService } from '../blocks/blocks.service';
 import { NauthenticityService } from '../integrations/nauthenticity.service';
 import { FlownauIntegrationService } from '../integrations/flownau.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { JournalService } from '../journal/journal.service';
 
 // TODO: This schema and the LLM call it feeds classify across all GTD
 // categories AND content_idea in one prompt, one request. That is the
@@ -47,6 +48,7 @@ export class TriageService {
     private readonly nauthenticityService: NauthenticityService,
     private readonly flownauService: FlownauIntegrationService,
     private readonly prisma: PrismaService,
+    private readonly journalService: JournalService,
   ) {}
 
   async processRawText(
@@ -90,7 +92,6 @@ export class TriageService {
           resolvedWorkspaceId,
           owner?.id,
           capturedAt,
-          rawText,
         );
       }
 
@@ -307,7 +308,7 @@ OUTPUT: Return valid JSON matching the schema.`,
   }
 
   /**
-   * Journal-only fast path: stores the capture as a journal_entry.
+   * Journal-only fast path: hands the capture to Journal as an entry.
    *
    * The text is stored as it arrives. Callers send text that has already been
    * cleaned once — Zazŭ transcribes, cleans the disfluencies out, and where the
@@ -316,7 +317,10 @@ OUTPUT: Return valid JSON matching the schema.`,
    * said and what their diary records, and every one of them moves the wording
    * a little further from theirs.
    *
-   * `rawText` carries the untouched transcription so the original is never lost.
+   * The entry is built by Journal rather than assembled here. Triage decides
+   * that something is a diary entry; what an entry *is* belongs to Journal, and
+   * this path drifting from the web one is exactly what having two producers
+   * cost before.
    */
   private async processJournalOnly(
     text: string,
@@ -324,23 +328,18 @@ OUTPUT: Return valid JSON matching the schema.`,
     workspaceId?: string,
     userId?: string,
     capturedAt?: string,
-    rawText?: string,
   ) {
-    const journalBlock = await this.blocksService.createInternal({
-      type: 'journal_entry',
-      properties: {
-        summary: text,
-        raw: rawText ?? text,
-        // When the note was recorded, not when it happened to be processed. A
-        // journal entry that lands on the wrong day because ingestion was slow
-        // is wrong in the one dimension a journal is organised by.
-        date: capturedAt ?? new Date().toISOString(),
-        sourceBlockId,
-        source: 'zazu_voicenote',
-        status: 'published',
-      },
-      workspaceId,
+    const journalBlock = await this.journalService.createEntry({
+      text,
+      // When the note was recorded, not when it happened to be processed. A
+      // journal entry that lands on the wrong day because ingestion was slow
+      // is wrong in the one dimension a journal is organised by.
+      date: capturedAt,
+      source: 'zazu',
+      originFormat: 'voice',
+      workspaceId: workspaceId!,
       userId,
+      sourceId: sourceBlockId,
     });
 
     return {

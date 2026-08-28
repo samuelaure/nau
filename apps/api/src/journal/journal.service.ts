@@ -1,675 +1,403 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ConfigService } from '@nestjs/config';
-import { Cron } from '@nestjs/schedule';
-import { getClientForFeature } from '@nau/llm-client';
-import { signServiceToken } from '@nau/auth';
+import { getClientForFeature, type LLMFeature } from '@nau/llm-client';
 import { z } from 'zod';
 import { BlocksService } from '../blocks/blocks.service';
-import axios from 'axios';
-import {
-  dayjs,
-  dayIn,
-  localNow,
-  closedPeriodBounds,
-  safeZone,
-  type PeriodBounds,
-  type PeriodType,
-} from '../common/time';
+import type {
+  GenerateSynthesisDto,
+  JournalEntryProperties,
+  JournalOriginFormat,
+  JournalSource,
+  JournalSynthesisProperties,
+  SynthesisSourceKind,
+  SynthesisSourceRef,
+} from '@nau/types';
 
 /**
- * What a period's derived entry holds.
+ * Journal owns two things and nothing else: the entries a person captures, and
+ * the interpretations built from them.
  *
- * Three fields for three different readers, produced in one model call so they
- * cannot disagree about the same day:
+ * It deliberately does not know what a day, a week or a quarter is. A period is
+ * a decision belonging to whichever calendar the person lives in — Gregorian,
+ * the nine-day naŭ calendar, an astrological transit — and that decision lives
+ * in the Time module. Time resolves which entries or which smaller syntheses
+ * make up a period and passes them here by id. This service reads exactly what
+ * it is handed.
  *
- * - `synthesis` — the derived entry itself, read in the web app. The captures
- *   of one day arrive scattered, each written without knowledge of the others,
- *   and this is them returned as one thing. It is the artefact; everything
- *   else here describes it.
- * - `digest` — what Zazŭ sends to Telegram. Deliberately NOT the synthesis:
- *   the whole point of the derived entry is to be read in the app, and pushing
- *   its full text into a chat both defeats that and is what produced a 15,669
- *   character message Telegram refused. This is a notice that the day has been
- *   interpreted, carrying enough of what it said to be worth reading on a
- *   phone.
- * - `summary` — one line, to label the period in a list. Nothing reads it to
- *   understand the day.
- *
- * The same relationship Zazŭ already has with a voice note: the note is stored
- * in full, and the reply confirms it landed and says roughly what it was.
+ * The consequence worth stating: there is no date arithmetic in this file, and
+ * there should never be. A query here that selects entries by date range would
+ * be Journal re-deriving what a period is, which is the coupling this design
+ * exists to remove.
  */
-const JournalSummarySchema = z.object({
-  synthesis: z.string().describe('The derived entry: every experience of the period brought together as one piece, ordered by what mattered rather than by clock time. This is what the person reads in the app.'),
-  digest: z.string().describe('A short notice for a chat message — a few sentences naming what the period was about. Read on a phone, in place of the full entry, never a substitute for it.'),
-  summary: z.string().describe('One line, enough to tell this period apart from another in a list. An orienting label, not a retelling.'),
-  highlights: z.array(z.string()).describe('The few things worth remembering, one short line each. Empty if the record does not support any.'),
+
+const SYNTHESIS_PLACEHOLDER = '{{SOURCES: ENTRIES OR SYNTHESES}}';
+const SYNTHESIS_RESULT_PLACEHOLDER = '{{SYNTHESIS}}';
+
+/**
+ * The command that turns a period's record into one continuous account.
+ *
+ * Stored on every synthesis as a template, with its placeholder unresolved. The
+ * content that filled it is already recoverable through `synthesisSource`, and
+ * keeping the resolved text would copy the person's own words into a field kept
+ * for auditing instructions.
+ */
+const SYNTHESIS_PROMPT = `Estás escribiendo la entrada del diario de alguien para un periodo de su vida.
+
+Recibes el registro completo de ese periodo. Eso es todo lo que existe, y no hace falta más.
+
+Esto NO es un resumen. No estás condensando ni recortando. Lo que recibes llegó suelto — una cosa a media tarde, otra de noche, cada una escrita sin saber de las demás — y tu trabajo es devolverlo como UNA sola experiencia continua. Homogeneizar, no comprimir: lo que estaba disperso queda unido, lo que se repite se reconoce como una misma cosa, y lo que la persona vivió con más peso ocupa más espacio.
+
+Deja que cada experiencia ocupe el espacio que merece según lo que pesó para la persona: algo que atravesó el periodo entero se cuenta con detalle; algo mencionado de paso se menciona de paso. No inventes transiciones suaves entre cosas que no tienen relación — si el periodo saltó de un tema a otro sin conexión, el salto es parte de cómo fue.
+
+Escribe en primera persona, con las palabras de la persona siempre que sea posible. Si dijo "me siento dormido, dejado", eso se queda; no lo conviertas en "experimenté una sensación de letargo". Conserva los nombres propios, las cifras, los lugares, las frases que sólo usaría esta persona. Esa es la diferencia entre releerse y leer a un desconocido.
+
+REGLA ABSOLUTA — nada de lo que escribas puede no estar en el registro. No infieras acontecimientos, emociones ni detalles que no aparezcan. Si el registro es escaso, escribe poco. Una entrada breve y fiel es correcta; una entrada rica e inventada es un recuerdo falso, y esto es el registro que esta persona tiene de su propia vida.
+
+No opines sobre lo que la persona vivió. No añadas consejos, ánimos, moralejas ni conclusiones a las que no haya llegado ella misma. No juzgues sus decisiones ni celebres sus logros — no eres un observador, eres su propia voz ordenando lo vivido. No adornes y no uses lenguaje grandilocuente. La reflexión viene después y no es tu trabajo.
+
+Escribe en el mismo idioma del registro.
+
+REGISTRO DEL PERIODO:
+${SYNTHESIS_PLACEHOLDER}`;
+
+/**
+ * The command that reads a synthesis back.
+ *
+ * A separate call on purpose. Asking one model to both recount a period and
+ * reflect on it produces writing that does neither well — the reflection bleeds
+ * into the account and the account flattens the reflection. Splitting them lets
+ * each be judged on its own terms.
+ */
+const REFLECTION_PROMPT = `Acabas de leer el periodo de vida de alguien, ya ordenado como una sola experiencia continua. Tu trabajo ahora es distinto: no volver a contarlo, sino leerlo.
+
+Escribe una reflexión sobre lo que este periodo fue. Busca lo que la persona quizá no vio mientras lo vivía: patrones que se repiten, tensiones entre lo que dijo querer y lo que hizo, cosas que volvieron una y otra vez, cambios de tono a lo largo del periodo.
+
+No resumas lo que ya está dicho. Si la reflexión sólo repite los hechos en otro orden, no sirve.
+
+REGLA ABSOLUTA — todo lo que observes tiene que sostenerse en el registro. Puedes señalar un patrón que la persona no nombró, porque el patrón está en lo que sí escribió; no puedes atribuirle emociones, motivos ni acontecimientos que no aparecen. Si el registro no da para una observación honesta, escribe poco. Una reflexión corta y cierta vale más que una extensa e inventada.
+
+No des consejos, no moralices, no celebres ni consueles. No eres un terapeuta ni un entrenador — eres la persona mirando su propio periodo con algo de distancia. Habla en primera persona, en el mismo idioma del registro.
+
+SÍNTESIS DEL PERIODO:
+${SYNTHESIS_RESULT_PLACEHOLDER}
+
+REGISTRO DEL PERIODO:
+${SYNTHESIS_PLACEHOLDER}`;
+
+const SynthesisSchema = z.object({
+  synthesis: z
+    .string()
+    .describe(
+      'El periodo entero contado como una sola experiencia continua, en primera persona y con las palabras de quien lo vivió.',
+    ),
 });
 
-type JournalSummaryOutput = z.infer<typeof JournalSummarySchema>;
+const ReflectionSchema = z.object({
+  reflection: z
+    .string()
+    .describe(
+      'Una lectura de lo vivido: patrones, tensiones y repeticiones que el registro sostiene. Nunca un resumen de los hechos.',
+    ),
+});
 
-/**
- * What each period reads.
- *
- * The day and the week read the entries themselves, because they are close
- * enough to the writing that the author's own words still fit. From the month
- * up, each level reads summaries one step down — a size that keeps the input
- * bounded (≈30 dailies, ≈13 weeklies, 12 monthlies) and keeps the hierarchy
- * meaningful: a year built from every entry of the year would overflow the
- * context window and silently drop whatever fell off the end.
- *
- * Note that the month and the trimester are parallel branches rather than
- * nested: the trimester reads weeks, not months, and the year reads months, not
- * trimesters. That is deliberate — each level picks the granularity that gives
- * it a useful number of inputs, rather than inheriting whatever the level below
- * happened to produce.
- */
-const SUMMARY_SOURCE: Record<PeriodType, 'entries' | PeriodType> = {
-  daily: 'entries',
-  weekly: 'entries',
-  monthly: 'daily',
-  trimester: 'weekly',
-  yearly: 'monthly',
-  custom: 'entries',
-};
-
-const PERIOD_LABEL: Record<PeriodType, string> = {
-  daily: 'Diario',
-  weekly: 'Semanal',
-  monthly: 'Mensual',
-  trimester: 'Trimestral',
-  yearly: 'Anual',
-  custom: 'Personalizado',
-};
+/** How many times a model call is retried before the attempt is abandoned. */
+const LLM_ATTEMPTS = 3;
 
 @Injectable()
 export class JournalService {
   private readonly logger = new Logger(JournalService.name);
+
   constructor(
     private readonly prisma: PrismaService,
-    private readonly configService: ConfigService,
     private readonly blocksService: BlocksService,
   ) {}
 
-  /**
-   * The zone a workspace's periods are lived in.
-   *
-   * Summaries are workspace-scoped artefacts, so the boundary has to be a
-   * property of the workspace rather than of whoever happens to trigger the run.
-   * Workspace.timezone is seeded from the owner's own timezone.
-   */
-  private async getWorkspaceTimezone(workspaceId: string): Promise<string> {
-    const ws = await this.prisma.workspace.findUnique({
-      where: { id: workspaceId },
-      select: { timezone: true },
-    });
-    return safeZone(ws?.timezone);
-  }
+  // ── Entries ────────────────────────────────────────────────────────────────
 
   /**
-   * Mock for user preferences. In Phase 9 this will be a real DB model.
-   */
-  private async getUserPreferences() {
-    return {
-      autoDaily: true,
-      autoWeekly: true,
-      autoMonthly: true,
-      autoTrimester: true,
-      autoYearly: true,
-      defaultLanguage: 'es',
-    };
-  }
-
-  /**
-   * The text of an entry, as the summaries read it.
+   * The one way a journal entry comes into being.
    *
-   * Every entry stores two forms of itself: `raw`, the capture as it arrived,
-   * and `summary`, that same text with the disfluencies taken out. Summaries
-   * read ONE of them. Reading both would put the same content in front of the
-   * model twice and weight it accordingly.
+   * Zazŭ, the web app and the mobile app all arrive here. They differ in how
+   * they captured something, not in what an entry is, so they share this
+   * contract rather than each assembling the block themselves — which is how
+   * the two previous producers drifted into writing different fields for the
+   * same thing.
    *
-   * `raw` is the one, because it is the only form with no model standing between
-   * the microphone and the summary. The cleaned version is itself a model
-   * output, and however tightly its prompt is written it remains one more place
-   * the wording can drift. The filler it strips costs a handful of tokens and
-   * confuses nothing.
-   *
-   * Neither is ever a summary of the entry: a day built from summaries of its
-   * entries is a summary of summaries, and each such layer drops the specifics —
-   * the names, the numbers, the turns of phrase — which are the part worth
-   * keeping.
+   * Text arrives ready to store. Cleaning a transcription belongs to whoever
+   * holds the audio; by the time it is an entry, it is what the person said.
    */
-  private entryText(block: { properties: unknown }): string {
-    const p = block.properties as Record<string, unknown> | null;
+  async createEntry(params: {
+    text: string;
+    date?: string;
+    source: JournalSource;
+    originFormat: JournalOriginFormat;
+    workspaceId: string;
+    userId?: string;
+    sourceId?: string;
+  }) {
+    const text = params.text?.trim();
+    if (!text) throw new BadRequestException('text is required');
 
-    // A correction made by hand outranks the original capture. If the person
-    // opened the entry and fixed it, that is the most authoritative version of
-    // what they meant — more so than a transcription of what a microphone heard.
-    // `raw` still holds the original either way, so nothing is lost.
-    if (p?.editedAt) return (p.summary as string) || '';
-
-    // The fallbacks are for rows that predate the field, not a routine path:
-    // every entry has carried `raw` since the backfill.
-    return (p?.raw as string) || (p?.summary as string) || (p?.text as string) || '';
-  }
-
-  /**
-   * Public entry point: a period named by two date strings.
-   *
-   * The strings name calendar days, and a calendar day only becomes an instant
-   * once you know where it is being lived. They are resolved in the workspace's
-   * own zone — the same boundary the scheduled runs use, so a summary asked for
-   * by hand covers exactly the period the cron would have generated.
-   */
-  async generateSummary(
-    periodType: PeriodType,
-    startDateStr: string,
-    endDateStr: string,
-    workspaceId: string,
-  ) {
-    const tz = await this.getWorkspaceTimezone(workspaceId);
-    const start = dayIn(startDateStr, tz).startOf('day');
-    const end = dayIn(endDateStr, tz).endOf('day');
-
-    return this.generateForBounds(periodType, workspaceId, tz, {
-      start: start.toDate(),
-      end: end.toDate(),
-      label: start.isSame(end, 'day')
-        ? start.format('D [de] MMMM [de] YYYY')
-        : `${start.format('D [de] MMMM')} al ${end.format('D [de] MMMM [de] YYYY')}`,
-    });
-  }
-
-  /**
-   * @param deliver Whether to push the result to Zazŭ immediately once written.
-   *   False for the scheduled run, which writes the summary the moment its day
-   *   closes at local midnight but holds delivery for the 06:00 tick — nobody
-   *   wants a Telegram message at 00:00. True for anything triggered by a
-   *   person asking for a summary directly, who is by definition awake to read it.
-   */
-  private async generateForBounds(
-    periodType: PeriodType,
-    workspaceId: string,
-    tz: string,
-    bounds: PeriodBounds,
-    deliver = true,
-  ) {
-    const { start: startDate, end: endDate } = bounds;
-    const startIso = startDate.toISOString();
-    const endIso = endDate.toISOString();
-    const source = SUMMARY_SOURCE[periodType];
-
-    this.logger.log(`Generating ${periodType} summary (source: ${source}) from ${startIso} to ${endIso}`);
-
-    // Idempotency, matched on the period the summary covers. This used to match
-    // on createdAt falling inside the period, which is wrong in both directions:
-    // a monthly summary is written on the 1st of the following month and so
-    // never matched itself, while any daily written today blocked every other
-    // daily for today.
-    const existingSummary = await this.prisma.block.findFirst({
-      where: {
-        type: 'journal_summary',
-        workspaceId,
-        deletedAt: null,
-        AND: [
-          { properties: { path: ['periodType'], equals: periodType } },
-          { properties: { path: ['periodStart'], equals: startIso } },
-          { properties: { path: ['periodEnd'], equals: endIso } },
-        ],
-      },
-    });
-
-    if (existingSummary && periodType !== 'custom') {
-      this.logger.log(`Summary for ${periodType} ${startIso} already exists (${existingSummary.id}). Skipping.`);
-      return { success: true, blockId: existingSummary.id, cached: true };
-    }
-
-    // Entries are selected by properties.date — when the thought was captured —
-    // not by createdAt, which is when ingestion happened to finish. A note
-    // recorded at 23:50 and transcribed at 00:05 belongs to the day it was
-    // spoken. In the existing 76 entries these differ by a day in 20 cases, so
-    // filtering on createdAt misfiles a quarter of the journal.
-    const journalEntries = await this.prisma.block.findMany({
-      where: {
-        workspaceId,
-        type: 'journal_entry',
-        deletedAt: null,
-        AND: [
-          { properties: { path: ['date'], gte: startIso } },
-          { properties: { path: ['date'], lte: endIso } },
-        ],
-      },
-      orderBy: { createdAt: 'asc' },
-    });
-
-    // Nothing else is read. Recorded activity, tasks and inbox captures used to
-    // be pulled in here as supporting context, and the result was a diary that
-    // opened by telling its author they had created two tasks named "sin
-    // título" — the system's own noise, in the place where a person's life was
-    // supposed to be. What someone lived is what they said they lived. If a day
-    // holds no entries, it produces no interpretation, which is the honest
-    // answer rather than a paragraph assembled from event rows.
-
-    // The summaries this period is built from, if it is built from summaries.
-    // Selected by the period they cover and by their own type, so a month reads
-    // its days and nothing else. deletedAt matters here: the 95 fabricated
-    // summaries were soft-deleted, and the previous query would have fed them
-    // straight back in as context.
-    const sourceSummaries = source === 'entries' ? [] : await this.prisma.block.findMany({
-      where: {
-        type: 'journal_summary',
-        workspaceId,
-        deletedAt: null,
-        AND: [
-          { properties: { path: ['periodType'], equals: source } },
-          { properties: { path: ['periodStart'], gte: startIso } },
-          { properties: { path: ['periodEnd'], lte: endIso } },
-        ],
-      },
-      orderBy: { createdAt: 'asc' },
-    });
-
-    // Nothing to read. Generating anyway costs an LLM call and writes a summary
-    // of nothing, which is what produced 128 summaries against 76 entries while
-    // the journal sat idle.
-    const hasInput = source === 'entries'
-      ? journalEntries.length > 0
-      : sourceSummaries.length > 0;
-
-    if (!hasInput) {
-      this.logger.log(`No ${source} input for ${periodType} in workspace ${workspaceId}. Skipping.`);
-      return { success: true, skipped: true, reason: 'no input' };
-    }
-
-    // Format the input for the model
-    let contextText = '';
-
-    if (source === 'entries') {
-      contextText += '## EXPERIENCIAS CAPTURADAS\n';
-      journalEntries.forEach(entry => {
-        const text = this.entryText(entry);
-        if (!text) return;
-        const at = (entry.properties as any)?.date ?? entry.createdAt;
-        contextText += `\n### ${dayjs(at).tz(tz).format('YYYY-MM-DD HH:mm')}\n${text}\n`;
-      });
-    } else {
-      contextText += `## RESÚMENES ${source.toUpperCase()} DEL PERIODO\n`;
-      sourceSummaries.forEach(sum => {
-        const props = sum.properties as any;
-        const from = dayjs(props.periodStart).format('YYYY-MM-DD');
-        const to = dayjs(props.periodEnd).format('YYYY-MM-DD');
-        contextText += `\n### ${from} → ${to}\n`;
-        if (props.summary) contextText += `Qué pasó: ${props.summary}\n`;
-        if (props.synthesis) contextText += `Qué significó: ${props.synthesis}\n`;
-      });
-    }
-
-    if (!contextText.trim()) {
-      return { success: false, error: 'No data to summarize in this period.' };
-    }
-
-    // 4. Call OpenAI with Synthesis + Summary requirement
-    let aiResult: JournalSummaryOutput = {
-      synthesis: 'Resumen no disponible.',
-      digest: 'No se pudo interpretar el periodo.',
-      summary: 'No se encontraron datos procesables.',
-      highlights: [],
+    const properties: JournalEntryProperties = {
+      text,
+      textOriginal: text,
+      // When it was lived. A note spoken at 23:50 and transcribed at 00:05
+      // belongs to the day it was spoken, not the day ingestion finished.
+      date: params.date ?? new Date().toISOString(),
+      source: params.source,
+      originFormat: params.originFormat,
+      ...(params.sourceId ? { sourceId: params.sourceId } : {}),
     };
 
-    try {
-      const { client: llmClient, model: llmModel } = getClientForFeature('journal_summary');
-      if (llmClient) {
-        try {
-          const result = await llmClient.parseCompletion({
-            model: llmModel,
-            temperature: 0.2,
-          schema: JournalSummarySchema as any,
-          schemaName: 'JournalSummary',
-          messages: [
-            {
-              role: 'system',
-              content: `Estás escribiendo la entrada ${PERIOD_LABEL[periodType].toLowerCase()} del diario de alguien: ${bounds.label}.
-
-Recibes ${source === 'entries' ? 'las experiencias que esa persona capturó a lo largo del periodo, en el orden en que las vivió' : `las entradas ${source} que ya cubren este periodo`}. Eso es todo el registro que existe. No hay más, y no hace falta más.
-
-Esto NO es un resumen. No estás condensando ni recortando. Las capturas llegaron sueltas — una a media tarde, otra de noche, cada una escrita sin saber de las demás — y tu trabajo es devolverlas como UNA sola experiencia continua. Homogeneizar, no comprimir: lo que estaba disperso queda unido, lo que se repite a lo largo del día se reconoce como una misma cosa, y lo que la persona vivió con más peso ocupa más espacio.
-
-Devuelve cuatro cosas:
-
-1. "synthesis" — el periodo entero, contado como una sola experiencia continua.
-
-   Sigue el orden en que ocurrió. Deja que cada experiencia ocupe el espacio que merece según lo que pesó para la persona: algo que atravesó el día entero se cuenta con detalle; algo mencionado de paso se menciona de paso. No inventes transiciones suaves entre cosas que no tienen relación — si el día saltó de un tema a otro sin conexión, el salto es parte de cómo fue el día.
-
-   Escribe en primera persona, con las palabras de la persona siempre que sea posible. Si dijo "me siento dormido, dejado", eso se queda; no lo conviertas en "experimenté una sensación de letargo". Conserva los nombres propios, las cifras, los lugares, las frases que sólo usaría esta persona. Esa es la diferencia entre releerse y leer a un desconocido.
-
-   Es la pieza principal. Debe poder leerse sola y que la persona se reconozca en ella.
-
-2. "digest" — un aviso breve para leer en el móvil, de dos a cuatro frases.
-
-   La persona lee la pieza completa en su aplicación; esto sólo le dice que su día ya está interpretado y de qué fue. Nombra lo que de verdad ocupó el periodo, sin desarrollarlo. No es un índice ni una lista de temas: son frases, en el mismo tono e idioma que "synthesis". Nunca lo sustituye — si alguien quiere el día entero, va a la aplicación.
-
-3. "summary" — una línea para distinguir este periodo de otro en una lista. Una etiqueta para orientarse, no un recuento.
-
-4. "highlights" — lo poco que merece recordarse, una línea corta cada uno. Lista vacía si el registro no da para ninguno.
-
-REGLA ABSOLUTA — nada de lo que escribas puede no estar en el registro. No infieras acontecimientos, emociones ni detalles que no aparezcan. Si el registro es escaso, escribe poco. Una entrada breve y fiel es correcta; una entrada rica e inventada es un recuerdo falso, y esto es el registro que esta persona tiene de su propia vida.
-
-No opines sobre lo que la persona vivió. No añadas consejos, ánimos, moralejas ni conclusiones a las que no haya llegado ella misma. No juzgues sus decisiones ni celebres sus logros — no eres un observador, eres su propia voz ordenando el día. No adornes y no uses lenguaje grandilocuente.
-
-Escribe en el mismo idioma del registro.`
-            },
-            {
-              role: 'user',
-              content: contextText
-            }
-          ],
-          });
-          aiResult = result.data as JournalSummaryOutput;
-        } catch (err) {
-          this.logger.error('Error calling LLM for hierarchical summary', err);
-        }
-      }
-    } catch {
-      this.logger.warn('LLM not configured. Skipping journal AI summary.');
-    }
-
-    // 5. Format the delivery message before saving, so it can be stored
-    // verbatim on the block rather than reconstructed later for a delayed or
-    // retried delivery.
-    // What Zazŭ sends is the digest, never the derived entry itself.
-    //
-    // The entry exists to be read in the web app; that is where the day is
-    // reviewed and edited. A chat message is a different medium with a
-    // different job — it says the day has been interpreted and roughly what it
-    // held, the same way Zazŭ already answers a voice note with a short
-    // confirmation rather than the transcription.
-    //
-    // It is also what keeps delivery bounded. Sending the full text put a
-    // 15,669-character message in front of Telegram's 4,096 limit; the digest
-    // is short by construction rather than by truncation, so the reader never
-    // gets half a sentence.
-    const finalDeliveryText = aiResult.digest;
-
-    // 6. Save as Block
-    const newSummaryBlock = await this.blocksService.createInternal({
-      type: 'journal_summary',
-      workspaceId,
-      properties: {
-        periodType,
-        periodStart: startDate.toISOString(),
-        periodEnd: endDate.toISOString(),
-        synthesis: aiResult.synthesis,
-        // Stored alongside the entry rather than only sent, so what went out
-        // over Telegram can be read back later next to what it described.
-        digest: aiResult.digest,
-        summary: aiResult.summary,
-        highlights: aiResult.highlights,
-        // What this entry was actually built from, recorded on the entry
-        // itself. Without it there is no way to tell later whether a given
-        // entry predates this hierarchy.
-        sourceType: source,
-        sourceCount: source === 'entries' ? journalEntries.length : sourceSummaries.length,
-        timezone: tz,
-        // False only for a scheduled run holding delivery for the 06:00 tick.
-        // Everything else — a person asking for a summary directly, or a
-        // period Zazŭ never auto-delivers — has nothing pending, so it starts
-        // true. `deliverPending` is the only thing that flips it afterwards,
-        // so a delivery that failed there is visible and retried on the next
-        // tick rather than silently lost.
-        delivered: deliver || periodType === 'custom',
-        // The exact message a delivery sends, stored so a delayed or retried
-        // delivery reproduces it byte for byte rather than reconstructing an
-        // approximation from the other properties.
-        deliveryText: finalDeliveryText,
-        periodLabel: bounds.label,
-      }
+    return this.blocksService.createInternal({
+      type: 'journal_entry',
+      workspaceId: params.workspaceId,
+      userId: params.userId,
+      properties: properties as unknown as Record<string, unknown>,
     });
-
-    // The hierarchy as a graph: each summary points at exactly what it read.
-    if (sourceSummaries.length > 0) {
-      await this.prisma.relation.createMany({
-        data: sourceSummaries.map(inf => ({
-          type: 'parent_summary_of',
-          fromBlockId: newSummaryBlock.id,
-          toBlockId: inf.id,
-        })),
-        skipDuplicates: true,
-      });
-    }
-
-    if (source === 'entries' && journalEntries.length > 0) {
-      await this.prisma.relation.createMany({
-        data: journalEntries.map(j => ({
-          type: 'summarized_by',
-          fromBlockId: j.id,
-          toBlockId: newSummaryBlock.id,
-        })),
-        skipDuplicates: true,
-      });
-    }
-
-    // 7. Deliver, unless this is a scheduled run holding it for the 06:00 tick —
-    // `delivered` was already written true above in every case that reaches here.
-    if (deliver && periodType !== 'custom') {
-      await this.notifyZazu(newSummaryBlock.id, workspaceId, periodType, bounds.label, finalDeliveryText);
-    }
-
-    return {
-      success: true,
-      blockId: newSummaryBlock.id,
-      data: newSummaryBlock,
-      summaryData: finalDeliveryText
-    };
   }
 
-  /** Pushes one already-written summary to every member of its workspace via Zazŭ. */
-  private async notifyZazu(
+  /**
+   * Turns a block that already exists into a journal entry.
+   *
+   * The GTD inbox and the journal are the same substrate: a capture that turns
+   * out to be a diary entry becomes one in place, keeping its id and its
+   * history. Writing a second row and pointing it at the first would leave two
+   * records of one thought, and every reader would have to know which is
+   * authoritative.
+   */
+  async convertBlockToEntry(
     blockId: string,
-    workspaceId: string,
-    periodType: PeriodType,
-    periodLabel: string,
-    deliveryText: string,
+    params: {
+      text?: string;
+      date?: string;
+      source: JournalSource;
+      originFormat: JournalOriginFormat;
+    },
   ) {
-    const zazuUrl = process.env.ZAZU_INTERNAL_URL || 'http://zazu:3000';
-    const periodTitle = PERIOD_LABEL[periodType];
-    const recipients = await this.getWorkspaceRecipients(workspaceId);
+    const block = await this.prisma.block.findUnique({ where: { id: blockId } });
+    if (!block) throw new BadRequestException(`Block ${blockId} not found`);
 
-    for (const nauUserId of recipients) {
-      try {
-        const token = await signServiceToken({
-          iss: '9nau-api',
-          aud: 'zazu',
-          secret: this.configService.getOrThrow<string>('AUTH_SECRET'),
-        });
+    const existing = (block.properties ?? {}) as Record<string, unknown>;
+    const text = (params.text ?? (existing.text as string) ?? '').trim();
+    if (!text) throw new BadRequestException('cannot convert a block with no text');
 
-        await axios.post(`${zazuUrl}/api/internal/notify`, {
-          nauUserId,
-          type: 'journal_summary',
-          periodType,
-          periodTitle: `Resumen ${periodTitle} — ${periodLabel}`,
-          summaryData: deliveryText,
-        }, {
-          headers: { Authorization: `Bearer ${token}` },
-          timeout: 10000,
-        });
-      } catch (err: any) {
-        this.logger.error(`Failed to notify Zazŭ for ${nauUserId} (summary ${blockId}): ${err.message}`);
-      }
-    }
+    const properties: JournalEntryProperties = {
+      text,
+      textOriginal: (existing.textOriginal as string) ?? text,
+      date: params.date ?? (existing.date as string) ?? new Date().toISOString(),
+      source: params.source,
+      originFormat: params.originFormat,
+      ...(existing.sourceId ? { sourceId: existing.sourceId as string } : {}),
+      ...(existing.sortOrder ? { sortOrder: existing.sortOrder as number } : {}),
+    };
+
+    return this.blocksService.updateInternal(blockId, {
+      type: 'journal_entry',
+      properties: properties as unknown as Record<string, unknown>,
+    });
   }
 
+  // ── Synthesis ──────────────────────────────────────────────────────────────
+
   /**
-   * Sends every summary generated but not yet pushed, for one workspace.
+   * Interprets a period from the sources it is given.
    *
-   * Split from generation so a summary can be written the moment its period
-   * closes — at local midnight, so nothing captured right up to 23:59 is
-   * missed — while the Telegram message waits for a decent hour. Matched by
-   * `delivered: false` rather than by time window, so a delivery that failed
-   * once is retried on the next tick instead of lost.
+   * `from`/`to` describe which period this belongs to; they never decide what
+   * is read. `sourceIds` does, and it arrives already resolved by Time — which
+   * is what keeps every calendar question on Time's side of the boundary. A
+   * period whose first six days hold nothing is still that whole period, and
+   * says so, because the label and the content are separate facts.
    */
-  private async deliverPending(workspaceId: string) {
-    const pending = await this.prisma.block.findMany({
-      where: {
-        type: 'journal_summary',
-        workspaceId,
-        deletedAt: null,
-        properties: { path: ['delivered'], equals: false },
-      },
-    });
+  async generateSynthesis(dto: GenerateSynthesisDto) {
+    const { workspaceId, from, to, sourceKind, sourceIds } = dto;
 
-    for (const block of pending) {
-      const props = block.properties as Record<string, unknown>;
-      const periodType = props.periodType as PeriodType;
+    const sources = await this.loadSources(workspaceId, sourceKind, sourceIds);
 
-      await this.notifyZazu(
-        block.id,
+    // Nothing to read. A period nobody recorded is not a period to narrate, and
+    // calling a model here is what once produced summaries of empty months
+    // describing events that never happened.
+    if (sources.length === 0) {
+      this.logger.log(`No ${sourceKind} to read for ${from}–${to}; writing an empty synthesis.`);
+      return this.saveSynthesis({
         workspaceId,
-        periodType,
-        (props.periodLabel as string) ?? '',
-        props.deliveryText as string,
-      );
-      await this.blocksService.updateInternal(block.id, {
-        properties: { ...props, delivered: true },
+        from,
+        to,
+        sourceKind,
+        refs: [],
+        synthesis: '',
+        reflection: '',
+        noData: true,
       });
     }
-  }
 
-  async saveDirectSummary(
-    periodType: string,
-    type: string,
-    synthesis: string,
-    summary: string,
-    startDateStr: string,
-    endDateStr: string
-  ) {
-    const startDate = dayjs(startDateStr).startOf('day').toDate();
-    const endDate = dayjs(endDateStr).endOf('day').toDate();
+    const record = sources.map((s) => s.text).join('\n\n');
 
-    this.logger.log(`Saving direct summary of type ${type} for period ${periodType}`);
+    const synthesis = await this.callModel(
+      'journal_synthesis',
+      SynthesisSchema,
+      'Synthesis',
+      SYNTHESIS_PROMPT.replace(SYNTHESIS_PLACEHOLDER, record),
+      (data) => (data as { synthesis: string }).synthesis,
+    );
 
-    const newSummaryBlock = await this.blocksService.createInternal({
-      type, // 'journal_summary' or 'content_brief'
-      properties: {
-        periodType,
-        periodStart: startDate.toISOString(),
-        periodEnd: endDate.toISOString(),
-        synthesis,
-        summary,
-        highlights: [],
-      }
+    // The reflection reads the synthesis, with the record still in view so it
+    // can point at specifics the synthesis smoothed over.
+    const reflection = await this.callModel(
+      'journal_reflection',
+      ReflectionSchema,
+      'Reflection',
+      REFLECTION_PROMPT.replace(SYNTHESIS_RESULT_PLACEHOLDER, synthesis).replace(
+        SYNTHESIS_PLACEHOLDER,
+        record,
+      ),
+      (data) => (data as { reflection: string }).reflection,
+    );
+
+    return this.saveSynthesis({
+      workspaceId,
+      from,
+      to,
+      sourceKind,
+      refs: sources.map((s) => s.ref),
+      synthesis,
+      reflection,
     });
-
-    return {
-      success: true,
-      blockId: newSummaryBlock.id,
-      data: newSummaryBlock,
-    };
-  }
-
-  /** naŭ user ids of every member of a workspace, for proactive delivery. */
-  private async getWorkspaceRecipients(workspaceId: string): Promise<string[]> {
-    const members = await this.prisma.workspaceMember.findMany({
-      where: { workspaceId },
-      select: { userId: true },
-    });
-    return members.map((m) => m.userId);
   }
 
   /**
-   * One tick an hour, which decides per workspace what is due in its own zone.
+   * Reads exactly the blocks named, and nothing else.
    *
-   * There used to be five crons, each firing at a fixed UTC hour for everyone.
-   * That cannot be right once a day belongs to a place: 23:00 UTC is one in the
-   * morning in Madrid, so the "daily" summary closed a day that still had two
-   * hours to run, and the two hours it did include belonged to the day before.
+   * Scoped to the workspace even though the ids came from a trusted service:
+   * blocks hold personal journal content and are readable by id otherwise.
    *
-   * An hourly tick asks each workspace what time it is there, and acts when the
-   * local clock says so. Every generator is idempotent on the period it covers,
-   * so a repeated hour — which is exactly what happens when the clocks go back —
-   * is skipped rather than duplicated.
-   *
-   * Generation and delivery are two different hours. The daily/weekly summary
-   * is written right at local midnight, once the day is genuinely over — firing
-   * at 23:00 instead, as this used to, closed the book on a day that still had
-   * an hour left in it, so anything captured between 23:00 and 23:59 fell into
-   * the next day's summary instead of this one. Delivery waits until 06:00
-   * local so nobody gets a Telegram message at midnight; `deliverPending`
-   * sends whatever generation left marked `delivered: false`, on a workspace
-   * that may not even be the one that just generated something (a summary
-   * written just before 06:00 still goes out on the same run).
+   * A synthesis of syntheses reads only the `synthesis` field of its sources,
+   * never their `reflection`. A higher period wants its own reflection written
+   * from its own vantage point, not inherited from the levels below it.
    */
-  @Cron('0 * * * *')
-  async handleScheduledSummaries() {
-    const prefs = await this.getUserPreferences();
+  private async loadSources(
+    workspaceId: string,
+    kind: SynthesisSourceKind,
+    ids: string[],
+  ): Promise<Array<{ ref: SynthesisSourceRef; text: string }>> {
+    if (!ids?.length) return [];
 
-    const workspaces = await this.prisma.workspace.findMany({
-      select: { id: true, timezone: true },
+    const type = kind === 'entries' ? 'journal_entry' : 'journal_synthesis';
+    const blocks = await this.prisma.block.findMany({
+      where: { id: { in: ids }, workspaceId, type, deletedAt: null },
+      orderBy: { createdAt: 'asc' },
     });
-    const now = new Date();
 
-    for (const ws of workspaces) {
-      const tz = safeZone(ws.timezone);
-      const local = localNow(tz, now);
-      // The day that just closed, for generators anchored on local midnight —
-      // any instant within it works, since periodBounds only reads the
-      // calendar day off `ref`.
-      const closedDay = local.subtract(1, 'day').toDate();
+    return blocks
+      .map((block) => {
+        const props = (block.properties ?? {}) as Record<string, unknown>;
 
-      try {
-        // 00:00 local: the day that just ended is now closed and safe to read
-        // in full. The weekly runs after the daily rather than racing it.
-        //
-        // No activity block is written any more. It narrated what the system
-        // observed — tasks created, things scheduled — and nothing reads it
-        // now that a period is built from captured experiences alone, so
-        // generating one was an LLM call per workspace per night for an
-        // artefact with no reader.
-        if (local.hour() === 0) {
-          if (prefs.autoDaily) {
-            await this.runPeriod('daily', ws.id, tz, closedDay, false);
-          }
-          // isoWeekday 1 is Monday: the day that just started, so the week
-          // that just closed ended on the Sunday before it.
-          if (prefs.autoWeekly && local.isoWeekday() === 1) {
-            await this.runPeriod('weekly', ws.id, tz, closedDay, false);
-          }
+        if (kind === 'entries') {
+          const date = (props.date as string) ?? block.createdAt.toISOString();
+          return {
+            ref: { id: block.id, from: date, to: date },
+            text: (props.text as string) ?? '',
+          };
         }
 
-        // 06:00 local: send whatever the midnight run generated but held back.
-        if (local.hour() === 6) {
-          await this.deliverPending(ws.id);
-        }
-
-        // The larger periods run early on the first local day, staggered so each
-        // reads what the level it depends on has already written.
-        if (local.date() === 1) {
-          if (prefs.autoMonthly && local.hour() === 1) {
-            await this.runPeriod('monthly', ws.id, tz, now);
-          }
-          if (prefs.autoTrimester && local.hour() === 2 && local.month() % 3 === 0) {
-            await this.runPeriod('trimester', ws.id, tz, now);
-          }
-          if (prefs.autoYearly && local.hour() === 3 && local.month() === 0) {
-            await this.runPeriod('yearly', ws.id, tz, now);
-          }
-        }
-      } catch (err: any) {
-        // One workspace's failure must not stop the tick for the rest.
-        this.logger.error(`Scheduled journal run failed for workspace ${ws.id}: ${err.message}`);
-      }
-    }
+        return {
+          ref: {
+            id: block.id,
+            from: (props.from as string) ?? '',
+            to: (props.to as string) ?? '',
+          },
+          text: (props.synthesis as string) ?? '',
+        };
+      })
+      .filter((s) => s.text.trim().length > 0);
   }
 
-  /** The period that has just closed in this workspace's zone. */
-  private async runPeriod(
-    periodType: PeriodType,
-    workspaceId: string,
-    tz: string,
-    now: Date,
-    deliver = true,
-  ) {
-    const bounds = closedPeriodBounds(periodType, tz, now);
-    this.logger.log(`${periodType} for workspace ${workspaceId} — ${bounds.label} (${tz})`);
-    return this.generateForBounds(periodType, workspaceId, tz, bounds, deliver);
+  /**
+   * A model call that either succeeds or says so.
+   *
+   * Retried because a provider hiccup should not cost a period its
+   * interpretation. Not swallowed into a placeholder string, which is what the
+   * previous implementation did — a synthesis reading "Resumen no disponible"
+   * looks like content to every reader downstream and is indistinguishable from
+   * a real one until someone opens it.
+   */
+  private async callModel<T>(
+    feature: LLMFeature,
+    schema: z.ZodType<T>,
+    schemaName: string,
+    prompt: string,
+    extract: (data: unknown) => string,
+  ): Promise<string> {
+    const { client, model } = getClientForFeature(feature);
+    if (!client) throw new Error('No LLM client configured for journal synthesis');
+
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= LLM_ATTEMPTS; attempt += 1) {
+      try {
+        const result = await client.parseCompletion({
+          model,
+          temperature: 0.2,
+          schema: schema as never,
+          schemaName,
+          messages: [{ role: 'user', content: prompt }],
+        });
+        const text = extract(result.data);
+        if (text?.trim()) return text;
+        lastError = new Error(`${schemaName} came back empty`);
+      } catch (err) {
+        lastError = err;
+        this.logger.warn(`${schemaName} attempt ${attempt}/${LLM_ATTEMPTS} failed: ${String(err)}`);
+      }
+    }
+
+    throw new Error(`${schemaName} failed after ${LLM_ATTEMPTS} attempts: ${String(lastError)}`);
+  }
+
+  /**
+   * Writes the synthesis, recording what produced it.
+   *
+   * `synthesisSource` names every source with the span it covered, so the
+   * provenance of a synthesis is readable without fetching each one. The
+   * prompts are stored as templates: what filled their placeholders is already
+   * recoverable from the sources, and storing the resolved text would copy the
+   * person's words into a field kept for auditing instructions.
+   */
+  private async saveSynthesis(params: {
+    workspaceId: string;
+    from: string;
+    to: string;
+    sourceKind: SynthesisSourceKind;
+    refs: SynthesisSourceRef[];
+    synthesis: string;
+    reflection: string;
+    noData?: boolean;
+  }) {
+    const properties: JournalSynthesisProperties = {
+      synthesis: params.synthesis,
+      synthesisOriginal: params.synthesis,
+      reflection: params.reflection,
+      reflectionOriginal: params.reflection,
+      from: params.from,
+      to: params.to,
+      synthesisSource: {
+        kind: params.sourceKind,
+        ids: params.refs,
+        count: params.refs.length,
+      },
+      prompts: {
+        synthesisPrompt: SYNTHESIS_PROMPT,
+        reflectionPrompt: REFLECTION_PROMPT,
+      },
+      ...(params.noData ? { noData: true } : {}),
+    };
+
+    const block = await this.blocksService.createInternal({
+      type: 'journal_synthesis',
+      workspaceId: params.workspaceId,
+      properties: properties as unknown as Record<string, unknown>,
+    });
+
+    return { success: true, blockId: block.id, data: block };
   }
 }

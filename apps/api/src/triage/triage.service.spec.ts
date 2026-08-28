@@ -5,6 +5,7 @@ import { BlocksService } from '../blocks/blocks.service';
 import { NauthenticityService } from '../integrations/nauthenticity.service';
 import { FlownauIntegrationService } from '../integrations/flownau.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { JournalService } from '../journal/journal.service';
 import { Prisma } from '@prisma/client';
 
 // Minimal inline type to avoid a hard dependency on generated @prisma/client
@@ -80,6 +81,7 @@ const actionTriageResult = {
 describe('TriageService', () => {
   let service: TriageService;
   let blocksService: jest.Mocked<BlocksService>;
+  let journalService: jest.Mocked<JournalService>;
   let nauthenticityService: jest.Mocked<NauthenticityService>;
   let flownauService: jest.Mocked<FlownauIntegrationService>;
 
@@ -124,11 +126,18 @@ describe('TriageService', () => {
             user: { findFirst: jest.fn() },
           },
         },
+        {
+          provide: JournalService,
+          useValue: {
+            createEntry: jest.fn().mockResolvedValue({ id: 'journal-block' }),
+          },
+        },
       ],
     }).compile();
 
     service = module.get<TriageService>(TriageService);
     blocksService = module.get(BlocksService);
+    journalService = module.get(JournalService);
     nauthenticityService = module.get(NauthenticityService);
     flownauService = module.get(FlownauIntegrationService);
 
@@ -254,54 +263,52 @@ describe('TriageService', () => {
 
     it('stores the text exactly as received, without a further model rewrite', async () => {
       const spoken = 'Hoy fui al taller y por fin arreglaron la bici.';
-      blocksService.createInternal.mockResolvedValueOnce(makeBlock({ type: 'journal_entry' }) as any);
 
       await service.processRawText(spoken, 'user-123', 'vn-1', null, 'ws-1', true);
 
       // Zazu already transcribed and cleaned this once. A second pass here made
       // three rewrites stand between what was said and what the diary records.
       expect(mockParseCompletion).not.toHaveBeenCalled();
-
-      const props = blocksService.createInternal.mock.calls[0]![0].properties as Record<string, unknown>;
-      expect(props.summary).toBe(spoken);
-    });
-
-    it('keeps the untouched transcription when the caller sends one', async () => {
-      blocksService.createInternal.mockResolvedValueOnce(makeBlock({ type: 'journal_entry' }) as any);
-
-      await service.processRawText(
-        'Hoy fui al taller.',
-        'user-123',
-        'vn-1',
-        null,
-        'ws-1',
-        true,
-        undefined,
-        'eh hoy fui al al taller o sea',
+      expect(journalService.createEntry).toHaveBeenCalledWith(
+        expect.objectContaining({ text: spoken }),
       );
-
-      const props = blocksService.createInternal.mock.calls[0]![0].properties as Record<string, unknown>;
-      expect(props.raw).toBe('eh hoy fui al al taller o sea');
-      expect(props.summary).toBe('Hoy fui al taller.');
     });
 
-    it('falls back to the given text when no raw transcription is sent', async () => {
-      blocksService.createInternal.mockResolvedValueOnce(makeBlock({ type: 'journal_entry' }) as any);
+    /**
+     * Triage decides that something is a diary entry. What an entry *is* — its
+     * fields, its defaults — belongs to Journal. This path assembling the block
+     * itself is what let it drift from the web capture path until the two wrote
+     * different shapes for the same thing.
+     */
+    it('hands the entry to Journal rather than writing the block itself', async () => {
+      await service.processRawText('Hoy fui al taller.', 'user-123', 'vn-1', null, 'ws-1', true);
 
-      await service.processRawText('Escrito a mano.', 'user-123', undefined, null, 'ws-1', true);
+      expect(journalService.createEntry).toHaveBeenCalledTimes(1);
+      expect(blocksService.createInternal).not.toHaveBeenCalled();
+    });
 
-      const props = blocksService.createInternal.mock.calls[0]![0].properties as Record<string, unknown>;
-      expect(props.raw).toBe('Escrito a mano.');
+    it('records where the capture came from, without carrying its format inward', async () => {
+      await service.processRawText('Hoy fui al taller.', 'user-123', 'vn-1', null, 'ws-1', true);
+
+      expect(journalService.createEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          source: 'zazu',
+          originFormat: 'voice',
+          // The capture stays reachable, as a reference — never as an audio
+          // handle Journal would have to understand.
+          sourceId: 'vn-1',
+        }),
+      );
     });
 
     it('dates the entry when it was captured, not when it was processed', async () => {
-      blocksService.createInternal.mockResolvedValueOnce(makeBlock({ type: 'journal_entry' }) as any);
       const capturedAt = '2026-08-21T23:50:00.000Z';
 
       await service.processRawText('tarde', 'user-123', 'vn-1', null, 'ws-1', true, capturedAt);
 
-      const props = blocksService.createInternal.mock.calls[0]![0].properties as Record<string, unknown>;
-      expect(props.date).toBe(capturedAt);
+      expect(journalService.createEntry).toHaveBeenCalledWith(
+        expect.objectContaining({ date: capturedAt }),
+      );
     });
   });
 });
