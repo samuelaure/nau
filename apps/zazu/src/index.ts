@@ -439,6 +439,13 @@ async function handleFinalDispatch(ctx: ZazuContext) {
 
   clearVoicenoteSession(ctx);
 
+  // dispatchToJournal doesn't catch its own errors (unlike dispatchToBrands,
+  // which logs per-brand failures internally) — log the rejection here so a
+  // failed dispatch isn't silent even though the confirmation now reports it.
+  if (journalResult.status === 'rejected') {
+    logger.error({ err: journalResult.reason }, '[handleFinalDispatch] dispatchToJournal failed');
+  }
+
   const contentResultData = contentResults.status === 'fulfilled' && Array.isArray(contentResults.value)
     ? contentResults.value as Array<{ brandName: string; ideaCount: number }>
     : [];
@@ -448,7 +455,18 @@ async function handleFinalDispatch(ctx: ZazuContext) {
     : 0;
 
   const contentLines = contentResultData.map((r) => `- ${r.ideaCount} ideas para ${r.brandName}`).join('\n');
-  const journalLine = intents.includes('journal') ? '📓 Entrada de journal guardada.' : '';
+  // journalResult reflects what actually happened, not what the user asked
+  // for — dispatchToJournal returns void, so `fulfilled` is the whole signal.
+  // Unlike content/actions there's no partial-success shape for journal (one
+  // entry, one request), so fulfilled/rejected is a real success/failure line,
+  // not an approximation. A rejection (e.g. the API now returns 400 for a
+  // capture with no resolvable workspace) must not be reported as saved: the
+  // entry doesn't exist and the person has no reason to re-record it.
+  const journalLine = intents.includes('journal')
+    ? (journalResult.status === 'fulfilled'
+        ? '📓 Entrada de journal guardada.'
+        : '⚠️ No se pudo guardar la entrada de journal.')
+    : '';
   const contentLine = contentLines ? `💡 Ideas de contenido:\n${contentLines}` : '';
   const actionLine = intents.includes('actions') ? `🎯 GTD: ${actionsResultData} ${actionsResultData === 1 ? 'bloque creado' : 'bloques creados'}.` : '';
 
