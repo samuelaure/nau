@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { CapturesController } from './captures.controller';
 import { CapturesService } from './captures.service';
-import { BlocksModule } from '../blocks/blocks.module';
+import { JournalModule } from '../journal/journal.module';
 import { PrivateStorageService } from '../media/private-storage.service';
 
 @Module({
-  imports: [BlocksModule],
+  imports: [JournalModule],
   controllers: [CapturesController],
   providers: [CapturesService, PrivateStorageService],
   exports: [CapturesService],

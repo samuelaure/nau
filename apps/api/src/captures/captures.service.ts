@@ -1,7 +1,7 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { getFeatureFallbackChain, getClientForFeature } from '@nau/llm-client';
 import { z } from 'zod';
-import { BlocksService } from '../blocks/blocks.service';
+import { JournalService } from '../journal/journal.service';
 import { PrivateStorageService } from '../media/private-storage.service';
 
 const CleanedCapture = z.object({
@@ -25,7 +25,7 @@ export class CapturesService {
   private readonly logger = new Logger(CapturesService.name);
 
   constructor(
-    private readonly blocks: BlocksService,
+    private readonly journal: JournalService,
     private readonly storage: PrivateStorageService,
   ) {}
 
@@ -65,33 +65,6 @@ Write in the same language as the input.`,
     }
   }
 
-  private async createEntry(params: {
-    text: string;
-    userId: string;
-    workspaceId: string;
-    capturedAt?: string;
-    source: string;
-    audioKey?: string;
-    rawText?: string;
-  }) {
-    return this.blocks.createInternal({
-      type: 'journal_entry',
-      workspaceId: params.workspaceId,
-      userId: params.userId,
-      properties: {
-        summary: params.text,
-        // The raw capture is kept alongside the distilled version. The model
-        // rewrites the user's words, and there should always be a way back to
-        // what was actually said.
-        raw: params.rawText ?? params.text,
-        date: params.capturedAt ?? new Date().toISOString(),
-        source: params.source,
-        audioKey: params.audioKey,
-        status: 'published',
-      },
-    });
-  }
-
   async captureText(params: {
     text: string;
     userId: string;
@@ -105,11 +78,13 @@ Write in the same language as the input.`,
     // filler and false starts of speech; running it over something the user
     // deliberately wrote just rewrites their words in a model's voice, which is
     // the opposite of what a personal journal is for.
-    const block = await this.createEntry({
-      ...params,
+    const block = await this.journal.createEntry({
       text: trimmed,
-      rawText: trimmed,
-      source: 'web_text',
+      date: params.capturedAt,
+      source: 'app',
+      originFormat: 'text',
+      workspaceId: params.workspaceId,
+      userId: params.userId,
     });
 
     return { success: true, block };
@@ -157,12 +132,19 @@ Write in the same language as the input.`,
     }
 
     const distilled = await this.distil(raw);
-    const block = await this.createEntry({
-      ...params,
+
+    // The audio and its untouched transcription stay here, with the capture
+    // that produced them. What reaches the journal is the text — an entry is a
+    // piece of writing, and what it was before it was writing belongs to
+    // whoever did the capturing.
+    const block = await this.journal.createEntry({
       text: distilled,
-      rawText: raw,
-      source: params.source ?? 'web_voice',
-      audioKey: params.audioKey,
+      date: params.capturedAt,
+      source: 'app',
+      originFormat: 'voice',
+      workspaceId: params.workspaceId,
+      userId: params.userId,
+      sourceId: params.audioKey,
     });
 
     return { success: true, transcription: raw, block };

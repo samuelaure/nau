@@ -1,22 +1,35 @@
 import { Controller, Post, Get, Query, Body, UseGuards } from '@nestjs/common';
 import { TriageService } from './triage.service';
 import { ServiceAuthGuard } from '../common/guards/service-auth.guard';
+import type { TriageRequestDto } from '@nau/types';
 
-export class TriageDto {
+/**
+ * Implements the shared wire contract rather than restating it.
+ *
+ * The class exists because Nest needs one at runtime for `@Body()`; the shape
+ * comes from `@nau/types`, which is what Zazŭ builds its request against. If
+ * the two drift, this stops compiling.
+ */
+export class TriageDto implements TriageRequestDto {
   text!: string;
   userId?: string;
   sourceBlockId?: string;
   brandId?: string | null;
   workspaceId?: string;
   journalOnly?: boolean;
-  /** When the capture was recorded. Falls back to now if the caller omits it. */
   capturedAt?: string;
-  /**
-   * The untouched transcription, when the caller has already cleaned `text`.
-   * Stored alongside so there is always a way back to what was actually said.
-   */
-  rawText?: string;
 }
+
+/**
+ * `rawText` used to be accepted here: the untouched transcription, sent so the
+ * journal entry could hold both the raw and the cleaned form of itself.
+ *
+ * An entry holds one text now. The original transcription stays with the
+ * service that produced it — Zazŭ keeps it on its own `Voicenote` row — and
+ * `sourceBlockId` is the way back to it. Callers may still send the field;
+ * it is ignored rather than rejected, so Zazŭ does not have to deploy in
+ * lockstep with this change.
+ */
 
 @UseGuards(ServiceAuthGuard)
 @Controller('triage')
@@ -33,7 +46,6 @@ export class TriageController {
       body.workspaceId,
       body.journalOnly,
       body.capturedAt,
-      body.rawText,
     );
     return result;
   }

@@ -1,6 +1,4 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import dayjs from 'dayjs';
-import { ConfigService } from '@nestjs/config';
 import { JournalService } from './journal.service';
 import { BlocksService } from '../blocks/blocks.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -14,111 +12,65 @@ const mockParseCompletion = jest.fn();
 jest.mock('@nau/llm-client', () => ({
   getClientForFeature: jest.fn(() => ({
     client: { parseCompletion: mockParseCompletion },
-    model: 'gpt-4o-mini',
+    model: 'gpt-4o',
   })),
 }));
 
-jest.mock('@nau/auth', () => ({ signServiceToken: jest.fn().mockResolvedValue('tok') }));
-jest.mock('axios', () => ({ post: jest.fn().mockResolvedValue({ data: {} }) }));
-
-/** The rows the mocked findMany should answer with, keyed by what was asked for. */
-type Fixture = {
-  entries?: unknown[];
-  activity?: unknown[];
-  sideBlocks?: unknown[];
-  summaries?: unknown[];
-};
-
-const activityBlock = (dateIso: string, text: string) => ({
-  id: `a-${dateIso}`,
-  type: 'journal_activity',
-  createdAt: new Date(dateIso),
-  properties: { date: dateIso, raw: text, summary: text, source: 'activity_synthesis' },
-});
-
-const entry = (dateIso: string, props: Record<string, unknown>) => ({
-  id: `e-${dateIso}`,
+const entry = (id: string, date: string, text: string) => ({
+  id,
   type: 'journal_entry',
-  createdAt: new Date(dateIso),
-  properties: { date: dateIso, ...props },
+  createdAt: new Date(date),
+  properties: { text, date, source: 'zazu', originFormat: 'voice' },
 });
 
-const summary = (periodType: string, start: string, end: string) => ({
-  id: `s-${periodType}-${start}`,
-  type: 'journal_summary',
-  createdAt: new Date(end),
+const synthesis = (id: string, from: string, to: string) => ({
+  id,
+  type: 'journal_synthesis',
+  createdAt: new Date(from),
   properties: {
-    periodType,
-    periodStart: start,
-    periodEnd: end,
-    summary: `qué pasó en el ${periodType} ${start}`,
-    synthesis: `qué significó el ${periodType} ${start}`,
+    from,
+    to,
+    synthesis: `la síntesis de ${id}`,
+    reflection: `la reflexión de ${id}`,
   },
 });
 
-describe('JournalService — what each period reads', () => {
+describe('JournalService', () => {
   let service: JournalService;
   let blocksService: jest.Mocked<BlocksService>;
   let findMany: jest.Mock;
-  let findFirst: jest.Mock;
+  let findUnique: jest.Mock;
 
-  /**
-   * Routes each findMany to the right slice of the fixture by inspecting the
-   * `where` the service built. That is deliberate: the assertions below are
-   * about which query the service issues, so the mock has to distinguish them.
-   */
-  const load = (f: Fixture) => {
-    findMany.mockImplementation(({ where }: any) => {
-      if (where.type === 'journal_entry') return Promise.resolve(f.entries ?? []);
-      if (where.type === 'journal_activity') return Promise.resolve(f.activity ?? []);
-      if (where.type === 'journal_summary') {
-        const wanted = where.AND?.[0]?.properties?.equals;
-        return Promise.resolve(
-          (f.summaries ?? []).filter((s: any) => s.properties.periodType === wanted),
-        );
-      }
-      if (where.type?.in) return Promise.resolve(f.sideBlocks ?? []);
-      return Promise.resolve([]);
+  /** The properties of the block the service wrote. */
+  const written = () =>
+    blocksService.createInternal.mock.calls[0]![0].properties as Record<string, any>;
+
+  const generate = (overrides: Partial<Parameters<JournalService['generateSynthesis']>[0]> = {}) =>
+    service.generateSynthesis({
+      workspaceId: 'ws-1',
+      from: '2026-08-20T00:00:00.000Z',
+      to: '2026-08-20T23:59:59.999Z',
+      sourceKind: 'entries',
+      sourceIds: ['e-1'],
+      ...overrides,
     });
-  };
-
-  const promptFor = async (
-    periodType: any,
-    start: string,
-    end: string,
-  ): Promise<{ system: string; user: string }> => {
-    await service.generateSummary(periodType, start, end, 'ws-1');
-    const call = mockParseCompletion.mock.calls.at(-1)![0];
-    return { system: call.messages[0].content, user: call.messages[1].content };
-  };
 
   beforeEach(async () => {
     findMany = jest.fn().mockResolvedValue([]);
-    findFirst = jest.fn().mockResolvedValue(null);
+    findUnique = jest.fn().mockResolvedValue(null);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         JournalService,
         {
           provide: PrismaService,
-          useValue: {
-            block: { findMany, findFirst },
-            relation: { createMany: jest.fn() },
-            workspaceMember: { findMany: jest.fn().mockResolvedValue([]) },
-            // Every period boundary is resolved in the workspace's zone. These
-            // tests pin it to UTC so the expected instants stay readable.
-            workspace: {
-              findUnique: jest.fn().mockResolvedValue({ timezone: 'UTC' }),
-              findMany: jest.fn().mockResolvedValue([]),
-            },
-          },
+          useValue: { block: { findMany, findUnique } },
         },
-        { provide: ConfigService, useValue: { getOrThrow: jest.fn(() => 'secret') } },
         {
           provide: BlocksService,
           useValue: {
-            createInternal: jest.fn().mockResolvedValue({ id: 'new-summary' }),
-            updateInternal: jest.fn(),
+            createInternal: jest.fn().mockResolvedValue({ id: 'new-block' }),
+            updateInternal: jest.fn().mockResolvedValue({ id: 'converted' }),
           },
         },
       ],
@@ -127,372 +79,276 @@ describe('JournalService — what each period reads', () => {
     service = module.get(JournalService);
     blocksService = module.get(BlocksService);
 
-    mockParseCompletion.mockResolvedValue({
-      data: { synthesis: 's', digest: 'd', summary: 'r', highlights: [] },
-    });
+    mockParseCompletion
+      .mockResolvedValueOnce({ data: { synthesis: 'lo que viví' } })
+      .mockResolvedValueOnce({ data: { reflection: 'lo que significó' } });
   });
 
   afterEach(() => jest.clearAllMocks());
 
-  describe('daily', () => {
-    it('reads the raw capture of every entry in the day', async () => {
-      load({
-        entries: [
-          entry('2026-08-20T09:12:00.000Z', { raw: 'lo que dije de verdad', summary: 'limpio' }),
-          entry('2026-08-20T18:40:00.000Z', { raw: 'segunda nota cruda', summary: 'limpio 2' }),
-        ],
+  describe('creating an entry', () => {
+    it('stores one text field, mirrored into textOriginal', async () => {
+      await service.createEntry({
+        text: 'lo que dije',
+        source: 'zazu',
+        originFormat: 'voice',
+        workspaceId: 'ws-1',
       });
 
-      const { user } = await promptFor('daily', '2026-08-20', '2026-08-20');
-
-      expect(user).toContain('lo que dije de verdad');
-      expect(user).toContain('segunda nota cruda');
+      expect(written()).toMatchObject({
+        text: 'lo que dije',
+        textOriginal: 'lo que dije',
+        source: 'zazu',
+        originFormat: 'voice',
+      });
     });
 
-    it('prefers a hand-made correction over the original capture', async () => {
-      load({
-        entries: [
-          entry('2026-08-20T09:12:00.000Z', {
-            raw: 'lo que el microfono oyo',
-            summary: 'lo que yo quise decir',
-            editedAt: '2026-08-21T10:00:00.000Z',
-          }),
-        ],
+    it('keeps no trace of how the capture was stored', async () => {
+      await service.createEntry({
+        text: 'x',
+        source: 'zazu',
+        originFormat: 'voice',
+        workspaceId: 'ws-1',
+        sourceId: 'capture-9',
       });
 
-      const { user } = await promptFor('daily', '2026-08-20', '2026-08-20');
-
-      expect(user).toContain('lo que yo quise decir');
-      expect(user).not.toContain('lo que el microfono oyo');
+      const props = written();
+      // The origin is a reference, not a handle: Journal can say where this came
+      // from without knowing what an audio key is.
+      expect(props.sourceId).toBe('capture-9');
+      expect(props.audioKey).toBeUndefined();
+      expect(props.raw).toBeUndefined();
+      expect(props.summary).toBeUndefined();
+      expect(props.status).toBeUndefined();
     });
 
-    it('reads only one of the two stored forms, not both', async () => {
-      load({
-        entries: [
-          entry('2026-08-20T09:12:00.000Z', { raw: 'la forma cruda', summary: 'la forma limpia' }),
-        ],
-      });
-
-      const { user } = await promptFor('daily', '2026-08-20', '2026-08-20');
-
-      expect(user).toContain('la forma cruda');
-      expect(user).not.toContain('la forma limpia');
-    });
-
-    it('falls back to the cleaned text for entries written before raw existed', async () => {
-      load({ entries: [entry('2026-08-20T09:12:00.000Z', { summary: 'sólo tengo el limpio' })] });
-
-      const { user } = await promptFor('daily', '2026-08-20', '2026-08-20');
-
-      expect(user).toContain('sólo tengo el limpio');
-    });
-
-    it('selects entries by when they were captured, not when they were stored', async () => {
-      load({ entries: [entry('2026-08-20T09:12:00.000Z', { raw: 'x' })] });
-
-      await service.generateSummary('daily', '2026-08-20', '2026-08-20', 'ws-1');
-
-      const entryQuery = findMany.mock.calls.find((c) => c[0].where.type === 'journal_entry')![0];
-      expect(entryQuery.where.AND).toEqual([
-        { properties: { path: ['date'], gte: expect.any(String) } },
-        { properties: { path: ['date'], lte: expect.any(String) } },
-      ]);
-      expect(entryQuery.where.createdAt).toBeUndefined();
-    });
-
-    it('never asks for summaries of its own entries', async () => {
-      load({
-        entries: [entry('2026-08-20T09:12:00.000Z', { raw: 'x' })],
-        summaries: [summary('daily', '2026-08-20T00:00:00.000Z', '2026-08-20T23:59:59.999Z')],
-      });
-
-      const { user } = await promptFor('daily', '2026-08-20', '2026-08-20');
-
-      expect(user).not.toContain('qué pasó en el daily');
+    it('refuses an empty entry', async () => {
+      await expect(
+        service.createEntry({
+          text: '   ',
+          source: 'app',
+          originFormat: 'text',
+          workspaceId: 'ws-1',
+        }),
+      ).rejects.toThrow('text is required');
     });
   });
 
-  /**
-   * A period is built from captured experiences and nothing else.
-   *
-   * Recorded activity, tasks and inbox captures used to be read in as
-   * supporting context, and the result opened by telling its author they had
-   * created two tasks named "sin título" — the system's own noise in the place
-   * where a person's life was meant to be. These tests hold that line.
-   */
-  describe('only what the person captured', () => {
-    it('never reads the activity the system recorded about itself', async () => {
-      load({
-        entries: [entry('2026-08-20T09:12:00.000Z', { raw: 'lo que dije' })],
-        activity: [activityBlock('2026-08-20T23:59:59.999Z', 'Creé dos tareas y completé una.')],
+  describe('converting a capture into an entry', () => {
+    it('changes the existing block rather than writing a second one', async () => {
+      findUnique.mockResolvedValue({
+        id: 'blk-1',
+        type: 'capture',
+        properties: { text: 'lo capturado', date: '2026-08-20T09:00:00.000Z' },
       });
 
-      const { user } = await promptFor('daily', '2026-08-20', '2026-08-20');
+      await service.convertBlockToEntry('blk-1', { source: 'zazu', originFormat: 'voice' });
 
-      expect(user).toContain('lo que dije');
-      expect(user).not.toContain('Creé dos tareas y completé una.');
-    });
-
-    it('does not query for activity, tasks or captures at all', async () => {
-      load({ entries: [entry('2026-08-20T09:12:00.000Z', { raw: 'lo que dije' })] });
-
-      await service.generateSummary('daily', '2026-08-20', '2026-08-20', 'ws-1');
-
-      const typesQueried = findMany.mock.calls.map((c) => c[0].where.type);
-      expect(typesQueried).not.toContain('journal_activity');
-      // `{ in: [...] }` was the action/content_idea query.
-      expect(typesQueried.some((t) => t && typeof t === 'object' && 'in' in t)).toBe(false);
-    });
-
-    it('writes nothing for a day whose only trace is system activity', async () => {
-      load({ activity: [activityBlock('2026-08-20T23:59:59.999Z', 'Completé tres tareas.')] });
-
-      const result = await service.generateSummary('daily', '2026-08-20', '2026-08-20', 'ws-1');
-
-      // Silence is the honest answer. A day nobody wrote about is not a day to
-      // narrate from event rows.
-      expect(result).toMatchObject({ skipped: true });
       expect(blocksService.createInternal).not.toHaveBeenCalled();
+      expect(blocksService.updateInternal).toHaveBeenCalledWith(
+        'blk-1',
+        expect.objectContaining({ type: 'journal_entry' }),
+      );
     });
 
-    it('does not feed activity into the levels that read summaries', async () => {
-      load({
-        activity: [activityBlock('2026-07-04T23:59:59.999Z', 'Actividad de julio.')],
-        summaries: [summary('daily', '2026-07-04T00:00:00.000Z', '2026-07-04T23:59:59.999Z')],
+    it('keeps the date the capture already carried', async () => {
+      findUnique.mockResolvedValue({
+        id: 'blk-1',
+        type: 'capture',
+        properties: { text: 'x', date: '2026-08-20T09:00:00.000Z' },
       });
 
-      const { user } = await promptFor('monthly', '2026-07-01', '2026-07-31');
+      await service.convertBlockToEntry('blk-1', { source: 'zazu', originFormat: 'voice' });
 
-      expect(user).not.toContain('Actividad de julio.');
+      const dto = blocksService.updateInternal.mock.calls[0]![1] as any;
+      expect(dto.properties.date).toBe('2026-08-20T09:00:00.000Z');
     });
   });
 
-  /**
-   * The derived entry is read in the app; Telegram gets a short notice about
-   * it. Sending the entry itself is what put a 15,669-character message in
-   * front of Telegram's 4,096 limit and crash-looped Zazŭ 1,215 times.
-   */
-  describe('the entry is read in the app, the digest is what is sent', () => {
-    const generated = async () => {
-      load({ entries: [entry('2026-08-20T09:12:00.000Z', { raw: 'lo que viví' })] });
-      mockParseCompletion.mockResolvedValueOnce({
-        data: {
-          synthesis: 'el día entero, homogeneizado, largo'.repeat(50),
-          digest: 'Hoy fue sobre dinero y sobre reconectar con la familia.',
-          summary: 'dinero y familia',
-          highlights: [],
-        },
-      });
-      await service.generateSummary('daily', '2026-08-20', '2026-08-20', 'ws-1');
-      return blocksService.createInternal.mock.calls[0]![0].properties as Record<string, unknown>;
-    };
+  describe('generating a synthesis', () => {
+    it('reads exactly the ids it was given, never a date range', async () => {
+      findMany.mockResolvedValue([entry('e-1', '2026-08-20T09:00:00.000Z', 'lo que viví')]);
 
-    it('sends the digest, not the derived entry', async () => {
-      const props = await generated();
-      expect(props.deliveryText).toBe('Hoy fue sobre dinero y sobre reconectar con la familia.');
-    });
+      await generate({ sourceIds: ['e-1', 'e-2'] });
 
-    it('never puts the full entry into the delivery text', async () => {
-      const props = await generated();
-      expect(props.deliveryText).not.toContain('el día entero, homogeneizado');
-      expect((props.deliveryText as string).length).toBeLessThan(4096);
-    });
-
-    it('keeps the full entry on the block, which is what the app reads', async () => {
-      const props = await generated();
-      expect(props.synthesis).toContain('el día entero, homogeneizado');
-    });
-
-    it('stores the digest too, so what was sent can be read back later', async () => {
-      const props = await generated();
-      expect(props.digest).toBe('Hoy fue sobre dinero y sobre reconectar con la familia.');
-    });
-
-    it('asks the model for a digest meant for a phone', async () => {
-      load({ entries: [entry('2026-08-20T09:12:00.000Z', { raw: 'x' })] });
-      const { system } = await promptFor('daily', '2026-08-20', '2026-08-20');
-      expect(system).toContain('"digest"');
-      expect(system).toContain('móvil');
-      // It must be clear it replaces nothing — the app holds the real thing.
-      expect(system).toContain('Nunca lo sustituye');
-    });
-  });
-
-  describe('an interpretation, not a summary', () => {
-    it('tells the model to homogenise rather than condense', async () => {
-      load({ entries: [entry('2026-08-20T09:12:00.000Z', { raw: 'x' })] });
-
-      const { system } = await promptFor('daily', '2026-08-20', '2026-08-20');
-
-      expect(system).toContain('NO es un resumen');
-      expect(system).toContain('UNA sola experiencia continua');
-    });
-
-    it('asks for the person\'s own words, which is what makes it recognisable', async () => {
-      load({ entries: [entry('2026-08-20T09:12:00.000Z', { raw: 'x' })] });
-
-      const { system } = await promptFor('daily', '2026-08-20', '2026-08-20');
-
-      expect(system).toContain('primera persona');
-      expect(system).toContain('con las palabras de la persona');
-    });
-
-    it('forbids the model from commenting on what was lived', async () => {
-      load({ entries: [entry('2026-08-20T09:12:00.000Z', { raw: 'x' })] });
-
-      const { system } = await promptFor('daily', '2026-08-20', '2026-08-20');
-
-      expect(system).toContain('No opines');
-      expect(system).toContain('no eres un observador');
-    });
-
-    it('weights each experience by what it meant rather than evenly', async () => {
-      load({ entries: [entry('2026-08-20T09:12:00.000Z', { raw: 'x' })] });
-
-      const { system } = await promptFor('daily', '2026-08-20', '2026-08-20');
-
-      expect(system).toContain('el espacio que merece');
-    });
-  });
-
-  describe('weekly', () => {
-    it('reads the entries of its days, not the daily summaries', async () => {
-      load({
-        entries: [entry('2026-08-18T10:00:00.000Z', { raw: 'la nota del martes' })],
-        summaries: [summary('daily', '2026-08-18T00:00:00.000Z', '2026-08-18T23:59:59.999Z')],
-      });
-
-      const { user } = await promptFor('weekly', '2026-08-17', '2026-08-23');
-
-      expect(user).toContain('la nota del martes');
-      expect(user).not.toContain('qué pasó en el daily');
-    });
-  });
-
-  describe('monthly', () => {
-    it('reads the daily summaries of the month', async () => {
-      load({
-        entries: [entry('2026-07-04T10:00:00.000Z', { raw: 'una entrada suelta de julio' })],
-        summaries: [
-          summary('daily', '2026-07-04T00:00:00.000Z', '2026-07-04T23:59:59.999Z'),
-          summary('weekly', '2026-07-01T00:00:00.000Z', '2026-07-05T23:59:59.999Z'),
-        ],
-      });
-
-      const { user } = await promptFor('monthly', '2026-07-01', '2026-07-31');
-
-      expect(user).toContain('qué pasó en el daily');
-      // Not the weeks, and not the entries themselves: one level down, only.
-      expect(user).not.toContain('qué pasó en el weekly');
-      expect(user).not.toContain('una entrada suelta de julio');
-    });
-  });
-
-  describe('trimester', () => {
-    it('reads the weekly summaries of the quarter', async () => {
-      load({
-        summaries: [
-          summary('weekly', '2026-07-06T00:00:00.000Z', '2026-07-12T23:59:59.999Z'),
-          summary('daily', '2026-07-06T00:00:00.000Z', '2026-07-06T23:59:59.999Z'),
-        ],
-      });
-
-      const { user } = await promptFor('trimester', '2026-07-01', '2026-09-30');
-
-      expect(user).toContain('qué pasó en el weekly');
-      expect(user).not.toContain('qué pasó en el daily');
-    });
-  });
-
-  describe('yearly', () => {
-    it('reads the monthly summaries of the year', async () => {
-      load({
-        summaries: [
-          summary('monthly', '2026-07-01T00:00:00.000Z', '2026-07-31T23:59:59.999Z'),
-          summary('trimester', '2026-07-01T00:00:00.000Z', '2026-09-30T23:59:59.999Z'),
-        ],
-      });
-
-      const { user } = await promptFor('yearly', '2026-01-01', '2026-12-31');
-
-      expect(user).toContain('qué pasó en el monthly');
-      expect(user).not.toContain('qué pasó en el trimester');
-    });
-  });
-
-  describe('guards', () => {
-    it('writes nothing when the period has no input', async () => {
-      load({});
-
-      const result = await service.generateSummary('monthly', '2026-07-01', '2026-07-31', 'ws-1');
-
-      expect(result).toMatchObject({ skipped: true });
-      expect(mockParseCompletion).not.toHaveBeenCalled();
-      expect(blocksService.createInternal).not.toHaveBeenCalled();
-    });
-
-    it('excludes soft-deleted summaries from what it reads', async () => {
-      load({ summaries: [summary('daily', '2026-07-04T00:00:00.000Z', '2026-07-04T23:59:59.999Z')] });
-
-      await service.generateSummary('monthly', '2026-07-01', '2026-07-31', 'ws-1');
-
-      const q = findMany.mock.calls.find((c) => c[0].where.type === 'journal_summary')![0];
-      expect(q.where.deletedAt).toBeNull();
-    });
-
-    it('matches an existing summary on the period it covers, not on when it was written', async () => {
-      findFirst.mockResolvedValue({ id: 'already-there' });
-
-      const result = await service.generateSummary('monthly', '2026-07-01', '2026-07-31', 'ws-1');
-
-      expect(result).toMatchObject({ cached: true, blockId: 'already-there' });
-      const where = findFirst.mock.calls[0]![0].where;
-      expect(where.AND).toEqual([
-        { properties: { path: ['periodType'], equals: 'monthly' } },
-        {
-          properties: {
-            path: ['periodStart'],
-            equals: '2026-07-01T00:00:00.000Z',
-          },
-        },
-        {
-          properties: {
-            path: ['periodEnd'],
-            equals: '2026-07-31T23:59:59.999Z',
-          },
-        },
-      ]);
+      const where = findMany.mock.calls[0]![0].where;
+      expect(where.id).toEqual({ in: ['e-1', 'e-2'] });
+      // The period is a label on the result, not a filter on the query.
+      expect(where.properties).toBeUndefined();
       expect(where.createdAt).toBeUndefined();
     });
 
-    it('records on the summary what it was built from', async () => {
-      load({ summaries: [summary('daily', '2026-07-04T00:00:00.000Z', '2026-07-04T23:59:59.999Z')] });
+    it('scopes the read to the workspace even though a service asked', async () => {
+      findMany.mockResolvedValue([entry('e-1', '2026-08-20T09:00:00.000Z', 'x')]);
 
-      await service.generateSummary('monthly', '2026-07-01', '2026-07-31', 'ws-1');
+      await generate();
 
-      const props = blocksService.createInternal.mock.calls[0]![0].properties as Record<string, unknown>;
-      expect(props.sourceType).toBe('daily');
-      expect(props.sourceCount).toBe(1);
+      expect(findMany.mock.calls[0]![0].where).toMatchObject({
+        workspaceId: 'ws-1',
+        deletedAt: null,
+      });
+    });
+
+    it('runs two separate calls: the account, then the reading of it', async () => {
+      findMany.mockResolvedValue([entry('e-1', '2026-08-20T09:00:00.000Z', 'lo que viví')]);
+
+      await generate();
+
+      expect(mockParseCompletion).toHaveBeenCalledTimes(2);
+      const [first, second] = mockParseCompletion.mock.calls.map((c) => c[0].messages[0].content);
+      expect(first).toContain('lo que viví');
+      // The second call sees the first's output — that is what makes it a
+      // reading of the synthesis rather than a second account of the record.
+      expect(second).toContain('lo que viví');
+      expect(second).toContain('lo que viví');
+    });
+
+    it('stores both pieces, each mirrored into its original', async () => {
+      findMany.mockResolvedValue([entry('e-1', '2026-08-20T09:00:00.000Z', 'x')]);
+
+      await generate();
+
+      expect(written()).toMatchObject({
+        synthesis: 'lo que viví',
+        synthesisOriginal: 'lo que viví',
+        reflection: 'lo que significó',
+        reflectionOriginal: 'lo que significó',
+      });
+    });
+
+    it('records the period it was asked for, even where the record is thin', async () => {
+      findMany.mockResolvedValue([entry('e-1', '2026-08-31T09:00:00.000Z', 'x')]);
+
+      await generate({
+        from: '2026-08-01T00:00:00.000Z',
+        to: '2026-08-31T23:59:59.999Z',
+      });
+
+      // A month whose first three weeks hold nothing is still that whole month.
+      expect(written()).toMatchObject({
+        from: '2026-08-01T00:00:00.000Z',
+        to: '2026-08-31T23:59:59.999Z',
+      });
+    });
+
+    it('names every source it read, with the span each covered', async () => {
+      findMany.mockResolvedValue([
+        entry('e-1', '2026-08-20T09:00:00.000Z', 'primera'),
+        entry('e-2', '2026-08-20T18:00:00.000Z', 'segunda'),
+      ]);
+
+      await generate({ sourceIds: ['e-1', 'e-2'] });
+
+      expect(written().synthesisSource).toEqual({
+        kind: 'entries',
+        count: 2,
+        ids: [
+          { id: 'e-1', from: '2026-08-20T09:00:00.000Z', to: '2026-08-20T09:00:00.000Z' },
+          { id: 'e-2', from: '2026-08-20T18:00:00.000Z', to: '2026-08-20T18:00:00.000Z' },
+        ],
+      });
+    });
+
+    it('stores the prompts as templates, without the record pasted in', async () => {
+      findMany.mockResolvedValue([entry('e-1', '2026-08-20T09:00:00.000Z', 'un secreto')]);
+
+      await generate();
+
+      const { synthesisPrompt, reflectionPrompt } = written().prompts;
+      expect(synthesisPrompt).toContain('{{SOURCES: ENTRIES OR SYNTHESES}}');
+      expect(reflectionPrompt).toContain('{{SYNTHESIS}}');
+      // What filled the placeholder is recoverable through synthesisSource;
+      // copying it here would duplicate the person's words into a field kept
+      // for auditing instructions.
+      expect(synthesisPrompt).not.toContain('un secreto');
+      expect(reflectionPrompt).not.toContain('un secreto');
     });
   });
 
-  describe('prompt', () => {
-    it('forbids writing anything the record does not contain', async () => {
-      load({ entries: [entry('2026-08-20T09:12:00.000Z', { raw: 'x' })] });
+  describe('building on smaller syntheses', () => {
+    it('reads their synthesis and never their reflection', async () => {
+      findMany.mockResolvedValue([
+        synthesis('s-1', '2026-08-01T00:00:00.000Z', '2026-08-07T23:59:59.999Z'),
+      ]);
 
-      const { system } = await promptFor('daily', '2026-08-20', '2026-08-20');
+      await generate({ sourceKind: 'syntheses', sourceIds: ['s-1'] });
 
-      // The absence of this instruction is how 95 summaries of empty periods
-      // came to describe events that never happened.
-      expect(system).toMatch(/no puede no estar|no infieras/i);
+      const prompts = mockParseCompletion.mock.calls.map((c) => c[0].messages[0].content);
+      for (const prompt of prompts) {
+        expect(prompt).toContain('la síntesis de s-1');
+        // A higher period earns its own reflection from its own vantage point.
+        // Inheriting the one below would compound a reading of a reading.
+        expect(prompt).not.toContain('la reflexión de s-1');
+      }
     });
 
-    it('tells the model the period it is covering', async () => {
-      load({ entries: [entry('2026-08-20T09:12:00.000Z', { raw: 'x' })] });
+    it('asks for syntheses, not entries', async () => {
+      findMany.mockResolvedValue([
+        synthesis('s-1', '2026-08-01T00:00:00.000Z', '2026-08-07T23:59:59.999Z'),
+      ]);
 
-      const { system } = await promptFor('daily', '2026-08-20', '2026-08-20');
+      await generate({ sourceKind: 'syntheses', sourceIds: ['s-1'] });
 
-      expect(system).toContain('20 de agosto de 2026');
+      expect(findMany.mock.calls[0]![0].where.type).toBe('journal_synthesis');
+    });
+
+    it('carries each source period through to the provenance', async () => {
+      findMany.mockResolvedValue([
+        synthesis('s-1', '2026-08-01T00:00:00.000Z', '2026-08-07T23:59:59.999Z'),
+      ]);
+
+      await generate({ sourceKind: 'syntheses', sourceIds: ['s-1'] });
+
+      expect(written().synthesisSource.ids).toEqual([
+        { id: 's-1', from: '2026-08-01T00:00:00.000Z', to: '2026-08-07T23:59:59.999Z' },
+      ]);
+    });
+  });
+
+  describe('when there is nothing to read', () => {
+    it('writes an empty synthesis without calling a model', async () => {
+      findMany.mockResolvedValue([]);
+
+      const result = await generate({ sourceIds: [] });
+
+      expect(mockParseCompletion).not.toHaveBeenCalled();
+      expect(written()).toMatchObject({ noData: true, synthesis: '', reflection: '' });
+      expect(result.success).toBe(true);
+    });
+
+    it('says so for a period whose sources are all blank', async () => {
+      findMany.mockResolvedValue([entry('e-1', '2026-08-20T09:00:00.000Z', '   ')]);
+
+      await generate();
+
+      expect(mockParseCompletion).not.toHaveBeenCalled();
+      expect(written().noData).toBe(true);
+    });
+  });
+
+  describe('when a model call fails', () => {
+    it('retries before giving up', async () => {
+      findMany.mockResolvedValue([entry('e-1', '2026-08-20T09:00:00.000Z', 'x')]);
+      mockParseCompletion.mockReset();
+      mockParseCompletion
+        .mockRejectedValueOnce(new Error('502'))
+        .mockResolvedValueOnce({ data: { synthesis: 'lo que viví' } })
+        .mockResolvedValueOnce({ data: { reflection: 'lo que significó' } });
+
+      await generate();
+
+      expect(written().synthesis).toBe('lo que viví');
+    });
+
+    it('fails loudly rather than storing a placeholder as if it were writing', async () => {
+      findMany.mockResolvedValue([entry('e-1', '2026-08-20T09:00:00.000Z', 'x')]);
+      mockParseCompletion.mockReset();
+      mockParseCompletion.mockRejectedValue(new Error('502'));
+
+      // A synthesis reading "not available" is indistinguishable from a real one
+      // to every reader downstream. Nothing is written at all.
+      await expect(generate()).rejects.toThrow(/Synthesis failed/);
+      expect(blocksService.createInternal).not.toHaveBeenCalled();
     });
   });
 });

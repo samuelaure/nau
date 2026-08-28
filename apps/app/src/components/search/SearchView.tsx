@@ -8,15 +8,16 @@ import { Button } from '@9nau/ui/components/button'
 import { cn } from '@9nau/ui/lib/utils'
 import { useUiStore, useUiActions } from '@/lib/state/ui-store'
 
-type FilterType = 'all' | 'note' | 'action' | 'journal_entry' | 'journal_summary' | 'experience' | 'content_idea'
+type FilterType = 'all' | 'note' | 'action' | 'journal_entry' | 'journal_synthesis' | 'content_idea'
 
+// `experience` is gone: it and `journal_entry` were two names for one concept,
+// and the surviving name is the one anything actually writes.
 const FILTER_OPTIONS: { value: FilterType; label: string; emoji: string }[] = [
   { value: 'all', label: 'Todo', emoji: '🔍' },
   { value: 'note', label: 'Notas', emoji: '📝' },
   { value: 'action', label: 'Acciones', emoji: '⚡' },
   { value: 'journal_entry', label: 'Journal', emoji: '📓' },
-  { value: 'journal_summary', label: 'Resúmenes', emoji: '✨' },
-  { value: 'experience', label: 'Experiencias', emoji: '☕' },
+  { value: 'journal_synthesis', label: 'Síntesis', emoji: '✨' },
   { value: 'content_idea', label: 'Ideas', emoji: '💡' },
 ]
 

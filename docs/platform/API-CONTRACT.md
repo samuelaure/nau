@@ -112,7 +112,7 @@ Base URL: `https://api.9nau.com` (routes at root, no `/api` prefix).
 | GET | `/sync/pull` | USER | Pull blocks since cursor |
 | POST | `/triage` | USER | Triage raw text/transcription |
 | POST | `/triage/retroprocess` | USER + admin | Retroprocess voice captures |
-| POST | `/journal/summary` | USER | Generate period synthesis |
+| POST | `/journal/synthesis` | SERVICE | Interpret a period from the sources given. Body: `{ workspaceId, from, to, sourceKind: 'entries'\|'syntheses', sourceIds: string[] }`. `from`/`to` label the period; `sourceIds` decides what is read — Journal runs no date query of its own, because what belongs to a period is the Time module's decision. Two model calls produce `synthesis` then `reflection` |
 | POST | `/media/upload` | USER | Upload to R2 |
 | GET | `/media/:fileId` | USER | Stream/redirect media |
 

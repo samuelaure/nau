@@ -242,13 +242,13 @@ describe('BlocksService', () => {
       prisma.block.findMany.mockResolvedValueOnce([]);
 
       await service.findAll(user.sub, {
-        types: 'journal_entry,journal_summary',
+        types: 'journal_entry,journal_synthesis',
         from: '2026-08-01',
         to: '2026-08-31',
       });
 
       const arg = prisma.block.findMany.mock.calls[0]![0] as any;
-      expect(arg.where.type).toEqual({ in: ['journal_entry', 'journal_summary'] });
+      expect(arg.where.type).toEqual({ in: ['journal_entry', 'journal_synthesis'] });
       expect(arg.where.AND).toEqual([
         { properties: { path: ['status'], not: 'trash' } },
         {
@@ -256,8 +256,8 @@ describe('BlocksService', () => {
             { properties: { path: ['date'], gte: '2026-08-01', lte: '2026-08-31' } },
             {
               AND: [
-                { properties: { path: ['periodEnd'], gte: '2026-08-01' } },
-                { properties: { path: ['periodStart'], lte: '2026-08-31' } },
+                { properties: { path: ['to'], gte: '2026-08-01' } },
+                { properties: { path: ['from'], lte: '2026-08-31' } },
               ],
             },
           ],
@@ -266,36 +266,35 @@ describe('BlocksService', () => {
     });
 
     /**
-     * The exact regression: a journal_summary carries no `date` at all — it
-     * covers a span, stored as periodStart/periodEnd. Filtering only on `date`
-     * is an AND against a key that never exists on that type, so it matches
-     * zero rows. Every summary ever generated was invisible to any
-     * range-scoped query — including the journal view's own request — while
-     * appearing correctly in an unscoped query. Confirmed against production:
-     * 0 of 33 summaries in the database carry a `date` property.
+     * The exact regression: a journal_synthesis carries no `date` at all — it
+     * covers a span, stored as `from`/`to`. Filtering only on `date` is an AND
+     * against a key that never exists on that type, so it matches zero rows.
+     * Every synthesis ever generated was invisible to any range-scoped query —
+     * including the journal view's own request — while appearing correctly in
+     * an unscoped query.
      */
-    it('includes a journal_summary whose period overlaps the requested range, even with no `date` property', async () => {
+    it('includes a journal_synthesis whose period overlaps the requested range, even with no `date` property', async () => {
       const summaryBlock = {
         ...mockBlock,
-        type: 'journal_summary',
+        type: 'journal_synthesis',
         properties: {
-          periodType: 'daily',
-          periodStart: '2026-08-24T22:00:00.000Z',
-          periodEnd: '2026-08-25T21:59:59.999Z',
+          from: '2026-08-24T22:00:00.000Z',
+          to: '2026-08-25T21:59:59.999Z',
           synthesis: 'lo que pasó el 25',
-          // Deliberately no `date` key — this is the real shape in production.
+          reflection: 'lo que significó',
+          // Deliberately no `date` key — this is the real shape a synthesis has.
         },
       };
       prisma.block.findMany.mockResolvedValueOnce([summaryBlock]);
 
       const result = await service.findAll(user.sub, {
-        types: 'journal_summary',
+        types: 'journal_synthesis',
         from: '2026-08-25T00:00:00.000Z',
         to: '2026-08-25T23:59:59.999Z',
       });
 
       // The where-clause construction is asserted above; this asserts the
-      // actual failure mode — a summary the person just received not showing
+      // actual failure mode — a synthesis the person just received not showing
       // up in the exact view built to display it.
       expect(result).toEqual([summaryBlock]);
     });

@@ -25,8 +25,8 @@ export type LLMFeature =
   | 'triage'               // GTD triage of raw text captures (api)
   | 'planning'             // scheduling/ordering content pieces (flownau)
   | 'template_compile'     // template schema → system prompt compilation (flownau)
-  | 'journal_summary'      // hierarchical journal summaries (api)
-  | 'journal_activity'     // prose narration of a day's recorded activity (api)
+  | 'journal_synthesis'    // retells a period as one continuous experience (api)
+  | 'journal_reflection'   // reads a synthesis back for what it reveals (api)
   | 'comment_suggestions'  // Instagram comment suggestions (nauthenticity)
   | 'post_intelligence'    // post hook/theme/sentiment extraction (nauthenticity)
   | 'synthesis'            // brand creative synthesis (nauthenticity)
@@ -48,10 +48,11 @@ const DEFAULT_FEATURE_MODELS: Record<LLMFeature, string> = {
   triage:              'openai/gpt-4o',
   planning:            'openai/gpt-4o-mini',
   template_compile:    'openai/gpt-4o',
-  journal_summary:     'openai/gpt-4o',
-  // Prose only: the timeline arrives already rendered, so there is nothing to
-  // reason about and a small model does the job exactly as well.
-  journal_activity:    'openai/gpt-4o-mini',
+  journal_synthesis:   'openai/gpt-4o',
+  // Reflection is the harder of the two: recounting follows the record, but
+  // reading it back for what it reveals is where a weaker model starts
+  // inventing patterns that are not there.
+  journal_reflection:  'openai/gpt-4o',
   comment_suggestions: 'openai/gpt-4o-mini',
   post_intelligence:   'openai/gpt-4o-mini',
   synthesis:           'openai/gpt-4o-mini',

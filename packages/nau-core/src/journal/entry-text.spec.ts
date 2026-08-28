@@ -1,82 +1,59 @@
-import { entryText, displayText, editableField, entryEditPatch } from './entry-text'
+import { entryText, displayText, entryEditPatch } from './entry-text'
 
 /**
- * These cases are drawn from real production rows. The voice-note shape is the
- * one that rendered blank in Home for weeks: it carries `raw` and `summary` and
- * has no `text` at all.
+ * An entry holds one text field.
+ *
+ * These tests used to enumerate which of `raw`, `summary` and `text` won under
+ * which conditions — the rule three separate readers each implemented slightly
+ * differently, which is how voice-captured entries came to render as blank rows
+ * on the home screen. There is no rule left to test; what remains is that the
+ * one field is read, and that an edit never touches the record of what the
+ * entry said first.
  */
-const voiceNote = {
-  properties: {
-    raw: ' Acabo de confirmar de que las notas de voz no se están procesando.',
-    summary: 'Acabo de confirmar que las notas de voz no se están procesando.',
-    date: '2026-08-24T12:25:34.000Z',
-    source: 'zazu_voicenote',
-    status: 'published',
-  },
-}
 
-const webEntry = {
-  properties: { text: 'Escrito a mano desde la web', date: '2026-08-24', status: 'published' },
-}
+const entry = (properties: Record<string, unknown>) => ({ properties })
 
-describe('entryText — what a summary is built from', () => {
-  it('prefers the untouched capture, so no model stands between mic and diary', () => {
-    expect(entryText(voiceNote)).toBe(voiceNote.properties.raw)
+describe('entryText', () => {
+  it('reads the entry text', () => {
+    expect(entryText(entry({ text: 'lo que viví' }))).toBe('lo que viví')
   })
 
-  it('reads the typed text when that is all there is', () => {
-    expect(entryText(webEntry)).toBe('Escrito a mano desde la web')
+  it('never falls back to the pre-edit version', () => {
+    // `textOriginal` is provenance, not content. Showing it when `text` is
+    // empty would resurrect writing the person deliberately cleared.
+    expect(entryText(entry({ text: '', textOriginal: 'lo que dije al principio' }))).toBe('')
   })
 
-  it('lets a hand-made correction outrank the original transcription', () => {
-    const corrected = {
-      properties: {
-        raw: 'lo que el microfono oyo',
-        summary: 'lo que yo quise decir',
-        editedAt: '2026-08-24T13:00:00.000Z',
-      },
-    }
-    expect(entryText(corrected)).toBe('lo que yo quise decir')
-  })
-
-  it('never throws on a block with no properties at all', () => {
+  it('survives a block with no properties at all', () => {
     expect(entryText({ properties: null })).toBe('')
     expect(entryText({ properties: undefined })).toBe('')
   })
 
-  it('ignores non-string values rather than rendering them', () => {
-    expect(entryText({ properties: { raw: 42, summary: 'el bueno' } })).toBe('el bueno')
+  it('ignores a non-string in the text field', () => {
+    expect(entryText(entry({ text: 42 }))).toBe('')
   })
 })
 
-describe('displayText — what goes on screen', () => {
-  it('shows the cleaned form, so reading back is not wading through filler', () => {
-    expect(displayText(voiceNote)).toBe(voiceNote.properties.summary)
-  })
-
-  it('falls back to raw when nothing cleaner exists', () => {
-    expect(displayText({ properties: { raw: 'sólo tengo el crudo' } })).toBe('sólo tengo el crudo')
-  })
-
-  it('is never empty for an entry that has any text at all', () => {
-    // The exact regression: this returned '' and the row rendered blank.
-    expect(displayText(voiceNote)).not.toBe('')
+describe('displayText', () => {
+  it('shows what the entry says', () => {
+    expect(displayText(entry({ text: 'lo que viví' }))).toBe('lo que viví')
   })
 })
 
-describe('editableField — where an edit must be written', () => {
-  it('corrects the field the entry actually speaks through', () => {
-    expect(editableField(voiceNote)).toBe('summary')
-    expect(editableField(webEntry)).toBe('text')
+describe('entryEditPatch', () => {
+  it('writes the correction to the field the entry speaks through', () => {
+    const patch = entryEditPatch(entry({ text: 'antes' }), 'después')
+    expect(patch.text).toBe('después')
   })
 
-  it('stamps editedAt so the summary generator honours the correction', () => {
-    const patch = entryEditPatch(voiceNote, 'corregido')
-    expect(patch.summary).toBe('corregido')
-    expect(patch.editedAt).toEqual(expect.any(String))
+  it('leaves the original untouched', () => {
+    const patch = entryEditPatch(entry({ text: 'antes', textOriginal: 'antes' }), 'después')
+    // The only evidence that an entry was changed is that these two differ.
+    expect(patch.textOriginal).toBeUndefined()
   })
 
-  it('leaves raw untouched, because it is the record of what was captured', () => {
-    expect(entryEditPatch(voiceNote, 'corregido')).not.toHaveProperty('raw')
+  it('stamps when the correction happened', () => {
+    const patch = entryEditPatch(entry({ text: 'antes' }), 'después')
+    expect(typeof patch.editedAt).toBe('string')
   })
 })
