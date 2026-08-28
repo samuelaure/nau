@@ -11,12 +11,18 @@ export class TriageDto {
   journalOnly?: boolean;
   /** When the capture was recorded. Falls back to now if the caller omits it. */
   capturedAt?: string;
-  /**
-   * The untouched transcription, when the caller has already cleaned `text`.
-   * Stored alongside so there is always a way back to what was actually said.
-   */
-  rawText?: string;
 }
+
+/**
+ * `rawText` used to be accepted here: the untouched transcription, sent so the
+ * journal entry could hold both the raw and the cleaned form of itself.
+ *
+ * An entry holds one text now. The original transcription stays with the
+ * service that produced it — Zazŭ keeps it on its own `Voicenote` row — and
+ * `sourceBlockId` is the way back to it. Callers may still send the field;
+ * it is ignored rather than rejected, so Zazŭ does not have to deploy in
+ * lockstep with this change.
+ */
 
 @UseGuards(ServiceAuthGuard)
 @Controller('triage')
@@ -33,7 +39,6 @@ export class TriageController {
       body.workspaceId,
       body.journalOnly,
       body.capturedAt,
-      body.rawText,
     );
     return result;
   }

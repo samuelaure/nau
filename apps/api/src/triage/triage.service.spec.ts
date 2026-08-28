@@ -310,5 +310,46 @@ describe('TriageService', () => {
         expect.objectContaining({ date: capturedAt }),
       );
     });
+
+    /**
+     * Zazŭ still sends `rawText` — it did so before an entry held one text
+     * field, and it deploys separately from this service. Accepting and
+     * ignoring the field is what lets the two ship independently; rejecting it
+     * would break every voice note between the two deploys.
+     */
+    it('tolerates a caller still sending the old rawText field', async () => {
+      await expect(
+        (service.processRawText as unknown as (...args: unknown[]) => Promise<unknown>)(
+          'Hoy fui al taller.',
+          'user-123',
+          'vn-1',
+          null,
+          'ws-1',
+          true,
+          undefined,
+          'eh hoy fui al al taller o sea',
+        ),
+      ).resolves.toBeDefined();
+
+      expect(journalService.createEntry).toHaveBeenCalledWith(
+        expect.objectContaining({ text: 'Hoy fui al taller.' }),
+      );
+    });
+
+    /**
+     * An entry with no workspace is written, counted, and visible in no view the
+     * person can reach. Refusing is the honest failure: the bot reports it
+     * instead of confirming a save that silently went nowhere.
+     */
+    it('refuses to file an entry it cannot attach to a workspace', async () => {
+      const prisma = (service as unknown as { prisma: { user: { findFirst: jest.Mock } } }).prisma;
+      prisma.user.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.processRawText('sin casa', 'user-123', 'vn-1', null, undefined, true),
+      ).rejects.toThrow(/workspace/i);
+
+      expect(journalService.createEntry).not.toHaveBeenCalled();
+    });
   });
 });

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { getClientForFeature } from '@nau/llm-client';
 import { z } from 'zod';
 import { BlocksService } from '../blocks/blocks.service';
@@ -59,7 +59,6 @@ export class TriageService {
     workspaceId?: string,
     journalOnly?: boolean,
     capturedAt?: string,
-    rawText?: string,
   ) {
 
     try {
@@ -329,6 +328,16 @@ OUTPUT: Return valid JSON matching the schema.`,
     userId?: string,
     capturedAt?: string,
   ) {
+    // An entry with no workspace belongs to nobody: it is written, it is
+    // counted, and it appears in no view the person can reach. Refusing is the
+    // honest failure — the caller retries or reports it, instead of the entry
+    // disappearing into a table while the bot says it was saved.
+    if (!workspaceId) {
+      throw new BadRequestException(
+        'Cannot file a journal entry: no workspace could be resolved for this user',
+      );
+    }
+
     const journalBlock = await this.journalService.createEntry({
       text,
       // When the note was recorded, not when it happened to be processed. A
@@ -337,7 +346,7 @@ OUTPUT: Return valid JSON matching the schema.`,
       date: capturedAt,
       source: 'zazu',
       originFormat: 'voice',
-      workspaceId: workspaceId!,
+      workspaceId,
       userId,
       sourceId: sourceBlockId,
     });
