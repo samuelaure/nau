@@ -81,6 +81,7 @@ model Workspace {
   inviteTokens InviteToken[]
   tags         Tag[]
   blocks       Block[]
+  timezones    WorkspaceTimezone[]
 }
 
 model WorkspaceMember {
@@ -242,8 +243,7 @@ model Block {
   relationsFrom Relation[] @relation("FromBlock")
   relationsTo   Relation[] @relation("ToBlock")
 
-  schedule    Schedule?
-  timeEntries TimeEntry[]
+  planning    Planning?
   events      Event[]
   tags        BlockTag[]
 
@@ -289,32 +289,44 @@ model Relation {
 /// `timezone` is required for a rule to mean anything: "every weekday at 08:00"
 /// resolves to different instants either side of a daylight-saving change, and
 /// without a zone the rule silently drifts by an hour twice a year.
-model Schedule {
+model Planning {
   id      String @id @default(cuid())
   blockId String @unique
   block   Block  @relation(fields: [blockId], references: [id], onDelete: Cascade)
 
-  startDate DateTime
-  endDate   DateTime?
+  /// WHERE this was placed: which time system, which of its scales, and an
+  /// instant inside the period. This triple is the identity, and it is the
+  /// truth — it names the period rather than measuring it, so it survives a
+  /// timezone change with nothing to migrate.
+  system String @default("gregorian")
+  scale  String @default("day")
+  anchor DateTime
 
-  rrule    String?
-  /// IANA zone the rule is read in. Null means the workspace's own zone.
-  timezone String?
+  /// The resolved interval, DERIVED from the triple above and stored only so a
+  /// query can filter on an index instead of resolving every system in memory.
+  /// Half-open: [from, to). Rebuildable at any time from {system, scale, anchor}
+  /// — never edit it independently.
+  from DateTime
+  to   DateTime
+
+  /// The repetition rule, in whatever dialect its system speaks. Gregorian
+  /// stores RFC 5545; nothing outside that system may parse this.
+  recurrence String?
+  /// IANA zone the rule is read in. Null means the workspace's own zone. A rule
+  /// is an intention about a wall clock, so it carries its zone separately from
+  /// the instants it produces.
+  recurrenceTimezone String?
 
   /// Where the rule counts from. See RecurrenceMode.
   recurrenceMode RecurrenceMode @default(FIXED)
 
-  /// Kept for blocks that are not recurring, where completion is a property of
-  /// the schedule itself. For recurring ones, completion belongs to an
-  /// occurrence and lives in Event — a habit has no single completion date.
-  completedAt DateTime?
-
-  exceptions ScheduleException[]
+  overrides OccurrenceOverride[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([startDate])
+  @@index([from, to])
+  @@index([system, scale])
 }
 
 /// Where a recurrence rule counts from.
@@ -335,7 +347,7 @@ enum RecurrenceMode {
   AFTER_COMPLETION
 }
 
-enum ScheduleExceptionKind {
+enum OverrideKind {
   /// The occurrence does not happen. RFC 5545 EXDATE.
   SKIPPED
   /// The occurrence happens at a different time. RFC 5545 RECURRENCE-ID.
@@ -345,121 +357,118 @@ enum ScheduleExceptionKind {
 /// A single occurrence that departs from its rule.
 ///
 /// The only reason an occurrence is ever stored. Everything a rule predicts is
-/// computed on read; this table holds the exceptions to it, which is the same
-/// shape every calendar system uses.
-model ScheduleException {
+/// computed on read; this table holds the deliberate departures from it, which
+/// is the same shape every calendar system uses. Not called an exception
+/// because it is a decision, not an error.
+model OccurrenceOverride {
   id String @id @default(cuid())
 
-  scheduleId String
-  schedule   Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  planningId String
+  planning   Planning @relation(fields: [planningId], references: [id], onDelete: Cascade)
 
-  /// The instant the rule predicted, which is how the exception is matched back
+  /// The instant the rule predicted, which is how the override is matched back
   /// to the occurrence it replaces.
   occurrenceAt DateTime
-  kind         ScheduleExceptionKind
+  kind         OverrideKind
   /// Where it moved to. Null when skipped.
   movedTo      DateTime?
 
   createdAt DateTime @default(now())
 
-  @@unique([scheduleId, occurrenceAt])
-  @@index([scheduleId])
+  @@unique([planningId, occurrenceAt])
+  @@index([planningId])
 }
 
-/// Real time spent on something. A fact about the past, never a plan.
+
+/// Where a workspace has lived, and since when.
 ///
-/// Separate from Schedule on purpose: a plan is edited, a session happened and
-/// does not change. One block accumulates many sessions, which is how a task
-/// worked across three sittings stays one task.
+/// A single current zone is not enough. Someone spends a season in Madrid and
+/// then moves to Mexico City; with one field, changing it silently
+/// reinterprets every period they ever recorded, and "August 2026" starts
+/// resolving in Mexico although it was lived in Spain.
 ///
-/// Shape follows every time tracker that exists — Toggl, Harvest, Clockify.
-model TimeEntry {
-  id String @id @default(cuid())
-
-  blockId String
-  block   Block  @relation(fields: [blockId], references: [id], onDelete: Cascade)
-
-  workspaceId String?
-  userId      String?
-
-  startedAt DateTime
-  /// Null while a session is still running.
-  endedAt   DateTime?
-  note      String?
+/// A period of the past is resolved with the zone in force then. That works
+/// only because a period's stored truth is {system, scale, anchor} — had the
+/// interval been stored, every past period would need migrating on each move.
+///
+/// Workspace.timezone remains as a cache of the most recent row so ordinary
+/// queries do not pay a join.
+model WorkspaceTimezone {
+  id          String   @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  /// IANA zone.
+  timezone    String
+  /// The instant this zone came into force.
+  effectiveAt DateTime
 
   createdAt DateTime @default(now())
 
-  @@index([blockId])
-  @@index([workspaceId, startedAt])
+  @@index([workspaceId, effectiveAt])
 }
 
-/// A way of dividing time. Gregorian is one of several, not the ground truth.
+/// How one workspace has configured one time system.
 ///
-/// The naŭ calendar runs 9-day weeks and 27-day months; astrological periods
-/// follow transits; personal epochs follow where someone was living. Each is a
-/// different way of grouping the same instants, so the calendar decides how a
-/// range is named and bounded, never what the data is.
+/// A row exists only where a workspace changed something. Defaults live in the
+/// system's own code, so there is no shared built-in row for every workspace to
+/// borrow and accidentally write to.
 ///
-/// Ordinary periods are DERIVED from a date range — "August 2026" needs no row.
-/// Only named or irregular ones are stored, in Period.
-model Calendar {
-  id          String       @id @default(cuid())
-  kind        CalendarKind
-  name        String
-  /// Null for the built-in calendars, which every workspace can use.
-  ///
-  /// A workspace that wants to configure one gets its own row, which overrides
-  /// the built-in of the same kind. That is what this being nullable is for.
-  workspaceId String?
-  isDefault   Boolean      @default(false)
-
-  /// Settings that belong to this way of dividing time, and to no other.
-  ///
-  /// Gregorian carries `firstDayOfWeek` (0 = Sunday, 1 = Monday). The naŭ
-  /// calendar cannot be asked that question — its naŭ are nine days and do not
-  /// align to a weekday — and astrological transits have no weeks at all. Hanging
-  /// the setting off the person would force every ordering system to carry
-  /// options that do not apply to it.
-  config      Json         @default("{}")
-
-  periods Period[]
+/// `config` is the system's own shape and only that system validates it:
+/// Gregorian carries `firstDayOfWeek`; the naŭ calendar cannot be asked that
+/// question at all, and ephemeris has no weeks. Hanging the setting off the
+/// person would force every system to carry options that mean nothing to it.
+model TimeSystemConfig {
+  id          String  @id @default(cuid())
+  workspaceId String
+  /// 'gregorian' | 'nau' | 'ephemeris' | 'triggers'
+  system      String
+  /// Whether this system is active as a view for this workspace.
+  enabled     Boolean @default(true)
+  config      Json    @default("{}")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([workspaceId, kind, name])
+  @@unique([workspaceId, system])
 }
 
-enum CalendarKind {
-  GREGORIAN
-  NAU
-  ASTROLOGICAL
-  /// Personal epochs: a stay in one country, a trip, a chapter of a life.
-  PERSONAL
-}
 
-/// A named stretch of time.
+
+/// A period someone gave a name to, or hung something from.
 ///
-/// Rows exist only where a range cannot be computed — a personal epoch, or a
-/// period someone chose to name. "The year of the dragon" recalls a life in a
-/// way "2024" does not, and that name is the entire reason this table exists.
-model Period {
-  id String @id @default(cuid())
+/// Periods are COMPUTED, not stored. "August 2026" needs no row, and
+/// materialising every period of every active system would mean rows forever
+/// and a table that can drift from the rule that generated it.
+///
+/// A row appears only when a period acquires something of its own: a title the
+/// person chose, or a synthesis hanging off it.
+///
+/// Identity is {system, scale, anchor} — never a from/to match. Matching on
+/// instants fails three ways: two computations of the same period differ by a
+/// millisecond, a naŭ and a Gregorian week that coincide would collide, and a
+/// timezone change moves the interval and orphans whatever hung from it.
+model NamedPeriod {
+  id          String @id @default(cuid())
+  workspaceId String
 
-  calendarId String
-  calendar   Calendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  system String
+  scale  String
+  /// An instant inside the period. Names it without measuring it.
+  anchor DateTime
 
-  workspaceId String?
-
-  name     String?
-  startsAt DateTime
-  endsAt   DateTime
+  /// What the person called it — "El Encuentro". The system's own name
+  /// ("agosto de 2026") is computed and never stored.
+  ///
+  /// Belongs to the period rather than to any synthesis of it: a future period
+  /// can be named before it has any content, and regenerating a synthesis must
+  /// not put the name at risk.
+  title String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([workspaceId, startsAt])
-  @@index([calendarId])
+  @@unique([workspaceId, system, scale, anchor])
+  @@index([workspaceId, anchor])
 }
 
 /// Append-only record of what happened to a block and when.
