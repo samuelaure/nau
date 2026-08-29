@@ -1,8 +1,8 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '../../prisma/prisma.service';
 import { getClientForFeature, type LLMFeature } from '@nau/llm-client';
 import { z } from 'zod';
-import { BlocksService } from '../blocks/blocks.service';
+import { BlocksService } from '../../blocks/blocks.service';
 import type {
   GenerateSynthesisDto,
   JournalEntryProperties,

@@ -12,7 +12,7 @@ import { IntegrationsModule } from './integrations/integrations.module';
 import { SyncModule } from './sync/sync.module';
 import { MediaModule } from './media/media.module';
 import { TriageModule } from './triage/triage.module';
-import { JournalModule } from './journal/journal.module';
+import { JournalModule } from './relations/api-journal/journal.module';
 import { AgendaModule } from './agenda/agenda.module';
 import { TimeModule } from './time/time.module';
 import { AuthModule } from './auth/auth.module';
