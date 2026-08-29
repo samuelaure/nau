@@ -1,7 +1,5 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { JournalService } from './journal.service';
-import { BlocksService } from '../../blocks/blocks.service';
-import { PrismaService } from '../../prisma/prisma.service';
+import type { ScopedPrismaService } from '../../core/tenancy/scoped-prisma.service';
 
 jest.mock('@prisma/client', () => ({
   PrismaClient: jest.fn().mockImplementation(() => ({})),
@@ -37,13 +35,15 @@ const synthesis = (id: string, from: string, to: string) => ({
 
 describe('JournalService', () => {
   let service: JournalService;
-  let blocksService: jest.Mocked<BlocksService>;
   let findMany: jest.Mock;
   let findUnique: jest.Mock;
+  let create: jest.Mock;
+  let update: jest.Mock;
+  let forWorkspace: jest.Mock;
+  let unscopedFindUnique: jest.Mock;
 
-  /** The properties of the block the service wrote. */
-  const written = () =>
-    blocksService.createInternal.mock.calls[0]![0].properties as Record<string, any>;
+  /** The `data` of the last `client.block.create` call. */
+  const written = () => create.mock.calls[0]![0].data.properties as Record<string, any>;
 
   const generate = (overrides: Partial<Parameters<JournalService['generateSynthesis']>[0]> = {}) =>
     service.generateSynthesis({
@@ -55,30 +55,24 @@ describe('JournalService', () => {
       ...overrides,
     });
 
-  beforeEach(async () => {
+  beforeEach(() => {
     findMany = jest.fn().mockResolvedValue([]);
     findUnique = jest.fn().mockResolvedValue(null);
+    create = jest.fn().mockResolvedValue({ id: 'new-block' });
+    update = jest.fn().mockResolvedValue({ id: 'converted' });
+    unscopedFindUnique = jest.fn().mockResolvedValue(null);
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        JournalService,
-        {
-          provide: PrismaService,
-          useValue: { block: { findMany, findUnique } },
-        },
-        {
-          provide: BlocksService,
-          useValue: {
-            createInternal: jest.fn().mockResolvedValue({ id: 'new-block' }),
-            updateInternal: jest.fn().mockResolvedValue({ id: 'converted' }),
-          },
-        },
-      ],
-    }).compile();
+    const scopedClient = { block: { findMany, findUnique, create, update } };
+    forWorkspace = jest.fn().mockReturnValue(scopedClient);
 
-    service = module.get(JournalService);
-    blocksService = module.get(BlocksService);
+    const scoped = {
+      forWorkspace,
+      unscoped: () => ({ block: { findUnique: unscopedFindUnique } }),
+    } as unknown as ScopedPrismaService;
 
+    service = new JournalService(scoped);
+
+    mockParseCompletion.mockReset();
     mockParseCompletion
       .mockResolvedValueOnce({ data: { synthesis: 'lo que viví' } })
       .mockResolvedValueOnce({ data: { reflection: 'lo que significó' } });
@@ -95,6 +89,7 @@ describe('JournalService', () => {
         workspaceId: 'ws-1',
       });
 
+      expect(forWorkspace).toHaveBeenCalledWith('ws-1');
       expect(written()).toMatchObject({
         text: 'lo que dije',
         textOriginal: 'lo que dije',
@@ -122,6 +117,21 @@ describe('JournalService', () => {
       expect(props.status).toBeUndefined();
     });
 
+    it('writes under the pre-migration type string, not the kind id', async () => {
+      // The kind id (journal.entry) is the contract; the column keeps today's
+      // value until the vocabulary migration (nau#68) runs.
+      await service.createEntry({
+        text: 'x',
+        source: 'app',
+        originFormat: 'text',
+        workspaceId: 'ws-1',
+      });
+
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ type: 'journal_entry' }) }),
+      );
+    });
+
     it('refuses an empty entry', async () => {
       await expect(
         service.createEntry({
@@ -136,32 +146,62 @@ describe('JournalService', () => {
 
   describe('converting a capture into an entry', () => {
     it('changes the existing block rather than writing a second one', async () => {
-      findUnique.mockResolvedValue({
+      unscopedFindUnique.mockResolvedValue({
         id: 'blk-1',
         type: 'capture',
+        workspaceId: 'ws-1',
+        deletedAt: null,
         properties: { text: 'lo capturado', date: '2026-08-20T09:00:00.000Z' },
       });
 
       await service.convertBlockToEntry('blk-1', { source: 'zazu', originFormat: 'voice' });
 
-      expect(blocksService.createInternal).not.toHaveBeenCalled();
-      expect(blocksService.updateInternal).toHaveBeenCalledWith(
-        'blk-1',
-        expect.objectContaining({ type: 'journal_entry' }),
+      expect(create).not.toHaveBeenCalled();
+      expect(forWorkspace).toHaveBeenCalledWith('ws-1');
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'blk-1' },
+          data: expect.objectContaining({ type: 'journal_entry' }),
+        }),
       );
     });
 
     it('keeps the date the capture already carried', async () => {
-      findUnique.mockResolvedValue({
+      unscopedFindUnique.mockResolvedValue({
         id: 'blk-1',
         type: 'capture',
+        workspaceId: 'ws-1',
+        deletedAt: null,
         properties: { text: 'x', date: '2026-08-20T09:00:00.000Z' },
       });
 
       await service.convertBlockToEntry('blk-1', { source: 'zazu', originFormat: 'voice' });
 
-      const dto = blocksService.updateInternal.mock.calls[0]![1] as any;
-      expect(dto.properties.date).toBe('2026-08-20T09:00:00.000Z');
+      const dto = update.mock.calls[0]![0] as any;
+      expect(dto.data.properties.date).toBe('2026-08-20T09:00:00.000Z');
+    });
+
+    it('refuses a block that does not exist', async () => {
+      unscopedFindUnique.mockResolvedValue(null);
+
+      await expect(
+        service.convertBlockToEntry('missing', { source: 'zazu', originFormat: 'voice' }),
+      ).rejects.toThrow('missing');
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it('refuses a soft-deleted block', async () => {
+      unscopedFindUnique.mockResolvedValue({
+        id: 'blk-1',
+        workspaceId: 'ws-1',
+        deletedAt: new Date(),
+        properties: { text: 'x' },
+      });
+
+      await expect(
+        service.convertBlockToEntry('blk-1', { source: 'zazu', originFormat: 'voice' }),
+      ).rejects.toThrow();
+      expect(update).not.toHaveBeenCalled();
     });
   });
 
@@ -176,17 +216,17 @@ describe('JournalService', () => {
       // The period is a label on the result, not a filter on the query.
       expect(where.properties).toBeUndefined();
       expect(where.createdAt).toBeUndefined();
+      // No workspaceId in the where clause either — that filter is applied by
+      // the scoped client itself, not written by this service.
+      expect(where.workspaceId).toBeUndefined();
     });
 
-    it('scopes the read to the workspace even though a service asked', async () => {
+    it('scopes every read and write to the workspace it was asked about', async () => {
       findMany.mockResolvedValue([entry('e-1', '2026-08-20T09:00:00.000Z', 'x')]);
 
       await generate();
 
-      expect(findMany.mock.calls[0]![0].where).toMatchObject({
-        workspaceId: 'ws-1',
-        deletedAt: null,
-      });
+      expect(forWorkspace).toHaveBeenCalledWith('ws-1');
     });
 
     it('runs two separate calls: the account, then the reading of it', async () => {
@@ -199,7 +239,6 @@ describe('JournalService', () => {
       expect(first).toContain('lo que viví');
       // The second call sees the first's output — that is what makes it a
       // reading of the synthesis rather than a second account of the record.
-      expect(second).toContain('lo que viví');
       expect(second).toContain('lo que viví');
     });
 
@@ -262,6 +301,16 @@ describe('JournalService', () => {
       // for auditing instructions.
       expect(synthesisPrompt).not.toContain('un secreto');
       expect(reflectionPrompt).not.toContain('un secreto');
+    });
+
+    it('writes under the pre-migration type string', async () => {
+      findMany.mockResolvedValue([entry('e-1', '2026-08-20T09:00:00.000Z', 'x')]);
+
+      await generate();
+
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ type: 'journal_synthesis' }) }),
+      );
     });
   });
 
@@ -348,7 +397,7 @@ describe('JournalService', () => {
       // A synthesis reading "not available" is indistinguishable from a real one
       // to every reader downstream. Nothing is written at all.
       await expect(generate()).rejects.toThrow(/Synthesis failed/);
-      expect(blocksService.createInternal).not.toHaveBeenCalled();
+      expect(create).not.toHaveBeenCalled();
     });
   });
 
@@ -366,6 +415,7 @@ describe('JournalService', () => {
 
       const rows = await service.entriesIn('ws-1', range);
 
+      expect(forWorkspace).toHaveBeenCalledWith('ws-1');
       expect(rows.map((r) => r.id)).toEqual(['e1', 'e2']);
       expect(rows[0]!.at).toEqual(new Date('2026-08-17T09:00:00Z'));
       expect(rows[1]!.textLength).toBe('texto largo con mas contenido'.length);

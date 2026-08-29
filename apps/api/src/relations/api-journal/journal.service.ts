@@ -1,8 +1,7 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ScopedPrismaService } from '../../core/tenancy/scoped-prisma.service';
 import { getClientForFeature, type LLMFeature } from '@nau/llm-client';
 import { z } from 'zod';
-import { BlocksService } from '../../blocks/blocks.service';
 import type {
   GenerateSynthesisDto,
   JournalEntryProperties,
@@ -116,10 +115,7 @@ const LLM_ATTEMPTS = 3;
 export class JournalService {
   private readonly logger = new Logger(JournalService.name);
 
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly blocksService: BlocksService,
-  ) {}
+  constructor(private readonly scoped: ScopedPrismaService) {}
 
   // ── Entries ────────────────────────────────────────────────────────────────
 
@@ -158,11 +154,18 @@ export class JournalService {
       ...(params.sourceId ? { sourceId: params.sourceId } : {}),
     };
 
-    return this.blocksService.createInternal({
-      type: 'journal_entry',
-      workspaceId: params.workspaceId,
-      userId: params.userId,
-      properties: properties as unknown as Record<string, unknown>,
+    // `forWorkspace`, not `forUser`: the caller here is always a service acting
+    // on a capture already resolved to a workspace (captures, triage), not a
+    // human request with membership to check. `type` stays the pre-migration
+    // string — the kind id (`journal.entry`) is the contract callers name, but
+    // the column keeps today's value until the vocabulary migration (nau#68).
+    const client = this.scoped.forWorkspace(params.workspaceId);
+    return client.block.create({
+      data: {
+        type: 'journal_entry',
+        properties: properties as unknown as object,
+        userId: params.userId ?? null,
+      },
     });
   }
 
@@ -184,8 +187,14 @@ export class JournalService {
       originFormat: JournalOriginFormat;
     },
   ) {
-    const block = await this.prisma.block.findUnique({ where: { id: blockId } });
-    if (!block) throw new BadRequestException(`Block ${blockId} not found`);
+    // The block's own workspace is not known until it is read, so this one read
+    // goes through the unscoped client — the same transitional path
+    // `ScopedPrismaService.assertBlockAccess` documents, kept local here rather
+    // than importing that method from outside the relation. Every write below
+    // goes through the workspace the block actually reported.
+    const block = await this.scoped.unscoped().block.findUnique({ where: { id: blockId } });
+    if (!block || block.deletedAt) throw new NotFoundException(`Block ${blockId} not found`);
+    if (!block.workspaceId) throw new BadRequestException(`Block ${blockId} has no workspace`);
 
     const existing = (block.properties ?? {}) as Record<string, unknown>;
     const text = (params.text ?? (existing.text as string) ?? '').trim();
@@ -201,9 +210,10 @@ export class JournalService {
       ...(existing.sortOrder ? { sortOrder: existing.sortOrder as number } : {}),
     };
 
-    return this.blocksService.updateInternal(blockId, {
-      type: 'journal_entry',
-      properties: properties as unknown as Record<string, unknown>,
+    const client = this.scoped.forWorkspace(block.workspaceId);
+    return client.block.update({
+      where: { id: blockId },
+      data: { type: 'journal_entry', properties: properties as unknown as object },
     });
   }
 
@@ -302,9 +312,9 @@ export class JournalService {
    * That distinction is Journal's own and stays inside this method.
    */
   async entriesIn(workspaceId: string, range: { start: Date; end: Date }): Promise<JournalSourceRow[]> {
-    const blocks = await this.prisma.block.findMany({
+    const client = this.scoped.forWorkspace(workspaceId);
+    const blocks = await client.block.findMany({
       where: {
-        workspaceId,
         type: 'journal_entry',
         deletedAt: null,
       },
@@ -331,9 +341,9 @@ export class JournalService {
     workspaceId: string,
     range: { start: Date; end: Date },
   ): Promise<JournalSourceRow[]> {
-    const blocks = await this.prisma.block.findMany({
+    const client = this.scoped.forWorkspace(workspaceId);
+    const blocks = await client.block.findMany({
       where: {
-        workspaceId,
         type: 'journal_synthesis',
         deletedAt: null,
       },
@@ -361,8 +371,9 @@ export class JournalService {
     if (!ids?.length) return [];
 
     const type = kind === 'entries' ? 'journal_entry' : 'journal_synthesis';
-    const blocks = await this.prisma.block.findMany({
-      where: { id: { in: ids }, workspaceId, type, deletedAt: null },
+    const client = this.scoped.forWorkspace(workspaceId);
+    const blocks = await client.block.findMany({
+      where: { id: { in: ids }, type, deletedAt: null },
       orderBy: { createdAt: 'asc' },
     });
 
@@ -470,10 +481,12 @@ export class JournalService {
       ...(params.noData ? { noData: true } : {}),
     };
 
-    const block = await this.blocksService.createInternal({
-      type: 'journal_synthesis',
-      workspaceId: params.workspaceId,
-      properties: properties as unknown as Record<string, unknown>,
+    const client = this.scoped.forWorkspace(params.workspaceId);
+    const block = await client.block.create({
+      data: {
+        type: 'journal_synthesis',
+        properties: properties as unknown as object,
+      },
     });
 
     return { success: true, blockId: block.id, data: block };
