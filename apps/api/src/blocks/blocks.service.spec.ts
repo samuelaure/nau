@@ -234,7 +234,7 @@ describe('BlocksService', () => {
         // When something is due lives in its own table, so it has to travel
         // with the block. A view that cannot see it has to guess, which is how
         // properties.date came to mean two different things in two screens.
-        include: { schedule: { include: { exceptions: true } } },
+        include: { planning: { include: { overrides: true } } },
       });
     });
 
@@ -456,7 +456,7 @@ describe('BlocksService', () => {
           children: true,
           relationsFrom: true,
           relationsTo: true,
-          schedule: true,
+          planning: true,
         },
       });
       expect(result!.id).toBe('block-1');
@@ -474,7 +474,7 @@ describe('BlocksService', () => {
   });
 
   describe('getRemindableBlocks', () => {
-    it('should return blocks with schedules scoped to the caller', async () => {
+    it('should return blocks with plannings scoped to the caller', async () => {
       prisma.block.findMany.mockResolvedValueOnce([mockBlock]);
 
       const result = await service.getRemindableBlocks(user.sub);
@@ -483,9 +483,9 @@ describe('BlocksService', () => {
         where: {
           deletedAt: null,
           workspaceId: { in: ['ws-1'] },
-          schedule: { isNot: null },
+          planning: { isNot: null },
         },
-        include: { schedule: true },
+        include: { planning: true },
       });
       expect(result).toHaveLength(1);
     });

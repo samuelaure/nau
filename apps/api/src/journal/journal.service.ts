@@ -13,6 +13,15 @@ import type {
   SynthesisSourceRef,
 } from '@nau/types';
 
+/** One block Time can use as a synthesis source, with its private shape erased. */
+export interface JournalSourceRow {
+  readonly id: string;
+  /** When it was lived (entry) or the period it covers (synthesis). */
+  readonly at: Date;
+  /** Character count, for estimating token cost without reading full text. */
+  readonly textLength: number;
+}
+
 /**
  * Journal owns two things and nothing else: the entries a person captures, and
  * the interpretations built from them.
@@ -275,6 +284,75 @@ export class JournalService {
    * never their `reflection`. A higher period wants its own reflection written
    * from its own vantage point, not inherited from the levels below it.
    */
+  // ── Contract for Time ────────────────────────────────────────────────────
+  //
+  // Time decides WHEN a period closed and WHAT composes its synthesis; it must
+  // never learn HOW Journal stores that. These two methods are the seam: typed
+  // rows in, no `properties` key crosses it. Reaching into Journal's JSON from
+  // outside this file is the exact coupling nau#63 found and this exists to
+  // remove — a renamed key would break Time at runtime with no compile error
+  // and no failing test, because a raw SQL string is invisible to both
+  // TypeScript and Prisma.
+
+  /**
+   * Journal entries lived inside an interval, ordered by when they were lived.
+   *
+   * `properties.date` is the moment lived, not the moment ingested — a note
+   * spoken at 23:50 and transcribed at 00:05 belongs to the day it was spoken.
+   * That distinction is Journal's own and stays inside this method.
+   */
+  async entriesIn(workspaceId: string, range: { start: Date; end: Date }): Promise<JournalSourceRow[]> {
+    const blocks = await this.prisma.block.findMany({
+      where: {
+        workspaceId,
+        type: 'journal_entry',
+        deletedAt: null,
+      },
+    });
+
+    return blocks
+      .map((block) => {
+        const props = (block.properties ?? {}) as unknown as JournalEntryProperties;
+        return { id: block.id, at: new Date(props.date), textLength: (props.text ?? '').length };
+      })
+      .filter((row) => row.at >= range.start && row.at < range.end)
+      .sort((a, b) => a.at.getTime() - b.at.getTime());
+  }
+
+  /**
+   * Real syntheses (not empty placeholders) whose period starts inside a range.
+   *
+   * A synthesis records only its own from/to, not which scale produced it —
+   * matching that against a scale's period boundaries is Time's arithmetic, not
+   * Journal's, so it stays out of this method on purpose. `noData` syntheses are
+   * excluded: they hold nothing to compose a larger period from.
+   */
+  async synthesesStartingIn(
+    workspaceId: string,
+    range: { start: Date; end: Date },
+  ): Promise<JournalSourceRow[]> {
+    const blocks = await this.prisma.block.findMany({
+      where: {
+        workspaceId,
+        type: 'journal_synthesis',
+        deletedAt: null,
+      },
+    });
+
+    return blocks
+      .map((block) => {
+        const props = (block.properties ?? {}) as unknown as JournalSynthesisProperties;
+        return {
+          id: block.id,
+          at: new Date(props.from),
+          textLength: (props.synthesis ?? '').length,
+          noData: props.noData === true,
+        };
+      })
+      .filter((row) => !row.noData && row.at >= range.start && row.at < range.end)
+      .sort((a, b) => a.at.getTime() - b.at.getTime());
+  }
+
   private async loadSources(
     workspaceId: string,
     kind: SynthesisSourceKind,

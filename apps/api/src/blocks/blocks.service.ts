@@ -5,6 +5,12 @@ import { CreateBlockDto } from './dto/create-block.dto';
 import { UpdateBlockDto } from './dto/update-block.dto';
 import { FindBlocksQueryDto } from './dto/find-blocks-query.dto';
 import { Prisma } from '@prisma/client';
+import {
+  SystemRegistry,
+  ZoneHistory,
+  gregorian,
+  type Interval,
+} from '@nau/time';
 import type {
   AccessTokenPayload,
   CreateBlockDto as InternalCreateBlockDto,
@@ -66,15 +72,30 @@ export class BlocksService {
     // line on a day is what made the keyboard flow lag, and it left a window
     // where a block existed but was due nowhere — which is how six actions once
     // came to be invisible on the agenda.
-    if (createBlockDto.schedule) {
-      const { startDate, endDate, rrule, recurrenceMode } = createBlockDto.schedule;
-      await this.prisma.schedule.create({
+    // Planning is resolved by the Time module, which is the only thing that
+    // knows what a period is. Blocks holds the identity it was given and the
+    // interval Time computed from it; it does not compute one itself.
+    if (createBlockDto.planning) {
+      const p = createBlockDto.planning;
+      const anchor = new Date(p.anchor);
+      const interval = await this.resolvePlanningInterval(
+        workspaceId,
+        p.system ?? 'gregorian',
+        p.scale ?? 'day',
+        anchor,
+      );
+
+      await this.prisma.planning.create({
         data: {
           blockId: block.id,
-          startDate: new Date(startDate),
-          endDate: endDate ? new Date(endDate) : null,
-          rrule: rrule ?? null,
-          recurrenceMode: recurrenceMode ?? 'FIXED',
+          system: p.system ?? 'gregorian',
+          scale: p.scale ?? 'day',
+          anchor,
+          from: interval.start,
+          to: interval.end,
+          recurrence: p.recurrence ?? null,
+          recurrenceTimezone: p.recurrenceTimezone ?? null,
+          recurrenceMode: p.recurrenceMode ?? 'FIXED',
         },
       });
     }
@@ -87,6 +108,61 @@ export class BlocksService {
    * Performs NO authorization — the caller is responsible for having
    * established the trust boundary. Never reachable from a user-facing route.
    */
+  /**
+   * The span a planning identity resolves to.
+   *
+   * Blocks does not own this answer — Time does — but creating a block and
+   * placing it in a period is one act from the person's side, and splitting it
+   * into two calls once left a window where a block existed but was due
+   * nowhere. Resolving through the shared package keeps the answer identical to
+   * the one Time would give without importing Time's service, which would make
+   * the two modules circular.
+   */
+  private async resolvePlanningInterval(
+    workspaceId: string,
+    system: string,
+    scale: string,
+    anchor: Date,
+  ): Promise<{ start: Date; end: Date }> {
+    const [workspace, zones, config] = await Promise.all([
+      this.prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { timezone: true },
+      }),
+      this.prisma.workspaceTimezone.findMany({
+        where: { workspaceId },
+        orderBy: { effectiveAt: 'asc' },
+        select: { timezone: true, effectiveAt: true },
+      }),
+      this.prisma.timeSystemConfig.findUnique({
+        where: { workspaceId_system: { workspaceId, system } },
+        select: { config: true },
+      }),
+    ]);
+
+    const history =
+      zones.length > 0
+        ? new ZoneHistory(zones, workspace?.timezone ?? 'UTC')
+        : ZoneHistory.fixed(workspace?.timezone ?? 'UTC');
+
+    const registry = new SystemRegistry([gregorian]);
+    const period = registry
+      .get(system)
+      .periodAt(scale, anchor, {
+        timezone: history.at(anchor),
+        config: (config?.config ?? {}) as Record<string, unknown>,
+      });
+
+    if (!period) {
+      throw new NotFoundException(
+        `The ${system} system has no ${scale} period containing that instant`,
+      );
+    }
+
+    const interval: Interval = period.interval;
+    return { start: interval.start, end: interval.end ?? interval.start };
+  }
+
   async createInternal(createBlockDto: InternalCreateBlockDto) {
     const { parentId, type, properties, workspaceId, userId } = createBlockDto;
 
@@ -213,11 +289,11 @@ export class BlocksService {
 
     const blocks = await this.prisma.block.findMany({
       where,
-      // The schedule travels with the block. When something is due is not a
+      // The planning travels with the block. When something is due is not a
       // property of the block — it lives in its own table — and a view that
       // cannot see it has to guess, which is how `properties.date` came to mean
       // two different things in two different screens.
-      include: { schedule: { include: { exceptions: true } } },
+      include: { planning: { include: { overrides: true } } },
       ...(limit ? { take: Math.min(Number(limit) || 200, 1000) } : {}),
     });
     return this.sortByDateThenOrder(blocks);
@@ -301,7 +377,7 @@ export class BlocksService {
         children: true,
         relationsFrom: true,
         relationsTo: true,
-        schedule: true,
+        planning: true,
       },
     });
   }
@@ -314,9 +390,9 @@ export class BlocksService {
       where: {
         deletedAt: null,
         workspaceId: { in: memberWorkspaceIds },
-        schedule: { isNot: null },
+        planning: { isNot: null },
       },
-      include: { schedule: true },
+      include: { planning: true },
     });
   }
 
