@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { gregorian, type Interval, type SystemId } from '@nau/time';
 import { PrismaService } from '../prisma/prisma.service';
-import { BlocksService } from '../blocks/blocks.service';
+import { ScopedPrismaService } from '../core/tenancy/scoped-prisma.service';
 import { BlockEventsService } from '../blocks/block-events.service';
 import { WorkspaceTimeService } from './workspace-time.service';
 
@@ -35,7 +35,7 @@ export interface UpsertPlanningInput {
 export class PlanningService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly blocks: BlocksService,
+    private readonly tenancy: ScopedPrismaService,
     private readonly events: BlockEventsService,
     private readonly time: WorkspaceTimeService,
   ) {}
@@ -74,7 +74,7 @@ export class PlanningService {
    * maintain.
    */
   async upsert(userId: string, input: UpsertPlanningInput) {
-    const block = await this.blocks.assertBlockAccess(userId, input.blockId);
+    const block = await this.tenancy.assertBlockAccess(userId, input.blockId);
     if (!block.workspaceId) {
       throw new BadRequestException('A block must belong to a workspace to be planned');
     }
@@ -130,7 +130,7 @@ export class PlanningService {
   }
 
   async findOne(userId: string, blockId: string) {
-    await this.blocks.assertBlockAccess(userId, blockId);
+    await this.tenancy.assertBlockAccess(userId, blockId);
     return this.prisma.planning.findUnique({ where: { blockId } });
   }
 
@@ -138,7 +138,7 @@ export class PlanningService {
     const planning = await this.prisma.planning.findUnique({ where: { id } });
     if (!planning) throw new NotFoundException(`Planning ${id} not found`);
 
-    await this.blocks.assertBlockAccess(userId, planning.blockId);
+    await this.tenancy.assertBlockAccess(userId, planning.blockId);
 
     return this.prisma.planning.delete({ where: { id } });
   }

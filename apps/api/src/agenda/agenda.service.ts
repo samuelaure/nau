@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { BlocksService } from '../blocks/blocks.service';
+import { ScopedPrismaService } from '../core/tenancy/scoped-prisma.service';
 import { BlockEventsService } from '../blocks/block-events.service';
 import {
   dayIn,
@@ -85,6 +86,7 @@ export class AgendaService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly blocks: BlocksService,
+    private readonly tenancy: ScopedPrismaService,
     private readonly events: BlockEventsService,
     private readonly time: WorkspaceTimeService,
     private readonly occurrences: OccurrencesService,
@@ -99,7 +101,7 @@ export class AgendaService {
     date: string;
     now?: Date;
   }) {
-    await this.blocks.assertWorkspaceMembership(params.userId, params.workspaceId);
+    await this.tenancy.assertMembership(params.userId, params.workspaceId);
 
     const now = params.now ?? new Date();
     const system = params.system ?? gregorian.id;
@@ -165,7 +167,7 @@ export class AgendaService {
     system?: string;
     now?: Date;
   }) {
-    await this.blocks.assertWorkspaceMembership(params.userId, params.workspaceId);
+    await this.tenancy.assertMembership(params.userId, params.workspaceId);
 
     const now = params.now ?? new Date();
     const system = params.system ?? gregorian.id;
@@ -214,7 +216,7 @@ export class AgendaService {
    * this list exists to leave open.
    */
   async nextActions(params: { userId: string; workspaceId: string }) {
-    await this.blocks.assertWorkspaceMembership(params.userId, params.workspaceId);
+    await this.tenancy.assertMembership(params.userId, params.workspaceId);
 
     const blocks = await this.prisma.block.findMany({
       where: {
@@ -531,7 +533,7 @@ export class AgendaService {
     occurrenceAt: string;
     done: boolean;
   }) {
-    const block = await this.blocks.assertBlockAccess(params.userId, params.blockId);
+    const block = await this.tenancy.assertBlockAccess(params.userId, params.blockId);
 
     const planning = await this.prisma.planning.findUnique({
       where: { blockId: params.blockId },
@@ -564,7 +566,7 @@ export class AgendaService {
    * a habit above a task means it comes first every day, not only today.
    */
   async reorder(params: { userId: string; workspaceId: string; blockIds: string[] }) {
-    await this.blocks.assertWorkspaceMembership(params.userId, params.workspaceId);
+    await this.tenancy.assertMembership(params.userId, params.workspaceId);
 
     const blocks = await this.prisma.block.findMany({
       where: { id: { in: params.blockIds }, workspaceId: params.workspaceId, deletedAt: null },
