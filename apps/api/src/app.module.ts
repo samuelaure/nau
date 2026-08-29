@@ -5,7 +5,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { CoreModule } from './core/core.module';
 import { BlocksModule } from './blocks/blocks.module';
 import { HealthModule } from './health/health.module';
-import { RelationsModule } from './relations/relations.module';
+import { GraphModule } from './core/substrate/graph/graph.module';
 import { EventsModule } from './events/events.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { SyncModule } from './sync/sync.module';
@@ -45,7 +45,7 @@ import { CapturesModule } from './captures/captures.module';
     CoreModule,
     BlocksModule,
     HealthModule,
-    RelationsModule,
+    GraphModule,
     TimeModule,
     EventsModule,
     IntegrationsModule,

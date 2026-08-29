@@ -1,13 +1,13 @@
 import { Controller, Post, Body, Delete, Param, UseGuards } from '@nestjs/common';
-import { RelationsService } from './relations.service';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { CurrentUser } from '../auth/current-user.decorator';
+import { GraphService } from './graph.service';
+import { JwtAuthGuard } from '../../../auth/jwt-auth.guard';
+import { CurrentUser } from '../../../auth/current-user.decorator';
 import type { AccessTokenPayload } from '@nau/types';
 
 @Controller('relations')
 @UseGuards(JwtAuthGuard)
-export class RelationsController {
-  constructor(private readonly relationsService: RelationsService) {}
+export class GraphController {
+  constructor(private readonly relationsService: GraphService) {}
 
   @Post()
   create(

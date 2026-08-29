@@ -1,12 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { RelationsController } from './relations.controller';
-import { RelationsService } from './relations.service';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { GraphController } from './graph.controller';
+import { GraphService } from './graph.service';
+import { JwtAuthGuard } from '../../../auth/jwt-auth.guard';
 import type { AccessTokenPayload } from '@nau/types';
 
-describe('RelationsController', () => {
-  let controller: RelationsController;
-  let service: RelationsService;
+describe('GraphController', () => {
+  let controller: GraphController;
+  let service: GraphService;
 
   const user = {
     sub: 'user-1',
@@ -18,10 +18,10 @@ describe('RelationsController', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      controllers: [RelationsController],
+      controllers: [GraphController],
       providers: [
         {
-          provide: RelationsService,
+          provide: GraphService,
           useValue: {
             create: jest.fn().mockResolvedValue({ id: 'rel-1' }),
             remove: jest.fn().mockResolvedValue({ id: 'rel-1' }),
@@ -33,8 +33,8 @@ describe('RelationsController', () => {
       .useValue({ canActivate: () => true })
       .compile();
 
-    controller = module.get<RelationsController>(RelationsController);
-    service = module.get<RelationsService>(RelationsService);
+    controller = module.get<GraphController>(GraphController);
+    service = module.get<GraphService>(GraphService);
   });
 
   it('should be defined', () => {

@@ -264,7 +264,7 @@
     },
     "/relations": {
       "post": {
-        "operationId": "RelationsController_create",
+        "operationId": "GraphController_create",
         "parameters": [],
         "responses": {
           "201": {
@@ -275,7 +275,7 @@
     },
     "/relations/{id}": {
       "delete": {
-        "operationId": "RelationsController_remove",
+        "operationId": "GraphController_remove",
         "parameters": [
           {
             "name": "id",
