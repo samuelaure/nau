@@ -2,6 +2,7 @@ import { Global, Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { KindRegistryService } from './kinds/kind-registry.service';
 import { ScopedPrismaService } from './tenancy/scoped-prisma.service';
+import { SubstrateService } from './substrate/substrate.service';
 
 /**
  * What `api` is once every module is switched off.
@@ -17,7 +18,7 @@ import { ScopedPrismaService } from './tenancy/scoped-prisma.service';
 @Global()
 @Module({
   imports: [PrismaModule],
-  providers: [KindRegistryService, ScopedPrismaService],
-  exports: [KindRegistryService, ScopedPrismaService],
+  providers: [KindRegistryService, ScopedPrismaService, SubstrateService],
+  exports: [KindRegistryService, ScopedPrismaService, SubstrateService],
 })
 export class CoreModule {}

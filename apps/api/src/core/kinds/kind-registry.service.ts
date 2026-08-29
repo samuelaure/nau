@@ -43,7 +43,10 @@ export class KindRegistryService {
     }
 
     this.kinds.set(kind.id, kind as BlockKind);
-    this.logger.log(`Registered kind ${kind.id} (owner: ${ownerOf(kind.id)})`);
+    // Debug rather than log: registration happens once per kind at startup and
+    // is worth having when a relation fails to mount, but at log level it
+    // buries real output in any suite that builds a registry per test.
+    this.logger.debug(`Registered kind ${kind.id} (owner: ${ownerOf(kind.id)})`);
   }
 
   /** Every registered kind. Order is registration order. */
