@@ -174,7 +174,7 @@ describe('relations/ are independent of one another', () => {
  * list reaching empty is what finishes the rebuild.
  */
 const PRISMA_LEGACY = [
-  'agenda/agenda.service.ts',
+  'relations/api-actions/agenda.service.ts',
   'auth/auth.service.ts',
   'blocks/block-events.service.ts',
   'blocks/blocks.service.ts',

@@ -13,7 +13,7 @@ import { SyncModule } from './sync/sync.module';
 import { MediaModule } from './media/media.module';
 import { TriageModule } from './triage/triage.module';
 import { JournalModule } from './relations/api-journal/journal.module';
-import { AgendaModule } from './agenda/agenda.module';
+import { AgendaModule } from './relations/api-actions/agenda.module';
 import { TimeModule } from './time/time.module';
 import { AuthModule } from './auth/auth.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
