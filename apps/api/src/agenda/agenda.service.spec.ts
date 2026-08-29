@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AgendaService } from './agenda.service';
 import { BlocksService } from '../blocks/blocks.service';
+import { ScopedPrismaService } from '../core/tenancy/scoped-prisma.service';
 import { BlockEventsService } from '../blocks/block-events.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { WorkspaceTimeService } from '../time/workspace-time.service';
@@ -105,10 +106,15 @@ describe('AgendaService — meaning on top of Time', () => {
         },
         {
           provide: BlocksService,
+          useValue: { update: jest.fn() },
+        },
+        {
+          // Authorization is the tenancy layer's job now, not the block
+          // service's — the agenda keeps BlocksService only for the mutation.
+          provide: ScopedPrismaService,
           useValue: {
-            assertWorkspaceMembership: jest.fn(),
+            assertMembership: jest.fn(),
             assertBlockAccess: jest.fn().mockResolvedValue({ id: 'b1', workspaceId: 'ws-1' }),
-            update: jest.fn(),
           },
         },
         { provide: BlockEventsService, useValue: { record: jest.fn() } },

@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { GraphService } from './graph.service';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { BlocksService } from '../../../blocks/blocks.service';
+import { ScopedPrismaService } from '../../tenancy/scoped-prisma.service';
 import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
 import { Relation } from '@prisma/client';
 
@@ -18,7 +18,7 @@ describe('GraphService', () => {
           useValue: mockDeep<PrismaService>(),
         },
         {
-          provide: BlocksService,
+          provide: ScopedPrismaService,
           useValue: { assertBlockAccess: jest.fn().mockResolvedValue({ id: 'b1', workspaceId: 'ws-1' }) },
         },
       ],

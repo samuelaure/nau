@@ -162,6 +162,73 @@ describe('relations/ are independent of one another', () => {
   });
 });
 
+/**
+ * Modules that still reach Prisma directly, from before the rebuild.
+ *
+ * A ratchet, not a permission list. Each of these belongs to a module whose own
+ * session will move it behind the substrate or the tenancy layer (nau#80–#83),
+ * and the test below fails if the list *grows* — so the debt can be paid down
+ * but not added to, without anyone having to notice in review.
+ *
+ * Removing a name from this list when its module is rebuilt is the point. The
+ * list reaching empty is what finishes the rebuild.
+ */
+const PRISMA_LEGACY = [
+  'agenda/agenda.service.ts',
+  'auth/auth.service.ts',
+  'blocks/block-events.service.ts',
+  'blocks/blocks.service.ts',
+  'brands/brands.service.ts',
+  'events/events.service.ts',
+  'projects/projects.service.ts',
+  'prompts/prompts.service.ts',
+  'social-profiles/social-profiles.service.ts',
+  'sync/sync.service.ts',
+  'tags/tags.service.ts',
+  'time/occurrences.service.ts',
+  'time/periods.service.ts',
+  'time/planning.service.ts',
+  'time/synthesis-scheduler.service.ts',
+  'time/workspace-time.service.ts',
+  'triage/triage.service.ts',
+  'usage/usage.service.ts',
+  'workspaces/workspaces.service.ts',
+];
+
+describe('the pre-rebuild Prisma debt only shrinks', () => {
+  it('no module outside core/ and relations/ reaches Prisma unless already known to', () => {
+    const offenders = sourcesUnder(SRC)
+      .map(rel)
+      .filter((name) => !name.startsWith('core/') && !name.startsWith('prisma/'))
+      .filter((name) => {
+        const lines = importLines(join(SRC, name));
+        // Only reaching the *client* counts. Importing a generated enum or a
+        // model type from `@prisma/client` is not database access — a DTO
+        // naming `WorkspaceRole` issues no query, and treating it as a
+        // violation would push code toward duplicating the enum instead.
+        return lines.some(
+          (line) =>
+            /\/prisma\.service/.test(line) &&
+            !/PrismaModule/.test(line) &&
+            !/scoped-prisma\.service/.test(line),
+        );
+      })
+      // A relation owning its own model is allowed; it is the rule below that
+      // governs those.
+      .filter((name) => !name.startsWith('relations/'));
+
+    const unexpected = offenders.filter((name) => !PRISMA_LEGACY.includes(name));
+    expect(unexpected).toEqual([]);
+  });
+
+  it('the list names nothing that has already been cleaned up', () => {
+    // Keeps the ratchet honest: a stale entry would silently re-permit a file
+    // that was moved back.
+    const stale = PRISMA_LEGACY.filter((name) => !existsSync(join(SRC, name)));
+    expect(stale).toEqual([]);
+  });
+});
+
 describe('PrismaService has an owner', () => {
   /**
    * The rule: only `core/` and a relation that owns the model may talk to

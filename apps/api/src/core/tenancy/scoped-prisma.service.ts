@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   isWorkspaceOwned,
@@ -49,6 +49,40 @@ export class ScopedPrismaService {
   async forUser(userId: string, workspaceId: string) {
     await this.assertMembership(userId, workspaceId);
     return this.forWorkspace(workspaceId);
+  }
+
+  /** Every workspace the user belongs to. */
+  async memberWorkspaceIds(userId: string): Promise<string[]> {
+    const memberships = await this.prisma.workspaceMember.findMany({
+      where: { userId },
+      select: { workspaceId: true },
+    });
+    return memberships.map((m) => m.workspaceId);
+  }
+
+  /**
+   * Loads a block only if the caller is a member of its workspace.
+   *
+   * Lives here rather than on the service that owns blocks because it is an
+   * authorization decision, not a block operation — and because four separate
+   * services were calling it across a module boundary purely to get at the
+   * check. A block is reachable by id otherwise, and blocks carry personal
+   * journal content.
+   *
+   * This is the transitional shape. Once every caller holds a scoped client the
+   * check becomes unnecessary — a query that cannot leave the workspace cannot
+   * load a block from another one — and this method goes with them. It exists
+   * so that the callers can stop importing the blocks module *now*, without
+   * waiting for each of their own rebuilds.
+   */
+  async assertBlockAccess(userId: string, blockId: string) {
+    const block = await this.prisma.block.findUnique({ where: { id: blockId } });
+    if (!block || block.deletedAt) {
+      throw new NotFoundException(`Block with ID ${blockId} not found`);
+    }
+    if (!block.workspaceId) throw new ForbiddenException('Block has no workspace');
+    await this.assertMembership(userId, block.workspaceId);
+    return block;
   }
 
   /**
