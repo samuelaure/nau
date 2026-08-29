@@ -1,8 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { BlocksService } from '../blocks/blocks.service';
-import { ScopedPrismaService } from '../core/tenancy/scoped-prisma.service';
-import { BlockEventsService } from '../blocks/block-events.service';
+import { PrismaService } from '../../prisma/prisma.service';
+import { BlocksService } from '../../blocks/blocks.service';
+import { ScopedPrismaService } from '../../core/tenancy/scoped-prisma.service';
+import { BlockEventsService } from '../../blocks/block-events.service';
 import {
   dayIn,
   gregorian,
@@ -14,8 +14,8 @@ import {
   type Occurrence,
   type ResolveContext,
 } from '@nau/time';
-import { WorkspaceTimeService } from '../time/workspace-time.service';
-import { OccurrencesService, type OccurrenceRef } from '../time/occurrences.service';
+import { WorkspaceTimeService } from '../../time/workspace-time.service';
+import { OccurrencesService, type OccurrenceRef } from '../../time/occurrences.service';
 
 /** Block types that belong on an agenda. */
 const AGENDA_TYPES = ['action', 'habit', 'appointment'];
