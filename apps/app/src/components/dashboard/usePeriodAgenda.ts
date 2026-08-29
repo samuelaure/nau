@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import { useAgendaRange, type AgendaItem } from '@/hooks/use-agenda-api'
 import { useUiStore } from '@/lib/state/ui-store'
-import { usePeriodsIn } from '@/relations/app-time/use-periods'
+import { usePeriodsIn } from '@/core/periods/use-periods'
 import { toKey, toSlot, type PeriodSlot } from '@/relations/app-actions/periods'
 
 /** Occurrences owed, keyed by the period they are drawn under. */

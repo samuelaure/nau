@@ -17,5 +17,3 @@ export const timeModule: ModuleDescriptor = {
 }
 
 export { useTimeSystems, useUpdateTimeSystem } from './use-time-systems'
-export { usePeriodsIn, usePeriodAt, type ResolvedPeriod } from './use-periods'
-export { anchorRun, stepDate, childScale, isToday, type ScaleRef } from './scroll-window'

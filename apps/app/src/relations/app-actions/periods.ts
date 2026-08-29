@@ -1,6 +1,6 @@
 import { gregorian, type ScaleId } from '@nau/time'
-import type { ResolvedPeriod } from '@/relations/app-time/use-periods'
-import { anchorRun, childScale, stepDate } from '@/relations/app-time/scroll-window'
+import type { ResolvedPeriod } from '@/core/periods/use-periods'
+import { anchorRun, childScale, stepDate } from '@/core/periods/scroll-window'
 
 /**
  * Actions' own vocabulary for "what size are the periods in this list".
@@ -18,7 +18,7 @@ export type Granularity = ScaleId
  * A period, in the shape Actions' components read.
  *
  * Everything here is the server's answer (`ResolvedPeriod`, from
- * `relations/app-time/use-periods.ts`) reshaped into what the deleted
+ * `core/periods/use-periods.ts`) reshaped into what the deleted
  * `lib/periods.ts` used to hand-compute. The computation is gone; the shape
  * survives because the components built against it. `start`/`end` are `Date`
  * instead of the wire's ISO strings because callers already do `Date` math on
@@ -101,11 +101,12 @@ export function isCurrent(slot: PeriodSlot, now = new Date()): boolean {
  * The anchors for a run of periods, newest first, centred on today — for the
  * infinite scroll to resolve against the server.
  *
- * A thin re-export of `scroll-window`'s `anchorRun`/`stepDate`, kept in this
- * file so Actions' components import one module for "everything about the
- * periods on screen" rather than reaching into `app-time` directly for half of
- * it. `app-time` itself does no resolving — see the note on `anchorRun`: these
- * are anchors, not periods, and `usePeriodsIn` is what turns them into slots.
+ * A thin re-export of `core/periods/scroll-window`'s `anchorRun`/`stepDate`,
+ * kept in this file so Actions' components import one module for "everything
+ * about the periods on screen" rather than reaching into `core/periods`
+ * directly for half of it. `scroll-window` itself does no resolving — see the
+ * note on `anchorRun`: these are anchors, not periods, and `usePeriodsIn` is
+ * what turns them into slots.
  */
 export function periodAnchors(
   granularity: Granularity,
