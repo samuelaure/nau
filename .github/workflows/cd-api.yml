@@ -1,0 +1,99 @@
+name: CD — api
+
+# Deploys the api. Never runs on its own — it is triggered by ci-api.yml
+# finishing, and refuses to do anything unless that run succeeded on main.
+# This is what makes "push to main" and "deploy" two separate events again:
+# a branch push or a PR can make ci-api.yml run, but nothing there can ever
+# satisfy this trigger.
+on:
+  workflow_run:
+    workflows: ["CI — api"]
+    types: [completed]
+
+jobs:
+  publish:
+    name: Build & push image
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/samuelaure/nau/api:latest
+            ghcr.io/samuelaure/nau/api:sha-${{ github.event.workflow_run.head_sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  init:
+    name: Initialize deployment environment
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'
+    permissions:
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Initialize server and network
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_SSH_HOST }}
+          username: root
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            docker network create nau-network 2>/dev/null || true
+            mkdir -p ~/apps/{api,flownau,accounts,app,nauthenticity,zazu,whatsnau}
+            docker pull pgvector/pgvector:pg16 2>/dev/null || true
+
+  deploy:
+    name: Deploy to production
+    runs-on: ubuntu-latest
+    needs: [publish, init]
+    permissions:
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Sync docker-compose to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_SSH_HOST }}
+          username: root
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: apps/api/docker-compose.yml
+          target: ~/apps/api/
+          strip_components: 2
+      - uses: appleboy/ssh-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.DEPLOY_SSH_HOST }}
+          username: root
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: GITHUB_TOKEN
+          script: |
+            set -e
+            echo "$GITHUB_TOKEN" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            echo "${{ secrets.API_ENV_FILE }}" > ~/apps/api/.env
+            cd ~/apps/api
+            docker compose pull
+            docker compose up -d api-postgres api-redis
+            docker compose run --rm --no-deps -w /app/apps/api api npx prisma migrate deploy
+            docker compose up -d
+            docker image prune -f || true
