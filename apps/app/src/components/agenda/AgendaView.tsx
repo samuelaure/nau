@@ -26,18 +26,15 @@ import {
   type AgendaItem,
   type AgendaPeriod,
 } from '@/hooks/use-agenda-api'
-import { useUpsertSchedule } from '@/hooks/use-schedule-api'
+import { useUpsertPlanning } from '@/hooks/use-schedule-api'
 import { useUiStore } from '@/lib/state/ui-store'
 import { AgendaRow } from './AgendaRow'
 import { ItemComposer } from './ItemComposer'
-import { toInputDate } from './scheduling'
+import { toKey } from '@/relations/app-actions/periods'
+import { stepDate } from '@/core/periods/scroll-window'
 
-function shift(date: Date, period: AgendaPeriod, direction: -1 | 1): Date {
-  const d = new Date(date)
-  if (period === 'daily') d.setDate(d.getDate() + direction)
-  if (period === 'weekly') d.setDate(d.getDate() + 7 * direction)
-  if (period === 'monthly') d.setMonth(d.getMonth() + direction)
-  return d
+function shift(date: Date, scale: AgendaPeriod, direction: -1 | 1): Date {
+  return stepDate(date, scale, direction)
 }
 
 function formatDuration(minutes: number): string {
@@ -48,9 +45,9 @@ function formatDuration(minutes: number): string {
 }
 
 const PERIODS: { value: AgendaPeriod; label: string; composerDefault: 'today' | 'week' | 'month' }[] = [
-  { value: 'daily', label: 'Día', composerDefault: 'today' },
-  { value: 'weekly', label: 'Semana', composerDefault: 'week' },
-  { value: 'monthly', label: 'Mes', composerDefault: 'month' },
+  { value: 'day', label: 'Día', composerDefault: 'today' },
+  { value: 'week', label: 'Semana', composerDefault: 'week' },
+  { value: 'month', label: 'Mes', composerDefault: 'month' },
 ]
 
 /**
@@ -63,17 +60,17 @@ const PERIODS: { value: AgendaPeriod; label: string; composerDefault: 'today' | 
 export function AgendaView() {
   const activeWorkspaceId = useUiStore((s) => s.activeWorkspaceId)
   const [date, setDate] = useState(() => new Date())
-  const [period, setPeriod] = useState<AgendaPeriod>('daily')
+  const [period, setPeriod] = useState<AgendaPeriod>('day')
 
   const { data, isLoading } = useAgenda({
-    date: toInputDate(date),
-    period,
+    date: toKey(date),
+    scale: period,
     workspaceId: activeWorkspaceId ?? undefined,
   })
 
   const setCompletion = useSetCompletion()
   const reorder = useReorderAgenda()
-  const upsertSchedule = useUpsertSchedule()
+  const upsertPlanning = useUpsertPlanning()
 
   // Held locally so a drag lands instantly; the server order arrives back on the
   // next fetch and replaces it.
@@ -117,14 +114,12 @@ export function AgendaView() {
     const from = new Date(item.occurrenceAt)
     const to = new Date(from)
     to.setDate(to.getDate() + 1)
-    const end = new Date(to)
-    end.setHours(23, 59, 59, 999)
 
-    upsertSchedule.mutate({
+    upsertPlanning.mutate({
       blockId: item.blockId,
-      startDate: to.toISOString(),
-      endDate: end.toISOString(),
-      rrule: null,
+      scale: 'day',
+      anchor: to.toISOString(),
+      recurrence: null,
     })
   }
 

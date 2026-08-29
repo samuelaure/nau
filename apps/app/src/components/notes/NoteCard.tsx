@@ -2,8 +2,7 @@ import { Block } from '@9nau/types'
 import { cn } from '@9nau/ui/lib/utils'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
 import { useDeleteBlock, useUpdateBlock } from '@/hooks/use-blocks-api'
-import { useUpsertSchedule } from '@/hooks/use-schedule-api'
-import { rangeOf } from '@/components/agenda/scheduling'
+import { useUpsertPlanning } from '@/hooks/use-schedule-api'
 import { Button } from '@9nau/ui/components/button'
 import { MoreVertical, CalendarPlus } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
@@ -20,7 +19,7 @@ export function NoteCard({ note }: NoteCardProps) {
   }))
   const deleteBlock = useDeleteBlock()
   const updateBlock = useUpdateBlock()
-  const upsertSchedule = useUpsertSchedule()
+  const upsertPlanning = useUpsertPlanning()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -50,16 +49,15 @@ export function NoteCard({ note }: NoteCardProps) {
   const handleScheduleToday = async (e: React.MouseEvent) => {
     e.stopPropagation()
     setIsMenuOpen(false)
-    const { start, end } = rangeOf({ kind: 'today' })
     await updateBlock.mutateAsync({
       id: note.id,
       updateDto: { type: 'action', properties: { status: 'todo' } },
     })
-    await upsertSchedule.mutateAsync({
+    await upsertPlanning.mutateAsync({
       blockId: note.id,
-      startDate: start.toISOString(),
-      endDate: end.toISOString(),
-      rrule: null,
+      scale: 'day',
+      anchor: new Date().toISOString(),
+      recurrence: null,
     })
   }
 
@@ -117,7 +115,7 @@ export function NoteCard({ note }: NoteCardProps) {
                 variant="ghost"
                 className="w-full justify-start gap-2 text-sm"
                 onClick={handleScheduleToday}
-                disabled={updateBlock.isPending || upsertSchedule.isPending}
+                disabled={updateBlock.isPending || upsertPlanning.isPending}
               >
                 <CalendarPlus className="h-4 w-4" />
                 A la agenda

@@ -1,7 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api-client'
+import type { Granularity } from '@/relations/app-actions/periods'
 
-export type AgendaPeriod = 'daily' | 'weekly' | 'monthly'
+/**
+ * The rhythm vocabulary (`daily`/`weekly`/`monthly`) and the scale vocabulary
+ * (`day`/`week`/`month`) used to coexist on either side of the wire, translated
+ * back and forth for no reason — `apps/api/src/agenda/agenda.controller.ts`'s
+ * own comment on `SCALES` says so. The server now speaks scale only; this type
+ * is `Granularity`, kept as its own name here because "the grain an agenda
+ * view is drawn at" is what every caller in this file actually means, and
+ * spelling out `Granularity` at each use site would say less, not more.
+ */
+export type AgendaPeriod = Granularity
 
 export interface AgendaItem {
   blockId: string
@@ -39,7 +49,7 @@ export interface AgendaItem {
 }
 
 export interface Agenda {
-  period: AgendaPeriod
+  scale: AgendaPeriod
   label: string
   start: string
   end: string
@@ -51,11 +61,11 @@ export interface Agenda {
   carriedCount: number
 }
 
-export const useAgenda = (params: { date: string; period: AgendaPeriod; workspaceId?: string }) =>
+export const useAgenda = (params: { date: string; scale: AgendaPeriod; workspaceId?: string }) =>
   useQuery<Agenda, Error>({
     queryKey: ['agenda', params],
     queryFn: () => {
-      const search = new URLSearchParams({ date: params.date, period: params.period })
+      const search = new URLSearchParams({ date: params.date, scale: params.scale })
       if (params.workspaceId) search.append('workspaceId', params.workspaceId)
       return apiClient.get(`/agenda?${search.toString()}`)
     },
@@ -135,7 +145,7 @@ export const useAgendaRange = (params: {
       const search = new URLSearchParams({
         from: params.from,
         to: params.to,
-        period: params.period,
+        scale: params.period,
       })
       if (params.workspaceId) search.append('workspaceId', params.workspaceId)
       return apiClient.get(`/agenda?${search.toString()}`)

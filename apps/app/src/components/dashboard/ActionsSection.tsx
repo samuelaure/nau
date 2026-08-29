@@ -7,8 +7,9 @@ import { Block } from '@9nau/types'
 import { EditableItem } from './EditableItem'
 import type { AgendaItem } from '@/hooks/use-agenda-api'
 import { useSetCompletion } from '@/hooks/use-agenda-api'
-import { useUpsertSchedule } from '@/hooks/use-schedule-api'
-import { rangeOf, WHEN_LABELS, type WhenKind } from '@/components/agenda/scheduling'
+import { useUpsertPlanning } from '@/hooks/use-schedule-api'
+import { WHEN_LABELS, scaleOf, type WhenKind } from '@/components/agenda/scheduling'
+import type { Granularity } from '@/relations/app-actions/periods'
 import { useCreateBlock, useUpdateBlock, useDeleteBlock } from '@/hooks/use-blocks-api'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
 
@@ -122,22 +123,21 @@ function Badges({ item }: { item: AgendaItem }) {
  */
 export function ActionsSection({
   dateStr,
-  periodStart,
-  periodEnd,
+  granularity,
   occurrences,
   blocksById,
   workspaceId,
 }: {
   dateStr: string
   /**
-   * The full span of the period being viewed — a day, a week, a month, however
-   * wide. An item created here is scheduled across the whole span, never
-   * collapsed to a single day: creating from the month view has to produce a
-   * month-wide item, or it silently becomes a day-level item that shows up
-   * "22 days late" the next time someone looks at today.
+   * The scale of the period being viewed — day, week, month, however wide. An
+   * item created here is planned at this scale, never collapsed to a single
+   * day: creating from the month view has to produce a month-scale item, or it
+   * silently becomes a day-scale item that shows up "22 days late" the next
+   * time someone looks at today. The server resolves the actual span from
+   * `{scale, anchor}`; nothing here computes a range.
    */
-  periodStart: string
-  periodEnd: string
+  granularity: Granularity
   occurrences: AgendaItem[]
   blocksById: Map<string, Block>
   workspaceId?: string
@@ -147,22 +147,25 @@ export function ActionsSection({
   const createBlock = useCreateBlock()
   const updateBlock = useUpdateBlock()
   const deleteBlock = useDeleteBlock()
-  const upsertSchedule = useUpsertSchedule()
+  const upsertPlanning = useUpsertPlanning()
   const setFocusedItemId = useDashboardStore((s) => s.actions.setFocusedItemId)
 
   /**
    * Puts an item in another period without going there.
    *
    * Planning something for next month is not wanting to be in next month, so
-   * the view stays where it is.
+   * the view stays where it is. `anchor` is today; the server resolves which
+   * concrete week/month that falls in — no client-side range calculation, per
+   * the same fix applied to every other period-resolving view.
    */
   const moveTo = (item: AgendaItem, kind: WhenKind) => {
-    const { start, end } = rangeOf({ kind })
-    upsertSchedule.mutate({
+    upsertPlanning.mutate({
       blockId: item.blockId,
-      startDate: start.toISOString(),
-      endDate: end.toISOString(),
-      rrule: item.recurring ? undefined : null,
+      scale: scaleOf(kind),
+      anchor: new Date().toISOString(),
+      // Moving to a period keeps an existing recurrence, but clears it for a
+      // one-off — matching what upsertPlanning already does for a fresh item.
+      recurrence: item.recurring ? undefined : null,
     })
   }
   const setDraggedItem = useDashboardStore((s) => s.actions.setDraggedItem)
@@ -176,11 +179,14 @@ export function ActionsSection({
    * which is exactly how six actions came to sit invisibly outside the agenda —
    * and typing should never be able to produce that.
    *
-   * The span is the whole period, not the one day `dateStr` names. Creating from
-   * the month view has to span the month: a single-day schedule stamped with the
-   * month's first day is what previously showed up "22 days late" the next time
-   * someone opened today, because the item was really a day-level item that
-   * happened to be dated in August, not a month-level one at all.
+   * Still one request. `CreateBlockDto.planning` (added with the Time rebuild)
+   * is what makes it possible: `schedule: {startDate, endDate, rrule}` was
+   * never a field this endpoint had — nau#93 flagged the mismatch — but the
+   * one-request property it protected survives under the real field,
+   * `planning: {scale, anchor, recurrence}`. The block still goes on the
+   * period being viewed: `granularity` names its scale, `dateStr` an instant
+   * inside it, and the server resolves the actual span — never a client-side
+   * range computed from `periodStart`/`periodEnd`.
    */
   const handleAdd = async (_afterId: string | null, parentId: string | null) => {
     const created = await createBlock.mutateAsync({
@@ -188,10 +194,7 @@ export function ActionsSection({
       parentId: parentId ?? undefined,
       workspaceId,
       properties: { text: '', status: 'todo' },
-      // One request. Typing a line and putting it on a period is a single act,
-      // and splitting it into two calls made every Enter wait for two round
-      // trips and two refetches.
-      schedule: { startDate: periodStart, endDate: periodEnd, rrule: null },
+      planning: { scale: granularity, anchor: `${dateStr}T00:00:00`, recurrence: null },
     })
 
     setFocusedItemId(created.id)
