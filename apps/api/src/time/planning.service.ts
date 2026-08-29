@@ -27,6 +27,8 @@ export interface UpsertPlanningInput {
   recurrence?: string | null;
   recurrenceTimezone?: string | null;
   recurrenceMode?: 'FIXED' | 'AFTER_COMPLETION';
+  /** When the rule stops applying. Null repeats indefinitely. */
+  recurrenceUntil?: Date | null;
 }
 
 @Injectable()
@@ -97,6 +99,7 @@ export class PlanningService {
       recurrence: input.recurrence ?? null,
       recurrenceTimezone: input.recurrenceTimezone ?? null,
       recurrenceMode: input.recurrenceMode ?? ('FIXED' as const),
+      recurrenceUntil: input.recurrenceUntil ?? null,
     };
 
     const moved =

@@ -116,14 +116,7 @@ export class OccurrencesService {
 
       const occurrences = recurring
         ? this.expand(planning, query.range, ctx, query.lastCompleted?.get(planning.blockId))
-        : [
-            {
-              at: planning.anchor,
-              effectiveAt: planning.anchor,
-              moved: false,
-              projected: false,
-            } satisfies Occurrence,
-          ];
+        : this.singleOccurrence(planning);
 
       for (const occurrence of occurrences) {
         out.push({
@@ -157,6 +150,35 @@ export class OccurrencesService {
     return out.sort((a, b) => a.effectiveAt.getTime() - b.effectiveAt.getTime());
   }
 
+  /**
+   * The one occurrence of a block that does not repeat.
+   *
+   * Overrides apply here exactly as they do to a rule. Skipping a one-off is a
+   * decision like any other, and reading `anchor` straight would make a skipped
+   * item reappear for ever and a moved one draw on the date it was moved from.
+   */
+  private singleOccurrence(planning: {
+    anchor: Date;
+    overrides: { occurrenceAt: Date; kind: string; movedTo: Date | null }[];
+  }): readonly Occurrence[] {
+    const override = planning.overrides.find(
+      (o) => o.occurrenceAt.getTime() === planning.anchor.getTime(),
+    );
+
+    if (override?.kind === 'SKIPPED') return [];
+
+    const movedTo = override?.kind === 'MOVED' ? override.movedTo : null;
+
+    return [
+      {
+        at: planning.anchor,
+        effectiveAt: movedTo ?? planning.anchor,
+        moved: Boolean(movedTo),
+        projected: false,
+      },
+    ];
+  }
+
   private expand(
     planning: {
       system: string;
@@ -164,6 +186,7 @@ export class OccurrencesService {
       recurrence: string | null;
       recurrenceTimezone: string | null;
       recurrenceMode: string;
+      recurrenceUntil: Date | null;
       overrides: { occurrenceAt: Date; kind: string; movedTo: Date | null }[];
     },
     range: Interval,
@@ -189,6 +212,7 @@ export class OccurrencesService {
           movedTo: o.movedTo,
         })),
         ...(lastCompletedAt ? { lastCompletedAt } : {}),
+        ...(planning.recurrenceUntil ? { endAt: planning.recurrenceUntil } : {}),
         mode: planning.recurrenceMode,
       } as never,
     );

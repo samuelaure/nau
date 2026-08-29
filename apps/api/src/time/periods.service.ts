@@ -54,8 +54,11 @@ export class PeriodsService {
     }
 
     const ctx = await this.time.resolveContext(workspaceId, systemId, start);
-    const startInstant = dayIn(from, ctx.timezone).toDate();
-    const endInstant = dayIn(to, ctx.timezone).toDate();
+    const startInstant = dayIn(from, ctx.timezone).startOf('day').toDate();
+    // Inclusive of the day named: `to` is a calendar day the caller asked for,
+    // and taking its local midnight as an exclusive end would silently drop it.
+    // `forRange` on the agenda side does the same, so the two agree.
+    const endInstant = dayIn(to, ctx.timezone).endOf('day').toDate();
 
     const periods = this.time
       .registry_()

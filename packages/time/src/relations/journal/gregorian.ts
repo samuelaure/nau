@@ -30,72 +30,68 @@ import { GREGORIAN_SYSTEM_ID } from '../../systems/gregorian';
 /**
  * Which scale's syntheses feed each larger one.
  *
- * A month reads days rather than weeks because weeks straddle month boundaries
- * — a week ending on the 3rd belongs to two months, and reading it into either
- * would import days that are not in that month. Days nest exactly, so they do
- * not have that problem.
+ * Samuel's rule, and each row is a deliberate choice rather than a pattern:
  *
- * A quarter reads months, and a year reads quarters: each step compresses by
- * roughly the same factor, which keeps any one synthesis from being asked to
- * read an unmanageable number of sources.
+ *   day      ← entries
+ *   week     ← entries          (not daily syntheses: a week reads the days
+ *                                themselves, keeping it close to what was lived)
+ *   month    ← daily syntheses
+ *   quarter  ← weekly syntheses
+ *   year     ← monthly syntheses
+ *
+ * Note the quarter: a week can straddle a quarter boundary — the week of 29
+ * June to 5 July belongs to both Q2 and Q3 — so reading weeks into a quarter
+ * pulls in a few days from either side. That is accepted deliberately; months
+ * would nest exactly but weeks are what Samuel wants a quarter to be made of.
+ * Recorded here so the next reader knows it is a decision, not an oversight.
  */
-const COMPOSES_FROM: Readonly<Record<string, string>> = {
-  week: 'day',
+const COMPOSES_FROM: Readonly<Record<string, string | null>> = {
+  day: null,
+  week: null,
   month: 'day',
-  quarter: 'month',
-  year: 'quarter',
+  quarter: 'week',
+  year: 'month',
 };
 
+/** The scale a period of this scale is composed from, if any. */
+export function composesFrom(scale: string): string | null {
+  return COMPOSES_FROM[scale] ?? null;
+}
+
 /**
- * How much material is worth reading directly before compressing instead.
+ * The size past which a synthesis request is worth noticing.
  *
- * A threshold on real content rather than on the nominal length of the period,
- * which is the point: a quiet month may hold fewer entries than a busy week,
- * and should be read straight from the entries rather than through a layer of
- * summaries that adds nothing. Duration is a poor proxy for density and using
- * it as one is what made the old fixed table wrong in both directions.
+ * Deliberately NOT a switch that changes which sources are read: the
+ * composition rule above is fixed, and silently swapping sources would make one
+ * month's synthesis mean something different from the next. This is a
+ * measurement threshold — the scheduler logs when a request exceeds it, so the
+ * real numbers accumulate before anyone decides what to do about them.
  *
- * A chosen number, revisable against real usage — and in one place, so revising
- * it is one decision rather than a hunt.
+ * A chosen number, in one place, revisable against what those logs show.
  */
 export const DIRECT_READ_TOKEN_BUDGET = 40_000;
 
 export const gregorianJournal: JournalComposition = {
   /**
-   * Where this period's synthesis should read from, best option first.
+   * Where this period's synthesis reads from.
    *
-   * Two candidates are offered rather than one, because which is right depends
-   * on what is actually there. The caller asks Journal how dense each is and
-   * takes the first that fits its budget:
-   *
-   * 1. The raw entries — truthful and complete, but unbounded in size.
-   * 2. The syntheses of the scale below — bounded, at the cost of one layer of
-   *    compression.
-   *
-   * A day has only the first: there is no smaller Gregorian scale to compose
-   * from, so its synthesis always reads entries.
+   * Exactly one plan, because what a period is made of is a property of the
+   * calendar rather than of how much happened to be written that month. If the
+   * sources it names do not exist yet, the answer is to generate them first —
+   * see the scheduler — not to fall back to a different kind of source.
    */
   preferredSources(period: Period, _ctx: ResolveContext): readonly SourcePlan[] {
-    const entries: SourcePlan = {
-      kind: 'entries',
-      fromScale: null,
-      range: period.interval,
-    };
+    const smaller = COMPOSES_FROM[period.ref.scale] ?? null;
 
-    const smaller = COMPOSES_FROM[period.ref.scale];
-    if (!smaller) return [entries];
+    // A day and a week read the entries themselves. Everything larger reads the
+    // syntheses of one particular scale below — one plan, not a choice, because
+    // which sources a period is made of is a property of the calendar rather
+    // than of how much happened to be written that month.
+    if (!smaller) {
+      return [{ kind: 'entries', fromScale: null, range: period.interval }];
+    }
 
-    return [
-      entries,
-      {
-        kind: 'syntheses',
-        // Always a scale of this same system. Composing across systems would be
-        // one system interpreting another's divisions, which is the single
-        // thing translation must never do.
-        fromScale: smaller,
-        range: period.interval,
-      },
-    ];
+    return [{ kind: 'syntheses', fromScale: smaller, range: period.interval }];
   },
 
   /**
@@ -112,13 +108,14 @@ export const gregorianJournal: JournalComposition = {
 };
 
 /**
- * Whether a candidate set is small enough to read directly.
+ * Whether a request is large enough to be worth flagging.
  *
- * Exposed so the caller can walk `preferredSources` and decide, rather than
- * having the rule buried where it cannot be tested or tuned.
+ * Reports rather than decides. Nothing changes behaviour on the strength of
+ * this — it exists so the volume of real requests becomes visible before any
+ * limit is imposed on the strength of a guess.
  */
-export function fitsDirectRead(density: SourceDensity): boolean {
-  return density.estimatedTokens <= DIRECT_READ_TOKEN_BUDGET;
+export function exceedsBudget(density: SourceDensity): boolean {
+  return density.estimatedTokens > DIRECT_READ_TOKEN_BUDGET;
 }
 
 /** The system this composition belongs to. Used when registering relations. */

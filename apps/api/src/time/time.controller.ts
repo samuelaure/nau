@@ -174,6 +174,7 @@ export class TimeController {
       recurrence?: string | null;
       recurrenceTimezone?: string | null;
       recurrenceMode?: 'FIXED' | 'AFTER_COMPLETION';
+      recurrenceUntil?: string | null;
     },
   ) {
     if (!body.blockId || !body.anchor) {
@@ -188,6 +189,7 @@ export class TimeController {
       recurrence: body.recurrence ?? null,
       recurrenceTimezone: body.recurrenceTimezone ?? null,
       recurrenceMode: body.recurrenceMode ?? 'FIXED',
+      recurrenceUntil: body.recurrenceUntil ? new Date(body.recurrenceUntil) : null,
     });
   }
 

@@ -62,6 +62,7 @@ export {
 // interest in Journal never pulls this in.
 export {
   gregorianJournal,
-  fitsDirectRead,
+  exceedsBudget,
+  composesFrom,
   DIRECT_READ_TOKEN_BUDGET,
 } from './relations/journal/gregorian';

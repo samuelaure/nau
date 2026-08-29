@@ -39,6 +39,12 @@ ALTER TABLE "Planning" RENAME COLUMN "timezone" TO "recurrenceTimezone";
 
 ALTER TABLE "Planning" ADD COLUMN "system" TEXT NOT NULL DEFAULT 'gregorian';
 ALTER TABLE "Planning" ADD COLUMN "scale"  TEXT NOT NULL DEFAULT 'day';
+-- When a rule stops applying. The old `endDate` served two purposes at once —
+-- the span of the period a block sat in, AND how long a habit kept recurring —
+-- so a habit placed on one day could not also run until December. Splitting
+-- them is what makes "every weekday until the end of term" expressible.
+ALTER TABLE "Planning" ADD COLUMN "recurrenceUntil" TIMESTAMP(3);
+
 ALTER TABLE "Planning" ADD COLUMN "anchor" TIMESTAMP(3);
 ALTER TABLE "Planning" ADD COLUMN "from"   TIMESTAMP(3);
 ALTER TABLE "Planning" ADD COLUMN "to"     TIMESTAMP(3);
@@ -117,6 +123,14 @@ SET "from" = "startDate",
     END
 WHERE "from" IS NULL;
 
+-- For a recurring block the old `endDate` was the recurrence bound rather than
+-- the span of one period, so it carries over as such. Production has no
+-- recurring rows today (verified: 0 of 27 have an rrule), which makes this a
+-- no-op here and correct for any database that does have them.
+UPDATE "Planning"
+SET "recurrenceUntil" = "endDate"
+WHERE "recurrence" IS NOT NULL AND "endDate" IS NOT NULL;
+
 -- Every row now has an identity, so the columns become required.
 ALTER TABLE "Planning" ALTER COLUMN "anchor" SET NOT NULL;
 ALTER TABLE "Planning" ALTER COLUMN "from"   SET NOT NULL;
@@ -166,26 +180,29 @@ CREATE TABLE "TimeSystemConfig" (
 CREATE UNIQUE INDEX "TimeSystemConfig_workspaceId_system_key"
     ON "TimeSystemConfig"("workspaceId", "system");
 
--- Every existing workspace keeps the week it already had.
+-- Every workspace gets Sunday, which is what their owner wants.
 --
--- The default for NEW workspaces becomes Sunday, which is a change of meaning.
--- It is safe precisely because migration 20260824180000_calendar_config wrote
--- firstDayOfWeek explicitly into the shared row: the value is recorded rather
--- than inherited, so writing it per workspace here preserves exactly what each
--- one was already getting, and nobody's weeks move underneath them.
+-- Normally a default change would be preserved per workspace rather than
+-- applied — migration 20260824180000_calendar_config had written
+-- firstDayOfWeek: 1 explicitly, so each workspace's Monday was recorded rather
+-- than inherited, and overwriting recorded values is how you move someone's
+-- weeks underneath them without asking.
+--
+-- Here it was asked. All seven workspaces belong to one person, who wants weeks
+-- to start on Sunday (2026-08-29). So this is a deliberate, confirmed change of
+-- meaning rather than a silent one, and it is applied to the existing rows
+-- instead of only to new ones.
+--
+-- What moves as a result: any weekly synthesis generated from here on covers
+-- Sunday to Saturday. Syntheses already written keep the from/to they recorded,
+-- so nothing already generated is reinterpreted.
 INSERT INTO "TimeSystemConfig" ("id", "workspaceId", "system", "enabled", "config", "updatedAt")
 SELECT
     'tsc_' || w.id || '_gregorian',
     w.id,
     'gregorian',
     true,
-    COALESCE(
-        (SELECT c."config" FROM "Calendar" c
-          WHERE c."workspaceId" = w.id AND c."kind" = 'GREGORIAN' LIMIT 1),
-        (SELECT c."config" FROM "Calendar" c
-          WHERE c."workspaceId" IS NULL AND c."kind" = 'GREGORIAN' LIMIT 1),
-        '{"firstDayOfWeek": 1}'::jsonb
-    ),
+    '{"firstDayOfWeek": 0}'::jsonb,
     NOW()
 FROM "Workspace" w;
 

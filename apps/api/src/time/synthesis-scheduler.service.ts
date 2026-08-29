@@ -1,12 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import {
-  fitsDirectRead,
+  exceedsBudget,
   gregorian,
   gregorianClosedPeriodAt,
   gregorianPeriodsIn,
   gregorianJournal,
   localNow,
+  type Interval,
   type Period,
   type ResolveContext,
   type SourcePlan,
@@ -110,56 +111,144 @@ export class SynthesisSchedulerService {
   }
 
   /**
-   * Builds one period's synthesis, if it is worth building.
+   * Builds one period's synthesis, generating what it depends on first.
    *
-   * Time chooses the sources; Journal interprets them. The choice is made on
-   * actual content density rather than on the nominal length of the period,
-   * because a quiet month can hold less than a busy week and should be read
-   * straight from the entries.
+   * The rule, for Gregorian: a day and a week read the entries themselves; a
+   * month reads daily syntheses, a quarter weekly ones, a year monthly ones.
+   *
+   * So asking for a year can require most of a calendar to be built from
+   * nothing. If a month's synthesis is missing, it is generated before the year
+   * that needs it — and if that month's own days are missing, they are
+   * generated first in turn. The recursion walks down until it reaches entries,
+   * then builds back up.
+   *
+   * The one thing that stops the descent is absence of material rather than
+   * absence of a synthesis. A week nobody wrote in is skipped, not generated
+   * empty: it has nothing to say, and a summary of it would be invented.
    */
   async synthesise(
     workspaceId: string,
     period: Period,
     ctx: ResolveContext,
+    depth = 0,
   ): Promise<{ generated: boolean; reason?: string }> {
-    const plans = gregorianJournal.preferredSources(period, ctx);
-
-    for (const plan of plans) {
-      const ids = await this.resolveSourceIds(workspaceId, plan);
-      if (ids.length === 0) continue;
-
-      const density = await this.densityOf(workspaceId, plan, ids);
-
-      // Reading the entries directly is preferred and truthful; falling to the
-      // level below trades one layer of compression for a bounded size. Take
-      // the first plan that fits, and the last one regardless — a period whose
-      // smaller syntheses are themselves large still has to be summarised.
-      const isLast = plan === plans[plans.length - 1];
-      if (!fitsDirectRead(density) && !isLast) continue;
-
-      if (gregorianJournal.shouldSynthesise?.(period, density) === false) {
-        return { generated: false, reason: 'empty' };
-      }
-
-      await this.journal.generateSynthesis({
-        workspaceId,
-        from: period.interval.start.toISOString(),
-        to: (period.interval.end ?? period.interval.start).toISOString(),
-        sourceKind: plan.kind,
-        sourceIds: ids,
-      });
-
-      this.logger.log(
-        `Synthesised ${period.ref.system}/${period.ref.scale} "${period.name}" for ` +
-          `workspace ${workspaceId} from ${ids.length} ${plan.kind}`,
-      );
-      return { generated: true };
+    // A guard, not a policy. Gregorian nests four deep (year → month → day), so
+    // anything beyond this is a cycle in a system's own composition rule.
+    if (depth > 8) {
+      this.logger.error(`Composition depth exceeded at ${period.ref.scale} — check the rule`);
+      return { generated: false, reason: 'depth' };
     }
 
-    // A period nobody recorded is not a period to narrate. Calling a model here
-    // is what once produced summaries of empty months describing events that
-    // never happened.
-    return { generated: false, reason: 'no sources' };
+    const [plan] = gregorianJournal.preferredSources(period, ctx);
+    if (!plan) return { generated: false, reason: 'no plan' };
+
+    // Everything larger than a week is built from smaller syntheses, so the
+    // ones that are missing have to exist before this one can be asked for.
+    if (plan.kind === 'syntheses' && plan.fromScale) {
+      await this.ensureSubSyntheses(workspaceId, period, plan.fromScale, ctx, depth);
+    }
+
+    const ids = await this.resolveSourceIds(workspaceId, plan);
+    if (ids.length === 0) {
+      // A period nobody recorded is not a period to narrate. Calling a model
+      // here is what once produced summaries of empty months describing events
+      // that never happened.
+      return { generated: false, reason: 'no sources' };
+    }
+
+    const density = await this.densityOf(workspaceId, plan, ids);
+
+    if (gregorianJournal.shouldSynthesise?.(period, density) === false) {
+      return { generated: false, reason: 'empty' };
+    }
+
+    // Measured, not enforced. The rule stays fixed and the numbers accumulate,
+    // so that any future limit is set against real volume rather than a guess.
+    if (exceedsBudget(density)) {
+      this.logger.warn(
+        `Large synthesis: ${period.ref.scale} "${period.name}" for workspace ` +
+          `${workspaceId} — ${ids.length} ${plan.kind}, ~${density.estimatedTokens} tokens`,
+      );
+    }
+
+    await this.journal.generateSynthesis({
+      workspaceId,
+      from: period.interval.start.toISOString(),
+      to: (period.interval.end ?? period.interval.start).toISOString(),
+      sourceKind: plan.kind,
+      sourceIds: ids,
+    });
+
+    this.logger.log(
+      `Synthesised ${period.ref.system}/${period.ref.scale} "${period.name}" for ` +
+        `workspace ${workspaceId} from ${ids.length} ${plan.kind} ` +
+        `(~${density.estimatedTokens} tokens)`,
+    );
+    return { generated: true };
+  }
+
+  /**
+   * Generates the smaller syntheses this period is composed of, where missing.
+   *
+   * "Missing" means the sub-period has material but no synthesis. A sub-period
+   * with nothing in it is left alone: it is not a gap to fill, it is a stretch
+   * where nothing was written, and the period above simply has one fewer source.
+   */
+  private async ensureSubSyntheses(
+    workspaceId: string,
+    period: Period,
+    fromScale: string,
+    ctx: ResolveContext,
+    depth: number,
+  ): Promise<void> {
+    const subPeriods = gregorianPeriodsIn(fromScale, period.interval, ctx);
+    if (subPeriods.length === 0) return;
+
+    const existing = await this.existingSyntheses(workspaceId, period.interval, fromScale, ctx);
+
+    for (const sub of subPeriods) {
+      if (existing.has(sub.interval.start.getTime())) continue;
+      await this.synthesise(workspaceId, sub, ctx, depth + 1);
+    }
+  }
+
+  /**
+   * The starts of the sub-periods that already have a synthesis.
+   *
+   * A synthesis records its from/to but not which scale produced it, so the
+   * scale is recovered by matching each one's start against a real sub-period
+   * boundary. Exact rather than approximate, because both come from the same
+   * calculation — and a synthesis matching no boundary belongs to another scale
+   * and must not be counted here.
+   */
+  private async existingSyntheses(
+    workspaceId: string,
+    range: Interval,
+    scale: string,
+    ctx: ResolveContext,
+  ): Promise<Set<number>> {
+    if (!range.end) return new Set();
+
+    const boundaries = new Set(
+      gregorianPeriodsIn(scale, range, ctx).map((p) => p.interval.start.getTime()),
+    );
+
+    const rows = await this.prisma.$queryRaw<{ startsAt: Date }[]>`
+      SELECT (properties->>'from')::timestamptz AS "startsAt"
+      FROM "Block"
+      WHERE "workspaceId" = ${workspaceId}
+        AND type = 'journal_synthesis'
+        AND "deletedAt" IS NULL
+        AND COALESCE((properties->>'noData')::boolean, false) = false
+        AND (properties->>'from')::timestamptz >= ${range.start}
+        AND (properties->>'from')::timestamptz <  ${range.end}
+    `;
+
+    return new Set(
+      rows
+        .map((r) => new Date(r.startsAt).getTime())
+        .filter((t) => boundaries.has(t)),
+    );
   }
 
   /**

@@ -319,6 +319,13 @@ model Planning {
 
   /// Where the rule counts from. See RecurrenceMode.
   recurrenceMode RecurrenceMode @default(FIXED)
+  /// When the rule stops applying. Null means it repeats indefinitely.
+  ///
+  /// Distinct from `to`, which bounds the single period this block sits in. A
+  /// habit placed on one day can recur for a year, so the two answer different
+  /// questions and collapsing them would make "every weekday until December"
+  /// inexpressible.
+  recurrenceUntil DateTime?
 
   overrides OccurrenceOverride[]
 
