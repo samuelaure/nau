@@ -4,6 +4,7 @@ import { APP_PIPE } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
+import { CoreModule } from './core/core.module';
 import { BlocksModule } from './blocks/blocks.module';
 import { HealthModule } from './health/health.module';
 import { RelationsModule } from './relations/relations.module';
@@ -43,6 +44,7 @@ import { CapturesModule } from './captures/captures.module';
       { name: 'medium', ttl: 60_000, limit: 200 },
     ]),
     PrismaModule,
+    CoreModule,
     BlocksModule,
     HealthModule,
     RelationsModule,
