@@ -1,10 +1,10 @@
 import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { Logger } from '@nestjs/common';
 import helmet from 'helmet';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const cookieParser = require('cookie-parser');
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { mountOpenApi } from './core/contract/openapi';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -28,6 +28,8 @@ async function bootstrap() {
     origin: rawOrigins,
     credentials: true,
   });
+
+  mountOpenApi(app);
 
   const port = process.env.PORT ?? 3000;
   await app.listen(port);

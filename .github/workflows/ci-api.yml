@@ -70,6 +70,16 @@ jobs:
         run: pnpm --filter=@9nau/api exec npx prisma generate
       - name: Typecheck
         run: pnpm turbo typecheck --filter=@9nau/api
+      # The published contract must match the code that serves it. Five services
+      # consume this api and none of them can see a change to it until the spec
+      # changes too, so a stale spec fails the build rather than shipping.
+      - name: Check the published contract is current
+        run: pnpm --filter=@9nau/api contract:check
+        env:
+          NODE_ENV: test
+          AUTH_SECRET: ci-test-secret-32-chars-minimum!!
+          ALLOWED_ORIGINS: http://localhost:3000
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
       - name: Build
         run: pnpm turbo build --filter=@9nau/api
 

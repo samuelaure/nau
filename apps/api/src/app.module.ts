@@ -1,9 +1,8 @@
 import { Module, ValidationPipe } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_PIPE } from '@nestjs/core';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
+import { CoreModule } from './core/core.module';
 import { BlocksModule } from './blocks/blocks.module';
 import { HealthModule } from './health/health.module';
 import { RelationsModule } from './relations/relations.module';
@@ -43,6 +42,7 @@ import { CapturesModule } from './captures/captures.module';
       { name: 'medium', ttl: 60_000, limit: 200 },
     ]),
     PrismaModule,
+    CoreModule,
     BlocksModule,
     HealthModule,
     RelationsModule,
@@ -63,12 +63,18 @@ import { CapturesModule } from './captures/captures.module';
     UsageModule,
     TagsModule,
   ],
-  controllers: [AppController],
   providers: [
-    AppService,
     {
       provide: APP_PIPE,
-      useClass: ValidationPipe,
+      // Strict deliberately. Registered bare, an unknown field in a payload was
+      // accepted and ignored, so a client sending the wrong shape got a 2xx and
+      // no indication anything was wrong — which is how client and server drift
+      // apart without either side noticing.
+      useValue: new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
     },
     {
       provide: APP_GUARD,
