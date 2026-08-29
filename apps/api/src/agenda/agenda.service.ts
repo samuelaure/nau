@@ -224,7 +224,13 @@ export class AgendaService {
         deletedAt: null,
         type: { in: AGENDA_TYPES },
         planning: { is: null },
-        AND: [{ properties: { path: ['status'], not: 'done' } }],
+        // Resolved either way — done or cancelled — is not a next action
+        // waiting to be placed; it has already been attended to. An item left
+        // filtered only on 'done' would show a cancelled one as still pending.
+        AND: [
+          { properties: { path: ['status'], not: 'done' } },
+          { properties: { path: ['status'], not: 'cancelled' } },
+        ],
       },
       orderBy: { createdAt: 'desc' },
     });
