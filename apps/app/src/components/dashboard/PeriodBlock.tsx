@@ -10,7 +10,7 @@ import { NotesInboxSection } from '../notes/NotesInboxSection'
 import { HierarchicalBlock } from '@9nau/core'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
 import type { AgendaItem } from '@/hooks/use-agenda-api'
-import { isCurrent, SUB_GRANULARITY, type PeriodSlot } from '@/lib/periods'
+import { isCurrent, subGranularity, type PeriodSlot } from '@/relations/app-actions/periods'
 
 export interface PeriodContents {
   occurrences: AgendaItem[]
@@ -49,7 +49,7 @@ export function PeriodBlock({
   const [showSubPeriods, setShowSubPeriods] = useState(false)
   const { setDropTarget } = useDashboardStore((s) => ({ setDropTarget: s.actions.setDropTarget }))
 
-  const sub = SUB_GRANULARITY[slot.granularity]
+  const sub = subGranularity(slot.granularity)
 
   // Counts every kind of entry, because at home a period is empty only when
   // nothing at all happened in it. A tab that shows one type counts only that
@@ -75,8 +75,7 @@ export function PeriodBlock({
     >
       <ActionsSection
         dateStr={slot.key}
-        periodStart={slot.start.toISOString()}
-        periodEnd={slot.end.toISOString()}
+        granularity={slot.granularity}
         occurrences={contents.occurrences}
         blocksById={blocksById}
         workspaceId={workspaceId}
@@ -147,10 +146,10 @@ export function PeriodBlock({
           )}
         </button>
 
-        {onDrillDown && SUB_GRANULARITY[slot.granularity] && (
+        {onDrillDown && sub && (
           <button
             onClick={() => onDrillDown(slot)}
-            title={`Ver por ${SUB_GRANULARITY[slot.granularity] === 'day' ? 'días' : 'meses'}`}
+            title={`Ver por ${sub === 'day' ? 'días' : 'meses'}`}
             className="mr-2 rounded-md p-1 text-gray-400 transition-colors hover:bg-white/60 hover:text-gray-700 dark:hover:bg-gray-700"
           >
             <ChevronRight className="h-4 w-4" />

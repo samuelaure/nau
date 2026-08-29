@@ -1,13 +1,26 @@
 /**
- * Turning what a person says about time into the two things the server stores:
- * a range, and optionally a rule.
+ * Turning what a person says about time into what the server stores: an
+ * anchor, a scale, and optionally a rule.
  *
  * Deliberately small and free of components, so the vocabulary of "today, this
  * week, every three days" exists in one place and both the creator and the
  * editor speak it identically.
+ *
+ * What used to live here as `rangeOf`/`toInputDate` computed a period's range
+ * on the client — the same class of drift the server-resolved-periods
+ * migration removed everywhere else (nau#58, nau#93). The server resolves
+ * where a week starts now; this file only names the scale a `WhenKind`
+ * anchors to, via `scaleOf`.
  */
 
 export type WhenKind = 'today' | 'week' | 'month' | 'date'
+
+/** The scale a `WhenKind` anchors to. `date` is still a day-scale anchor. */
+export function scaleOf(kind: WhenKind): 'day' | 'week' | 'month' {
+  if (kind === 'week') return 'week'
+  if (kind === 'month') return 'month'
+  return 'day'
+}
 
 export type FrequencyKind =
   | 'none'
@@ -28,49 +41,6 @@ export interface FrequencyValue {
   kind: FrequencyKind
   /** Only for the two interval kinds. */
   n?: number
-}
-
-/** A calendar day as the browser's own clock reads it, not as UTC would. */
-export function toInputDate(date: Date): string {
-  const pad = (v: number) => String(v).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
-}
-
-/**
- * The range a `WhenValue` names, in local time.
- *
- * A range and not a point, because that is the whole of deferring: "this week"
- * is Monday to Sunday and can be done at any moment inside it. A single day is
- * the degenerate case where both ends are the same day.
- */
-export function rangeOf(when: WhenValue, today = new Date()): { start: Date; end: Date } {
-  const base =
-    when.kind === 'date' && when.date ? new Date(`${when.date}T00:00:00`) : new Date(today)
-
-  const startOfDay = (d: Date) => new Date(new Date(d).setHours(0, 0, 0, 0))
-  const endOfDay = (d: Date) => new Date(new Date(d).setHours(23, 59, 59, 999))
-
-  switch (when.kind) {
-    case 'week': {
-      // ISO weeks: Monday first. Sunday counts as the last day of the week that
-      // is ending, not the first of the one beginning.
-      const day = base.getDay()
-      const monday = new Date(base)
-      monday.setDate(base.getDate() - (day === 0 ? 6 : day - 1))
-      const sunday = new Date(monday)
-      sunday.setDate(monday.getDate() + 6)
-      return { start: startOfDay(monday), end: endOfDay(sunday) }
-    }
-    case 'month': {
-      const first = new Date(base.getFullYear(), base.getMonth(), 1)
-      const last = new Date(base.getFullYear(), base.getMonth() + 1, 0)
-      return { start: startOfDay(first), end: endOfDay(last) }
-    }
-    case 'today':
-    case 'date':
-    default:
-      return { start: startOfDay(base), end: endOfDay(base) }
-  }
 }
 
 /**

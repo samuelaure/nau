@@ -230,6 +230,28 @@ export interface CreateBlockDto {
   properties: Record<string, unknown>
   workspaceId?: string
   userId?: string
+  /**
+   * When it is due, set in the same request that creates it.
+   *
+   * Typing a line and scheduling it are one act from the person's side, and
+   * splitting them into two calls left a window where a block existed but was
+   * due nowhere. Present in `apps/api`'s own `CreateBlockDto`
+   * (`apps/api/src/blocks/dto/create-block.dto.ts`) since the Time rebuild;
+   * missing here until now, which is the class of drift nau#66 tracks — one
+   * canonical type, several hand-copied shadows of it.
+   */
+  planning?: {
+    /** Which time system it is placed in. Defaults to Gregorian. */
+    system?: string
+    /** Which of that system's scales — 'day', 'week', 'month'… */
+    scale?: string
+    /** Any instant inside the period being planned into. */
+    anchor: string
+    /** The repetition rule, in the dialect its system speaks. */
+    recurrence?: string | null
+    recurrenceTimezone?: string | null
+    recurrenceMode?: 'FIXED' | 'AFTER_COMPLETION'
+  }
 }
 
 export interface UpdateBlockDto {

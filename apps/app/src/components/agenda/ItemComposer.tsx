@@ -4,12 +4,12 @@ import { useEffect, useState } from 'react'
 import { Loader2, Plus, Repeat, Square, Circle } from 'lucide-react'
 import { cn } from '@9nau/ui/lib/utils'
 import { useCreateBlock, useUpdateBlock } from '@/hooks/use-blocks-api'
-import { useUpsertSchedule } from '@/hooks/use-schedule-api'
+import { useUpsertPlanning } from '@/hooks/use-schedule-api'
+import { toKey } from '@/relations/app-actions/periods'
 import {
-  rangeOf,
   rruleOf,
   modeOf,
-  toInputDate,
+  scaleOf,
   FREQUENCY_LABELS,
   WHEN_LABELS,
   type FrequencyKind,
@@ -52,19 +52,19 @@ export function ItemComposer({
   const [title, setTitle] = useState('')
   const [when, setWhen] = useState<WhenValue>({
     kind: defaultWhen,
-    date: toInputDate(defaultDate ?? new Date()),
+    date: toKey(defaultDate ?? new Date()),
   })
   const [frequency, setFrequency] = useState<FrequencyValue>({ kind: 'none', n: 3 })
   const [estimate, setEstimate] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    setWhen((w) => ({ ...w, kind: defaultWhen, date: toInputDate(defaultDate ?? new Date()) }))
+    setWhen((w) => ({ ...w, kind: defaultWhen, date: toKey(defaultDate ?? new Date()) }))
   }, [defaultWhen, defaultDate])
 
   const createBlock = useCreateBlock()
-  const upsertSchedule = useUpsertSchedule()
-  const busy = createBlock.isPending || upsertSchedule.isPending
+  const upsertPlanning = useUpsertPlanning()
+  const busy = createBlock.isPending || upsertPlanning.isPending
 
   const isHabit = frequency.kind !== 'none'
 
@@ -87,12 +87,14 @@ export function ItemComposer({
         },
       })
 
-      const { start, end } = rangeOf(when)
-      await upsertSchedule.mutateAsync({
+      const anchor =
+        when.kind === 'date' && when.date ? new Date(`${when.date}T00:00:00`) : new Date()
+
+      await upsertPlanning.mutateAsync({
         blockId: block.id,
-        startDate: start.toISOString(),
-        endDate: end.toISOString(),
-        rrule: rruleOf(frequency),
+        scale: scaleOf(when.kind),
+        anchor: anchor.toISOString(),
+        recurrence: rruleOf(frequency),
         recurrenceMode: modeOf(frequency),
       })
 

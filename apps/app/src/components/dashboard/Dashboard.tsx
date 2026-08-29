@@ -6,7 +6,7 @@ import { PeriodBlock, type PeriodContents } from './PeriodBlock'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
 import { useUiStore } from '@/lib/state/ui-store'
 import { usePeriodAgenda } from './usePeriodAgenda'
-import { useWorkspaceCalendar } from '@/hooks/use-calendar-api'
+import { usePeriodAt, usePeriodsIn } from '@/relations/app-time/use-periods'
 import { NextActions } from './NextActions'
 import { HierarchicalBlock, findItemAndParent, calculateSortOrder } from '@9nau/core'
 import { Button } from '@9nau/ui/components/button'
@@ -15,13 +15,14 @@ import { useUpdateBlock } from '@/hooks/use-blocks-api'
 import { cn } from '@9nau/ui/lib/utils'
 import {
   isCurrent,
-  periodOf,
-  periodRun,
-  shiftPeriod,
-  subPeriods,
+  periodAnchors,
+  stepAnchor,
+  subGranularity,
+  toKey,
+  toSlot,
   type Granularity,
   type PeriodSlot,
-} from '@/lib/periods'
+} from '@/relations/app-actions/periods'
 
 interface DashboardProps {
   notesByDate: Map<string, Block[]>
@@ -71,25 +72,39 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
   const todayRef = useRef<HTMLDivElement>(null)
   const activeWorkspaceId = useUiStore((s) => s.activeWorkspaceId)
 
-  // Fetched rather than assumed. Where a week starts belongs to the calendar,
-  // and if this disagreed with the server the list would draw one week while the
-  // summaries described another, with nothing to say so.
-  const { data: calendar } = useWorkspaceCalendar()
-  const calendarConfig = calendar?.config
-
   useEffect(() => {
     setTodayRef(todayRef)
   }, [todayRef, setTodayRef])
 
-  const slots = useMemo(
-    () => periodRun(granularity, visiblePast, visibleFuture, new Date(), calendarConfig),
-    [granularity, visiblePast, visibleFuture, calendarConfig],
+  // The anchors on screen — not periods yet. Resolving where a week starts is
+  // the server's job now (`usePeriodsIn`, just below), not something computed
+  // here and kept "in sync" with the server by a comment. This is what fixed
+  // a workspace whose week began on Sunday creating items in one range and
+  // seeing them in another.
+  const anchors = useMemo(
+    () => periodAnchors(granularity, visiblePast, visibleFuture, new Date()),
+    [granularity, visiblePast, visibleFuture],
   )
+
+  const anchorSpan = useMemo(() => {
+    if (anchors.length === 0) return null
+    const times = anchors.map((a) => a.getTime())
+    return { from: toKey(new Date(Math.min(...times))), to: toKey(new Date(Math.max(...times))) }
+  }, [anchors])
+
+  const { data: periodsData } = usePeriodsIn({
+    scale: granularity,
+    from: anchorSpan?.from ?? '',
+    to: anchorSpan?.to ?? '',
+    workspaceId: anchorSpan ? activeWorkspaceId ?? null : null,
+  })
+
+  const slots = useMemo(() => (periodsData?.periods ?? []).map(toSlot), [periodsData])
 
   // Which period something appears under is decided by its schedule. The blocks
   // still carry the text and the tree; the agenda decides what is owed, which is
   // the only way one recurring block can show up across many periods.
-  const { byPeriod } = usePeriodAgenda(slots, calendarConfig)
+  const { byPeriod } = usePeriodAgenda(slots)
 
   const blocksById = useMemo(() => {
     const map = new Map<string, Block>()
@@ -261,57 +276,29 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
   }
 
   const renderSubPeriod = (parent: PeriodSlot) => (
-    <>
-      {subPeriods(parent, calendarConfig).map((sub) => (
-        <PeriodBlock
-          key={sub.key}
-          slot={sub}
-          contents={contentsOf(sub)}
-          blocksById={blocksById}
-          workspaceId={activeWorkspaceId ?? undefined}
-        />
-      ))}
-    </>
+    <SubPeriods
+      parent={parent}
+      contentsOf={contentsOf}
+      blocksById={blocksById}
+      workspaceId={activeWorkspaceId ?? undefined}
+    />
   )
 
   const containerProps = { onDrop: handleDrop, 'data-testid': 'dashboard-main-content' }
 
   if (viewMode === 'horizontal') {
-    const slot = periodOf(currentDate, granularity, calendarConfig)
     return (
-      <div {...containerProps} className="relative">
-        <div className="mb-2 flex items-center justify-center space-x-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setCurrentDate(shiftPeriod(slot, -1, calendarConfig).start)}
-            aria-label="Previous"
-          >
-            <ChevronsLeft className="h-4 w-4" />
-          </Button>
-          <h2 className="w-64 text-center text-base font-semibold capitalize text-gray-700 dark:text-gray-200">
-            {slot.label}
-          </h2>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setCurrentDate(shiftPeriod(slot, 1, calendarConfig).start)}
-            aria-label="Next"
-          >
-            <ChevronsRight className="h-4 w-4" />
-          </Button>
-        </div>
-        <div ref={isCurrent(slot) ? todayRef : null}>
-          <PeriodBlock
-            showHeader={false}
-            slot={slot}
-            contents={contentsOf(slot)}
-            blocksById={blocksById}
-            workspaceId={activeWorkspaceId ?? undefined}
-            renderSubPeriod={renderSubPeriod}
-          />
-        </div>
-      </div>
+      <HorizontalPeriod
+        currentDate={currentDate}
+        granularity={granularity}
+        setCurrentDate={setCurrentDate}
+        todayRef={todayRef}
+        contentsOf={contentsOf}
+        blocksById={blocksById}
+        workspaceId={activeWorkspaceId ?? undefined}
+        renderSubPeriod={renderSubPeriod}
+        containerProps={containerProps}
+      />
     )
   }
 
@@ -361,5 +348,120 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
         <span className="ml-2 text-[10px] font-semibold uppercase tracking-wider">Pasado</span>
       </button>
     </div>
+  )
+}
+
+/**
+ * The one period shown in horizontal mode, resolved by the server.
+ *
+ * Its own component rather than inline in `Dashboard`, because it needs its
+ * own `usePeriodAt` call and a hook cannot be called conditionally inside the
+ * `viewMode === 'horizontal'` branch above.
+ */
+function HorizontalPeriod({
+  currentDate,
+  granularity,
+  setCurrentDate,
+  todayRef,
+  contentsOf,
+  blocksById,
+  workspaceId,
+  renderSubPeriod,
+  containerProps,
+}: {
+  currentDate: Date
+  granularity: Granularity
+  setCurrentDate: (date: Date) => void
+  todayRef: React.RefObject<HTMLDivElement>
+  contentsOf: (slot: PeriodSlot) => PeriodContents
+  blocksById: Map<string, Block>
+  workspaceId?: string
+  renderSubPeriod: (parent: PeriodSlot) => React.ReactNode
+  containerProps: { onDrop: () => void; 'data-testid': string }
+}) {
+  const { data } = usePeriodAt({
+    scale: granularity,
+    at: currentDate.toISOString(),
+    workspaceId: workspaceId ?? null,
+  })
+  const slot = data?.period ? toSlot(data.period) : null
+
+  const step = (offset: number) => {
+    if (!slot) return
+    setCurrentDate(stepAnchor(slot.start, granularity, offset))
+  }
+
+  if (!slot) return null
+
+  return (
+    <div {...containerProps} className="relative">
+      <div className="mb-2 flex items-center justify-center space-x-1">
+        <Button variant="ghost" size="icon" onClick={() => step(-1)} aria-label="Previous">
+          <ChevronsLeft className="h-4 w-4" />
+        </Button>
+        <h2 className="w-64 text-center text-base font-semibold capitalize text-gray-700 dark:text-gray-200">
+          {slot.label}
+        </h2>
+        <Button variant="ghost" size="icon" onClick={() => step(1)} aria-label="Next">
+          <ChevronsRight className="h-4 w-4" />
+        </Button>
+      </div>
+      <div ref={isCurrent(slot) ? todayRef : null}>
+        <PeriodBlock
+          showHeader={false}
+          slot={slot}
+          contents={contentsOf(slot)}
+          blocksById={blocksById}
+          workspaceId={workspaceId}
+          renderSubPeriod={renderSubPeriod}
+        />
+      </div>
+    </div>
+  )
+}
+
+/**
+ * A period's children, one level down, resolved by the server.
+ *
+ * Its own component for the same reason as `HorizontalPeriod`: resolving a
+ * range of sub-periods needs `usePeriodsIn`, and `PeriodBlock` calls
+ * `renderSubPeriod` from inside a conditional (`showSubPeriods`), where a hook
+ * cannot live.
+ */
+function SubPeriods({
+  parent,
+  contentsOf,
+  blocksById,
+  workspaceId,
+}: {
+  parent: PeriodSlot
+  contentsOf: (slot: PeriodSlot) => PeriodContents
+  blocksById: Map<string, Block>
+  workspaceId?: string
+}) {
+  const sub = subGranularity(parent.granularity)
+
+  const { data } = usePeriodsIn({
+    scale: sub ?? 'day',
+    from: toKey(parent.start),
+    to: toKey(parent.end),
+    workspaceId: sub ? workspaceId ?? null : null,
+  })
+
+  if (!sub) return null
+  const subSlots = (data?.periods ?? []).map(toSlot)
+
+  return (
+    <>
+      {subSlots.map((slot) => (
+        <PeriodBlock
+          key={slot.key}
+          slot={slot}
+          contents={contentsOf(slot)}
+          blocksById={blocksById}
+          workspaceId={workspaceId}
+        />
+      ))}
+    </>
   )
 }

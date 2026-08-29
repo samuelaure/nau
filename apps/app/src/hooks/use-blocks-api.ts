@@ -48,15 +48,15 @@ export const useGetBlocks = (params: FindBlocksParams) => {
   })
 }
 
-/** A block, optionally placed on a day in the same request. */
-type CreateBlockInput = CreateBlockDto & {
-  schedule?: {
-    startDate: string
-    endDate?: string | null
-    rrule?: string | null
-    recurrenceMode?: 'FIXED' | 'AFTER_COMPLETION'
-  }
-}
+/**
+ * A block, optionally placed on a period in the same request.
+ *
+ * `CreateBlockDto.planning` already carries this — see `@nau/types`. This
+ * used to be a locally-invented `schedule: {startDate, endDate, rrule}` shape
+ * that never matched any endpoint (nau#93): the real field, and the real
+ * one-request guarantee, come from the DTO itself now.
+ */
+type CreateBlockInput = CreateBlockDto
 
 /**
  * Every cached block list, whatever parameters it was fetched with.
@@ -118,11 +118,11 @@ export const useCreateBlock = () => {
       patchCachedBlocks(queryClient, (blocks) => removeBlock(blocks, context?.tempId ?? ''))
     },
 
-    // A block that arrived with a schedule is owed somewhere, and what is owed
-    // is computed server-side from rules this client does not evaluate. The
+    // A block that arrived with a plan is owed somewhere, and what is owed is
+    // computed server-side from rules this client does not evaluate. The
     // agenda is the one thing that genuinely has to be asked again.
     onSettled: (_data, _err, input) => {
-      if (input.schedule) queryClient.invalidateQueries({ queryKey: ['agenda'] })
+      if (input.planning) queryClient.invalidateQueries({ queryKey: ['agenda'] })
     },
   })
 }

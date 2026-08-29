@@ -3,7 +3,8 @@
 import { useMemo } from 'react'
 import { useAgendaRange, type AgendaItem } from '@/hooks/use-agenda-api'
 import { useUiStore } from '@/lib/state/ui-store'
-import { API_PERIOD, periodOf, toKey, type CalendarConfig, type PeriodSlot } from '@/lib/periods'
+import { usePeriodsIn } from '@/relations/app-time/use-periods'
+import { toKey, toSlot, type PeriodSlot } from '@/relations/app-actions/periods'
 
 /** Occurrences owed, keyed by the period they are drawn under. */
 export type OccurrencesByPeriod = Map<string, AgendaItem[]>
@@ -21,7 +22,7 @@ export type OccurrencesByPeriod = Map<string, AgendaItem[]>
  * It is also the only way recurrence works at all. A daily habit is one block
  * that shows on seven days, and no amount of reading a date field produces that.
  */
-export function usePeriodAgenda(slots: PeriodSlot[], config?: CalendarConfig) {
+export function usePeriodAgenda(slots: PeriodSlot[]) {
   const activeWorkspaceId = useUiStore((s) => s.activeWorkspaceId)
 
   const span = useMemo(() => {
@@ -38,29 +39,46 @@ export function usePeriodAgenda(slots: PeriodSlot[], config?: CalendarConfig) {
   const { data, isLoading } = useAgendaRange({
     from: span?.from ?? '',
     to: span?.to ?? '',
-    period: (span ? API_PERIOD[span.granularity] : 'daily') as never,
+    period: (span?.granularity ?? 'day') as never,
     workspaceId: span ? activeWorkspaceId ?? undefined : undefined,
   })
+
+  // Which period each day of the span falls in, resolved by the server in one
+  // request rather than one `usePeriodAt` call per row — the same shape of fix
+  // the server-resolved periods migration made everywhere else: the client
+  // asks once for the whole window instead of recomputing membership itself.
+  const { data: periodsData } = usePeriodsIn({
+    scale: span?.granularity ?? 'day',
+    from: span?.from ?? '',
+    to: span?.to ?? '',
+    workspaceId: span ? activeWorkspaceId ?? null : null,
+  })
+
+  const slotByDay = useMemo(() => {
+    const resolved = (periodsData?.periods ?? []).map(toSlot)
+    return (day: Date) => resolved.find((slot) => day >= slot.start && day <= slot.end) ?? null
+  }, [periodsData])
 
   /**
    * Grouped by the period each row belongs to.
    *
-   * The server resolved each row's calendar day in the workspace's zone, so the
-   * only thing left here is deciding which slot that day falls in — arithmetic,
-   * and no timezone reasoning on the client.
+   * The server resolved both the row's calendar day and the window's periods,
+   * so what is left here is matching one against the other — arithmetic, and
+   * no timezone reasoning or period-boundary calculation on the client.
    */
   const byPeriod = useMemo<OccurrencesByPeriod>(() => {
     const map: OccurrencesByPeriod = new Map()
     if (!span) return map
 
     for (const item of data?.items ?? []) {
-      const key = periodOf(new Date(`${item.day}T12:00:00`), span.granularity, config).key
+      const slot = slotByDay(new Date(`${item.day}T12:00:00`))
+      const key = slot?.key ?? item.day
       const list = map.get(key)
       if (list) list.push(item)
       else map.set(key, [item])
     }
     return map
-  }, [data?.items, span, config])
+  }, [data?.items, span, slotByDay])
 
   return { byPeriod, timezone: data?.timezone ?? 'UTC', isLoading }
 }
