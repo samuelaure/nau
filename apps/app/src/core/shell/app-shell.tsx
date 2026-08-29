@@ -3,10 +3,14 @@
 import * as React from 'react'
 import { ArrowUp } from 'lucide-react'
 import { Button } from '@9nau/ui/components/button'
+import { TelegramLinkBanner } from '@9nau/ui'
 import { cn } from '@9nau/ui/lib/utils'
 import { Header } from './header'
 import { Sidebar } from './sidebar'
 import { useShellStore } from './shell-store'
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.9nau.com'
+const BOT_USERNAME = process.env.NEXT_PUBLIC_BOT_USERNAME ?? 'zazu_bot'
 
 /**
  * The frame every module renders inside.
@@ -41,6 +45,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen flex-col bg-white font-sans text-gray-900 dark:bg-gray-950 dark:text-gray-100">
+      <TelegramLinkBanner apiUrl={API_URL} botUsername={BOT_USERNAME} />
       <Header isScrolled={isScrolled} />
       <div className="flex flex-1 overflow-hidden pt-16">
         <Sidebar />
