@@ -70,7 +70,15 @@ import { CapturesModule } from './captures/captures.module';
     AppService,
     {
       provide: APP_PIPE,
-      useClass: ValidationPipe,
+      // Strict deliberately. Registered bare, an unknown field in a payload was
+      // accepted and ignored, so a client sending the wrong shape got a 2xx and
+      // no indication anything was wrong — which is how client and server drift
+      // apart without either side noticing.
+      useValue: new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
     },
     {
       provide: APP_GUARD,
