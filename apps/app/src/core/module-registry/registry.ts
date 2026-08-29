@@ -24,14 +24,14 @@ import {
 // import { actionsModule } from '@/relations/app-actions'
 // import { gtdModule } from '@/relations/app-gtd'
 // import { referencesModule } from '@/relations/app-references'
-// import { timeModule } from '@/relations/app-time'
+import { timeModule } from '@/relations/app-time'
 
 const MODULES: ModuleDescriptor[] = [
   // gtdModule,
   // actionsModule,
   // referencesModule,
   // journalModule,
-  // timeModule,
+  timeModule,
 ]
 
 export type { WorkspaceContext }

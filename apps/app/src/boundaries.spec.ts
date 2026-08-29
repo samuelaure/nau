@@ -15,8 +15,12 @@ import { join } from 'node:path'
  * nau#57. Two layers is the honest shape here; a third would be structure
  * without a reason.
  *
- * - `core/` never imports `relations/`. That import is the moment the core
- *   stops being agnostic and becomes "whatever Journal needed".
+ * - `core/` never imports `relations/`, with one declared exception:
+ *   `module-registry/registry.ts` is the single file allowed to, because its
+ *   whole job is supplying the real module list — the rules it applies stay
+ *   in `select.ts`, which holds no such import. Anywhere else in `core/`,
+ *   that import is the moment the core stops being agnostic and becomes
+ *   "whatever Journal needed".
  * - Nothing imports a sibling across the relations/ boundary — one module's
  *   web-facing relation never reaches into another's. Deleting
  *   `relations/app-journal/` should delete Journal from the web app and
@@ -60,10 +64,18 @@ describe('core/ knows nothing of any concrete module', () => {
     return
   }
 
-  const files = sourcesUnder(CORE)
+  const REGISTRY_FILE = 'core/module-registry/registry.ts'
+  const files = sourcesUnder(CORE).filter((f) => rel(f) !== REGISTRY_FILE)
 
   it.each(files.map(rel))('%s does not import from relations/', (name) => {
     const offending = importLines(join(SRC, name)).filter((line) => /relations\//.test(line))
+    expect(offending).toEqual([])
+  })
+
+  it(`${REGISTRY_FILE} imports from relations/ only to supply the module list`, () => {
+    const offending = importLines(join(SRC, REGISTRY_FILE)).filter(
+      (line) => /relations\//.test(line) && !/^import \{ \w+Module \} from '@\/relations\//.test(line.trim()),
+    )
     expect(offending).toEqual([])
   })
 
