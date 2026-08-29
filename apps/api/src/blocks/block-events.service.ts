@@ -27,7 +27,24 @@ export type BlockEventType =
   | 'occurrence.completed'
   | 'occurrence.reopened';
 
-const DONE_STATUSES = new Set(['done', 'completed']);
+/**
+ * The statuses that resolve an item — it stops asking for attention, one way
+ * or another.
+ *
+ * `'completed'` is accepted on read for one release only, migrating data
+ * written before the vocabulary was normalised to `'done'`
+ * (nau#101) — nothing in this codebase writes `'completed'` any more, and this
+ * entry should be deleted once the backfill in that issue has run.
+ *
+ * `'cancelled'` is a genuine third outcome, not a synonym for done: it says the
+ * item was resolved without being completed, which is what lets cancelling
+ * stand in for deleting without losing the fact that something was planned.
+ * Both count as "resolved" for the purpose of this set — `block.completed` is
+ * still the event name, because from the log's point of view what matters is
+ * that the item stopped being pending, and `metadata.to` already carries which
+ * of the two it became.
+ */
+const RESOLVED_STATUSES = new Set(['done', 'completed', 'cancelled']);
 
 /**
  * Records what happened to a block, and when.
@@ -92,12 +109,12 @@ export class BlockEventsService {
 
     await this.record('block.status_changed', before, { from: from ?? null, to: to ?? null }, actorUserId);
 
-    const wasDone = from ? DONE_STATUSES.has(from) : false;
-    const isDone = to ? DONE_STATUSES.has(to) : false;
+    const wasResolved = from ? RESOLVED_STATUSES.has(from) : false;
+    const isResolved = to ? RESOLVED_STATUSES.has(to) : false;
 
-    if (isDone && !wasDone) {
-      await this.record('block.completed', before, { from: from ?? null }, actorUserId);
-    } else if (wasDone && !isDone) {
+    if (isResolved && !wasResolved) {
+      await this.record('block.completed', before, { from: from ?? null, to: to ?? null }, actorUserId);
+    } else if (wasResolved && !isResolved) {
       await this.record('block.reopened', before, { to: to ?? null }, actorUserId);
     }
   }

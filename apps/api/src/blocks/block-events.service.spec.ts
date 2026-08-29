@@ -73,7 +73,7 @@ describe('BlockEventsService', () => {
       expect(create.mock.calls[0]![0].data.metadata).toEqual({ from: 'todo', to: 'done' });
     });
 
-    it('treats "completed" as done too, since both spellings are in the data', async () => {
+    it('still accepts "completed" as legacy spelling of done, until nau#101 backfills it', async () => {
       await service.recordUpdate({ ...block, ...withStatus('todo') }, withStatus('completed'));
 
       expect(typesRecorded()).toContain('block.completed');
@@ -85,10 +85,33 @@ describe('BlockEventsService', () => {
       expect(typesRecorded()).toEqual(['block.status_changed', 'block.reopened']);
     });
 
-    it('does not re-record a completion when one done status becomes another', async () => {
+    it('does not re-record a completion when one resolved status becomes another', async () => {
       await service.recordUpdate({ ...block, ...withStatus('done') }, withStatus('completed'));
 
       expect(typesRecorded()).toEqual(['block.status_changed']);
+    });
+
+    // Cancelling is a third outcome, not a synonym for done — but from the
+    // log's point of view both stop the item being pending, which is what
+    // 'block.completed' actually records. `metadata.to` is what lets a reader
+    // tell the two apart afterwards.
+    it('names cancelling as a completion too, with the outcome in its metadata', async () => {
+      await service.recordUpdate({ ...block, ...withStatus('todo') }, withStatus('cancelled'));
+
+      expect(typesRecorded()).toEqual(['block.status_changed', 'block.completed']);
+      expect(create.mock.calls[1]![0].data.metadata).toEqual({ from: 'todo', to: 'cancelled' });
+    });
+
+    it('does not re-record a completion when done becomes cancelled', async () => {
+      await service.recordUpdate({ ...block, ...withStatus('done') }, withStatus('cancelled'));
+
+      expect(typesRecorded()).toEqual(['block.status_changed']);
+    });
+
+    it('records a reopening when a cancelled item goes back to open', async () => {
+      await service.recordUpdate({ ...block, ...withStatus('cancelled') }, withStatus('todo'));
+
+      expect(typesRecorded()).toEqual(['block.status_changed', 'block.reopened']);
     });
   });
 });
