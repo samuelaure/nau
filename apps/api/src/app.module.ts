@@ -1,8 +1,6 @@
 import { Module, ValidationPipe } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_PIPE } from '@nestjs/core';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { CoreModule } from './core/core.module';
 import { BlocksModule } from './blocks/blocks.module';
@@ -65,9 +63,7 @@ import { CapturesModule } from './captures/captures.module';
     UsageModule,
     TagsModule,
   ],
-  controllers: [AppController],
   providers: [
-    AppService,
     {
       provide: APP_PIPE,
       // Strict deliberately. Registered bare, an unknown field in a payload was

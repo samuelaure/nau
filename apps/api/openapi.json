@@ -1,17 +1,6 @@
 {
   "openapi": "3.0.0",
   "paths": {
-    "/": {
-      "get": {
-        "operationId": "AppController_getHello",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        }
-      }
-    },
     "/captures/voice/upload-url": {
       "post": {
         "operationId": "CapturesController_voiceUploadUrl",
