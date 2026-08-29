@@ -1,18 +1,18 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { RelationsService } from './relations.service';
-import { PrismaService } from '../prisma/prisma.service';
-import { BlocksService } from '../blocks/blocks.service';
+import { GraphService } from './graph.service';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { BlocksService } from '../../../blocks/blocks.service';
 import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
 import { Relation } from '@prisma/client';
 
-describe('RelationsService', () => {
-  let service: RelationsService;
+describe('GraphService', () => {
+  let service: GraphService;
   let prisma: DeepMockProxy<PrismaService>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        RelationsService,
+        GraphService,
         {
           provide: PrismaService,
           useValue: mockDeep<PrismaService>(),
@@ -24,7 +24,7 @@ describe('RelationsService', () => {
       ],
     }).compile();
 
-    service = module.get<RelationsService>(RelationsService);
+    service = module.get<GraphService>(GraphService);
     prisma = module.get(PrismaService);
   });
 

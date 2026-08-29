@@ -96,6 +96,108 @@
         }
       }
     },
+    "/journal/entries": {
+      "get": {
+        "operationId": "JournalReadController_entries",
+        "summary": "List journal entries",
+        "description": "Newest first. `from`/`to` bound the instant the entry was lived, as a half-open range [from, to), so an entry exactly at `to` belongs to the next period rather than this one.",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "ISO 8601",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "ISO 8601",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entries the caller can see in this workspace."
+          }
+        },
+        "tags": [
+          "journal"
+        ]
+      }
+    },
+    "/journal/syntheses": {
+      "get": {
+        "operationId": "JournalReadController_syntheses",
+        "summary": "List journal syntheses",
+        "description": "Newest first. Filtered by the start of the period each synthesis covers. There is no `scale` parameter: which scales exist is the Time module's vocabulary, and a synthesis is identified here by its span.",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "ISO 8601",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "ISO 8601",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Syntheses the caller can see in this workspace."
+          }
+        },
+        "tags": [
+          "journal"
+        ]
+      }
+    },
     "/blocks": {
       "post": {
         "operationId": "BlocksController_create",
@@ -264,7 +366,7 @@
     },
     "/relations": {
       "post": {
-        "operationId": "RelationsController_create",
+        "operationId": "GraphController_create",
         "parameters": [],
         "responses": {
           "201": {
@@ -275,7 +377,7 @@
     },
     "/relations/{id}": {
       "delete": {
-        "operationId": "RelationsController_remove",
+        "operationId": "GraphController_remove",
         "parameters": [
           {
             "name": "id",

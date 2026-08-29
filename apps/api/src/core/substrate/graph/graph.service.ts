@@ -1,10 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { BlocksService } from '../blocks/blocks.service';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { BlocksService } from '../../../blocks/blocks.service';
 import { Prisma } from '@prisma/client';
 
 @Injectable()
-export class RelationsService {
+export class GraphService {
   constructor(
     private prisma: PrismaService,
     private blocks: BlocksService,

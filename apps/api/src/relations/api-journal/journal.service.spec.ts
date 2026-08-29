@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JournalService } from './journal.service';
-import { BlocksService } from '../blocks/blocks.service';
-import { PrismaService } from '../prisma/prisma.service';
+import { BlocksService } from '../../blocks/blocks.service';
+import { PrismaService } from '../../prisma/prisma.service';
 
 jest.mock('@prisma/client', () => ({
   PrismaClient: jest.fn().mockImplementation(() => ({})),

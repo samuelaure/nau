@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { BlocksModule } from '../blocks/blocks.module';
-import { JournalModule } from '../journal/journal.module';
+import { JournalModule } from '../relations/api-journal/journal.module';
 import { TimeController } from './time.controller';
 import { WorkspaceTimeService } from './workspace-time.service';
 import { PlanningService } from './planning.service';

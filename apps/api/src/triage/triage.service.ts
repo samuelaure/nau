@@ -5,7 +5,7 @@ import { BlocksService } from '../blocks/blocks.service';
 import { NauthenticityService } from '../integrations/nauthenticity.service';
 import { FlownauIntegrationService } from '../integrations/flownau.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { JournalService } from '../journal/journal.service';
+import { JournalService } from '../relations/api-journal/journal.service';
 
 // TODO: This schema and the LLM call it feeds classify across all GTD
 // categories AND content_idea in one prompt, one request. That is the
