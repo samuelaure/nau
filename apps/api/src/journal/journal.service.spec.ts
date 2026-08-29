@@ -351,4 +351,74 @@ describe('JournalService', () => {
       expect(blocksService.createInternal).not.toHaveBeenCalled();
     });
   });
+
+  // The typed contract Time consumes instead of reading `properties` directly
+  // (nau#63). A key renamed here must fail these tests before it can break
+  // Time silently at runtime.
+  describe('entriesIn — the typed contract Time consumes', () => {
+    const range = { start: new Date('2026-08-17T00:00:00Z'), end: new Date('2026-08-18T00:00:00Z') };
+
+    it('returns entries lived inside the range, by the date they were lived', async () => {
+      findMany.mockResolvedValue([
+        entry('e1', '2026-08-17T09:00:00Z', 'texto uno'),
+        entry('e2', '2026-08-17T22:00:00Z', 'texto largo con mas contenido'),
+      ]);
+
+      const rows = await service.entriesIn('ws-1', range);
+
+      expect(rows.map((r) => r.id)).toEqual(['e1', 'e2']);
+      expect(rows[0]!.at).toEqual(new Date('2026-08-17T09:00:00Z'));
+      expect(rows[1]!.textLength).toBe('texto largo con mas contenido'.length);
+    });
+
+    it('excludes an entry whose lived date falls outside the range', async () => {
+      findMany.mockResolvedValue([entry('e1', '2026-08-16T23:00:00Z', 'texto')]);
+
+      const rows = await service.entriesIn('ws-1', range);
+
+      expect(rows).toHaveLength(0);
+    });
+
+    it('orders by when the entry was lived, not by creation order', async () => {
+      findMany.mockResolvedValue([
+        entry('later', '2026-08-17T20:00:00Z', 'segundo'),
+        entry('earlier', '2026-08-17T06:00:00Z', 'primero'),
+      ]);
+
+      const rows = await service.entriesIn('ws-1', range);
+
+      expect(rows.map((r) => r.id)).toEqual(['earlier', 'later']);
+    });
+  });
+
+  describe('synthesesStartingIn — the typed contract Time consumes', () => {
+    const range = { start: new Date('2026-08-01T00:00:00Z'), end: new Date('2026-09-01T00:00:00Z') };
+
+    it('returns a synthesis whose period starts inside the range', async () => {
+      findMany.mockResolvedValue([synthesis('s1', '2026-08-10T00:00:00Z', '2026-08-17T00:00:00Z')]);
+
+      const rows = await service.synthesesStartingIn('ws-1', range);
+
+      expect(rows[0]!.id).toBe('s1');
+      expect(rows[0]!.at).toEqual(new Date('2026-08-10T00:00:00Z'));
+    });
+
+    it('excludes a noData placeholder — it holds nothing to compose from', async () => {
+      const empty = synthesis('s1', '2026-08-10T00:00:00Z', '2026-08-17T00:00:00Z');
+      (empty.properties as any).noData = true;
+      findMany.mockResolvedValue([empty]);
+
+      const rows = await service.synthesesStartingIn('ws-1', range);
+
+      expect(rows).toHaveLength(0);
+    });
+
+    it('excludes a synthesis whose period starts outside the range', async () => {
+      findMany.mockResolvedValue([synthesis('s1', '2026-09-05T00:00:00Z', '2026-09-12T00:00:00Z')]);
+
+      const rows = await service.synthesesStartingIn('ws-1', range);
+
+      expect(rows).toHaveLength(0);
+    });
+  });
 });

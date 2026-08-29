@@ -14,7 +14,7 @@ import {
 } from '@nau/time';
 import { PrismaService } from '../prisma/prisma.service';
 import { WorkspaceTimeService } from './workspace-time.service';
-import { JournalService } from '../journal/journal.service';
+import { JournalService, type JournalSourceRow } from '../journal/journal.service';
 
 /**
  * Deciding when a period has closed, and asking Journal to interpret it.
@@ -148,15 +148,15 @@ export class SynthesisSchedulerService {
       await this.ensureSubSyntheses(workspaceId, period, plan.fromScale, ctx, depth);
     }
 
-    const ids = await this.resolveSourceIds(workspaceId, plan);
-    if (ids.length === 0) {
+    const sources = await this.resolveSources(workspaceId, plan);
+    if (sources.length === 0) {
       // A period nobody recorded is not a period to narrate. Calling a model
       // here is what once produced summaries of empty months describing events
       // that never happened.
       return { generated: false, reason: 'no sources' };
     }
 
-    const density = await this.densityOf(workspaceId, plan, ids);
+    const density = this.density(sources);
 
     if (gregorianJournal.shouldSynthesise?.(period, density) === false) {
       return { generated: false, reason: 'empty' };
@@ -167,7 +167,7 @@ export class SynthesisSchedulerService {
     if (exceedsBudget(density)) {
       this.logger.warn(
         `Large synthesis: ${period.ref.scale} "${period.name}" for workspace ` +
-          `${workspaceId} — ${ids.length} ${plan.kind}, ~${density.estimatedTokens} tokens`,
+          `${workspaceId} — ${sources.length} ${plan.kind}, ~${density.estimatedTokens} tokens`,
       );
     }
 
@@ -176,12 +176,12 @@ export class SynthesisSchedulerService {
       from: period.interval.start.toISOString(),
       to: (period.interval.end ?? period.interval.start).toISOString(),
       sourceKind: plan.kind,
-      sourceIds: ids,
+      sourceIds: sources.map((s) => s.id),
     });
 
     this.logger.log(
       `Synthesised ${period.ref.system}/${period.ref.scale} "${period.name}" for ` +
-        `workspace ${workspaceId} from ${ids.length} ${plan.kind} ` +
+        `workspace ${workspaceId} from ${sources.length} ${plan.kind} ` +
         `(~${density.estimatedTokens} tokens)`,
     );
     return { generated: true };
@@ -233,48 +233,33 @@ export class SynthesisSchedulerService {
       gregorianPeriodsIn(scale, range, ctx).map((p) => p.interval.start.getTime()),
     );
 
-    const rows = await this.prisma.$queryRaw<{ startsAt: Date }[]>`
-      SELECT (properties->>'from')::timestamptz AS "startsAt"
-      FROM "Block"
-      WHERE "workspaceId" = ${workspaceId}
-        AND type = 'journal_synthesis'
-        AND "deletedAt" IS NULL
-        AND COALESCE((properties->>'noData')::boolean, false) = false
-        AND (properties->>'from')::timestamptz >= ${range.start}
-        AND (properties->>'from')::timestamptz <  ${range.end}
-    `;
+    const rows = await this.journal.synthesesStartingIn(workspaceId, {
+      start: range.start,
+      end: range.end,
+    });
 
-    return new Set(
-      rows
-        .map((r) => new Date(r.startsAt).getTime())
-        .filter((t) => boundaries.has(t)),
-    );
+    return new Set(rows.map((r) => r.at.getTime()).filter((t) => boundaries.has(t)));
   }
 
   /**
-   * The concrete ids a plan resolves to.
+   * The concrete rows a plan resolves to.
    *
    * This is the boundary: Time answers "what belongs to this period" and hands
-   * Journal a list. Journal never sees a date range as a selector.
+   * Journal a list of ids. Journal never sees a date range as a selector — the
+   * lookup by date happens here, against the typed contract Journal exposes
+   * (`entriesIn` / `synthesesStartingIn`), never against `properties` directly.
+   * See nau#63: reading Journal's storage format from here was coupling no
+   * compiler or test could see, because it lived inside a SQL string.
    */
-  private async resolveSourceIds(workspaceId: string, plan: SourcePlan): Promise<string[]> {
+  private async resolveSources(
+    workspaceId: string,
+    plan: SourcePlan,
+  ): Promise<JournalSourceRow[]> {
     const { start, end } = plan.range;
     if (!end) return [];
 
     if (plan.kind === 'entries') {
-      // An entry carries the moment it was lived in `properties.date`, which is
-      // not the same as when it was ingested: a note spoken at 23:50 and
-      // transcribed at 00:05 belongs to the day it was spoken.
-      const rows = await this.prisma.$queryRaw<{ id: string }[]>`
-        SELECT id FROM "Block"
-        WHERE "workspaceId" = ${workspaceId}
-          AND type = 'journal_entry'
-          AND "deletedAt" IS NULL
-          AND (properties->>'date')::timestamptz >= ${start}
-          AND (properties->>'date')::timestamptz <  ${end}
-        ORDER BY (properties->>'date')::timestamptz ASC
-      `;
-      return rows.map((r) => r.id);
+      return this.journal.entriesIn(workspaceId, { start, end });
     }
 
     // Syntheses of the scale below, matched on the period each describes.
@@ -291,43 +276,22 @@ export class SynthesisSchedulerService {
     const subPeriods = gregorianPeriodsIn(plan.fromScale, plan.range, ctx);
     if (subPeriods.length === 0) return [];
 
-    const boundaries = subPeriods.map((p) => p.interval.start);
-
-    const rows = await this.prisma.$queryRaw<{ id: string; from: Date }[]>`
-      SELECT id, (properties->>'from')::timestamptz AS from
-      FROM "Block"
-      WHERE "workspaceId" = ${workspaceId}
-        AND type = 'journal_synthesis'
-        AND "deletedAt" IS NULL
-        AND (properties->>'from')::timestamptz >= ${start}
-        AND (properties->>'from')::timestamptz <  ${end}
-      ORDER BY (properties->>'from')::timestamptz ASC
-    `;
-
-    const wanted = new Set(boundaries.map((b) => b.getTime()));
-    return rows.filter((r) => wanted.has(new Date(r.from).getTime())).map((r) => r.id);
+    const boundaries = new Set(subPeriods.map((p) => p.interval.start.getTime()));
+    const rows = await this.journal.synthesesStartingIn(workspaceId, { start, end });
+    return rows.filter((r) => boundaries.has(r.at.getTime()));
   }
 
   /**
-   * How much material a candidate set holds, without loading its text.
+   * How much material a set of rows holds, without loading its full text.
    *
    * Character length stands in for tokens deliberately: an exact count would
-   * mean tokenising every entry to answer a question used only to choose
-   * between two plans. Four characters per token is the usual rough ratio.
+   * mean tokenising every entry to answer a question used only for logging.
+   * Four characters per token is the usual rough ratio. Journal supplies the
+   * length alongside each row, so this is arithmetic on data already fetched
+   * rather than a second query.
    */
-  private async densityOf(
-    workspaceId: string,
-    plan: SourcePlan,
-    ids: string[],
-  ): Promise<{ count: number; estimatedTokens: number }> {
-    const field = plan.kind === 'entries' ? 'text' : 'synthesis';
-    const rows = await this.prisma.$queryRaw<{ chars: bigint | null }[]>`
-      SELECT COALESCE(SUM(length(properties->>${field})), 0)::bigint AS chars
-      FROM "Block"
-      WHERE "workspaceId" = ${workspaceId} AND id = ANY(${ids})
-    `;
-
-    const chars = Number(rows[0]?.chars ?? 0);
-    return { count: ids.length, estimatedTokens: Math.ceil(chars / 4) };
+  private density(rows: readonly JournalSourceRow[]): { count: number; estimatedTokens: number } {
+    const chars = rows.reduce((total, row) => total + row.textLength, 0);
+    return { count: rows.length, estimatedTokens: Math.ceil(chars / 4) };
   }
 }

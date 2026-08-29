@@ -24,7 +24,8 @@ const ctx = { timezone: 'UTC', config: { firstDayOfWeek: 0 } };
 describe('SynthesisSchedulerService', () => {
   let service: SynthesisSchedulerService;
   let generateSynthesis: jest.Mock;
-  let queryRaw: jest.Mock;
+  let entriesIn: jest.Mock;
+  let synthesesStartingIn: jest.Mock;
   let workspaceFindMany: jest.Mock;
 
   /** Entry ids present per day, and synthesis starts already generated. */
@@ -37,48 +38,40 @@ describe('SynthesisSchedulerService', () => {
     entriesByDay = new Map();
     existingSyntheses = new Set();
 
-    // Stands in for the three raw queries: entry ids in a range, synthesis ids
-    // in a range, and the character count of a set of ids.
-    queryRaw = jest.fn().mockImplementation((strings: TemplateStringsArray, ...values: any[]) => {
-      const sql = strings.join(' ');
-
-      if (sql.includes('SUM(length')) {
-        const ids = (values.find((v) => Array.isArray(v)) ?? []) as string[];
-        return Promise.resolve([{ chars: BigInt(ids.length * 400) }]);
-      }
-
-      const start = values.find((v) => v instanceof Date) as Date;
-      const end = values.filter((v) => v instanceof Date)[1] as Date;
-
-      if (sql.includes("'journal_entry'")) {
-        const out: { id: string }[] = [];
-        for (const [day, ids] of entriesByDay) {
-          const at = new Date(`${day}T12:00:00Z`);
-          if (at >= start && at < end) out.push(...ids.map((id) => ({ id })));
+    // Stands in for JournalService's typed contract — the seam nau#63 asked
+    // for, replacing a mocked `$queryRaw` that let the raw-SQL coupling hide
+    // behind a passing test.
+    entriesIn = jest.fn().mockImplementation((_ws: string, range: { start: Date; end: Date }) => {
+      const out: { id: string; at: Date; textLength: number }[] = [];
+      for (const [day, ids] of entriesByDay) {
+        const at = new Date(`${day}T12:00:00Z`);
+        if (at >= range.start && at < range.end) {
+          out.push(...ids.map((id) => ({ id, at, textLength: 400 })));
         }
-        return Promise.resolve(out);
       }
-
-      // journal_synthesis — either the existence check or the source lookup.
-      const rows = [...existingSyntheses]
-        .map((iso) => new Date(iso))
-        .filter((d) => d >= start && d < end)
-        .map((d) => ({ id: `syn-${d.toISOString()}`, from: d, startsAt: d }));
-      return Promise.resolve(rows);
+      return Promise.resolve(out.sort((a, b) => a.at.getTime() - b.at.getTime()));
     });
+
+    synthesesStartingIn = jest
+      .fn()
+      .mockImplementation((_ws: string, range: { start: Date; end: Date }) =>
+        Promise.resolve(
+          [...existingSyntheses]
+            .map((iso) => new Date(iso))
+            .filter((d) => d >= range.start && d < range.end)
+            .map((d) => ({ id: `syn-${d.toISOString()}`, at: d, textLength: 400 })),
+        ),
+      );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SynthesisSchedulerService,
-        {
-          provide: PrismaService,
-          useValue: { workspace: { findMany: workspaceFindMany }, $queryRaw: queryRaw },
-        },
+        { provide: PrismaService, useValue: { workspace: { findMany: workspaceFindMany } } },
         {
           provide: WorkspaceTimeService,
           useValue: { resolveContext: jest.fn().mockResolvedValue(ctx) },
         },
-        { provide: JournalService, useValue: { generateSynthesis } },
+        { provide: JournalService, useValue: { generateSynthesis, entriesIn, synthesesStartingIn } },
       ],
     }).compile();
 
@@ -137,7 +130,7 @@ describe('SynthesisSchedulerService', () => {
 
       // Two days generated first, then the month that reads them.
       expect(scalesGenerated()).toEqual(['day', 'day', 'month']);
-      const monthCall = generateSynthesis.mock.calls.at(-1)![0];
+      const monthCall = generateSynthesis.mock.calls[generateSynthesis.mock.calls.length - 1]![0];
       expect(monthCall.sourceKind).toBe('syntheses');
       expect(monthCall.sourceIds).toHaveLength(2);
     });
