@@ -81,6 +81,17 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Load E2E env vars
+        # SECURITY (nau#91): every prior version of this step wrote each line
+        # straight to $GITHUB_ENV. GitHub Actions prints a job's full env block
+        # at the top of every subsequent step's log, and only the exact
+        # registered secret string gets masked — not the individual values
+        # inside a multi-line secret dumped into other variables. That put
+        # every credential in ROOT_ENV_FILE into plaintext, world-readable
+        # Actions logs on this public repo, on every PR, for months.
+        #
+        # ::add-mask:: registers each value with the runner's log masker
+        # before it ever reaches $GITHUB_ENV, so subsequent steps' env-block
+        # dumps get redacted too — not just direct echoes of the variable.
         run: |
           echo "${{ secrets.ROOT_ENV_FILE }}" > .env.e2e
           # Exclude vars already set by the job env (DATABASE_URL, NODE_ENV, AUTH_SECRET, COOKIE_DOMAIN, *_URL)
@@ -90,8 +101,13 @@ jobs:
             | grep -v '^AUTH_SECRET=' \
             | grep -v '^COOKIE_DOMAIN=' \
             | grep -v '_URL=' \
-            >> $GITHUB_ENV
-          rm .env.e2e
+            > .env.e2e.filtered
+          while IFS='=' read -r key value; do
+            [ -z "$key" ] && continue
+            echo "::add-mask::${value}"
+            echo "${key}=${value}" >> "$GITHUB_ENV"
+          done < .env.e2e.filtered
+          rm .env.e2e .env.e2e.filtered
 
       - uses: pnpm/action-setup@v4
 

@@ -29,7 +29,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Run tests for all packages
-        run: pnpm --filter='./packages/*' --if-present run test -- --passWithNoTests
+        # No `--` before the flag: pnpm's own `--` here would forward a
+        # second, literal "--" ahead of the flag to every package's `test`
+        # script, and jest reads that as a testMatch pattern instead of a
+        # flag — silently 0-matches and fails every package with real specs
+        # (first hit: packages/time, added on the un-pushed re-architecture
+        # branch, nau#89). Passing the flag directly avoids that.
+        run: pnpm --filter='./packages/*' --if-present run test --passWithNoTests
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
