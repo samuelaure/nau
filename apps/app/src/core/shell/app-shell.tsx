@@ -1,0 +1,70 @@
+'use client'
+
+import * as React from 'react'
+import { ArrowUp } from 'lucide-react'
+import { Button } from '@9nau/ui/components/button'
+import { cn } from '@9nau/ui/lib/utils'
+import { Header } from './header'
+import { Sidebar } from './sidebar'
+import { useShellStore } from './shell-store'
+
+/**
+ * The frame every module renders inside.
+ *
+ * What it deliberately no longer does: hold a ref to "today" and a view mode
+ * in order to offer a "go to today" button. Those belong to the module that
+ * has a notion of today — the shell cannot know whether the thing on screen
+ * has one. Scrolling back to the top is genuinely the frame's, because the
+ * frame owns the scroll container.
+ */
+export function AppShell({ children }: { children: React.ReactNode }) {
+  const isSidebarOpen = useShellStore((s) => s.isSidebarOpen)
+  const isDarkMode = useShellStore((s) => s.isDarkMode)
+
+  const mainRef = React.useRef<HTMLDivElement>(null)
+  const [isScrolled, setIsScrolled] = React.useState(false)
+
+  // The store reads the persisted theme when it is created; applying it to
+  // the document is the shell's job, once, on mount. Doing it inside the
+  // store would make constructing it a side effect on the DOM.
+  React.useEffect(() => {
+    document.documentElement.classList.toggle('dark', isDarkMode)
+  }, [isDarkMode])
+
+  React.useEffect(() => {
+    const el = mainRef.current
+    if (!el) return
+    const onScroll = () => setIsScrolled(el.scrollTop > 10)
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [])
+
+  return (
+    <div className="flex h-screen flex-col bg-white font-sans text-gray-900 dark:bg-gray-950 dark:text-gray-100">
+      <Header isScrolled={isScrolled} />
+      <div className="flex flex-1 overflow-hidden pt-16">
+        <Sidebar />
+        <main
+          ref={mainRef}
+          className={cn(
+            'flex-1 overflow-y-auto bg-white p-4 transition-all duration-300 md:p-8 dark:bg-gray-950',
+          )}
+          style={{ marginLeft: isSidebarOpen ? '288px' : '80px' }}
+        >
+          {children}
+        </main>
+      </div>
+
+      {isScrolled && (
+        <Button
+          onClick={() => mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' })}
+          size="icon"
+          aria-label="Back to top"
+          className="fixed bottom-8 right-8 z-50 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90"
+        >
+          <ArrowUp className="h-6 w-6" />
+        </Button>
+      )}
+    </div>
+  )
+}

@@ -24,10 +24,16 @@ export class CreateBlockDto implements ICreateBlockDto {
    * splitting them into two calls made the keyboard flow lag and left a window
    * where a block existed but was due nowhere.
    */
-  schedule?: {
-    startDate: string;
-    endDate?: string | null;
-    rrule?: string | null;
+  planning?: {
+    /** Which time system it is placed in. Defaults to Gregorian. */
+    system?: string;
+    /** Which of that system's scales — 'day', 'week', 'month'… */
+    scale?: string;
+    /** Any instant inside the period being planned into. */
+    anchor: string;
+    /** The repetition rule, in the dialect its system speaks. */
+    recurrence?: string | null;
+    recurrenceTimezone?: string | null;
     recurrenceMode?: 'FIXED' | 'AFTER_COMPLETION';
   };
 }

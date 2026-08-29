@@ -136,7 +136,7 @@ export class SyncService {
     const blocks = await this.prisma.block.findMany({
       where,
       include: {
-        schedule: true,
+        planning: true,
         events: {
           take: 10,
           orderBy: { createdAt: 'desc' },

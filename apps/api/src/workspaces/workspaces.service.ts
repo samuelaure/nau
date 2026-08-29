@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException, ConflictException } 
 import { WorkspaceRole } from '@prisma/client';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { ScopedPrismaService } from '../core/tenancy/scoped-prisma.service';
 import { CreateWorkspaceDto, AddMemberDto } from './workspaces.dto';
 
 function generateSlug(name: string): string {
@@ -10,7 +11,10 @@ function generateSlug(name: string): string {
 
 @Injectable()
 export class WorkspacesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tenancy: ScopedPrismaService,
+  ) {}
 
   async getWorkspaceById(workspaceId: string) {
     const workspace = await this.prisma.workspace.findUnique({
@@ -228,11 +232,20 @@ export class WorkspacesService {
     });
   }
 
+  /**
+   * Delegates rather than implementing.
+   *
+   * This was the second of two identical membership checks — the other lived on
+   * the blocks service — and two implementations of one security decision will
+   * eventually disagree, with only one of them audited when it matters. The
+   * implementation now lives in `core/tenancy`, which is also what applies the
+   * scope to every query.
+   *
+   * Kept as a method here because three services call it through this class;
+   * they will reach for the scoped client directly as each is rebuilt, and this
+   * forwarder goes when the last one does.
+   */
   async assertMembership(userId: string, workspaceId: string) {
-    const member = await this.prisma.workspaceMember.findUnique({
-      where: { userId_workspaceId: { userId, workspaceId } },
-    });
-    if (!member) throw new ForbiddenException('Not a member of this workspace');
-    return member;
+    return this.tenancy.assertMembership(userId, workspaceId);
   }
 }

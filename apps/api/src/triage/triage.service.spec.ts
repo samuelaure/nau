@@ -5,7 +5,7 @@ import { BlocksService } from '../blocks/blocks.service';
 import { NauthenticityService } from '../integrations/nauthenticity.service';
 import { FlownauIntegrationService } from '../integrations/flownau.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { JournalService } from '../journal/journal.service';
+import { JournalService } from '../relations/api-journal/journal.service';
 import { Prisma } from '@prisma/client';
 
 // Minimal inline type to avoid a hard dependency on generated @prisma/client

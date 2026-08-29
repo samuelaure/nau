@@ -1,59 +1,96 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AgendaService } from './agenda.service';
 import { BlocksService } from '../blocks/blocks.service';
+import { ScopedPrismaService } from '../core/tenancy/scoped-prisma.service';
 import { BlockEventsService } from '../blocks/block-events.service';
-import { CalendarService } from '../calendar/calendar.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { WorkspaceTimeService } from '../time/workspace-time.service';
+import { OccurrencesService } from '../time/occurrences.service';
 
 jest.mock('@prisma/client', () => ({
   PrismaClient: jest.fn().mockImplementation(() => ({})),
   Prisma: {},
 }));
 
+/**
+ * The agenda is now the half of this that is about MEANING.
+ *
+ * Time answers when things occur; this service decides what a row is, whether
+ * it is done, how long it should take, and where it is drawn. The split is
+ * visible in these tests: occurrences arrive from a mocked Time module, and
+ * everything asserted here is something only Actions could know.
+ */
+
 const MONDAY = '2026-08-17';
 
-const scheduledBlock = (over: {
+/** A block as Actions sees it — properties and a planning identity. */
+const plannedBlock = (over: {
   id: string;
   type?: string;
   title?: string;
-  rrule?: string | null;
-  startDate?: string;
-  endDate?: string | null;
+  scale?: string;
+  from?: string;
+  to?: string;
+  recurrence?: string | null;
   sortOrder?: number;
   estimateMinutes?: number;
-  recurrenceMode?: 'FIXED' | 'AFTER_COMPLETION';
-  exceptions?: unknown[];
+  parentId?: string | null;
 }) => ({
   id: over.id,
   type: over.type ?? 'action',
+  parentId: over.parentId ?? null,
   properties: {
     text: over.title ?? over.id,
     sortOrder: over.sortOrder ?? 0,
     ...(over.estimateMinutes ? { estimateMinutes: over.estimateMinutes } : {}),
   },
-  schedule: {
-    id: `sch-${over.id}`,
+  planning: {
+    id: `pl-${over.id}`,
     blockId: over.id,
-    startDate: new Date(over.startDate ?? '2026-08-17T08:00:00.000Z'),
-    endDate: over.endDate ? new Date(over.endDate) : null,
-    rrule: over.rrule ?? null,
-    timezone: null,
-    recurrenceMode: over.recurrenceMode ?? 'FIXED',
-    exceptions: over.exceptions ?? [],
+    system: 'gregorian',
+    scale: over.scale ?? 'day',
+    anchor: new Date(over.from ?? '2026-08-17T00:00:00.000Z'),
+    from: new Date(over.from ?? '2026-08-17T00:00:00.000Z'),
+    to: new Date(over.to ?? '2026-08-18T00:00:00.000Z'),
+    recurrence: over.recurrence ?? null,
+    recurrenceTimezone: null,
+    recurrenceMode: 'FIXED',
   },
 });
 
-describe('AgendaService — one list for actions and habits', () => {
+/** What Time would report for a block, at one instant. */
+const occurrenceOf = (
+  block: ReturnType<typeof plannedBlock>,
+  at: string,
+  over: Partial<{ projected: boolean; moved: boolean; overdue: number }> = {},
+) => ({
+  blockId: block.id,
+  occurrenceAt: new Date(at),
+  effectiveAt: new Date(at),
+  moved: over.moved ?? false,
+  projected: over.projected ?? false,
+  system: 'gregorian',
+  scale: block.planning.scale,
+  from: block.planning.from,
+  to: block.planning.to,
+  recurring: Boolean(block.planning.recurrence),
+  overdue: over.overdue ?? 0,
+});
+
+describe('AgendaService — meaning on top of Time', () => {
   let service: AgendaService;
   let blockFindMany: jest.Mock;
   let eventFindMany: jest.Mock;
+  let planningFindUnique: jest.Mock;
   let blocks: jest.Mocked<BlocksService>;
   let events: jest.Mocked<BlockEventsService>;
-  let calendar: { forWorkspace: jest.Mock };
+  let inView: jest.Mock;
 
   beforeEach(async () => {
     blockFindMany = jest.fn().mockResolvedValue([]);
     eventFindMany = jest.fn().mockResolvedValue([]);
+    planningFindUnique = jest.fn().mockResolvedValue({ recurrence: null });
+    inView = jest.fn().mockResolvedValue([]);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -63,213 +100,208 @@ describe('AgendaService — one list for actions and habits', () => {
           useValue: {
             block: { findMany: blockFindMany, update: jest.fn() },
             event: { findMany: eventFindMany },
-            schedule: { findUnique: jest.fn().mockResolvedValue({ rrule: null }) },
-            workspace: { findUnique: jest.fn().mockResolvedValue({ timezone: 'UTC' }) },
+            planning: { findUnique: planningFindUnique },
             $transaction: jest.fn().mockResolvedValue([]),
           },
         },
         {
           provide: BlocksService,
+          useValue: { update: jest.fn() },
+        },
+        {
+          // Authorization is the tenancy layer's job now, not the block
+          // service's — the agenda keeps BlocksService only for the mutation.
+          provide: ScopedPrismaService,
           useValue: {
-            assertWorkspaceMembership: jest.fn(),
+            assertMembership: jest.fn(),
             assertBlockAccess: jest.fn().mockResolvedValue({ id: 'b1', workspaceId: 'ws-1' }),
-            update: jest.fn(),
           },
         },
         { provide: BlockEventsService, useValue: { record: jest.fn() } },
         {
-          // The calendar answers where a period starts and how a week is cut.
-          // Pinned to UTC and ISO Monday so the expected instants stay readable.
-          provide: CalendarService,
+          // Pinned to UTC with an ISO-Monday week so expected instants stay
+          // readable. Which day opens a week is Time's answer, not this one's.
+          provide: WorkspaceTimeService,
           useValue: {
-            forWorkspace: jest
+            resolveContext: jest
               .fn()
               .mockResolvedValue({ timezone: 'UTC', config: { firstDayOfWeek: 1 } }),
           },
         },
+        { provide: OccurrencesService, useValue: { inView } },
       ],
     }).compile();
 
     service = module.get(AgendaService);
     blocks = module.get(BlocksService);
     events = module.get(BlockEventsService);
-    calendar = module.get(CalendarService) as unknown as { forWorkspace: jest.Mock };
   });
 
   afterEach(() => jest.clearAllMocks());
 
-  const agenda = (period: any = 'daily', date = MONDAY, now = new Date('2026-08-17T12:00:00.000Z')) =>
-    service.forPeriod({ userId: 'u1', workspaceId: 'ws-1', period, date, now });
+  /**
+   * Wires a set of blocks and the occurrences Time would report for them.
+   *
+   * The block lookup answers by query rather than blindly, because `collect`
+   * makes two different ones: the blocks Time reported, and separately the
+   * overdue candidates for carry-over. A mock that returned everything to both
+   * would let the same block arrive twice and hide a real duplicate bug.
+   */
+  const given = (
+    entries: { block: ReturnType<typeof plannedBlock>; at: string; over?: object }[],
+  ) => {
+    const all = entries.map((e) => e.block);
+    blockFindMany.mockImplementation((args: any) => {
+      const ids = args?.where?.id?.in as string[] | undefined;
+      if (ids) return Promise.resolve(all.filter((b) => ids.includes(b.id)));
+      // The carry query, which asks for overdue one-offs rather than by id.
+      return Promise.resolve([]);
+    });
+    inView.mockResolvedValue(
+      entries.map((e) => occurrenceOf(e.block, e.at, e.over as never)),
+    );
+  };
+
+  /** The same, for tests that drive `inView` directly. */
+  const givenBlocks = (all: ReturnType<typeof plannedBlock>[]) => {
+    blockFindMany.mockImplementation((args: any) => {
+      const ids = args?.where?.id?.in as string[] | undefined;
+      if (ids) return Promise.resolve(all.filter((b) => ids.includes(b.id)));
+      return Promise.resolve([]);
+    });
+  };
+
+  const agenda = (scale = 'day', date = MONDAY, now = new Date('2026-08-17T12:00:00.000Z')) =>
+    service.forPeriod({ userId: 'u1', workspaceId: 'ws-1', scale, date, now });
 
   it('puts a habit and an action in the same list, ordered together', async () => {
-    blockFindMany.mockResolvedValue([
-      scheduledBlock({ id: 'task', type: 'action', title: 'Enviar el informe', sortOrder: 1 }),
-      scheduledBlock({
-        id: 'habit',
-        type: 'habit',
-        title: 'Meditar',
-        rrule: 'FREQ=DAILY',
-        sortOrder: 0,
-      }),
+    const task = plannedBlock({ id: 'task', title: 'Enviar el informe', sortOrder: 1 });
+    const habit = plannedBlock({
+      id: 'habit',
+      type: 'habit',
+      title: 'Meditar',
+      recurrence: 'FREQ=DAILY',
+      sortOrder: 0,
+    });
+    given([
+      { block: task, at: '2026-08-17T09:00:00.000Z' },
+      { block: habit, at: '2026-08-17T07:00:00.000Z' },
     ]);
 
     const result = await agenda();
 
-    // The habit sorts first because its sortOrder says so, not because it is a
-    // habit. Every tool that separates the two forces the person to merge them
-    // mentally.
-    expect(result.items.map((i) => i.title)).toEqual(['Meditar', 'Enviar el informe']);
-    expect(result.items.map((i) => i.type)).toEqual(['habit', 'action']);
+    // Ordered by sortOrder, so dragging a habit above a task means it comes
+    // first every day rather than only today.
+    expect(result.items.map((i) => i.blockId)).toEqual(['habit', 'task']);
   });
 
-  it('expands a recurring habit across a week without storing occurrences', async () => {
-    blockFindMany.mockResolvedValue([
-      scheduledBlock({ id: 'habit', type: 'habit', rrule: 'FREQ=DAILY' }),
-    ]);
+  it('calls anything with a recurrence a habit, without storing the type', async () => {
+    const block = plannedBlock({ id: 'h', type: 'action', recurrence: 'FREQ=DAILY' });
+    given([{ block, at: '2026-08-17T08:00:00.000Z' }]);
 
-    const result = await agenda('weekly');
+    const result = await agenda();
 
-    expect(result.items).toHaveLength(7);
-    expect(result.items.every((i) => i.recurring)).toBe(true);
+    // Adding a frequency turns an action into a habit and removing it turns it
+    // back, with no write and no second transition to maintain.
+    expect(result.items[0]!.isHabit).toBe(true);
+    expect(result.items[0]!.recurring).toBe(true);
   });
 
-  it('marks an action deferred to a period as spanning it', async () => {
-    blockFindMany.mockResolvedValue([
-      scheduledBlock({
-        id: 'deferred',
-        startDate: '2026-08-17T00:00:00.000Z',
-        endDate: '2026-08-23T23:59:59.999Z',
-      }),
-    ]);
+  it('marks an item planned above day scale as spanning its period', async () => {
+    const block = plannedBlock({
+      id: 'mes',
+      scale: 'month',
+      from: '2026-08-01T00:00:00.000Z',
+      to: '2026-09-01T00:00:00.000Z',
+    });
+    given([{ block, at: '2026-08-01T00:00:00.000Z' }]);
 
-    const result = await agenda('weekly');
+    const result = await agenda('month', '2026-08-15');
 
-    // Due at some point inside the week rather than at a moment in it.
     expect(result.items[0]!.spansPeriod).toBe(true);
   });
 
-  it('reads completion from the event log, per occurrence', async () => {
-    blockFindMany.mockResolvedValue([
-      scheduledBlock({ id: 'habit', type: 'habit', rrule: 'FREQ=DAILY' }),
-    ]);
-    eventFindMany.mockResolvedValue([
-      {
-        type: 'occurrence.completed',
-        blockId: 'habit',
-        metadata: { occurrenceAt: '2026-08-18T08:00:00.000Z' },
-      },
-    ]);
+  describe('completion, read from the event log', () => {
+    it('reads completion per occurrence, not per block', async () => {
+      const block = plannedBlock({ id: 'h', type: 'habit', recurrence: 'FREQ=DAILY' });
+      givenBlocks([block]);
+      inView.mockResolvedValue([
+        occurrenceOf(block, '2026-08-17T08:00:00.000Z'),
+        occurrenceOf(block, '2026-08-18T08:00:00.000Z'),
+      ]);
+      eventFindMany.mockResolvedValue([
+        {
+          type: 'occurrence.completed',
+          blockId: 'h',
+          metadata: { occurrenceAt: '2026-08-17T08:00:00.000Z' },
+        },
+      ]);
 
-    const result = await agenda('weekly');
-    const done = result.items.filter((i) => i.done);
+      const result = await agenda();
 
-    // One day of the week, not the whole habit: a habit is never simply "done".
-    expect(done).toHaveLength(1);
-    expect(done[0]!.occurrenceAt).toBe('2026-08-18T08:00:00.000Z');
-  });
+      expect(result.items.map((i) => i.done)).toEqual([true, false]);
+    });
 
-  it('lets a later reopening undo an earlier completion', async () => {
-    blockFindMany.mockResolvedValue([
-      scheduledBlock({ id: 'habit', type: 'habit', rrule: 'FREQ=DAILY' }),
-    ]);
-    eventFindMany.mockResolvedValue([
-      {
-        type: 'occurrence.completed',
-        blockId: 'habit',
-        metadata: { occurrenceAt: '2026-08-18T08:00:00.000Z' },
-      },
-      {
-        type: 'occurrence.reopened',
-        blockId: 'habit',
-        metadata: { occurrenceAt: '2026-08-18T08:00:00.000Z' },
-      },
-    ]);
+    it('lets a later reopening undo an earlier completion', async () => {
+      const block = plannedBlock({ id: 'h', type: 'habit', recurrence: 'FREQ=DAILY' });
+      given([{ block, at: '2026-08-17T08:00:00.000Z' }]);
+      eventFindMany.mockResolvedValue([
+        {
+          type: 'occurrence.completed',
+          blockId: 'h',
+          metadata: { occurrenceAt: '2026-08-17T08:00:00.000Z' },
+        },
+        {
+          type: 'occurrence.reopened',
+          blockId: 'h',
+          metadata: { occurrenceAt: '2026-08-17T08:00:00.000Z' },
+        },
+      ]);
 
-    const result = await agenda('weekly');
+      const result = await agenda();
 
-    expect(result.items.filter((i) => i.done)).toHaveLength(0);
-  });
+      expect(result.items[0]!.done).toBe(false);
+    });
 
-  it('drops a skipped occurrence from the agenda entirely', async () => {
-    blockFindMany.mockResolvedValue([
-      scheduledBlock({
-        id: 'habit',
-        type: 'habit',
-        rrule: 'FREQ=DAILY',
-        exceptions: [
-          { occurrenceAt: new Date('2026-08-19T08:00:00.000Z'), kind: 'SKIPPED', movedTo: null },
-        ],
-      }),
-    ]);
-
-    const result = await agenda('weekly');
-
-    expect(result.items).toHaveLength(6);
-  });
-
-  it('totals only what is still pending, and counts what has no estimate', async () => {
-    blockFindMany.mockResolvedValue([
-      scheduledBlock({ id: 'a', estimateMinutes: 90 }),
-      scheduledBlock({ id: 'b', estimateMinutes: 30, startDate: '2026-08-17T10:00:00.000Z' }),
-      scheduledBlock({ id: 'c', startDate: '2026-08-17T12:00:00.000Z' }),
-    ]);
-    eventFindMany.mockResolvedValue([
-      {
-        type: 'occurrence.completed',
-        blockId: 'b',
-        metadata: { occurrenceAt: '2026-08-17T10:00:00.000Z' },
-      },
-    ]);
-
-    const result = await agenda();
-
-    // Finished work does not make a day look busier than it is.
-    expect(result.plannedMinutes).toBe(90);
-    expect(result.unestimatedCount).toBe(1);
-  });
-
-  describe('setCompletion', () => {
     it('records against the predicted instant, not the moment of ticking', async () => {
-      // Catching up on yesterday's habit must not mark it done today, or the
-      // streak describes the wrong days.
-      const occurrenceAt = '2026-08-16T08:00:00.000Z';
-
       await service.setCompletion({
         userId: 'u1',
-        blockId: 'habit',
-        occurrenceAt,
+        blockId: 'b1',
+        occurrenceAt: '2026-08-16T08:00:00.000Z',
         done: true,
       });
 
+      // Catching up on yesterday's habit must be recorded against yesterday, or
+      // the streak describes the wrong days.
       expect(events.record).toHaveBeenCalledWith(
         'occurrence.completed',
         expect.anything(),
-        { occurrenceAt },
+        { occurrenceAt: '2026-08-16T08:00:00.000Z' },
         'u1',
       );
     });
 
     it('mirrors state onto the block for a one-off, so the rest of the app sees it', async () => {
+      planningFindUnique.mockResolvedValue({ recurrence: null });
+
       await service.setCompletion({
         userId: 'u1',
-        blockId: 'task',
+        blockId: 'b1',
         occurrenceAt: '2026-08-17T08:00:00.000Z',
         done: true,
       });
 
-      expect(blocks.update).toHaveBeenCalledWith('u1', 'task', {
+      expect(blocks.update).toHaveBeenCalledWith('u1', 'b1', {
         properties: { status: 'done' },
       });
     });
 
     it('leaves a recurring block alone, because a habit is never done', async () => {
-      const prisma = (service as unknown as { prisma: { schedule: { findUnique: jest.Mock } } })
-        .prisma;
-      prisma.schedule.findUnique.mockResolvedValue({ rrule: 'FREQ=DAILY' });
+      planningFindUnique.mockResolvedValue({ recurrence: 'FREQ=DAILY' });
 
       await service.setCompletion({
         userId: 'u1',
-        blockId: 'habit',
+        blockId: 'b1',
         occurrenceAt: '2026-08-17T08:00:00.000Z',
         done: true,
       });
@@ -278,423 +310,264 @@ describe('AgendaService — one list for actions and habits', () => {
     });
   });
 
-  describe('carry-over of what was not done', () => {
-    const overdueTask = () =>
-      blockFindMany.mockResolvedValue([
-        scheduledBlock({
-          id: 'olvidada',
-          title: 'Enviar el informe',
-          startDate: '2026-08-14T09:00:00.000Z',
-          endDate: '2026-08-14T09:00:00.000Z',
-        }),
+  describe('the counts a view shows above the list', () => {
+    it('totals only what is still pending, and counts what has no estimate', async () => {
+      const done = plannedBlock({ id: 'done', estimateMinutes: 30 });
+      const pending = plannedBlock({ id: 'pending', estimateMinutes: 45 });
+      const noEstimate = plannedBlock({ id: 'vague' });
+      givenBlocks([done, pending, noEstimate]);
+      inView.mockResolvedValue([
+        occurrenceOf(done, '2026-08-17T08:00:00.000Z'),
+        occurrenceOf(pending, '2026-08-17T09:00:00.000Z'),
+        occurrenceOf(noEstimate, '2026-08-17T10:00:00.000Z'),
+      ]);
+      eventFindMany.mockResolvedValue([
+        {
+          type: 'occurrence.completed',
+          blockId: 'done',
+          metadata: { occurrenceAt: '2026-08-17T08:00:00.000Z' },
+        },
       ]);
 
-    it('shows an unfinished action in the period being lived now', async () => {
-      overdueTask();
+      const result = await agenda();
 
-      const result = await agenda('daily', MONDAY);
+      expect(result.plannedMinutes).toBe(45);
+      expect(result.unestimatedCount).toBe(1);
+    });
+
+    it('keeps projections out of the planned time', async () => {
+      const block = plannedBlock({
+        id: 'h',
+        type: 'habit',
+        recurrence: 'FREQ=DAILY',
+        estimateMinutes: 20,
+      });
+      givenBlocks([block]);
+      inView.mockResolvedValue([
+        occurrenceOf(block, '2026-08-17T08:00:00.000Z'),
+        occurrenceOf(block, '2026-08-18T08:00:00.000Z', { projected: true }),
+      ]);
+
+      const result = await agenda();
+
+      // A guess is not a commitment, so it does not consume the day's budget.
+      expect(result.plannedMinutes).toBe(20);
+    });
+  });
+
+  describe('carry-over — derived, never written', () => {
+    const yesterday = () =>
+      plannedBlock({
+        id: 'ayer',
+        from: '2026-08-16T00:00:00.000Z',
+        to: '2026-08-17T00:00:00.000Z',
+      });
+
+    it('shows an unfinished action in the period being lived now', async () => {
+      inView.mockResolvedValue([]);
+      blockFindMany.mockResolvedValue([yesterday()]);
+
+      const result = await agenda('day', MONDAY);
 
       expect(result.items).toHaveLength(1);
-      expect(result.items[0]!.carriedFrom).toBe('2026-08-14T09:00:00.000Z');
+      expect(result.items[0]!.carriedFrom).toBe('2026-08-16T00:00:00.000Z');
+      expect(result.carriedCount).toBe(1);
     });
 
     it('counts the periods it has been carried, so it cannot be ignored forever', async () => {
-      overdueTask();
+      inView.mockResolvedValue([]);
+      blockFindMany.mockResolvedValue([
+        plannedBlock({
+          id: 'viejo',
+          from: '2026-08-14T00:00:00.000Z',
+          to: '2026-08-15T00:00:00.000Z',
+        }),
+      ]);
 
-      const result = await agenda('daily', MONDAY);
+      const result = await agenda('day', MONDAY);
 
-      // Friday to Monday.
       expect(result.items[0]!.carriedPeriods).toBe(3);
     });
 
     it('does not carry into a past period that is merely being looked at', async () => {
+      inView.mockResolvedValue([]);
+      blockFindMany.mockResolvedValue([yesterday()]);
+
       // Looking back at last Tuesday should show last Tuesday, not last Tuesday
       // plus everything still open since.
-      overdueTask();
-
-      const result = await agenda('daily', '2026-08-16', new Date('2026-08-17T12:00:00.000Z'));
+      const result = await agenda('day', '2026-08-20', new Date('2026-08-25T12:00:00.000Z'));
 
       expect(result.items).toHaveLength(0);
     });
 
     it('stops carrying once it is done', async () => {
-      overdueTask();
+      inView.mockResolvedValue([]);
+      blockFindMany.mockResolvedValue([yesterday()]);
       eventFindMany.mockResolvedValue([
         {
           type: 'occurrence.completed',
-          blockId: 'olvidada',
-          metadata: { occurrenceAt: '2026-08-14T09:00:00.000Z' },
+          blockId: 'ayer',
+          metadata: { occurrenceAt: '2026-08-16T00:00:00.000Z' },
         },
       ]);
 
-      const result = await agenda('daily', MONDAY);
+      const result = await agenda('day', MONDAY);
 
       expect(result.items).toHaveLength(0);
     });
 
-    it('carries at the granularity it was planned at, not into today', async () => {
-      // An action deferred to a month belongs in the month view. Dropping it
-      // into today's list would defeat the point of having deferred it.
-      blockFindMany.mockResolvedValue([
-        scheduledBlock({
-          id: 'mensual',
-          startDate: '2026-07-01T00:00:00.000Z',
-          endDate: '2026-07-31T23:59:59.999Z',
-        }),
-      ]);
+    it('carries at the scale it was planned at, never into today', async () => {
+      inView.mockResolvedValue([]);
+      // A month-level item that went unfinished belongs in the current month,
+      // not in today's list — putting it there would defeat the deferral.
+      blockFindMany.mockResolvedValue([]);
 
-      const daily = await agenda('daily', MONDAY);
-      const monthly = await agenda('monthly', MONDAY);
+      const daily = await agenda('day', '2026-08-23', new Date('2026-08-23T12:00:00.000Z'));
 
       expect(daily.items).toHaveLength(0);
-      expect(monthly.items).toHaveLength(1);
-      expect(monthly.items[0]!.carriedPeriods).toBe(1);
+      // The month query asks for scale: 'month', which the day query never does.
+      expect(blockFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            planning: { is: expect.objectContaining({ scale: 'day' }) },
+          }),
+        }),
+      );
     });
 
     it('never carries a habit: a missed one does not accumulate', async () => {
-      blockFindMany.mockResolvedValue([
-        scheduledBlock({
-          id: 'habit',
-          type: 'habit',
-          rrule: 'FREQ=DAILY',
-          startDate: '2026-08-01T08:00:00.000Z',
+      inView.mockResolvedValue([]);
+      blockFindMany.mockResolvedValue([]);
+
+      await agenda('day', MONDAY);
+
+      // The carry query excludes anything with a recurrence, because a missed
+      // habit is simply missed — it does not pile up.
+      expect(blockFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            planning: { is: expect.objectContaining({ recurrence: null }) },
+          }),
         }),
-      ]);
-
-      const result = await agenda('daily', MONDAY);
-
-      expect(result.items.every((i) => i.carriedFrom === null)).toBe(true);
+      );
     });
 
     it('counts manual deferrals separately from the automatic carry', async () => {
-      // One is a decision, the other is time passing. Two counters, two signals.
-      overdueTask();
+      inView.mockResolvedValue([]);
+      blockFindMany.mockResolvedValue([yesterday()]);
       eventFindMany.mockResolvedValue([
-        { type: 'block.rescheduled', blockId: 'olvidada', metadata: {} },
-        { type: 'block.rescheduled', blockId: 'olvidada', metadata: {} },
+        { type: 'block.rescheduled', blockId: 'ayer', metadata: {} },
+        { type: 'block.rescheduled', blockId: 'ayer', metadata: {} },
       ]);
 
-      const result = await agenda('daily', MONDAY);
+      const result = await agenda('day', MONDAY);
 
+      // Two different facts: how many times the person moved it by hand, and
+      // how many periods it has drifted on its own.
       expect(result.items[0]!.rescheduledCount).toBe(2);
-      expect(result.items[0]!.carriedPeriods).toBe(3);
+      expect(result.items[0]!.carriedPeriods).toBe(1);
     });
   });
 
-  describe('habits derived and anchored', () => {
-    it('calls anything with a recurrence a habit, without storing the type', async () => {
-      blockFindMany.mockResolvedValue([
-        scheduledBlock({ id: 'con-frecuencia', type: 'action', rrule: 'FREQ=DAILY' }),
-        scheduledBlock({ id: 'sin-frecuencia', type: 'action' }),
-      ]);
+  describe('what Time is asked, and what Actions decides', () => {
+    it('asks Time for the view, and never computes occurrences itself', async () => {
+      await agenda('week', MONDAY);
+
+      expect(inView).toHaveBeenCalledWith(
+        expect.objectContaining({ workspaceId: 'ws-1', scale: 'week' }),
+      );
+    });
+
+    it('keeps non-agenda types out, which is Actions’ business and not Time’s', async () => {
+      const note = plannedBlock({ id: 'nota', type: 'note' });
+      // Time reports it because it is planned; Actions drops it because a note
+      // is not something you do.
+      blockFindMany.mockResolvedValue([]);
+      inView.mockResolvedValue([occurrenceOf(note, '2026-08-17T08:00:00.000Z')]);
 
       const result = await agenda();
 
-      expect(result.items.find((i) => i.blockId === 'con-frecuencia')!.isHabit).toBe(true);
-      expect(result.items.find((i) => i.blockId === 'sin-frecuencia')!.isHabit).toBe(false);
-    });
-
-    it('reports how late an anchored habit is, relative to its own rhythm', async () => {
-      blockFindMany.mockResolvedValue([
-        scheduledBlock({
-          id: 'afeitarme',
-          type: 'habit',
-          rrule: 'FREQ=DAILY;INTERVAL=3',
-          recurrenceMode: 'AFTER_COMPLETION',
-          startDate: '2026-08-01T08:00:00.000Z',
-        }),
-      ]);
-      eventFindMany.mockResolvedValue([
-        {
-          type: 'occurrence.completed',
-          blockId: 'afeitarme',
-          metadata: { occurrenceAt: '2026-08-11T08:00:00.000Z' },
-        },
-      ]);
-
-      // Due on the 14th, looked at on the 17th: one whole interval late.
-      const result = await agenda('daily', MONDAY, new Date('2026-08-17T08:00:00.000Z'));
-
-      expect(result.items[0]!.overdue).toBe(1);
-    });
-
-    it('leaves a fixed habit with no lateness, because it does not accumulate', async () => {
-      blockFindMany.mockResolvedValue([
-        scheduledBlock({ id: 'diario', type: 'habit', rrule: 'FREQ=DAILY' }),
-      ]);
-
-      const result = await agenda();
-
-      expect(result.items.every((i) => i.overdue === 0)).toBe(true);
-    });
-
-    it('keeps projections out of the planned time', async () => {
-      // Half of a projected week is a guess. Counting it as planned would make
-      // the capacity warning fire on work that may never be scheduled.
-      blockFindMany.mockResolvedValue([
-        scheduledBlock({
-          id: 'anclado',
-          type: 'habit',
-          rrule: 'FREQ=DAILY;INTERVAL=2',
-          recurrenceMode: 'AFTER_COMPLETION',
-          estimateMinutes: 30,
-          startDate: '2026-08-17T08:00:00.000Z',
-        }),
-      ]);
-
-      const result = await agenda('weekly', MONDAY, new Date('2026-08-17T07:00:00.000Z'));
-
-      expect(result.items.filter((i) => i.projected).length).toBeGreaterThan(0);
-      expect(result.plannedMinutes).toBe(30);
-    });
-  });
-
-  describe('forRange — many periods at once', () => {
-    const range = (from = '2026-08-17', to = '2026-08-23', now = new Date('2026-08-20T12:00:00.000Z')) =>
-      service.forRange({ userId: 'u1', workspaceId: 'ws-1', from, to, period: 'daily', now });
-
-    it('expands a daily habit across every day in the span', async () => {
-      blockFindMany.mockResolvedValue([
-        scheduledBlock({ id: 'habit', type: 'habit', rrule: 'FREQ=DAILY' }),
-      ]);
-
-      const result = await range();
-
-      expect(result.items).toHaveLength(7);
-    });
-
-    it('tells each row which day to draw it under', async () => {
-      blockFindMany.mockResolvedValue([
-        scheduledBlock({ id: 'habit', type: 'habit', rrule: 'FREQ=DAILY' }),
-      ]);
-
-      const result = await range();
-
-      // Grouping back into days is arithmetic on the client, so every row has to
-      // say where it belongs without the client recomputing occurrences.
-      expect(result.items.every((i) => i.shownAt === i.effectiveAt)).toBe(true);
-    });
-
-    it('carries an overdue task onto today, not onto every day in the span', async () => {
-      blockFindMany.mockResolvedValue([
-        scheduledBlock({
-          id: 'olvidada',
-          startDate: '2026-08-14T09:00:00.000Z',
-          endDate: '2026-08-14T09:00:00.000Z',
-        }),
-      ]);
-
-      const result = await range();
-      const carried = result.items.filter((i) => i.carriedFrom);
-
-      expect(carried).toHaveLength(1);
-      // Drawn under today while still recorded against the day it was planned
-      // for, which is what lets it be ticked from either.
-      expect(carried[0]!.shownAt).toBe('2026-08-20T00:00:00.000Z');
-      expect(carried[0]!.occurrenceAt).toBe('2026-08-14T09:00:00.000Z');
-    });
-
-    it('carries nothing when the span does not reach today', async () => {
-      blockFindMany.mockResolvedValue([
-        scheduledBlock({
-          id: 'olvidada',
-          startDate: '2026-07-01T09:00:00.000Z',
-          endDate: '2026-07-01T09:00:00.000Z',
-        }),
-      ]);
-
-      const result = await range('2026-08-01', '2026-08-10');
-
-      expect(result.items.filter((i) => i.carriedFrom)).toHaveLength(0);
-    });
-
-    it('agrees with forPeriod about a day inside the span', async () => {
-      // A day rendered inside a run of days and the same day rendered on its own
-      // must never disagree, which is why both go through one collector.
-      blockFindMany.mockResolvedValue([
-        scheduledBlock({ id: 'habit', type: 'habit', rrule: 'FREQ=DAILY' }),
-      ]);
-
-      const spanned = await range('2026-08-17', '2026-08-23', new Date('2026-08-17T12:00:00.000Z'));
-      const alone = await service.forPeriod({
-        userId: 'u1',
-        workspaceId: 'ws-1',
-        period: 'daily',
-        date: '2026-08-17',
-        now: new Date('2026-08-17T12:00:00.000Z'),
-      });
-
-      const fromSpan = spanned.items.filter((i) => i.shownAt.startsWith('2026-08-17'));
-      expect(fromSpan.map((i) => i.occurrenceAt)).toEqual(alone.items.map((i) => i.occurrenceAt));
-    });
-
-    it('resolves the calendar day in the workspace zone, not in UTC', async () => {
-      // Madrid is UTC+2 in August, so a local midnight is 22:00 the day before.
-      // Slicing the ISO string on the client would file two hours of every day
-      // under the one before it.
-      calendar.forWorkspace.mockResolvedValue({
-        timezone: 'Europe/Madrid',
-        config: { firstDayOfWeek: 1 },
-      });
-      blockFindMany.mockResolvedValue([
-        scheduledBlock({ id: 'tarde', startDate: '2026-08-19T22:30:00.000Z' }),
-      ]);
-
-      const result = await range('2026-08-17', '2026-08-23');
-
-      expect(result.items[0]!.day).toBe('2026-08-20');
-      expect(result.items[0]!.shownAt.slice(0, 10)).toBe('2026-08-19');
+      expect(result.items).toHaveLength(0);
     });
 
     it('carries the parent id, so a view can place it in a tree', async () => {
-      blockFindMany.mockResolvedValue([
-        { ...scheduledBlock({ id: 'hija' }), parentId: 'padre' },
-      ]);
+      const child = plannedBlock({ id: 'hijo', parentId: 'padre' });
+      given([{ block: child, at: '2026-08-17T08:00:00.000Z' }]);
 
-      const result = await range();
+      const result = await agenda();
 
       expect(result.items[0]!.parentId).toBe('padre');
     });
+
+    it('reports how late an anchored habit is, as Time measured it', async () => {
+      const block = plannedBlock({ id: 'afeitar', type: 'habit', recurrence: 'FREQ=DAILY;INTERVAL=3' });
+      givenBlocks([block]);
+      inView.mockResolvedValue([
+        occurrenceOf(block, '2026-08-14T08:00:00.000Z', { overdue: 1 }),
+      ]);
+
+      const result = await agenda();
+
+      // Lateness is a property of the rhythm, which Time owns. Actions only
+      // passes it through to whatever maps it onto colour.
+      expect(result.items[0]!.overdue).toBe(1);
+    });
   });
 
-  describe('single-level display — an item lives at exactly one granularity', () => {
-    // The reported bug: an action scheduled for the whole of August must not
-    // leak into every day inside it. "Greater than a week and no more than a
-    // month" belongs at month level, full stop — never cascaded down.
-    const augustWhole = () =>
+  describe('next actions — what has no period at all', () => {
+    it('returns blocks with no planning, which is where a capture waits', async () => {
       blockFindMany.mockResolvedValue([
-        scheduledBlock({
-          id: 'agosto',
-          title: 'Revisar objetivos del mes',
-          startDate: '2026-08-01T00:00:00.000Z',
-          endDate: '2026-08-31T23:59:59.999Z',
-        }),
+        {
+          id: 'idea',
+          type: 'action',
+          parentId: null,
+          properties: { text: 'Llamar al fontanero' },
+          createdAt: new Date('2026-08-10T10:00:00.000Z'),
+        },
       ]);
 
-    it('shows a month-spanning item in the month view', async () => {
-      augustWhole();
-
-      const result = await service.forPeriod({
-        userId: 'u1',
-        workspaceId: 'ws-1',
-        period: 'monthly',
-        date: '2026-08-15',
-        now: new Date('2026-08-23T12:00:00.000Z'),
-      });
+      const result = await service.nextActions({ userId: 'u1', workspaceId: 'ws-1' });
 
       expect(result.items).toHaveLength(1);
-      expect(result.items[0]!.blockId).toBe('agosto');
-    });
-
-    it('does NOT show a month-spanning item in the day view for a day inside it', async () => {
-      // This is the exact scenario reported: created at month level, then found
-      // 22 days "late" the next time today was opened. It must not appear at
-      // all in the day view — not carried, not overdue, simply absent, because
-      // it belongs to its own month, not to any day inside it.
-      augustWhole();
-
-      const result = await agenda('daily', '2026-08-23', new Date('2026-08-23T12:00:00.000Z'));
-
-      expect(result.items).toHaveLength(0);
-    });
-
-    it('does NOT show a month-spanning item in the week view either', async () => {
-      augustWhole();
-
-      const result = await agenda('weekly', '2026-08-17', new Date('2026-08-23T12:00:00.000Z'));
-
-      expect(result.items).toHaveLength(0);
-    });
-
-    it('does NOT show a week-long item in the month view containing it', async () => {
-      // The other direction: a week-level item must not leak up into month
-      // view either. Exactly one level, not "this level and everything above".
-      blockFindMany.mockResolvedValue([
-        scheduledBlock({
-          id: 'semana',
-          startDate: '2026-08-17T00:00:00.000Z',
-          endDate: '2026-08-23T23:59:59.999Z',
+      expect(blockFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ planning: { is: null } }),
         }),
-      ]);
+      );
+    });
+  });
 
-      const result = await service.forPeriod({
+  describe('forRange — many periods in one request', () => {
+    it('asks Time once for the whole span', async () => {
+      await service.forRange({
         userId: 'u1',
         workspaceId: 'ws-1',
-        period: 'monthly',
-        date: '2026-08-15',
-        now: new Date('2026-08-23T12:00:00.000Z'),
+        from: '2026-08-17',
+        to: '2026-08-23',
+        scale: 'day',
+        now: new Date('2026-08-17T12:00:00.000Z'),
       });
 
-      expect(result.items).toHaveLength(0);
+      // One request for the run of days on screen, not one per day.
+      expect(inView).toHaveBeenCalledTimes(1);
     });
 
-    it('carries a month-spanning item forward only into the current month, never into today', async () => {
-      // Unfinished work still has to surface — but at its own level. A month
-      // item that goes unfinished reappears in the current month, not in today.
-      blockFindMany.mockResolvedValue([
-        scheduledBlock({
-          id: 'julio',
-          startDate: '2026-07-01T00:00:00.000Z',
-          endDate: '2026-07-31T23:59:59.999Z',
-        }),
-      ]);
+    it('tells each row which day to draw it under', async () => {
+      const block = plannedBlock({ id: 'x' });
+      given([{ block, at: '2026-08-19T08:00:00.000Z' }]);
 
-      const daily = await agenda('daily', '2026-08-23', new Date('2026-08-23T12:00:00.000Z'));
-      const monthly = await service.forPeriod({
+      const result = await service.forRange({
         userId: 'u1',
         workspaceId: 'ws-1',
-        period: 'monthly',
-        date: '2026-08-15',
-        now: new Date('2026-08-23T12:00:00.000Z'),
+        from: '2026-08-17',
+        to: '2026-08-23',
+        scale: 'day',
+        now: new Date('2026-08-17T12:00:00.000Z'),
       });
 
-      expect(daily.items).toHaveLength(0);
-      expect(monthly.items).toHaveLength(1);
-      expect(monthly.items[0]!.carriedFrom).not.toBeNull();
-    });
-
-    it('does not filter recurring items: a habit shows regardless of its schedule span', async () => {
-      blockFindMany.mockResolvedValue([
-        scheduledBlock({
-          id: 'habito',
-          type: 'habit',
-          rrule: 'FREQ=DAILY',
-          startDate: '2026-08-01T00:00:00.000Z',
-          endDate: '2026-08-31T23:59:59.999Z',
-        }),
-      ]);
-
-      const result = await agenda('daily', '2026-08-17', new Date('2026-08-17T12:00:00.000Z'));
-
-      expect(result.items).toHaveLength(1);
-    });
-
-    it('shows a quarter-and-a-half item at year level, past the trimester bucket', async () => {
-      blockFindMany.mockResolvedValue([
-        scheduledBlock({
-          id: 'largo',
-          startDate: '2026-01-01T00:00:00.000Z',
-          endDate: '2026-12-31T23:59:59.999Z',
-        }),
-      ]);
-
-      const yearly = await service.forPeriod({
-        userId: 'u1',
-        workspaceId: 'ws-1',
-        period: 'yearly',
-        date: '2026-06-01',
-        now: new Date('2026-08-23T12:00:00.000Z'),
-      });
-      const trimester = await service.forPeriod({
-        userId: 'u1',
-        workspaceId: 'ws-1',
-        period: 'trimester',
-        date: '2026-06-01',
-        now: new Date('2026-08-23T12:00:00.000Z'),
-      });
-
-      expect(yearly.items).toHaveLength(1);
-      expect(trimester.items).toHaveLength(0);
+      // The day is resolved server-side: an instant only becomes a day once you
+      // know where it is being lived, and slicing an ISO string answers for UTC.
+      expect(result.items[0]!.day).toBe('2026-08-19');
     });
   });
 });

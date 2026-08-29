@@ -3,9 +3,16 @@ import { AgendaService } from './agenda.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AccessTokenPayload } from '@nau/types';
-import type { PeriodType } from '../common/time';
 
-const PERIODS = ['daily', 'weekly', 'monthly', 'trimester', 'yearly'] as const;
+/**
+ * The Gregorian scales an agenda can be drawn at.
+ *
+ * Named for the scale rather than for the rhythm — 'day' rather than 'daily' —
+ * because a scale is a division of time, not a frequency. The two vocabularies
+ * used to coexist, one on each side of the wire, and translating between them
+ * was pure ceremony.
+ */
+const SCALES = ['day', 'week', 'month', 'quarter', 'year'] as const;
 
 @Controller('agenda')
 @UseGuards(JwtAuthGuard)
@@ -25,15 +32,15 @@ export class AgendaController {
   async forPeriod(
     @CurrentUser() user: AccessTokenPayload,
     @Query('date') date: string,
-    @Query('period') period: string = 'daily',
+    @Query('scale') scale: string = 'day',
     @Query('workspaceId') workspaceId?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
     const ws = workspaceId ?? user.workspaceId;
     if (!ws) throw new BadRequestException('workspaceId is required');
-    if (!PERIODS.includes(period as (typeof PERIODS)[number])) {
-      throw new BadRequestException(`period must be one of ${PERIODS.join(', ')}`);
+    if (!SCALES.includes(scale as (typeof SCALES)[number])) {
+      throw new BadRequestException(`scale must be one of ${SCALES.join(', ')}`);
     }
 
     if (from && to) {
@@ -42,14 +49,14 @@ export class AgendaController {
         workspaceId: ws,
         from,
         to,
-        period: period as PeriodType,
+        scale,
       });
     }
 
     return this.agenda.forPeriod({
       userId: user.sub,
       workspaceId: ws,
-      period: period as PeriodType,
+      scale,
       date: date || new Date().toISOString(),
     });
   }
