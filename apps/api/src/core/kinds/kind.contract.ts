@@ -110,6 +110,19 @@ export interface Projection {
   readonly type: ProjectionType;
 }
 
+/**
+ * A kind whose properties type is not known to the holder.
+ *
+ * The registry deals in these: it stores and hands back kinds without caring
+ * what any of them describes, which is what lets it hold kinds written after it
+ * was. `schema` is widened to `ZodType<unknown>` so that kinds with unrelated
+ * property types can sit in one collection — a `BlockKind<A> | BlockKind<B>`
+ * array cannot otherwise satisfy any single generic signature.
+ */
+export type AnyBlockKind = Omit<BlockKind<unknown>, 'schema'> & {
+  readonly schema: { safeParse: ZodType['safeParse'] };
+};
+
 /** A kind id is `<owner>.<name>`; both halves are required. */
 export const KIND_ID_PATTERN = /^[a-z][a-z0-9]*\.[a-z][a-z0-9_]*$/;
 

@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_PIPE } from '@nestjs/core';
 import { PrismaModule } from './prisma/prisma.module';
 import { CoreModule } from './core/core.module';
+import { JournalKindsModule } from './relations/api-journal/journal-kinds.module';
 import { BlocksModule } from './blocks/blocks.module';
 import { HealthModule } from './health/health.module';
 import { GraphModule } from './core/substrate/graph/graph.module';
@@ -43,6 +44,7 @@ import { CapturesModule } from './captures/captures.module';
     ]),
     PrismaModule,
     CoreModule,
+    JournalKindsModule,
     BlocksModule,
     HealthModule,
     GraphModule,

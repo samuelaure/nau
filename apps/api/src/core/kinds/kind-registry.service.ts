@@ -1,5 +1,5 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
-import { BlockKind, KIND_ID_PATTERN, ownerOf } from './kind.contract';
+import { AnyBlockKind, BlockKind, KIND_ID_PATTERN, ownerOf } from './kind.contract';
 
 /**
  * The set of block kinds the running system knows, assembled at startup from
@@ -17,7 +17,7 @@ import { BlockKind, KIND_ID_PATTERN, ownerOf } from './kind.contract';
 @Injectable()
 export class KindRegistryService {
   private readonly logger = new Logger(KindRegistryService.name);
-  private readonly kinds = new Map<string, BlockKind>();
+  private readonly kinds = new Map<string, AnyBlockKind>();
 
   /**
    * Called by a relation's module at startup, once per kind it owns.
@@ -26,8 +26,14 @@ export class KindRegistryService {
    * rather than warns. A registry that tolerates two owners for one kind has
    * the same failure the vocabulary drift had: no single answer to "who owns
    * this", discovered later and by inspection.
+   *
+   * Takes `AnyBlockKind` rather than a generic `BlockKind<T>` because a relation
+   * registers several kinds at once: in a heterogeneous array the type parameter
+   * binds to the first element and every other kind is rejected. The registry
+   * stores kinds opaquely regardless, and the type each schema carries survives
+   * where it is actually used.
    */
-  register<T>(kind: BlockKind<T>): void {
+  register(kind: AnyBlockKind): void {
     if (!KIND_ID_PATTERN.test(kind.id)) {
       throw new Error(
         `Invalid kind id "${kind.id}": expected "<owner>.<name>", lowercase, e.g. "example.thing"`,
@@ -42,7 +48,7 @@ export class KindRegistryService {
       );
     }
 
-    this.kinds.set(kind.id, kind as BlockKind);
+    this.kinds.set(kind.id, kind);
     // Debug rather than log: registration happens once per kind at startup and
     // is worth having when a relation fails to mount, but at log level it
     // buries real output in any suite that builds a registry per test.
@@ -50,12 +56,12 @@ export class KindRegistryService {
   }
 
   /** Every registered kind. Order is registration order. */
-  all(): readonly BlockKind[] {
+  all(): readonly AnyBlockKind[] {
     return [...this.kinds.values()];
   }
 
   /** Kinds owned by one module — the whole surface a relation contributed. */
-  ownedBy(owner: string): readonly BlockKind[] {
+  ownedBy(owner: string): readonly AnyBlockKind[] {
     return this.all().filter((kind) => ownerOf(kind.id) === owner);
   }
 
@@ -66,7 +72,7 @@ export class KindRegistryService {
    * modules' types. Ask for what you need — `withCapability('schedulable')` —
    * and a kind registered later is included without this caller changing.
    */
-  withCapability(capability: keyof BlockKind['capabilities']): readonly BlockKind[] {
+  withCapability(capability: keyof BlockKind['capabilities']): readonly AnyBlockKind[] {
     return this.all().filter((kind) => kind.capabilities[capability]);
   }
 
@@ -75,7 +81,7 @@ export class KindRegistryService {
   }
 
   /** Throws if the kind is unknown — an unregistered kind is never a default. */
-  get(kindId: string): BlockKind {
+  get(kindId: string): AnyBlockKind {
     const kind = this.kinds.get(kindId);
     if (!kind) {
       throw new BadRequestException(`Unknown block kind "${kindId}"`);
