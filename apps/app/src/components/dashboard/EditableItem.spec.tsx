@@ -3,21 +3,18 @@ import '@testing-library/jest-dom'
 import { EditableItem } from './EditableItem'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
 import { HierarchicalBlock } from '@9nau/core'
+import { makeHierarchicalBlock } from '@/test/block-fixture'
 import React from 'react'
 
 jest.mock('@/lib/state/dashboard-store')
 
 const useDashboardStoreMock = useDashboardStore as unknown as jest.Mock
 
-const mockItem: HierarchicalBlock = {
+const mockItem = makeHierarchicalBlock({
   id: 'item-1',
   type: 'action',
-  parentId: null,
   properties: { text: 'Test item', sortOrder: 1, date: '2025-08-05', completed: false },
-  createdAt: new Date(),
-  updatedAt: new Date(),
-  children: [],
-}
+})
 
 const mockParentList: HierarchicalBlock[] = [
   mockItem,
@@ -183,7 +180,7 @@ describe('EditableItem', () => {
         index={0}
       />
     )
-    const deleteButton = screen.getByRole('button')
+    const deleteButton = screen.getByRole('button', { name: 'Delete item' })
     fireEvent.click(deleteButton)
     expect(mockOnDelete).toHaveBeenCalledWith('item-1')
   })

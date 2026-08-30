@@ -12,7 +12,9 @@
     "prod:on": "dotenv -e ../../.env -e .env next dev",
     "start": "next start",
     "test": "jest",
-    "test:on": "dotenv -e ../../.env.test -e .env.test next dev"
+    "test:ci": "jest --coverage",
+    "test:on": "dotenv -e ../../.env.test -e .env.test next dev",
+    "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
     "@9nau/ui": "workspace:^",

@@ -2,10 +2,10 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api-client'
-import type { Workspace, Brand, WorkspaceMember, CreateBrandDto, UpdateBrandDto, WorkspaceRole, Project, CreateProjectDto, UpdateProjectDto } from '@9nau/types'
+import type { Workspace, WorkspaceMember, WorkspaceRole, Project, CreateProjectDto, UpdateProjectDto } from '@9nau/types'
 
 export type WorkspaceWithRole = Workspace & { role: WorkspaceRole }
-export type { Workspace, Brand, WorkspaceMember }
+export type { Workspace, WorkspaceMember }
 
 export const useGetWorkspaces = () =>
   useQuery<WorkspaceWithRole[]>({
@@ -34,46 +34,6 @@ export const useDeleteWorkspace = (workspaceId: string) => {
   return useMutation<void, Error>({
     mutationFn: () => apiClient.delete(`/workspaces/${workspaceId}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['workspaces'] }),
-  })
-}
-
-export const useGetBrands = (workspaceId: string | null) =>
-  useQuery<Brand[]>({
-    queryKey: ['brands', workspaceId],
-    queryFn: () => apiClient.get(`/workspaces/${workspaceId}/brands`),
-    enabled: !!workspaceId,
-  })
-
-export const useCreateBrand = (workspaceId: string) => {
-  const qc = useQueryClient()
-  return useMutation<Brand, Error, CreateBrandDto>({
-    mutationFn: (body) => apiClient.post(`/workspaces/${workspaceId}/brands`, body),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['brands', workspaceId] })
-      qc.invalidateQueries({ queryKey: ['workspaces'] })
-    },
-  })
-}
-
-export const useUpdateBrand = (workspaceId: string, brandId: string) => {
-  const qc = useQueryClient()
-  return useMutation<Brand, Error, UpdateBrandDto>({
-    mutationFn: (body) => apiClient.patch(`/workspaces/${workspaceId}/brands/${brandId}`, body),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['brands', workspaceId] })
-      qc.invalidateQueries({ queryKey: ['workspaces'] })
-    },
-  })
-}
-
-export const useDeleteBrand = (workspaceId: string) => {
-  const qc = useQueryClient()
-  return useMutation<void, Error, { brandId: string }>({
-    mutationFn: ({ brandId }) => apiClient.delete(`/workspaces/${workspaceId}/brands/${brandId}`),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['brands', workspaceId] })
-      qc.invalidateQueries({ queryKey: ['workspaces'] })
-    },
   })
 }
 

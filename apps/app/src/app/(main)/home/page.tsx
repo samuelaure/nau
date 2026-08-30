@@ -49,14 +49,11 @@ export default function HomePage() {
     }
     const notes = blocks.filter((b: Block) => b.type === 'note')
     const actions = blocks.filter((b: Block) => b.type === 'action')
-    // `journal_entry` is the canonical type and the only one anything writes
-    // today. `experience` is read too, because six rows of it predate the
-    // normalisation and were invisible everywhere while the filter named one
-    // type — showing them is not the same as endorsing the second name, and
-    // they stay readable until they are migrated.
-    const experiences = blocks.filter(
-      (b: Block) => b.type === 'journal_entry' || b.type === 'experience',
-    )
+    // `journal_entry` is the canonical and only type anything writes. The
+    // production census (#78) confirmed the six pre-normalisation
+    // `experience` rows are all soft-deleted — nothing left for this filter
+    // to reach by keeping the second name.
+    const experiences = blocks.filter((b: Block) => b.type === 'journal_entry')
 
     const notesByDate = groupBlocksByDate(notes)
     const actionsHierarchy = buildHierarchy(actions)

@@ -4,7 +4,8 @@ import '@testing-library/jest-dom'
 import { ReactNode } from 'react'
 import { useGetBlocks, useCreateBlock, useUpdateBlock, useDeleteBlock } from './use-blocks-api'
 import { apiClient } from '@/lib/api-client'
-import { Block, CreateBlockDto, UpdateBlockDto } from '@9nau/types'
+import { CreateBlockDto, UpdateBlockDto } from '@9nau/types'
+import { makeBlock } from '@/test/block-fixture'
 
 // Mock the API client
 jest.mock('@/lib/api-client', () => ({
@@ -28,15 +29,12 @@ const wrapper = ({ children }: { children: ReactNode }) => (
   <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
 )
 
-const mockBlock: Block = {
+const mockBlock = makeBlock({
   id: 'block-1',
   uuid: 'uuid-1',
   type: 'note',
   properties: { text: 'Test note' },
-  parentId: null,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-}
+})
 
 describe('useGetBlocks', () => {
   it('should fetch blocks successfully', async () => {

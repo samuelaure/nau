@@ -199,7 +199,6 @@ export function EditableItem({
               )}
             />
           )}
-          {item.type === 'experience' && <span className="mr-3 mt-1.5 text-gray-400 flex-shrink-0">•</span>}
           {isEditing ? (
             <textarea
               ref={textAreaRef}
@@ -230,6 +229,7 @@ export function EditableItem({
               variant="ghost"
               size="icon"
               className="h-7 w-7 rounded-full"
+              aria-label="Expand item"
               onMouseDown={(e) => {
                 e.preventDefault() // prevent input blur
                 setIsModalOpen(true)
@@ -242,6 +242,7 @@ export function EditableItem({
               variant="ghost"
               size="icon"
               className="h-7 w-7 rounded-full"
+              aria-label="Delete item"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => onDelete(item.id)}
             >

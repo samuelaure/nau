@@ -8,17 +8,17 @@ import { Button } from '@9nau/ui/components/button'
 import { cn } from '@9nau/ui/lib/utils'
 import { useUiStore, useUiActions } from '@/lib/state/ui-store'
 
-type FilterType = 'all' | 'note' | 'action' | 'journal_entry' | 'journal_synthesis' | 'content_idea'
+type FilterType = 'all' | 'note' | 'action' | 'journal_entry' | 'journal_synthesis'
 
 // `experience` is gone: it and `journal_entry` were two names for one concept,
-// and the surviving name is the one anything actually writes.
+// and the surviving name is the one anything actually writes. Content
+// ('content_idea') has no face in `app` at all — see #75.
 const FILTER_OPTIONS: { value: FilterType; label: string; emoji: string }[] = [
   { value: 'all', label: 'Todo', emoji: '🔍' },
   { value: 'note', label: 'Notas', emoji: '📝' },
   { value: 'action', label: 'Acciones', emoji: '⚡' },
   { value: 'journal_entry', label: 'Journal', emoji: '📓' },
   { value: 'journal_synthesis', label: 'Síntesis', emoji: '✨' },
-  { value: 'content_idea', label: 'Ideas', emoji: '💡' },
 ]
 
 export function SearchView() {

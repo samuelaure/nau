@@ -43,6 +43,12 @@ describe('NoteInput', () => {
   })
 
   it('should call createBlock and collapse on blur with text', async () => {
+    // The component only clears and collapses in `onSuccess` (see
+    // note-input.tsx's `handleClose`) — a mock that never calls it leaves the
+    // textarea mounted regardless of whether `mutate` was called correctly.
+    mockCreateBlock.mockImplementationOnce((_dto, options) => {
+      options?.onSuccess?.()
+    })
     render(<NoteInput />, { wrapper })
     fireEvent.click(screen.getByText('Take a note...'))
     const textarea = screen.getByPlaceholderText('Take a note...') as HTMLTextAreaElement
@@ -54,11 +60,17 @@ describe('NoteInput', () => {
     })
 
     await waitFor(() => expect(mockCreateBlock).toHaveBeenCalledTimes(1))
+    // `mutate` is called with a second argument (`{ onSuccess }`), so the
+    // assertion has to match both positional arguments, not just the first.
+    // `workspaceId` is always sent, `undefined` when no workspace is active
+    // (`activeWorkspaceId ?? undefined` in note-input.tsx) — not omitted.
     expect(mockCreateBlock).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'note',
+        workspaceId: undefined,
         properties: { text: 'This is a new note', status: 'inbox', date: expect.any(String) },
-      })
+      }),
+      expect.any(Object)
     )
     expect(textarea).not.toBeInTheDocument()
   })

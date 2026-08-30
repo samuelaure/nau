@@ -6,6 +6,7 @@ import { HierarchicalSection } from './HierarchicalSection'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
 import { useCreateBlock, useUpdateBlock, useDeleteBlock } from '@/hooks/use-blocks-api'
 import { HierarchicalBlock } from '@9nau/core'
+import { makeHierarchicalBlock } from '@/test/block-fixture'
 import React from 'react'
 
 jest.mock('@/lib/state/dashboard-store')
@@ -27,25 +28,19 @@ describe('HierarchicalSection', () => {
   const setDropTarget = jest.fn()
   const setFocusedItemId = jest.fn()
   const mockItems: HierarchicalBlock[] = [
-    {
+    makeHierarchicalBlock({
       id: 'item-1',
       type: 'action',
-      parentId: null,
       properties: { text: 'Root item', sortOrder: 1, date: '2025-08-05' },
-      createdAt: new Date(),
-      updatedAt: new Date(),
       children: [
-        {
+        makeHierarchicalBlock({
           id: 'item-2',
           type: 'action',
           parentId: 'item-1',
           properties: { text: 'Child item', sortOrder: 1, date: '2025-08-05' },
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          children: [],
-        },
+        }),
       ],
-    },
+    }),
   ]
 
   beforeEach(() => {
@@ -104,7 +99,9 @@ describe('HierarchicalSection', () => {
         expect.objectContaining({
           type: 'action',
           parentId: null,
-          properties: { text: '', date: '2025-08-05', status: 'inbox' },
+          // 'published' is the real default (HierarchicalSection.tsx) — items
+          // created here are immediately visible, not held in an inbox.
+          properties: { text: '', date: '2025-08-05', status: 'published' },
         }),
         expect.any(Object)
       )
@@ -119,10 +116,15 @@ describe('HierarchicalSection', () => {
     fireEvent.click(screen.getByText('Root item'))
     fireEvent.change(screen.getByDisplayValue('Root item'), { target: { value: 'Updated text' } })
     fireEvent.blur(screen.getByDisplayValue('Updated text'))
+    // entryEditPatch stamps editedAt alongside text — see the comment on
+    // handleUpdate in HierarchicalSection.tsx for why: without it, a
+    // correction to a voice-captured entry is silently outranked by the
+    // original transcription. editedAt is a real timestamp, not a fixed
+    // value to compare exactly.
     expect(mockUpdateBlock).toHaveBeenCalledWith(
       expect.objectContaining({
         id: 'item-1',
-        updateDto: { properties: { text: 'Updated text' } },
+        updateDto: { properties: { text: 'Updated text', editedAt: expect.any(String) } },
       })
     )
   })

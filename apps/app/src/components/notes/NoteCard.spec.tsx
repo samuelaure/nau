@@ -2,13 +2,15 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { NoteCard } from './NoteCard'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
-import { Block } from '@9nau/types'
-import { useDeleteBlock } from '@/hooks/use-blocks-api'
+import { useDeleteBlock, useUpdateBlock } from '@/hooks/use-blocks-api'
+import { useUpsertPlanning } from '@/hooks/use-schedule-api'
+import { makeBlock } from '@/test/block-fixture'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import React from 'react'
 
 jest.mock('@/lib/state/dashboard-store')
 jest.mock('@/hooks/use-blocks-api')
+jest.mock('@/hooks/use-schedule-api')
 
 const useDashboardStoreMock = useDashboardStore as unknown as jest.Mock
 const mockDeleteBlock = jest.fn()
@@ -18,15 +20,12 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
   <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
 )
 
-const mockNote: Block = {
+const mockNote = makeBlock({
   id: 'note-1',
   uuid: 'uuid-1',
   type: 'note',
   properties: { text: 'This is a test note.' },
-  parentId: null,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-}
+})
 
 describe('NoteCard', () => {
   const setDraggedItem = jest.fn()
@@ -42,7 +41,13 @@ describe('NoteCard', () => {
         },
       })
     )
-    ;(useDeleteBlock as jest.Mock).mockReturnValue({ mutate: mockDeleteBlock })
+    // Every mutation hook the component reads must return the shape
+    // `useMutation` actually produces — `isPending` included — or a click
+    // that reads `.isPending` crashes with "Cannot read properties of
+    // undefined" before the assertion under test ever runs. #71.
+    ;(useDeleteBlock as jest.Mock).mockReturnValue({ mutate: mockDeleteBlock, isPending: false })
+    ;(useUpdateBlock as jest.Mock).mockReturnValue({ mutate: jest.fn(), isPending: false })
+    ;(useUpsertPlanning as jest.Mock).mockReturnValue({ mutate: jest.fn(), isPending: false })
   })
 
   afterEach(() => {

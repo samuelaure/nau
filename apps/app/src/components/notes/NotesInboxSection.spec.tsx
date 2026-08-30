@@ -1,23 +1,14 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { NotesInboxSection } from './NotesInboxSection'
-import { Block } from '@9nau/types'
+import { makeBlock } from '@/test/block-fixture'
 import React from 'react'
 
 jest.mock('./NoteGrid', () => ({
   NoteGrid: jest.fn(() => <div>Mocked NoteGrid</div>),
 }))
 
-const mockNotes: Block[] = [
-  {
-    id: '1',
-    type: 'note',
-    parentId: null,
-    properties: { text: 'Note 1' },
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-]
+const mockNotes = [makeBlock({ id: '1', type: 'note', properties: { text: 'Note 1' } })]
 
 describe('NotesInboxSection', () => {
   it('should render the title and toggle content on click', () => {
