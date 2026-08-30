@@ -1,11 +1,17 @@
 name: CI — app
 
 # The main 9naŭ front-end (Next.js 14, React Query, Zustand).
-# Uses Vitest + @testing-library/react. Component and hook tests run against
-# jsdom; no real API required because fetch is mocked via vi.stubGlobal.
+# Uses Jest + @testing-library/react. Component and hook tests run against
+# jsdom; no real API required because fetch is mocked at the module level.
 #
 # CI only — deploy lives in cd-app.yml, triggered by this workflow succeeding
 # on main. See ci-api.yml for why they are split.
+#
+# `pnpm --filter=X run <script>` exits 0 when <script> doesn't exist in X's
+# package.json — this workflow used to report green on a suite that never
+# ran (#3). Each script this workflow depends on is checked to exist before
+# it's invoked, so a script disappearing from apps/app/package.json fails
+# the build instead of silently doing nothing.
 on:
   push:
     branches: [main]
@@ -40,6 +46,9 @@ jobs:
       - name: Build workspace packages
         run: pnpm build --filter='./packages/**'
 
+      - name: Verify test:ci script exists
+        run: node -e "if (!require('./apps/app/package.json').scripts['test:ci']) { console.error('apps/app/package.json has no test:ci script — pnpm --filter would silently exit 0'); process.exit(1) }"
+
       - name: Run unit tests with coverage
         run: pnpm --filter=@9nau/app test:ci
 
@@ -65,6 +74,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Build workspace packages
         run: pnpm build --filter='./packages/**'
+      - name: Verify typecheck script exists
+        run: node -e "if (!require('./apps/app/package.json').scripts['typecheck']) { console.error('apps/app/package.json has no typecheck script — pnpm turbo would silently exit 0'); process.exit(1) }"
       - name: Typecheck
         run: pnpm turbo typecheck --filter=@9nau/app
       - name: Build
