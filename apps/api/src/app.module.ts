@@ -18,6 +18,7 @@ import { JournalModule } from './relations/api-journal/journal.module';
 import { ReferencesModule } from './relations/api-references/references.module';
 import { GtdModule } from './relations/api-gtd/gtd.module';
 import { AgendaModule } from './relations/api-actions/agenda.module';
+import { ActionsModule } from './relations/api-actions/actions.module';
 import { TimeModule } from './time/time.module';
 import { AuthModule } from './auth/auth.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
@@ -64,6 +65,7 @@ import { CapturesModule } from './captures/captures.module';
     ReferencesModule,
     GtdModule,
     AgendaModule,
+    ActionsModule,
     AuthModule,
     WorkspacesModule,
     BrandsModule,

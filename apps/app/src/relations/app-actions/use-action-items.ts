@@ -1,27 +1,32 @@
 'use client'
 
 /**
- * DRAFT, not yet confirmed by `module:actions`. ENTIRELY SPECULATIVE.
+ * Confirmed against the real route — `apps/api/src/relations/api-actions/
+ * actions.controller.ts` + `actions.service.ts` (nau#126). The route this
+ * file already guessed (`/actions/items*`) turned out correct: `api`'s
+ * comment on nau#76 floated `/v1/actions/actions`, but no relation ever
+ * shipped with a `v1` prefix (`agenda`, `references/notes`, `journal` are
+ * all unprefixed), so the shipped route follows what actually exists.
  *
- * Unlike `app-references`' and `app-gtd`'s drafts, there is no real
- * controller to read this off: `apps/api/src/relations/api-actions/` only
- * exposes `agenda.controller.ts` (occurrences — what's owed) and no CRUD
- * route for the `actions.item` kind itself (text, tree, editing). This is
- * exactly the gap #64 and #93 already named: `Dashboard.tsx` still joins
- * `/agenda` occurrences against action blocks fetched from the old,
- * polymorphic `/blocks` because nothing else exists yet.
+ * Two real differences from this file's earlier draft, both from reading the
+ * real response shape rather than assuming one:
  *
- * The shape below is derived from the real, registered kind
- * (`packages/actions/src/schemas.ts`'s `ActionItemSchema`) — not invented —
- * but the routes themselves (`/actions/items*`) are a guess at what a REST
- * surface over that kind would look like, shaped by analogy with
- * `references/notes`. `api`'s own comment in nau#76 suggested
- * `/v1/actions/actions` with the tree included in one response, which this
- * draft does not attempt — building tree-shaped pagination without a real
- * endpoint to check it against would be guessing twice.
+ *   - the substrate's `Block<T>` never flattens `properties` onto the row —
+ *     `text`/`status`/`priority`/`deadline`/`estimateMinutes` live under
+ *     `properties`, `id`/`uuid`/`kind`/`parentId`/timestamps sit alongside it.
+ *   - `hasChildren` is real and returned by every endpoint (`create`, `get`,
+ *     `list`, `update`) — the one half of `@nau/actions`' `shapeOf` this
+ *     substrate-only CRUD can answer honestly. `Shape` itself (action/habit/
+ *     project/routine) still needs `Planning`, which lives in the agenda
+ *     (nau#64, not yet migrated) — a caller with both can derive it; this
+ *     hook alone cannot and does not pretend to.
  *
- * Per nau#119: draft, mark unconfirmed, publish, converge. This one carries
- * the least confidence of the three drafts and says so.
+ * `GET /actions/items` returns every item in the workspace in one response,
+ * regardless of tree depth — `parentId` on each row is what lets a caller
+ * reconstruct the tree or render flat and use `hasChildren` to decide what
+ * expands. Never paginated: an unbounded personal action list was judged
+ * cheap enough not to need it, same call `references/notes` made differently
+ * only because a note collection can be much larger.
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -30,16 +35,22 @@ import { apiClient } from '@/core/http/client'
 export type ActionStatus = 'todo' | 'done' | 'cancelled'
 export type ActionPriority = 'low' | 'medium' | 'high'
 
-/** DRAFT: substrate envelope fields assumed by analogy, unconfirmed — see file header. */
-export interface ActionItem {
-  id: string
-  kind: 'actions.item'
+export interface ActionItemProperties {
   text: string
   status: ActionStatus
   priority: ActionPriority | null
   deadline: string | null
   estimateMinutes: number | null
+}
+
+export interface ActionItem {
+  id: string
+  uuid: string
+  kind: 'actions.item'
+  properties: ActionItemProperties
   parentId: string | null
+  /** Whether this item has children — derived by the server from the tree, never stored. */
+  hasChildren: boolean
   createdAt: string
   updatedAt: string
 }
@@ -62,18 +73,15 @@ export interface UpdateActionItemInput {
   parentId?: string | null
 }
 
-/**
- * SPECULATIVE — `GET /actions/items` does not exist. Kept `enabled: false`
- * so nothing accidentally fires against a 404 in the meantime; flip once
- * `module:actions` confirms a route (or a different shape entirely — the
- * tree-in-one-response alternative `api` floated in nau#76 would replace
- * this hook, not extend it).
- */
-export const useGetActionItems = (params: { workspaceId: string | null }) =>
+export const useGetActionItems = (params: { workspaceId: string | null; status?: ActionStatus }) =>
   useQuery<ActionItem[]>({
-    queryKey: ['actions', 'items', params.workspaceId],
-    queryFn: () => apiClient.get(`/actions/items?workspaceId=${params.workspaceId}`),
-    enabled: false,
+    queryKey: ['actions', 'items', params.workspaceId, params.status],
+    queryFn: () => {
+      const search = new URLSearchParams({ workspaceId: params.workspaceId! })
+      if (params.status) search.set('status', params.status)
+      return apiClient.get(`/actions/items?${search.toString()}`)
+    },
+    enabled: Boolean(params.workspaceId),
   })
 
 export const useCreateActionItem = () => {
