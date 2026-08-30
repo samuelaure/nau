@@ -64,8 +64,8 @@ export class ReferencesController {
 
     return this.references.listNotes(user.sub, ws, {
       parentId,
-      take: take ? Number(take) : undefined,
-      skip: skip ? Number(skip) : undefined,
+      take: parseTake(take),
+      skip: parseSkip(skip),
     });
   }
 
@@ -103,4 +103,30 @@ export class ReferencesController {
     await this.references.deleteNote(user.sub, ws, id);
     return { success: true };
   }
+}
+
+/**
+ * Rejects an unparseable page size rather than letting it reach Prisma as
+ * `NaN` — same discipline `journal-read.controller.ts`'s `parseLimit`
+ * applies to its own `limit` param (nau#113). A bad `take` falling through
+ * as `undefined` would return the unbounded default, which reads as a
+ * working query rather than a rejected one.
+ */
+function parseTake(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 500) {
+    throw new BadRequestException('`take` must be an integer between 1 and 500');
+  }
+  return parsed;
+}
+
+/** Same reasoning as `parseTake`, for the offset rather than the page size. */
+function parseSkip(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new BadRequestException('`skip` must be a non-negative integer');
+  }
+  return parsed;
 }
