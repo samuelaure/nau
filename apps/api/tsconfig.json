@@ -18,7 +18,8 @@
      * to its own issue, not to unblocking one import.
      */
     "paths": {
-      "@nau/actions/relations/gtd": ["../../packages/actions/dist/relations/gtd/index.d.ts"]
+      "@nau/actions/relations/gtd": ["../../packages/actions/dist/relations/gtd/index.d.ts"],
+      "@nau/references/relations/gtd": ["../../packages/references/dist/relations/gtd/index.d.ts"]
     },
     "declaration": true,
     "emitDecoratorMetadata": true,
