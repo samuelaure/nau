@@ -105,6 +105,47 @@ export class GtdService {
   }
 
   /**
+   * Everything currently sitting in one tray — the read app-gtd asked for in
+   * nau#125 and that had no answer until now: `currentTray`/`isOrdered` only
+   * ever answered for a blockId already known, and a tray view has no
+   * blockIds to start from.
+   *
+   * Pulls every `gtd.*` event for the workspace once (`EventsService`'s new
+   * `findByWorkspaceAndTypePrefix`), groups by block, and asks `@nau/gtd`'s
+   * own `currentTray` per block — the same pure function every single-item
+   * read already uses, just fed from a wider slice of history. No new
+   * derivation logic lives here; this method only assembles the input the
+   * core already knows how to answer from.
+   *
+   * Ordered items never appear: `currentTray` returns null for them by
+   * construction (nau#111's own discipline — an ordered item has left every
+   * tray), so filtering on `trayId` already excludes them without a separate
+   * `isOrdered` check per block.
+   */
+  async tray(userId: string, workspaceId: string, trayId: string): Promise<string[]> {
+    const rows = await this.events.findByWorkspaceAndTypePrefix(userId, workspaceId, 'gtd.');
+
+    const byBlock = new Map<string, Movement[]>();
+    for (const row of rows) {
+      const movement = this.toMovement(row);
+      const existing = byBlock.get(movement.itemId) ?? [];
+      existing.push(movement);
+      byBlock.set(movement.itemId, existing);
+    }
+
+    const blockIds: string[] = [];
+    for (const [blockId, movements] of byBlock) {
+      // findByWorkspaceAndTypePrefix already orders oldest-first, matching
+      // what movementsFor produces for a single block (it reverses
+      // findByBlock's newest-first order to the same effect) — no second
+      // sort needed here.
+      if (currentTray(movements, blockId) === trayId) blockIds.push(blockId);
+    }
+
+    return blockIds;
+  }
+
+  /**
    * Introduces a new capture to a tray — always `references.note` (nau#111),
    * always the general tray unless a specific one is named.
    *
