@@ -8,16 +8,29 @@ import type {
   ScaleId,
   SystemId,
 } from '@nau/time';
+import { periodsBetween } from '@nau/time';
 
 /**
- * `(Actions)·(Time)` — DRAFT, not yet confirmed by `module:time`.
+ * `(Actions)·(Time)` — confirmed by `module:time` on nau#121 (2026-08-30).
  *
- * Per the method in nau#119: this is the contract Actions needs from Time to
- * finish `relations/time/` (`tmp/actions-blueprint.md` §3.1) — written now,
- * marked as unconfirmed, rather than waiting for Time to build its own side
- * first. Everything below is grounded in `@nau/time`'s real `core/contract.ts`
- * (imported, not guessed), plus the one operation nau#104 already asked Time
- * for and left explicitly unresolved.
+ * Written per the method in nau#119: this is the contract Actions needs from
+ * Time to finish `relations/time/` (`tmp/actions-blueprint.md` §3.1),
+ * written before Time's side existed, grounded in `@nau/time`'s real
+ * `core/contract.ts` rather than guessed. Confirmation found two things
+ * worth keeping visible rather than silently folding in:
+ *
+ *   - `periodsBetween` shipped for real (`@nau/time`'s own export, nau#104)
+ *     with one more parameter (`registry`) than this file's draft alias
+ *     assumed, because it walks the real registered system rather than
+ *     assuming one. Imported directly below; the draft alias is gone.
+ *   - Building it surfaced a bug in Time's own first implementation, not in
+ *     anything drafted here: testing `periodAt(...) === null` at the start
+ *     instant as "this system can't answer" is wrong — naŭ returns `null`
+ *     for "fin de mes" and still projects fine. The right test is
+ *     `capabilities.projects`. Left here as a note because it is exactly
+ *     the distinction this file already got right elsewhere (`someday` as
+ *     `null` via a capability, never a caller-side special case) — worth
+ *     remembering it can still slip in by a different door.
  *
  * What this relation is for, per the blueprint:
  *   - expanding planned items over a window, asking Time for occurrences;
@@ -25,16 +38,7 @@ import type {
  *     decides whether an item still claims attention; this relation decides
  *     which period to draw it under;
  *   - counting how many periods separate two instants, for carry-over's
- *     `carriedPeriods` count — today `agenda.service.ts` computes this by
- *     walking `gregorianPeriodAt` in a loop, importing Gregorian by name
- *     directly inside Actions' relation, which is the exact coupling nau#104
- *     asks Time to retire.
- *
- * What is NOT drafted here: `periodsBetween` itself. nau#104 already
- * specifies its shape precisely (`periodsBetween(system, scale, from, to,
- * ctx): number | null`) as an operation Time's own `core/` or systems
- * publish — this file only names where Actions calls it from, not its
- * signature, so as not to duplicate a contract Time is already deciding.
+ *     `carriedPeriods` count, via `periodsBetween` below.
  */
 
 /**
@@ -72,27 +76,18 @@ export interface OccurrencesInWindow {
  * period each one falls under — what `relations/time/` needs to decide
  * *which period to draw a row under*, per the blueprint's own description of
  * what this relation does with carry-over.
+ *
+ * **Not delivered together by `TimeSystem.occurrences`** — confirmed against
+ * `contract.ts:282-286`, which returns only `Occurrence[]`. Composing this
+ * shape costs one extra `periodAt(scale, occurrence.effectiveAt, ctx)` call
+ * per occurrence, paid by whoever implements this relation for real. Free
+ * with Gregorian (`cost: 'arithmetic'`); worth batching or caching for a
+ * `cost: 'computed'` system (ephemeris) resolving a window with many
+ * occurrences — nothing to optimise yet with only Gregorian registered.
  */
 export interface ResolvedOccurrence {
   readonly occurrence: Occurrence;
   readonly period: Period;
 }
 
-/**
- * The one operation nau#104 already specified and left for Time to publish.
- * Restated here, not redefined, so this relation's code has something
- * concrete to call against while nau#104 is still open — the moment Time
- * ships the real thing, this type alias is deleted and every caller points
- * at Time's own export instead.
- *
- * `null` for a system where the question has no answer (`someday`,
- * trigger-driven systems) — never a caller-side special case, per nau#104's
- * own framing of the failure `AGENDA_TYPES` already taught this platform.
- */
-export type PeriodsBetween = (
-  system: SystemId,
-  scale: ScaleId,
-  from: Instant,
-  to: Instant,
-  ctx: ResolveContext,
-) => number | null;
+export { periodsBetween };
