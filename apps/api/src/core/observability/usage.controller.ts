@@ -20,15 +20,25 @@ export class UsageController {
   /**
    * Internal endpoint — called by services after each LLM/Apify operation.
    * Protected by service-to-service JWT.
-   * workspaceId is optional — if omitted, it is resolved from brandId.
+   *
+   * `workspaceId` is required. It used to be optional, resolved here from
+   * `brandId` by querying the Brand model — a platform-wide observability
+   * endpoint reaching into module:content's domain to save its callers a
+   * lookup. Cut deliberately rather than carried forward; see the note on
+   * `UsageService.record`.
    */
   @Post('_service/usage/events')
   @UseGuards(ServiceAuthGuard)
   async recordEvent(@Body() dto: CreateUsageEventDto) {
+    if (!dto.workspaceId) {
+      throw new BadRequestException(
+        'workspaceId is required — resolve it from your own brandId before calling',
+      );
+    }
     if (!dto.service || !dto.operation) {
       throw new BadRequestException('service and operation are required');
     }
-    return this.usageService.recordWithResolution(dto);
+    return this.usageService.record(dto);
   }
 
   /**
