@@ -14,6 +14,16 @@
       "import": "./dist/relations/gtd/index.js",
       "require": "./dist/relations/gtd/index.js",
       "types": "./dist/relations/gtd/index.d.ts"
+    },
+    "./relations/time": {
+      "import": "./dist/relations/time/index.js",
+      "require": "./dist/relations/time/index.js",
+      "types": "./dist/relations/time/index.d.ts"
+    },
+    "./relations/references": {
+      "import": "./dist/relations/references/index.js",
+      "require": "./dist/relations/references/index.js",
+      "types": "./dist/relations/references/index.d.ts"
     }
   },
   "files": ["dist"],
@@ -31,6 +41,7 @@
   },
   "license": "UNLICENSED",
   "dependencies": {
+    "@nau/time": "workspace:*",
     "zod": "^4.3.6"
   }
 }
