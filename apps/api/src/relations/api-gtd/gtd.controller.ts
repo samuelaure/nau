@@ -125,6 +125,26 @@ export class GtdController {
     }
   }
 
+  /**
+   * The tray listing nau#125 asked for. Declared before `:blockId/tray`
+   * below — NestJS matches routes in declaration order, and a literal
+   * segment (`tray`) must be checked before a param segment that would
+   * otherwise swallow it as a blockId.
+   */
+  @Get('tray')
+  async listTray(
+    @CurrentUser() user: AccessTokenPayload,
+    @Query('trayId') trayId: string,
+    @Query('workspaceId') workspaceId?: string,
+  ) {
+    const ws = workspaceId ?? user.workspaceId;
+    if (!ws) throw new BadRequestException('workspaceId is required');
+    if (!trayId) throw new BadRequestException('trayId is required');
+
+    const blockIds = await this.gtd.tray(user.sub, ws, trayId);
+    return { trayId, blockIds };
+  }
+
   @Get(':blockId/tray')
   async tray(@CurrentUser() user: AccessTokenPayload, @Param('blockId') blockId: string) {
     const trayId = await this.gtd.currentTray(user.sub, blockId);

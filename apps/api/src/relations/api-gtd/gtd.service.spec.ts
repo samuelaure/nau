@@ -34,7 +34,11 @@ describe('GtdService', () => {
     mutateKind: jest.Mock;
     update: jest.Mock;
   };
-  let events: { create: jest.Mock; findByBlock: jest.Mock };
+  let events: {
+    create: jest.Mock;
+    findByBlock: jest.Mock;
+    findByWorkspaceAndTypePrefix: jest.Mock;
+  };
   let service: GtdService;
   const client = {} as ScopedPrismaClient;
 
@@ -49,6 +53,7 @@ describe('GtdService', () => {
     events = {
       create: jest.fn().mockResolvedValue(undefined),
       findByBlock: jest.fn().mockResolvedValue([]),
+      findByWorkspaceAndTypePrefix: jest.fn().mockResolvedValue([]),
     };
 
     service = new GtdService(
@@ -286,6 +291,76 @@ describe('GtdService', () => {
       ]);
 
       expect(await service.currentTray('u1', 'b1')).toBe('inbox');
+    });
+  });
+
+  // nau#125: the read app-gtd was blocked without — everything sitting in
+  // one tray right now, with no blockId known in advance.
+  describe('tray', () => {
+    it('lists blocks whose last movement lands in the requested tray', async () => {
+      events.findByWorkspaceAndTypePrefix.mockResolvedValue([
+        movementEvent({
+          blockId: 'b1',
+          type: 'gtd.capture',
+          metadata: { from: null, to: 'inbox' },
+          createdAt: new Date('2026-08-01T00:00:00.000Z'),
+        }),
+        movementEvent({
+          blockId: 'b2',
+          type: 'gtd.capture',
+          metadata: { from: null, to: 'inbox' },
+          createdAt: new Date('2026-08-01T00:00:00.000Z'),
+        }),
+      ]);
+
+      expect(await service.tray('u1', 'ws1', 'inbox')).toEqual(['b1', 'b2']);
+      expect(events.findByWorkspaceAndTypePrefix).toHaveBeenCalledWith('u1', 'ws1', 'gtd.');
+    });
+
+    it('excludes a block once it has moved to a different tray', async () => {
+      events.findByWorkspaceAndTypePrefix.mockResolvedValue([
+        movementEvent({
+          blockId: 'b1',
+          type: 'gtd.capture',
+          metadata: { from: null, to: 'inbox' },
+          createdAt: new Date('2026-08-01T00:00:00.000Z'),
+        }),
+        movementEvent({
+          blockId: 'b1',
+          type: 'gtd.process',
+          metadata: { from: 'inbox', to: 'projects/x' },
+          createdAt: new Date('2026-08-02T00:00:00.000Z'),
+        }),
+      ]);
+
+      expect(await service.tray('u1', 'ws1', 'inbox')).toEqual([]);
+      expect(await service.tray('u1', 'ws1', 'projects/x')).toEqual(['b1']);
+    });
+
+    // isOrdered relies on currentTray() === null; ordered items never match
+    // any real trayId, so no separate exclusion check is needed here.
+    it('excludes an ordered block from every tray listing', async () => {
+      events.findByWorkspaceAndTypePrefix.mockResolvedValue([
+        movementEvent({
+          blockId: 'b1',
+          type: 'gtd.capture',
+          metadata: { from: null, to: 'inbox' },
+          createdAt: new Date('2026-08-01T00:00:00.000Z'),
+        }),
+        movementEvent({
+          blockId: 'b1',
+          type: 'gtd.order',
+          metadata: { from: 'inbox', to: null },
+          createdAt: new Date('2026-08-02T00:00:00.000Z'),
+        }),
+      ]);
+
+      expect(await service.tray('u1', 'ws1', 'inbox')).toEqual([]);
+    });
+
+    it('returns an empty list for a tray with nothing in it', async () => {
+      events.findByWorkspaceAndTypePrefix.mockResolvedValue([]);
+      expect(await service.tray('u1', 'ws1', 'inbox')).toEqual([]);
     });
   });
 });
