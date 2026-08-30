@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
- * The one rule this package exists to hold, enforced rather than trusted.
+ * The rules this package exists to hold, enforced rather than trusted.
  *
  * Journal has no `sub-modules/` layer — there is exactly one implementation
  * of what a journal entry is, not several interchangeable ones satisfying a
@@ -13,6 +13,12 @@ import { join } from 'node:path';
  * here may depend on NestJS, Prisma, or anything else that would stop this
  * code from running on a device with no server relationship. Deleting
  * `apps/api` entirely must leave this package fully functional.
+ *
+ * `relations/` holds Journal's dealings with one other module —
+ * `relations/gtd/` is `(Journal)·(GTD)`, published as its own entry point
+ * (`@nau/journal/relations/gtd`) rather than folded into the root export,
+ * so the relation stays optional (nau#115). No relation may import another;
+ * there is only one today, but the rule is cheap to state ahead of a second.
  */
 
 const SRC = join(__dirname);

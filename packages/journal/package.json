@@ -4,6 +4,18 @@
   "description": "Journal's domain rules — entry shape, synthesis shape, capabilities — agnostic of any transport or persistence",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./relations/gtd": {
+      "import": "./dist/relations/gtd/index.js",
+      "require": "./dist/relations/gtd/index.js",
+      "types": "./dist/relations/gtd/index.d.ts"
+    }
+  },
   "scripts": {
     "build": "tsc --build",
     "typecheck": "tsc --noEmit -p tsconfig.test.json",
