@@ -5,6 +5,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { CoreModule } from './core/core.module';
 import { JournalKindsModule } from './relations/api-journal/journal-kinds.module';
 import { ReferencesKindsModule } from './relations/api-references/references-kinds.module';
+import { ActionsKindsModule } from './relations/api-actions/actions-kinds.module';
 import { BlocksModule } from './blocks/blocks.module';
 import { HealthModule } from './health/health.module';
 import { GraphModule } from './core/substrate/graph/graph.module';
@@ -48,6 +49,7 @@ import { CapturesModule } from './captures/captures.module';
     CoreModule,
     JournalKindsModule,
     ReferencesKindsModule,
+    ActionsKindsModule,
     BlocksModule,
     HealthModule,
     GraphModule,

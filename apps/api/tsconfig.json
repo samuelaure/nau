@@ -3,6 +3,23 @@
   "compilerOptions": {
     "outDir": "./dist",
     "baseUrl": "./",
+    /**
+     * `@nau/actions/relations/gtd` is declared only through `package.json`'s
+     * `exports` field. `moduleResolution: "node"` (the classic resolver,
+     * inherited from `tsconfig.base.json`) never reads `exports` at all — it
+     * finds only what a package's `main`/`types` name — so the subpath
+     * compiles under Jest's real Node resolver (confirmed: `node -e
+     * "require('@nau/actions/relations/gtd')"` succeeds from this
+     * directory) but fails `tsc`/`nest build` specifically. A `paths` entry
+     * here is the standard fix for a classic resolver plus package `exports`
+     * subpaths, scoped to this project rather than changing
+     * `moduleResolution` for the whole monorepo — that switch (to `node16`/
+     * `bundler`) is a real decision with its own blast radius and belongs
+     * to its own issue, not to unblocking one import.
+     */
+    "paths": {
+      "@nau/actions/relations/gtd": ["../../packages/actions/dist/relations/gtd/index.d.ts"]
+    },
     "declaration": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,

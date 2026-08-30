@@ -112,6 +112,9 @@ importers:
       '@aws-sdk/client-s3':
         specifier: ^3.1032.0
         version: 3.1036.0
+      '@nau/actions':
+        specifier: workspace:*
+        version: link:../../packages/actions
       '@nau/auth':
         specifier: workspace:*
         version: link:../../packages/auth
@@ -1009,6 +1012,10 @@ importers:
         version: 2.1.9(@types/node@25.6.0)(jsdom@29.1.1(@noble/hashes@2.2.0))(lightningcss@1.32.0)(terser@5.46.2)
 
   packages/actions:
+    dependencies:
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
     devDependencies:
       '@types/jest':
         specifier: ^29.5.14

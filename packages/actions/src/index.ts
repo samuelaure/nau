@@ -31,3 +31,5 @@ export * from './core/contract';
 export * from './core/shape';
 export * from './core/attention';
 export * from './core/completion';
+export * from './schemas';
+export * from './capabilities';
