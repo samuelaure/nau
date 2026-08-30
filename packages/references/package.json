@@ -14,6 +14,11 @@
       "import": "./dist/relations/gtd/index.js",
       "require": "./dist/relations/gtd/index.js",
       "types": "./dist/relations/gtd/index.d.ts"
+    },
+    "./relations/actions": {
+      "import": "./dist/relations/actions/index.js",
+      "require": "./dist/relations/actions/index.js",
+      "types": "./dist/relations/actions/index.d.ts"
     }
   },
   "files": ["dist"],
