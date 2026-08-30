@@ -1,6 +1,10 @@
 import { Injectable, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
+/**
+ * The event a caller reports. `workspaceId` is mandatory and never resolved
+ * on this side — see the note on `record()` for why.
+ */
 export interface CreateUsageEventDto {
   workspaceId: string;
   brandId?: string;
@@ -37,19 +41,23 @@ export class UsageService {
     if (!user || user.email !== adminEmail) throw new ForbiddenException('Admin access required');
   }
 
-  async recordWithResolution(dto: CreateUsageEventDto) {
-    let workspaceId = dto.workspaceId;
-    if (!workspaceId && dto.brandId) {
-      const brand = await this.prisma.brand.findUnique({
-        where: { id: dto.brandId },
-        select: { workspaceId: true },
-      });
-      workspaceId = brand?.workspaceId ?? 'unknown';
-    }
-    if (!workspaceId) workspaceId = 'unknown';
-    return this.record({ ...dto, workspaceId });
-  }
-
+  /**
+   * Records a usage event exactly as reported. No longer resolves
+   * `workspaceId` from a `brandId` on the caller's behalf.
+   *
+   * That resolution used to query `Brand` directly, which is `module:content`'s
+   * model — usage/observability is platform-wide and has no business knowing
+   * what a brand is. It also had a real caller: flownaŭ and nauthenticity could
+   * omit `workspaceId` and rely on `brandId` being resolved here.
+   *
+   * That relationship is deliberately cut, not migrated. flownaŭ and
+   * nauthenticity have no active users, and Samuel has decided (2026-08-30) to
+   * design the api's contract as if they never existed rather than keep
+   * dragging code shaped around them forward. If either is worked on again,
+   * the fix on their side is to resolve their own `brandId -> workspaceId` and
+   * send it explicitly — the same thing every other caller of this route
+   * already does.
+   */
   async record(dto: CreateUsageEventDto) {
     return this.prisma.usageEvent.create({
       data: {
