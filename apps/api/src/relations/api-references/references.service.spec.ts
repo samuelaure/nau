@@ -1,0 +1,78 @@
+import { ReferencesService } from './references.service';
+import type { ScopedPrismaService } from '../../core/tenancy/scoped-prisma.service';
+import type { SubstrateService } from '../../core/substrate/substrate.service';
+
+const noteBlock = (over: Record<string, unknown> = {}) => ({
+  id: 'note-1',
+  kind: 'references.note',
+  properties: {
+    text: 'llamar a la empresa de mudanzas',
+    content: 'llamar a la empresa de mudanzas',
+    suggestedType: 'action',
+  },
+  ...over,
+});
+
+describe('ReferencesService.orderIntoActions', () => {
+  let findOne: jest.Mock;
+  let mutateKind: jest.Mock;
+  let forUser: jest.Mock;
+  let service: ReferencesService;
+
+  beforeEach(() => {
+    findOne = jest.fn().mockResolvedValue(noteBlock());
+    mutateKind = jest.fn().mockResolvedValue(
+      noteBlock({ kind: 'actions.item', properties: { text: 'llamar a la empresa de mudanzas', status: 'todo', priority: null, deadline: null } }),
+    );
+    forUser = jest.fn().mockResolvedValue({});
+
+    const scoped = { forUser } as unknown as ScopedPrismaService;
+    const substrate = { findOne, mutateKind } as unknown as SubstrateService;
+    service = new ReferencesService(scoped, substrate);
+  });
+
+  it('reads the existing note before deciding the new properties', async () => {
+    await service.orderIntoActions('u-1', 'ws-1', { blockId: 'note-1', suggestedText: 'x' } as never);
+    expect(findOne).toHaveBeenCalledWith({}, 'note-1');
+  });
+
+  it('mutates the block to actions.item, never creating a second one', async () => {
+    await service.orderIntoActions('u-1', 'ws-1', { blockId: 'note-1' } as never);
+
+    expect(mutateKind).toHaveBeenCalledWith(
+      {},
+      'note-1',
+      'actions.item',
+      expect.objectContaining({ status: 'todo' }),
+    );
+  });
+
+  it('carries the note text through when the order supplies no correction', async () => {
+    await service.orderIntoActions('u-1', 'ws-1', { blockId: 'note-1' } as never);
+
+    const properties = mutateKind.mock.calls[0][3];
+    expect(properties.text).toBe('llamar a la empresa de mudanzas');
+  });
+
+  it('applies a text correction from the order over the note', async () => {
+    await service.orderIntoActions('u-1', 'ws-1', {
+      blockId: 'note-1',
+      text: 'texto corregido',
+    } as never);
+
+    const properties = mutateKind.mock.calls[0][3];
+    expect(properties.text).toBe('texto corregido');
+  });
+
+  it('carries priority and deadline from the order', async () => {
+    await service.orderIntoActions('u-1', 'ws-1', {
+      blockId: 'note-1',
+      priority: 'high',
+      deadline: '2026-09-01T00:00:00.000Z',
+    } as never);
+
+    const properties = mutateKind.mock.calls[0][3];
+    expect(properties.priority).toBe('high');
+    expect(properties.deadline).toBe('2026-09-01T00:00:00.000Z');
+  });
+});

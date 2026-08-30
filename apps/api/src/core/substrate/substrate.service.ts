@@ -167,6 +167,42 @@ export class SubstrateService {
   }
 
   /**
+   * Changes what a block *is* — the GTD `order` act (nau#111): a captured
+   * item transits from one module's kind to another's by mutating the same
+   * row's `type`, never by creating a second block.
+   *
+   * A separate method from `update`, not a parameter added to it, because
+   * this is categorically different from editing properties: it changes
+   * *which schema* the properties must satisfy. `update` validates against
+   * `current.kind`; this validates the new properties against `toKind`
+   * instead — a note's `content` and an action's `text` are different
+   * fields, so the caller supplies the destination shape whole rather than
+   * this method merging across two unrelated schemas.
+   *
+   * No relation calls this on its own initiative to "convert" something —
+   * per nau#111 the decision belongs to GTD's `order`, which computes the
+   * new properties (each relation's own `relations/gtd/order.ts`, pure, no
+   * persistence) and hands them here. This method is the one place the
+   * actual mutation happens, so every kind transition is auditable in one
+   * spot rather than reimplemented per pair of modules.
+   */
+  async mutateKind<T>(
+    client: ScopedPrismaClient,
+    id: string,
+    toKind: string,
+    properties: T,
+  ): Promise<Block<T>> {
+    const validated = this.kinds.validate(toKind, properties as object) as T;
+
+    const row = await client.block.update({
+      where: { id },
+      data: { type: toKind, properties: validated as object },
+    });
+
+    return this.toBlock<T>(row);
+  }
+
+  /**
    * Removes a block, honouring what its kind declared.
    *
    * A kind that declares `softDeletable` is stamped rather than removed; one

@@ -8,6 +8,18 @@ import {
   type Attachment,
   type NoteProperties,
 } from '@nau/references';
+// `@nau/actions/relations/gtd`, declared only via `package.json`'s `exports`
+// field, cannot be resolved under this project's `moduleResolution: "node"`
+// (tsconfig.base.json) — the classic resolver ignores `exports` subpaths
+// entirely. `dist/relations/gtd/package.json` (built alongside the rest,
+// see `@nau/actions`' `build` script) is what makes this path self-
+// describing and resolvable without it: a self-contained sub-package,
+// exactly how `moduleResolution: "node"` was already finding nested
+// packages before `exports` existed. Same latent gap exists in `@nau/journal`'s
+// identical `./relations/gtd` export; unexercised until this file, the
+// first to import either from an app using this resolver.
+import { orderIntoActions, type OrderIntoActions } from '@nau/actions/relations/gtd';
+import { ACTIONS_ITEM_KIND } from '@nau/actions';
 
 /**
  * References owns one thing: the note, and the CRUD every note-taking
@@ -18,11 +30,12 @@ import {
  * established (nau#92): a relation reaches the substrate through the scope,
  * never through a service outside itself.
  *
- * Ordering — mutating a note's own `type` into a foreign kind (nau#111) — is
- * deliberately absent here. It is the contract `relations/actions/` and
- * `relations/gtd/` publish (per `tmp/references-blueprint.md` §3.1, §3.2),
- * not a References CRUD operation, and lands once those relations exist on
- * the other side.
+ * Ordering into Actions — mutating a note's own `type` into `actions.item`
+ * (nau#111) — lands here now that `@nau/actions/relations/gtd` exists
+ * (nau#114). `orderIntoActions` decides the properties, purely; this method
+ * is the persistence-layer act, using `SubstrateService.mutateKind` (also
+ * added by nau#114 — the substrate had no operation for changing what a
+ * block *is*, only for editing what it holds).
  */
 @Injectable()
 export class ReferencesService {
@@ -93,5 +106,21 @@ export class ReferencesService {
   async deleteNote(userId: string, workspaceId: string, id: string) {
     const client = await this.scoped.forUser(userId, workspaceId);
     await this.substrate.remove(client, id);
+  }
+
+  /**
+   * GTD's `order` act, when the destination is Actions: mutates the note's
+   * own `type` to `actions.item` in place (nau#111) — never creates a second
+   * block. `orderIntoActions` (pure, `@nau/actions/relations/gtd`) decides
+   * the properties from the note's current ones plus whatever GTD's
+   * processing corrected; this method reads the note, computes the result,
+   * and writes it via `SubstrateService.mutateKind`.
+   */
+  async orderIntoActions(userId: string, workspaceId: string, order: OrderIntoActions) {
+    const client = await this.scoped.forUser(userId, workspaceId);
+    const existing = await this.substrate.findOne<Record<string, unknown>>(client, order.blockId);
+    const properties = orderIntoActions(order, existing.properties);
+
+    return this.substrate.mutateKind(client, order.blockId, ACTIONS_ITEM_KIND, properties);
   }
 }

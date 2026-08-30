@@ -201,6 +201,47 @@ describe('SubstrateService', () => {
     });
   });
 
+  describe('mutateKind', () => {
+    it('validates the new properties against the destination kind, not the current one', async () => {
+      // Currently `example.thing` ({ text }); mutating to `example.flat`
+      // ({ n }) must reject a `text`-shaped payload, proving it checks the
+      // kind being moved *to*, not the one the row already has.
+      await expect(
+        substrate.mutateKind(as(), 'b1', 'example.flat', { text: 'wrong shape' } as never),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(client.block.update).not.toHaveBeenCalled();
+    });
+
+    it('writes both type and properties in the same update', async () => {
+      client.block.update.mockResolvedValue(
+        row({ type: 'example.flat', properties: { n: 1 } }),
+      );
+
+      await substrate.mutateKind(as(), 'b1', 'example.flat', { n: 1 });
+
+      expect(client.block.update).toHaveBeenCalledWith({
+        where: { id: 'b1' },
+        data: { type: 'example.flat', properties: { n: 1 } },
+      });
+    });
+
+    it('returns the block under its new kind', async () => {
+      client.block.update.mockResolvedValue(
+        row({ type: 'example.flat', properties: { n: 1 } }),
+      );
+
+      const block = await substrate.mutateKind(as(), 'b1', 'example.flat', { n: 1 });
+      expect(block.kind).toBe('example.flat');
+    });
+
+    it('refuses a destination kind nobody registered', async () => {
+      await expect(
+        substrate.mutateKind(as(), 'b1', 'ghost.kind', {}),
+      ).rejects.toThrow(/Unknown block kind/);
+    });
+  });
+
   describe('remove honours what the kind declared', () => {
     it('soft-deletes a kind that declares softDeletable', async () => {
       await substrate.remove(as(), 'b1');
