@@ -7,10 +7,10 @@ import { JournalKindsModule } from './relations/api-journal/journal-kinds.module
 import { BlocksModule } from './blocks/blocks.module';
 import { HealthModule } from './health/health.module';
 import { GraphModule } from './core/substrate/graph/graph.module';
-import { EventsModule } from './events/events.module';
+import { EventsModule } from './core/substrate/events/events.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { SyncModule } from './sync/sync.module';
-import { MediaModule } from './media/media.module';
+import { MediaModule } from './core/storage/media.module';
 import { TriageModule } from './triage/triage.module';
 import { JournalModule } from './relations/api-journal/journal.module';
 import { AgendaModule } from './relations/api-actions/agenda.module';
@@ -21,8 +21,8 @@ import { BrandsModule } from './brands/brands.module';
 import { ProjectsModule } from './projects/projects.module';
 import { SocialProfilesModule } from './social-profiles/social-profiles.module';
 import { PromptsModule } from './prompts/prompts.module';
-import { UsageModule } from './usage/usage.module';
-import { TagsModule } from './tags/tags.module';
+import { UsageModule } from './core/observability/usage.module';
+import { TagsModule } from './core/substrate/tags/tags.module';
 // Nest's cron scheduler. The alias it once needed is gone: the module that
 // clashed with this name is now TimeModule, which is what it was always about.
 import { ScheduleModule } from '@nestjs/schedule';

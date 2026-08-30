@@ -9,7 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { TagsService } from './tags.service';
-import { ServiceAuthGuard } from '../common/guards/service-auth.guard';
+import { ServiceAuthGuard } from '../../../common/guards/service-auth.guard';
 import { IsOptional, IsString } from 'class-validator';
 
 class CreateTagBody {

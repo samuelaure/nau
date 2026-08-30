@@ -7,7 +7,7 @@ import {
   BadRequestException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { ServiceAuthGuard } from '../common/guards/service-auth.guard';
+import { ServiceAuthGuard } from '../../common/guards/service-auth.guard';
 import { StorageService } from './storage.service';
 import { nau, extFromMime } from 'nau-storage';
 import { randomUUID } from 'crypto';
