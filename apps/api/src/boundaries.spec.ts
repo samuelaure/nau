@@ -164,16 +164,21 @@ describe('relations/ are independent of one another', () => {
       for (const file of sourcesUnder(join(RELATIONS, dir))) {
         for (const line of importLines(file)) {
           const specifier = line.match(/from\s+['"]([^'"]+)['"]/)?.[1];
-          if (!specifier) continue;
+          // Only a relative specifier can name a sibling folder under
+          // apps/api/src/relations/ — an npm package subpath
+          // (`@nau/actions/relations/gtd`) contains the literal text
+          // "relations/" too, but it names a folder inside that package's own
+          // `packages/*/src/`, not a sibling here. The rule missed this until
+          // relations/api-gtd started importing three such subpaths in one
+          // file, which is what surfaced the gap.
+          if (!specifier || !specifier.startsWith('.')) continue;
 
           // A sibling is normally reached relatively (`../api-beta/thing`), so
           // the literal text `relations/` never appears in the import. The
           // specifier has to be resolved against the importing file to see
           // where it actually lands — matching on the raw string was the first
           // version of this rule, and it could not fire at all.
-          const target = specifier.startsWith('.')
-            ? join(file, '..', specifier).replace(/\\/g, '/')
-            : specifier;
+          const target = join(file, '..', specifier).replace(/\\/g, '/');
 
           const landed = target.match(/relations\/([a-z0-9-]+)/i);
           if (landed !== null && landed[1] !== dir) {

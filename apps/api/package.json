@@ -36,6 +36,7 @@
     "@aws-sdk/client-s3": "^3.1032.0",
     "@nau/actions": "workspace:*",
     "@nau/auth": "workspace:*",
+    "@nau/gtd": "workspace:*",
     "@nau/journal": "workspace:*",
     "@nau/llm-client": "workspace:*",
     "@nau/references": "workspace:*",

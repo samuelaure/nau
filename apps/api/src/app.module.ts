@@ -16,6 +16,7 @@ import { MediaModule } from './core/storage/media.module';
 import { TriageModule } from './triage/triage.module';
 import { JournalModule } from './relations/api-journal/journal.module';
 import { ReferencesModule } from './relations/api-references/references.module';
+import { GtdModule } from './relations/api-gtd/gtd.module';
 import { AgendaModule } from './relations/api-actions/agenda.module';
 import { TimeModule } from './time/time.module';
 import { AuthModule } from './auth/auth.module';
@@ -61,6 +62,7 @@ import { CapturesModule } from './captures/captures.module';
     TriageModule,
     JournalModule,
     ReferencesModule,
+    GtdModule,
     AgendaModule,
     AuthModule,
     WorkspacesModule,
