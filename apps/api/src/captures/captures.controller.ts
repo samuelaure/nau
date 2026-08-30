@@ -1,7 +1,7 @@
 import { Body, Controller, Post, UseGuards, BadRequestException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { CapturesService } from './captures.service';
-import { PrivateStorageService } from '../media/private-storage.service';
+import { PrivateStorageService } from '../core/storage/private-storage.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AccessTokenPayload } from '@nau/types';

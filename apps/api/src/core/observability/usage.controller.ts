@@ -7,9 +7,9 @@ import {
   UseGuards,
   BadRequestException,
 } from '@nestjs/common';
-import { ServiceAuthGuard } from '../common/guards/service-auth.guard';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { CurrentUser } from '../auth/current-user.decorator';
+import { ServiceAuthGuard } from '../../common/guards/service-auth.guard';
+import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { CurrentUser } from '../../auth/current-user.decorator';
 import type { AccessTokenPayload } from '@nau/types';
 import { UsageService, CreateUsageEventDto } from './usage.service';
 

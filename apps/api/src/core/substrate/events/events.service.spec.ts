@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { EventsService } from './events.service';
-import { PrismaService } from '../prisma/prisma.service';
-import { ScopedPrismaService } from '../core/tenancy/scoped-prisma.service';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { ScopedPrismaService } from '../../tenancy/scoped-prisma.service';
 import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
 import { Event } from '@prisma/client';
 

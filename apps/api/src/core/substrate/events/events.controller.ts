@@ -1,7 +1,7 @@
 import { Controller, Post, Body, Get, Param, UseGuards } from '@nestjs/common';
 import { EventsService } from './events.service';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { CurrentUser } from '../auth/current-user.decorator';
+import { JwtAuthGuard } from '../../../auth/jwt-auth.guard';
+import { CurrentUser } from '../../../auth/current-user.decorator';
 import type { AccessTokenPayload } from '@nau/types';
 
 @Controller('events')
