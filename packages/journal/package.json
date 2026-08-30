@@ -1,0 +1,23 @@
+{
+  "name": "@nau/journal",
+  "version": "0.1.0",
+  "description": "Journal's domain rules — entry shape, synthesis shape, capabilities — agnostic of any transport or persistence",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc --build",
+    "typecheck": "tsc --noEmit -p tsconfig.test.json",
+    "test": "jest"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "@types/node": "^24.1.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.8.3"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "zod": "^4.3.6"
+  }
+}

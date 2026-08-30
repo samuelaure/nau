@@ -6,7 +6,7 @@ import {
   LEGACY_TYPE_BY_KIND,
   type JournalEntryProperties,
   type JournalSynthesisProperties,
-} from './journal.schemas';
+} from '@nau/journal';
 
 /** One entry, as a consumer of Journal sees it. */
 export interface JournalEntryView {
