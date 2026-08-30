@@ -8,8 +8,8 @@
   "scripts": {
     "bootstrap": "dotenv -e ../../.env.development -e .env.development -- npx tsx scripts/bootstrap-admin.ts",
     "build": "nest build",
-    "contract:check": "npx ts-node --transpile-only -r tsconfig-paths/register scripts/emit-openapi.ts --check",
-    "contract:emit": "dotenv -e ../../.env.development -e .env.development -- npx ts-node --transpile-only -r tsconfig-paths/register scripts/emit-openapi.ts",
+    "contract:check": "nest build && node scripts/emit-openapi.js --check",
+    "contract:emit": "dotenv -e ../../.env.development -e .env.development -- nest build && dotenv -e ../../.env.development -e .env.development -- node scripts/emit-openapi.js",
     "dev": "dotenv -e ../../.env.development -e .env.development -- nest start --watch",
     "dev:db:migrate:deploy": "dotenv -e ../../.env.development -e .env.development -- npx prisma migrate deploy",
     "dev:db:reset": "dotenv -e ../../.env.development -e .env.development -- npx prisma migrate reset --force --skip-seed",
