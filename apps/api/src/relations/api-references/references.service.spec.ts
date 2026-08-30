@@ -76,3 +76,55 @@ describe('ReferencesService.orderIntoActions', () => {
     expect(properties.deadline).toBe('2026-09-01T00:00:00.000Z');
   });
 });
+
+describe('ReferencesService.orderIntoReferences', () => {
+  let findOne: jest.Mock;
+  let update: jest.Mock;
+  let forUser: jest.Mock;
+  let service: ReferencesService;
+
+  beforeEach(() => {
+    findOne = jest.fn().mockResolvedValue(
+      noteBlock({
+        properties: {
+          title: 'Ideas de vacaciones',
+          content: 'Portugal en primavera',
+          attachments: [],
+          suggestedType: 'references.note',
+        },
+      }),
+    );
+    update = jest.fn().mockResolvedValue(noteBlock());
+    forUser = jest.fn().mockResolvedValue({});
+
+    const scoped = { forUser } as unknown as ScopedPrismaService;
+    const substrate = { findOne, update } as unknown as SubstrateService;
+    service = new ReferencesService(scoped, substrate);
+  });
+
+  it('reads the existing note before deciding the new properties', async () => {
+    await service.orderIntoReferences('u-1', 'ws-1', { blockId: 'note-1' });
+    expect(findOne).toHaveBeenCalledWith({}, 'note-1');
+  });
+
+  it('never mutates the kind — it is already references.note, per nau#111', async () => {
+    await service.orderIntoReferences('u-1', 'ws-1', { blockId: 'note-1' });
+
+    expect(update).toHaveBeenCalledWith(
+      {},
+      'note-1',
+      expect.objectContaining({
+        properties: expect.objectContaining({ suggestedType: null }),
+      }),
+    );
+  });
+
+  it('clears suggestedType while leaving title, content and attachments untouched', async () => {
+    await service.orderIntoReferences('u-1', 'ws-1', { blockId: 'note-1' });
+
+    const properties = update.mock.calls[0][2].properties;
+    expect(properties.suggestedType).toBeNull();
+    expect(properties.title).toBe('Ideas de vacaciones');
+    expect(properties.content).toBe('Portugal en primavera');
+  });
+});

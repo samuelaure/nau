@@ -20,6 +20,7 @@ import {
 // first to import either from an app using this resolver.
 import { orderIntoActions, type OrderIntoActions } from '@nau/actions/relations/gtd';
 import { ACTIONS_ITEM_KIND } from '@nau/actions';
+import { orderIntoReferences, type OrderIntoReferences } from '@nau/references/relations/gtd';
 
 /**
  * References owns one thing: the note, and the CRUD every note-taking
@@ -122,5 +123,22 @@ export class ReferencesService {
     const properties = orderIntoActions(order, existing.properties);
 
     return this.substrate.mutateKind(client, order.blockId, ACTIONS_ITEM_KIND, properties);
+  }
+
+  /**
+   * GTD's `order` act, when the destination is References itself (nau#117):
+   * unlike `orderIntoActions`, no kind mutation happens — `references.note`
+   * is already the block's kind (nau#111), so this only clears the pending
+   * `suggestedType` a tray item carried while awaiting confirmation.
+   * `orderIntoReferences` (pure, `@nau/references/relations/gtd`) decides
+   * the properties; this method reads the note and writes the result back
+   * via the ordinary `update`, since `type` never changes here.
+   */
+  async orderIntoReferences(userId: string, workspaceId: string, order: OrderIntoReferences) {
+    const client = await this.scoped.forUser(userId, workspaceId);
+    const existing = await this.substrate.findOne<NoteProperties>(client, order.blockId);
+    const properties = orderIntoReferences(order, existing.properties);
+
+    return this.substrate.update<NoteProperties>(client, order.blockId, { properties });
   }
 }

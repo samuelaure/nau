@@ -9,6 +9,11 @@
       "import": "./dist/index.js",
       "require": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./relations/gtd": {
+      "import": "./dist/relations/gtd/index.js",
+      "require": "./dist/relations/gtd/index.js",
+      "types": "./dist/relations/gtd/index.d.ts"
     }
   },
   "files": ["dist"],
