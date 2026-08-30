@@ -14,11 +14,18 @@ import { join } from 'node:path';
  * code from running on a device with no server relationship. Deleting
  * `apps/api` entirely must leave this package fully functional.
  *
- * `relations/` holds Journal's dealings with one other module —
- * `relations/gtd/` is `(Journal)·(GTD)`, published as its own entry point
- * (`@nau/journal/relations/gtd`) rather than folded into the root export,
- * so the relation stays optional (nau#115). No relation may import another;
- * there is only one today, but the rule is cheap to state ahead of a second.
+ * `relations/` holds Journal's dealings with one other module each, published
+ * as its own entry point rather than folded into the root export, so each
+ * relation stays optional:
+ *
+ *   - `relations/gtd/` — `(Journal)·(GTD)`, confirmed (nau#115).
+ *   - `relations/time/` — `(Journal)·(Time)`, DRAFT (nau#123) — the shape
+ *     Time already reads in production, transcribed here rather than
+ *     invented, per the method nau#119 documents.
+ *
+ * No relation may import another — `(Journal)·(GTD)` and `(Journal)·(Time)`
+ * share no logic, and letting one reach into the other is how one quietly
+ * becomes a dependency of the other.
  */
 
 const SRC = join(__dirname);
@@ -60,6 +67,24 @@ describe('this package runs wherever Journal is needed, not only inside api', ()
 
   it.each(files.map(rel))('%s does not reach into apps/api', (name) => {
     const offending = importLines(join(SRC, name)).filter((line) => /apps\/api/.test(line));
+    expect(offending).toEqual([]);
+  });
+});
+
+describe('no relation imports another', () => {
+  const RELATIONS = join(SRC, 'relations');
+  const files = sourcesUnder(RELATIONS);
+
+  it('finds relation sources to check', () => {
+    expect(files.length).toBeGreaterThan(0);
+  });
+
+  it.each(files.map(rel))('%s does not reach into a sibling relation', (name) => {
+    const relation = name.split('/')[1];
+    const offending = importLines(join(SRC, name)).filter((line) => {
+      const match = /relations\/([^/'"]+)/.exec(line);
+      return match !== null && match[1] !== relation;
+    });
     expect(offending).toEqual([]);
   });
 });
