@@ -4,9 +4,11 @@ import {
   JournalSynthesisSchema,
   JOURNAL_ENTRY_KIND,
   JOURNAL_SYNTHESIS_KIND,
+  JOURNAL_ENTRY_CAPABILITIES,
+  JOURNAL_SYNTHESIS_CAPABILITIES,
   type JournalEntryProperties,
   type JournalSynthesisProperties,
-} from './journal.schemas';
+} from '@nau/journal';
 
 /**
  * What Journal contributes to the running system.
@@ -15,29 +17,19 @@ import {
  * at which the registry stops being a mechanism with nothing in it. Deleting
  * this folder unregisters them: the core does not change, the database schema
  * does not change, and there is no migration to write.
+ *
+ * The schema and the capabilities are Journal's domain rules, defined in
+ * `@nau/journal` (nau#96) — a package with no dependency on this api, so the
+ * same rules can validate a capture on a device that never reaches this file.
+ * What is api-shaped, and stays here, is the registration itself: wiring
+ * those rules into `core/kinds`, and declaring which fields become projected
+ * columns — a decision about this database, not about what an entry means.
  */
 
 export const journalEntryKind: BlockKind<JournalEntryProperties> = {
   id: JOURNAL_ENTRY_KIND,
   schema: JournalEntrySchema,
-  capabilities: {
-    /**
-     * An entry records what already happened, so it is never *due*. This is the
-     * declaration that keeps entries off an agenda without the agenda holding a
-     * list of which types to exclude.
-     */
-    schedulable: false,
-    taggable: true,
-    /** Entries sync to the mobile client. */
-    syncable: true,
-    /**
-     * An entry is a leaf. Threading replies under an entry would make the
-     * capture a container, which is a different product decision than the one
-     * this shape encodes.
-     */
-    nestable: false,
-    softDeletable: true,
-  },
+  capabilities: JOURNAL_ENTRY_CAPABILITIES,
   /**
    * `date` is what every read filters and orders by — it is the field Time
    * reached for in raw SQL before that coupling was cut (nau#63). Projecting it
@@ -52,17 +44,7 @@ export const journalEntryKind: BlockKind<JournalEntryProperties> = {
 export const journalSynthesisKind: BlockKind<JournalSynthesisProperties> = {
   id: JOURNAL_SYNTHESIS_KIND,
   schema: JournalSynthesisSchema,
-  capabilities: {
-    schedulable: false,
-    taggable: true,
-    /**
-     * A synthesis is derived, not captured. Syncing it to a device would ship a
-     * copy of something regenerable, and one that changes when its sources do.
-     */
-    syncable: false,
-    nestable: false,
-    softDeletable: true,
-  },
+  capabilities: JOURNAL_SYNTHESIS_CAPABILITIES,
   /**
    * A synthesis is found by the period it covers, which is the pair Time asks
    * for when composing a larger period from smaller ones.

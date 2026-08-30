@@ -1,7 +1,8 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { JournalService } from './journal.service';
 import { ServiceAuthGuard } from '../../common/guards/service-auth.guard';
-import type { GenerateSynthesisDto, SynthesisSourceKind } from '@nau/types';
+import type { GenerateSynthesisDto } from '@nau/types';
+import type { SynthesisSourceKind } from '@nau/journal';
 
 export class GenerateSynthesisBody implements GenerateSynthesisDto {
   workspaceId!: string;

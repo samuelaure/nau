@@ -2,15 +2,18 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import { ScopedPrismaService } from '../../core/tenancy/scoped-prisma.service';
 import { getClientForFeature, type LLMFeature } from '@nau/llm-client';
 import { z } from 'zod';
-import type {
-  GenerateSynthesisDto,
-  JournalEntryProperties,
-  JournalOriginFormat,
-  JournalSource,
-  JournalSynthesisProperties,
-  SynthesisSourceKind,
-  SynthesisSourceRef,
-} from '@nau/types';
+import type { GenerateSynthesisDto } from '@nau/types';
+import {
+  buildConvertedEntry,
+  buildNewEntry,
+  InvalidJournalEntryError,
+  type JournalEntryProperties,
+  type JournalOriginFormat,
+  type JournalSource,
+  type JournalSynthesisProperties,
+  type SynthesisSourceKind,
+  type SynthesisSourceRef,
+} from '@nau/journal';
 
 /** One block Time can use as a synthesis source, with its private shape erased. */
 export interface JournalSourceRow {
@@ -140,19 +143,19 @@ export class JournalService {
     userId?: string;
     sourceId?: string;
   }) {
-    const text = params.text?.trim();
-    if (!text) throw new BadRequestException('text is required');
-
-    const properties: JournalEntryProperties = {
-      text,
-      textOriginal: text,
-      // When it was lived. A note spoken at 23:50 and transcribed at 00:05
-      // belongs to the day it was spoken, not the day ingestion finished.
-      date: params.date ?? new Date().toISOString(),
-      source: params.source,
-      originFormat: params.originFormat,
-      ...(params.sourceId ? { sourceId: params.sourceId } : {}),
-    };
+    // The shape of a valid entry is `@nau/journal`'s rule, not this file's — an
+    // offline capture needs the same answer without reaching this service at
+    // all (nau#96). `InvalidJournalEntryError` maps onto the same HTTP failure
+    // a malformed request already produced.
+    const properties = this.buildEntry(() =>
+      buildNewEntry({
+        text: params.text,
+        date: params.date,
+        source: params.source,
+        originFormat: params.originFormat,
+        sourceId: params.sourceId,
+      }),
+    );
 
     // `forWorkspace`, not `forUser`: the caller here is always a service acting
     // on a capture already resolved to a workspace (captures, triage), not a
@@ -197,24 +200,43 @@ export class JournalService {
     if (!block.workspaceId) throw new BadRequestException(`Block ${blockId} has no workspace`);
 
     const existing = (block.properties ?? {}) as Record<string, unknown>;
-    const text = (params.text ?? (existing.text as string) ?? '').trim();
-    if (!text) throw new BadRequestException('cannot convert a block with no text');
+    const properties = this.buildEntry(() =>
+      buildConvertedEntry({
+        existing,
+        text: params.text,
+        date: params.date,
+        source: params.source,
+        originFormat: params.originFormat,
+      }),
+    );
 
-    const properties: JournalEntryProperties = {
-      text,
-      textOriginal: (existing.textOriginal as string) ?? text,
-      date: params.date ?? (existing.date as string) ?? new Date().toISOString(),
-      source: params.source,
-      originFormat: params.originFormat,
-      ...(existing.sourceId ? { sourceId: existing.sourceId as string } : {}),
-      ...(existing.sortOrder ? { sortOrder: existing.sortOrder as number } : {}),
-    };
+    // `sortOrder` is the substrate's concern, not Journal's rule for what an
+    // entry is (nau#85) — `buildConvertedEntry` never touches it, so it is
+    // carried through here, at the persistence boundary, if the block already
+    // had one.
+    const withSortOrder = existing.sortOrder
+      ? { ...properties, sortOrder: existing.sortOrder as number }
+      : properties;
 
     const client = this.scoped.forWorkspace(block.workspaceId);
     return client.block.update({
       where: { id: blockId },
-      data: { type: 'journal_entry', properties: properties as unknown as object },
+      data: { type: 'journal_entry', properties: withSortOrder as unknown as object },
     });
+  }
+
+  /**
+   * Runs a `@nau/journal` builder and translates its own error into this
+   * transport's — the domain package knows nothing of HTTP, and an api caller
+   * still needs a `BadRequestException` to come out of an invalid entry.
+   */
+  private buildEntry(build: () => JournalEntryProperties): JournalEntryProperties {
+    try {
+      return build();
+    } catch (err) {
+      if (err instanceof InvalidJournalEntryError) throw new BadRequestException(err.message);
+      throw err;
+    }
   }
 
   // ── Synthesis ──────────────────────────────────────────────────────────────
