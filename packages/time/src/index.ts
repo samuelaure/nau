@@ -29,6 +29,7 @@ export * from './core/zone';
 export * from './core/registry';
 export * from './core/translate';
 export * from './core/journal-relation';
+export * from './core/periods-between';
 
 // ── Systems ─────────────────────────────────────────────────────────────────
 export { gregorian, GREGORIAN_SYSTEM_ID } from './systems/gregorian';
