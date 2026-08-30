@@ -21,6 +21,8 @@ import {
 import { orderIntoActions, type OrderIntoActions } from '@nau/actions/relations/gtd';
 import { ACTIONS_ITEM_KIND } from '@nau/actions';
 import { orderIntoReferences, type OrderIntoReferences } from '@nau/references/relations/gtd';
+import { hasPendingReviews, type ReviewIntent } from '@nau/references';
+import type { AggregateIsOverdue } from '@nau/references/relations/actions';
 
 /**
  * References owns one thing: the note, and the CRUD every note-taking
@@ -140,5 +142,29 @@ export class ReferencesService {
     const properties = orderIntoReferences(order, existing.properties);
 
     return this.substrate.update<NoteProperties>(client, order.blockId, { properties });
+  }
+
+  /**
+   * Whether the aggregate "Revisar referencias" item should be alive right
+   * now, per `@nau/references`' own `hasPendingReviews`
+   * (`core/review-intent.ts`) and the `(References)·(Actions)` contract
+   * (`@nau/references/relations/actions`, nau#120).
+   *
+   * `isOverdue` is a required parameter, deliberately not resolved inside
+   * this method. Per the open-question note in
+   * `packages/references/src/relations/actions/contract.ts`, resolving it
+   * correctly means going through whatever `(Time)·(Actions)` exposes once
+   * it replaces the pre-rebuild `agenda.service.ts` (nau#64) —
+   * reimplementing that overdue arithmetic a second time inside this method
+   * would be exactly the class of duplicated logic the core/relations
+   * convention exists to prevent. Until that relation is available, the
+   * caller supplies `isOverdue` itself (e.g. from the legacy agenda path)
+   * rather than this method guessing.
+   */
+  hasPendingReviewAggregate(
+    intents: readonly ReviewIntent[],
+    isOverdue: AggregateIsOverdue,
+  ): boolean {
+    return hasPendingReviews(intents, isOverdue);
   }
 }

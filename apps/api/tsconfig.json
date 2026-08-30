@@ -19,7 +19,8 @@
      */
     "paths": {
       "@nau/actions/relations/gtd": ["../../packages/actions/dist/relations/gtd/index.d.ts"],
-      "@nau/references/relations/gtd": ["../../packages/references/dist/relations/gtd/index.d.ts"]
+      "@nau/references/relations/gtd": ["../../packages/references/dist/relations/gtd/index.d.ts"],
+      "@nau/references/relations/actions": ["../../packages/references/dist/relations/actions/index.d.ts"]
     },
     "declaration": true,
     "emitDecoratorMetadata": true,

@@ -1,6 +1,7 @@
 import { ReferencesService } from './references.service';
 import type { ScopedPrismaService } from '../../core/tenancy/scoped-prisma.service';
 import type { SubstrateService } from '../../core/substrate/substrate.service';
+import type { ReviewIntent } from '@nau/references';
 
 const noteBlock = (over: Record<string, unknown> = {}) => ({
   id: 'note-1',
@@ -126,5 +127,33 @@ describe('ReferencesService.orderIntoReferences', () => {
     expect(properties.suggestedType).toBeNull();
     expect(properties.title).toBe('Ideas de vacaciones');
     expect(properties.content).toBe('Portugal en primavera');
+  });
+});
+
+describe('ReferencesService.hasPendingReviewAggregate', () => {
+  const intent = (over: Partial<ReviewIntent> = {}): ReviewIntent => ({
+    noteId: 'note-1',
+    actionItemId: 'action-1',
+    elevated: false,
+    ...over,
+  });
+
+  // Pure delegation to @nau/references' own hasPendingReviews — no Time
+  // resolution happens inside this method (nau#120's open question 3: the
+  // caller supplies isOverdue, this method never resolves it itself).
+  const service = new ReferencesService({} as never, {} as never);
+
+  it('is false with no intents at all', () => {
+    expect(service.hasPendingReviewAggregate([], () => true)).toBe(false);
+  });
+
+  it('is true when a non-elevated intent is overdue', () => {
+    const intents = [intent({ actionItemId: 'a' })];
+    expect(service.hasPendingReviewAggregate(intents, (id) => id === 'a')).toBe(true);
+  });
+
+  it('is false when the only overdue intent is elevated', () => {
+    const intents = [intent({ actionItemId: 'a', elevated: true })];
+    expect(service.hasPendingReviewAggregate(intents, (id) => id === 'a')).toBe(false);
   });
 });
