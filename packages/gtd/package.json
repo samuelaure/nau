@@ -1,0 +1,38 @@
+{
+  "name": "@nau/gtd",
+  "version": "0.1.0",
+  "description": "The flow that connects naŭ's modules — trays and the movement between them, agnostic of what is being moved and of which module receives it",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./relations/zazu": {
+      "import": "./dist/relations/zazu/index.js",
+      "require": "./dist/relations/zazu/index.js",
+      "types": "./dist/relations/zazu/index.d.ts"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc --build",
+    "typecheck": "tsc --noEmit -p tsconfig.test.json",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@nau/actions": "workspace:*",
+    "@nau/journal": "workspace:*",
+    "@nau/references": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "@types/node": "^24.1.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.8.3"
+  },
+  "license": "UNLICENSED"
+}
