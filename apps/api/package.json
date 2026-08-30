@@ -37,6 +37,7 @@
     "@nau/auth": "workspace:*",
     "@nau/journal": "workspace:*",
     "@nau/llm-client": "workspace:*",
+    "@nau/references": "workspace:*",
     "@nau/time": "workspace:*",
     "@nau/types": "workspace:*",
     "@nestjs/bullmq": "^11.0.4",
