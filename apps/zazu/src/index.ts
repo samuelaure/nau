@@ -422,6 +422,7 @@ async function handleFinalDispatch(ctx: ZazuContext) {
           journalWorkspaceId,
           nauUserId,
           voicenoteCreatedAt,
+          ctx.session.pendingVoicenoteOrigin,
         )
       : Promise.resolve(),
     intents.includes('content') && brands.length > 0

@@ -23,6 +23,10 @@ export class ZazuCaptureDto {
   @IsOptional()
   @IsString()
   capturedAt?: string;
+
+  @IsOptional()
+  @IsString()
+  originFormat?: 'voice' | 'text';
 }
 
 /**
@@ -71,7 +75,7 @@ export class JournalZazuController {
       text: body.text,
       date: body.capturedAt,
       source: 'zazu',
-      originFormat: 'voice',
+      originFormat: body.originFormat ?? 'voice',
       workspaceId: resolvedWorkspaceId,
       userId: ownerId,
       sourceId: body.sourceBlockId,

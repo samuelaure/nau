@@ -19,13 +19,11 @@ export interface ReferencesKindCapabilities {
 }
 
 /**
- * A note never carries its own plan — a review reminder is a real Actions
+ * A note never carries its own plan - a review reminder is a real Actions
  * item referencing the note (`ReviewIntent`, see `review-intent.ts`), never a
- * date stored on the note itself. `schedulable: true` here is what makes a
- * note *locatable* from that reminder without scanning every note: the
- * capability is declared on the kind so `(References)·(Actions)` can find it,
- * even though the note holds no plan of its own — see `review-intent.ts` for
- * why the schedule lives one hop away rather than on the note.
+ * date stored on the note itself. `schedulable: false` prevents Time's agenda
+ * from trying to query the note for dates that actually live in Actions.
+ * The note is located via the Actions item's relation, not by its own schedule.
  *
  * `nestable: true` because a note may belong to a `Collection`, using the
  * same block tree every other nestable kind uses — References does not
@@ -33,7 +31,7 @@ export interface ReferencesKindCapabilities {
  * captures notes today and will keep doing so through its own rebuild.
  */
 export const REFERENCES_NOTE_CAPABILITIES: ReferencesKindCapabilities = {
-  schedulable: true,
+  schedulable: false,
   taggable: true,
   syncable: true,
   nestable: true,
