@@ -1,4 +1,5 @@
 import { Controller, Post, Get, Query, Body, UseGuards } from '@nestjs/common';
+import { IsString, IsOptional, IsBoolean } from 'class-validator';
 import { TriageService } from './triage.service';
 import { ServiceAuthGuard } from '../common/guards/service-auth.guard';
 import type { TriageRequestDto } from '@nau/types';
@@ -9,14 +10,43 @@ import type { TriageRequestDto } from '@nau/types';
  * The class exists because Nest needs one at runtime for `@Body()`; the shape
  * comes from `@nau/types`, which is what Zazŭ builds its request against. If
  * the two drift, this stops compiling.
+ *
+ * Every field needs a `class-validator` decorator, not just a TypeScript
+ * type: with `whitelist: true`/`forbidNonWhitelisted: true` (global, see
+ * `app.module.ts`), a plain-TS-typed field with no decorator emits no
+ * design-time metadata, so `class-validator` cannot confirm it belongs to
+ * the class — it then rejects every property on the body as unknown, not
+ * just the undecorated one. Reproduced against production 2026-08-31: a real
+ * journal capture (`sourceBlockId: a3b399ea-...`) was rejected 400 with
+ * "property text should not exist" on a body that matched this class
+ * exactly, because none of its six fields carried a decorator.
  */
 export class TriageDto implements TriageRequestDto {
+  @IsString()
   text!: string;
+
+  @IsOptional()
+  @IsString()
   userId?: string;
+
+  @IsOptional()
+  @IsString()
   sourceBlockId?: string;
+
+  @IsOptional()
+  @IsString()
   brandId?: string | null;
+
+  @IsOptional()
+  @IsString()
   workspaceId?: string;
+
+  @IsOptional()
+  @IsBoolean()
   journalOnly?: boolean;
+
+  @IsOptional()
+  @IsString()
   capturedAt?: string;
 }
 
