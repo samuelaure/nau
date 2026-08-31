@@ -3,7 +3,7 @@
  *
  * This is the mechanism only — a URL, a method, cookies, and the shape of a
  * failure. It knows no endpoint, no module, and no domain type. Each
- * `relations/app-{module}/` builds its own hooks on top of this and owns the
+ * `relations/{module}/` builds its own hooks on top of this and owns the
  * paths and payloads it sends, because those belong to that module's contract
  * with its counterpart in `api`, not to the app as a whole.
  */

@@ -6,25 +6,28 @@ import { join } from 'node:path'
  *
  * Two directions of dependency are allowed and no others:
  *
- *     relations/  ──▶  core/
+ *     domain modules  ──▶  core/
  *
- * `app` has no `sub-modules/` layer — Time's third layer exists for
- * interchangeable implementations of one contract (Gregorian vs naŭ vs
- * ephemeris). Journal, Actions and Content are not that: they are distinct
- * modules with no shared contract they each satisfy differently. See
- * nau#57. Two layers is the honest shape here; a third would be structure
- * without a reason.
+ * `app` is a host, not a module — it is what remains when every domain
+ * module is switched off (nau#57, nau#131). A domain module has no other
+ * way to exist as a frontend, so it lives directly under `src/{module}/`
+ * rather than in a `relations/` folder that would imply it could exist
+ * independently of being here. `app` has no `sub-modules/` layer either —
+ * Time's third layer exists for interchangeable implementations of one
+ * contract (Gregorian vs naŭ vs ephemeris). Journal, Actions and Content are
+ * not that: they are distinct modules with no shared contract they each
+ * satisfy differently. Two layers is the honest shape here; a third would be
+ * structure without a reason.
  *
- * - `core/` never imports `relations/`, with one declared exception:
+ * - `core/` never imports a domain module, with one declared exception:
  *   `module-registry/registry.ts` is the single file allowed to, because its
  *   whole job is supplying the real module list — the rules it applies stay
  *   in `select.ts`, which holds no such import. Anywhere else in `core/`,
  *   that import is the moment the core stops being agnostic and becomes
  *   "whatever Journal needed".
- * - Nothing imports a sibling across the relations/ boundary — one module's
- *   web-facing relation never reaches into another's. Deleting
- *   `relations/app-journal/` should delete Journal from the web app and
- *   touch nothing else.
+ * - Nothing imports a sibling across the domain-module boundary — one
+ *   module's web-facing code never reaches into another's. Deleting
+ *   `journal/` should delete Journal from the web app and touch nothing else.
  *
  * A test rather than a lint rule because it travels with the package: it
  * runs wherever the tests run, with no dependency on anyone's editor setup.
@@ -34,7 +37,14 @@ import { join } from 'node:path'
 
 const SRC = join(__dirname)
 const CORE = join(SRC, 'core')
-const RELATIONS = join(SRC, 'relations')
+
+const DOMAIN_MODULES = [
+  'actions',
+  'gtd',
+  'journal',
+  'references',
+  'time',
+]
 
 function sourcesUnder(dir: string): string[] {
   const out: string[] = []
@@ -67,15 +77,19 @@ describe('core/ knows nothing of any concrete module', () => {
   const REGISTRY_FILE = 'core/module-registry/registry.ts'
   const files = sourcesUnder(CORE).filter((f) => rel(f) !== REGISTRY_FILE)
 
-  it.each(files.map(rel))('%s does not import from relations/', (name) => {
-    const offending = importLines(join(SRC, name)).filter((line) => /relations\//.test(line))
+  it.each(files.map(rel))('%s does not import from domain modules', (name) => {
+    const offending = importLines(join(SRC, name)).filter((line) => 
+      DOMAIN_MODULES.some(mod => new RegExp(`@/${mod}/`).test(line))
+    )
     expect(offending).toEqual([])
   })
 
-  it(`${REGISTRY_FILE} imports from relations/ only to supply the module list`, () => {
-    const offending = importLines(join(SRC, REGISTRY_FILE)).filter(
-      (line) => /relations\//.test(line) && !/^import \{ \w+Module \} from '@\/relations\//.test(line.trim()),
-    )
+  it(`${REGISTRY_FILE} imports from domain modules only to supply the module list`, () => {
+    const offending = importLines(join(SRC, REGISTRY_FILE)).filter((line) => {
+      const mentionsDomain = DOMAIN_MODULES.some(mod => new RegExp(`@/${mod}/`).test(line));
+      const isAllowedImport = /^import \{ \w+Module \} from '@\/(actions|gtd|journal|references|time)\//.test(line.trim());
+      return mentionsDomain && !isAllowedImport;
+    })
     expect(offending).toEqual([])
   })
 
@@ -93,24 +107,28 @@ describe('core/ knows nothing of any concrete module', () => {
   })
 })
 
-describe('relations/ never reach into a sibling relation', () => {
-  if (!existsSync(RELATIONS)) {
-    it.skip('relations/ does not exist yet', () => {})
-    return
-  }
+describe('domain modules never reach into a sibling domain module', () => {
+  it('no domain module imports a sibling', () => {
+    const violations: string[] = []
 
-  const files = sourcesUnder(RELATIONS)
+    for (const dir of DOMAIN_MODULES) {
+      const fullDir = join(SRC, dir)
+      if (!existsSync(fullDir)) continue
 
-  it('finds relation sources to check', () => {
-    expect(files.length).toBeGreaterThan(0)
-  })
+      for (const file of sourcesUnder(fullDir)) {
+        for (const line of importLines(file)) {
+          // Both absolute @/module and relative ../module form
+          const absoluteMatch = line.match(/from\s+['"]@\/([^/]+)/)?.[1]
+          const relativeMatch = line.match(/from\s+['"]\.\.\/([^/]+)/)?.[1]
+          const targetModule = absoluteMatch || relativeMatch
+          
+          if (targetModule && DOMAIN_MODULES.includes(targetModule) && targetModule !== dir) {
+            violations.push(`${rel(file)} imports ${targetModule}`)
+          }
+        }
+      }
+    }
 
-  it.each(files.map(rel))('%s does not reach into another relation', (name) => {
-    const relation = name.split('/')[1] // relations/<app-journal>/...
-    const offending = importLines(join(SRC, name)).filter((line) => {
-      const match = /relations\/([^/'"]+)/.exec(line)
-      return match !== null && match[1] !== relation
-    })
-    expect(offending).toEqual([])
+    expect(violations).toEqual([])
   })
 })

@@ -15,7 +15,7 @@ import type { Workspace, WorkspaceMember, WorkspaceRole } from '@9nau/types'
  * What was in the old `use-workspaces-api.ts` and is deliberately not here:
  * Brands (Content's concept, removed from the app entirely — see the
  * Content/Brand removal issue) and Projects (Actions' concept, which moves to
- * `relations/app-actions/` with the rest of that module's data hooks).
+ * `actions/` with the rest of that module's data hooks).
  */
 
 export type WorkspaceWithRole = Workspace & { role: WorkspaceRole }

@@ -22,7 +22,7 @@ import {
   toSlot,
   type Granularity,
   type PeriodSlot,
-} from '@/relations/app-actions/periods'
+} from '@/actions/periods'
 
 interface DashboardProps {
   notesByDate: Map<string, Block[]>

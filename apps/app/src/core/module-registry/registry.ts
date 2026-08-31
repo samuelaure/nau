@@ -14,17 +14,17 @@ import {
  *
  * Deliberately an explicit import list, not self-registration by side
  * effect: switching a module on or off is one line here, and this file is
- * the only one in `core/` permitted to name a module or import from
- * `relations/`.
+ * the only one in `core/` permitted to name a domain module or import from
+ * one of its `src/{module}/` folders.
  *
  * The rules themselves live in `select.ts` as pure functions — this file
  * only supplies them with the real list.
  */
-// import { journalModule } from '@/relations/app-journal'
-// import { actionsModule } from '@/relations/app-actions'
-// import { gtdModule } from '@/relations/app-gtd'
-// import { referencesModule } from '@/relations/app-references'
-import { timeModule } from '@/relations/app-time'
+// import { journalModule } from '@/journal'
+// import { actionsModule } from '@/actions'
+// import { gtdModule } from '@/gtd'
+// import { referencesModule } from '@/references'
+import { timeModule } from '@/time'
 
 const MODULES: ModuleDescriptor[] = [
   // gtdModule,

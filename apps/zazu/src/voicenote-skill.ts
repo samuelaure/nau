@@ -343,6 +343,7 @@ Return only valid JSON: { "cleanTranscription": "...", "summary": "..." }`,
     workspaceId: string,
     nauUserId: string,
     capturedAt?: string,
+    originFormat?: 'voice' | 'text',
   ): Promise<void> {
     const headers = await buildServiceHeaders('9nau-api')
     const body: TriageRequestDto = {
@@ -350,13 +351,13 @@ Return only valid JSON: { "cleanTranscription": "...", "summary": "..." }`,
       userId: nauUserId,
       sourceBlockId: voicenoteId,
       workspaceId,
-      journalOnly: true,
       // The moment the note was recorded. Without it the entry is dated when
       // the API happened to process it, which puts it on the wrong day
       // whenever ingestion lags.
       capturedAt: capturedAt ?? new Date().toISOString(),
+      originFormat,
     }
-    await axios.post(`${NAU_API_URL}/triage`, body, { headers, timeout: 60_000 })
+    await axios.post(`${NAU_API_URL}/journal/zazu-capture`, body, { headers, timeout: 60_000 })
   }
 
   async dispatchToActions(
@@ -371,9 +372,8 @@ Return only valid JSON: { "cleanTranscription": "...", "summary": "..." }`,
       userId: nauUserId,
       sourceBlockId: voicenoteId,
       workspaceId,
-      journalOnly: false,
     }
-    const res = await axios.post(`${NAU_API_URL}/triage`, body, { headers, timeout: 60_000 })
+    const res = await axios.post(`${NAU_API_URL}/gtd/zazu-triage`, body, { headers, timeout: 60_000 })
     return res.data
   }
 

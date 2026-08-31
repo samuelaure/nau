@@ -10,7 +10,7 @@ import { NotesInboxSection } from '../notes/NotesInboxSection'
 import { HierarchicalBlock } from '@9nau/core'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
 import type { AgendaItem } from '@/hooks/use-agenda-api'
-import { isCurrent, subGranularity, type PeriodSlot } from '@/relations/app-actions/periods'
+import { isCurrent, subGranularity, type PeriodSlot } from '@/actions/periods'
 
 export interface PeriodContents {
   occurrences: AgendaItem[]

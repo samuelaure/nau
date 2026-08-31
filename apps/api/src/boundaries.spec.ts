@@ -6,25 +6,17 @@ import { join } from 'node:path';
  *
  * Two directions of dependency are allowed and no others:
  *
- *     relations/  ──▶  core/
+ *     domain modules  ──▶  core/
  *
  * `api` has no `sub-modules/` layer, for the same reason `apps/app` has none:
- * Time's third layer exists for interchangeable implementations of one contract
- * (Gregorian vs naŭ vs ephemeris). Journal, Actions and References are not
- * that — they are distinct domains with no shared contract they each satisfy
- * differently. See nau#57. Two layers is the honest shape; a third would be
- * structure without a reason.
+ * `api` is what remains when every module is switched off.
  *
- * The operating definition that decides what may live in `core/`:
- *
- *     `api` is what remains when every module is switched off.
- *
- * - `core/` never imports `relations/`. That import is the moment the core
+ * - `core/` never imports domain modules. That import is the moment the core
  *   stops being a substrate and becomes "whatever Journal needed".
  * - `core/` never names a module in code. A core that knows `journal.entry`
  *   exists has stopped being agnostic — this is the rule that keeps the kind
  *   registry a mechanism rather than a list.
- * - No relation imports another relation. Deleting `relations/api-journal/`
+ * - No domain module imports another domain module. Deleting `journal/`
  *   should delete Journal from the backend and touch nothing else.
  * - `PrismaService` is injectable only in `core/` and in the relation that owns
  *   the model. This is the api-specific rule and the most valuable one: today
@@ -40,7 +32,6 @@ import { join } from 'node:path';
 
 const SRC = join(__dirname);
 const CORE = join(SRC, 'core');
-const RELATIONS = join(SRC, 'relations');
 
 function sourcesUnder(dir: string): string[] {
   if (!existsSync(dir)) return [];
@@ -79,7 +70,7 @@ function codeWithoutCommentsOrStrings(file: string): string {
 
 const rel = (file: string) => file.slice(SRC.length + 1).replace(/\\/g, '/');
 
-/** Every module that has, or will have, a relation under `relations/`. */
+/** Every module that has, or will have, a relation. */
 const MODULE_NAMES = [
   'journal',
   'actions',
@@ -93,6 +84,13 @@ const MODULE_NAMES = [
   'flownau',
   'nauthenticity',
   'zazu',
+];
+
+const DOMAIN_MODULES = [
+  'actions',
+  'gtd',
+  'journal',
+  'references',
 ];
 
 /**
@@ -120,8 +118,10 @@ describe('core/ is a substrate, not a module host', () => {
     expect(files.length).toBeGreaterThan(0);
   });
 
-  it.each(files.map(rel))('%s does not import from relations/', (name) => {
-    const offending = importLines(join(SRC, name)).filter((line) => /relations\//.test(line));
+  it.each(files.map(rel))('%s does not import from domain modules', (name) => {
+    const offending = importLines(join(SRC, name)).filter((line) => 
+      MODULE_NAMES.some(mod => new RegExp(`['"](\\.\\./)*${mod}/`).test(line))
+    );
     expect(offending).toEqual([]);
   });
 
@@ -141,48 +141,24 @@ describe('core/ is a substrate, not a module host', () => {
   });
 });
 
-describe('relations/ are independent of one another', () => {
-  /**
-   * Enumerated inside the test rather than at module load.
-   *
-   * The first version of this rule built its `it.each` cases from the directory
-   * listing as the file was loaded, so a relation added afterwards generated no
-   * cases at all — and the rule passed while being violated. It was caught by
-   * checking that the guard fails when it should, which is the only reason this
-   * comment exists rather than a silent hole.
-   */
-  it('no relation imports a sibling relation', () => {
-    if (!existsSync(RELATIONS)) return;
-
-    const dirs = readdirSync(RELATIONS).filter((entry) =>
-      statSync(join(RELATIONS, entry)).isDirectory(),
-    );
-
+describe('domain modules are independent of one another', () => {
+  it('no domain module imports a sibling domain module', () => {
     const violations: string[] = [];
 
-    for (const dir of dirs) {
-      for (const file of sourcesUnder(join(RELATIONS, dir))) {
+    for (const dir of DOMAIN_MODULES) {
+      if (!existsSync(join(SRC, dir))) continue;
+      
+      for (const file of sourcesUnder(join(SRC, dir))) {
         for (const line of importLines(file)) {
           const specifier = line.match(/from\s+['"]([^'"]+)['"]/)?.[1];
-          // Only a relative specifier can name a sibling folder under
-          // apps/api/src/relations/ — an npm package subpath
-          // (`@nau/actions/relations/gtd`) contains the literal text
-          // "relations/" too, but it names a folder inside that package's own
-          // `packages/*/src/`, not a sibling here. The rule missed this until
-          // relations/api-gtd started importing three such subpaths in one
-          // file, which is what surfaced the gap.
           if (!specifier || !specifier.startsWith('.')) continue;
 
-          // A sibling is normally reached relatively (`../api-beta/thing`), so
-          // the literal text `relations/` never appears in the import. The
-          // specifier has to be resolved against the importing file to see
-          // where it actually lands — matching on the raw string was the first
-          // version of this rule, and it could not fire at all.
           const target = join(file, '..', specifier).replace(/\\/g, '/');
-
-          const landed = target.match(/relations\/([a-z0-9-]+)/i);
-          if (landed !== null && landed[1] !== dir) {
-            violations.push(`${rel(file)} imports ${landed[1]}`);
+          
+          const landedModule = DOMAIN_MODULES.find(mod => target.includes(`/src/${mod}/`));
+          
+          if (landedModule && landedModule !== dir) {
+            violations.push(`${rel(file)} imports ${landedModule}`);
           }
         }
       }
@@ -204,7 +180,7 @@ describe('relations/ are independent of one another', () => {
  * list reaching empty is what finishes the rebuild.
  */
 const PRISMA_LEGACY = [
-  'relations/api-actions/agenda.service.ts',
+  'actions/agenda.service.ts',
   'auth/auth.service.ts',
   'blocks/block-events.service.ts',
   'blocks/blocks.service.ts',
@@ -220,22 +196,17 @@ const PRISMA_LEGACY = [
   'time/planning.service.ts',
   'time/synthesis-scheduler.service.ts',
   'time/workspace-time.service.ts',
-  'triage/triage.service.ts',
   'core/observability/usage.service.ts',
   'workspaces/workspaces.service.ts',
 ];
 
 describe('the pre-rebuild Prisma debt only shrinks', () => {
-  it('no module outside core/ and relations/ reaches Prisma unless already known to', () => {
+  it('no module outside core/ and domain modules reaches Prisma unless already known to', () => {
     const offenders = sourcesUnder(SRC)
       .map(rel)
       .filter((name) => !name.startsWith('core/') && !name.startsWith('prisma/'))
       .filter((name) => {
         const lines = importLines(join(SRC, name));
-        // Only reaching the *client* counts. Importing a generated enum or a
-        // model type from `@prisma/client` is not database access — a DTO
-        // naming `WorkspaceRole` issues no query, and treating it as a
-        // violation would push code toward duplicating the enum instead.
         return lines.some(
           (line) =>
             /\/prisma\.service/.test(line) &&
@@ -243,17 +214,13 @@ describe('the pre-rebuild Prisma debt only shrinks', () => {
             !/scoped-prisma\.service/.test(line),
         );
       })
-      // A relation owning its own model is allowed; it is the rule below that
-      // governs those.
-      .filter((name) => !name.startsWith('relations/'));
+      .filter((name) => !DOMAIN_MODULES.some(mod => name.startsWith(`${mod}/`)));
 
     const unexpected = offenders.filter((name) => !PRISMA_LEGACY.includes(name));
     expect(unexpected).toEqual([]);
   });
 
   it('the list names nothing that has already been cleaned up', () => {
-    // Keeps the ratchet honest: a stale entry would silently re-permit a file
-    // that was moved back.
     const stale = PRISMA_LEGACY.filter((name) => !existsSync(join(SRC, name)));
     expect(stale).toEqual([]);
   });
@@ -261,16 +228,18 @@ describe('the pre-rebuild Prisma debt only shrinks', () => {
 
 describe('PrismaService has an owner', () => {
   /**
-   * The rule: only `core/` and a relation that owns the model may talk to
+   * The rule: only `core/` and a domain module that owns the model may talk to
    * Prisma. Everything else goes through the substrate or through the owning
-   * relation's published contract.
+   * module's published contract.
    *
-   * Scoped to core/ and relations/ deliberately — the pre-rebuild module
+   * Scoped to core/ and domain modules deliberately - the pre-rebuild module
    * folders still sit alongside these and are exempt until they move
-   * (nau#79–#83). Tightening this to all of src/ is the last step of the
+   * (nau#79-#83). Tightening this to all of src/ is the last step of the
    * rebuild, not the first.
    */
-  const files = [...sourcesUnder(CORE), ...sourcesUnder(RELATIONS)];
+  const domainDirs = DOMAIN_MODULES.map(mod => join(SRC, mod));
+  const domainFiles = domainDirs.flatMap(dir => existsSync(dir) ? sourcesUnder(dir) : []);
+  const files = [...sourcesUnder(CORE), ...domainFiles];
 
   const OWNERS = [
     /^core\/tenancy\//,
@@ -297,7 +266,7 @@ describe('PrismaService has an owner', () => {
     const isCore = name.startsWith('core/');
     const allowed = isCore
       ? OWNERS.some((pattern) => pattern.test(name))
-      : name.startsWith('relations/');
+      : DOMAIN_MODULES.some(mod => name.startsWith(`${mod}/`));
 
     expect(allowed).toBe(true);
   });

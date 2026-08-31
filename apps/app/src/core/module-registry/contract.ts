@@ -76,7 +76,7 @@ export interface WidgetEntry {
  *
  * Unlike `EnabledWhen`, `search` genuinely is a function, not a declared
  * value — searching requires calling the module's own endpoint, which is
- * exactly the kind of domain logic `relations/app-{module}/` exists to hold.
+ * exactly the kind of domain logic `relations/{module}/` exists to hold.
  * The core treats it as opaque: it awaits the promise and renders what comes
  * back, it does not branch on which module supplied it.
  */

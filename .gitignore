@@ -55,6 +55,9 @@ lint_output.txt
 
 # AI agent working directories
 .agent/
+.agents/
+GEMINI.md
+AGENTS.md
 
 # Local scripts dependencies
 scripts/node_modules/
