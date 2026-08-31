@@ -1,23 +1,11 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { getClientForFeature } from '@nau/llm-client';
 import { z } from 'zod';
-import { BlocksService } from '../blocks/blocks.service';
-import { NauthenticityService } from '../integrations/nauthenticity.service';
-import { FlownauIntegrationService } from '../integrations/flownau.service';
-import { PrismaService } from '../prisma/prisma.service';
-import { JournalService } from '../relations/journal/journal.service';
+import { BlocksService } from '../../blocks/blocks.service';
+import { NauthenticityService } from '../../integrations/nauthenticity.service';
+import { FlownauIntegrationService } from '../../integrations/flownau.service';
+import { PrismaService } from '../../prisma/prisma.service';
 
-// TODO: This schema and the LLM call it feeds classify across all GTD
-// categories AND content_idea in one prompt, one request. That is the
-// opposite of module ownership — a person marking only "Tareas" still
-// triggers content-idea/brand-routing logic in the same call, and touching
-// one category's behaviour risks the others. Journal and content-idea are
-// already correctly separated (their own pipelines, see
-// VoicenoteSkill.dispatchToJournal / dispatchToBrands). This module — the
-// GTD/Actions side — is the one still owed that separation. Tracked as
-// https://github.com/samuelaure/nau/issues/5 (design: docs/future/actions-gtd-smart-capture.md).
-// Deliberately not touched now — Actions is out of scope while journal work
-// is in progress.
 const TriageResultSchema = z.object({
   segments: z.array(z.object({
     category: z.enum([
@@ -40,15 +28,14 @@ const TriageResultSchema = z.object({
 export type TriageResult = z.infer<typeof TriageResultSchema>;
 
 @Injectable()
-export class TriageService {
-  private readonly logger = new Logger(TriageService.name);
+export class GtdTriageService {
+  private readonly logger = new Logger(GtdTriageService.name);
 
   constructor(
     private readonly blocksService: BlocksService,
     private readonly nauthenticityService: NauthenticityService,
     private readonly flownauService: FlownauIntegrationService,
     private readonly prisma: PrismaService,
-    private readonly journalService: JournalService,
   ) {}
 
   async processRawText(
@@ -57,43 +44,8 @@ export class TriageService {
     sourceBlockId?: string,
     brandId?: string | null,
     workspaceId?: string,
-    journalOnly?: boolean,
-    capturedAt?: string,
   ) {
-
     try {
-      // ── Journal-only fast path ──────────────────────────────────────────────
-      if (journalOnly) {
-        let resolvedWorkspaceId = workspaceId;
-        if (!resolvedWorkspaceId) {
-          const user = await this.prisma.user.findFirst({
-            where: {
-              OR: [
-                { id: userId },
-                { telegramId: userId },
-              ],
-            },
-            include: { workspaces: { take: 1 } },
-          });
-          resolvedWorkspaceId = user?.workspaces?.[0]?.workspaceId;
-        }
-        // userId arrives from Zazu but was never passed on, so every journal
-        // entry was written with no record of who wrote it. The caller may send
-        // a Telegram id, so resolve it to the naŭ user before stamping.
-        const owner = await this.prisma.user.findFirst({
-          where: { OR: [{ id: userId }, { telegramId: userId }] },
-          select: { id: true },
-        });
-
-        return await this.processJournalOnly(
-          text,
-          sourceBlockId,
-          resolvedWorkspaceId,
-          owner?.id,
-          capturedAt,
-        );
-      }
-
       // 1. Fetch context — projects + brand DNA
       const recentBlocks = await this.blocksService.findAllInternal({});
 
@@ -123,11 +75,9 @@ export class TriageService {
       let aiRoutingEnabled = false;
 
       if (brandId) {
-        // Explicit brand selected by user — fetch its dna-light for context, no AI routing needed
         const dna = await this.nauthenticityService.getBrandDnaLight(brandId);
         if (dna) brandsForPrompt = [dna];
       } else if (resolvedWorkspaceId) {
-        // No brand selected → fetch all workspace brands for AI detection
         brandsForPrompt = await this.nauthenticityService.getBrandsForWorkspace(resolvedWorkspaceId);
         aiRoutingEnabled = brandsForPrompt.length > 0;
       }
@@ -190,12 +140,12 @@ OUTPUT: Return valid JSON matching the schema.`,
 
       const parsed = result.data;
 
-      // 6. Save blocks — pass through explicit brandId and aiRouting flag
+      // 6. Save blocks
       const createdBlocks = await this.saveTriagedBlocks(parsed, sourceBlockId, brandId, aiRoutingEnabled, resolvedWorkspaceId);
 
       return {
         success: true,
-        summary: `Procesé tu texto: ${parsed.segments.length} bloques creados. Diario actualizado.`,
+        summary: `Procesé tu texto: ${parsed.segments.length} bloques creados.`,
         blocks: createdBlocks,
         rawResult: parsed
       };
@@ -235,11 +185,8 @@ OUTPUT: Return valid JSON matching the schema.`,
       }
 
       if (segment.category === 'content_idea') {
-        // Prefer explicit brandId from user selection; fall back to AI-detected one
         const resolvedBrandId = explicitBrandId ?? segment.metadata?.brandId ?? null;
         const resolvedBrandName = segment.metadata?.brandName ?? null;
-
-        // aiLinked = true when brand was detected by AI (no explicit selection)
         const aiLinked = resolvedBrandId !== null && !explicitBrandId && aiRoutingEnabled;
 
         properties.brandId = resolvedBrandId;
@@ -250,18 +197,8 @@ OUTPUT: Return valid JSON matching the schema.`,
 
       const block = await this.blocksService.createInternal({ type, properties, workspaceId });
 
-      // Deliberately unscheduled.
-      //
-      // An action with no schedule is a *next action*, which is a state with
-      // meaning rather than a defect: it is where a capture waits until someone
-      // decides when it happens. Capturing is not planning, and scheduling on
-      // the person's behalf takes that decision away from them — every capture
-      // would arrive already committed to the day it was spoken.
-
-      // Forward content_idea blocks with a resolved brand to flownaŭ
       if (segment.category === 'content_idea' && properties.brandId) {
         try {
-          // Resolve brandId → flownaŭ accountId
           const accountId = await this.flownauService.resolveAccountByBrandId(properties.brandId);
 
           if (accountId) {
@@ -272,16 +209,14 @@ OUTPUT: Return valid JSON matching the schema.`,
               properties: { flownauSyncStatus: 'success' },
             });
           } else {
-            this.logger.warn(`[Flownau-Integration] No flownaŭ account found for brandId ${properties.brandId}. Idea not forwarded.`);
+            this.logger.warn(`[Flownau-Integration] No flownau account found for brandId ${properties.brandId}. Idea not forwarded.`);
             await this.blocksService.updateInternal(block.id, {
               properties: { flownauSyncStatus: 'no_account' },
             });
           }
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
-          this.logger.error(
-            `[Flownau-Integration-Error] Failed to ingest idea block ${block.id}: ${msg}`,
-          );
+          this.logger.error(`[Flownau-Integration-Error] Failed to ingest idea block ${block.id}: ${msg}`);
           await this.blocksService.updateInternal(block.id, {
             properties: { flownauSyncStatus: 'error' },
           });
@@ -291,91 +226,7 @@ OUTPUT: Return valid JSON matching the schema.`,
       createdBlocks.push(block);
     }
 
-    // No journal entry is written here.
-    //
-    // This path runs when the capture was routed to tasks or ideas, so no diary
-    // entry was asked for — and what it used to write was a `journalSummary`
-    // the model produced under "keep it brief and reflective": a summary of the
-    // capture, often in third person and in whatever language the model chose.
-    // The one such entry in production reads "Today's focus includes scheduling
-    // and communication tasks", which is nobody's diary.
-    //
-    // The journal is fed by the journal path, where the person's own words are
-    // what gets stored.
-
     return createdBlocks;
-  }
-
-  /**
-   * Journal-only fast path: hands the capture to Journal as an entry.
-   *
-   * The text is stored as it arrives. Callers send text that has already been
-   * cleaned once — Zazŭ transcribes, cleans the disfluencies out, and where the
-   * note mixed intents splits the journal part out of it. Running a further
-   * distillation here made three model rewrites stand between what the person
-   * said and what their diary records, and every one of them moves the wording
-   * a little further from theirs.
-   *
-   * The entry is built by Journal rather than assembled here. Triage decides
-   * that something is a diary entry; what an entry *is* belongs to Journal, and
-   * this path drifting from the web one is exactly what having two producers
-   * cost before.
-   */
-  private async processJournalOnly(
-    text: string,
-    sourceBlockId?: string,
-    workspaceId?: string,
-    userId?: string,
-    capturedAt?: string,
-  ) {
-    // An entry with no workspace belongs to nobody: it is written, it is
-    // counted, and it appears in no view the person can reach. Refusing is the
-    // honest failure — the caller retries or reports it, instead of the entry
-    // disappearing into a table while the bot says it was saved.
-    if (!workspaceId) {
-      throw new BadRequestException(
-        'Cannot file a journal entry: no workspace could be resolved for this user',
-      );
-    }
-
-    const journalBlock = await this.journalService.createEntry({
-      text,
-      // When the note was recorded, not when it happened to be processed. A
-      // journal entry that lands on the wrong day because ingestion was slow
-      // is wrong in the one dimension a journal is organised by.
-      date: capturedAt,
-      source: 'zazu',
-      originFormat: 'voice',
-      workspaceId,
-      userId,
-      sourceId: sourceBlockId,
-    });
-
-    return {
-      success: true,
-      summary: 'Entrada de diario guardada.',
-      blocks: [journalBlock],
-      rawResult: { segments: [], journalEntry: text },
-    };
-  }
-
-  /**
-   * Returns ultra-light brand list for a user. Used by Zazŭ to populate the brand selection keyboard.
-   */
-  async getUserBrands(userId: string): Promise<Array<{ id: string; brandName: string }>> {
-    try {
-      const user = await this.prisma.user.findFirst({
-        where: { OR: [{ id: userId }, { telegramId: userId }] },
-        include: { workspaces: { take: 1 } },
-      });
-      const workspaceId = user?.workspaces?.[0]?.workspaceId;
-      if (!workspaceId) return [];
-
-      const brands = await this.nauthenticityService.getBrandsForWorkspace(workspaceId);
-      return brands.map(b => ({ id: b.id, brandName: b.brandName }));
-    } catch {
-      return [];
-    }
   }
 
   async retroprocess(userId: string) {

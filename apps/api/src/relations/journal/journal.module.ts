@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { JournalService } from './journal.service';
 import { JournalController } from './journal.controller';
 import { JournalReadController } from './journal-read.controller';
+import { JournalZazuController } from './journal-zazu.controller';
 import { JournalReadService } from './journal-read.service';
 
 /**
@@ -12,7 +13,7 @@ import { JournalReadService } from './journal-read.service';
  * outside this relation.
  */
 @Module({
-  controllers: [JournalController, JournalReadController],
+  controllers: [JournalController, JournalReadController, JournalZazuController],
   providers: [JournalService, JournalReadService],
   exports: [JournalService, JournalReadService],
 })

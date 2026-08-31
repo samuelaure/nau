@@ -13,7 +13,6 @@ import { EventsModule } from './core/substrate/events/events.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { SyncModule } from './sync/sync.module';
 import { MediaModule } from './core/storage/media.module';
-import { TriageModule } from './triage/triage.module';
 import { JournalModule } from './relations/journal/journal.module';
 import { ReferencesModule } from './relations/references/references.module';
 import { GtdModule } from './relations/gtd/gtd.module';
@@ -60,7 +59,6 @@ import { CapturesModule } from './captures/captures.module';
     IntegrationsModule,
     SyncModule,
     MediaModule,
-    TriageModule,
     JournalModule,
     ReferencesModule,
     GtdModule,
