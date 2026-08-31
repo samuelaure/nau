@@ -1,19 +1,22 @@
 'use client'
 
 import React, { useState, useMemo } from 'react'
-import { useGetBlocks, useUpdateBlock } from '@/hooks/use-blocks-api'
-import { Block } from '@9nau/types'
-import { ChevronLeft, ChevronRight, Sparkles, BookOpen, FileText } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Sparkles, BookOpen, FileText, Plus } from 'lucide-react'
 import { Button } from '@9nau/ui/components/button'
 import { cn } from '@9nau/ui/lib/utils'
 import { JournalCapture } from './JournalCapture'
 import { EditableText } from './EditableText'
 import { useUiStore } from '@/lib/state/ui-store'
+import {
+  useGetJournalEntries,
+  useGetJournalSyntheses,
+  useUpdateJournalEntry,
+  useDeleteJournalEntry,
+  useUpdateJournalSynthesis,
+  useCreateJournalEntry,
+} from '@/journal/use-journal-api'
 
 type PeriodType = 'day' | 'week' | 'month' | 'year'
-
-/** Types the journal timeline renders. Everything else is another module's. */
-const JOURNAL_TYPES = ['journal_entry', 'journal_synthesis', 'note', 'action']
 
 function getDateRange(date: Date, period: PeriodType): { start: Date; end: Date } {
   const d = new Date(date)
@@ -82,50 +85,37 @@ export function JournalView() {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [period, setPeriod] = useState<PeriodType>('day')
 
-  const updateBlock = useUpdateBlock()
+  const updateEntry = useUpdateJournalEntry()
+  const deleteEntry = useDeleteJournalEntry()
+  const updateSynthesis = useUpdateJournalSynthesis()
+  const createEntry = useCreateJournalEntry()
 
   const range = useMemo(() => getDateRange(currentDate, period), [currentDate, period])
 
-  // Only the period being viewed, and only the types this view renders. It used
-  // to request every block in the workspace — 968 Instagram captures included —
-  // and filter in the browser to show a single day.
-  const { data: allBlocks, isLoading } = useGetBlocks({
-    types: JOURNAL_TYPES,
+  const entryParams = {
+    workspaceId: activeWorkspaceId,
     from: range.start.toISOString(),
     to: range.end.toISOString(),
-    workspaceId: activeWorkspaceId ?? undefined,
-  })
-
-  const { entries, syntheses } = useMemo(() => {
-    if (!allBlocks) return { entries: [], syntheses: [] }
-
-    const byDate = (a: Block, b: Block) => {
-      const da = ((a.properties as any)?.date as string) || a.createdAt
-      const db = ((b.properties as any)?.date as string) || b.createdAt
-      return new Date(da).getTime() - new Date(db).getTime()
-    }
-
-    return {
-      entries: allBlocks
-        .filter((b: Block) => b.type === 'journal_entry' || b.type === 'note' || b.type === 'action')
-        .sort(byDate),
-      syntheses: allBlocks
-        .filter((b: Block) => b.type === 'journal_synthesis')
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
-    }
-  }, [allBlocks])
-
-  /**
-   * Writing an edit stamps `editedAt`, which tells the summary generator to read
-   * this text instead of the original capture. A deliberate correction is more
-   * authoritative than a transcription; `raw` keeps the original regardless.
-   */
-  const saveProperty = (block: Block, key: string, next: string) => {
-    updateBlock.mutate({
-      id: block.id,
-      updateDto: { properties: { [key]: next, editedAt: new Date().toISOString() } },
-    })
   }
+  const synthesisParams = {
+    workspaceId: activeWorkspaceId,
+    from: range.start.toISOString(),
+    to: range.end.toISOString(),
+  }
+
+  const { data: entries = [], isLoading: entriesLoading } = useGetJournalEntries(entryParams)
+  const { data: syntheses = [], isLoading: synthesisLoading } = useGetJournalSyntheses(synthesisParams)
+  const isLoading = entriesLoading || synthesisLoading
+
+  // Sorted newest-first for syntheses, by lived date for entries
+  const sortedEntries = useMemo(
+    () => [...entries].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+    [entries],
+  )
+  const sortedSyntheses = useMemo(
+    () => [...syntheses].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    [syntheses],
+  )
 
   const periodButtons: { value: PeriodType; label: string }[] = [
     { value: 'day', label: 'Día' },
@@ -159,8 +149,7 @@ export function JournalView() {
         </div>
       </div>
 
-      {/* Capture box, only on the day view: an entry written while looking at a
-          month would be filed under today anyway, which is confusing. */}
+      {/* Capture box, only on the day view */}
       {period === 'day' && (
         <div className="mb-6">
           <JournalCapture />
@@ -186,18 +175,12 @@ export function JournalView() {
         <div className="text-center text-gray-500 dark:text-gray-400 mt-10">Cargando datos...</div>
       )}
 
-      {/* The interpretation of a period: the account of it, then the reading of
-          that account. Two model calls produced them and they are stored apart,
-          but they are one piece of writing to read — which is why they sit in
-          one card, synthesis first, with no heading between them competing for
-          attention. Both are editable: what a model wrote is a first draft, and
-          the person's correction of it is worth more. */}
-      {syntheses.length > 0 && (
+      {/* Syntheses: account then reflection, both editable */}
+      {sortedSyntheses.length > 0 && (
         <div className="mb-8 space-y-4">
-          {syntheses.map((synthesis: Block) => {
-            const props = synthesis.properties as any
-            const from = props.from ? new Date(props.from as string) : null
-            const to = props.to ? new Date(props.to as string) : null
+          {sortedSyntheses.map((synthesis) => {
+            const from = synthesis.from ? new Date(synthesis.from) : null
+            const to = synthesis.to ? new Date(synthesis.to) : null
             const fmt = (d: Date) =>
               d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
 
@@ -211,29 +194,38 @@ export function JournalView() {
                   <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
                     {from && to ? `${fmt(from)} — ${fmt(to)}` : 'Síntesis'}
                   </span>
-                  {props.editedAt && (
-                    <span className="text-[10px] text-emerald-600/60 dark:text-emerald-400/60">editado</span>
-                  )}
                 </div>
 
-                {props.noData ? (
+                {synthesis.noData ? (
                   <p className="text-sm italic text-gray-500 dark:text-gray-400">
                     No hay nada registrado en este periodo.
                   </p>
                 ) : (
                   <div className="space-y-4">
                     <EditableText
-                      value={(props.synthesis as string) || ''}
+                      value={synthesis.synthesis ?? ''}
                       label="la síntesis"
-                      onSave={(next) => saveProperty(synthesis, 'synthesis', next)}
+                      onSave={(next) =>
+                        updateSynthesis.mutate({
+                          id: synthesis.id,
+                          synthesis: next,
+                          workspaceId: activeWorkspaceId ?? undefined,
+                        })
+                      }
                       className="text-sm leading-relaxed text-gray-700 dark:text-gray-300"
                     />
-                    {(props.reflection as string) && (
+                    {synthesis.reflection && (
                       <div className="border-t border-emerald-200/60 pt-4 dark:border-emerald-800/40">
                         <EditableText
-                          value={(props.reflection as string) || ''}
+                          value={synthesis.reflection}
                           label="la reflexión"
-                          onSave={(next) => saveProperty(synthesis, 'reflection', next)}
+                          onSave={(next) =>
+                            updateSynthesis.mutate({
+                              id: synthesis.id,
+                              reflection: next,
+                              workspaceId: activeWorkspaceId ?? undefined,
+                            })
+                          }
                           className="text-sm leading-relaxed text-gray-600 dark:text-gray-400"
                         />
                       </div>
@@ -246,22 +238,34 @@ export function JournalView() {
         </div>
       )}
 
-      {entries.length > 0 ? (
+      {/* Entries list */}
+      {sortedEntries.length > 0 ? (
         <div className="space-y-3">
-          <div className="flex items-center gap-2 mb-4">
-            <FileText className="w-4 h-4 text-gray-400" />
-            <span className="text-xs font-bold uppercase tracking-wider text-gray-400">
-              Entradas ({entries.length})
-            </span>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-gray-400" />
+              <span className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                Entradas ({sortedEntries.length})
+              </span>
+            </div>
+            {period === 'day' && (
+              <button
+                onClick={() =>
+                  createEntry.mutate({
+                    text: '',
+                    date: range.start.toISOString(),
+                    workspaceId: activeWorkspaceId ?? undefined,
+                  })
+                }
+                className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
+              >
+                <Plus className="w-3 h-3" /> Nueva entrada
+              </button>
+            )}
           </div>
-          {entries.map((entry: Block) => {
-            const props = entry.properties as any
-            // One field holds the entry now. `textOriginal` keeps what it said
-            // before any edit, but this page shows what it says.
-            const text = (props.text || '') as string
-            const at = (props.date as string) || entry.createdAt
-            const time = new Date(at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
-            const source = (props.source as string) || entry.source || ''
+
+          {sortedEntries.map((entry) => {
+            const time = new Date(entry.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
 
             return (
               <div
@@ -270,33 +274,43 @@ export function JournalView() {
               >
                 <div className="flex flex-col items-center">
                   <span className="text-xs font-mono text-gray-400 dark:text-gray-500">{time}</span>
-                  <div className={cn(
-                    'w-2 h-2 rounded-full mt-1',
-                    entry.type === 'journal_entry' ? 'bg-emerald-400' :
-                    entry.type === 'action' ? 'bg-blue-400' : 'bg-gray-300 dark:bg-gray-600'
-                  )} />
+                  <div className="w-2 h-2 rounded-full mt-1 bg-emerald-400" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <EditableText
-                    value={text}
+                    value={entry.text}
                     label="la entrada"
                     placeholder="Sin contenido"
-                    onSave={(next) => saveProperty(entry, 'text', next)}
+                    onSave={(next) =>
+                      updateEntry.mutate({
+                        id: entry.id,
+                        text: next,
+                        workspaceId: activeWorkspaceId ?? undefined,
+                      })
+                    }
                     className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed"
                   />
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase">
-                      {entry.type === 'journal_entry' ? '📓 Journal' : entry.type === 'action' ? '⚡ Action' : '📝 Note'}
+                      📓 Journal
                     </span>
-                    {source && (
-                      <span className="text-[10px] text-gray-300 dark:text-gray-600">• {source}</span>
+                    {entry.source && (
+                      <span className="text-[10px] text-gray-300 dark:text-gray-600">• {entry.source}</span>
                     )}
-                    {props.originFormat === 'voice' && (
+                    {entry.originFormat === 'voice' && (
                       <span className="text-[10px] text-gray-300 dark:text-gray-600">• voz</span>
                     )}
-                    {props.editedAt && (
+                    {entry.editedAt && (
                       <span className="text-[10px] text-gray-300 dark:text-gray-600">• editado</span>
                     )}
+                    <button
+                      onClick={() =>
+                        deleteEntry.mutate({ id: entry.id, workspaceId: activeWorkspaceId ?? undefined })
+                      }
+                      className="text-[10px] text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity ml-auto"
+                    >
+                      eliminar
+                    </button>
                   </div>
                 </div>
               </div>

@@ -4,18 +4,22 @@ import { act } from 'react'
 import '@testing-library/jest-dom'
 import { HierarchicalSection } from './HierarchicalSection'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
-import { useCreateBlock, useUpdateBlock, useDeleteBlock } from '@/hooks/use-blocks-api'
+import { useUpdateBlock } from '@/hooks/use-blocks-api'
+import { useCreateActionItem, useUpdateActionItem, useDeleteActionItem } from '@/actions/use-action-items'
 import { HierarchicalBlock } from '@9nau/core'
 import { makeHierarchicalBlock } from '@/test/block-fixture'
 import React from 'react'
 
 jest.mock('@/lib/state/dashboard-store')
 jest.mock('@/hooks/use-blocks-api')
+jest.mock('@/actions/use-action-items')
+jest.mock('@/journal/use-journal-api')
 
 const queryClient = new QueryClient()
-const mockCreateBlock = jest.fn()
+const mockCreateActionItem = jest.fn()
+const mockUpdateActionItem = jest.fn()
+const mockDeleteActionItem = jest.fn()
 const mockUpdateBlock = jest.fn()
-const mockDeleteBlock = jest.fn()
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
   <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
@@ -55,9 +59,17 @@ describe('HierarchicalSection', () => {
         },
       })
     )
-    ;(useCreateBlock as jest.Mock).mockReturnValue({ mutate: mockCreateBlock })
+    ;(useCreateActionItem as jest.Mock).mockReturnValue({ mutate: mockCreateActionItem })
+    ;(useUpdateActionItem as jest.Mock).mockReturnValue({ mutate: mockUpdateActionItem })
+    ;(useDeleteActionItem as jest.Mock).mockReturnValue({ mutate: mockDeleteActionItem })
     ;(useUpdateBlock as jest.Mock).mockReturnValue({ mutate: mockUpdateBlock })
-    ;(useDeleteBlock as jest.Mock).mockReturnValue({ mutate: mockDeleteBlock })
+    // Journal hooks — not exercised by the action-type tests but must be
+    // present so the component doesn't crash when calling them.
+    const { useCreateJournalEntry, useUpdateJournalEntry, useDeleteJournalEntry } =
+      jest.requireMock('@/journal/use-journal-api')
+    ;(useCreateJournalEntry as jest.Mock).mockReturnValue({ mutate: jest.fn() })
+    ;(useUpdateJournalEntry as jest.Mock).mockReturnValue({ mutate: jest.fn() })
+    ;(useDeleteJournalEntry as jest.Mock).mockReturnValue({ mutate: jest.fn() })
   })
 
   afterEach(() => {
@@ -69,8 +81,6 @@ describe('HierarchicalSection', () => {
       wrapper,
     })
     expect(screen.getByText('Actions')).toBeInTheDocument()
-    // Items are rendered as EditableItem which might be in view or edit mode
-    // Let's check for the text content instead of display value
     expect(screen.getByText('Root item')).toBeInTheDocument()
     expect(screen.getByText('Child item')).toBeInTheDocument()
   })
@@ -84,9 +94,9 @@ describe('HierarchicalSection', () => {
     expect(screen.queryByText('Root item')).not.toBeInTheDocument()
   })
 
-  it('should call createBlock on empty section click', async () => {
-    mockCreateBlock.mockImplementationOnce((dto, options) => {
-      options.onSuccess({ id: 'new-block-id' })
+  it('should call createActionItem on empty section click', async () => {
+    mockCreateActionItem.mockImplementationOnce((_dto: unknown, options: { onSuccess: (v: {id: string}) => void }) => {
+      options.onSuccess({ id: 'new-item-id' })
     })
     render(<HierarchicalSection dateStr="2025-08-05" sectionType="action" title="Actions" items={[]} />, { wrapper })
 
@@ -95,36 +105,29 @@ describe('HierarchicalSection', () => {
     })
 
     await waitFor(() => {
-      expect(mockCreateBlock).toHaveBeenCalledWith(
+      expect(mockCreateActionItem).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: 'action',
-          parentId: null,
-          // 'published' is the real default (HierarchicalSection.tsx) — items
-          // created here are immediately visible, not held in an inbox.
-          properties: { text: '', date: '2025-08-05', status: 'published' },
+          text: '',
+          parentId: undefined,
         }),
         expect.any(Object)
       )
     })
-    expect(setFocusedItemId).toHaveBeenCalledWith('new-block-id')
+    expect(setFocusedItemId).toHaveBeenCalledWith('new-item-id')
   })
 
-  it('should call useUpdateBlock on update', () => {
+  it('should call updateActionItem on update', () => {
     render(<HierarchicalSection dateStr="2025-08-05" sectionType="action" title="Actions" items={mockItems} />, {
       wrapper,
     })
     fireEvent.click(screen.getByText('Root item'))
     fireEvent.change(screen.getByDisplayValue('Root item'), { target: { value: 'Updated text' } })
     fireEvent.blur(screen.getByDisplayValue('Updated text'))
-    // entryEditPatch stamps editedAt alongside text — see the comment on
-    // handleUpdate in HierarchicalSection.tsx for why: without it, a
-    // correction to a voice-captured entry is silently outranked by the
-    // original transcription. editedAt is a real timestamp, not a fixed
-    // value to compare exactly.
-    expect(mockUpdateBlock).toHaveBeenCalledWith(
+
+    expect(mockUpdateActionItem).toHaveBeenCalledWith(
       expect.objectContaining({
         id: 'item-1',
-        updateDto: { properties: { text: 'Updated text', editedAt: expect.any(String) } },
+        body: { text: 'Updated text' },
       })
     )
   })

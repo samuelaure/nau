@@ -1,8 +1,10 @@
 import { Block } from '@9nau/types'
 import { cn } from '@9nau/ui/lib/utils'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
-import { useDeleteBlock, useUpdateBlock } from '@/hooks/use-blocks-api'
+import { useDeleteNote } from '@/references/use-notes'
+import { useUpdateBlock } from '@/hooks/use-blocks-api'
 import { useUpsertPlanning } from '@/hooks/use-schedule-api'
+import { useUiStore } from '@/lib/state/ui-store'
 import { Button } from '@9nau/ui/components/button'
 import { MoreVertical, CalendarPlus } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
@@ -17,7 +19,17 @@ export function NoteCard({ note }: NoteCardProps) {
     draggedItem: s.draggedItem,
     setEditingNoteId: s.actions.setEditingNoteId,
   }))
-  const deleteBlock = useDeleteBlock()
+  const activeWorkspaceId = useUiStore((s) => s.activeWorkspaceId)
+
+  // Domain hook for delete. The note passes through the Block bridge for now
+  // because the page-level data fetch is still via /blocks (nau#136). Once the
+  // page migrates to useGetNotes the prop will be Note, not Block, and the
+  // workspaceId will come from note.workspaceId directly.
+  const deleteNote = useDeleteNote(activeWorkspaceId)
+
+  // handleScheduleToday converts a note → action at the substrate level (type
+  // change). That operation has no domain-specific route; it stays on /blocks
+  // until a dedicated "convert to action" endpoint exists.
   const updateBlock = useUpdateBlock()
   const upsertPlanning = useUpsertPlanning()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -35,16 +47,15 @@ export function NoteCard({ note }: NoteCardProps) {
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation()
-    deleteBlock.mutate(note.id)
+    deleteNote.mutate(note.id)
   }
 
   /**
    * Processes a captured note into something due today.
    *
    * One click and no dialog, because this is the GTD processing step and its
-   * whole value is speed: an inbox that takes a form per item stops being
-   * emptied. Anything more specific — another day, a frequency, an estimate —
-   * is an edit afterwards, on an item that already exists somewhere.
+   * whole value is speed. Uses /blocks because the operation changes the block's
+   * type — that is a substrate concern, not References' or Actions' domain.
    */
   const handleScheduleToday = async (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -92,7 +103,7 @@ export function NoteCard({ note }: NoteCardProps) {
     >
       <div onClick={() => setEditingNoteId(note.id)} className="p-4 flex-grow">
         <p className="whitespace-pre-wrap text-sm text-card-foreground break-words max-h-80 overflow-hidden">
-          {note.properties.text as string}
+          {(note.properties.text ?? note.properties.content ?? '') as string}
         </p>
       </div>
       <div className="h-10 flex items-center justify-end px-2 opacity-0 group-hover:opacity-100 transition-opacity">

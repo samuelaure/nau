@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { Block, CreateBlockDto } from '@9nau/types'
+import { Block } from '@9nau/types'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { EditableItem } from './EditableItem'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
-import { useCreateBlock, useUpdateBlock, useDeleteBlock } from '@/hooks/use-blocks-api'
-import { findItemAndParent, HierarchicalBlock, entryEditPatch } from '@9nau/core'
+import { useUpdateBlock } from '@/hooks/use-blocks-api'
+import { useCreateActionItem, useUpdateActionItem, useDeleteActionItem } from '@/actions/use-action-items'
+import { useCreateJournalEntry, useUpdateJournalEntry, useDeleteJournalEntry } from '@/journal/use-journal-api'
+import { findItemAndParent, HierarchicalBlock } from '@9nau/core'
 
 interface HierarchicalSectionProps {
   dateStr: string
@@ -45,9 +47,16 @@ export function HierarchicalSection({
     setFocusedItemId: s.actions.setFocusedItemId,
   }))
 
-  const createBlock = useCreateBlock()
+
+  const createActionItem = useCreateActionItem()
+  const updateActionItem = useUpdateActionItem()
+  const deleteActionItem = useDeleteActionItem()
+  const createJournalEntry = useCreateJournalEntry()
+  const updateJournalEntry = useUpdateJournalEntry()
+  const deleteJournalEntry = useDeleteJournalEntry()
+  // handleFullUpdate changes a block's type (e.g. note→journal_entry in
+  // drag-drop). That is a substrate mutation with no domain route.
   const updateBlock = useUpdateBlock()
-  const deleteBlock = useDeleteBlock()
 
   /**
    * Writes the edit to whichever field this entry speaks through.
@@ -59,11 +68,11 @@ export function HierarchicalSection({
    * transcription — without it, a fixed entry is silently re-outranked.
    */
   const handleUpdate = (id: string, newText: string) => {
-    const item = findItemAndParent(items, id)?.item
-    updateBlock.mutate({
-      id,
-      updateDto: { properties: entryEditPatch(item ?? { properties: {} }, newText) },
-    })
+    if (sectionType === 'action') {
+      updateActionItem.mutate({ id, body: { text: newText } })
+    } else {
+      updateJournalEntry.mutate({ id, text: newText, workspaceId })
+    }
   }
 
   const handleToggle = (id: string) => {
@@ -77,24 +86,25 @@ export function HierarchicalSection({
   }
 
   const handleAdd = (afterId: string | null, parentId: string | null) => {
-    const newBlock: CreateBlockDto = {
-      type: sectionType,
-      parentId,
-      workspaceId,
-      // `date` is when this belongs, which for an experience is the day it
-      // happened — not a due date. Creating it from a past period files it
-      // there, which is the whole point of being able to add one late.
-      properties: { text: '', date: dateStr, status: 'published' },
+    if (sectionType === 'action') {
+      createActionItem.mutate(
+        { text: '', parentId: parentId ?? undefined, workspaceId },
+        { onSuccess: (created) => setFocusedItemId(created.id) },
+      )
+    } else {
+      createJournalEntry.mutate(
+        { text: '', date: dateStr, workspaceId },
+        { onSuccess: (created) => setFocusedItemId(created.id) },
+      )
     }
-    createBlock.mutate(newBlock, {
-      onSuccess: (createdBlock) => {
-        setFocusedItemId(createdBlock.id)
-      },
-    })
   }
 
   const handleDelete = (id: string) => {
-    deleteBlock.mutate(id)
+    if (sectionType === 'action') {
+      deleteActionItem.mutate(id)
+    } else {
+      deleteJournalEntry.mutate({ id, workspaceId })
+    }
   }
 
   const handleIndent = (id: string) => {
@@ -102,7 +112,11 @@ export function HierarchicalSection({
     if (found && found.index > 0) {
       const newParent = found.parentList[found.index - 1]
       if (newParent) {
-        updateBlock.mutate({ id, updateDto: { parentId: newParent.id } }, { onSuccess: () => setFocusedItemId(id) })
+        if (sectionType === 'action') {
+          updateActionItem.mutate({ id, body: { parentId: newParent.id } }, { onSuccess: () => setFocusedItemId(id) })
+        } else {
+          updateBlock.mutate({ id, updateDto: { parentId: newParent.id } }, { onSuccess: () => setFocusedItemId(id) })
+        }
       }
     }
   }
@@ -112,7 +126,11 @@ export function HierarchicalSection({
     if (found && found.parent) {
       const grandParentInfo = findItemAndParent(items, found.parent.id)
       const newParentId = grandParentInfo?.parent?.id || null
-      updateBlock.mutate({ id, updateDto: { parentId: newParentId } }, { onSuccess: () => setFocusedItemId(id) })
+      if (sectionType === 'action') {
+        updateActionItem.mutate({ id, body: { parentId: newParentId } }, { onSuccess: () => setFocusedItemId(id) })
+      } else {
+        updateBlock.mutate({ id, updateDto: { parentId: newParentId } }, { onSuccess: () => setFocusedItemId(id) })
+      }
     }
   }
 

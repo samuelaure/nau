@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { ScopedPrismaService } from '../core/tenancy/scoped-prisma.service';
 import {
   JOURNAL_ENTRY_KIND,
@@ -56,6 +56,134 @@ export interface JournalSynthesisView {
 @Injectable()
 export class JournalReadService {
   constructor(private readonly scoped: ScopedPrismaService) {}
+
+  // ── Writes (entry) ─────────────────────────────────────────────────────────
+
+  /**
+   * Creates a plain journal entry directly from the App.
+   *
+   * Unlike the Zazŭ path (which goes through `JournalService.createEntry`), the
+   * App has no audio and always sends clean text, so the builder call is
+   * avoided — it is validated at the domain boundary, and a blank entry is a
+   * valid draft from the user's perspective.
+   */
+  async createEntry(
+    userId: string,
+    workspaceId: string,
+    params: { text: string; date?: string },
+  ): Promise<JournalEntryView> {
+    const client = await this.scoped.forUser(userId, workspaceId);
+    const now = new Date().toISOString();
+    const properties: JournalEntryProperties = {
+      text: params.text,
+      textOriginal: params.text,
+      date: params.date ?? now,
+      source: 'app',
+      originFormat: 'text',
+    };
+    const row = await client.block.create({
+      data: {
+        type: LEGACY_TYPE_BY_KIND[JOURNAL_ENTRY_KIND],
+        properties: properties as unknown as object,
+        userId,
+      },
+    });
+    return this.toEntryView(row);
+  }
+
+  /**
+   * Edits the user-facing text of an entry.
+   *
+   * `textOriginal` is never touched — it is the immutable capture. `editedAt`
+   * is stamped so downstream consumers (synthesis generation) know to prefer
+   * the corrected text. Editing an entry never regenerates any synthesis that
+   * already includes it (nau#36).
+   */
+  async updateEntry(
+    userId: string,
+    workspaceId: string,
+    id: string,
+    params: { text: string },
+  ): Promise<JournalEntryView> {
+    const client = await this.scoped.forUser(userId, workspaceId);
+    const existing = await client.block.findUnique({
+      where: { id, type: LEGACY_TYPE_BY_KIND[JOURNAL_ENTRY_KIND], deletedAt: null },
+    });
+    if (!existing) throw new NotFoundException(`Journal entry ${id} not found`);
+
+    const prev = (existing.properties ?? {}) as unknown as JournalEntryProperties;
+    const updated: JournalEntryProperties = {
+      ...prev,
+      text: params.text,
+      editedAt: new Date().toISOString(),
+    };
+    const row = await client.block.update({
+      where: { id },
+      data: { properties: updated as unknown as object },
+    });
+    return this.toEntryView(row);
+  }
+
+  /**
+   * Soft-deletes an entry.
+   *
+   * Uses the substrate's `deletedAt` convention, the same as every other block.
+   * A deleted entry is not recomposed into future syntheses; existing ones
+   * already composed it and are not altered.
+   */
+  async deleteEntry(userId: string, workspaceId: string, id: string): Promise<{ success: true }> {
+    const client = await this.scoped.forUser(userId, workspaceId);
+    const existing = await client.block.findUnique({
+      where: { id, type: LEGACY_TYPE_BY_KIND[JOURNAL_ENTRY_KIND], deletedAt: null },
+    });
+    if (!existing) throw new NotFoundException(`Journal entry ${id} not found`);
+
+    await client.block.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+    return { success: true };
+  }
+
+  // ── Writes (synthesis) ──────────────────────────────────────────────────────
+
+  /**
+   * Edits the user-facing text of a synthesis or its reflection.
+   *
+   * `synthesisOriginal` and `reflectionOriginal` are never touched — they are
+   * the model's first draft and exist for audit. Editing a synthesis never
+   * regenerates it (nau#36) and never triggers re-generation of a superior
+   * synthesis that already composed this one. There is no `POST` or `DELETE`
+   * for syntheses: they are created by the pipeline, never by hand, and they
+   * are permanent records of a period.
+   */
+  async updateSynthesis(
+    userId: string,
+    workspaceId: string,
+    id: string,
+    params: { synthesis?: string; reflection?: string },
+  ): Promise<JournalSynthesisView> {
+    const client = await this.scoped.forUser(userId, workspaceId);
+    const existing = await client.block.findUnique({
+      where: { id, type: LEGACY_TYPE_BY_KIND[JOURNAL_SYNTHESIS_KIND], deletedAt: null },
+    });
+    if (!existing) throw new NotFoundException(`Journal synthesis ${id} not found`);
+
+    const prev = (existing.properties ?? {}) as unknown as JournalSynthesisProperties;
+    const updated: JournalSynthesisProperties = {
+      ...prev,
+      ...(params.synthesis !== undefined ? { synthesis: params.synthesis } : {}),
+      ...(params.reflection !== undefined ? { reflection: params.reflection } : {}),
+      editedAt: new Date().toISOString(),
+    };
+    const row = await client.block.update({
+      where: { id },
+      data: { properties: updated as unknown as object },
+    });
+    return this.toSynthesisView(row);
+  }
+
+  // ── Reads ───────────────────────────────────────────────────────────────────
 
   /**
    * Entries within a half-open range `[from, to)`, newest first.
