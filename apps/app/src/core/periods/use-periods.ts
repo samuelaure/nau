@@ -14,10 +14,10 @@ import { gregorian, type ScaleId, type SystemId } from '@nau/time'
  * `@nau/time` is one implementation now, shared by both, so there is nothing
  * left here to keep in sync.
  *
- * In `core/`, not `relations/time/`: this file names no consuming module
+ * In `core/`, not `time/`: this file names no consuming module
  * and does no more than transport `GET /time/periods` / `GET /time/period`
  * as typed data — it doesn't interpret what a period means, which is each
- * relation's own business. `relations/time/` keeps only what genuinely is
+ * module's own business. `time/` keeps only what genuinely is
  * Time's own domain (`use-time-systems.ts`'s workspace configuration,
  * `TimeSystemSettings.tsx`'s UI for it). Any relation that needs a resolved
  * period — Actions does today, Journal will — imports this directly, the

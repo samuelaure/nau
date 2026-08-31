@@ -6,25 +6,28 @@ import { join } from 'node:path'
  *
  * Two directions of dependency are allowed and no others:
  *
- *     relations/  ──▶  core/
+ *     domain modules  ──▶  core/
  *
- * `app` has no `sub-modules/` layer — Time's third layer exists for
- * interchangeable implementations of one contract (Gregorian vs naŭ vs
- * ephemeris). Journal, Actions and Content are not that: they are distinct
- * modules with no shared contract they each satisfy differently. See
- * nau#57. Two layers is the honest shape here; a third would be structure
- * without a reason.
+ * `app` is a host, not a module — it is what remains when every domain
+ * module is switched off (nau#57, nau#131). A domain module has no other
+ * way to exist as a frontend, so it lives directly under `src/{module}/`
+ * rather than in a `relations/` folder that would imply it could exist
+ * independently of being here. `app` has no `sub-modules/` layer either —
+ * Time's third layer exists for interchangeable implementations of one
+ * contract (Gregorian vs naŭ vs ephemeris). Journal, Actions and Content are
+ * not that: they are distinct modules with no shared contract they each
+ * satisfy differently. Two layers is the honest shape here; a third would be
+ * structure without a reason.
  *
- * - `core/` never imports `relations/`, with one declared exception:
+ * - `core/` never imports a domain module, with one declared exception:
  *   `module-registry/registry.ts` is the single file allowed to, because its
  *   whole job is supplying the real module list — the rules it applies stay
  *   in `select.ts`, which holds no such import. Anywhere else in `core/`,
  *   that import is the moment the core stops being agnostic and becomes
  *   "whatever Journal needed".
- * - Nothing imports a sibling across the relations/ boundary — one module's
- *   web-facing relation never reaches into another's. Deleting
- *   `relations/journal/` should delete Journal from the web app and
- *   touch nothing else.
+ * - Nothing imports a sibling across the domain-module boundary — one
+ *   module's web-facing code never reaches into another's. Deleting
+ *   `journal/` should delete Journal from the web app and touch nothing else.
  *
  * A test rather than a lint rule because it travels with the package: it
  * runs wherever the tests run, with no dependency on anyone's editor setup.

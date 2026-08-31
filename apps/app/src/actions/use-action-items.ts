@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * Confirmed against the real route — `apps/api/src/relations/api-actions/
+ * Confirmed against the real route — `apps/api/src/actions/
  * actions.controller.ts` + `actions.service.ts` (nau#126). The route this
  * file already guessed (`/actions/items*`) turned out correct: `api`'s
  * comment on nau#76 floated `/v1/actions/actions`, but no relation ever

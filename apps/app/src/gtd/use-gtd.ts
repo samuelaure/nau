@@ -4,7 +4,7 @@
  * DRAFT, not yet confirmed by `module:gtd`.
  *
  * Written against the real, merged (local `main`, unpushed as of writing)
- * `apps/api/src/relations/api-gtd/gtd.controller.ts` and `gtd.service.ts` —
+ * `apps/api/src/gtd/gtd.controller.ts` and `gtd.service.ts` —
  * not invented. Per nau#119's method: draft from observable evidence, mark
  * it unconfirmed in the code, publish the issue, converge.
  *
