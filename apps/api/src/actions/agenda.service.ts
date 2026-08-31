@@ -18,7 +18,7 @@ import { WorkspaceTimeService } from '../time/workspace-time.service';
 import { OccurrencesService, type OccurrenceRef } from '../time/occurrences.service';
 
 /** Block types that belong on an agenda. */
-const AGENDA_TYPES = ['action', 'habit', 'appointment'];
+const AGENDA_TYPES = ['actions.item', 'action', 'habit', 'appointment'];
 
 export interface AgendaItem {
   blockId: string;

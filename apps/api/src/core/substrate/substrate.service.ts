@@ -8,6 +8,22 @@ import type {
   FindBlocksQuery,
 } from './substrate.contract';
 
+const LEGACY_TYPES: Record<string, string[]> = {
+  'actions.item': ['action', 'habit', 'appointment'],
+  'references.note': ['note'],
+  'journal.entry': ['journal_entry'],
+  'journal.synthesis': ['journal_synthesis'],
+};
+
+const MODERN_KIND_BY_LEGACY: Record<string, string> = {
+  'action': 'actions.item',
+  'habit': 'actions.item',
+  'appointment': 'actions.item',
+  'note': 'references.note',
+  'journal_entry': 'journal.entry',
+  'journal_synthesis': 'journal.synthesis',
+};
+
 /**
  * Persistence for the substance of a block.
  *
@@ -58,7 +74,7 @@ export class SubstrateService {
     return {
       id: row.id,
       uuid: row.uuid,
-      kind: row.type,
+      kind: MODERN_KIND_BY_LEGACY[row.type] || row.type,
       properties: row.properties as T,
       // Non-null in practice and enforced by the tenancy layer; the column is
       // still nullable in the schema until nau#67 tightens it, and the census
@@ -117,9 +133,11 @@ export class SubstrateService {
     // ambiguity is how a broken query survives review.
     this.kinds.get(query.kind);
 
+    const types = [query.kind, ...(LEGACY_TYPES[query.kind] || [])];
+
     const rows = await client.block.findMany({
       where: {
-        type: query.kind,
+        type: { in: types },
         ...(query.parentId !== undefined && { parentId: query.parentId }),
         ...(query.includeDeleted ? {} : { deletedAt: null }),
       },
