@@ -97,6 +97,19 @@
       }
     },
     "/journal/entries": {
+      "post": {
+        "operationId": "JournalReadController_createEntry",
+        "summary": "Create a journal entry",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The created entry."
+          }
+        },
+        "tags": [
+          "journal"
+        ]
+      },
       "get": {
         "operationId": "JournalReadController_entries",
         "summary": "List journal entries",
@@ -140,6 +153,100 @@
         "responses": {
           "200": {
             "description": "Entries the caller can see in this workspace."
+          }
+        },
+        "tags": [
+          "journal"
+        ]
+      }
+    },
+    "/journal/entries/{id}": {
+      "patch": {
+        "operationId": "JournalReadController_updateEntry",
+        "summary": "Edit a journal entry text",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "workspaceId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The updated entry."
+          }
+        },
+        "tags": [
+          "journal"
+        ]
+      },
+      "delete": {
+        "operationId": "JournalReadController_deleteEntry",
+        "summary": "Delete a journal entry",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "workspaceId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Entry deleted."
+          }
+        },
+        "tags": [
+          "journal"
+        ]
+      }
+    },
+    "/journal/syntheses/{id}": {
+      "patch": {
+        "operationId": "JournalReadController_updateSynthesis",
+        "summary": "Edit a journal synthesis text (never regenerates)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "workspaceId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The updated synthesis."
           }
         },
         "tags": [
@@ -196,6 +303,27 @@
         "tags": [
           "journal"
         ]
+      }
+    },
+    "/journal/zazu-capture": {
+      "post": {
+        "operationId": "JournalZazuController_processZazuCapture",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ZazuCaptureDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        }
       }
     },
     "/blocks": {
@@ -680,58 +808,6 @@
         }
       }
     },
-    "/triage": {
-      "post": {
-        "operationId": "TriageController_processTriage",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TriageDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        }
-      }
-    },
-    "/triage/brands": {
-      "get": {
-        "operationId": "TriageController_getUserBrandsForTriage",
-        "parameters": [
-          {
-            "name": "userId",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        }
-      }
-    },
-    "/triage/retroprocess": {
-      "post": {
-        "operationId": "TriageController_retroprocess",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        }
-      }
-    },
     "/references/notes": {
       "post": {
         "operationId": "ReferencesController_create",
@@ -1000,6 +1076,38 @@
         ],
         "responses": {
           "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/gtd/zazu-triage": {
+      "post": {
+        "operationId": "GtdZazuController_processTriage",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ZazuTriageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/gtd/retroprocess": {
+      "post": {
+        "operationId": "GtdZazuController_retroprocess",
+        "parameters": [],
+        "responses": {
+          "201": {
             "description": ""
           }
         }
@@ -2721,15 +2829,15 @@
         "type": "object",
         "properties": {}
       },
+      "ZazuCaptureDto": {
+        "type": "object",
+        "properties": {}
+      },
       "CreateBlockDto": {
         "type": "object",
         "properties": {}
       },
       "UpdateBlockDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "TriageDto": {
         "type": "object",
         "properties": {}
       },
@@ -2750,6 +2858,10 @@
         "properties": {}
       },
       "OrderBody": {
+        "type": "object",
+        "properties": {}
+      },
+      "ZazuTriageDto": {
         "type": "object",
         "properties": {}
       },
