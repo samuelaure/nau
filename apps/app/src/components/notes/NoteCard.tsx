@@ -4,7 +4,7 @@ import { useDashboardStore } from '@/lib/state/dashboard-store'
 import { useDeleteNote } from '@/references/use-notes'
 import { useUpdateBlock } from '@/hooks/use-blocks-api'
 import { useUpsertPlanning } from '@/hooks/use-schedule-api'
-import { useUiStore } from '@/lib/state/ui-store'
+import { useActiveWorkspaceId } from '@/core/identity/workspace-store'
 import { Button } from '@9nau/ui/components/button'
 import { MoreVertical, CalendarPlus } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
@@ -19,7 +19,7 @@ export function NoteCard({ note }: NoteCardProps) {
     draggedItem: s.draggedItem,
     setEditingNoteId: s.actions.setEditingNoteId,
   }))
-  const activeWorkspaceId = useUiStore((s) => s.activeWorkspaceId)
+  const activeWorkspaceId = useActiveWorkspaceId()
 
   // Domain hook for delete. The note passes through the Block bridge for now
   // because the page-level data fetch is still via /blocks (nau#136). Once the

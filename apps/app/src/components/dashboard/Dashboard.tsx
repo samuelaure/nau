@@ -4,7 +4,7 @@ import { useMemo, useRef, useEffect } from 'react'
 import { Block } from '@9nau/types'
 import { PeriodBlock, type PeriodContents } from './PeriodBlock'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
-import { useUiStore } from '@/lib/state/ui-store'
+import { useActiveWorkspaceId } from '@/core/identity/workspace-store'
 import { usePeriodAgenda } from './usePeriodAgenda'
 import { usePeriodAt, usePeriodsIn } from '@/core/periods/use-periods'
 import { NextActions } from './NextActions'
@@ -70,7 +70,7 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
 
   const updateBlock = useUpdateBlock()
   const todayRef = useRef<HTMLDivElement>(null)
-  const activeWorkspaceId = useUiStore((s) => s.activeWorkspaceId)
+  const activeWorkspaceId = useActiveWorkspaceId()
 
   useEffect(() => {
     setTodayRef(todayRef)
@@ -318,6 +318,7 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
       {/* Deliberately a button and not a scroll trigger. See the effect above. */}
       <div className="flex items-center justify-center text-gray-500">
         <button
+          type="button"
           onClick={loadMoreFuture}
           className="flex flex-grow items-center justify-center rounded-lg p-1.5 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800"
         >
@@ -326,6 +327,7 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
         </button>
         {visibleFuture > 0 && (
           <button
+            type="button"
             onClick={hideFuture}
             className="ml-2 rounded-lg p-1.5 text-sm font-semibold transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
             title="Ocultar futuro"
@@ -349,6 +351,7 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
       ))}
 
       <button
+        type="button"
         onClick={loadMorePast}
         className="flex w-full items-center justify-center rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800"
       >

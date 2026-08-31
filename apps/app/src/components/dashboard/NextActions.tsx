@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ChevronDown, ChevronRight, Inbox } from 'lucide-react'
 import { apiClient } from '@/lib/api-client'
 import { cn } from '@9nau/ui/lib/utils'
-import { useUiStore } from '@/lib/state/ui-store'
+import { useActiveWorkspaceId } from '@/core/identity/workspace-store'
 import { useUpdateActionItem } from '@/actions/use-action-items'
 
 interface NextAction {
@@ -32,7 +32,7 @@ interface NextAction {
  * open.
  */
 export function NextActions() {
-  const activeWorkspaceId = useUiStore((s) => s.activeWorkspaceId)
+  const activeWorkspaceId = useActiveWorkspaceId()
   const [isOpen, setIsOpen] = useState(true)
   const updateActionItem = useUpdateActionItem()
 

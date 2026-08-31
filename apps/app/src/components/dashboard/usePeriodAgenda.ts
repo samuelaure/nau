@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import { useAgendaRange, type AgendaItem } from '@/hooks/use-agenda-api'
-import { useUiStore } from '@/lib/state/ui-store'
+import { useActiveWorkspaceId } from '@/core/identity/workspace-store'
 import { usePeriodsIn } from '@/core/periods/use-periods'
 import { toKey, toSlot, type PeriodSlot } from '@/actions/periods'
 
@@ -23,7 +23,7 @@ export type OccurrencesByPeriod = Map<string, AgendaItem[]>
  * that shows on seven days, and no amount of reading a date field produces that.
  */
 export function usePeriodAgenda(slots: PeriodSlot[]) {
-  const activeWorkspaceId = useUiStore((s) => s.activeWorkspaceId)
+  const activeWorkspaceId = useActiveWorkspaceId()
 
   const span = useMemo(() => {
     if (slots.length === 0) return null

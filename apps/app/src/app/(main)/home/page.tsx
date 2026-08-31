@@ -13,6 +13,7 @@ import { groupBlocksByDate, buildHierarchy, formatDisplayDate } from '@9nau/core
 import { Block } from '@9nau/types'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
 import { useUiStore } from '@/lib/state/ui-store'
+import { useActiveWorkspaceId } from '@/core/identity/workspace-store'
 import { NoteGrid } from '@/components/notes/NoteGrid'
 
 /**
@@ -71,7 +72,7 @@ function actionToBlock(action: ActionItem): Block {
 }
 
 export default function HomePage() {
-  const activeWorkspaceId = useUiStore((s) => s.activeWorkspaceId)
+  const activeWorkspaceId = useActiveWorkspaceId()
   const activeView = useUiStore((s) => s.activeView)
   const setAllBlocks = useDashboardStore((s) => s.actions.setAllBlocks)
 

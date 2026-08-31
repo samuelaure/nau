@@ -3,7 +3,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { Mic, Square, Loader2, Send } from 'lucide-react'
 import { useCaptureText, useCaptureVoice } from '@/hooks/use-captures-api'
-import { useUiStore } from '@/lib/state/ui-store'
+import { useActiveWorkspaceId } from '@/core/identity/workspace-store'
 
 /**
  * Writing or speaking a journal entry.
@@ -14,7 +14,7 @@ import { useUiStore } from '@/lib/state/ui-store'
  * did not choose to keep.
  */
 export function JournalCapture() {
-  const activeWorkspaceId = useUiStore((s) => s.activeWorkspaceId)
+  const activeWorkspaceId = useActiveWorkspaceId()
 
   const [text, setText] = useState('')
   const [recording, setRecording] = useState(false)

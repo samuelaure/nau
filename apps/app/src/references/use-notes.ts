@@ -79,13 +79,19 @@ export const useGetNotes = (params: {
   useQuery<Note[]>({
     queryKey: ['references', 'notes', params],
     queryFn: () => {
-      const search = new URLSearchParams({ workspaceId: params.workspaceId! })
+      const search = new URLSearchParams()
+      // `null` means "the workspace on my token" — the server already
+      // resolves it from the auth context when the param is absent
+      // (references.controller.ts: `body.workspaceId ?? user.workspaceId`).
+      // Gating the query on this ever being non-null left every screen
+      // permanently empty for a person who never opened the workspace
+      // switcher, since nothing else sets it by default.
+      if (params.workspaceId) search.set('workspaceId', params.workspaceId)
       if (params.parentId) search.set('parentId', params.parentId)
       if (params.take) search.set('take', String(params.take))
       if (params.skip) search.set('skip', String(params.skip))
       return apiClient.get(`/references/notes?${search.toString()}`)
     },
-    enabled: !!params.workspaceId,
   })
 
 export const useGetNote = (id: string, workspaceId: string | null) =>

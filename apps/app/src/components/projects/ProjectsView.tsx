@@ -12,11 +12,11 @@ import {
   useUpdateProject,
   useDeleteProject,
 } from '@/hooks/use-workspaces-api'
-import { useUiStore } from '@/lib/state/ui-store'
+import { useActiveWorkspaceId } from '@/core/identity/workspace-store'
 import type { Project } from '@9nau/types'
 
 export function ProjectsView() {
-  const activeWorkspaceId = useUiStore((s) => s.activeWorkspaceId)
+  const activeWorkspaceId = useActiveWorkspaceId()
   const { data: workspaces } = useGetWorkspaces()
 
   const workspaceIds = activeWorkspaceId

@@ -84,11 +84,15 @@ export const useGetActionItems = (params: { workspaceId: string | null; status?:
   useQuery<ActionItem[]>({
     queryKey: ['actions', 'items', params.workspaceId, params.status],
     queryFn: () => {
-      const search = new URLSearchParams({ workspaceId: params.workspaceId! })
+      // `null` means "the workspace on my token" — the server resolves it
+      // from the auth context when the param is absent. Gating this query on
+      // workspaceId ever being non-null left the dashboard permanently empty
+      // for anyone who never opened the workspace switcher.
+      const search = new URLSearchParams()
+      if (params.workspaceId) search.set('workspaceId', params.workspaceId)
       if (params.status) search.set('status', params.status)
       return apiClient.get(`/actions/items?${search.toString()}`)
     },
-    enabled: Boolean(params.workspaceId),
   })
 
 export const useCreateActionItem = () => {

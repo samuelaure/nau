@@ -27,7 +27,7 @@ import {
   type AgendaPeriod,
 } from '@/hooks/use-agenda-api'
 import { useUpsertPlanning } from '@/hooks/use-schedule-api'
-import { useUiStore } from '@/lib/state/ui-store'
+import { useActiveWorkspaceId } from '@/core/identity/workspace-store'
 import { AgendaRow } from './AgendaRow'
 import { ItemComposer } from './ItemComposer'
 import { toKey } from '@/actions/periods'
@@ -58,7 +58,7 @@ const PERIODS: { value: AgendaPeriod; label: string; composerDefault: 'today' | 
  * the work the tool was supposed to do.
  */
 export function AgendaView() {
-  const activeWorkspaceId = useUiStore((s) => s.activeWorkspaceId)
+  const activeWorkspaceId = useActiveWorkspaceId()
   const [date, setDate] = useState(() => new Date())
   const [period, setPeriod] = useState<AgendaPeriod>('day')
 

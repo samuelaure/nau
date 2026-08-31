@@ -6,7 +6,7 @@ import { Button } from '@9nau/ui/components/button'
 import { cn } from '@9nau/ui/lib/utils'
 import { JournalCapture } from './JournalCapture'
 import { EditableText } from './EditableText'
-import { useUiStore } from '@/lib/state/ui-store'
+import { useActiveWorkspaceId } from '@/core/identity/workspace-store'
 import {
   useGetJournalEntries,
   useGetJournalSyntheses,
@@ -81,7 +81,7 @@ function formatPeriodTitle(date: Date, period: PeriodType): string {
 }
 
 export function JournalView() {
-  const activeWorkspaceId = useUiStore((st) => st.activeWorkspaceId)
+  const activeWorkspaceId = useActiveWorkspaceId()
   const [currentDate, setCurrentDate] = useState(new Date())
   const [period, setPeriod] = useState<PeriodType>('day')
 

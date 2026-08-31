@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { useCreateNote } from '@/references/use-notes'
-import { useUiStore } from '@/lib/state/ui-store'
+import { useActiveWorkspaceId } from '@/core/identity/workspace-store'
 import { Card } from '@9nau/ui/components/card'
 import { Button } from '@9nau/ui/components/button'
 
@@ -21,7 +21,7 @@ export function NoteInput() {
     }
   }, [text])
 
-  const activeWorkspaceId = useUiStore((s) => s.activeWorkspaceId)
+  const activeWorkspaceId = useActiveWorkspaceId()
 
   /**
    * Saves, and only then clears.

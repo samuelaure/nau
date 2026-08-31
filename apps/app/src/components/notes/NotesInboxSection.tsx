@@ -14,11 +14,11 @@ export function NotesInboxSection({ title, notes }: NotesInboxSectionProps) {
   return (
     <div className="mb-4">
       <button
-        className="flex items-center w-full text-left p-2 rounded-md hover:bg-gray-50"
+        className="flex items-center w-full text-left p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800"
         onClick={() => setIsOpen(!isOpen)}
       >
         {isOpen ? <ChevronDown className="w-4 h-4 mr-2" /> : <ChevronRight className="w-4 h-4 mr-2" />}
-        <h3 className="text-sm font-semibold text-gray-800">{title}</h3>
+        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">{title}</h3>
       </button>
       {isOpen && (
         <div className="pl-2 mt-2">

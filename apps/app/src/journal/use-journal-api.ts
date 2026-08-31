@@ -62,13 +62,17 @@ export const useGetJournalEntries = (params: {
   useQuery<JournalEntryView[]>({
     queryKey: JOURNAL_KEYS.entries(params),
     queryFn: () => {
-      const s = new URLSearchParams({ workspaceId: params.workspaceId! })
+      // `null` means "the workspace on my token" — the server resolves it
+      // from the auth context when the param is absent. Gating this query on
+      // workspaceId ever being non-null left Journal permanently empty for
+      // anyone who never opened the workspace switcher.
+      const s = new URLSearchParams()
+      if (params.workspaceId) s.set('workspaceId', params.workspaceId)
       if (params.from) s.set('from', params.from)
       if (params.to) s.set('to', params.to)
       if (params.limit) s.set('limit', String(params.limit))
       return apiClient.get(`/journal/entries?${s.toString()}`)
     },
-    enabled: !!params.workspaceId,
   })
 
 export const useGetJournalSyntheses = (params: {
@@ -80,13 +84,13 @@ export const useGetJournalSyntheses = (params: {
   useQuery<JournalSynthesisView[]>({
     queryKey: JOURNAL_KEYS.syntheses(params),
     queryFn: () => {
-      const s = new URLSearchParams({ workspaceId: params.workspaceId! })
+      const s = new URLSearchParams()
+      if (params.workspaceId) s.set('workspaceId', params.workspaceId)
       if (params.from) s.set('from', params.from)
       if (params.to) s.set('to', params.to)
       if (params.limit) s.set('limit', String(params.limit))
       return apiClient.get(`/journal/syntheses?${s.toString()}`)
     },
-    enabled: !!params.workspaceId,
   })
 
 // ── Writes (entry) ────────────────────────────────────────────────────────────
