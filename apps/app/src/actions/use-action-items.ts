@@ -41,6 +41,13 @@ export interface ActionItemProperties {
   priority: ActionPriority | null
   deadline: string | null
   estimateMinutes: number | null
+  /**
+   * Stamped by the substrate on every kind, not declared by Actions' own
+   * schema — survives onto the wire only because the schema is
+   * `.passthrough()` (packages/actions/src/schemas.ts). Declared here so
+   * sibling ordering (buildHierarchy) can read it without a cast.
+   */
+  sortOrder?: number
 }
 
 export interface ActionItem {

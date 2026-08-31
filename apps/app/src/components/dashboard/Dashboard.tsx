@@ -99,7 +99,15 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
     workspaceId: anchorSpan ? activeWorkspaceId ?? null : null,
   })
 
-  const slots = useMemo(() => (periodsData?.periods ?? []).map(toSlot), [periodsData])
+  // `GET /time/periods` returns oldest-first (it resolves a [from, to) range
+  // in order, and other callers may depend on that) — but this layout puts
+  // the "Futuro" control above the list and "Pasado" below, so the render
+  // order needs to be newest-first: reversed once here, at the one place
+  // that turns the API's chronological list into this screen's spatial one.
+  const slots = useMemo(
+    () => [...(periodsData?.periods ?? [])].reverse().map(toSlot),
+    [periodsData],
+  )
 
   // Which period something appears under is decided by its schedule. The blocks
   // still carry the text and the tree; the agenda decides what is owed, which is

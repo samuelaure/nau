@@ -101,6 +101,16 @@
         "operationId": "JournalReadController_createEntry",
         "summary": "Create a journal entry",
         "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEntryDto"
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
             "description": "The created entry."
@@ -182,6 +192,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEntryDto"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "The updated entry."
@@ -244,6 +264,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSynthesisDto"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "The updated synthesis."
@@ -1189,6 +1219,16 @@
       "post": {
         "operationId": "AgendaController_setCompletion",
         "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetCompletionDto"
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
             "description": ""
@@ -1200,6 +1240,16 @@
       "post": {
         "operationId": "AgendaController_reorder",
         "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReorderDto"
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
             "description": ""
@@ -2829,6 +2879,18 @@
         "type": "object",
         "properties": {}
       },
+      "CreateEntryDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "UpdateEntryDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "UpdateSynthesisDto": {
+        "type": "object",
+        "properties": {}
+      },
       "ZazuCaptureDto": {
         "type": "object",
         "properties": {}
@@ -2862,6 +2924,14 @@
         "properties": {}
       },
       "ZazuTriageDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "SetCompletionDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "ReorderDto": {
         "type": "object",
         "properties": {}
       },

@@ -119,6 +119,45 @@ describe('Dashboard', () => {
     expect(screen.getByText('Pasado')).toBeInTheDocument()
   })
 
+  it('renders periods newest-first, matching "Futuro" above and "Pasado" below', () => {
+    // GET /time/periods (usePeriodsIn) returns oldest-first — a [from, to)
+    // range resolved in chronological order. This layout puts "Futuro" above
+    // the list and "Pasado" below, so the DOM order must be reversed from
+    // what the API returns, or a click on "Futuro" reveals rows at the
+    // bottom of the list instead of the top. Each slot's header (its title
+    // button) renders unconditionally — unlike the body inside it, which
+    // only mounts once expanded — so the header order is what this asserts.
+    ;(usePeriodsIn as jest.Mock).mockReturnValue({
+      data: {
+        periods: [
+          resolvedPeriod({
+            anchor: '2025-08-03T00:00:00.000Z',
+            from: '2025-08-03T00:00:00.000Z',
+            name: '3 de agosto',
+          }),
+          resolvedPeriod({
+            anchor: '2025-08-04T00:00:00.000Z',
+            from: '2025-08-04T00:00:00.000Z',
+            name: '4 de agosto',
+          }),
+          resolvedPeriod({
+            anchor: '2025-08-05T00:00:00.000Z',
+            from: '2025-08-05T00:00:00.000Z',
+            name: '5 de agosto',
+          }),
+        ],
+        timezone: 'UTC',
+      },
+    })
+    render(<Dashboard notesByDate={mockNotesByDate} actions={mockActions} experiences={mockExperiences} />, {
+      wrapper,
+    })
+    const labels = screen.getAllByText(/de agosto$/).map((el) => el.textContent)
+    // Newest (08-05) first, oldest (08-03) last — the reverse of API order.
+    expect(labels[0]).toBe('5 de agosto')
+    expect(labels[labels.length - 1]).toBe('3 de agosto')
+  })
+
   it('should call loadMoreFuture when the Futuro button is clicked', () => {
     render(<Dashboard notesByDate={mockNotesByDate} actions={mockActions} experiences={mockExperiences} />, {
       wrapper,

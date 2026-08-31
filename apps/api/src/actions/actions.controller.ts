@@ -10,26 +10,61 @@ import {
   UseGuards,
   BadRequestException,
 } from '@nestjs/common';
+import { IsString, IsOptional, IsNumber, IsIn } from 'class-validator';
 import { ActionsService } from './actions.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AccessTokenPayload } from '@nau/types';
 
 export class CreateActionItemBody {
+  @IsString()
+  @IsOptional()
   text?: string;
+
+  @IsIn(['low', 'medium', 'high'])
+  @IsOptional()
   priority?: 'low' | 'medium' | 'high' | null;
+
+  @IsString()
+  @IsOptional()
   deadline?: string | null;
+
+  @IsNumber()
+  @IsOptional()
   estimateMinutes?: number | null;
+
+  @IsString()
+  @IsOptional()
   parentId?: string | null;
+
+  @IsString()
+  @IsOptional()
   workspaceId?: string;
 }
 
 export class UpdateActionItemBody {
+  @IsString()
+  @IsOptional()
   text?: string;
+
+  @IsIn(['todo', 'done', 'cancelled'])
+  @IsOptional()
   status?: 'todo' | 'done' | 'cancelled';
+
+  @IsIn(['low', 'medium', 'high'])
+  @IsOptional()
   priority?: 'low' | 'medium' | 'high' | null;
+
+  @IsString()
+  @IsOptional()
   deadline?: string | null;
+
+  @IsNumber()
+  @IsOptional()
   estimateMinutes?: number | null;
+
+  @IsString()
+  @IsOptional()
   parentId?: string | null;
 }
 

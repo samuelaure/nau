@@ -7,53 +7,106 @@ import { JournalView } from '@/components/journal/JournalView'
 import { AgendaView } from '@/components/agenda/AgendaView'
 import { SearchView } from '@/components/search/SearchView'
 import { ProjectsView } from '@/components/projects/ProjectsView'
-import { useGetBlocks } from '@/hooks/use-blocks-api'
+import { useGetNotes, type Note } from '@/references/use-notes'
+import { useGetActionItems, type ActionItem } from '@/actions/use-action-items'
 import { groupBlocksByDate, buildHierarchy, formatDisplayDate } from '@9nau/core'
 import { Block } from '@9nau/types'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
 import { useUiStore } from '@/lib/state/ui-store'
 import { NoteGrid } from '@/components/notes/NoteGrid'
 
+/**
+ * Adapts a domain-module row (`Note`, `ActionItem`) onto the `Block` shape
+ * `buildHierarchy`/`groupBlocksByDate` (packages/nau-core) already understand.
+ *
+ * Deliberately local and disposable rather than a change to those helpers:
+ * `nau-core`'s hierarchy/grouping logic only reads `id`, `parentId`,
+ * `properties.sortOrder`, `properties.date`/`createdAt` and `properties.text`
+ * — none of that is Journal/Actions/References' domain, it's tree and date
+ * bookkeeping any kind needs. Reshaping the two rows that already carry
+ * everything it needs is cheaper and lower-risk than teaching those helpers
+ * five modules' response shapes, and it can be deleted the day `Dashboard`
+ * and `NoteGrid` are rebuilt to read `Note`/`ActionItem` natively (nau#136's
+ * remaining scope).
+ */
+function noteToBlock(note: Note): Block {
+  return {
+    id: note.id,
+    type: 'note',
+    properties: {
+      text: note.properties.content,
+      title: note.properties.title,
+      sortOrder: note.properties.sortOrder,
+    },
+    parentId: note.parentId,
+    uuid: note.uuid,
+    source: note.source,
+    sourceRef: note.sourceRef,
+    createdAt: note.createdAt,
+    updatedAt: note.updatedAt,
+    deletedAt: null,
+  }
+}
+
+function actionToBlock(action: ActionItem): Block {
+  return {
+    id: action.id,
+    type: 'action',
+    properties: {
+      text: action.properties.text,
+      status: action.properties.status,
+      priority: action.properties.priority,
+      deadline: action.properties.deadline,
+      estimateMinutes: action.properties.estimateMinutes,
+      sortOrder: action.properties.sortOrder,
+    },
+    parentId: action.parentId,
+    uuid: action.uuid,
+    source: null,
+    sourceRef: null,
+    createdAt: action.createdAt,
+    updatedAt: action.updatedAt,
+    deletedAt: null,
+  }
+}
+
 export default function HomePage() {
   const activeWorkspaceId = useUiStore((s) => s.activeWorkspaceId)
   const activeView = useUiStore((s) => s.activeView)
   const setAllBlocks = useDashboardStore((s) => s.actions.setAllBlocks)
 
-  const queryParams = useMemo(() => {
-    const params: any = {}
-    if (activeView !== 'home') {
-      params.status = activeView
-    }
-    if (activeWorkspaceId) {
-      params.workspaceId = activeWorkspaceId
-    }
-    return params
-  }, [activeView, activeWorkspaceId])
+  const {
+    data: notesData,
+    isLoading: notesLoading,
+    isError: notesError,
+  } = useGetNotes({ workspaceId: activeWorkspaceId })
+  const {
+    data: actionsData,
+    isLoading: actionsLoading,
+    isError: actionsError,
+  } = useGetActionItems({ workspaceId: activeWorkspaceId })
 
-  const { data: blocks, isLoading, isError } = useGetBlocks(queryParams)
+  const isLoading = notesLoading || actionsLoading
+  const isError = notesError || actionsError
+
+  const blocks = useMemo(() => {
+    const notes = (notesData ?? []).map(noteToBlock)
+    const actions = (actionsData ?? []).map(actionToBlock)
+    return [...notes, ...actions]
+  }, [notesData, actionsData])
 
   useMemo(() => {
-    if (blocks) {
+    if (blocks.length > 0 || (notesData && actionsData)) {
       setAllBlocks(blocks)
     }
-  }, [blocks, setAllBlocks])
+  }, [blocks, notesData, actionsData, setAllBlocks])
 
   const processedData = useMemo(() => {
-    if (!blocks) {
-      return {
-        notesByDate: new Map<string, Block[]>(),
-        actionsHierarchy: [],
-        experiencesHierarchy: [],
-        groupedNotes: {},
-      }
-    }
     const notes = blocks.filter((b: Block) => b.type === 'note')
     const actions = blocks.filter((b: Block) => b.type === 'action')
-    // `journal_entry` is the canonical and only type anything writes. The
-    // production census (#78) confirmed the six pre-normalisation
-    // `experience` rows are all soft-deleted — nothing left for this filter
-    // to reach by keeping the second name.
-    const experiences = blocks.filter((b: Block) => b.type === 'journal_entry')
+    // Journal has its own view (JournalView, below) reading journal.entry
+    // directly — it never joins the block list here any more (nau#134).
+    const experiences: Block[] = []
 
     const notesByDate = groupBlocksByDate(notes)
     const actionsHierarchy = buildHierarchy(actions)

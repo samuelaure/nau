@@ -1,9 +1,40 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query, UseGuards, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiOkResponse, ApiQuery, ApiCreatedResponse, ApiNoContentResponse } from '@nestjs/swagger';
+import { IsString, IsOptional, IsNotEmpty } from 'class-validator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JournalReadService } from './journal-read.service';
 import type { AccessTokenPayload } from '@nau/types';
+
+export class CreateEntryDto {
+  @IsString()
+  @IsNotEmpty()
+  text!: string;
+
+  @IsString()
+  @IsOptional()
+  date?: string;
+
+  @IsString()
+  @IsOptional()
+  workspaceId?: string;
+}
+
+export class UpdateEntryDto {
+  @IsString()
+  @IsOptional()
+  text?: string;
+}
+
+export class UpdateSynthesisDto {
+  @IsString()
+  @IsOptional()
+  synthesis?: string;
+
+  @IsString()
+  @IsOptional()
+  reflection?: string;
+}
 
 /**
  * Journal's read surface for people.
@@ -28,7 +59,7 @@ export class JournalReadController {
   @ApiCreatedResponse({ description: 'The created entry.' })
   async createEntry(
     @CurrentUser() user: AccessTokenPayload,
-    @Body() body: { text: string; date?: string; workspaceId?: string },
+    @Body() body: CreateEntryDto,
   ) {
     const ws = body.workspaceId ?? user.workspaceId;
     if (!ws) throw new BadRequestException('workspaceId is required');
@@ -42,11 +73,11 @@ export class JournalReadController {
     @CurrentUser() user: AccessTokenPayload,
     @Param('id') id: string,
     @Query('workspaceId') workspaceId?: string,
-    @Body() body: { text: string } = { text: '' },
+    @Body() body: UpdateEntryDto = {},
   ) {
     const ws = workspaceId ?? user.workspaceId;
     if (!ws) throw new BadRequestException('workspaceId is required');
-    return this.read.updateEntry(user.sub, ws, id, { text: body.text });
+    return this.read.updateEntry(user.sub, ws, id, { text: body.text ?? '' });
   }
 
   @Delete('entries/:id')
@@ -70,7 +101,7 @@ export class JournalReadController {
     @CurrentUser() user: AccessTokenPayload,
     @Param('id') id: string,
     @Query('workspaceId') workspaceId?: string,
-    @Body() body: { synthesis?: string; reflection?: string } = {},
+    @Body() body: UpdateSynthesisDto = {},
   ) {
     const ws = workspaceId ?? user.workspaceId;
     if (!ws) throw new BadRequestException('workspaceId is required');

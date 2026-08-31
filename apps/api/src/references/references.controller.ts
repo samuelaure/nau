@@ -10,6 +10,7 @@ import {
   UseGuards,
   BadRequestException,
 } from '@nestjs/common';
+import { IsString, IsOptional, IsArray } from 'class-validator';
 import { ReferencesService } from './references.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -17,16 +18,38 @@ import type { AccessTokenPayload } from '@nau/types';
 import type { Attachment } from '@nau/references';
 
 export class CreateNoteBody {
+  @IsString()
+  @IsOptional()
   title?: string | null;
+
+  @IsString()
+  @IsOptional()
   content?: string;
+
+  @IsArray()
+  @IsOptional()
   attachments?: Attachment[];
+
+  @IsString()
+  @IsOptional()
   parentId?: string | null;
+
+  @IsString()
+  @IsOptional()
   workspaceId?: string;
 }
 
 export class UpdateNoteBody {
+  @IsString()
+  @IsOptional()
   title?: string | null;
+
+  @IsString()
+  @IsOptional()
   content?: string;
+
+  @IsArray()
+  @IsOptional()
   attachments?: Attachment[];
 }
 

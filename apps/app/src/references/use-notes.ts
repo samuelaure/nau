@@ -32,6 +32,12 @@ export interface NoteProperties {
   attachments: Attachment[]
   /** Set by GTD's triage while a note sits in a tray. Null once ordered or never suggested. */
   suggestedType: string | null
+  /**
+   * Stamped by the substrate on every kind, not declared by References' own
+   * schema — survives onto the wire only because the schema is
+   * `.passthrough()` (packages/references/src/core/schemas.ts).
+   */
+  sortOrder?: number
 }
 
 /** A `references.note` block, as returned raw by the substrate — see file header. */

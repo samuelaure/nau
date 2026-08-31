@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Body, Query, UseGuards, BadRequestException } from '@nestjs/common';
+import { IsString, IsOptional, IsNotEmpty, IsBoolean, IsArray } from 'class-validator';
 import { AgendaService } from './agenda.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -13,6 +14,30 @@ import type { AccessTokenPayload } from '@nau/types';
  * was pure ceremony.
  */
 const SCALES = ['day', 'week', 'month', 'quarter', 'year'] as const;
+
+export class SetCompletionDto {
+  @IsString()
+  @IsNotEmpty()
+  blockId!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  occurrenceAt!: string;
+
+  @IsBoolean()
+  @IsOptional()
+  done?: boolean;
+}
+
+export class ReorderDto {
+  @IsString()
+  @IsOptional()
+  workspaceId?: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  blockIds!: string[];
+}
 
 @Controller('agenda')
 @UseGuards(JwtAuthGuard)
@@ -75,7 +100,7 @@ export class AgendaController {
   @Post('complete')
   async setCompletion(
     @CurrentUser() user: AccessTokenPayload,
-    @Body() body: { blockId: string; occurrenceAt: string; done: boolean },
+    @Body() body: SetCompletionDto,
   ) {
     if (!body.blockId || !body.occurrenceAt) {
       throw new BadRequestException('blockId and occurrenceAt are required');
@@ -91,7 +116,7 @@ export class AgendaController {
   @Post('reorder')
   async reorder(
     @CurrentUser() user: AccessTokenPayload,
-    @Body() body: { workspaceId?: string; blockIds: string[] },
+    @Body() body: ReorderDto,
   ) {
     const ws = body.workspaceId ?? user.workspaceId;
     if (!ws) throw new BadRequestException('workspaceId is required');
