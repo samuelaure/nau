@@ -9,7 +9,7 @@ import type { AgendaItem } from '@/hooks/use-agenda-api'
 import { useSetCompletion } from '@/hooks/use-agenda-api'
 import { useUpsertPlanning } from '@/hooks/use-schedule-api'
 import { WHEN_LABELS, scaleOf, type WhenKind } from '@/components/agenda/scheduling'
-import type { Granularity } from '@/relations/app-actions/periods'
+import type { Granularity } from '@/relations/actions/periods'
 import { useCreateBlock, useUpdateBlock, useDeleteBlock } from '@/hooks/use-blocks-api'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
 

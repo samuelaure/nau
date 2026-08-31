@@ -6,13 +6,13 @@ import type { Scale, ScaleId, SystemId } from '@nau/time'
  * `@nau/time` resolves what a period *is*; nothing in it knows about an
  * infinite-scroll list of them, because that is a presentation concern of
  * whichever module renders one. This file is that concern, factored out to
- * `core/` rather than left inside `relations/app-time/`: it takes only
+ * `core/` rather than left inside `relations/time/`: it takes only
  * `@nau/time`'s types as parameters, has no opinion on what a period being
  * empty or full *means* — that's `(Time)·Actions` or `(Time)·Journal`
  * territory — and more than one relation needs exactly this windowing
  * (Actions does, Journal will). A relation genuinely specific to Time
  * (`use-time-systems.ts`, `use-periods.ts` — the actual `/time/*` HTTP calls)
- * stays in `relations/app-time/`; this doesn't call the network at all,
+ * stays in `relations/time/`; this doesn't call the network at all,
  * which is the test for whether something belongs in `core/`.
  */
 

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api-client'
-import type { Granularity } from '@/relations/app-actions/periods'
+import type { Granularity } from '@/relations/actions/periods'
 
 /**
  * The rhythm vocabulary (`daily`/`weekly`/`monthly`) and the scale vocabulary

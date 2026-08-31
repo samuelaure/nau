@@ -30,7 +30,7 @@ import { useUpsertPlanning } from '@/hooks/use-schedule-api'
 import { useUiStore } from '@/lib/state/ui-store'
 import { AgendaRow } from './AgendaRow'
 import { ItemComposer } from './ItemComposer'
-import { toKey } from '@/relations/app-actions/periods'
+import { toKey } from '@/relations/actions/periods'
 import { stepDate } from '@/core/periods/scroll-window'
 
 function shift(date: Date, scale: AgendaPeriod, direction: -1 | 1): Date {

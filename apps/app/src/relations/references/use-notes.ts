@@ -1,25 +1,18 @@
 'use client'
 
 /**
- * DRAFT, not yet confirmed by `module:references`.
+ * Confirmed by `module:references` on nau#124: `GET /references/notes` returns
+ * a bare `Block<NoteProperties>[]` (no `{ notes, total }` envelope), and there
+ * is no `ReferencesReadService`/`toNoteView` flattening step the way
+ * `journal-read.service.ts` has for `journal.entry` — the substance/content
+ * split from `substrate.contract.ts` is passed through as-is. `title`,
+ * `content`, `attachments`, `suggestedType` live under `properties`, not
+ * flattened onto the block, unlike this hook's first draft assumed by analogy
+ * with Journal.
  *
- * Written against the real, merged (local `main`, not yet pushed as of
- * writing) `apps/api/src/relations/api-references/references.controller.ts`
- * — not invented. Every field below is read directly off that controller and
- * `packages/references/src/core/schemas.ts`'s `NoteSchema`/`AttachmentSchema`,
- * per the method in nau#119: draft from observable evidence, mark it
- * unconfirmed in the code itself, publish the issue, converge when the owning
- * session responds.
- *
- * What's genuinely uncertain, flagged rather than guessed:
- * - The exact response envelope of `GET /references/notes` (a bare array? a
- *   `{ notes, total }` page shape? — the controller returns whatever
- *   `references.listNotes()` resolves to, and that return type wasn't
- *   re-derived here without reading the service body, which this draft
- *   didn't do).
- * - Whether `id`/`createdAt`/`updatedAt`/`parentId` are echoed on every
- *   response the same way `journal.entry`'s route does, since `NoteSchema`
- *   only describes `properties`, not the substrate envelope around it.
+ * References offered to build a flattening service instead; consuming the raw
+ * envelope was chosen here to avoid new API surface for a shape `app` can
+ * already destructure cheaply at the call site.
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -33,18 +26,28 @@ export interface Attachment {
   metadata: Record<string, unknown> | null
 }
 
-/** DRAFT: substrate envelope fields assumed by analogy with journal.entry — unconfirmed. */
-export interface Note {
-  id: string
-  kind: 'references.note'
+export interface NoteProperties {
   title: string | null
   content: string
   attachments: Attachment[]
   /** Set by GTD's triage while a note sits in a tray. Null once ordered or never suggested. */
   suggestedType: string | null
+}
+
+/** A `references.note` block, as returned raw by the substrate — see file header. */
+export interface Note {
+  id: string
+  uuid: string
+  kind: 'references.note'
+  properties: NoteProperties
+  workspaceId: string
+  userId: string | null
   parentId: string | null
+  source: string | null
+  sourceRef: string | null
   createdAt: string
   updatedAt: string
+  deletedAt: string | null
 }
 
 export interface CreateNoteInput {

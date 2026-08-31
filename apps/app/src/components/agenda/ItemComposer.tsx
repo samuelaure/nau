@@ -5,7 +5,7 @@ import { Loader2, Plus, Repeat, Square, Circle } from 'lucide-react'
 import { cn } from '@9nau/ui/lib/utils'
 import { useCreateBlock, useUpdateBlock } from '@/hooks/use-blocks-api'
 import { useUpsertPlanning } from '@/hooks/use-schedule-api'
-import { toKey } from '@/relations/app-actions/periods'
+import { toKey } from '@/relations/actions/periods'
 import {
   rruleOf,
   modeOf,

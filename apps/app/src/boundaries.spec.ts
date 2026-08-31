@@ -23,7 +23,7 @@ import { join } from 'node:path'
  *   "whatever Journal needed".
  * - Nothing imports a sibling across the relations/ boundary — one module's
  *   web-facing relation never reaches into another's. Deleting
- *   `relations/app-journal/` should delete Journal from the web app and
+ *   `relations/journal/` should delete Journal from the web app and
  *   touch nothing else.
  *
  * A test rather than a lint rule because it travels with the package: it

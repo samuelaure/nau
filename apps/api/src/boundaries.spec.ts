@@ -24,7 +24,7 @@ import { join } from 'node:path';
  * - `core/` never names a module in code. A core that knows `journal.entry`
  *   exists has stopped being agnostic — this is the rule that keeps the kind
  *   registry a mechanism rather than a list.
- * - No relation imports another relation. Deleting `relations/api-journal/`
+ * - No relation imports another relation. Deleting `relations/journal/`
  *   should delete Journal from the backend and touch nothing else.
  * - `PrismaService` is injectable only in `core/` and in the relation that owns
  *   the model. This is the api-specific rule and the most valuable one: today
@@ -169,7 +169,7 @@ describe('relations/ are independent of one another', () => {
           // (`@nau/actions/relations/gtd`) contains the literal text
           // "relations/" too, but it names a folder inside that package's own
           // `packages/*/src/`, not a sibling here. The rule missed this until
-          // relations/api-gtd started importing three such subpaths in one
+          // relations/gtd started importing three such subpaths in one
           // file, which is what surfaced the gap.
           if (!specifier || !specifier.startsWith('.')) continue;
 
@@ -204,7 +204,7 @@ describe('relations/ are independent of one another', () => {
  * list reaching empty is what finishes the rebuild.
  */
 const PRISMA_LEGACY = [
-  'relations/api-actions/agenda.service.ts',
+  'relations/actions/agenda.service.ts',
   'auth/auth.service.ts',
   'blocks/block-events.service.ts',
   'blocks/blocks.service.ts',

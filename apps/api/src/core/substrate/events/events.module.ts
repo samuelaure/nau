@@ -7,7 +7,7 @@ import { PrismaModule } from '../../../prisma/prisma.module';
   imports: [PrismaModule],
   controllers: [EventsController],
   providers: [EventsService],
-  // Exported so relations/api-gtd can reuse it as the movement log (nau#118)
+  // Exported so relations/gtd can reuse it as the movement log (nau#118)
   // rather than a second Event-shaped table for the same kind of row.
   exports: [EventsService],
 })

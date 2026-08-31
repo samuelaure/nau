@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { gregorianPeriodAt } from '@nau/time';
 import { SynthesisSchedulerService } from './synthesis-scheduler.service';
 import { WorkspaceTimeService } from './workspace-time.service';
-import { JournalService } from '../relations/api-journal/journal.service';
+import { JournalService } from '../relations/journal/journal.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 jest.mock('@prisma/client', () => ({
