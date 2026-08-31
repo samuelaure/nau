@@ -343,6 +343,10 @@ export interface TriageRequestDto {
    * lands on the day ingestion finished, which is wrong whenever that lags.
    */
   capturedAt?: string
+  /**
+   * The format of the original capture, e.g. voice or text.
+   */
+  originFormat?: 'voice' | 'text'
 }
 
 // ── API response wrapper ───────────────────────────────────────────────────────
