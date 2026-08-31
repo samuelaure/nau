@@ -34,7 +34,14 @@ import { join } from 'node:path'
 
 const SRC = join(__dirname)
 const CORE = join(SRC, 'core')
-const RELATIONS = join(SRC, 'relations')
+
+const DOMAIN_MODULES = [
+  'actions',
+  'gtd',
+  'journal',
+  'references',
+  'time',
+]
 
 function sourcesUnder(dir: string): string[] {
   const out: string[] = []
@@ -67,15 +74,19 @@ describe('core/ knows nothing of any concrete module', () => {
   const REGISTRY_FILE = 'core/module-registry/registry.ts'
   const files = sourcesUnder(CORE).filter((f) => rel(f) !== REGISTRY_FILE)
 
-  it.each(files.map(rel))('%s does not import from relations/', (name) => {
-    const offending = importLines(join(SRC, name)).filter((line) => /relations\//.test(line))
+  it.each(files.map(rel))('%s does not import from domain modules', (name) => {
+    const offending = importLines(join(SRC, name)).filter((line) => 
+      DOMAIN_MODULES.some(mod => new RegExp(`@/${mod}/`).test(line))
+    )
     expect(offending).toEqual([])
   })
 
-  it(`${REGISTRY_FILE} imports from relations/ only to supply the module list`, () => {
-    const offending = importLines(join(SRC, REGISTRY_FILE)).filter(
-      (line) => /relations\//.test(line) && !/^import \{ \w+Module \} from '@\/relations\//.test(line.trim()),
-    )
+  it(`${REGISTRY_FILE} imports from domain modules only to supply the module list`, () => {
+    const offending = importLines(join(SRC, REGISTRY_FILE)).filter((line) => {
+      const mentionsDomain = DOMAIN_MODULES.some(mod => new RegExp(`@/${mod}/`).test(line));
+      const isAllowedImport = /^import \{ \w+Module \} from '@\/(actions|gtd|journal|references|time)\//.test(line.trim());
+      return mentionsDomain && !isAllowedImport;
+    })
     expect(offending).toEqual([])
   })
 
@@ -93,24 +104,28 @@ describe('core/ knows nothing of any concrete module', () => {
   })
 })
 
-describe('relations/ never reach into a sibling relation', () => {
-  if (!existsSync(RELATIONS)) {
-    it.skip('relations/ does not exist yet', () => {})
-    return
-  }
+describe('domain modules never reach into a sibling domain module', () => {
+  it('no domain module imports a sibling', () => {
+    const violations: string[] = []
 
-  const files = sourcesUnder(RELATIONS)
+    for (const dir of DOMAIN_MODULES) {
+      const fullDir = join(SRC, dir)
+      if (!existsSync(fullDir)) continue
 
-  it('finds relation sources to check', () => {
-    expect(files.length).toBeGreaterThan(0)
-  })
+      for (const file of sourcesUnder(fullDir)) {
+        for (const line of importLines(file)) {
+          // Both absolute @/module and relative ../module form
+          const absoluteMatch = line.match(/from\s+['"]@\/([^/]+)/)?.[1]
+          const relativeMatch = line.match(/from\s+['"]\.\.\/([^/]+)/)?.[1]
+          const targetModule = absoluteMatch || relativeMatch
+          
+          if (targetModule && DOMAIN_MODULES.includes(targetModule) && targetModule !== dir) {
+            violations.push(`${rel(file)} imports ${targetModule}`)
+          }
+        }
+      }
+    }
 
-  it.each(files.map(rel))('%s does not reach into another relation', (name) => {
-    const relation = name.split('/')[1] // relations/<app-journal>/...
-    const offending = importLines(join(SRC, name)).filter((line) => {
-      const match = /relations\/([^/'"]+)/.exec(line)
-      return match !== null && match[1] !== relation
-    })
-    expect(offending).toEqual([])
+    expect(violations).toEqual([])
   })
 })

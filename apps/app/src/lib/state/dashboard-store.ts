@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { Block } from '@9nau/types'
 import { RefObject } from 'react'
-import type { Granularity } from '@/relations/actions/periods'
+import type { Granularity } from '@/actions/periods'
 
 type ViewMode = 'list' | 'horizontal'
 

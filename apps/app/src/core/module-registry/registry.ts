@@ -20,11 +20,11 @@ import {
  * The rules themselves live in `select.ts` as pure functions — this file
  * only supplies them with the real list.
  */
-// import { journalModule } from '@/relations/journal'
-// import { actionsModule } from '@/relations/actions'
-// import { gtdModule } from '@/relations/gtd'
-// import { referencesModule } from '@/relations/references'
-import { timeModule } from '@/relations/time'
+// import { journalModule } from '@/journal'
+// import { actionsModule } from '@/actions'
+// import { gtdModule } from '@/gtd'
+// import { referencesModule } from '@/references'
+import { timeModule } from '@/time'
 
 const MODULES: ModuleDescriptor[] = [
   // gtdModule,
