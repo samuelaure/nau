@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { useCreateBlock } from '@/hooks/use-blocks-api'
+import { useCreateNote } from '@/references/use-notes'
 import { useUiStore } from '@/lib/state/ui-store'
 import { Card } from '@9nau/ui/components/card'
 import { Button } from '@9nau/ui/components/button'
@@ -12,7 +12,7 @@ export function NoteInput() {
   const formRef = React.useRef<HTMLFormElement>(null)
   const textAreaRef = React.useRef<HTMLTextAreaElement>(null)
 
-  const createBlock = useCreateBlock()
+  const createNote = useCreateNote()
 
   React.useEffect(() => {
     if (textAreaRef.current) {
@@ -37,17 +37,11 @@ export function NoteInput() {
       return
     }
 
-    const today = new Date()
-    const pad = (n: number) => String(n).padStart(2, '0')
-    // The day the person is looking at, in their own clock. A note belongs to
-    // the day it was captured, which is not a due date and never becomes one.
-    const dateInUserTimeZone = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`
-
-    createBlock.mutate(
+    createNote.mutate(
       {
-        type: 'note',
+        content: trimmed,
+        title: null,
         workspaceId: activeWorkspaceId ?? undefined,
-        properties: { text: trimmed, status: 'inbox', date: dateInUserTimeZone },
       },
       {
         onSuccess: () => {
@@ -58,9 +52,7 @@ export function NoteInput() {
     )
   }
 
-  // Bound to the latest handler on every render. The previous version listed
-  // `formRef.current` as a dependency, which never changes identity, so the
-  // listener kept whichever `handleClose` it captured first.
+  // Bound to the latest handler on every render.
   const closeRef = React.useRef(handleClose)
   closeRef.current = handleClose
 
@@ -107,13 +99,13 @@ export function NoteInput() {
             autoFocus
           />
           <div className="mt-2 flex items-center justify-end gap-2">
-            {createBlock.isError && (
+            {createNote.isError && (
               <span className="mr-auto text-xs text-red-600">
                 No se pudo guardar. El texto sigue aquí.
               </span>
             )}
-            <Button type="button" variant="ghost" onClick={handleClose} disabled={createBlock.isPending}>
-              {createBlock.isPending ? 'Guardando…' : 'Listo'}
+            <Button type="button" variant="ghost" onClick={handleClose} disabled={createNote.isPending}>
+              {createNote.isPending ? 'Guardando…' : 'Listo'}
             </Button>
           </div>
         </div>

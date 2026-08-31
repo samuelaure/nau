@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { useUpdateBlock, useDeleteBlock } from '@/hooks/use-blocks-api'
+import { useUpdateNote, useDeleteNote } from '@/references/use-notes'
 import { Button } from '@9nau/ui/components/button'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
+import { useUiStore } from '@/lib/state/ui-store'
 import { MoreVertical } from 'lucide-react'
 
 export function EditNoteModal() {
@@ -17,12 +18,19 @@ export function EditNoteModal() {
   const textAreaRef = useRef<HTMLTextAreaElement>(null)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
 
-  const updateBlock = useUpdateBlock()
-  const deleteBlock = useDeleteBlock()
+  // `editingNote` is still a Block from the global block store — `content` lives
+  // under `properties.text` for the old-style notes while the `/blocks` bridge is
+  // alive. `Block` never carried `workspaceId` (packages/types), so the active
+  // workspace comes from the same store `NoteCard.tsx` already reads it from,
+  // not from the note itself. When the bridge is retired the store will carry
+  // `Note` objects, which do have `workspaceId` natively (nau#136).
+  const activeWorkspaceId = useUiStore((s) => s.activeWorkspaceId)
+  const updateNote = useUpdateNote(activeWorkspaceId)
+  const deleteNote = useDeleteNote(activeWorkspaceId)
 
   useEffect(() => {
     if (editingNote) {
-      setText(editingNote.properties.text as string)
+      setText((editingNote.properties.text ?? editingNote.properties.content ?? '') as string)
     }
   }, [editingNote])
 
@@ -41,10 +49,11 @@ export function EditNoteModal() {
   }, [editingNote])
 
   const handleSaveAndClose = () => {
-    if (editingNote && text.trim() !== editingNote.properties.text) {
-      updateBlock.mutate({
+    const original = (editingNote?.properties.text ?? editingNote?.properties.content ?? '') as string
+    if (editingNote && text.trim() !== original) {
+      updateNote.mutate({
         id: editingNote.id,
-        updateDto: { properties: { text: text.trim() } },
+        body: { content: text.trim() },
       })
     }
     setEditingNoteId(null)
@@ -53,7 +62,7 @@ export function EditNoteModal() {
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation()
     if (editingNote) {
-      deleteBlock.mutate(editingNote.id)
+      deleteNote.mutate(editingNote.id)
       setEditingNoteId(null)
     }
   }

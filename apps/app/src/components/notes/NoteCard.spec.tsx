@@ -2,7 +2,8 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { NoteCard } from './NoteCard'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
-import { useDeleteBlock, useUpdateBlock } from '@/hooks/use-blocks-api'
+import { useUpdateBlock } from '@/hooks/use-blocks-api'
+import { useDeleteNote } from '@/references/use-notes'
 import { useUpsertPlanning } from '@/hooks/use-schedule-api'
 import { makeBlock } from '@/test/block-fixture'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -10,10 +11,14 @@ import React from 'react'
 
 jest.mock('@/lib/state/dashboard-store')
 jest.mock('@/hooks/use-blocks-api')
+jest.mock('@/references/use-notes')
 jest.mock('@/hooks/use-schedule-api')
+jest.mock('@/lib/state/ui-store', () => ({
+  useUiStore: () => null,
+}))
 
 const useDashboardStoreMock = useDashboardStore as unknown as jest.Mock
-const mockDeleteBlock = jest.fn()
+const mockDeleteNote = jest.fn()
 const queryClient = new QueryClient()
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -43,11 +48,10 @@ describe('NoteCard', () => {
     )
     // Every mutation hook the component reads must return the shape
     // `useMutation` actually produces — `isPending` included — or a click
-    // that reads `.isPending` crashes with "Cannot read properties of
-    // undefined" before the assertion under test ever runs. #71.
-    ;(useDeleteBlock as jest.Mock).mockReturnValue({ mutate: mockDeleteBlock, isPending: false })
-    ;(useUpdateBlock as jest.Mock).mockReturnValue({ mutate: jest.fn(), isPending: false })
-    ;(useUpsertPlanning as jest.Mock).mockReturnValue({ mutate: jest.fn(), isPending: false })
+    // that reads `.isPending` crashes before the assertion under test runs.
+    ;(useDeleteNote as jest.Mock).mockReturnValue({ mutate: mockDeleteNote, isPending: false })
+    ;(useUpdateBlock as jest.Mock).mockReturnValue({ mutate: jest.fn(), mutateAsync: jest.fn(), isPending: false })
+    ;(useUpsertPlanning as jest.Mock).mockReturnValue({ mutate: jest.fn(), mutateAsync: jest.fn(), isPending: false })
   })
 
   afterEach(() => {
@@ -84,7 +88,7 @@ describe('NoteCard', () => {
     expect(setDraggedItem).toHaveBeenCalledWith(null)
   })
 
-  it('should call deleteBlock on delete button click', () => {
+  it('should call deleteNote on delete button click', () => {
     render(<NoteCard note={mockNote} />, { wrapper })
     const menuButton = screen.getByTestId('note-card-menu-button')
     fireEvent.click(menuButton)
@@ -92,6 +96,6 @@ describe('NoteCard', () => {
     const deleteButton = screen.getByText('Delete note')
     fireEvent.click(deleteButton)
 
-    expect(mockDeleteBlock).toHaveBeenCalledWith(mockNote.id)
+    expect(mockDeleteNote).toHaveBeenCalledWith(mockNote.id)
   })
 })

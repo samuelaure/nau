@@ -1,5 +1,5 @@
-import { Controller, Get, Query, UseGuards, BadRequestException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiOkResponse, ApiQuery } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query, UseGuards, BadRequestException } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiOkResponse, ApiQuery, ApiCreatedResponse, ApiNoContentResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JournalReadService } from './journal-read.service';
@@ -22,6 +22,60 @@ import type { AccessTokenPayload } from '@nau/types';
 @UseGuards(JwtAuthGuard)
 export class JournalReadController {
   constructor(private readonly read: JournalReadService) {}
+
+  @Post('entries')
+  @ApiOperation({ summary: 'Create a journal entry' })
+  @ApiCreatedResponse({ description: 'The created entry.' })
+  async createEntry(
+    @CurrentUser() user: AccessTokenPayload,
+    @Body() body: { text: string; date?: string; workspaceId?: string },
+  ) {
+    const ws = body.workspaceId ?? user.workspaceId;
+    if (!ws) throw new BadRequestException('workspaceId is required');
+    return this.read.createEntry(user.sub, ws, { text: body.text, date: body.date });
+  }
+
+  @Patch('entries/:id')
+  @ApiOperation({ summary: 'Edit a journal entry text' })
+  @ApiOkResponse({ description: 'The updated entry.' })
+  async updateEntry(
+    @CurrentUser() user: AccessTokenPayload,
+    @Param('id') id: string,
+    @Query('workspaceId') workspaceId?: string,
+    @Body() body: { text: string } = { text: '' },
+  ) {
+    const ws = workspaceId ?? user.workspaceId;
+    if (!ws) throw new BadRequestException('workspaceId is required');
+    return this.read.updateEntry(user.sub, ws, id, { text: body.text });
+  }
+
+  @Delete('entries/:id')
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Delete a journal entry' })
+  @ApiNoContentResponse({ description: 'Entry deleted.' })
+  async deleteEntry(
+    @CurrentUser() user: AccessTokenPayload,
+    @Param('id') id: string,
+    @Query('workspaceId') workspaceId?: string,
+  ) {
+    const ws = workspaceId ?? user.workspaceId;
+    if (!ws) throw new BadRequestException('workspaceId is required');
+    return this.read.deleteEntry(user.sub, ws, id);
+  }
+
+  @Patch('syntheses/:id')
+  @ApiOperation({ summary: 'Edit a journal synthesis text (never regenerates)' })
+  @ApiOkResponse({ description: 'The updated synthesis.' })
+  async updateSynthesis(
+    @CurrentUser() user: AccessTokenPayload,
+    @Param('id') id: string,
+    @Query('workspaceId') workspaceId?: string,
+    @Body() body: { synthesis?: string; reflection?: string } = {},
+  ) {
+    const ws = workspaceId ?? user.workspaceId;
+    if (!ws) throw new BadRequestException('workspaceId is required');
+    return this.read.updateSynthesis(user.sub, ws, id, body);
+  }
 
   @Get('entries')
   @ApiOperation({

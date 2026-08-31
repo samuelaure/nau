@@ -10,7 +10,8 @@ import { useSetCompletion } from '@/hooks/use-agenda-api'
 import { useUpsertPlanning } from '@/hooks/use-schedule-api'
 import { WHEN_LABELS, scaleOf, type WhenKind } from '@/components/agenda/scheduling'
 import type { Granularity } from '@/actions/periods'
-import { useCreateBlock, useUpdateBlock, useDeleteBlock } from '@/hooks/use-blocks-api'
+import { useCreateBlock } from '@/hooks/use-blocks-api'
+import { useUpdateActionItem, useDeleteActionItem } from '@/actions/use-action-items'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
 
 /**
@@ -145,8 +146,11 @@ export function ActionsSection({
   const [isOpen, setIsOpen] = useState(true)
   const setCompletion = useSetCompletion()
   const createBlock = useCreateBlock()
-  const updateBlock = useUpdateBlock()
-  const deleteBlock = useDeleteBlock()
+  // update/delete go through the Actions domain endpoint; create still uses
+  // /blocks because POST /actions/items does not support `planning` yet, and
+  // the one-request create+schedule guarantee must be preserved (nau#136).
+  const updateActionItem = useUpdateActionItem()
+  const deleteActionItem = useDeleteActionItem()
   const upsertPlanning = useUpsertPlanning()
   const setFocusedItemId = useDashboardStore((s) => s.actions.setFocusedItemId)
 
@@ -201,14 +205,14 @@ export function ActionsSection({
   }
 
   const handleUpdate = (id: string, text: string) =>
-    updateBlock.mutate({ id, updateDto: { properties: { text } } })
+    updateActionItem.mutate({ id, body: { text } })
 
   const handleIndent = (id: string) => {
     const index = occurrences.findIndex((o) => o.blockId === id)
     const previous = occurrences[index - 1]
     if (!previous || previous.blockId === id) return
-    updateBlock.mutate(
-      { id, updateDto: { parentId: previous.blockId } },
+    updateActionItem.mutate(
+      { id, body: { parentId: previous.blockId } },
       { onSuccess: () => setFocusedItemId(id) },
     )
   }
@@ -217,8 +221,8 @@ export function ActionsSection({
     const item = occurrences.find((o) => o.blockId === id)
     if (!item?.parentId) return
     const grandParent = occurrences.find((o) => o.blockId === item.parentId)?.parentId ?? null
-    updateBlock.mutate(
-      { id, updateDto: { parentId: grandParent } },
+    updateActionItem.mutate(
+      { id, body: { parentId: grandParent } },
       { onSuccess: () => setFocusedItemId(id) },
     )
   }
@@ -259,7 +263,7 @@ export function ActionsSection({
             onAddItem={(_after, parentId) => void handleAdd(_after, parentId)}
             onIndent={handleIndent}
             onOutdent={handleOutdent}
-            onDelete={(id) => deleteBlock.mutate(id)}
+            onDelete={(id) => deleteActionItem.mutate(id)}
             onDragStart={(_e, dragged) => setDraggedItem(dragged)}
             onDragEnd={() => {
               setDraggedItem(null)

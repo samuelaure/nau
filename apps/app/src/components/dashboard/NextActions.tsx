@@ -6,7 +6,7 @@ import { ChevronDown, ChevronRight, Inbox } from 'lucide-react'
 import { apiClient } from '@/lib/api-client'
 import { cn } from '@9nau/ui/lib/utils'
 import { useUiStore } from '@/lib/state/ui-store'
-import { useUpdateBlock } from '@/hooks/use-blocks-api'
+import { useUpdateActionItem } from '@/actions/use-action-items'
 
 interface NextAction {
   blockId: string
@@ -34,7 +34,7 @@ interface NextAction {
 export function NextActions() {
   const activeWorkspaceId = useUiStore((s) => s.activeWorkspaceId)
   const [isOpen, setIsOpen] = useState(true)
-  const updateBlock = useUpdateBlock()
+  const updateActionItem = useUpdateActionItem()
 
   const { data } = useQuery<{ items: NextAction[] }, Error>({
     queryKey: ['agenda', 'next', activeWorkspaceId],
@@ -71,8 +71,6 @@ export function NextActions() {
             <div
               key={item.blockId}
               draggable
-              // Dragging one onto a period is what plans it. Until then it has
-              // no day, and the list is honest about that.
               onDragStart={(e) => {
                 e.dataTransfer.effectAllowed = 'move'
                 e.dataTransfer.setData('text/plain', item.blockId)
@@ -86,9 +84,9 @@ export function NextActions() {
               )}
               <button
                 onClick={() =>
-                  updateBlock.mutate({
+                  updateActionItem.mutate({
                     id: item.blockId,
-                    updateDto: { properties: { status: 'done' } },
+                    body: { status: 'done' },
                   })
                 }
                 title="Completar sin planificar"
