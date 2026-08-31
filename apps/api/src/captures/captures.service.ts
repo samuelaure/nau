@@ -1,7 +1,7 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { getFeatureFallbackChain, getClientForFeature } from '@nau/llm-client';
 import { z } from 'zod';
-import { JournalService } from '../relations/journal/journal.service';
+import { JournalService } from '../journal/journal.service';
 import { PrivateStorageService } from '../core/storage/private-storage.service';
 
 const CleanedCapture = z.object({

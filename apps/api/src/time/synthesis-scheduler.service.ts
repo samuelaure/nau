@@ -14,7 +14,7 @@ import {
 } from '@nau/time';
 import { PrismaService } from '../prisma/prisma.service';
 import { WorkspaceTimeService } from './workspace-time.service';
-import { JournalService, type JournalSourceRow } from '../relations/journal/journal.service';
+import { JournalService, type JournalSourceRow } from '../journal/journal.service';
 
 /**
  * Deciding when a period has closed, and asking Journal to interpret it.

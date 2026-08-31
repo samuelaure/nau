@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { CapturesController } from './captures.controller';
 import { CapturesService } from './captures.service';
-import { JournalModule } from '../relations/journal/journal.module';
+import { JournalModule } from '../journal/journal.module';
 import { PrivateStorageService } from '../core/storage/private-storage.service';
 
 @Module({
