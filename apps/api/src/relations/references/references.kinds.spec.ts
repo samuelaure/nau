@@ -19,10 +19,8 @@ describe('References registers against the core registry', () => {
     expect(registry.ownedBy('references').map((k) => k.id)).toEqual([REFERENCES_NOTE_KIND]);
   });
 
-  it('declares the kind schedulable — locatable from its ReviewIntent, though the note holds no plan itself', () => {
-    expect(registry.withCapability('schedulable').map((k) => k.id)).toEqual([
-      REFERENCES_NOTE_KIND,
-    ]);
+  it('does not declare the kind schedulable — a review reminder is a real Actions item, never a date on the note', () => {
+    expect(registry.withCapability('schedulable').map((k) => k.id)).toEqual([]);
   });
 
   it('declares the kind syncable — nau-mobile captures notes today', () => {

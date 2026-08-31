@@ -220,7 +220,6 @@ const PRISMA_LEGACY = [
   'time/planning.service.ts',
   'time/synthesis-scheduler.service.ts',
   'time/workspace-time.service.ts',
-  'triage/triage.service.ts',
   'core/observability/usage.service.ts',
   'workspaces/workspaces.service.ts',
 ];
