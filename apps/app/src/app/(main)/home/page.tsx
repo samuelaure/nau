@@ -6,7 +6,6 @@ import { Dashboard } from '@/components/dashboard/Dashboard'
 import { JournalView } from '@/components/journal/JournalView'
 import { AgendaView } from '@/components/agenda/AgendaView'
 import { SearchView } from '@/components/search/SearchView'
-import { ProjectsView } from '@/components/projects/ProjectsView'
 import { useGetNotes, type Note } from '@/references/use-notes'
 import { useGetActionItems, type ActionItem } from '@/actions/use-action-items'
 import { groupBlocksByDate, buildHierarchy, formatDisplayDate } from '@9nau/core'
@@ -15,6 +14,7 @@ import { useDashboardStore } from '@/lib/state/dashboard-store'
 import { useUiStore } from '@/lib/state/ui-store'
 import { useActiveWorkspaceId } from '@/core/identity/workspace-store'
 import { NoteGrid } from '@/components/notes/NoteGrid'
+import { ActionsLibrary } from '@/components/actions/ActionsLibrary'
 
 /**
  * Adapts a domain-module row (`Note`, `ActionItem`) onto the `Block` shape
@@ -153,7 +153,11 @@ export default function HomePage() {
   }
 
   if (activeView === 'projects') {
-    return <ProjectsView />
+    return <ActionsLibrary />
+  }
+
+  if (activeView === 'actions') {
+    return <ActionsLibrary />
   }
 
   return (

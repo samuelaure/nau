@@ -10,8 +10,7 @@ import { useSetCompletion } from '@/hooks/use-agenda-api'
 import { useUpsertPlanning } from '@/hooks/use-schedule-api'
 import { WHEN_LABELS, scaleOf, type WhenKind } from '@/components/agenda/scheduling'
 import type { Granularity } from '@/actions/periods'
-import { useCreateBlock } from '@/hooks/use-blocks-api'
-import { useUpdateActionItem, useDeleteActionItem } from '@/actions/use-action-items'
+import { useCreateActionItem, useUpdateActionItem, useDeleteActionItem } from '@/actions/use-action-items'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
 
 /**
@@ -145,10 +144,7 @@ export function ActionsSection({
 }) {
   const [isOpen, setIsOpen] = useState(true)
   const setCompletion = useSetCompletion()
-  const createBlock = useCreateBlock()
-  // update/delete go through the Actions domain endpoint; create still uses
-  // /blocks because POST /actions/items does not support `planning` yet, and
-  // the one-request create+schedule guarantee must be preserved (nau#136).
+  const createActionItem = useCreateActionItem()
   const updateActionItem = useUpdateActionItem()
   const deleteActionItem = useDeleteActionItem()
   const upsertPlanning = useUpsertPlanning()
@@ -193,12 +189,17 @@ export function ActionsSection({
    * range computed from `periodStart`/`periodEnd`.
    */
   const handleAdd = async (_afterId: string | null, parentId: string | null) => {
-    const created = await createBlock.mutateAsync({
-      type: 'action',
-      parentId: parentId ?? undefined,
+    const created = await createActionItem.mutateAsync({
+      parentId,
       workspaceId,
-      properties: { text: '', status: 'todo' },
-      planning: { scale: granularity, anchor: `${dateStr}T00:00:00`, recurrence: null },
+      text: '',
+    })
+
+    await upsertPlanning.mutateAsync({
+      blockId: created.id,
+      scale: granularity,
+      anchor: `${dateStr}T00:00:00`,
+      recurrence: null,
     })
 
     setFocusedItemId(created.id)

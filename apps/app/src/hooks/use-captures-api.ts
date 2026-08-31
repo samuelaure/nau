@@ -13,7 +13,10 @@ export const useCaptureText = () => {
   return useMutation({
     mutationFn: (input: { text: string; workspaceId?: string; capturedAt?: string }) =>
       apiClient.post('/captures/text', input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['blocks'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['blocks'] })
+      queryClient.invalidateQueries({ queryKey: ['journal', 'entries'] })
+    },
   })
 }
 
@@ -44,7 +47,10 @@ export const useCaptureVoice = () => {
         source: 'web_voice',
       })
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['blocks'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['blocks'] })
+      queryClient.invalidateQueries({ queryKey: ['journal', 'entries'] })
+    },
   })
 }
 

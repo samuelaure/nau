@@ -9,7 +9,8 @@ import { cn } from '@9nau/ui/lib/utils'
 import { useShellStore } from './shell-store'
 import { useWorkspaceStore } from '@/core/identity/workspace-store'
 import { useGetWorkspaces } from '@/core/identity/use-workspaces'
-import { getNavEntries } from '@/core/module-registry/registry'
+import { useUiStore } from '@/lib/state/ui-store'
+import { WORKSPACE_VIEWS } from '@/lib/state/workspace-views'
 
 /**
  * The navigation frame.
@@ -34,6 +35,8 @@ export function Sidebar() {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
   const setActiveWorkspace = useWorkspaceStore((s) => s.setActiveWorkspace)
   const { data: workspaces } = useGetWorkspaces()
+  const activeView = useUiStore((s) => s.activeView)
+  const setView = useUiStore((s) => s.actions.setView)
 
   const pathname = usePathname()
   const [isHoverExpanded, setIsHoverExpanded] = React.useState(false)
@@ -42,10 +45,9 @@ export function Sidebar() {
   const isExpanded = isSidebarOpen || isHoverExpanded
   const activeWorkspace = workspaces?.find((w) => w.id === activeWorkspaceId) ?? null
 
-  // Which modules this workspace has switched on. Until the backend reports
-  // it, every registered module is treated as enabled — the mechanism is in
-  // place, and the data that drives it is a separate contract.
-  const navEntries = getNavEntries({ enabledModuleIds: [] })
+  // These are workspace surfaces, not route modules yet. Keeping this list in
+  // the shell makes every working surface reachable while module routes are
+  // progressively registered in the registry.
 
   React.useEffect(() => {
     return () => {
@@ -81,23 +83,22 @@ export function Sidebar() {
         />
 
         <ul className="flex-grow space-y-1">
-          {navEntries.map(({ moduleId, label, icon: Icon, href }) => {
-            const isActive = pathname === href || pathname.startsWith(`${href}/`)
+          {WORKSPACE_VIEWS.map(({ view, label, icon: Icon }) => {
+            const isActive = activeView === view
             return (
-              <li key={moduleId}>
-                <Link href={href}>
-                  <Button
-                    variant={isActive ? 'secondary' : 'ghost'}
-                    aria-current={isActive ? 'page' : undefined}
-                    className={cn(
-                      'flex h-12 w-full items-center text-sm font-medium transition-colors',
-                      isExpanded ? 'justify-start px-4' : 'justify-center',
-                    )}
-                  >
-                    <Icon className={cn('h-6 w-6', isExpanded && 'mr-4')} />
-                    {isExpanded && <span>{label}</span>}
-                  </Button>
-                </Link>
+              <li key={view}>
+                <Button
+                  variant={isActive ? 'secondary' : 'ghost'}
+                  aria-current={isActive ? 'page' : undefined}
+                  onClick={() => setView(view)}
+                  className={cn(
+                    'flex h-12 w-full items-center text-sm font-medium transition-colors',
+                    isExpanded ? 'justify-start px-4' : 'justify-center',
+                  )}
+                >
+                  <Icon className={cn('h-6 w-6', isExpanded && 'mr-4')} />
+                  {isExpanded && <span>{label}</span>}
+                </Button>
               </li>
             )
           })}

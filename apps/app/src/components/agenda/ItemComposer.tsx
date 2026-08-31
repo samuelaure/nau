@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Loader2, Plus, Repeat, Square, Circle } from 'lucide-react'
 import { cn } from '@9nau/ui/lib/utils'
-import { useCreateBlock, useUpdateBlock } from '@/hooks/use-blocks-api'
+import { useCreateActionItem } from '@/actions/use-action-items'
 import { useUpsertPlanning } from '@/hooks/use-schedule-api'
 import { toKey } from '@/actions/periods'
 import {
@@ -62,9 +62,9 @@ export function ItemComposer({
     setWhen((w) => ({ ...w, kind: defaultWhen, date: toKey(defaultDate ?? new Date()) }))
   }, [defaultWhen, defaultDate])
 
-  const createBlock = useCreateBlock()
+  const createActionItem = useCreateActionItem()
   const upsertPlanning = useUpsertPlanning()
-  const busy = createBlock.isPending || upsertPlanning.isPending
+  const busy = createActionItem.isPending || upsertPlanning.isPending
 
   const isHabit = frequency.kind !== 'none'
 
@@ -75,16 +75,10 @@ export function ItemComposer({
 
     try {
       const minutes = Number(estimate)
-      const block = await createBlock.mutateAsync({
-        // The type stays 'action'. What makes it a habit is the frequency, and
-        // deriving that means adding or removing one never needs a second write.
-        type: 'action',
+      const block = await createActionItem.mutateAsync({
         workspaceId,
-        properties: {
-          text,
-          status: 'todo',
-          ...(Number.isFinite(minutes) && minutes > 0 ? { estimateMinutes: minutes } : {}),
-        },
+        text,
+        ...(Number.isFinite(minutes) && minutes > 0 ? { estimateMinutes: minutes } : {}),
       })
 
       const anchor =

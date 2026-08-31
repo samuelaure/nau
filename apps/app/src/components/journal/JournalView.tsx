@@ -322,6 +322,21 @@ export function JournalView() {
           <div className="text-center py-16">
             <BookOpen className="w-12 h-12 mx-auto text-gray-300 dark:text-gray-600 mb-4" />
             <p className="text-gray-400 dark:text-gray-500">No hay entradas para este período</p>
+            {period === 'day' && (
+              <button
+                onClick={() =>
+                  createEntry.mutate({
+                    text: '',
+                    date: range.start.toISOString(),
+                    workspaceId: activeWorkspaceId ?? undefined,
+                  })
+                }
+                disabled={createEntry.isPending}
+                className="mx-auto mt-4 inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                <Plus className="h-4 w-4" /> Nueva entrada
+              </button>
+            )}
           </div>
         )
       )}
