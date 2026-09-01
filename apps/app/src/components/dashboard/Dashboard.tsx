@@ -12,6 +12,10 @@ import { HierarchicalBlock, findItemAndParent, calculateSortOrder } from '@9nau/
 import { Button } from '@9nau/ui/components/button'
 import { ChevronsLeft, ChevronsRight, ArrowUp, ArrowDown, X } from 'lucide-react'
 import { useUpdateBlock } from '@/hooks/use-blocks-api'
+import { useGetJournalEntries, type JournalEntryView } from '@/journal/use-journal-api'
+import { useUpdateActionItem } from '@/actions/use-action-items'
+import { useUpsertPlanning } from '@/hooks/use-schedule-api'
+import { apiClient } from '@/core/http/client'
 import { cn } from '@9nau/ui/lib/utils'
 import {
   isCurrent,
@@ -69,6 +73,8 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
   }))
 
   const updateBlock = useUpdateBlock()
+  const updateActionItem = useUpdateActionItem()
+  const upsertPlanning = useUpsertPlanning()
   const todayRef = useRef<HTMLDivElement>(null)
   const activeWorkspaceId = useActiveWorkspaceId()
 
@@ -109,10 +115,30 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
     [periodsData],
   )
 
+  // Journal's timestamp is what places an experience in Home's temporal
+  // canvas. Fetch one span for the window instead of one request per period.
+  const { data: journalEntries = [] } = useGetJournalEntries({
+    workspaceId: activeWorkspaceId,
+    from: anchorSpan ? new Date(`${anchorSpan.from}T00:00:00`).toISOString() : undefined,
+    to: anchorSpan ? new Date(`${anchorSpan.to}T23:59:59.999`).toISOString() : undefined,
+  })
+
   // Which period something appears under is decided by its schedule. The blocks
   // still carry the text and the tree; the agenda decides what is owed, which is
   // the only way one recurring block can show up across many periods.
   const { byPeriod } = usePeriodAgenda(slots)
+
+  const scheduledPeriodKeys = useMemo(() => {
+    const keys = new Map<string, Set<string>>()
+    byPeriod.forEach((items, periodKey) => {
+      items.forEach((item) => {
+        const periods = keys.get(item.blockId) ?? new Set<string>()
+        periods.add(periodKey)
+        keys.set(item.blockId, periods)
+      })
+    })
+    return keys
+  }, [byPeriod])
 
   const blocksById = useMemo(() => {
     const map = new Map<string, Block>()
@@ -151,12 +177,16 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
       return {
         occurrences: byPeriod.get(slot.key) ?? [],
         experiences: experiences.filter(inSlot),
-        notes: notes
-          .filter((n) => n.properties.status === 'inbox')
-          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+        journalEntries: journalEntries
+          .filter((entry) => {
+            const lived = new Date(entry.date)
+            return lived >= slot.start && lived <= slot.end
+          })
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+        notes: notes.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
       }
     }
-  }, [byPeriod, experiences, notesByDate])
+  }, [byPeriod, experiences, journalEntries, notesByDate])
 
   // Scrolling loads the past and only the past.
   //
@@ -178,7 +208,7 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
     return () => el.removeEventListener('scroll', handleScroll)
   }, [viewMode, mainContentRef, loadMorePast])
 
-  const handleDrop = () => {
+  const handleDrop = async () => {
     if (!draggedItem || !dropTarget) return
 
     if (
@@ -224,11 +254,15 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
 
     let newParentId: string | null = draggedItem.parentId
     let newSortOrder: number | undefined
-    const newProperties: Record<string, unknown> = {}
+    let movedToAnotherPeriod = false
 
     if (dropTarget.id) {
       const targetItemInfo = findItemAndParent(allItems, dropTarget.id)
-      if (!targetItemInfo) return
+      if (!targetItemInfo) {
+        setDraggedItem(null)
+        setDropTarget(null)
+        return
+      }
 
       if (dropTarget.position === 'on') {
         newParentId = targetItemInfo.item.id
@@ -251,28 +285,49 @@ export function Dashboard({ notesByDate, actions, experiences }: DashboardProps)
       newSortOrder = (lastRootItem?.properties.sortOrder || 0) + 1
     }
 
-    if ((draggedItem.properties.date as string) !== dropTarget.date) {
-      newProperties.date = dropTarget.date
+    if (!scheduledPeriodKeys.get(draggedItem.id)?.has(dropTarget.date)) {
+      movedToAnotherPeriod = true
       if (dropTarget.position !== 'on') newParentId = null
     }
 
     const hasChanged =
       newParentId !== draggedItem.parentId ||
       (newSortOrder !== undefined && newSortOrder !== (draggedItem.properties.sortOrder as number)) ||
-      Object.keys(newProperties).length > 0
+      movedToAnotherPeriod
 
+    try {
     if (hasChanged) {
-      updateBlock.mutate({
-        id: draggedItem.id,
-        updateDto: {
-          parentId: newParentId,
-          properties: { ...newProperties, sortOrder: newSortOrder },
-        },
-      })
+      // The Actions route owns the tree. A period move is a Planning update;
+      // never write a synthetic `date` property and hope the agenda notices.
+      if (newParentId !== draggedItem.parentId) {
+        await updateActionItem.mutateAsync({ id: draggedItem.id, body: { parentId: newParentId } })
+      }
+      if (movedToAnotherPeriod) {
+        const currentPlan = await apiClient.get<{
+          system?: string
+          scale?: Granularity
+          recurrence?: string | null
+          recurrenceTimezone?: string | null
+          recurrenceMode?: 'FIXED' | 'AFTER_COMPLETION'
+          recurrenceUntil?: string | null
+        }>(`/time/planning/${draggedItem.id}`).catch(() => null)
+        await upsertPlanning.mutateAsync({
+          blockId: draggedItem.id,
+          scale: currentPlan?.scale ?? granularity,
+          anchor: new Date(`${dropTarget.date}T12:00:00`).toISOString(),
+          recurrence: currentPlan?.recurrence ?? null,
+          recurrenceTimezone: currentPlan?.recurrenceTimezone ?? null,
+          recurrenceMode: currentPlan?.recurrenceMode ?? 'FIXED',
+          recurrenceUntil: currentPlan?.recurrenceUntil ?? null,
+        })
+      }
     }
-
-    setDraggedItem(null)
-    setDropTarget(null)
+    } finally {
+      // Never leave the canvas in a phantom dragging state after a failed
+      // network write; React Query preserves the visible item until refetch.
+      setDraggedItem(null)
+      setDropTarget(null)
+    }
   }
 
   /** Switches the whole list to the grain one level down, starting at this period. */

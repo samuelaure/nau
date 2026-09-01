@@ -4,7 +4,6 @@ import { Menu } from 'lucide-react'
 import { Button } from '@9nau/ui/components/button'
 import { cn } from '@9nau/ui/lib/utils'
 import { useShellStore } from './shell-store'
-import { SearchBar } from '@/core/search/search-bar'
 
 /**
  * The top bar.
@@ -33,9 +32,7 @@ export function Header({ isScrolled }: { isScrolled: boolean }) {
 
       <span className="ml-2 text-2xl font-semibold text-gray-700 dark:text-gray-100">9naŭ</span>
 
-      <div className="mx-8 flex-1">
-        <SearchBar />
-      </div>
+      <div className="ml-auto text-sm text-gray-400 dark:text-gray-500">Inicio</div>
     </header>
   )
 }

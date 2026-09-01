@@ -7,6 +7,7 @@ import { Block } from '@9nau/types'
 import { HierarchicalSection } from './HierarchicalSection'
 import { ActionsSection } from './ActionsSection'
 import { NotesInboxSection } from '../notes/NotesInboxSection'
+import { JournalPeriodSection } from '../journal/JournalPeriodSection'
 import { HierarchicalBlock } from '@9nau/core'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
 import type { AgendaItem } from '@/hooks/use-agenda-api'
@@ -15,6 +16,7 @@ import { isCurrent, subGranularity, type PeriodSlot } from '@/actions/periods'
 export interface PeriodContents {
   occurrences: AgendaItem[]
   experiences: HierarchicalBlock[]
+  journalEntries: import('@/journal/use-journal-api').JournalEntryView[]
   notes: Block[]
 }
 
@@ -55,7 +57,7 @@ export function PeriodBlock({
   // nothing at all happened in it. A tab that shows one type counts only that
   // type, which is the same rule applied to a narrower list.
   const total =
-    contents.occurrences.length + contents.experiences.length + contents.notes.length
+    contents.occurrences.length + contents.experiences.length + contents.journalEntries.length + contents.notes.length
   const isEmpty = total === 0
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -80,14 +82,8 @@ export function PeriodBlock({
         blocksById={blocksById}
         workspaceId={workspaceId}
       />
-      <HierarchicalSection
-        dateStr={slot.key}
-        sectionType="journal_entry"
-        title="Experiencias"
-        items={contents.experiences}
-        workspaceId={workspaceId}
-      />
-      <NotesInboxSection title="Notes Inbox" notes={contents.notes} />
+      <JournalPeriodSection entries={contents.journalEntries} date={slot.start} workspaceId={workspaceId} />
+      <NotesInboxSection title="Capturas y notas" notes={contents.notes} />
 
       {/* One level in place. Going deeper switches grain instead of nesting
           further: toggles inside toggles inside a scroll stop being readable at

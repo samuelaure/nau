@@ -1,20 +1,14 @@
 'use client'
 
-import { useMemo } from 'react'
-import { NoteInput } from '@/components/notes/note-input'
+import { useEffect, useMemo } from 'react'
 import { Dashboard } from '@/components/dashboard/Dashboard'
-import { JournalView } from '@/components/journal/JournalView'
-import { AgendaView } from '@/components/agenda/AgendaView'
-import { SearchView } from '@/components/search/SearchView'
 import { useGetNotes, type Note } from '@/references/use-notes'
 import { useGetActionItems, type ActionItem } from '@/actions/use-action-items'
 import { groupBlocksByDate, buildHierarchy, formatDisplayDate } from '@9nau/core'
 import { Block } from '@9nau/types'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
-import { useUiStore } from '@/lib/state/ui-store'
 import { useActiveWorkspaceId } from '@/core/identity/workspace-store'
-import { NoteGrid } from '@/components/notes/NoteGrid'
-import { ActionsLibrary } from '@/components/actions/ActionsLibrary'
+import { HomeCapture } from '@/components/home/HomeCapture'
 
 /**
  * Adapts a domain-module row (`Note`, `ActionItem`) onto the `Block` shape
@@ -73,7 +67,6 @@ function actionToBlock(action: ActionItem): Block {
 
 export default function HomePage() {
   const activeWorkspaceId = useActiveWorkspaceId()
-  const activeView = useUiStore((s) => s.activeView)
   const setAllBlocks = useDashboardStore((s) => s.actions.setAllBlocks)
 
   const {
@@ -96,7 +89,7 @@ export default function HomePage() {
     return [...notes, ...actions]
   }, [notesData, actionsData])
 
-  useMemo(() => {
+  useEffect(() => {
     if (blocks.length > 0 || (notesData && actionsData)) {
       setAllBlocks(blocks)
     }
@@ -139,56 +132,15 @@ export default function HomePage() {
     return <div className="text-center text-red-500 mt-10">Failed to load data. Please try again later.</div>
   }
 
-  // Route to special views
-  if (activeView === 'agenda') {
-    return <AgendaView />
-  }
-
-  if (activeView === 'journal') {
-    return <JournalView />
-  }
-
-  if (activeView === 'search') {
-    return <SearchView />
-  }
-
-  if (activeView === 'projects') {
-    return <ActionsLibrary />
-  }
-
-  if (activeView === 'actions') {
-    return <ActionsLibrary />
-  }
-
   return (
-    <>
-      <NoteInput />
-      {activeView === 'home' ? (
-        <Dashboard
-          notesByDate={processedData.notesByDate}
-          actions={processedData.actionsHierarchy}
-          experiences={processedData.experiencesHierarchy}
-        />
-      ) : (
-        <div className="space-y-8">
-          {Object.keys(processedData.groupedNotes).length === 0 ? (
-            <div className="text-center text-gray-500 dark:text-gray-400 mt-20">This section is empty.</div>
-          ) : (
-            Object.entries(processedData.groupedNotes).map(([date, notesForDate]) => (
-              <div key={date}>
-                <div className="flex items-center mb-4">
-                  <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider pr-3 whitespace-nowrap">
-                    {date}
-                  </div>
-                  <div className="flex-grow h-px bg-gray-200 dark:bg-gray-700"></div>
-                </div>
-                <NoteGrid notes={notesForDate} />
-              </div>
-            ))
-          )}
-        </div>
-      )}
-    </>
+    <div className="mx-auto max-w-6xl">
+      <HomeCapture />
+      <Dashboard
+        notesByDate={processedData.notesByDate}
+        actions={processedData.actionsHierarchy}
+        experiences={processedData.experiencesHierarchy}
+      />
+    </div>
   )
 }
 

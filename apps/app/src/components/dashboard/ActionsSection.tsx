@@ -246,6 +246,9 @@ export function ActionsSection({
     items.flatMap((item) => {
       const block = blocksById.get(item.blockId)
       if (!block) return []
+      // `date` is presentation context supplied by Time, not persisted on an
+      // Action. EditableItem's drop target needs it to identify this period.
+      const periodBlock: Block = { ...block, properties: { ...block.properties, date: dateStr } }
 
       const children = rows.childrenOf(item.blockId)
 
@@ -256,7 +259,7 @@ export function ActionsSection({
           className={cn('rounded-md', overdueTint(item.overdue))}
         >
           <EditableItem
-            item={block}
+            item={periodBlock}
             occurrence={item}
             parentList={[]}
             index={0}
