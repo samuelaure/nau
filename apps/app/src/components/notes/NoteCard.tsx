@@ -102,6 +102,11 @@ export function NoteCard({ note }: NoteCardProps) {
       )}
     >
       <div onClick={() => setEditingNoteId(note.id)} className="p-4 flex-grow">
+        {Boolean(note.properties.title) && (
+          <p className="mb-1 text-sm font-medium text-card-foreground break-words">
+            {note.properties.title as string}
+          </p>
+        )}
         <p className="whitespace-pre-wrap text-sm text-card-foreground break-words max-h-80 overflow-hidden">
           {(note.properties.text ?? note.properties.content ?? '') as string}
         </p>

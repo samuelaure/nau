@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
-import { Menu, Search as SearchIcon, RefreshCw, LayoutGrid, List, Settings, Moon, Sun, User, LogOut } from 'lucide-react'
+import { Menu, Search as SearchIcon, RefreshCw, Settings, Moon, Sun, User, LogOut } from 'lucide-react'
 import { Button } from '@9nau/ui/components/button'
 import { cn } from '@9nau/ui/lib/utils'
 import { useShellStore } from './shell-store'
@@ -22,8 +22,6 @@ export function Header({ isScrolled }: { isScrolled: boolean }) {
   const toggleDarkMode = useShellStore((s) => s.toggleDarkMode)
   const searchQuery = useUiStore((s) => s.searchQuery)
   const setSearchQuery = useUiStore((s) => s.actions.setSearchQuery)
-  const notesViewMode = useShellStore((s) => s.notesViewMode)
-  const setNotesViewMode = useShellStore((s) => s.setNotesViewMode)
   const router = useRouter()
 
   return (
@@ -64,19 +62,6 @@ export function Header({ isScrolled }: { isScrolled: boolean }) {
       <div className="ml-auto flex items-center gap-3">
         <Button variant="ghost" size="icon" aria-label="Sincronizar" title="Sincronizar (aún no disponible)">
           <RefreshCw className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-        </Button>
-
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={notesViewMode === 'grid' ? 'Ver como lista' : 'Ver como cuadrícula'}
-          onClick={() => setNotesViewMode(notesViewMode === 'grid' ? 'list' : 'grid')}
-        >
-          {notesViewMode === 'grid' ? (
-            <List className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-          ) : (
-            <LayoutGrid className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-          )}
         </Button>
 
         <SettingsMenu isDarkMode={isDarkMode} toggleDarkMode={toggleDarkMode} />

@@ -7,8 +7,9 @@ import { groupBlocksByDate, buildHierarchy, formatDisplayDate } from '@9nau/core
 import { Block } from '@9nau/types'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
 import { useActiveWorkspaceId } from '@/core/identity/workspace-store'
-import { CaptureBox } from '@/components/home/CaptureBox'
+import { BlockEditor } from '@/components/editor/BlockEditor'
 import { BandejaGeneral } from '@/components/home/BandejaGeneral'
+import { BandejaControls } from '@/components/home/BandejaControls'
 import { ContentTopBar, type ContentTab } from '@/core/shell/content-topbar'
 // TEMPORARY — the chatarrería (see content-topbar.tsx). Two parallel
 // "actions" implementations, side by side under their own tabs, so their
@@ -134,7 +135,12 @@ export default function HomePage() {
 
   return (
     <div>
-      <ContentTopBar title="Inicio" activeTab={activeTab} onTabChange={setActiveTab} />
+      <ContentTopBar
+        title="Inicio"
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        tabControls={activeTab === 'bandeja' ? <BandejaControls /> : undefined}
+      />
 
       <div className="px-4 py-6 md:px-8">
         {activeTab === 'agendaView' ? (
@@ -171,7 +177,7 @@ export default function HomePage() {
           <div className="mt-10 text-center text-red-500">Failed to load data. Please try again later.</div>
         ) : (
           <div className="mx-auto max-w-6xl">
-            <CaptureBox />
+            <BlockEditor />
             <BandejaGeneral notes={processedData.notes} />
           </div>
         )}

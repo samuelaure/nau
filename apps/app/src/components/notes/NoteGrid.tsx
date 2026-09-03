@@ -10,7 +10,7 @@ export function NoteGrid({ notes }: NoteGridProps) {
   const notesViewMode = useShellStore((s) => s.notesViewMode)
 
   if (notesViewMode === 'list') {
-    // Same max-width as CaptureBox (max-w-xl), so a card reads like the
+    // Same max-width as BlockEditor's inline mode (max-w-xl), so a card reads like the
     // capture box itself grown downward, not a table row stretched to the
     // full content column.
     return (

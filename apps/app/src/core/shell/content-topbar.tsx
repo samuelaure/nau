@@ -45,11 +45,14 @@ export function ContentTopBar({
   title,
   activeTab,
   onTabChange,
+  tabControls,
 }: {
   icon?: React.ReactNode
   title: string
   activeTab: ContentTab
   onTabChange: (tab: ContentTab) => void
+  /** Right-aligned controls specific to the active tab — e.g. Bandeja's group-by selector and grid/list toggle. Rendered on the tab row, not the title row. */
+  tabControls?: React.ReactNode
 }) {
   return (
     <div className="sticky top-0 z-10 border-b bg-white dark:border-gray-800 dark:bg-gray-950">
@@ -76,6 +79,7 @@ export function ContentTopBar({
             </button>
           )
         })}
+        {tabControls && <div className="ml-auto flex items-center gap-2 py-1.5">{tabControls}</div>}
       </div>
     </div>
   )
