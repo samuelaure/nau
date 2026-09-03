@@ -174,7 +174,7 @@ function CreateOption({
   // Every option is meant to open the same centered capture overlay, focused
   // on its own kind (Nota → General, the other three → their type-specific
   // tray) — the spec's "el botón siempre abre el mismo modal". That overlay
-  // doesn't accept a "which kind" argument yet: CaptureBox only creates
+  // doesn't accept a "which kind" argument yet: BlockEditor only creates
   // notes so far, since HomeCapture's type-tab logic is being migrated onto
   // it incrementally, one kind at a time. Wiring these four entries to real,
   // distinct creation flows belongs to that migration, not to this menu —

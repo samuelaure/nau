@@ -4,15 +4,14 @@ import * as React from 'react'
 import { Trash, Tag, Repeat, Clock, Calendar, MoreVertical } from 'lucide-react'
 import { cn } from '@9nau/ui/lib/utils'
 import { Card } from '@9nau/ui/components/card'
-import { Button } from '@9nau/ui/components/button'
 import { useCreateNote } from '@/references/use-notes'
 import { useActiveWorkspaceId } from '@/core/identity/workspace-store'
 import type { Block, UpdateBlockDto } from '@9nau/types'
 
 /**
- * The one composer for opening or capturing a block — the merge of three
- * things that used to be separate: `NoteInput`'s Keep-style collapsed card,
- * `BlockEditorModal`'s open editor (title, body, bottom toolbar), and
+ * The one editor for opening, creating, or capturing a block — the merge of
+ * three things that used to be separate: `NoteInput`'s Keep-style collapsed
+ * card, `BlockEditorModal`'s open editor (title, body, bottom toolbar), and
  * `EditNoteModal`'s save-on-click-outside. All three are now this one
  * component in two `mode`s:
  *
@@ -20,6 +19,10 @@ import type { Block, UpdateBlockDto } from '@9nau/types'
  *   in place with the content, capped the same way the overlay is.
  * - `overlay`: opens directly into the expanded editor as a centered
  *   `fixed inset-0` modal — same editor, different mount point.
+ *
+ * Named for what it now actually is — no longer just a capture box (it
+ * edits, not only creates), not tied to Home, not tied to notes or any one
+ * block type.
  *
  * Both modes save on an outside click; there is no explicit save button,
  * same as `BlockEditorModal`'s reasoning: closing is the confirmation.
@@ -29,7 +32,7 @@ import type { Block, UpdateBlockDto } from '@9nau/types'
  * "Eliminar" moved off the toolbar into a `MoreVertical` menu — the pattern
  * `EditNoteModal`/`NoteCard` already used for delete.
  */
-export function CaptureBox({
+export function BlockEditor({
   mode = 'inline',
   block = null,
   onUpdate,
@@ -61,8 +64,25 @@ export function CaptureBox({
   React.useEffect(() => {
     if (!block) return
     const props = block.properties as Record<string, unknown>
-    setTitle((props.title ?? props.text ?? props.summary ?? props.name ?? '') as string)
-    setBody((props.body ?? props.text ?? '') as string)
+    // A kind that actually carries a `title` field (References' notes —
+    // `noteToBlock` always sets it, even to null) must never fall back to
+    // showing its body there: a title-less note has to keep showing the
+    // placeholder, not a duplicate of its own content. That duplicate was
+    // also why edits silently failed to save — title always "changed"
+    // relative to itself, masking whether the body actually changed, and
+    // comparing against the wrong baseline.
+    //
+    // A kind with no title concept at all (Actions — `actionToBlock` never
+    // sets `properties.title`) has always used its one text field as the
+    // "title" row here, same as the pre-merge BlockEditorModal did — it
+    // never had a body field either.
+    if ('title' in props) {
+      setTitle((props.title ?? '') as string)
+      setBody((props.body ?? props.text ?? '') as string)
+    } else {
+      setTitle((props.text ?? props.summary ?? props.name ?? '') as string)
+      setBody((props.body as string) ?? '')
+    }
   }, [block])
 
   React.useEffect(() => {
@@ -106,19 +126,34 @@ export function CaptureBox({
     }
 
     const props = block.properties as Record<string, unknown>
+    const hasTitleField = 'title' in props
     const nextTitle = title.trim()
     const nextBody = body.trim()
-    const changed = nextTitle !== ((props.title ?? props.text) || '') || nextBody !== ((props.body ?? props.text) || '')
+    // Each field compared against its own original value — same
+    // hasTitleField distinction as the load effect above, so a title-less
+    // kind's one text field isn't compared as if it were two.
+    let changed: boolean
+    let nextProperties: Record<string, unknown>
+    if (hasTitleField) {
+      const originalTitle = (props.title ?? '') as string
+      const originalBody = (props.body ?? props.text ?? '') as string
+      changed = nextTitle !== originalTitle || nextBody !== originalBody
+      nextProperties = { ...props, title: nextTitle || null, text: nextBody, body: nextBody || undefined }
+    } else {
+      const originalText = (props.text ?? props.summary ?? props.name ?? '') as string
+      const originalBody = (props.body as string) ?? ''
+      changed = nextTitle !== originalText || nextBody !== originalBody
+      nextProperties = { ...props, text: nextTitle, body: nextBody || undefined }
+    }
     if (changed) {
-      onUpdate?.(block.id, {
-        properties: { ...props, title: nextTitle, text: nextTitle, body: nextBody || undefined },
-      })
+      onUpdate?.(block.id, { properties: nextProperties })
     }
     if (mode === 'overlay') onClose?.()
     else setExpanded(false)
   }
 
-  // Bound to the latest handler on every render, same as the old CaptureBox.
+  // Bound to the latest handler on every render, so the outside-click
+  // listener below never closes over a stale commit.
   const commitRef = React.useRef(commit)
   commitRef.current = commit
 
@@ -174,57 +209,89 @@ export function CaptureBox({
         mode === 'overlay' ? 'max-h-[80vh] max-w-2xl' : 'max-h-[85vh]',
       )}
     >
-      <input
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="Título"
-        autoFocus={mode === 'overlay'}
-        className="w-full bg-transparent px-5 pt-5 text-lg font-medium text-gray-900 outline-none placeholder:text-gray-400 dark:text-gray-100"
-      />
+      {/* Title and body share one scroll container so a long body scrolls
+          the title away with it, rather than leaving the title pinned above
+          an independently-scrolling textarea. */}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Título"
+          autoFocus={mode === 'overlay'}
+          className="w-full bg-transparent px-5 pt-5 text-lg font-medium text-gray-900 outline-none placeholder:text-gray-400 dark:text-gray-100"
+        />
 
-      <textarea
-        ref={bodyRef}
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        placeholder="Escribe algo…"
-        rows={mode === 'overlay' ? 4 : 1}
-        autoFocus={mode === 'inline'}
-        className="w-full flex-1 resize-none overflow-y-auto bg-transparent px-5 py-3 text-sm leading-relaxed text-gray-700 outline-none placeholder:text-gray-400 dark:text-gray-300"
-      />
+        <textarea
+          ref={bodyRef}
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          placeholder="Escribe algo…"
+          rows={mode === 'overlay' ? 4 : 1}
+          autoFocus={mode === 'inline'}
+          // Deliberately not flex-1 and no overflow-y of its own: scrolling
+          // now belongs to the wrapper above so title+body move together.
+          // scrollHeight auto-resize (the effect above) still drives this
+          // textarea's own height; the wrapper's overflow-y only kicks in
+          // once that combined height exceeds the editor's max-h.
+          className="w-full resize-none bg-transparent px-5 py-3 text-sm leading-relaxed text-gray-700 outline-none placeholder:text-gray-400 dark:text-gray-300"
+        />
+      </div>
 
       {/* No border-t here — the merge drops the divider between body and
           toolbar that BlockEditorModal had. */}
-      <div className="flex items-center gap-1 px-3 py-2">
-        <ToolbarButton title="Recordatorio" icon={Clock} disabled />
-        <ToolbarButton title="Frecuencia" icon={Repeat} disabled active={isHabit} />
-        <ToolbarButton title="Mover a…" icon={Calendar} disabled />
-        <ToolbarButton title="Etiquetas" icon={Tag} disabled />
-
-        <div ref={menuRef} className="relative ml-auto">
-          <button
-            onClick={() => setIsMenuOpen((o) => !o)}
-            aria-label="Más opciones"
-            className="rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700"
-          >
-            <MoreVertical className="h-4 w-4" />
-          </button>
-          {isMenuOpen && (
-            <div className="absolute bottom-full right-0 mb-1 w-36 rounded-md border bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800">
-              <button
-                onClick={handleDelete}
-                disabled={!block}
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-red-950/40"
-              >
-                <Trash className="h-3.5 w-3.5" />
-                Eliminar
-              </button>
-            </div>
-          )}
-        </div>
-
-        {createNote.isError && (
-          <span className="text-xs text-red-600">No se pudo guardar. El texto sigue aquí.</span>
+      <div className="flex flex-col gap-1 px-3 py-2">
+        {block && (
+          <div className="flex justify-end px-2">
+            <span className="text-[11px] text-gray-400 dark:text-gray-500">
+              Editado {new Date(block.updatedAt).toLocaleString('es-ES', {
+                day: 'numeric',
+                month: 'short',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </span>
+          </div>
         )}
+
+        <div className="flex items-center gap-3">
+          <ToolbarButton title="Recordatorio" icon={Clock} disabled />
+          <ToolbarButton title="Frecuencia" icon={Repeat} disabled active={isHabit} />
+          <ToolbarButton title="Mover a…" icon={Calendar} disabled />
+          <ToolbarButton title="Etiquetas" icon={Tag} disabled />
+
+          <div ref={menuRef} className="relative ml-auto">
+            <button
+              onClick={() => setIsMenuOpen((o) => !o)}
+              aria-label="Más opciones"
+              className="rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700"
+            >
+              <MoreVertical className="h-4 w-4" />
+            </button>
+            {isMenuOpen && (
+              <div className="absolute bottom-full right-0 mb-1 w-36 rounded-md bg-white py-1 shadow-lg dark:bg-gray-800">
+                <button
+                  onClick={handleDelete}
+                  disabled={!block}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-red-950/40"
+                >
+                  <Trash className="h-3.5 w-3.5" />
+                  Eliminar
+                </button>
+              </div>
+            )}
+          </div>
+
+          {createNote.isError && (
+            <span className="text-xs text-red-600">No se pudo guardar. El texto sigue aquí.</span>
+          )}
+
+          <button
+            onClick={commit}
+            className="rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            Cerrar
+          </button>
+        </div>
       </div>
     </div>
   )

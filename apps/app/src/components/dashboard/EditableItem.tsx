@@ -5,7 +5,7 @@ import { useDashboardStore } from '@/lib/state/dashboard-store'
 import { HierarchicalBlock, displayText, entryEditPatch } from '@9nau/core'
 import { X, Maximize2 } from 'lucide-react'
 import { Button } from '@9nau/ui/components/button'
-import { CaptureBox } from '../home/CaptureBox'
+import { BlockEditor } from '../editor/BlockEditor'
 import type { AgendaItem } from '@/hooks/use-agenda-api'
 
 interface EditableItemProps {
@@ -259,7 +259,7 @@ export function EditableItem({
       </div>
 
       {isModalOpen && (
-        <CaptureBox
+        <BlockEditor
           mode="overlay"
           block={item}
           onClose={() => setIsModalOpen(false)}

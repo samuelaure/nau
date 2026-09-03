@@ -3,14 +3,14 @@
 import { useUpdateNote, useDeleteNote } from '@/references/use-notes'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
 import { useActiveWorkspaceId } from '@/core/identity/workspace-store'
-import { CaptureBox } from '@/components/home/CaptureBox'
+import { BlockEditor } from '@/components/editor/BlockEditor'
 
 /**
  * Wires the globally-mounted overlay (see `AppProvider`) to whichever note
  * `NoteCard` put into `dashboard-store.editingNote`.
  *
  * `EditNoteModal` used to be its own editor; it is now just this wiring —
- * the actual editor is `CaptureBox` in `overlay` mode, the same component
+ * the actual editor is `BlockEditor` in `overlay` mode, the same component
  * `EditableItem`'s "Expand item" opens for actions. One editor, two call
  * sites, instead of two editors that happened to look similar.
  */
@@ -32,7 +32,7 @@ export function EditNoteModal() {
   if (!editingNote) return null
 
   return (
-    <CaptureBox
+    <BlockEditor
       mode="overlay"
       block={editingNote}
       onClose={() => setEditingNoteId(null)}
