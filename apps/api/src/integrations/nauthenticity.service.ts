@@ -106,4 +106,22 @@ export class NauthenticityService {
     this.logger.log(`Deleting project ${projectId} from nauthenticity`);
     return this.fetch(`/_service/projects/${projectId}`, { method: 'DELETE' });
   }
+
+  /**
+   * Queues a single Instagram post for scrape → download → transcode → R2 archival.
+   * See nau-mobile/docs/reprocessing-pipeline.md — the pipeline itself lives in
+   * nauthenticity; this just forwards a mobile-originated request to it with a
+   * signed service token, since the device can never hold that secret.
+   */
+  async processMobileCapture(url: string): Promise<{ status: string; jobId: string }> {
+    this.logger.log(`Queuing mobile capture for reprocessing: ${url}`);
+    return this.fetch('/_service/mobile/process-capture', {
+      method: 'POST',
+      body: JSON.stringify({ url }),
+    });
+  }
+
+  async getMobileCaptureStatus(jobId: string) {
+    return this.fetch(`/_service/mobile/process-capture/${jobId}`);
+  }
 }

@@ -14,37 +14,29 @@ export class SyncService {
 
   async push(
     blocks: Record<string, unknown>[],
-    userId?: string,
-    workspaceId?: string,
+    userId: string,
+    workspaceId: string,
   ) {
     this.logger.log(`Sync PUSH: processing ${blocks.length} blocks`);
     const results = [];
 
     for (const blockData of blocks) {
-      const {
-        uuid,
-        type,
-        properties,
-        updatedAt,
-        deletedAt,
-        source,
-        sourceRef,
-        workspaceId: blockWorkspaceId,
-        userId: blockUserId,
-      } = blockData as {
-        uuid: string;
-        type: string;
-        properties: Record<string, unknown>;
-        updatedAt: string;
-        deletedAt?: string | null;
-        source?: string;
-        sourceRef?: string;
-        workspaceId?: string;
-        userId?: string;
-      };
+      const { uuid, type, properties, updatedAt, deletedAt, source, sourceRef } =
+        blockData as {
+          uuid: string;
+          type: string;
+          properties: Record<string, unknown>;
+          updatedAt: string;
+          deletedAt?: string | null;
+          source?: string;
+          sourceRef?: string;
+        };
 
-      const resolvedWorkspaceId = blockWorkspaceId ?? workspaceId;
-      const resolvedUserId = blockUserId ?? userId;
+      // workspaceId/userId always come from the authenticated caller (see
+      // SyncController), never from the client payload — a per-block override here
+      // would let an authenticated user write into a workspace they don't own.
+      const resolvedWorkspaceId = workspaceId;
+      const resolvedUserId = userId;
 
       try {
         const upserted = await this.prisma.block.upsert({
