@@ -46,7 +46,11 @@ export class AuthController {
   async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: Response) {
     const tokens = await this.auth.register(dto);
     setCookies(res, tokens.accessToken, tokens.refreshToken);
-    return { expiresIn: tokens.expiresIn };
+    // Tokens in the body too — see the identical note on POST refresh below.
+    // A browser ignores these extra fields and rides on the HttpOnly cookie;
+    // nau-mobile has no cookie jar it can read from (the cookies are HttpOnly
+    // by design) and needs the raw values to store in SecureStore.
+    return { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, expiresIn: tokens.expiresIn };
   }
 
   // Temporarily raised 5→9 while debugging mobile login during the
@@ -59,7 +63,12 @@ export class AuthController {
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     const tokens = await this.auth.login(dto);
     setCookies(res, tokens.accessToken, tokens.refreshToken);
-    return { expiresIn: tokens.expiresIn };
+    // Tokens in the body too — see the identical note on POST refresh below.
+    // Body-only was fine for the web app (cookie-only), but left nau-mobile
+    // with nothing to put in SecureStore: the login response was silently
+    // { expiresIn } with accessToken/refreshToken undefined, which
+    // SecureStore then rejected as "must be strings" on every login attempt.
+    return { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, expiresIn: tokens.expiresIn };
   }
 
   @Post('refresh')
@@ -148,6 +157,6 @@ export class AuthController {
   ) {
     const tokens = await this.auth.setDefaultWorkspace(user.sub, dto.workspaceId);
     setCookies(res, tokens.accessToken, tokens.refreshToken);
-    return { expiresIn: tokens.expiresIn };
+    return { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, expiresIn: tokens.expiresIn };
   }
 }
