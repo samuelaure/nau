@@ -53,11 +53,18 @@ export const usePeriodsIn = (params: {
         from: params.from,
         to: params.to,
         system,
-        workspaceId: params.workspaceId!,
       })
+      // `workspaceId: null` is "All workspaces" (see workspace-store.ts) — a
+      // valid selection, not a not-yet-loaded value. This used to be sent as
+      // the literal string "null" (via `!`) while also gating the whole
+      // query behind `enabled: !!workspaceId`, so with no workspace
+      // explicitly picked the query never ran at all: no periods, so
+      // Dashboard/ActionsSection had nothing to render under, regardless of
+      // how many actions existed. Same bug as useAgenda's, fixed the same
+      // way — omit the param instead of blocking the fetch.
+      if (params.workspaceId) search.append('workspaceId', params.workspaceId)
       return apiClient.get(`/time/periods?${search.toString()}`)
     },
-    enabled: !!params.workspaceId,
   })
 }
 
@@ -75,10 +82,10 @@ export const usePeriodAt = (params: {
         scale: params.scale,
         at: params.at,
         system,
-        workspaceId: params.workspaceId!,
       })
+      // Same reasoning as usePeriodsIn above.
+      if (params.workspaceId) search.append('workspaceId', params.workspaceId)
       return apiClient.get(`/time/period?${search.toString()}`)
     },
-    enabled: !!params.workspaceId,
   })
 }

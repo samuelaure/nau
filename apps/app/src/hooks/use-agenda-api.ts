@@ -69,7 +69,12 @@ export const useAgenda = (params: { date: string; scale: AgendaPeriod; workspace
       if (params.workspaceId) search.append('workspaceId', params.workspaceId)
       return apiClient.get(`/agenda?${search.toString()}`)
     },
-    enabled: Boolean(params.workspaceId),
+    // `workspaceId: undefined` is "All workspaces" — a real, valid selection
+    // (see workspace-store.ts), not a not-yet-loaded value. Gating the query
+    // on it being truthy meant the agenda silently never fetched at all
+    // whenever no workspace had been explicitly picked, always rendering
+    // "Nada planificado" regardless of what existed. `date`/`scale` are
+    // always present, so there is nothing left to wait for.
   })
 
 /**
@@ -150,5 +155,6 @@ export const useAgendaRange = (params: {
       if (params.workspaceId) search.append('workspaceId', params.workspaceId)
       return apiClient.get(`/agenda?${search.toString()}`)
     },
-    enabled: Boolean(params.workspaceId),
+    // Same reasoning as `useAgenda` above — `workspaceId` unset is "All
+    // workspaces", a valid selection, not a loading gate.
   })
