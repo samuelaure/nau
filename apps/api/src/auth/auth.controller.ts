@@ -49,7 +49,12 @@ export class AuthController {
     return { expiresIn: tokens.expiresIn };
   }
 
-  @Throttle({ short: { ttl: 900_000, limit: 5 }, medium: { ttl: 900_000, limit: 5 } })
+  // Temporarily raised 5→9 while debugging mobile login during the
+  // nau-mobile auth migration (2026-09-03) — the generic error message hid a
+  // 429 as "wrong password", which burned through the original limit during
+  // troubleshooting. Revert to 5 once mobile distinguishes the two errors and
+  // the account is confirmed stable.
+  @Throttle({ short: { ttl: 900_000, limit: 9 }, medium: { ttl: 900_000, limit: 9 } })
   @Post('login')
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     const tokens = await this.auth.login(dto);
