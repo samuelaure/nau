@@ -11,6 +11,7 @@ import { BlockEditor } from '@/components/editor/BlockEditor'
 import { BandejaGeneral } from '@/components/home/BandejaGeneral'
 import { BandejaControls } from '@/components/home/BandejaControls'
 import { ContentTopBar, type ContentTab } from '@/core/shell/content-topbar'
+import { Breadcrumb } from '@/core/shell/breadcrumb'
 // TEMPORARY — the chatarrería (see content-topbar.tsx). Two parallel
 // "actions" implementations, side by side under their own tabs, so their
 // remaining function gets absorbed into one and these two — and the tabs —
@@ -140,6 +141,7 @@ export default function HomePage() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         tabControls={activeTab === 'bandeja' ? <BandejaControls /> : undefined}
+        breadcrumb={<Breadcrumb items={[{ id: 'home', label: 'Inicio', onClick: () => {} }]} />}
       />
 
       <div className="px-4 py-6 md:px-8">

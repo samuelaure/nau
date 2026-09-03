@@ -46,19 +46,24 @@ export function ContentTopBar({
   activeTab,
   onTabChange,
   tabControls,
+  breadcrumb,
 }: {
   icon?: React.ReactNode
   title: string
   activeTab: ContentTab
   onTabChange: (tab: ContentTab) => void
-  /** Right-aligned controls specific to the active tab — e.g. Bandeja's group-by selector and grid/list toggle. Rendered on the tab row, not the title row. */
+  /** Right-aligned controls specific to the active tab — e.g. Bandeja's group-by selector and grid/list toggle. Rendered on the title row, alongside it. */
   tabControls?: React.ReactNode
+  /** The optional first row, above the title — where a block sits in the tree. Absent at the root (nothing to break out of). */
+  breadcrumb?: React.ReactNode
 }) {
   return (
     <div className="sticky top-0 z-10 border-b bg-white dark:border-gray-800 dark:bg-gray-950">
+      {breadcrumb && <div className="flex h-7 items-center px-6">{breadcrumb}</div>}
       <div className="flex h-12 items-center gap-2 px-6">
         {icon ?? <Home className="h-5 w-5 text-gray-500 dark:text-gray-400" />}
         <h1 className="text-base font-semibold text-gray-900 dark:text-white">{title}</h1>
+        {tabControls && <div className="ml-auto flex items-center gap-2">{tabControls}</div>}
       </div>
       <div className="flex items-center gap-1 px-6">
         {TABS.map((tab) => {
@@ -79,7 +84,6 @@ export function ContentTopBar({
             </button>
           )
         })}
-        {tabControls && <div className="ml-auto flex items-center gap-2 py-1.5">{tabControls}</div>}
       </div>
     </div>
   )
