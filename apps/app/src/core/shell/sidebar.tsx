@@ -2,13 +2,14 @@
 
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Home, Inbox, CheckCircle2, Trash2, Building2, ChevronDown, Check, Lightbulb, CheckSquare, BookOpen, StickyNote } from 'lucide-react'
+import { Plus, Home, Inbox, CheckCircle2, Trash2, Building2, ChevronDown, Check } from 'lucide-react'
 import { Button } from '@9nau/ui/components/button'
 import { cn } from '@9nau/ui/lib/utils'
 import { useWorkspaceStore } from '@/core/identity/workspace-store'
 import { useGetWorkspaces } from '@/core/identity/use-workspaces'
 import { useUiStore } from '@/lib/state/ui-store'
 import { useShellStore } from './shell-store'
+import { BlockEditor } from '@/components/editor/BlockEditor'
 
 /**
  * The navigation frame.
@@ -35,20 +36,10 @@ export function Sidebar() {
   const activeView = useUiStore((s) => s.activeView)
   const setView = useUiStore((s) => s.actions.setView)
 
-  const [isCreateOpen, setIsCreateOpen] = React.useState(false)
+  const [isCreateModalOpen, setIsCreateModalOpen] = React.useState(false)
   const [toast, setToast] = React.useState<string | null>(null)
-  const createRef = React.useRef<HTMLDivElement>(null)
 
   const activeWorkspace = workspaces?.find((w) => w.id === activeWorkspaceId) ?? null
-
-  React.useEffect(() => {
-    if (!isCreateOpen) return
-    const onPointerDown = (e: MouseEvent) => {
-      if (createRef.current && !createRef.current.contains(e.target as Node)) setIsCreateOpen(false)
-    }
-    document.addEventListener('mousedown', onPointerDown)
-    return () => document.removeEventListener('mousedown', onPointerDown)
-  }, [isCreateOpen])
 
   React.useEffect(() => {
     if (!toast) return
@@ -64,9 +55,9 @@ export function Sidebar() {
       )}
     >
       <nav className="flex h-full flex-col p-3">
-        <div ref={createRef} className="relative mb-4">
+        <div className="mb-4">
           <Button
-            onClick={() => setIsCreateOpen((o) => !o)}
+            onClick={() => setIsCreateModalOpen(true)}
             className={cn(
               'flex h-11 w-full items-center gap-3 rounded-full bg-primary px-4 text-primary-foreground shadow-sm hover:bg-primary/90',
               isSidebarOpen ? 'justify-start' : 'justify-center',
@@ -75,21 +66,6 @@ export function Sidebar() {
             <Plus className="h-5 w-5" />
             {isSidebarOpen && <span className="font-medium">Crear</span>}
           </Button>
-
-          {isCreateOpen && (
-            <ul
-              role="menu"
-              className={cn(
-                'absolute top-full z-30 mt-1 overflow-hidden rounded-md border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-900',
-                isSidebarOpen ? 'left-0 right-0' : 'left-0 w-48',
-              )}
-            >
-              <CreateOption icon={StickyNote} label="Nota" onSelect={() => setIsCreateOpen(false)} />
-              <CreateOption icon={CheckSquare} label="Acción" onSelect={() => setIsCreateOpen(false)} />
-              <CreateOption icon={BookOpen} label="Journal" onSelect={() => setIsCreateOpen(false)} />
-              <CreateOption icon={Lightbulb} label="Idea" onSelect={() => setIsCreateOpen(false)} />
-            </ul>
-          )}
         </div>
 
         <ul className="space-y-1">
@@ -158,39 +134,15 @@ export function Sidebar() {
           </div>
         </div>
       )}
-    </aside>
-  )
-}
 
-function CreateOption({
-  icon: Icon,
-  label,
-  onSelect,
-}: {
-  icon: typeof StickyNote
-  label: string
-  onSelect: () => void
-}) {
-  // Every option is meant to open the same centered capture overlay, focused
-  // on its own kind (Nota → General, the other three → their type-specific
-  // tray) — the spec's "el botón siempre abre el mismo modal". That overlay
-  // doesn't accept a "which kind" argument yet: BlockEditor only creates
-  // notes so far, since HomeCapture's type-tab logic is being migrated onto
-  // it incrementally, one kind at a time. Wiring these four entries to real,
-  // distinct creation flows belongs to that migration, not to this menu —
-  // so for now every option just closes the menu without fabricating a
-  // creation path that isn't there yet.
-  return (
-    <li role="none">
-      <button
-        role="menuitem"
-        onClick={onSelect}
-        className="flex w-full items-center gap-3 px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
-      >
-        <Icon className="h-4 w-4 text-gray-500" />
-        {label}
-      </button>
-    </li>
+      {isCreateModalOpen && (
+        // Opens straight into an empty overlay — no type picker. Which kind
+        // gets created is a decision that belongs on BlockEditor's own
+        // bottom toolbar (Mover a…/etc.), not a menu here that would only
+        // fabricate a choice this editor can't yet act on.
+        <BlockEditor mode="overlay" onClose={() => setIsCreateModalOpen(false)} />
+      )}
+    </aside>
   )
 }
 

@@ -7,7 +7,7 @@ import { NoteGrid } from './NoteGrid'
 interface NotesInboxSectionProps {
   title: string
   notes: Block[]
-  /** A line under the title, after it — Bandeja's date-based groups opt in; PeriodBlock's own section doesn't, to avoid a visual change unrelated to this feature. */
+  /** A line after the title, vertically centered with it, filling the rest of the row — Bandeja's date-based groups opt in; PeriodBlock's own section doesn't, to avoid a visual change unrelated to this feature. */
   withDivider?: boolean
 }
 
@@ -17,14 +17,12 @@ export function NotesInboxSection({ title, notes, withDivider = false }: NotesIn
   return (
     <div className="mb-4">
       <button
-        className="flex w-full flex-col text-left"
+        className="flex w-full items-center rounded-md p-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <div className="flex items-center rounded-md p-2 hover:bg-gray-50 dark:hover:bg-gray-800">
-          {isOpen ? <ChevronDown className="w-4 h-4 mr-2" /> : <ChevronRight className="w-4 h-4 mr-2" />}
-          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">{title}</h3>
-        </div>
-        {withDivider && <div className={cn('mx-2 border-t border-gray-200 dark:border-gray-800')} />}
+        {isOpen ? <ChevronDown className="w-4 h-4 mr-2 shrink-0" /> : <ChevronRight className="w-4 h-4 mr-2 shrink-0" />}
+        <h3 className="shrink-0 text-sm font-semibold text-gray-800 dark:text-gray-200">{title}</h3>
+        {withDivider && <div className={cn('ml-3 h-px flex-1 bg-gray-200 dark:bg-gray-800')} />}
       </button>
       {isOpen && (
         <div className="pl-2 mt-2">

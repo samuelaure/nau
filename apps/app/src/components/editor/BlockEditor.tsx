@@ -1,11 +1,11 @@
 'use client'
 
 import * as React from 'react'
-import { Trash, Tag, Repeat, Clock, Calendar, MoreVertical } from 'lucide-react'
 import { cn } from '@9nau/ui/lib/utils'
 import { Card } from '@9nau/ui/components/card'
 import { useCreateNote } from '@/references/use-notes'
 import { useActiveWorkspaceId } from '@/core/identity/workspace-store'
+import { BlockBottomBar } from './BlockBottomBar'
 import type { Block, UpdateBlockDto } from '@9nau/types'
 
 /**
@@ -31,6 +31,11 @@ import type { Block, UpdateBlockDto } from '@9nau/types'
  * borders, no divider between the body and the bottom toolbar, and
  * "Eliminar" moved off the toolbar into a `MoreVertical` menu — the pattern
  * `EditNoteModal`/`NoteCard` already used for delete.
+ *
+ * The entire bottom row (`BlockBottomBar`, wrapping `BlockToolbar`) is
+ * shared with `NoteCard`'s on-hover controls, so the two never drift apart
+ * — `NoteCard` passes `showClose={false}`, since a hovered card has
+ * nothing to close.
  */
 export function BlockEditor({
   mode = 'inline',
@@ -53,10 +58,8 @@ export function BlockEditor({
   const [isExpanded, setExpanded] = React.useState(mode === 'overlay' || block !== null)
   const [title, setTitle] = React.useState('')
   const [body, setBody] = React.useState('')
-  const [isMenuOpen, setIsMenuOpen] = React.useState(false)
   const containerRef = React.useRef<HTMLDivElement>(null)
   const bodyRef = React.useRef<HTMLTextAreaElement>(null)
-  const menuRef = React.useRef<HTMLDivElement>(null)
 
   const createNote = useCreateNote()
   const activeWorkspaceId = useActiveWorkspaceId()
@@ -100,8 +103,6 @@ export function BlockEditor({
    * nothing currently opens an existing block inline).
    */
   const commit = () => {
-    if (isMenuOpen) return
-
     if (!block) {
       const trimmed = body.trim()
       if (!trimmed) {
@@ -171,19 +172,9 @@ export function BlockEditor({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [isExpanded, mode])
 
-  React.useEffect(() => {
-    if (!isMenuOpen) return
-    const onPointerDown = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setIsMenuOpen(false)
-    }
-    document.addEventListener('mousedown', onPointerDown)
-    return () => document.removeEventListener('mousedown', onPointerDown)
-  }, [isMenuOpen])
-
   const isHabit = Boolean((block as { schedule?: { rrule?: string } } | null)?.schedule?.rrule)
 
   const handleDelete = () => {
-    setIsMenuOpen(false)
     if (block) onDelete?.(block.id)
     if (mode === 'overlay') onClose?.()
   }
@@ -253,45 +244,13 @@ export function BlockEditor({
           </div>
         )}
 
-        <div className="flex items-center gap-3">
-          <ToolbarButton title="Recordatorio" icon={Clock} disabled />
-          <ToolbarButton title="Frecuencia" icon={Repeat} disabled active={isHabit} />
-          <ToolbarButton title="Mover a…" icon={Calendar} disabled />
-          <ToolbarButton title="Etiquetas" icon={Tag} disabled />
-
-          <div ref={menuRef} className="relative ml-auto">
-            <button
-              onClick={() => setIsMenuOpen((o) => !o)}
-              aria-label="Más opciones"
-              className="rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700"
-            >
-              <MoreVertical className="h-4 w-4" />
-            </button>
-            {isMenuOpen && (
-              <div className="absolute bottom-full right-0 mb-1 w-36 rounded-md bg-white py-1 shadow-lg dark:bg-gray-800">
-                <button
-                  onClick={handleDelete}
-                  disabled={!block}
-                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-red-950/40"
-                >
-                  <Trash className="h-3.5 w-3.5" />
-                  Eliminar
-                </button>
-              </div>
-            )}
-          </div>
-
-          {createNote.isError && (
-            <span className="text-xs text-red-600">No se pudo guardar. El texto sigue aquí.</span>
-          )}
-
-          <button
-            onClick={commit}
-            className="rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
-          >
-            Cerrar
-          </button>
-        </div>
+        <BlockBottomBar
+          isHabit={isHabit}
+          onDelete={handleDelete}
+          canDelete={!!block}
+          onClose={commit}
+          errorMessage={createNote.isError ? 'No se pudo guardar. El texto sigue aquí.' : null}
+        />
       </div>
     </div>
   )
@@ -310,34 +269,4 @@ export function BlockEditor({
   }
 
   return <div className="max-w-xl mx-auto mb-8">{editor}</div>
-}
-
-function ToolbarButton({
-  title,
-  icon: Icon,
-  onClick,
-  disabled,
-  active,
-}: {
-  title: string
-  icon: React.ElementType
-  onClick?: () => void
-  disabled?: boolean
-  active?: boolean
-}) {
-  return (
-    <button
-      title={disabled ? `${title} — próximamente` : title}
-      onClick={onClick}
-      disabled={disabled}
-      className={cn(
-        'rounded-full p-2 transition-colors',
-        'text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700',
-        active && 'text-emerald-600 dark:text-emerald-400',
-        disabled && 'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-gray-400',
-      )}
-    >
-      <Icon className="h-4 w-4" />
-    </button>
-  )
 }
