@@ -788,6 +788,37 @@
         }
       }
     },
+    "/integrations/nauthenticity/mobile-capture": {
+      "post": {
+        "operationId": "NauthenticityController_processMobileCapture",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/integrations/nauthenticity/mobile-capture/{jobId}": {
+      "get": {
+        "operationId": "NauthenticityController_getMobileCaptureStatus",
+        "parameters": [
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
     "/sync/push": {
       "post": {
         "operationId": "SyncController_push",
@@ -805,14 +836,6 @@
         "parameters": [
           {
             "name": "lastSyncedAt",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "workspaceId",
             "required": true,
             "in": "query",
             "schema": {
