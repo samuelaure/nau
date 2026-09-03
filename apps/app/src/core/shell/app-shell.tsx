@@ -52,9 +52,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <main
           ref={mainRef}
           className={cn(
-            'flex-1 overflow-y-auto bg-white p-4 transition-all duration-300 md:p-8 dark:bg-gray-950',
+            'flex-1 overflow-y-auto bg-white transition-all duration-300 dark:bg-gray-950',
           )}
-          style={{ marginLeft: isSidebarOpen ? '288px' : '80px' }}
+          style={{ marginLeft: isSidebarOpen ? '256px' : '80px' }}
         >
           {children}
         </main>

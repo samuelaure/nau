@@ -17,11 +17,23 @@ function loadTheme(): boolean {
   return localStorage.getItem(THEME_KEY) === 'dark'
 }
 
+const NOTES_VIEW_MODE_KEY = 'nau:notes-view-mode'
+
+type NotesViewMode = 'grid' | 'list'
+
+function loadNotesViewMode(): NotesViewMode {
+  if (typeof window === 'undefined') return 'grid'
+  return localStorage.getItem(NOTES_VIEW_MODE_KEY) === 'list' ? 'list' : 'grid'
+}
+
 interface ShellState {
   isSidebarOpen: boolean
   isDarkMode: boolean
+  /** Keep's grid/list toggle for the notes tray — a display preference, not tied to any one module's data. */
+  notesViewMode: NotesViewMode
   toggleSidebar: () => void
   toggleDarkMode: () => void
+  setNotesViewMode: (mode: NotesViewMode) => void
 }
 
 export const useShellStore = create<ShellState>((set) => ({
@@ -30,6 +42,7 @@ export const useShellStore = create<ShellState>((set) => ({
   // by the shell on mount rather than here, since a store should not be
   // reaching into the document as a side effect of being constructed.
   isDarkMode: loadTheme(),
+  notesViewMode: loadNotesViewMode(),
 
   toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
 
@@ -41,5 +54,13 @@ export const useShellStore = create<ShellState>((set) => ({
         document.documentElement.classList.toggle('dark', isDarkMode)
       }
       return { isDarkMode }
+    }),
+
+  setNotesViewMode: (mode) =>
+    set(() => {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(NOTES_VIEW_MODE_KEY, mode)
+      }
+      return { notesViewMode: mode }
     }),
 }))

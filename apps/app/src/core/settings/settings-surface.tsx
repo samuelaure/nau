@@ -38,8 +38,6 @@ export function SettingsSurface({ coreTabs }: { coreTabs: CoreSettingsTab[] }) {
 
   return (
     <div className="mx-auto max-w-4xl">
-      <h1 className="mb-6 text-2xl font-semibold text-gray-800 dark:text-gray-100">Settings</h1>
-
       <div role="tablist" aria-label="Settings sections" className="mb-6 flex gap-1 border-b dark:border-gray-800">
         {tabs.map((tab) => {
           const isActive = tab.id === active.id

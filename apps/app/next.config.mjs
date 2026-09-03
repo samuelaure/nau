@@ -1,6 +1,15 @@
 import { readFileSync } from 'fs'
 const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url)))
 
+const isDev = process.env.NODE_ENV !== 'production'
+
+// Dev-only: local services run on plain HTTP across several ports
+// (api :3005, accounts :3002, ...), which the production CSP's
+// `connect-src 'self' https:` deliberately excludes. Widening this in
+// production would be a real security regression, so it only loosens in
+// development, never as a blanket relaxation.
+const connectSrc = isDev ? "connect-src 'self' https: http://localhost:*" : "connect-src 'self' https:"
+
 const securityHeaders = [
   { key: 'X-DNS-Prefetch-Control', value: 'on' },
   { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
@@ -19,7 +28,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "img-src 'self' data: https:",
       "font-src 'self' https://fonts.gstatic.com",
-      "connect-src 'self' https:",
+      connectSrc,
       "frame-ancestors 'none'",
     ].join('; '),
   },

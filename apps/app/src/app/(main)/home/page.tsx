@@ -1,14 +1,21 @@
 'use client'
 
-import { useEffect, useMemo } from 'react'
-import { Dashboard } from '@/components/dashboard/Dashboard'
+import { useEffect, useMemo, useState } from 'react'
 import { useGetNotes, type Note } from '@/references/use-notes'
 import { useGetActionItems, type ActionItem } from '@/actions/use-action-items'
 import { groupBlocksByDate, buildHierarchy, formatDisplayDate } from '@9nau/core'
 import { Block } from '@9nau/types'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
 import { useActiveWorkspaceId } from '@/core/identity/workspace-store'
-import { HomeCapture } from '@/components/home/HomeCapture'
+import { CaptureBox } from '@/components/home/CaptureBox'
+import { BandejaGeneral } from '@/components/home/BandejaGeneral'
+import { ContentTopBar, type ContentTab } from '@/core/shell/content-topbar'
+// TEMPORARY — the chatarrería (see content-topbar.tsx). Two parallel
+// "actions" implementations, side by side under their own tabs, so their
+// remaining function gets absorbed into one and these two — and the tabs —
+// get deleted.
+import { AgendaView } from '@/components/agenda/AgendaView'
+import { Dashboard } from '@/components/dashboard/Dashboard'
 
 /**
  * Adapts a domain-module row (`Note`, `ActionItem`) onto the `Block` shape
@@ -66,6 +73,7 @@ function actionToBlock(action: ActionItem): Block {
 }
 
 export default function HomePage() {
+  const [activeTab, setActiveTab] = useState<ContentTab>('bandeja')
   const activeWorkspaceId = useActiveWorkspaceId()
   const setAllBlocks = useDashboardStore((s) => s.actions.setAllBlocks)
 
@@ -121,25 +129,53 @@ export default function HomePage() {
         {} as Record<string, Block[]>
       )
 
-    return { notesByDate, actionsHierarchy, experiencesHierarchy, groupedNotes }
+    return { notes, notesByDate, actionsHierarchy, experiencesHierarchy, groupedNotes }
   }, [blocks])
 
-  if (isLoading) {
-    return <div className="text-center text-gray-500 dark:text-gray-400 mt-10">Loading data...</div>
-  }
-
-  if (isError) {
-    return <div className="text-center text-red-500 mt-10">Failed to load data. Please try again later.</div>
-  }
-
   return (
-    <div className="mx-auto max-w-6xl">
-      <HomeCapture />
-      <Dashboard
-        notesByDate={processedData.notesByDate}
-        actions={processedData.actionsHierarchy}
-        experiences={processedData.experiencesHierarchy}
-      />
+    <div>
+      <ContentTopBar title="Inicio" activeTab={activeTab} onTabChange={setActiveTab} />
+
+      <div className="px-4 py-6 md:px-8">
+        {activeTab === 'agendaView' ? (
+          // TEMPORARY — see import comment above.
+          <AgendaView />
+        ) : activeTab === 'actionsSection' ? (
+          // TEMPORARY — mounts the whole old Dashboard rather than
+          // ActionsSection alone: ActionsSection needs the periods/agenda-
+          // range plumbing Dashboard already assembles (usePeriodAgenda,
+          // usePeriodsIn, slots) — reproducing that here just to isolate one
+          // section would rebuild machinery this tab exists to retire, not
+          // keep. Dashboard also still renders NextActions/notes/experiences
+          // alongside it; that's the real current shape of "the vista with
+          // the calendar icon", not just its actions.
+          <div className="mx-auto max-w-6xl">
+            <Dashboard
+              notesByDate={processedData.notesByDate}
+              actions={processedData.actionsHierarchy}
+              experiences={processedData.experiencesHierarchy}
+            />
+          </div>
+        ) : activeTab !== 'bandeja' ? (
+          // Overview/Acciones/Journal/References/Ideas are intentionally
+          // empty for now — only Bandeja (the GTD General tray,
+          // Keep-equivalent) is being built in this pass.
+          // JournalView/SearchView/ProjectsView still exist, just not
+          // mounted onto any tab yet.
+          <div className="mx-auto max-w-6xl py-16 text-center text-sm text-gray-400 dark:text-gray-500">
+            Próximamente.
+          </div>
+        ) : isLoading ? (
+          <div className="mt-10 text-center text-gray-500 dark:text-gray-400">Loading data...</div>
+        ) : isError ? (
+          <div className="mt-10 text-center text-red-500">Failed to load data. Please try again later.</div>
+        ) : (
+          <div className="mx-auto max-w-6xl">
+            <CaptureBox />
+            <BandejaGeneral notes={processedData.notes} />
+          </div>
+        )}
+      </div>
     </div>
   )
 }
