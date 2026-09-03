@@ -15,25 +15,43 @@ import { create } from 'zustand'
 
 const STORAGE_KEY = 'nau:activeWorkspaceId'
 
-function loadPersisted(): string | null {
-  if (typeof window === 'undefined') return null
-  return localStorage.getItem(STORAGE_KEY)
-}
-
 interface WorkspaceState {
   /** `null` = all workspaces. */
   activeWorkspaceId: string | null
   setActiveWorkspace: (id: string | null) => void
+  /** Pulls in whatever was persisted, once mounted client-side. See the comment below for why this can't happen at store-creation time. */
+  hydrateFromStorage: () => void
 }
 
+/**
+ * Always starts at `null` ("all workspaces") — even in the browser, even if
+ * `localStorage` holds a real selection. Reading `localStorage` inside
+ * `create()`'s initializer runs at module-evaluation time, which on the
+ * very first client render happens *before* React reconciles against the
+ * server's markup: a returning visitor with a workspace picked would
+ * render its name on the client (e.g. the sidebar's workspace picker text)
+ * while the server-rendered HTML it's hydrating against always shows "All
+ * workspaces" (the server has no `localStorage`) — the same hydration
+ * mismatch already hit twice elsewhere (shell-store.ts's notesViewMode/
+ * isDarkMode, notes-view-store.ts's groupBy). `AppShell`'s mount effect
+ * calls `hydrateFromStorage` instead, which by definition runs after the
+ * first paint is already committed and matched, then updates to the
+ * persisted workspace the same way any other post-mount state change
+ * would — including the refetches that follow from every query keyed on
+ * `activeWorkspaceId`, exactly as if the user had just picked it.
+ */
 export const useWorkspaceStore = create<WorkspaceState>((set) => ({
-  activeWorkspaceId: loadPersisted(),
+  activeWorkspaceId: null,
   setActiveWorkspace: (id) => {
     if (typeof window !== 'undefined') {
       if (id) localStorage.setItem(STORAGE_KEY, id)
       else localStorage.removeItem(STORAGE_KEY)
     }
     set({ activeWorkspaceId: id })
+  },
+  hydrateFromStorage: () => {
+    if (typeof window === 'undefined') return
+    set({ activeWorkspaceId: localStorage.getItem(STORAGE_KEY) })
   },
 }))
 

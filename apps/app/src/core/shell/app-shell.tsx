@@ -8,6 +8,7 @@ import { cn } from '@9nau/ui/lib/utils'
 import { Header } from './header'
 import { Sidebar } from './sidebar'
 import { useShellStore } from './shell-store'
+import { useWorkspaceStore } from '@/core/identity/workspace-store'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.9nau.com'
 const BOT_USERNAME = process.env.NEXT_PUBLIC_BOT_USERNAME ?? 'zazu_bot'
@@ -24,13 +25,25 @@ const BOT_USERNAME = process.env.NEXT_PUBLIC_BOT_USERNAME ?? 'zazu_bot'
 export function AppShell({ children }: { children: React.ReactNode }) {
   const isSidebarOpen = useShellStore((s) => s.isSidebarOpen)
   const isDarkMode = useShellStore((s) => s.isDarkMode)
+  const hydrateFromStorage = useShellStore((s) => s.hydrateFromStorage)
+  const hydrateWorkspaceFromStorage = useWorkspaceStore((s) => s.hydrateFromStorage)
 
   const mainRef = React.useRef<HTMLDivElement>(null)
   const [isScrolled, setIsScrolled] = React.useState(false)
 
-  // The store reads the persisted theme when it is created; applying it to
-  // the document is the shell's job, once, on mount. Doing it inside the
-  // store would make constructing it a side effect on the DOM.
+  // Both stores always start at their SSR-safe default (see shell-store.ts
+  // and workspace-store.ts); this pulls in whatever was actually persisted,
+  // once, after the first paint is already committed and matched against
+  // the server's markup.
+  React.useEffect(() => {
+    hydrateFromStorage()
+    hydrateWorkspaceFromStorage()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Reacts to isDarkMode changing after that — either from hydration just
+  // above, or a later manual toggle. Doing this inside the store would make
+  // constructing/updating it a side effect on the DOM.
   React.useEffect(() => {
     document.documentElement.classList.toggle('dark', isDarkMode)
   }, [isDarkMode])

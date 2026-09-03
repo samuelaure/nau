@@ -11,20 +11,9 @@ import { create } from 'zustand'
  */
 
 const THEME_KEY = 'nau:theme'
-
-function loadTheme(): boolean {
-  if (typeof window === 'undefined') return false
-  return localStorage.getItem(THEME_KEY) === 'dark'
-}
-
 const NOTES_VIEW_MODE_KEY = 'nau:notes-view-mode'
 
 type NotesViewMode = 'grid' | 'list'
-
-function loadNotesViewMode(): NotesViewMode {
-  if (typeof window === 'undefined') return 'grid'
-  return localStorage.getItem(NOTES_VIEW_MODE_KEY) === 'list' ? 'list' : 'grid'
-}
 
 interface ShellState {
   isSidebarOpen: boolean
@@ -34,15 +23,34 @@ interface ShellState {
   toggleSidebar: () => void
   toggleDarkMode: () => void
   setNotesViewMode: (mode: NotesViewMode) => void
+  /** Pulls in whatever was persisted, once mounted client-side. See the comment below for why this can't happen at store-creation time. */
+  hydrateFromStorage: () => void
 }
 
+/**
+ * `isDarkMode` starts `true` here — matching the inline script in
+ * `app/layout.tsx`, which applies the `dark` class before first paint using
+ * the same rule (dark unless `nau:theme` is explicitly `'light'`). Without
+ * that script, starting the store itself at `true` would only move the
+ * flash from "briefly light" to "server always light, client always dark",
+ * since the server can never read `localStorage` — the script is what
+ * actually prevents the flash; this default just keeps the store's first
+ * render consistent with what's already on screen by the time React runs.
+ *
+ * `notesViewMode` has no such script (it doesn't affect first paint the
+ * same way — nothing above the fold depends on it) and stays SSR-safe at
+ * its light/grid default: reading `localStorage` inside `create()`'s
+ * initializer runs at module-evaluation time, before React reconciles
+ * against the server's markup, and a mismatch there is a real hydration
+ * error (confirmed via the grid/list icon's own `<svg>` failing to match).
+ * `hydrateFromStorage`, called from `AppShell`'s mount effect, corrects
+ * both fields to their real persisted values after the first paint is
+ * already committed and matched.
+ */
 export const useShellStore = create<ShellState>((set) => ({
   isSidebarOpen: true,
-  // Read at creation so a reload keeps the chosen theme. The class is applied
-  // by the shell on mount rather than here, since a store should not be
-  // reaching into the document as a side effect of being constructed.
-  isDarkMode: loadTheme(),
-  notesViewMode: loadNotesViewMode(),
+  isDarkMode: true,
+  notesViewMode: 'grid',
 
   toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
 
@@ -63,4 +71,16 @@ export const useShellStore = create<ShellState>((set) => ({
       }
       return { notesViewMode: mode }
     }),
+
+  hydrateFromStorage: () => {
+    if (typeof window === 'undefined') return
+    // Same rule as the inline script in app/layout.tsx: dark unless the
+    // visitor explicitly opted into light. Keeping both in sync matters —
+    // this store disagreeing with the script would mean the class the
+    // script already applied gets flipped back off a moment later.
+    const isDarkMode = localStorage.getItem(THEME_KEY) !== 'light'
+    const notesViewMode: NotesViewMode = localStorage.getItem(NOTES_VIEW_MODE_KEY) === 'list' ? 'list' : 'grid'
+    document.documentElement.classList.toggle('dark', isDarkMode)
+    set({ isDarkMode, notesViewMode })
+  },
 }))
