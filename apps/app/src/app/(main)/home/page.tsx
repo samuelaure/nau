@@ -10,7 +10,7 @@ import { useActiveWorkspaceId } from '@/core/identity/workspace-store'
 import { BlockEditor } from '@/components/editor/BlockEditor'
 import { BandejaGeneral } from '@/components/home/BandejaGeneral'
 import { BandejaControls } from '@/components/home/BandejaControls'
-import { ContentTopBar, type ContentTab } from '@/core/shell/content-topbar'
+import { ContentTopBar, type ContentTabDef } from '@/core/shell/content-topbar'
 import { Breadcrumb } from '@/core/shell/breadcrumb'
 // TEMPORARY — the chatarrería (see content-topbar.tsx). Two parallel
 // "actions" implementations, side by side under their own tabs, so their
@@ -18,6 +18,12 @@ import { Breadcrumb } from '@/core/shell/breadcrumb'
 // get deleted.
 import { AgendaView } from '@/components/agenda/AgendaView'
 import { Dashboard } from '@/components/dashboard/Dashboard'
+// TEMPORARY — quarantining HomeCapture (see content-topbar.tsx) rather than
+// deleting it outright: it still creates journal entries and actions
+// (BlockEditor only creates notes), so it stays mounted and operative here
+// until that function is evaluated and either absorbed into BlockEditor or
+// deliberately dropped. Tracked in nau#147.
+import { HomeCapture } from '@/components/home/HomeCapture'
 
 /**
  * Adapts a domain-module row (`Note`, `ActionItem`) onto the `Block` shape
@@ -74,8 +80,42 @@ function actionToBlock(action: ActionItem): Block {
   }
 }
 
+type HomeTab =
+  | 'overview'
+  | 'bandeja'
+  | 'acciones'
+  | 'journal'
+  | 'references'
+  | 'ideas'
+  // TEMPORARY — the "chatarrería": naŭ has two parallel implementations of
+  // "actions", each named after the component it mounts so they're easy to
+  // tell apart while consolidating. Removed once one absorbs the other's
+  // remaining function and "Acciones" (above) is real. See
+  // tmp/flows/IMPLEMENTATION-PLAN.md.
+  | 'actionsSection'
+  | 'agendaView'
+  // TEMPORARY — same quarantine pattern as actionsSection/agendaView above.
+  // BlockEditor replaced HomeCapture as Inicio's capture surface but only
+  // covers notes; HomeCapture also created journal entries and actions
+  // (with plan-today/daily scheduling). Kept mounted here, operative, so
+  // its remaining function can be evaluated and absorbed into BlockEditor
+  // before HomeCapture.tsx is deleted. See nau#147.
+  | 'homeCapture'
+
+const HOME_TABS: Array<ContentTabDef<HomeTab>> = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'bandeja', label: 'Bandeja' },
+  { id: 'acciones', label: 'Acciones' },
+  { id: 'journal', label: 'Journal' },
+  { id: 'references', label: 'References' },
+  { id: 'ideas', label: 'Ideas' },
+  { id: 'actionsSection', label: 'ActionsSection' },
+  { id: 'agendaView', label: 'AgendaView' },
+  { id: 'homeCapture', label: 'HomeCapture' },
+]
+
 export default function HomePage() {
-  const [activeTab, setActiveTab] = useState<ContentTab>('bandeja')
+  const [activeTab, setActiveTab] = useState<HomeTab>('bandeja')
   const activeWorkspaceId = useActiveWorkspaceId()
   const setAllBlocks = useDashboardStore((s) => s.actions.setAllBlocks)
 
@@ -138,6 +178,7 @@ export default function HomePage() {
     <div>
       <ContentTopBar
         title="Inicio"
+        tabs={HOME_TABS}
         activeTab={activeTab}
         onTabChange={setActiveTab}
         tabControls={activeTab === 'bandeja' ? <BandejaControls /> : undefined}
@@ -163,6 +204,11 @@ export default function HomePage() {
               actions={processedData.actionsHierarchy}
               experiences={processedData.experiencesHierarchy}
             />
+          </div>
+        ) : activeTab === 'homeCapture' ? (
+          // TEMPORARY — see import comment above.
+          <div className="mx-auto max-w-6xl">
+            <HomeCapture />
           </div>
         ) : activeTab !== 'bandeja' ? (
           // Overview/Acciones/Journal/References/Ideas are intentionally
