@@ -1,11 +1,27 @@
 import { Block } from '@9nau/types'
 import { NoteCard } from './NoteCard'
+import { useShellStore } from '@/core/shell/shell-store'
 
 interface NoteGridProps {
   notes: Block[]
 }
 
 export function NoteGrid({ notes }: NoteGridProps) {
+  const notesViewMode = useShellStore((s) => s.notesViewMode)
+
+  if (notesViewMode === 'list') {
+    // Same max-width as BlockEditor's inline mode (max-w-xl), so a card reads like the
+    // capture box itself grown downward, not a table row stretched to the
+    // full content column.
+    return (
+      <div className="mx-auto flex max-w-xl flex-col gap-2">
+        {notes.map((note) => (
+          <NoteCard key={note.id} note={note} />
+        ))}
+      </div>
+    )
+  }
+
   return (
     <div
       style={{

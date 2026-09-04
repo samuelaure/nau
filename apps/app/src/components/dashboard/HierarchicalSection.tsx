@@ -7,6 +7,7 @@ import { useUpdateBlock } from '@/hooks/use-blocks-api'
 import { useCreateActionItem, useUpdateActionItem, useDeleteActionItem } from '@/actions/use-action-items'
 import { useCreateJournalEntry, useUpdateJournalEntry, useDeleteJournalEntry } from '@/journal/use-journal-api'
 import { findItemAndParent, HierarchicalBlock } from '@9nau/core'
+import { notify } from '@/core/notifications/notifications-store'
 
 interface HierarchicalSectionProps {
   dateStr: string
@@ -99,11 +100,24 @@ export function HierarchicalSection({
     }
   }
 
+  // EditableItem's BlockEditor overlay closes immediately on delete/update
+  // regardless of outcome (nau#153) — these two are what its onDelete/
+  // onFullUpdate actually call, so their failure is reported here, after
+  // the fact, rather than by the modal staying open.
   const handleDelete = (id: string) => {
     if (sectionType === 'action') {
-      deleteActionItem.mutate(id)
+      deleteActionItem.mutate(id, {
+        onError: () =>
+          notify({ tone: 'error', message: 'No se pudo eliminar.', action: { label: 'Reintentar', onClick: () => handleDelete(id) } }),
+      })
     } else {
-      deleteJournalEntry.mutate({ id, workspaceId })
+      deleteJournalEntry.mutate(
+        { id, workspaceId },
+        {
+          onError: () =>
+            notify({ tone: 'error', message: 'No se pudo eliminar.', action: { label: 'Reintentar', onClick: () => handleDelete(id) } }),
+        },
+      )
     }
   }
 
@@ -164,10 +178,17 @@ export function HierarchicalSection({
   }
 
   const handleFullUpdate = (id: string, dto: { type?: string; properties?: Record<string, unknown> }) => {
-    updateBlock.mutate({
-      id,
-      updateDto: dto,
-    })
+    updateBlock.mutate(
+      { id, updateDto: dto },
+      {
+        onError: () =>
+          notify({
+            tone: 'error',
+            message: 'No se pudo guardar la edición.',
+            action: { label: 'Reintentar', onClick: () => handleFullUpdate(id, dto) },
+          }),
+      },
+    )
   }
 
   const renderList = (

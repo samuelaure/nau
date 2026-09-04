@@ -2,23 +2,21 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { NoteCard } from './NoteCard'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
-import { useUpdateBlock } from '@/hooks/use-blocks-api'
-import { useDeleteNote } from '@/references/use-notes'
-import { useUpsertPlanning } from '@/hooks/use-schedule-api'
+import { useUpdateNote, useDeleteNote } from '@/references/use-notes'
+import { notify } from '@/core/notifications/notifications-store'
 import { makeBlock } from '@/test/block-fixture'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import React from 'react'
 
 jest.mock('@/lib/state/dashboard-store')
-jest.mock('@/hooks/use-blocks-api')
 jest.mock('@/references/use-notes')
-jest.mock('@/hooks/use-schedule-api')
+jest.mock('@/core/notifications/notifications-store', () => ({ notify: jest.fn() }))
 jest.mock('@/lib/state/ui-store', () => ({
   useUiStore: () => null,
 }))
 
 const useDashboardStoreMock = useDashboardStore as unknown as jest.Mock
-const mockDeleteNote = jest.fn()
+const notifyMock = notify as jest.Mock
 const queryClient = new QueryClient()
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -32,26 +30,32 @@ const mockNote = makeBlock({
   properties: { text: 'This is a test note.' },
 })
 
+/**
+ * NoteCard mounts BlockEditor locally (isEditorOpen), the same shape
+ * EditableItem already used — replacing the old dashboard-store.editingNote
+ * + separately-mounted EditNoteModal indirection nothing else ever read
+ * (nau#153). BlockEditor's own contract is specced on its own
+ * (BlockEditor.spec.tsx); these specs cover NoteCard's wiring of it.
+ */
 describe('NoteCard', () => {
   const setDraggedItem = jest.fn()
-  const setEditingNoteId = jest.fn()
+  let mockUpdateNote: jest.Mock
+  let mockDeleteNote: jest.Mock
 
   beforeEach(() => {
     useDashboardStoreMock.mockImplementation((selector) =>
       selector({
         draggedItem: null,
-        actions: {
-          setDraggedItem,
-          setEditingNoteId,
-        },
+        actions: { setDraggedItem },
       })
     )
+    mockUpdateNote = jest.fn()
+    mockDeleteNote = jest.fn()
     // Every mutation hook the component reads must return the shape
     // `useMutation` actually produces — `isPending` included — or a click
     // that reads `.isPending` crashes before the assertion under test runs.
+    ;(useUpdateNote as jest.Mock).mockReturnValue({ mutate: mockUpdateNote, isPending: false })
     ;(useDeleteNote as jest.Mock).mockReturnValue({ mutate: mockDeleteNote, isPending: false })
-    ;(useUpdateBlock as jest.Mock).mockReturnValue({ mutate: jest.fn(), mutateAsync: jest.fn(), isPending: false })
-    ;(useUpsertPlanning as jest.Mock).mockReturnValue({ mutate: jest.fn(), mutateAsync: jest.fn(), isPending: false })
   })
 
   afterEach(() => {
@@ -63,10 +67,38 @@ describe('NoteCard', () => {
     expect(screen.getByText('This is a test note.')).toBeInTheDocument()
   })
 
-  it('should call setEditingNoteId on click', () => {
+  it('opens the editor on click', () => {
     render(<NoteCard note={mockNote} />, { wrapper })
     fireEvent.click(screen.getByText('This is a test note.'))
-    expect(setEditingNoteId).toHaveBeenCalledWith(mockNote.id)
+    // BlockEditor's overlay renders the body in a textarea with the note's content.
+    expect(screen.getByDisplayValue('This is a test note.')).toBeInTheDocument()
+  })
+
+  it('closes the editor and saves via useUpdateNote on outside click', () => {
+    render(<NoteCard note={mockNote} />, { wrapper })
+    fireEvent.click(screen.getByText('This is a test note.'))
+    const body = screen.getByDisplayValue('This is a test note.')
+    fireEvent.change(body, { target: { value: 'Edited text' } })
+    fireEvent.keyDown(screen.getByDisplayValue('Edited text'), { key: 'Escape' })
+
+    expect(screen.queryByDisplayValue('Edited text')).not.toBeInTheDocument()
+    expect(mockUpdateNote).toHaveBeenCalledWith(
+      { id: 'note-1', body: { title: null, content: 'Edited text' } },
+      expect.anything(),
+    )
+  })
+
+  it('notifies with Reintentar when the update fails', () => {
+    render(<NoteCard note={mockNote} />, { wrapper })
+    fireEvent.click(screen.getByText('This is a test note.'))
+    fireEvent.change(screen.getByDisplayValue('This is a test note.'), { target: { value: 'Edited' } })
+    fireEvent.keyDown(screen.getByDisplayValue('Edited'), { key: 'Escape' })
+
+    const [, callbacks] = mockUpdateNote.mock.calls[0]
+    callbacks.onError()
+    expect(notifyMock).toHaveBeenCalledWith(
+      expect.objectContaining({ tone: 'error', action: expect.objectContaining({ label: 'Reintentar' }) }),
+    )
   })
 
   it('should call setDraggedItem on drag start', () => {
@@ -88,14 +120,33 @@ describe('NoteCard', () => {
     expect(setDraggedItem).toHaveBeenCalledWith(null)
   })
 
-  it('should call deleteNote on delete button click', () => {
+  it('should call deleteNote on delete button click, from the on-hover bottom bar', () => {
     render(<NoteCard note={mockNote} />, { wrapper })
-    const menuButton = screen.getByTestId('note-card-menu-button')
+    const menuButton = screen.getByLabelText('Más opciones')
     fireEvent.click(menuButton)
 
-    const deleteButton = screen.getByText('Delete note')
+    const deleteButton = screen.getByText('Eliminar')
     fireEvent.click(deleteButton)
 
     expect(mockDeleteNote).toHaveBeenCalledWith(mockNote.id)
+  })
+
+  it('deleting from inside the open editor also notifies on failure', () => {
+    render(<NoteCard note={mockNote} />, { wrapper })
+    fireEvent.click(screen.getByText('This is a test note.'))
+    // The editor's own MoreVertical menu, inside the opened BlockEditor —
+    // distinct DOM node from the on-hover bottom bar's, so this is the
+    // second "Más opciones"/"Eliminar" pair on screen at this point.
+    const menuButtons = screen.getAllByLabelText('Más opciones')
+    fireEvent.click(menuButtons[menuButtons.length - 1])
+    const deleteButtons = screen.getAllByText('Eliminar')
+    fireEvent.click(deleteButtons[deleteButtons.length - 1])
+
+    expect(mockDeleteNote).toHaveBeenCalledWith('note-1', expect.anything())
+    const [, callbacks] = mockDeleteNote.mock.calls[0]
+    callbacks.onError()
+    expect(notifyMock).toHaveBeenCalledWith(
+      expect.objectContaining({ tone: 'error', action: expect.objectContaining({ label: 'Reintentar' }) }),
+    )
   })
 })

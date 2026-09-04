@@ -97,8 +97,11 @@ export const useGetNotes = (params: {
 export const useGetNote = (id: string, workspaceId: string | null) =>
   useQuery<Note>({
     queryKey: ['references', 'notes', id, workspaceId],
-    queryFn: () => apiClient.get(`/references/notes/${id}?workspaceId=${workspaceId}`),
-    enabled: !!workspaceId,
+    // Same reasoning as useGetNotes: null is a real, valid "use my token's
+    // workspace" selection, not a not-yet-loaded value, so it must not be
+    // interpolated into the query string as the literal string "null", and
+    // must not gate the query behind `enabled` either.
+    queryFn: () => apiClient.get(`/references/notes/${id}${workspaceId ? `?workspaceId=${workspaceId}` : ''}`),
   })
 
 export const useCreateNote = () => {
@@ -112,8 +115,17 @@ export const useCreateNote = () => {
 export const useUpdateNote = (workspaceId: string | null) => {
   const qc = useQueryClient()
   return useMutation<Note, Error, { id: string; body: UpdateNoteInput }>({
-    mutationFn: ({ id, body }) =>
-      apiClient.patch(`/references/notes/${id}?workspaceId=${workspaceId}`, body),
+    mutationFn: ({ id, body }) => {
+      // `null` means "the workspace on my token" — same as useGetNotes above.
+      // This used to interpolate the literal string "null" into the query
+      // string whenever no workspace was explicitly selected, which the
+      // server reads as a real (nonexistent) workspace id and 403s on —
+      // silently breaking every edit for anyone who hadn't picked a
+      // workspace, the same shape of bug as nau's other workspaceId-gated
+      // query fixes.
+      const search = workspaceId ? `?workspaceId=${workspaceId}` : ''
+      return apiClient.patch(`/references/notes/${id}${search}`, body)
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['references', 'notes'] }),
   })
 }
@@ -121,7 +133,11 @@ export const useUpdateNote = (workspaceId: string | null) => {
 export const useDeleteNote = (workspaceId: string | null) => {
   const qc = useQueryClient()
   return useMutation<{ success: true }, Error, string>({
-    mutationFn: (id) => apiClient.delete(`/references/notes/${id}?workspaceId=${workspaceId}`),
+    mutationFn: (id) => {
+      // Same reasoning as useUpdateNote above.
+      const search = workspaceId ? `?workspaceId=${workspaceId}` : ''
+      return apiClient.delete(`/references/notes/${id}${search}`)
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['references', 'notes'] }),
   })
 }

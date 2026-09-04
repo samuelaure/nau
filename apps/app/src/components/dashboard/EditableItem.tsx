@@ -5,7 +5,7 @@ import { useDashboardStore } from '@/lib/state/dashboard-store'
 import { HierarchicalBlock, displayText, entryEditPatch } from '@9nau/core'
 import { X, Maximize2 } from 'lucide-react'
 import { Button } from '@9nau/ui/components/button'
-import { BlockEditorModal } from '../editor/BlockEditorModal'
+import { BlockEditor } from '../editor/BlockEditor'
 import type { AgendaItem } from '@/hooks/use-agenda-api'
 
 interface EditableItemProps {
@@ -258,20 +258,22 @@ export function EditableItem({
         )}
       </div>
 
-      <BlockEditorModal
-        isOpen={isModalOpen}
-        block={item}
-        onClose={() => setIsModalOpen(false)}
-        onUpdate={(id, dto) => {
-           if (onFullUpdate) {
-             onFullUpdate(id, dto)
-           } else {
-             // Fallback for simple edits if full update isn't passed down yet
-             onUpdate(id, dto.properties?.text as string || text)
-           }
-        }}
-        onDelete={() => onDelete(item.id)}
-      />
+      {isModalOpen && (
+        <BlockEditor
+          mode="overlay"
+          block={item}
+          onClose={() => setIsModalOpen(false)}
+          onUpdate={(id, dto) => {
+            if (onFullUpdate) {
+              onFullUpdate(id, dto)
+            } else {
+              // Fallback for simple edits if full update isn't passed down yet
+              onUpdate(id, dto.properties?.text as string || text)
+            }
+          }}
+          onDelete={() => onDelete(item.id)}
+        />
+      )}
     </>
   )
 }

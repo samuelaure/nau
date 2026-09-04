@@ -58,14 +58,48 @@ export const READ_AND_MUTATE_OPERATIONS = [
   'upsert',
 ] as const;
 
-/** Narrows a `where` clause to one workspace, preserving whatever it held. */
+/**
+ * `update`/`delete`/`upsert`/`findUnique`(`OrThrow`) require a
+ * `WhereUniqueInput` — a unique field (`id`, or a `@@unique` composite)
+ * present as a **top-level** key. Nesting the whole `where` under `AND` (as
+ * the generic path below does) loses that top-level key, which Prisma 7's
+ * client-side validation rejects before the query ever reaches the
+ * database — surfaced as a generic `PrismaClientValidationError` /
+ * `400 Invalid data provided` for what looks like a normal update on a row
+ * that demonstrably exists (nau#145).
+ */
+const UNIQUE_WHERE_OPERATIONS = [
+  'findUnique',
+  'findUniqueOrThrow',
+  'update',
+  'delete',
+  'upsert',
+] as const;
+
+/**
+ * Narrows a `where` clause to one workspace, preserving whatever it held.
+ *
+ * Two shapes, because Prisma's two families of operation need different
+ * ones: `findMany`/`updateMany`/etc. accept an arbitrary filter tree, so
+ * wrapping in `AND` is safe and simplest there. `update`/`delete`/`upsert`/
+ * `findUnique` instead require their unique key to survive at the top
+ * level — so workspaceId is merged in as a sibling filter alongside it,
+ * not nested under `AND`. Both still express "this row's own filter, AND
+ * this workspace" — only the shape Prisma requires differs.
+ */
 export function scopedWhere(
   where: Record<string, unknown> | undefined,
   workspaceId: string,
+  operation?: string,
 ): Record<string, unknown> {
   if (!where || Object.keys(where).length === 0) {
     return { workspaceId };
   }
+
+  if (operation && (UNIQUE_WHERE_OPERATIONS as readonly string[]).includes(operation)) {
+    return { ...where, workspaceId };
+  }
+
   return { AND: [where, { workspaceId }] };
 }
 

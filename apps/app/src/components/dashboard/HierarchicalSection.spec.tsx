@@ -8,12 +8,16 @@ import { useUpdateBlock } from '@/hooks/use-blocks-api'
 import { useCreateActionItem, useUpdateActionItem, useDeleteActionItem } from '@/actions/use-action-items'
 import { HierarchicalBlock } from '@9nau/core'
 import { makeHierarchicalBlock } from '@/test/block-fixture'
+import { notify } from '@/core/notifications/notifications-store'
 import React from 'react'
 
 jest.mock('@/lib/state/dashboard-store')
 jest.mock('@/hooks/use-blocks-api')
 jest.mock('@/actions/use-action-items')
 jest.mock('@/journal/use-journal-api')
+jest.mock('@/core/notifications/notifications-store', () => ({ notify: jest.fn() }))
+
+const notifyMock = notify as jest.Mock
 
 const queryClient = new QueryClient()
 const mockCreateActionItem = jest.fn()
@@ -130,5 +134,48 @@ describe('HierarchicalSection', () => {
         body: { text: 'Updated text' },
       })
     )
+  })
+
+  // These two are what EditableItem's BlockEditor overlay actually calls
+  // through onDelete/onFullUpdate — its modal closes unconditionally
+  // (nau#153), so a failure here can only be reported after the fact.
+  describe('reporting failure after an optimistic close (nau#153)', () => {
+    beforeEach(() => notifyMock.mockClear())
+
+    it('handleDelete notifies with Reintentar when deleteActionItem fails', () => {
+      render(<HierarchicalSection dateStr="2025-08-05" sectionType="action" title="Actions" items={mockItems} />, {
+        wrapper,
+      })
+      fireEvent.click(screen.getAllByLabelText('Delete item')[0])
+      expect(mockDeleteActionItem).toHaveBeenCalledWith('item-1', expect.anything())
+      const [, callbacks] = mockDeleteActionItem.mock.calls[0]
+      callbacks.onError()
+      expect(notifyMock).toHaveBeenCalledWith(
+        expect.objectContaining({ tone: 'error', action: expect.objectContaining({ label: 'Reintentar' }) }),
+      )
+    })
+
+    it('handleFullUpdate (fed by EditableItem\'s BlockEditor overlay) notifies with Reintentar on failure', () => {
+      render(<HierarchicalSection dateStr="2025-08-05" sectionType="action" title="Actions" items={mockItems} />, {
+        wrapper,
+      })
+      // Opens EditableItem's real BlockEditor overlay (mode="overlay",
+      // onFullUpdate wired to handleFullUpdate) and edits+closes it, the
+      // same path a real "Expand item" click takes.
+      fireEvent.mouseDown(screen.getAllByLabelText('Expand item')[0])
+      const bodyField = screen.getByDisplayValue('Root item')
+      fireEvent.change(bodyField, { target: { value: 'Edited via modal' } })
+      fireEvent.keyDown(screen.getByDisplayValue('Edited via modal'), { key: 'Escape' })
+
+      expect(mockUpdateBlock).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'item-1' }),
+        expect.anything(),
+      )
+      const [, callbacks] = mockUpdateBlock.mock.calls[0]
+      callbacks.onError()
+      expect(notifyMock).toHaveBeenCalledWith(
+        expect.objectContaining({ tone: 'error', action: expect.objectContaining({ label: 'Reintentar' }) }),
+      )
+    })
   })
 })

@@ -8,6 +8,8 @@ import { cn } from '@9nau/ui/lib/utils'
 import { Header } from './header'
 import { Sidebar } from './sidebar'
 import { useShellStore } from './shell-store'
+import { useWorkspaceStore } from '@/core/identity/workspace-store'
+import { useNotesViewStore } from '@/components/notes/notes-view-store'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.9nau.com'
 const BOT_USERNAME = process.env.NEXT_PUBLIC_BOT_USERNAME ?? 'zazu_bot'
@@ -24,13 +26,33 @@ const BOT_USERNAME = process.env.NEXT_PUBLIC_BOT_USERNAME ?? 'zazu_bot'
 export function AppShell({ children }: { children: React.ReactNode }) {
   const isSidebarOpen = useShellStore((s) => s.isSidebarOpen)
   const isDarkMode = useShellStore((s) => s.isDarkMode)
+  const hydrateFromStorage = useShellStore((s) => s.hydrateFromStorage)
+  const hydrateWorkspaceFromStorage = useWorkspaceStore((s) => s.hydrateFromStorage)
+  const hydrateNotesViewFromStorage = useNotesViewStore((s) => s.hydrateFromStorage)
 
   const mainRef = React.useRef<HTMLDivElement>(null)
   const [isScrolled, setIsScrolled] = React.useState(false)
 
-  // The store reads the persisted theme when it is created; applying it to
-  // the document is the shell's job, once, on mount. Doing it inside the
-  // store would make constructing it a side effect on the DOM.
+  // All three stores always start at their SSR-safe default (see
+  // shell-store.ts, workspace-store.ts, notes-view-store.ts); this pulls in
+  // whatever was actually persisted, once, after the first paint is already
+  // committed and matched against the server's markup. Centralized here
+  // rather than left to whichever component happens to read a given store
+  // first — notes-view-store's hydration used to live inside
+  // BandejaControls' GroupBySelector, which only worked because it always
+  // happened to mount alongside BandejaGeneral (the actual reader of
+  // groupBy); a layout that split them would have silently stuck
+  // BandejaGeneral on the SSR default forever.
+  React.useEffect(() => {
+    hydrateFromStorage()
+    hydrateWorkspaceFromStorage()
+    hydrateNotesViewFromStorage()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Reacts to isDarkMode changing after that — either from hydration just
+  // above, or a later manual toggle. Doing this inside the store would make
+  // constructing/updating it a side effect on the DOM.
   React.useEffect(() => {
     document.documentElement.classList.toggle('dark', isDarkMode)
   }, [isDarkMode])
@@ -52,9 +74,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <main
           ref={mainRef}
           className={cn(
-            'flex-1 overflow-y-auto bg-white p-4 transition-all duration-300 md:p-8 dark:bg-gray-950',
+            'flex-1 overflow-y-auto bg-white transition-all duration-300 dark:bg-gray-950',
           )}
-          style={{ marginLeft: isSidebarOpen ? '288px' : '80px' }}
+          style={{ marginLeft: isSidebarOpen ? '256px' : '80px' }}
         >
           {children}
         </main>

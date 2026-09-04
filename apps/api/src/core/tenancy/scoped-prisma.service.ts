@@ -109,11 +109,12 @@ export class ScopedPrismaService {
               shaped.where = scopedWhere(
                 shaped.where as Record<string, unknown> | undefined,
                 workspaceId,
+                operation,
               );
             } else if (
               (READ_AND_MUTATE_OPERATIONS as readonly string[]).includes(operation)
             ) {
-              shaped.where = scopedWhere(undefined, workspaceId);
+              shaped.where = scopedWhere(undefined, workspaceId, operation);
             }
 
             if ((operation === 'create' || operation === 'createMany') && 'data' in shaped) {
