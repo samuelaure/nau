@@ -8,6 +8,7 @@ import {
   UseGuards,
   BadRequestException,
 } from '@nestjs/common';
+import { IsString, IsOptional, IsIn } from 'class-validator';
 import { GtdService } from './gtd.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -17,14 +18,38 @@ import type { OrderIntoJournal } from '@nau/journal/relations/gtd';
 import type { OrderIntoReferences } from '@nau/references/relations/gtd';
 import type { JournalSource, JournalOriginFormat } from '@nau/journal';
 
-class CaptureBody {
+/**
+ * `class-validator` decorators are load-bearing, not documentation: the
+ * global `ValidationPipe` (app.module.ts) runs with `whitelist: true,
+ * forbidNonWhitelisted: true` — a body property with no matching decorator
+ * is stripped (or, with a body that has nothing left, the whole request
+ * rejected with 400 "should not exist"). These three DTOs shipped with only
+ * TypeScript type annotations and no decorators at all, so every real call
+ * to capture/process/order was rejected before ever reaching GtdService —
+ * confirmed by the local dev database (zero `gtd.*` events exist anywhere,
+ * despite this controller being in `main` for a while) and reproduced live
+ * against a running instance. Discovered while wiring app's BlockEditor to
+ * call capture for real for the first time (nau#153's GTD follow-up).
+ */
+export class CaptureBody {
+  @IsOptional()
+  @IsString()
   workspaceId?: string;
+
+  @IsString()
   trayId!: string;
+
+  @IsOptional()
+  @IsString()
   content?: string;
+
+  @IsOptional()
+  @IsString()
   title?: string | null;
 }
 
-class ProcessBody {
+export class ProcessBody {
+  @IsString()
   toTrayId!: string;
 }
 
@@ -33,15 +58,39 @@ class ProcessBody {
  * always carries `blockId` (nau#111/#114/#115/#117), so the destination-
  * specific fields below are its remainder.
  */
-class OrderBody {
+export class OrderBody {
+  @IsOptional()
+  @IsString()
   workspaceId?: string;
+
+  @IsIn(['actions', 'journal', 'references'])
   destination!: 'actions' | 'journal' | 'references';
+
+  @IsString()
   blockId!: string;
+
+  @IsOptional()
+  @IsString()
   text?: string;
+
+  @IsOptional()
+  @IsIn(['low', 'medium', 'high', null])
   priority?: 'low' | 'medium' | 'high' | null;
+
+  @IsOptional()
+  @IsString()
   deadline?: string | null;
+
+  @IsOptional()
+  @IsString()
   capturedAt?: string;
+
+  @IsOptional()
+  @IsString()
   source?: JournalSource;
+
+  @IsOptional()
+  @IsString()
   originFormat?: JournalOriginFormat;
 }
 
