@@ -28,7 +28,6 @@ export interface DashboardState {
   visibleFuture: number
   draggedItem: Block | null
   dropTarget: DropTarget | null
-  editingNote: Block | null
   allBlocks: Block[]
   focusedItemId: string | null
   mainContentRef: RefObject<HTMLDivElement> | null
@@ -42,7 +41,6 @@ export interface DashboardState {
     hideFuture: () => void
     setDraggedItem: (item: Block | null) => void
     setDropTarget: (target: DropTarget | null) => void
-    setEditingNoteId: (id: string | null) => void
     setAllBlocks: (blocks: Block[]) => void
     setFocusedItemId: (id: string | null) => void
     setMainContentRef: (ref: RefObject<HTMLDivElement>) => void
@@ -50,7 +48,7 @@ export interface DashboardState {
   }
 }
 
-const useDashboardStore = create<DashboardState>((set, get) => ({
+const useDashboardStore = create<DashboardState>((set) => ({
   viewMode: 'list',
   currentDate: new Date(),
   granularity: 'day',
@@ -58,7 +56,6 @@ const useDashboardStore = create<DashboardState>((set, get) => ({
   visibleFuture: 0,
   draggedItem: null,
   dropTarget: null,
-  editingNote: null,
   allBlocks: [],
   focusedItemId: null,
   mainContentRef: null,
@@ -81,15 +78,6 @@ const useDashboardStore = create<DashboardState>((set, get) => ({
       }
     },
     setDropTarget: (target) => set({ dropTarget: target }),
-    setEditingNoteId: (id) => {
-      if (!id) {
-        set({ editingNote: null })
-        return
-      }
-      const { allBlocks } = get()
-      const noteToEdit = allBlocks.find((block) => block.id === id)
-      set({ editingNote: noteToEdit || null })
-    },
     setAllBlocks: (blocks) => set({ allBlocks: blocks }),
     setFocusedItemId: (id) => set({ focusedItemId: id }),
     setMainContentRef: (ref) => set({ mainContentRef: ref }),
