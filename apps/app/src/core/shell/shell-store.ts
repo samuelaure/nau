@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { readPersisted } from '@/lib/state/persisted-field'
 
 /**
  * How the frame around the content is arranged.
@@ -79,7 +80,11 @@ export const useShellStore = create<ShellState>((set) => ({
     // this store disagreeing with the script would mean the class the
     // script already applied gets flipped back off a moment later.
     const isDarkMode = localStorage.getItem(THEME_KEY) !== 'light'
-    const notesViewMode: NotesViewMode = localStorage.getItem(NOTES_VIEW_MODE_KEY) === 'list' ? 'list' : 'grid'
+    const notesViewMode = readPersisted<NotesViewMode>(
+      NOTES_VIEW_MODE_KEY,
+      (v): v is NotesViewMode => v === 'grid' || v === 'list',
+      'grid',
+    )
     document.documentElement.classList.toggle('dark', isDarkMode)
     set({ isDarkMode, notesViewMode })
   },

@@ -9,6 +9,7 @@ import { Header } from './header'
 import { Sidebar } from './sidebar'
 import { useShellStore } from './shell-store'
 import { useWorkspaceStore } from '@/core/identity/workspace-store'
+import { useNotesViewStore } from '@/components/notes/notes-view-store'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.9nau.com'
 const BOT_USERNAME = process.env.NEXT_PUBLIC_BOT_USERNAME ?? 'zazu_bot'
@@ -27,17 +28,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isDarkMode = useShellStore((s) => s.isDarkMode)
   const hydrateFromStorage = useShellStore((s) => s.hydrateFromStorage)
   const hydrateWorkspaceFromStorage = useWorkspaceStore((s) => s.hydrateFromStorage)
+  const hydrateNotesViewFromStorage = useNotesViewStore((s) => s.hydrateFromStorage)
 
   const mainRef = React.useRef<HTMLDivElement>(null)
   const [isScrolled, setIsScrolled] = React.useState(false)
 
-  // Both stores always start at their SSR-safe default (see shell-store.ts
-  // and workspace-store.ts); this pulls in whatever was actually persisted,
-  // once, after the first paint is already committed and matched against
-  // the server's markup.
+  // All three stores always start at their SSR-safe default (see
+  // shell-store.ts, workspace-store.ts, notes-view-store.ts); this pulls in
+  // whatever was actually persisted, once, after the first paint is already
+  // committed and matched against the server's markup. Centralized here
+  // rather than left to whichever component happens to read a given store
+  // first — notes-view-store's hydration used to live inside
+  // BandejaControls' GroupBySelector, which only worked because it always
+  // happened to mount alongside BandejaGeneral (the actual reader of
+  // groupBy); a layout that split them would have silently stuck
+  // BandejaGeneral on the SSR default forever.
   React.useEffect(() => {
     hydrateFromStorage()
     hydrateWorkspaceFromStorage()
+    hydrateNotesViewFromStorage()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

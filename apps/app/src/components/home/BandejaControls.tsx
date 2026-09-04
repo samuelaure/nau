@@ -39,17 +39,11 @@ export function BandejaControls() {
 function GroupBySelector() {
   const groupBy = useNotesViewStore((s) => s.groupBy)
   const setGroupBy = useNotesViewStore((s) => s.setGroupBy)
-  const hydrateFromStorage = useNotesViewStore((s) => s.hydrateFromStorage)
   const [isOpen, setIsOpen] = React.useState(false)
   const ref = React.useRef<HTMLDivElement>(null)
 
-  // The store always starts at 'none' (SSR-safe — see notes-view-store.ts);
-  // this pulls in whatever was actually persisted, after the first paint
-  // is already committed and matched against the server's markup.
-  React.useEffect(() => {
-    hydrateFromStorage()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  // Hydration (SSR-safe default → persisted value) happens once, centrally,
+  // in AppShell's mount effect — not here. See app-shell.tsx.
 
   React.useEffect(() => {
     if (!isOpen) return

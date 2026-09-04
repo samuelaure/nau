@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { readPersisted } from '@/lib/state/persisted-field'
 
 /**
  * How Bandeja General groups its notes — a Keep-style optional divider, not
@@ -13,11 +14,6 @@ import { create } from 'zustand'
 export type NotesGroupBy = 'none' | 'createdAt' | 'updatedAt'
 
 const GROUP_BY_KEY = 'nau:notes-group-by'
-
-function loadGroupBy(): NotesGroupBy {
-  const stored = localStorage.getItem(GROUP_BY_KEY)
-  return stored === 'createdAt' || stored === 'updatedAt' ? stored : 'none'
-}
 
 interface NotesViewState {
   groupBy: NotesGroupBy
@@ -35,10 +31,11 @@ interface NotesViewState {
  * client render would show that while the server-rendered HTML it's
  * hydrating against always shows `none` (the server has no `localStorage`)
  * — a text mismatch React surfaces as a hydration error and recovers from
- * by discarding the server tree entirely. `GroupBySelector` calls
- * `hydrateFromStorage()` in a `useEffect` instead, which by definition runs
- * after the first paint is already committed and matched, then updates to
- * the persisted value the same way any other post-mount state change would.
+ * by discarding the server tree entirely. `AppShell`'s mount effect calls
+ * `hydrateFromStorage()` alongside the shell/workspace stores' own, which by
+ * definition runs after the first paint is already committed and matched,
+ * then updates to the persisted value the same way any other post-mount
+ * state change would.
  */
 export const useNotesViewStore = create<NotesViewState>((set) => ({
   groupBy: 'none',
@@ -49,6 +46,11 @@ export const useNotesViewStore = create<NotesViewState>((set) => ({
     }),
   hydrateFromStorage: () => {
     if (typeof window === 'undefined') return
-    set({ groupBy: loadGroupBy() })
+    const groupBy = readPersisted<NotesGroupBy>(
+      GROUP_BY_KEY,
+      (v): v is NotesGroupBy => v === 'createdAt' || v === 'updatedAt' || v === 'none',
+      'none',
+    )
+    set({ groupBy })
   },
 }))

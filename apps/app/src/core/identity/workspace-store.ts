@@ -51,7 +51,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   },
   hydrateFromStorage: () => {
     if (typeof window === 'undefined') return
-    set({ activeWorkspaceId: localStorage.getItem(STORAGE_KEY) })
+    // Unlike the enum-shaped fields elsewhere (theme, notesViewMode,
+    // groupBy — see lib/state/persisted-field.ts), a workspace id has no
+    // fixed set of valid values to check against client-side — "valid"
+    // here just means non-empty, since a stale or deleted workspace id is
+    // caught server-side by every request it scopes, not here.
+    const stored = localStorage.getItem(STORAGE_KEY)
+    set({ activeWorkspaceId: stored || null })
   },
 }))
 
