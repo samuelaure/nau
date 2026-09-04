@@ -9,11 +9,14 @@ interface BandejaGeneralProps {
 }
 
 /**
- * The GTD General tray, Keep-equivalent: every captured note, as cards —
- * grid or list per `notesViewMode` (`NoteGrid` reads that itself). No
- * Futuro/Pasado paging — that belongs to `Dashboard`'s period-scroll view,
- * a different surface (the old, still-unbuilt Time/Actions period view),
- * not this tray. Grouping (`groupBy`, from the content topbar's selector) is
+ * naŭ's actual GTD General tray (root, `ROOT_TRAY_ID`) — not "every note",
+ * only blocks GTD's own event log currently places in it (captured, not
+ * yet processed/ordered out; see `home/page.tsx`'s `trayNotes` filter
+ * against `useTrayContents`). Rendered Keep-equivalent, as cards — grid or
+ * list per `notesViewMode` (`NoteGrid` reads that itself). No Futuro/Pasado
+ * paging — that belongs to `Dashboard`'s period-scroll view, a different
+ * surface (the old, still-unbuilt Time/Actions period view), not this
+ * tray. Grouping (`groupBy`, from the content topbar's selector) is
  * optional and off by default — `none` renders the same flat list this
  * always has. Ordered newest first within each group, same as Keep orders
  * by last-touched.

@@ -1,26 +1,28 @@
 'use client'
 
 /**
- * DRAFT, not yet confirmed by `module:gtd`.
- *
- * Written against the real, merged (local `main`, unpushed as of writing)
- * `apps/api/src/gtd/gtd.controller.ts` and `gtd.service.ts` —
- * not invented. Per nau#119's method: draft from observable evidence, mark
- * it unconfirmed in the code, publish the issue, converge.
- *
- * **The gap this draft cannot fill on its own**: `api-gtd` exposes capture,
- * process, order, and reading ONE item's current tray
- * (`GET /gtd/:blockId/tray`). There is no route that lists everything sitting
- * in a tray — nothing `app`'s Inbox view can page through. `useCapture`,
- * `useProcess` and `useOrder` below are confirmed against real routes.
- * `useTrayContents` is speculative — it assumes a list endpoint that does not
- * exist yet, shaped by analogy with `references.listNotes` and `journal
- * entries`. This is the central question the tracking issue asks GTD to
- * resolve, not a detail to nod through.
+ * Confirmed against `apps/api/src/gtd/gtd.controller.ts`/`gtd.service.ts`.
+ * `useCapture`, `useProcess`, `useOrder` were already confirmed; nau#125
+ * resolved the one open gap — `useTrayContents` now calls the real
+ * `GET /gtd/tray?trayId&workspaceId → { trayId, blockIds: string[] }`,
+ * closed and verified (25 tests, nau#125's own comment thread) rather than
+ * speculative.
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/core/http/client'
+
+/**
+ * The general tray of naŭ itself — the root block, per the recursive model
+ * every block's own General/Actions/References/Journal/Ideas set follows
+ * (tmp/flows/gtd_ui_ux_flows.md §0). `trayId` is an opaque string owned by
+ * whichever caller creates it (packages/gtd/src/core/tray.ts is explicit
+ * that the core never names one) — naŭ root has no real `Block` row of its
+ * own to derive an id from, so this is the fixed convention for it, decided
+ * 2026-09-04. A tray inside some other block would use that block's own id,
+ * not this constant.
+ */
+export const ROOT_TRAY_ID = 'root'
 
 export interface CaptureInput {
   trayId: string
@@ -31,9 +33,17 @@ export interface CaptureInput {
 
 export const useCapture = () => {
   const qc = useQueryClient()
-  return useMutation<{ blockId: string }, Error, CaptureInput>({
+  return useMutation<{ blockId: string; trayId: string }, Error, CaptureInput>({
     mutationFn: (body) => apiClient.post('/gtd/capture', body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['gtd'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['gtd'] })
+      // capture always creates a references.note under the hood
+      // (gtd.service.ts) — the caller that hydrates a tray's blockIds
+      // against References' own list (BandejaGeneral's approach) needs
+      // that list refreshed too, or a just-captured note won't appear
+      // until something else happens to invalidate it.
+      qc.invalidateQueries({ queryKey: ['references', 'notes'] })
+    },
   })
 }
 
@@ -92,15 +102,23 @@ export const useItemTray = (blockId: string | null) =>
   })
 
 /**
- * SPECULATIVE — no confirmed endpoint. Assumes a `GET /gtd/tray` list route
- * shaped like `references.listNotes`, which does not exist in
- * `gtd.controller.ts` today. Do not build UI against this until `module:gtd`
- * confirms the shape (or confirms there is deliberately no such listing —
- * see the draft's opening note).
+ * Every block currently sitting in one tray — ids only, not hydrated
+ * (nau#125's own answer: the route deliberately returns ids, not full
+ * blocks, keeping the substance/content split the rest of the design
+ * follows; hydrating them against each destination's own list is the
+ * caller's job — see BandejaGeneral's use of this, which filters an
+ * already-fetched References list rather than adding a second fetch).
+ *
+ * `workspaceId: null` means "the workspace on my token" — same convention
+ * as every other hook here; the param is omitted rather than interpolated
+ * as the literal string "null" (the bug class fixed across use-notes.ts).
  */
 export const useTrayContents = (params: { trayId: string; workspaceId: string | null }) =>
-  useQuery<unknown[]>({
+  useQuery<{ trayId: string; blockIds: string[] }>({
     queryKey: ['gtd', 'tray-contents', params.trayId, params.workspaceId],
-    queryFn: () => apiClient.get(`/gtd/tray?trayId=${params.trayId}&workspaceId=${params.workspaceId}`),
-    enabled: false, // Never actually fires — the route is speculative, not confirmed.
+    queryFn: () => {
+      const search = new URLSearchParams({ trayId: params.trayId })
+      if (params.workspaceId) search.set('workspaceId', params.workspaceId)
+      return apiClient.get(`/gtd/tray?${search.toString()}`)
+    },
   })

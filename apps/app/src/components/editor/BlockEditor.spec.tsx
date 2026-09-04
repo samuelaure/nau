@@ -3,18 +3,21 @@ import '@testing-library/jest-dom'
 import React from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BlockEditor } from './BlockEditor'
-import { useCreateNote } from '@/references/use-notes'
+import { useCapture } from '@/gtd/use-gtd'
 import { useActiveWorkspaceId } from '@/core/identity/workspace-store'
 import { notify } from '@/core/notifications/notifications-store'
 import { makeBlock } from '@/test/block-fixture'
 
-jest.mock('@/references/use-notes')
+jest.mock('@/gtd/use-gtd', () => ({
+  ...jest.requireActual('@/gtd/use-gtd'),
+  useCapture: jest.fn(),
+}))
 jest.mock('@/core/identity/workspace-store')
 jest.mock('@/core/notifications/notifications-store', () => ({
   notify: jest.fn(),
 }))
 
-const useCreateNoteMock = useCreateNote as jest.Mock
+const useCaptureMock = useCapture as jest.Mock
 const useActiveWorkspaceIdMock = useActiveWorkspaceId as jest.Mock
 const notifyMock = notify as jest.Mock
 
@@ -31,11 +34,11 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
  * was only found by manual code reading, not by any test — see nau#153.
  */
 describe('BlockEditor', () => {
-  let createNoteMutate: jest.Mock
+  let captureMutate: jest.Mock
 
   beforeEach(() => {
-    createNoteMutate = jest.fn()
-    useCreateNoteMock.mockReturnValue({ mutate: createNoteMutate, isError: false, isPending: false })
+    captureMutate = jest.fn()
+    useCaptureMock.mockReturnValue({ mutate: captureMutate, isError: false, isPending: false })
     useActiveWorkspaceIdMock.mockReturnValue('workspace-1')
     notifyMock.mockClear()
   })
@@ -73,7 +76,7 @@ describe('BlockEditor', () => {
       fireEvent.click(screen.getByText('Take a note...'))
       fireEvent.mouseDown(screen.getByText('outside'))
       expect(screen.getByText('Take a note...')).toBeInTheDocument()
-      expect(createNoteMutate).not.toHaveBeenCalled()
+      expect(captureMutate).not.toHaveBeenCalled()
     })
 
     // The bug fixed in nau#153: closing an empty overlay capture (no block)
@@ -86,7 +89,7 @@ describe('BlockEditor', () => {
       render(<BlockEditor mode="overlay" onClose={onClose} />, { wrapper })
       fireEvent.keyDown(screen.getByPlaceholderText('Escribe algo…'), { key: 'Escape' })
       expect(onClose).toHaveBeenCalledTimes(1)
-      expect(createNoteMutate).not.toHaveBeenCalled()
+      expect(captureMutate).not.toHaveBeenCalled()
     })
 
     it('closes immediately on a non-empty overlay capture — does not wait for the mutation', () => {
@@ -94,12 +97,12 @@ describe('BlockEditor', () => {
       render(<BlockEditor mode="overlay" onClose={onClose} />, { wrapper })
       fireEvent.change(screen.getByPlaceholderText('Escribe algo…'), { target: { value: 'A new note' } })
       fireEvent.keyDown(screen.getByPlaceholderText('Escribe algo…'), { key: 'Escape' })
-      // Closed synchronously, before createNote's mutate callback (onError,
+      // Closed synchronously, before capture's mutate callback (onError,
       // below) ever has a chance to run — this is the "optimistic close"
       // contract, not a race that happens to pass.
       expect(onClose).toHaveBeenCalledTimes(1)
-      expect(createNoteMutate).toHaveBeenCalledWith(
-        expect.objectContaining({ content: 'A new note', workspaceId: 'workspace-1' }),
+      expect(captureMutate).toHaveBeenCalledWith(
+        expect.objectContaining({ trayId: 'root', content: 'A new note', workspaceId: 'workspace-1' }),
         expect.anything(),
       )
     })
@@ -109,13 +112,13 @@ describe('BlockEditor', () => {
       fireEvent.change(screen.getByPlaceholderText('Título'), { target: { value: '  ' } })
       fireEvent.change(screen.getByPlaceholderText('Escribe algo…'), { target: { value: '  hello  ' } })
       fireEvent.keyDown(screen.getByPlaceholderText('Escribe algo…'), { key: 'Escape' })
-      expect(createNoteMutate).toHaveBeenCalledWith(
+      expect(captureMutate).toHaveBeenCalledWith(
         expect.objectContaining({ content: 'hello', title: null }),
         expect.anything(),
       )
     })
 
-    it('notifies with a Reintentar action when createNote fails, after already closing', () => {
+    it('notifies with a Reintentar action when capture fails, after already closing', () => {
       const onClose = jest.fn()
       render(<BlockEditor mode="overlay" onClose={onClose} />, { wrapper })
       fireEvent.change(screen.getByPlaceholderText('Escribe algo…'), { target: { value: 'will fail' } })
@@ -123,7 +126,7 @@ describe('BlockEditor', () => {
 
       expect(onClose).toHaveBeenCalledTimes(1)
       // Simulate the mutation's onError firing, the way react-query would.
-      const [, callbacks] = createNoteMutate.mock.calls[0]
+      const [, callbacks] = captureMutate.mock.calls[0]
       callbacks.onError()
 
       expect(notifyMock).toHaveBeenCalledWith(

@@ -7,6 +7,7 @@ import { groupBlocksByDate, buildHierarchy, formatDisplayDate } from '@9nau/core
 import { Block } from '@9nau/types'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
 import { useActiveWorkspaceId } from '@/core/identity/workspace-store'
+import { useTrayContents, ROOT_TRAY_ID } from '@/gtd/use-gtd'
 import { BlockEditor } from '@/components/editor/BlockEditor'
 import { BandejaGeneral } from '@/components/home/BandejaGeneral'
 import { BandejaControls } from '@/components/home/BandejaControls'
@@ -129,9 +130,14 @@ export default function HomePage() {
     isLoading: actionsLoading,
     isError: actionsError,
   } = useGetActionItems({ workspaceId: activeWorkspaceId })
+  const {
+    data: rootTray,
+    isLoading: trayLoading,
+    isError: trayError,
+  } = useTrayContents({ trayId: ROOT_TRAY_ID, workspaceId: activeWorkspaceId })
 
-  const isLoading = notesLoading || actionsLoading
-  const isError = notesError || actionsError
+  const isLoading = notesLoading || actionsLoading || trayLoading
+  const isError = notesError || actionsError || trayError
 
   const blocks = useMemo(() => {
     const notes = (notesData ?? []).map(noteToBlock)
@@ -171,8 +177,18 @@ export default function HomePage() {
         {} as Record<string, Block[]>
       )
 
-    return { notes, notesByDate, actionsHierarchy, experiencesHierarchy, groupedNotes }
-  }, [blocks])
+    // Bandeja shows only what's actually still in naŭ's root tray — notes
+    // that were captured through GTD and not yet processed/ordered out.
+    // Not every References note qualifies: one created before this wiring
+    // existed, or through a path that bypasses GTD capture entirely, never
+    // got a `gtd.capture` movement recorded and so never entered any tray
+    // (see nau#153's GTD follow-up — this used to show every note
+    // unconditionally, which is a real behavior difference, not cosmetic).
+    const trayBlockIds = new Set(rootTray?.blockIds ?? [])
+    const trayNotes = notes.filter((note) => trayBlockIds.has(note.id))
+
+    return { notes, trayNotes, notesByDate, actionsHierarchy, experiencesHierarchy, groupedNotes }
+  }, [blocks, rootTray])
 
   return (
     <div>
@@ -226,7 +242,7 @@ export default function HomePage() {
         ) : (
           <div className="mx-auto max-w-6xl">
             <BlockEditor />
-            <BandejaGeneral notes={processedData.notes} />
+            <BandejaGeneral notes={processedData.trayNotes} />
           </div>
         )}
       </div>

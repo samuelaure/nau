@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { cn } from '@9nau/ui/lib/utils'
 import { Card } from '@9nau/ui/components/card'
-import { useCreateNote } from '@/references/use-notes'
+import { useCapture, ROOT_TRAY_ID } from '@/gtd/use-gtd'
 import { useActiveWorkspaceId } from '@/core/identity/workspace-store'
 import { notify } from '@/core/notifications/notifications-store'
 import { BlockBottomBar } from './BlockBottomBar'
@@ -49,7 +49,8 @@ import type { Block, UpdateBlockDto } from '@9nau/types'
  * still open to see it. `onUpdate`/`onDelete` are void callbacks precisely
  * so callers can fire-and-forget their own mutation and handle its error
  * with their own `notify()` call; `BlockEditor` only owns this for the one
- * mutation it runs itself (creating a note).
+ * mutation it runs itself (capturing a new note to naŭ's root tray — see
+ * ROOT_TRAY_ID in gtd/use-gtd.ts).
  */
 export function BlockEditor({
   mode = 'inline',
@@ -75,7 +76,7 @@ export function BlockEditor({
   const containerRef = React.useRef<HTMLDivElement>(null)
   const bodyRef = React.useRef<HTMLTextAreaElement>(null)
 
-  const createNote = useCreateNote()
+  const capture = useCapture()
   const activeWorkspaceId = useActiveWorkspaceId()
 
   React.useEffect(() => {
@@ -114,10 +115,16 @@ export function BlockEditor({
    * unconditional, a failure is `notify()`'s job, not this function
    * reopening or refusing to close.
    *
-   * Capturing (no `block`) creates a note via References. Editing an
-   * existing block reports the change up through `onUpdate` (nothing
-   * currently opens an existing block inline, but the collapse still
-   * exists for symmetry with the capture path).
+   * Capturing (no `block`) calls GTD's own capture (nau#153's GTD
+   * follow-up: this used to create a References note directly, bypassing
+   * the tray mechanism entirely — a real gap, since it meant nothing
+   * captured through this editor ever actually entered a tray Bandeja
+   * could read back out). GTD's capture always produces a references.note
+   * under the hood (gtd.service.ts), so the note itself is unchanged; what
+   * changed is that a `gtd.capture` movement is now recorded alongside it.
+   * Editing an existing block reports the change up through `onUpdate`
+   * (nothing currently opens an existing block inline, but the collapse
+   * still exists for symmetry with the capture path).
    */
   const commit = () => {
     // In `overlay` mode there is no collapsed state to fall back to — the
@@ -135,21 +142,20 @@ export function BlockEditor({
       setTitle('')
       setBody('')
       if (!trimmed) return
-      createNote.mutate(
-        { content: trimmed, title: capturedTitle, workspaceId: activeWorkspaceId ?? undefined },
-        {
-          onError: () =>
-            notify({
-              tone: 'error',
-              message: 'No se pudo guardar la nota.',
-              action: {
-                label: 'Reintentar',
-                onClick: () =>
-                  createNote.mutate({ content: trimmed, title: capturedTitle, workspaceId: activeWorkspaceId ?? undefined }),
-              },
-            }),
-        },
-      )
+      const captureInput = {
+        trayId: ROOT_TRAY_ID,
+        content: trimmed,
+        title: capturedTitle,
+        workspaceId: activeWorkspaceId ?? undefined,
+      }
+      capture.mutate(captureInput, {
+        onError: () =>
+          notify({
+            tone: 'error',
+            message: 'No se pudo guardar la nota.',
+            action: { label: 'Reintentar', onClick: () => capture.mutate(captureInput) },
+          }),
+      })
       return
     }
 
@@ -175,9 +181,9 @@ export function BlockEditor({
     }
     // Close first, unconditionally — same rule as the capture branch above.
     // onUpdate is a void, fire-and-forget callback; the caller that owns
-    // the real mutation (EditNoteModal, EditableItem) is responsible for
-    // its own notify() on failure, same as this function is for its own
-    // createNote call.
+    // the real mutation (NoteCard, EditableItem) is responsible for its
+    // own notify() on failure, same as this function is for its own
+    // capture call.
     close()
     if (changed) {
       onUpdate?.(block.id, { properties: nextProperties })
