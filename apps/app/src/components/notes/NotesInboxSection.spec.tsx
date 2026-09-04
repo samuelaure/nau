@@ -25,4 +25,14 @@ describe('NotesInboxSection', () => {
     expect(screen.getByText('No inbox notes for this day.')).toBeInTheDocument()
     expect(screen.queryByText('Mocked NoteGrid')).not.toBeInTheDocument()
   })
+
+  it('does not render a divider by default', () => {
+    const { container } = render(<NotesInboxSection title="Notes Inbox" notes={mockNotes} />)
+    expect(container.querySelector('.bg-gray-200')).not.toBeInTheDocument()
+  })
+
+  it('renders a divider next to the title when withDivider is true', () => {
+    const { container } = render(<NotesInboxSection title="Notes Inbox" notes={mockNotes} withDivider />)
+    expect(container.querySelector('.bg-gray-200')).toBeInTheDocument()
+  })
 })

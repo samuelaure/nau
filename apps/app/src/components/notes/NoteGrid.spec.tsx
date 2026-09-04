@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, act } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { NoteGrid } from './NoteGrid'
+import { useShellStore } from '@/core/shell/shell-store'
 import { makeBlock } from '@/test/block-fixture'
 import React from 'react'
 
@@ -14,6 +15,12 @@ const mockNotes = [
 ]
 
 describe('NoteGrid', () => {
+  afterEach(() => {
+    act(() => {
+      useShellStore.setState({ notesViewMode: 'grid' })
+    })
+  })
+
   it('should render a NoteCard for each note', () => {
     render(<NoteGrid notes={mockNotes} />)
     expect(screen.getByTestId('note-card-1')).toBeInTheDocument()
@@ -25,5 +32,12 @@ describe('NoteGrid', () => {
   it('should handle an empty notes array', () => {
     render(<NoteGrid notes={[]} />)
     expect(screen.queryByTestId(/note-card/)).not.toBeInTheDocument()
+  })
+
+  it('renders as a single column when notesViewMode is "list"', () => {
+    useShellStore.setState({ notesViewMode: 'list' })
+    const { container } = render(<NoteGrid notes={mockNotes} />)
+    expect(screen.getByTestId('note-card-1')).toBeInTheDocument()
+    expect(container.querySelector('.flex-col')).toBeInTheDocument()
   })
 })
