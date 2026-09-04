@@ -50,7 +50,7 @@
  * against production.
  */
 
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 
@@ -95,13 +95,13 @@ async function main() {
         const migratedProperties = {
           title: null,
           content: typeof props.text === 'string' ? props.text : '',
-          attachments: [],
+          attachments: [] as unknown[],
           suggestedType: null,
-          ...(props.sortOrder !== undefined ? { sortOrder: props.sortOrder } : {}),
+          ...(props.sortOrder !== undefined ? { sortOrder: props.sortOrder as number } : {}),
         };
         await prisma.block.update({
           where: { id: block.id },
-          data: { type: REFERENCES_NOTE_KIND, properties: migratedProperties },
+          data: { type: REFERENCES_NOTE_KIND, properties: migratedProperties as Prisma.InputJsonValue },
         });
       }
       console.log(`Migrated ${legacyNotes.length} legacy 'note' block(s).\n`);
