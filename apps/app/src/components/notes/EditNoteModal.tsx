@@ -3,6 +3,7 @@
 import { useUpdateNote, useDeleteNote } from '@/references/use-notes'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
 import { useActiveWorkspaceId } from '@/core/identity/workspace-store'
+import { notify } from '@/core/notifications/notifications-store'
 import { BlockEditor } from '@/components/editor/BlockEditor'
 
 /**
@@ -38,17 +39,35 @@ export function EditNoteModal() {
       onClose={() => setEditingNoteId(null)}
       onUpdate={(id, dto) => {
         const props = dto.properties as Record<string, unknown> | undefined
-        updateNote.mutate({
-          id,
-          body: {
-            title: (props?.title as string | null) ?? null,
-            content: (props?.text as string) ?? '',
+        const body = {
+          title: (props?.title as string | null) ?? null,
+          content: (props?.text as string) ?? '',
+        }
+        // BlockEditor already closed by the time this fires (see its
+        // docstring — nau#153) — a failure here can only be reported after
+        // the fact, never by keeping the modal open.
+        updateNote.mutate(
+          { id, body },
+          {
+            onError: () =>
+              notify({
+                tone: 'error',
+                message: 'No se pudo guardar la edición de la nota.',
+                action: { label: 'Reintentar', onClick: () => updateNote.mutate({ id, body }) },
+              }),
           },
-        })
+        )
       }}
       onDelete={(id) => {
-        deleteNote.mutate(id)
         setEditingNoteId(null)
+        deleteNote.mutate(id, {
+          onError: () =>
+            notify({
+              tone: 'error',
+              message: 'No se pudo eliminar la nota.',
+              action: { label: 'Reintentar', onClick: () => deleteNote.mutate(id) },
+            }),
+        })
       }}
     />
   )

@@ -4,8 +4,8 @@ import { BlockToolbar } from './BlockToolbar'
 
 /**
  * The entire bottom-edge row a block carries — not just the buttons
- * (`BlockToolbar`), the row itself: `BlockToolbar` alongside the error slot
- * and the optional "Cerrar".
+ * (`BlockToolbar`), the row itself: `BlockToolbar` alongside the optional
+ * "Cerrar".
  *
  * `NoteCard`'s on-hover row and `BlockEditor`'s open editor both render
  * this exact component now — abstracting only `BlockToolbar` still let the
@@ -18,6 +18,12 @@ import { BlockToolbar } from './BlockToolbar'
  * now takes `flex-1`, so it (and this component) work correctly as a
  * direct flex child wherever they're mounted, with no extra wrapper div
  * needed at either call site to make the layout behave.
+ *
+ * No error slot: closing (Cerrar, click-outside, Escape) always closes
+ * immediately regardless of what the save/update/delete behind it does —
+ * see notifications-store.ts. A failure surfaces as a toast with a retry
+ * action, never by keeping this row (and the modal around it) open to
+ * display an inline message the user didn't ask to see.
  */
 export function BlockBottomBar({
   isHabit,
@@ -25,7 +31,6 @@ export function BlockBottomBar({
   canDelete = true,
   showClose = true,
   onClose,
-  errorMessage,
 }: {
   isHabit?: boolean
   onDelete: () => void
@@ -34,13 +39,10 @@ export function BlockBottomBar({
   showClose?: boolean
   /** Required when `showClose` is true. */
   onClose?: () => void
-  errorMessage?: string | null
 }) {
   return (
     <div className="flex items-center gap-3">
       <BlockToolbar isHabit={isHabit} onDelete={onDelete} canDelete={canDelete} />
-
-      {errorMessage && <span className="text-xs text-red-600">{errorMessage}</span>}
 
       {showClose && (
         <button

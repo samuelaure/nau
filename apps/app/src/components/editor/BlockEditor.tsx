@@ -5,6 +5,7 @@ import { cn } from '@9nau/ui/lib/utils'
 import { Card } from '@9nau/ui/components/card'
 import { useCreateNote } from '@/references/use-notes'
 import { useActiveWorkspaceId } from '@/core/identity/workspace-store'
+import { notify } from '@/core/notifications/notifications-store'
 import { BlockBottomBar } from './BlockBottomBar'
 import type { Block, UpdateBlockDto } from '@9nau/types'
 
@@ -36,6 +37,19 @@ import type { Block, UpdateBlockDto } from '@9nau/types'
  * shared with `NoteCard`'s on-hover controls, so the two never drift apart
  * — `NoteCard` passes `showClose={false}`, since a hovered card has
  * nothing to close.
+ *
+ * Closing — the button, click-outside, or Escape — always closes
+ * immediately, whether that means creating, updating, or deleting. It never
+ * waits on the network request behind it, and never keeps the modal open to
+ * report a failure (decided 2026-09-04, see nau#153): the user's intent was
+ * "this is done" the moment they closed it, and a modal that reopens itself
+ * over a network hiccup reads as broken, not as careful. A failure is
+ * reported through `notify()` (core/notifications) instead — a toast with a
+ * Reintentar action — after the fact, decoupled from whether the UI is
+ * still open to see it. `onUpdate`/`onDelete` are void callbacks precisely
+ * so callers can fire-and-forget their own mutation and handle its error
+ * with their own `notify()` call; `BlockEditor` only owns this for the one
+ * mutation it runs itself (creating a note).
  */
 export function BlockEditor({
   mode = 'inline',
@@ -95,32 +109,45 @@ export function BlockEditor({
   }, [body, isExpanded])
 
   /**
-   * Saves, and only then clears or closes.
+   * Closes (or collapses) immediately, then fires the save — never the
+   * other way around. See the class docstring for why: closing is
+   * unconditional, a failure is `notify()`'s job, not this function
+   * reopening or refusing to close.
    *
-   * Capturing (no `block`) creates a note via References and resets to the
-   * collapsed card. Editing an existing block reports the change up through
-   * `onUpdate` and closes (overlay) or collapses back (inline, though
-   * nothing currently opens an existing block inline).
+   * Capturing (no `block`) creates a note via References. Editing an
+   * existing block reports the change up through `onUpdate` (nothing
+   * currently opens an existing block inline, but the collapse still
+   * exists for symmetry with the capture path).
    */
   const commit = () => {
+    // In `overlay` mode there is no collapsed state to fall back to — the
+    // host unmounts this component entirely (sidebar.tsx's "+Crear") — so
+    // closing always means `onClose`, never `setExpanded(false)`.
+    const close = () => {
+      if (mode === 'overlay') onClose?.()
+      else setExpanded(false)
+    }
+
     if (!block) {
       const trimmed = body.trim()
-      if (!trimmed) {
-        setExpanded(false)
-        return
-      }
+      const capturedTitle = title.trim() || null
+      close()
+      setTitle('')
+      setBody('')
+      if (!trimmed) return
       createNote.mutate(
+        { content: trimmed, title: capturedTitle, workspaceId: activeWorkspaceId ?? undefined },
         {
-          content: trimmed,
-          title: title.trim() || null,
-          workspaceId: activeWorkspaceId ?? undefined,
-        },
-        {
-          onSuccess: () => {
-            setTitle('')
-            setBody('')
-            setExpanded(false)
-          },
+          onError: () =>
+            notify({
+              tone: 'error',
+              message: 'No se pudo guardar la nota.',
+              action: {
+                label: 'Reintentar',
+                onClick: () =>
+                  createNote.mutate({ content: trimmed, title: capturedTitle, workspaceId: activeWorkspaceId ?? undefined }),
+              },
+            }),
         },
       )
       return
@@ -146,11 +173,15 @@ export function BlockEditor({
       changed = nextTitle !== originalText || nextBody !== originalBody
       nextProperties = { ...props, text: nextTitle, body: nextBody || undefined }
     }
+    // Close first, unconditionally — same rule as the capture branch above.
+    // onUpdate is a void, fire-and-forget callback; the caller that owns
+    // the real mutation (EditNoteModal, EditableItem) is responsible for
+    // its own notify() on failure, same as this function is for its own
+    // createNote call.
+    close()
     if (changed) {
       onUpdate?.(block.id, { properties: nextProperties })
     }
-    if (mode === 'overlay') onClose?.()
-    else setExpanded(false)
   }
 
   // Bound to the latest handler on every render, so the outside-click
@@ -254,7 +285,6 @@ export function BlockEditor({
           onDelete={handleDelete}
           canDelete={!!block}
           onClose={commit}
-          errorMessage={createNote.isError ? 'No se pudo guardar. El texto sigue aquí.' : null}
         />
       </div>
     </div>
