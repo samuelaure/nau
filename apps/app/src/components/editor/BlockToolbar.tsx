@@ -41,6 +41,9 @@ export function BlockToolbar({
     <div className="flex flex-1 items-center gap-3">
       <ToolbarButton title="Recordatorio" icon={Clock} disabled />
       <ToolbarButton title="Frecuencia" icon={Repeat} disabled active={isHabit} />
+      {/* Disabled — replaces NoteCard's old "A la agenda" (schedule-today),
+          dropped when NoteCard's bottom row moved onto this shared
+          toolbar. Not yet wired: see nau#152. */}
       <ToolbarButton title="Mover a…" icon={Calendar} disabled />
       <ToolbarButton title="Etiquetas" icon={Tag} disabled />
 

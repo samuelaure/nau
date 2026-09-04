@@ -172,8 +172,6 @@ export function BlockEditor({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [isExpanded, mode])
 
-  const isHabit = Boolean((block as { schedule?: { rrule?: string } } | null)?.schedule?.rrule)
-
   const handleDelete = () => {
     if (block) onDelete?.(block.id)
     if (mode === 'overlay') onClose?.()
@@ -245,7 +243,14 @@ export function BlockEditor({
         )}
 
         <BlockBottomBar
-          isHabit={isHabit}
+          // Recurrence ("isHabit") lives on the agenda occurrence shape
+          // (use-agenda-api.ts), not on Block — BlockEditor only ever holds
+          // a Block, so there's no real source for this here yet. The old
+          // computation read a `schedule.rrule` field Block never had (a
+          // shape abandoned in nau#93); dropped rather than left pretending
+          // to work. Wire this once BlockEditor can be opened with agenda
+          // context, or drop the prop if that never happens.
+          isHabit={false}
           onDelete={handleDelete}
           canDelete={!!block}
           onClose={commit}

@@ -2,17 +2,13 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { NoteCard } from './NoteCard'
 import { useDashboardStore } from '@/lib/state/dashboard-store'
-import { useUpdateBlock } from '@/hooks/use-blocks-api'
 import { useDeleteNote } from '@/references/use-notes'
-import { useUpsertPlanning } from '@/hooks/use-schedule-api'
 import { makeBlock } from '@/test/block-fixture'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import React from 'react'
 
 jest.mock('@/lib/state/dashboard-store')
-jest.mock('@/hooks/use-blocks-api')
 jest.mock('@/references/use-notes')
-jest.mock('@/hooks/use-schedule-api')
 jest.mock('@/lib/state/ui-store', () => ({
   useUiStore: () => null,
 }))
@@ -50,8 +46,6 @@ describe('NoteCard', () => {
     // `useMutation` actually produces — `isPending` included — or a click
     // that reads `.isPending` crashes before the assertion under test runs.
     ;(useDeleteNote as jest.Mock).mockReturnValue({ mutate: mockDeleteNote, isPending: false })
-    ;(useUpdateBlock as jest.Mock).mockReturnValue({ mutate: jest.fn(), mutateAsync: jest.fn(), isPending: false })
-    ;(useUpsertPlanning as jest.Mock).mockReturnValue({ mutate: jest.fn(), mutateAsync: jest.fn(), isPending: false })
   })
 
   afterEach(() => {
@@ -90,10 +84,10 @@ describe('NoteCard', () => {
 
   it('should call deleteNote on delete button click', () => {
     render(<NoteCard note={mockNote} />, { wrapper })
-    const menuButton = screen.getByTestId('note-card-menu-button')
+    const menuButton = screen.getByLabelText('Más opciones')
     fireEvent.click(menuButton)
 
-    const deleteButton = screen.getByText('Delete note')
+    const deleteButton = screen.getByText('Eliminar')
     fireEvent.click(deleteButton)
 
     expect(mockDeleteNote).toHaveBeenCalledWith(mockNote.id)
